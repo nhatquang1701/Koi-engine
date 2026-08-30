@@ -155,6 +155,10 @@ std::vector<Move> Position::legal_moves() const {
 }
 
 bool Position::apply_uci(std::string_view uci) {
+    if (!chess::uci::isUciMove(uci)) {
+        return false;
+    }
+
     try {
         const chess::Move move = chess::uci::uciToMove(board_, uci);
         if (move.move() == chess::Move::NO_MOVE || !board_.isLegal(move)) {

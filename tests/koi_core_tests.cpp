@@ -87,6 +87,14 @@ void test_invalid_uci_is_rejected_transactionally() {
     require(position.fen() == original, "rejected UCI move must leave the position unchanged");
 }
 
+void test_malformed_uci_is_rejected_transactionally() {
+    Position position;
+    const std::string original = position.fen();
+
+    require(!position.apply_uci("not-a-move"), "malformed UCI input must be rejected");
+    require(position.fen() == original, "malformed UCI input must leave the position unchanged");
+}
+
 void test_position_fen_matches_the_underlying_board() {
     Position position;
     require(position.apply_uci("e2e4"), "e2e4 must be legal");
@@ -158,6 +166,7 @@ int main() {
         {"malformed FEN rejection", test_malformed_fens_are_rejected_transactionally},
         {"adjacent king rejection", test_adjacent_kings_are_rejected_transactionally},
         {"invalid UCI rejection", test_invalid_uci_is_rejected_transactionally},
+        {"malformed UCI rejection", test_malformed_uci_is_rejected_transactionally},
         {"adapter FEN matches board", test_position_fen_matches_the_underlying_board},
         {"checkmate and stalemate", test_checkmate_and_stalemate_have_no_legal_moves},
         {"random chooser legality", test_random_chooser_returns_a_legal_move},

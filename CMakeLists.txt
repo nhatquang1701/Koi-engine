@@ -10,7 +10,7 @@ if(NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
     message(FATAL_ERROR "Koi Engine v1 requires a 64-bit Windows toolchain")
 endif()
 
-set(CMAKE_CXX_STANDARD 26)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -21,6 +21,7 @@ add_library(koi_core
     src/koi/move.cpp
     src/koi/move_chooser.cpp
     src/koi/position.cpp
+    src/koi/uci_controller.cpp
 )
 
 target_include_directories(koi_core PUBLIC
@@ -35,3 +36,27 @@ add_executable(koi_core_tests
 target_link_libraries(koi_core_tests PRIVATE koi_core)
 
 add_test(NAME koi_core_tests COMMAND koi_core_tests)
+
+add_executable(uci_controller_tests
+    tests/uci_controller_tests.cpp
+)
+
+target_link_libraries(uci_controller_tests PRIVATE koi_core)
+
+add_test(NAME uci_controller_tests COMMAND uci_controller_tests)
+
+add_executable(koi_engine
+    src/main.cpp
+)
+
+target_link_libraries(koi_engine PRIVATE koi_core)
+set_target_properties(koi_engine PROPERTIES OUTPUT_NAME "koi-engine")
+
+find_program(POWERSHELL_EXECUTABLE NAMES powershell REQUIRED)
+
+add_test(
+    NAME koi_engine_process
+    COMMAND ${POWERSHELL_EXECUTABLE} -NoProfile -ExecutionPolicy Bypass -File
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/uci_process_test.ps1"
+            -EnginePath "$<TARGET_FILE:koi_engine>"
+)

@@ -19,6 +19,8 @@ class RandomMoveChooser final : public MoveChooser {
 public:
     explicit RandomMoveChooser(std::uint32_t seed);
 
+    void set_seed(std::uint32_t seed);
+
     [[nodiscard]] Move choose(const Position& position) override;
 
 private:

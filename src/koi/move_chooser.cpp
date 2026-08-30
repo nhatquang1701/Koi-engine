@@ -19,6 +19,10 @@ std::uint32_t runtime_seed() {
 RandomMoveChooser::RandomMoveChooser(std::uint32_t seed)
     : engine_(seed == 0 ? runtime_seed() : seed) {}
 
+void RandomMoveChooser::set_seed(std::uint32_t seed) {
+    engine_.seed(seed == 0 ? runtime_seed() : seed);
+}
+
 Move RandomMoveChooser::choose(const Position& position) {
     const std::vector<Move> moves = position.legal_moves();
     if (moves.empty()) {
