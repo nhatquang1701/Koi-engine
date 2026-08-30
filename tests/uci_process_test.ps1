@@ -20,11 +20,21 @@ function Invoke-UciTranscript([string]$Transcript) {
         throw 'Unable to start koi-engine.'
     }
 
+    $stdoutTask = $process.StandardOutput.ReadToEndAsync()
+    $stderrTask = $process.StandardError.ReadToEndAsync()
     $process.StandardInput.Write($Transcript)
     $process.StandardInput.Close()
-    $output = $process.StandardOutput.ReadToEnd()
-    $diagnostics = $process.StandardError.ReadToEnd()
-    $process.WaitForExit()
+
+    if (-not $process.WaitForExit(5000)) {
+        if (-not $process.HasExited) {
+            $process.Kill()
+        }
+        $process.WaitForExit()
+        throw 'koi-engine did not exit within 5000 ms.'
+    }
+
+    $output = $stdoutTask.GetAwaiter().GetResult()
+    $diagnostics = $stderrTask.GetAwaiter().GetResult()
 
     if ($process.ExitCode -ne 0) {
         throw "koi-engine exited with $($process.ExitCode): $diagnostics"
@@ -36,7 +46,7 @@ function Invoke-UciTranscript([string]$Transcript) {
     return @($output -split "`r?`n" | Where-Object { $_.Length -ne 0 })
 }
 
-$handshake = @(Invoke-UciTranscript "uci`nisready`nposition startpos`ngo`nquit`n")
+$handshake = @(Invoke-UciTranscript "uci`nisready`nposition startpos`ngo`nstop`nquit`n")
 $expectedPrefix = @(
     'id name Koi Engine',
     'id author Koi Engine contributors',

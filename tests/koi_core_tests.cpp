@@ -64,6 +64,8 @@ void test_malformed_fens_are_rejected_transactionally() {
              "8/8/8/8/8/8/8/K6k x - - 0 1",
              "8/8/8/8/8/8/8/K6k w - e4 0 1",
              "8/8/8/8/8/8/8/K6k w - - -1 1",
+             "4k3/8/8/8/8/8/8/4K3 w - - 256 1",
+             "4k3/8/8/8/8/8/8/4K3 w - - 0 32769",
          }) {
         require(!position.set_fen(fen), "malformed or kingless FEN must be rejected");
         require(position.fen() == original, "rejected FEN must leave the position unchanged");
@@ -77,6 +79,30 @@ void test_adjacent_kings_are_rejected_transactionally() {
     require(!position.set_fen("8/8/8/8/8/8/4k3/4K3 w - - 0 1"),
             "FEN with adjacent kings must be rejected");
     require(position.fen() == original, "rejected adjacent-kings FEN must leave the position unchanged");
+}
+
+void test_castling_rights_require_the_standard_pieces() {
+    Position position;
+    const std::string original = position.fen();
+
+    for (std::string_view fen : {
+             "4k3/8/8/8/8/8/8/3K2R1 w K - 0 1",
+             "4k3/8/8/8/8/8/8/R2K4 w Q - 0 1",
+             "r3k3/8/8/8/8/8/8/4K3 b k - 0 1",
+             "3rk3/8/8/8/8/8/8/4K3 b q - 0 1",
+         }) {
+        require(!position.set_fen(fen), "castling rights must require the matching king and rook");
+        require(position.fen() == original, "rejected castling FEN must leave the position unchanged");
+    }
+}
+
+void test_impossible_triple_check_is_rejected_transactionally() {
+    Position position;
+    const std::string original = position.fen();
+
+    require(!position.set_fen("k3r3/8/8/8/1b6/8/2n5/4K3 w - - 0 1"),
+            "a triple-check FEN must be rejected before move generation");
+    require(position.fen() == original, "rejected triple-check FEN must leave the position unchanged");
 }
 
 void test_invalid_uci_is_rejected_transactionally() {
@@ -165,6 +191,8 @@ int main() {
         {"special moves", test_special_move_positions_accept_valid_uci_moves},
         {"malformed FEN rejection", test_malformed_fens_are_rejected_transactionally},
         {"adjacent king rejection", test_adjacent_kings_are_rejected_transactionally},
+        {"castling-rights validation", test_castling_rights_require_the_standard_pieces},
+        {"triple-check rejection", test_impossible_triple_check_is_rejected_transactionally},
         {"invalid UCI rejection", test_invalid_uci_is_rejected_transactionally},
         {"malformed UCI rejection", test_malformed_uci_is_rejected_transactionally},
         {"adapter FEN matches board", test_position_fen_matches_the_underlying_board},

@@ -10,6 +10,14 @@ namespace koi {
 
 namespace {
 
+struct FenLayout {
+    std::array<char, 64> squares{};
+    int white_king_square = -1;
+    int black_king_square = -1;
+    int white_kings = 0;
+    int black_kings = 0;
+};
+
 bool split_fen_fields(std::string_view fen, std::array<std::string_view, 6>& fields) {
     std::size_t offset = 0;
     std::size_t count = 0;
@@ -35,36 +43,35 @@ bool split_fen_fields(std::string_view fen, std::array<std::string_view, 6>& fie
     return count == fields.size();
 }
 
-bool valid_piece_placement(std::string_view placement) {
-    int rank_count = 1;
+bool valid_piece_placement(std::string_view placement, FenLayout& layout) {
+    layout = {};
+    int rank = 7;
     int width = 0;
-    int white_kings = 0;
-    int black_kings = 0;
-    int white_king_rank = -1;
-    int white_king_file = -1;
-    int black_king_rank = -1;
-    int black_king_file = -1;
 
     for (const char character : placement) {
         if (character == '/') {
-            if (width != 8 || rank_count == 8) {
+            if (width != 8 || rank == 0) {
                 return false;
             }
-            ++rank_count;
+            --rank;
             width = 0;
         } else if (character >= '1' && character <= '8') {
             width += character - '0';
         } else if (std::string_view("PNBRQKpnbrqk").find(character) != std::string_view::npos) {
+            if (width >= 8 || rank < 0) {
+                return false;
+            }
+
+            const int square = rank * 8 + width;
+            layout.squares[static_cast<std::size_t>(square)] = character;
             if (character == 'K') {
-                white_king_rank = rank_count - 1;
-                white_king_file = width;
+                layout.white_king_square = square;
+                ++layout.white_kings;
             } else if (character == 'k') {
-                black_king_rank = rank_count - 1;
-                black_king_file = width;
+                layout.black_king_square = square;
+                ++layout.black_kings;
             }
             ++width;
-            white_kings += character == 'K';
-            black_kings += character == 'k';
         } else {
             return false;
         }
@@ -74,15 +81,19 @@ bool valid_piece_placement(std::string_view placement) {
         }
     }
 
+    const int white_king_rank = layout.white_king_square / 8;
+    const int white_king_file = layout.white_king_square % 8;
+    const int black_king_rank = layout.black_king_square / 8;
+    const int black_king_file = layout.black_king_square % 8;
     const int rank_distance = white_king_rank - black_king_rank;
     const int file_distance = white_king_file - black_king_file;
     const bool adjacent_kings = rank_distance >= -1 && rank_distance <= 1 && file_distance >= -1 &&
                                 file_distance <= 1;
 
-    return rank_count == 8 && width == 8 && white_kings == 1 && black_kings == 1 && !adjacent_kings;
+    return rank == 0 && width == 8 && layout.white_kings == 1 && layout.black_kings == 1 && !adjacent_kings;
 }
 
-bool valid_castling(std::string_view castling) {
+bool valid_castling(std::string_view castling, const FenLayout& layout) {
     if (castling == "-") {
         return true;
     }
@@ -98,7 +109,11 @@ bool valid_castling(std::string_view castling) {
         }
     }
 
-    return true;
+    const auto piece_at = [&layout](int square) { return layout.squares[static_cast<std::size_t>(square)]; };
+    return (!castling.contains('K') || (piece_at(4) == 'K' && piece_at(7) == 'R')) &&
+           (!castling.contains('Q') || (piece_at(4) == 'K' && piece_at(0) == 'R')) &&
+           (!castling.contains('k') || (piece_at(60) == 'k' && piece_at(63) == 'r')) &&
+           (!castling.contains('q') || (piece_at(60) == 'k' && piece_at(56) == 'r'));
 }
 
 bool valid_en_passant(std::string_view en_passant, std::string_view side_to_move) {
@@ -114,18 +129,31 @@ bool valid_en_passant(std::string_view en_passant, std::string_view side_to_move
            (side_to_move == "b" && en_passant[1] == '3');
 }
 
-bool valid_counter(std::string_view counter, bool allow_zero) {
+bool valid_counter(std::string_view counter, bool allow_zero, std::uint32_t maximum) {
     std::uint32_t value = 0;
     const auto [end, error] = std::from_chars(counter.data(), counter.data() + counter.size(), value);
-    return error == std::errc{} && end == counter.data() + counter.size() && (allow_zero || value > 0);
+    return error == std::errc{} && end == counter.data() + counter.size() && (allow_zero || value > 0) &&
+           value <= maximum;
 }
 
 bool valid_fen(std::string_view fen) {
     std::array<std::string_view, 6> fields{};
-    return split_fen_fields(fen, fields) && valid_piece_placement(fields[0]) &&
-           (fields[1] == "w" || fields[1] == "b") && valid_castling(fields[2]) &&
-           valid_en_passant(fields[3], fields[1]) && valid_counter(fields[4], true) &&
-           valid_counter(fields[5], false);
+    FenLayout layout;
+    return split_fen_fields(fen, fields) && valid_piece_placement(fields[0], layout) &&
+           (fields[1] == "w" || fields[1] == "b") && valid_castling(fields[2], layout) &&
+           valid_en_passant(fields[3], fields[1]) && valid_counter(fields[4], true, 255) &&
+           valid_counter(fields[5], false, 32768);
+}
+
+bool valid_check_counts(const chess::Board& board) {
+    for (const chess::Color color : {chess::Color::WHITE, chess::Color::BLACK}) {
+        const chess::Square king = board.kingSq(color);
+        if (chess::attacks::attackers(board, ~color, king).count() > 2) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 } // namespace
@@ -179,6 +207,9 @@ bool Position::set_fen(std::string_view fen) {
 
     chess::Board candidate;
     if (!candidate.setFen(fen)) {
+        return false;
+    }
+    if (!valid_check_counts(candidate)) {
         return false;
     }
 
