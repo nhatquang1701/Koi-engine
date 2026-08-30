@@ -1,6 +1,5 @@
 #pragma once
 
-#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -24,7 +23,6 @@ public:
 
 private:
     chess::Board board_{};
-    std::optional<std::string> fen_override_;
 };
 
 } // namespace koi

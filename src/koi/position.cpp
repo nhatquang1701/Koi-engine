@@ -1,21 +1,115 @@
 #include "koi/position.hpp"
 
+#include <array>
+#include <charconv>
+#include <cctype>
+#include <cstdint>
 #include <stdexcept>
-#include <string>
 
 namespace koi {
 
 namespace {
 
-std::string with_black_double_pawn_target(const chess::Board& board, const chess::Move& move) {
-    const std::string uci = chess::uci::moveToUci(move);
-    const std::string target{uci[2], static_cast<char>((uci[1] + uci[3]) / 2)};
-    std::string fen = board.getFen();
+bool split_fen_fields(std::string_view fen, std::array<std::string_view, 6>& fields) {
+    std::size_t offset = 0;
+    std::size_t count = 0;
 
-    const std::size_t en_passant_begin = fen.find(' ', fen.find(' ', fen.find(' ') + 1) + 1) + 1;
-    const std::size_t en_passant_end = fen.find(' ', en_passant_begin);
-    fen.replace(en_passant_begin, en_passant_end - en_passant_begin, target);
-    return fen;
+    while (offset < fen.size()) {
+        while (offset < fen.size() && std::isspace(static_cast<unsigned char>(fen[offset]))) {
+            ++offset;
+        }
+        if (offset == fen.size()) {
+            break;
+        }
+        if (count == fields.size()) {
+            return false;
+        }
+
+        const std::size_t start = offset;
+        while (offset < fen.size() && !std::isspace(static_cast<unsigned char>(fen[offset]))) {
+            ++offset;
+        }
+        fields[count++] = fen.substr(start, offset - start);
+    }
+
+    return count == fields.size();
+}
+
+bool valid_piece_placement(std::string_view placement) {
+    int rank_count = 1;
+    int width = 0;
+    int white_kings = 0;
+    int black_kings = 0;
+
+    for (const char character : placement) {
+        if (character == '/') {
+            if (width != 8 || rank_count == 8) {
+                return false;
+            }
+            ++rank_count;
+            width = 0;
+        } else if (character >= '1' && character <= '8') {
+            width += character - '0';
+        } else if (std::string_view("PNBRQKpnbrqk").find(character) != std::string_view::npos) {
+            ++width;
+            white_kings += character == 'K';
+            black_kings += character == 'k';
+        } else {
+            return false;
+        }
+
+        if (width > 8) {
+            return false;
+        }
+    }
+
+    return rank_count == 8 && width == 8 && white_kings == 1 && black_kings == 1;
+}
+
+bool valid_castling(std::string_view castling) {
+    if (castling == "-") {
+        return true;
+    }
+
+    if (castling.empty() || castling.size() > 4) {
+        return false;
+    }
+
+    for (std::size_t index = 0; index < castling.size(); ++index) {
+        if (std::string_view("KQkq").find(castling[index]) == std::string_view::npos ||
+            castling.find(castling[index], index + 1) != std::string_view::npos) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool valid_en_passant(std::string_view en_passant, std::string_view side_to_move) {
+    if (en_passant == "-") {
+        return true;
+    }
+
+    if (en_passant.size() != 2 || en_passant[0] < 'a' || en_passant[0] > 'h') {
+        return false;
+    }
+
+    return (side_to_move == "w" && en_passant[1] == '6') ||
+           (side_to_move == "b" && en_passant[1] == '3');
+}
+
+bool valid_counter(std::string_view counter, bool allow_zero) {
+    std::uint32_t value = 0;
+    const auto [end, error] = std::from_chars(counter.data(), counter.data() + counter.size(), value);
+    return error == std::errc{} && end == counter.data() + counter.size() && (allow_zero || value > 0);
+}
+
+bool valid_fen(std::string_view fen) {
+    std::array<std::string_view, 6> fields{};
+    return split_fen_fields(fen, fields) && valid_piece_placement(fields[0]) &&
+           (fields[1] == "w" || fields[1] == "b") && valid_castling(fields[2]) &&
+           valid_en_passant(fields[3], fields[1]) && valid_counter(fields[4], true) &&
+           valid_counter(fields[5], false);
 }
 
 } // namespace
@@ -29,7 +123,7 @@ Position::Position(std::string_view fen) {
 }
 
 std::string Position::fen() const {
-    return fen_override_.value_or(board_.getFen());
+    return board_.getFen();
 }
 
 std::vector<Move> Position::legal_moves() const {
@@ -51,16 +145,7 @@ bool Position::apply_uci(std::string_view uci) {
             return false;
         }
 
-        const bool is_black_double_pawn_push =
-            board_.sideToMove() == chess::Color::BLACK &&
-            board_.at(move.from()).type() == chess::PieceType::PAWN &&
-            move.from().file() == move.to().file() &&
-            move.from().index() - move.to().index() == 16;
         board_.makeMove(move);
-        fen_override_.reset();
-        if (is_black_double_pawn_push) {
-            fen_override_ = with_black_double_pawn_target(board_, move);
-        }
         return true;
     } catch (...) {
         return false;
@@ -68,13 +153,16 @@ bool Position::apply_uci(std::string_view uci) {
 }
 
 bool Position::set_fen(std::string_view fen) {
+    if (!valid_fen(fen)) {
+        return false;
+    }
+
     chess::Board candidate;
     if (!candidate.setFen(fen)) {
         return false;
     }
 
     board_ = std::move(candidate);
-    fen_override_.reset();
     return true;
 }
 

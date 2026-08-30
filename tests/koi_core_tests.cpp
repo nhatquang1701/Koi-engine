@@ -46,12 +46,45 @@ void test_legal_uci_sequence_updates_position() {
             "e2e4 must update the position");
 
     position.apply_uci("e7e5");
-    require(position.fen() == "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e6 0 2",
+    require(position.fen() == "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2",
             "e7e5 must update the position");
 
     position.apply_uci("g1f3");
     require(position.fen() == "rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2",
             "g1f3 must update the position");
+}
+
+void test_malformed_fens_are_rejected_transactionally() {
+    Position position;
+    const std::string original = position.fen();
+
+    for (std::string_view fen : {
+             "8",
+             "8/8/8/8/8/8/8/8 w - - 0 1",
+             "8/8/8/8/8/8/8/K6k x - - 0 1",
+             "8/8/8/8/8/8/8/K6k w - e4 0 1",
+             "8/8/8/8/8/8/8/K6k w - - -1 1",
+         }) {
+        require(!position.set_fen(fen), "malformed or kingless FEN must be rejected");
+        require(position.fen() == original, "rejected FEN must leave the position unchanged");
+    }
+}
+
+void test_invalid_uci_is_rejected_transactionally() {
+    Position position;
+    const std::string original = position.fen();
+
+    require(!position.apply_uci("e2e5"), "illegal UCI move must be rejected");
+    require(position.fen() == original, "rejected UCI move must leave the position unchanged");
+}
+
+void test_position_fen_matches_the_underlying_board() {
+    Position position;
+    require(position.apply_uci("e2e4"), "e2e4 must be legal");
+    require(position.apply_uci("e7e5"), "e7e5 must be legal");
+
+    require(position.fen() == position.board().getFen(),
+            "adapter FEN must match the underlying board FEN");
 }
 
 void test_special_move_positions_accept_valid_uci_moves() {
@@ -113,6 +146,9 @@ int main() {
         {"default position", test_default_position_has_initial_fen_and_twenty_moves},
         {"legal UCI sequence", test_legal_uci_sequence_updates_position},
         {"special moves", test_special_move_positions_accept_valid_uci_moves},
+        {"malformed FEN rejection", test_malformed_fens_are_rejected_transactionally},
+        {"invalid UCI rejection", test_invalid_uci_is_rejected_transactionally},
+        {"adapter FEN matches board", test_position_fen_matches_the_underlying_board},
         {"checkmate and stalemate", test_checkmate_and_stalemate_have_no_legal_moves},
         {"random chooser legality", test_random_chooser_returns_a_legal_move},
         {"seeded chooser repeatability", test_seeded_choosers_are_repeatable},
