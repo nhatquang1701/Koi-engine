@@ -39,9 +39,10 @@ int UciController::run() {
             output_ << "id name Koi Engine\n"
                        "id author Koi Engine contributors\n"
                        "option name RandomSeed type spin default 0 min 0 max 2147483647\n"
-                       "uciok\n";
+                       "uciok\n"
+                    << std::flush;
         } else if (name == "isready") {
-            output_ << "readyok\n";
+            output_ << "readyok\n" << std::flush;
         } else if (name == "ucinewgame") {
             position_ = Position{};
         } else if (name == "position") {
@@ -121,11 +122,11 @@ void UciController::handle_setoption(std::istream& command) {
 }
 
 void UciController::write_bestmove() {
-    output_ << "bestmove " << chooser_.choose(position_).uci() << '\n';
+    output_ << "bestmove " << chooser_.choose(position_).uci() << '\n' << std::flush;
 }
 
 void UciController::write_position_error(const char* message) {
-    output_ << "info string " << message << '\n';
+    output_ << "info string " << message << '\n' << std::flush;
     diagnostics_ << "UCI position error: " << message << '\n';
 }
 

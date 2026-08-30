@@ -51,6 +51,21 @@ bool is_legal_move(const Position& position, std::string_view uci) {
     return false;
 }
 
+class FlushTrackingBuffer final : public std::stringbuf {
+public:
+    int sync() override {
+        ++sync_count_;
+        return std::stringbuf::sync();
+    }
+
+    [[nodiscard]] int sync_count() const noexcept {
+        return sync_count_;
+    }
+
+private:
+    int sync_count_ = 0;
+};
+
 void test_uci_handshake_has_the_required_order() {
     const ControllerResult result = run_controller("uci\nquit\n");
 
@@ -176,6 +191,23 @@ void test_protocol_output_contains_only_uci_responses() {
     }
 }
 
+void test_protocol_responses_flush_promptly() {
+    std::istringstream input(
+        "uci\n"
+        "isready\n"
+        "position startpos moves not-a-move\n"
+        "go\n"
+        "quit\n");
+    FlushTrackingBuffer output_buffer;
+    std::ostream output(&output_buffer);
+    std::ostringstream diagnostics;
+    UciController controller(input, output, diagnostics);
+
+    require(controller.run() == 0, "flush test transcript must shut down normally");
+    require(output_buffer.sync_count() == 4,
+            "handshake, readyok, info-string errors, and bestmove must each flush promptly");
+}
+
 struct TestCase {
     std::string_view name;
     void (*run)();
@@ -194,6 +226,7 @@ int main() {
         {"terminal 0000", test_terminal_position_returns_0000},
         {"unknown stop quit", test_unknown_stop_and_blank_commands_are_quiet_and_quit},
         {"protocol-clean output", test_protocol_output_contains_only_uci_responses},
+        {"promptly flushed responses", test_protocol_responses_flush_promptly},
     };
 
     for (const TestCase& test : tests) {
