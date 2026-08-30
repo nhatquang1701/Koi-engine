@@ -7,15 +7,18 @@ search-strength engine.
 
 ## Build prerequisites
 
-- A C++26-capable MSVC toolchain (the current CMake configuration selects
-  Visual Studio's `/std:c++latest` compiler mode).
+- A C++26-capable x64 MSVC toolchain (the current CMake configuration selects
+  Visual Studio's `/std:c++latest` compiler mode). Run CMake from an x64
+  Native Tools Command Prompt or x64 Developer PowerShell for Visual Studio,
+  so `cl.exe` is selected; the currently available MinGW/GCC/Clang toolchains
+  do not meet the C++26 requirement.
 - CMake 3.31 or newer.
 - Ninja.
 
-From a PowerShell prompt in the repository root:
+From an x64 Visual Studio developer shell in the repository root:
 
 ```powershell
-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=cl
 cmake --build build --config Release
 ```
 
@@ -51,6 +54,7 @@ notation `bestmove` from the starting position (for example, `bestmove e2e4`).
   choice.
 - `go` chooses and reports one legal move immediately; search limits are not
   used by this v1 placeholder.
+- `stop` is accepted as a no-op because `go` completes immediately in v1.
 - A terminal position with no legal moves returns `bestmove 0000`.
 - `quit` exits the process.
 
