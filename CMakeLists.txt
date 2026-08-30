@@ -17,12 +17,21 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 include(CTest)
 enable_testing()
 
+add_library(koi_core
+    src/koi/move.cpp
+    src/koi/move_chooser.cpp
+    src/koi/position.cpp
+)
+
+target_include_directories(koi_core PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/chess-library
+)
+
 add_executable(koi_core_tests
     tests/koi_core_tests.cpp
 )
 
-target_include_directories(koi_core_tests PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/src
-)
+target_link_libraries(koi_core_tests PRIVATE koi_core)
 
 add_test(NAME koi_core_tests COMMAND koi_core_tests)
