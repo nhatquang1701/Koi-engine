@@ -1,4 +1,3 @@
-#include <cstdint>
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -11,7 +10,6 @@
 namespace {
 
 using koi::Move;
-using koi::MoveChooser;
 using koi::Position;
 using koi::RandomMoveChooser;
 
@@ -60,14 +58,20 @@ void test_special_move_positions_accept_valid_uci_moves() {
     Position castling("r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1");
     require(contains_uci_move(castling, "e1g1"), "castling position must expose kingside castling");
     castling.apply_uci("e1g1");
+    require(castling.fen() == "r3k2r/8/8/8/8/8/8/R4RK1 b kq - 1 1",
+            "castling must move the rook and remove white castling rights");
 
     Position en_passant("rnbqkbnr/pppp1ppp/8/3Pp3/8/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 2");
     require(contains_uci_move(en_passant, "d5e6"), "en passant position must expose the valid capture");
     en_passant.apply_uci("d5e6");
+    require(en_passant.fen() == "rnbqkbnr/pppp1ppp/4P3/8/8/8/PPP1PPPP/RNBQKBNR b KQkq - 0 2",
+            "en passant must remove the captured pawn and clear the en passant square");
 
     Position promotion("4k3/P7/8/8/8/8/8/4K3 w - - 0 1");
     require(contains_uci_move(promotion, "a7a8q"), "promotion position must expose a queen promotion");
     promotion.apply_uci("a7a8q");
+    require(promotion.fen() == "Q3k3/8/8/8/8/8/8/4K3 b - - 0 1",
+            "promotion must replace the pawn with a queen and preserve castling rights as none");
 }
 
 void test_checkmate_and_stalemate_have_no_legal_moves() {
