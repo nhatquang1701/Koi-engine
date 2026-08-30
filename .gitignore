@@ -1,0 +1,10 @@
+.superpowers/sdd/
+build/
+out/
+*.user
+*.suo
+*.pdb
+*.ilk
+*.exe
+*.dll
+
