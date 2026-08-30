@@ -70,6 +70,15 @@ void test_malformed_fens_are_rejected_transactionally() {
     }
 }
 
+void test_adjacent_kings_are_rejected_transactionally() {
+    Position position;
+    const std::string original = position.fen();
+
+    require(!position.set_fen("8/8/8/8/8/8/4k3/4K3 w - - 0 1"),
+            "FEN with adjacent kings must be rejected");
+    require(position.fen() == original, "rejected adjacent-kings FEN must leave the position unchanged");
+}
+
 void test_invalid_uci_is_rejected_transactionally() {
     Position position;
     const std::string original = position.fen();
@@ -147,6 +156,7 @@ int main() {
         {"legal UCI sequence", test_legal_uci_sequence_updates_position},
         {"special moves", test_special_move_positions_accept_valid_uci_moves},
         {"malformed FEN rejection", test_malformed_fens_are_rejected_transactionally},
+        {"adjacent king rejection", test_adjacent_kings_are_rejected_transactionally},
         {"invalid UCI rejection", test_invalid_uci_is_rejected_transactionally},
         {"adapter FEN matches board", test_position_fen_matches_the_underlying_board},
         {"checkmate and stalemate", test_checkmate_and_stalemate_have_no_legal_moves},

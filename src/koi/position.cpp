@@ -40,6 +40,10 @@ bool valid_piece_placement(std::string_view placement) {
     int width = 0;
     int white_kings = 0;
     int black_kings = 0;
+    int white_king_rank = -1;
+    int white_king_file = -1;
+    int black_king_rank = -1;
+    int black_king_file = -1;
 
     for (const char character : placement) {
         if (character == '/') {
@@ -51,6 +55,13 @@ bool valid_piece_placement(std::string_view placement) {
         } else if (character >= '1' && character <= '8') {
             width += character - '0';
         } else if (std::string_view("PNBRQKpnbrqk").find(character) != std::string_view::npos) {
+            if (character == 'K') {
+                white_king_rank = rank_count - 1;
+                white_king_file = width;
+            } else if (character == 'k') {
+                black_king_rank = rank_count - 1;
+                black_king_file = width;
+            }
             ++width;
             white_kings += character == 'K';
             black_kings += character == 'k';
@@ -63,7 +74,12 @@ bool valid_piece_placement(std::string_view placement) {
         }
     }
 
-    return rank_count == 8 && width == 8 && white_kings == 1 && black_kings == 1;
+    const int rank_distance = white_king_rank - black_king_rank;
+    const int file_distance = white_king_file - black_king_file;
+    const bool adjacent_kings = rank_distance >= -1 && rank_distance <= 1 && file_distance >= -1 &&
+                                file_distance <= 1;
+
+    return rank_count == 8 && width == 8 && white_kings == 1 && black_kings == 1 && !adjacent_kings;
 }
 
 bool valid_castling(std::string_view castling) {
