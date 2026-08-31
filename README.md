@@ -51,6 +51,7 @@ From the configured build directory:
 .\out\release-vs\koi-perft.exe 4
 .\out\release-vs\koi-bench.exe
 .\out\release-vs\koi-bench.exe --threads 4 --speed 100 --timed
+.\out\release-vs\koi-replay.exe startpos moves e2e4 e7e5 g1f3
 ```
 
 `koi-perft` counts legal nodes from the standard starting position at the given
@@ -58,6 +59,12 @@ non-negative depth. `koi-bench` runs fixed-depth tactical positions and writes o
 deterministic benchmark report to its own stdout by default. `--threads` and
 `--speed` select a benchmark configuration; `--timed` adds wall-clock timing
 fields. It is a separate process and never writes to the UCI engine's stdout.
+
+`koi-replay` is a separate rules-boundary tool for replaying coordinate moves without
+exposing the vendored chess library. Give it `startpos` or `fen <six-field FEN>`, then
+an optional `moves` list. Its stable stdout reports `legal`, `result`, `termination`,
+and the final six-field `fen`; an illegal move leaves the reported position at the
+last legal state. It is useful for reproducing a match-ply or validating a UCI log.
 
 For a reproducible local match against Stockfish or another UCI engine, use the
 optional PowerShell harness:
@@ -70,14 +77,18 @@ optional PowerShell harness:
   -OutputDirectory .\match-results
 ```
 
-The harness records both engines' UCI handshakes and options, each position
-command and FEN, every `go` limit, parsed per-move evaluations, node/time
-counters, and the resulting coordinate-move PGN log in matching `.json` and
-`.pgn` files. Use `-MovetimeMs` or `-Nodes` instead of `-Depth` for those
-limits. To run a named FEN suite, pass `-FenFile` containing one entry per
-line in the form `name | six-field FEN` (blank lines and `#` comments are
-ignored). The PGN file declares its `MoveFormat` as UCI coordinate notation so
-the exact moves can be replayed with `position fen ... moves ...`.
+The harness writes a `koi-uci-match-v2` JSON report plus matching `.pgn`. It records
+both engines' UCI handshakes and options; every ply's actual root FEN, exact
+`position` and `go` commands, engine label, returned move, replay legality, timing,
+parsed final info/PV, all info lines, and raw `bestmove`; and each game's adjudicated
+result, winner, termination, and process status. Moves are replay-validated before
+they are appended, so illegal moves and non-terminal `0000` replies end only that game
+without contaminating later positions. PGN Result headers match the adjudicated result
+(`*` for max-ply games) and retain the `MoveFormat` header. Use `-MovetimeMs` or
+`-Nodes` instead of `-Depth` for those limits. To run a named FEN suite, pass
+`-FenFile` containing one entry per line in the form `name | six-field FEN` (blank
+lines and `#` comments are ignored). The replay executable is expected beside
+`koi-engine.exe` (or can be supplied as `-ReplayPath`).
 
 ## UCI smoke test
 

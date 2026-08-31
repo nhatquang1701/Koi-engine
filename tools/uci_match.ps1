@@ -6,6 +6,8 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$OpponentPath,
 
+    [string]$ReplayPath,
+
     [string]$FenFile,
 
     [string]$OutputDirectory = (Join-Path (Get-Location) 'match-results'),
@@ -125,19 +127,22 @@ function Send-UciLine($Engine, [string]$Command) {
 
 function Stop-UciEngine($Engine) {
     if ($null -eq $Engine) {
-        return ''
+        return [pscustomobject]@{ status = 'process exit'; exit_code = $null; stderr = '' }
     }
 
+    $status = 'clean shutdown'
     if (-not $Engine.Process.HasExited) {
         try {
             Send-UciLine $Engine 'quit'
         } catch {
+            $status = 'process exit'
         }
         try {
             $Engine.Process.StandardInput.Close()
         } catch {
         }
         if (-not $Engine.Process.WaitForExit($TimeoutMilliseconds)) {
+            $status = 'timeout'
             try {
                 $Engine.Process.Kill()
                 $Engine.Process.WaitForExit()
@@ -146,18 +151,22 @@ function Stop-UciEngine($Engine) {
         }
     }
 
-    try {
-        return $Engine.StderrTask.GetAwaiter().GetResult()
-    } catch {
-        return ''
+    $exitCode = $Engine.Process.ExitCode
+    if ($status -eq 'clean shutdown' -and $exitCode -ne 0) {
+        $status = 'process exit'
     }
+    $stderr = ''
+    try {
+        $stderr = $Engine.StderrTask.GetAwaiter().GetResult()
+    } catch {
+    }
+    return [pscustomobject]@{ status = $status; exit_code = $exitCode; stderr = $stderr }
 }
 
 function Read-UciLine($Engine, [string]$Description) {
     $readTask = $Engine.Process.StandardOutput.ReadLineAsync()
     if (-not $readTask.Wait($TimeoutMilliseconds)) {
-        Stop-UciEngine $Engine | Out-Null
-        throw "Timed out waiting for ${Engine.Label} ${Description}."
+        throw [System.TimeoutException]::new("Timed out waiting for ${Engine.Label} ${Description}.")
     }
 
     $line = $readTask.GetAwaiter().GetResult()
@@ -236,6 +245,7 @@ function Parse-InfoLine([string]$Line) {
     $nodesMatch = [regex]::Match($Line, '(?:^|\s)nodes\s+(\d+)')
     $npsMatch = [regex]::Match($Line, '(?:^|\s)nps\s+(\d+)')
     $timeMatch = [regex]::Match($Line, '(?:^|\s)time\s+(\d+)')
+    $pvMatch = [regex]::Match($Line, '(?:^|\s)pv\s+(.+)$')
 
     return [pscustomobject][ordered]@{
         depth = if ($depthMatch.Success) { [int]$depthMatch.Groups[1].Value } else { $null }
@@ -245,6 +255,7 @@ function Parse-InfoLine([string]$Line) {
         nodes = if ($nodesMatch.Success) { [uint64]$nodesMatch.Groups[1].Value } else { $null }
         nps = if ($npsMatch.Success) { [uint64]$npsMatch.Groups[1].Value } else { $null }
         time_ms = if ($timeMatch.Success) { [int64]$timeMatch.Groups[1].Value } else { $null }
+        pv = if ($pvMatch.Success) { @($pvMatch.Groups[1].Value.Trim() -split '\s+') } else { @() }
         raw = $Line
     }
 }
@@ -274,10 +285,6 @@ function Search-UciEngine($Engine, $Position, $Moves) {
     }
     $started.Stop()
 
-    if ($bestMove -ne '0000' -and $bestMove -notmatch '^[a-h][1-8][a-h][1-8][nbrq]?$') {
-        throw "${Engine.Label} returned an invalid coordinate move: $bestMoveLine"
-    }
-
     $lastInfo = $null
     if ($infos.Count -gt 0) {
         $lastInfo = $infos[$infos.Count - 1]
@@ -289,6 +296,62 @@ function Search-UciEngine($Engine, $Position, $Moves) {
         evaluation = $lastInfo
         infos = @($infos)
         bestmove_line = $bestMoveLine
+    }
+}
+
+function Invoke-KoiReplay([string]$Fen, [string[]]$Moves = @()) {
+    [string[]]$replayArguments = if ($Fen -ceq 'startpos') { @('startpos') } else { @('fen', $Fen) }
+    if ($Moves.Count -gt 0) {
+        $replayArguments += 'moves'
+        $replayArguments += $Moves
+    }
+    $output = & $replayExecutable @replayArguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "koi-replay exited with ${LASTEXITCODE}: $($output -join ' | ')"
+    }
+
+    $fields = @{}
+    foreach ($line in @($output)) {
+        $parts = $line -split ' ', 2
+        if ($parts.Count -eq 2) {
+            $fields[$parts[0]] = $parts[1]
+        }
+    }
+    foreach ($field in @('legal', 'result', 'termination', 'fen')) {
+        if (-not $fields.ContainsKey($field)) {
+            throw "koi-replay omitted '$field': $($output -join ' | ')"
+        }
+    }
+    if ($fields.legal -notin @('0', '1')) {
+        throw "koi-replay returned invalid legality '$($fields.legal)'."
+    }
+    return [pscustomobject]@{
+        legal = ($fields.legal -eq '1')
+        result = $fields.result
+        termination = $fields.termination
+        fen = $fields.fen
+    }
+}
+
+function Get-SideFromFen([string]$Fen) {
+    return ($Fen -split '\s+')[1]
+}
+
+function Get-Winner([string]$Result) {
+    if ($Result -ceq '1-0') {
+        return 'white'
+    }
+    if ($Result -ceq '0-1') {
+        return 'black'
+    }
+    return $null
+}
+
+function Set-EngineProcessStatus($Status, $Engine, [string]$Value) {
+    if ($Engine.Label -ceq 'Koi') {
+        $Status.koi = $Value
+    } else {
+        $Status.opponent = $Value
     }
 }
 
@@ -321,7 +384,7 @@ function Format-Pgn($Position, $Game, [string]$WhiteName, [string]$BlackName, [s
     $headers.Add(('[Round "{0}"]' -f $Game.round))
     $headers.Add(('[White "{0}"]' -f (Get-PgnHeaderValue $WhiteName)))
     $headers.Add(('[Black "{0}"]' -f (Get-PgnHeaderValue $BlackName)))
-    $headers.Add('[Result "*"]')
+    $headers.Add(('[Result "{0}"]' -f $Game.result))
     $headers.Add('[MoveFormat "UCI coordinate notation"]')
     $headers.Add(('[TimeControl "{0}"]' -f (Get-PgnHeaderValue $TimeControl)))
     if ($Position.Fen -cne 'startpos') {
@@ -348,12 +411,14 @@ function Format-Pgn($Position, $Game, [string]$WhiteName, [string]$BlackName, [s
         }
         $previousSide = $move.side
     }
-    $moveTokens.Add('*')
+    $moveTokens.Add($Game.result)
     return (($headers -join "`r`n") + "`r`n`r`n" + ($moveTokens -join ' ') + "`r`n")
 }
 
 $koiExecutable = Resolve-Executable $KoiPath 'Koi'
 $opponentExecutable = Resolve-Executable $OpponentPath 'opponent'
+$defaultReplayPath = Join-Path (Split-Path -Parent $koiExecutable) 'koi-replay.exe'
+$replayExecutable = Resolve-Executable $(if ([string]::IsNullOrWhiteSpace($ReplayPath)) { $defaultReplayPath } else { $ReplayPath }) 'koi-replay'
 $positions = Read-PositionSpecs
 $KoiColor = $KoiColor.ToLowerInvariant()
 $maximumThreads = [Math]::Max(1, [Math]::Min(64, [Environment]::ProcessorCount))
@@ -366,8 +431,8 @@ $timeControl = if ($MovetimeMs -gt 0) { "movetime $MovetimeMs" } elseif ($Nodes 
 
 $koiEngine = $null
 $opponentEngine = $null
-$koiStderr = ''
-$opponentStderr = ''
+$koiStop = [pscustomobject]@{ status = 'process exit'; exit_code = $null; stderr = '' }
+$opponentStop = [pscustomobject]@{ status = 'process exit'; exit_code = $null; stderr = '' }
 $gameRecords = [System.Collections.Generic.List[object]]::new()
 $pgnGames = [System.Collections.Generic.List[string]]::new()
 
@@ -384,38 +449,82 @@ try {
             Wait-UciReady $koiEngine 'new-game readyok'
             Wait-UciReady $opponentEngine 'new-game readyok'
 
-            $initialSide = Get-InitialSide $position.Fen
             $moves = [System.Collections.Generic.List[string]]::new()
             $moveRecords = [System.Collections.Generic.List[object]]::new()
-            $termination = 'ply limit'
+            $replay = Invoke-KoiReplay $position.Fen
+            $rootFen = $replay.fen
+            $result = $replay.result
+            $termination = if ($result -ne '*') { $replay.termination } else { $null }
+            $processStatus = [pscustomobject][ordered]@{ koi = 'running'; opponent = 'running' }
 
             for ($ply = 0; $ply -lt $MaxPlies; ++$ply) {
-                $side = Get-SideForPly $initialSide $ply
+                if ($null -ne $termination) {
+                    break
+                }
+                $side = Get-SideFromFen $rootFen
                 $koiTurn = ($side -ceq 'w' -and $KoiColor -ceq 'white') -or
                     ($side -ceq 'b' -and $KoiColor -ceq 'black')
                 $engine = if ($koiTurn) { $koiEngine } else { $opponentEngine }
                 $positionCommand = Format-PositionCommand $position $moves
-                $search = Search-UciEngine $engine $position $moves
+                try {
+                    $search = Search-UciEngine $engine $position $moves
+                } catch {
+                    $termination = if ($_.Exception -is [System.TimeoutException]) { 'timeout' } else { 'process exit' }
+                    $result = '*'
+                    Set-EngineProcessStatus $processStatus $engine $termination
+                    break
+                }
                 $record = [ordered]@{
                     ply = $ply + 1
+                    root_fen = $rootFen
                     side = $side
                     engine = $engine.Name
-                    position_fen = $position.Fen
+                    engine_label = $engine.Label
                     position_command = $positionCommand
                     go_command = $search.go_command
                     move = $search.move
+                    replay_legal = $false
                     elapsed_ms = $search.elapsed_ms
+                    final_info = $search.evaluation
                     evaluation = $search.evaluation
+                    all_info_lines = @($search.infos | ForEach-Object { $_.raw })
                     infos = $search.infos
                     bestmove_line = $search.bestmove_line
                 }
-                $moveRecords.Add([pscustomobject]$record)
 
                 if ($search.move -ceq '0000') {
-                    $termination = 'engine reported no legal move'
+                    $termination = 'illegal move'
+                    $result = '*'
+                    $moveRecords.Add([pscustomobject]$record)
                     break
                 }
+                try {
+                    $moveReplay = Invoke-KoiReplay $rootFen @($search.move)
+                } catch {
+                    $termination = 'process exit'
+                    $result = '*'
+                    $moveRecords.Add([pscustomobject]$record)
+                    break
+                }
+                $record.replay_legal = $moveReplay.legal
+                $moveRecords.Add([pscustomobject]$record)
+                if (-not $moveReplay.legal) {
+                    $termination = 'illegal move'
+                    $result = '*'
+                    break
+                }
+
                 $moves.Add($search.move)
+                $rootFen = $moveReplay.fen
+                $result = $moveReplay.result
+                if ($result -ne '*') {
+                    $termination = $moveReplay.termination
+                }
+            }
+
+            if ($null -eq $termination) {
+                $termination = 'max plies'
+                $result = '*'
             }
 
             $whiteName = if ($KoiColor -ceq 'white') { $koiEngine.Name } else { $opponentEngine.Name }
@@ -425,8 +534,10 @@ try {
                 initial_fen = $position.Fen
                 round = $gameIndex
                 koi_color = $KoiColor
-                result = '*'
+                result = $result
+                winner = Get-Winner $result
                 termination = $termination
+                process_status = $processStatus
                 moves = @($moveRecords)
             }
             $gameObject = [pscustomobject]$game
@@ -436,8 +547,16 @@ try {
     }
 }
 finally {
-    $koiStderr = Stop-UciEngine $koiEngine
-    $opponentStderr = Stop-UciEngine $opponentEngine
+    $koiStop = Stop-UciEngine $koiEngine
+    $opponentStop = Stop-UciEngine $opponentEngine
+    foreach ($game in $gameRecords) {
+        if ($game.process_status.koi -eq 'running') {
+            $game.process_status.koi = $koiStop.status
+        }
+        if ($game.process_status.opponent -eq 'running') {
+            $game.process_status.opponent = $opponentStop.status
+        }
+    }
 }
 
 New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
@@ -453,7 +572,9 @@ $engineSummary = @(
         identity = @($koiEngine.Handshake | Where-Object { $_ -match '^id ' })
         handshake = @($koiEngine.Handshake)
         options = @($koiEngine.SentOptions)
-        stderr = $koiStderr
+        process_status = $koiStop.status
+        exit_code = $koiStop.exit_code
+        stderr = $koiStop.stderr
     },
     [ordered]@{
         label = 'Opponent'
@@ -462,12 +583,14 @@ $engineSummary = @(
         identity = @($opponentEngine.Handshake | Where-Object { $_ -match '^id ' })
         handshake = @($opponentEngine.Handshake)
         options = @($opponentEngine.SentOptions)
-        stderr = $opponentStderr
+        process_status = $opponentStop.status
+        exit_code = $opponentStop.exit_code
+        stderr = $opponentStop.stderr
     }
 )
 
 $report = [ordered]@{
-    schema = 'koi-uci-match-v1'
+    schema = 'koi-uci-match-v2'
     generated_utc = (Get-Date).ToUniversalTime().ToString('o')
     configuration = [ordered]@{
         depth = $Depth

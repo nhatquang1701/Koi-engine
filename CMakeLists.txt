@@ -123,6 +123,15 @@ target_link_libraries(perft_tests PRIVATE koi_core)
 
 add_test(NAME perft_tests COMMAND perft_tests)
 
+add_executable(koi_replay_tests
+    tests/koi_replay_tests.cpp
+)
+
+add_test(
+    NAME koi_replay_tests
+    COMMAND koi_replay_tests "$<TARGET_FILE:koi_replay>"
+)
+
 add_executable(koi_perft
     tools/perft.cpp
 )
@@ -135,6 +144,13 @@ add_executable(koi_bench
 
 target_link_libraries(koi_bench PRIVATE koi_core)
 set_target_properties(koi_bench PROPERTIES OUTPUT_NAME "koi-bench")
+
+add_executable(koi_replay
+    tools/koi_replay.cpp
+)
+
+target_link_libraries(koi_replay PRIVATE koi_core)
+set_target_properties(koi_replay PROPERTIES OUTPUT_NAME "koi-replay")
 
 add_executable(koi_engine
     src/main.cpp
