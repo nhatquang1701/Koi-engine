@@ -96,7 +96,8 @@ $engine = (Resolve-Path .\out\release-vs\koi-engine.exe).Path
 ```
 
 The output should include, in order, the engine identification lines, the
-`RandomSeed`, `Hash`, `Threads`, `Speed`, and `Clear Hash` option declarations, `uciok`, `readyok`,
+`RandomSeed`, `Hash`, `Threads`, `Speed`, `UCI_AnalyseMode`, `MultiPV`, `Ponder`,
+and `Clear Hash` option declarations, `uciok`, `readyok`,
 zero or more valid `info` lines, and one legal coordinate-notation `bestmove`
 from the starting position (for example, `bestmove e2e4`).
 

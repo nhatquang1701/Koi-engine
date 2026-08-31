@@ -1,9 +1,11 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <condition_variable>
 #include <cstdint>
 #include <iostream>
 #include <limits>
+#include <mutex>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -137,6 +139,79 @@ private:
     std::atomic_int sync_count_ = 0;
 };
 
+class GatedInputBuffer final : public std::streambuf {
+public:
+    GatedInputBuffer(std::string prefix, std::string suffix)
+        : prefix_(std::move(prefix)), suffix_(std::move(suffix)) {}
+
+    void release() {
+        {
+            std::lock_guard lock(mutex_);
+            released_ = true;
+        }
+        condition_.notify_all();
+    }
+
+    void mark_marker() {
+        {
+            std::lock_guard lock(mutex_);
+            marker_seen_ = true;
+            released_ = true;
+        }
+        condition_.notify_all();
+    }
+
+    [[nodiscard]] bool wait_for_marker(std::chrono::milliseconds timeout) {
+        std::unique_lock lock(mutex_);
+        return condition_.wait_for(lock, timeout, [this] { return marker_seen_; });
+    }
+
+protected:
+    int_type underflow() override {
+        std::unique_lock lock(mutex_);
+        if (prefix_position_ < prefix_.size()) {
+            current_character_ = prefix_[prefix_position_++];
+            setg(&current_character_, &current_character_, &current_character_ + 1);
+            return traits_type::to_int_type(current_character_);
+        }
+
+        condition_.wait(lock, [this] { return released_; });
+        if (suffix_position_ >= suffix_.size()) {
+            return traits_type::eof();
+        }
+
+        current_character_ = suffix_[suffix_position_++];
+        setg(&current_character_, &current_character_, &current_character_ + 1);
+        return traits_type::to_int_type(current_character_);
+    }
+
+private:
+    std::string prefix_;
+    std::string suffix_;
+    std::size_t prefix_position_ = 0;
+    std::size_t suffix_position_ = 0;
+    char current_character_ = '\0';
+    std::mutex mutex_;
+    std::condition_variable condition_;
+    bool released_ = false;
+    bool marker_seen_ = false;
+};
+
+class ReleaseOnMultiPvBuffer final : public std::stringbuf {
+public:
+    explicit ReleaseOnMultiPvBuffer(GatedInputBuffer& input) : input_(input) {}
+
+    int sync() override {
+        if (str().find(" multipv 3 ") != std::string::npos) {
+            input_.mark_marker();
+        }
+        return std::stringbuf::sync();
+    }
+
+private:
+    GatedInputBuffer& input_;
+};
+
 void test_uci_handshake_has_identity_and_supported_options_in_order() {
     const ControllerResult result = run_controller("uci\nquit\n");
     const std::string expected =
@@ -224,7 +299,7 @@ void test_threads_and_speed_changes_suppress_the_active_generation() {
 }
 
 void test_lucas_analysis_options_accept_valid_values_ignore_invalid_values_and_emit_multipv() {
-    const ControllerResult result = run_controller(
+    GatedInputBuffer input(
         "setoption name UCI_AnalyseMode value TRUE\n"
         "setoption name MultiPV value 3\n"
         "setoption name Ponder value TrUe\n"
@@ -232,19 +307,43 @@ void test_lucas_analysis_options_accept_valid_values_ignore_invalid_values_and_e
         "setoption name MultiPV value 17\n"
         "setoption name Ponder value maybe\n"
         "position startpos\n"
-        "go depth 2\n"
-        "stop\n"
-        "quit\n");
-    const std::vector<std::string> lines = output_lines(result.output);
+        "go depth 1\n",
+        "stop\nquit\n");
+    std::istream input_stream(&input);
+    ReleaseOnMultiPvBuffer output_buffer(input);
+    std::ostream output(&output_buffer);
+    std::ostringstream diagnostics;
+    int exit_code = -1;
+    std::thread controller_thread([&] {
+        UciController controller(input_stream, output, diagnostics);
+        exit_code = controller.run();
+    });
+    const bool marker_seen = input.wait_for_marker(std::chrono::seconds(5));
+    if (!marker_seen) {
+        input.release();
+    }
+    controller_thread.join();
+
+    const std::vector<std::string> lines = output_lines(output_buffer.str());
     const std::vector<std::string> infos = lines_starting_with(lines, "info ");
     const std::vector<std::string> bestmoves = lines_starting_with(lines, "bestmove ");
 
-    require(result.exit_code == 0 && result.diagnostics.empty(),
+    require(marker_seen, "MultiPV must produce an observable third principal variation");
+    require(exit_code == 0 && diagnostics.str().empty(),
             "valid and invalid Lucas analysis options must leave the controller usable and quiet");
+    require(infos.size() >= 3, "MultiPV must emit at least three info lines");
+    bool saw_multipv_one = false;
+    bool saw_multipv_two = false;
+    bool saw_multipv_three = false;
     for (const std::string& info : infos) {
         require(is_valid_search_info(info),
                 "every search info line must include a valid multipv field between seldepth and score");
+        saw_multipv_one = saw_multipv_one || info.find(" multipv 1 ") != std::string::npos;
+        saw_multipv_two = saw_multipv_two || info.find(" multipv 2 ") != std::string::npos;
+        saw_multipv_three = saw_multipv_three || info.find(" multipv 3 ") != std::string::npos;
     }
+    require(saw_multipv_one && saw_multipv_two && saw_multipv_three,
+            "MultiPV must emit distinct ranked lines for all three requested variations");
     require(bestmoves.size() == 1 && is_legal_move(Position{}, bestmoves[0].substr(9)),
             "Lucas analysis options must retain exactly one legal bestmove");
 }
