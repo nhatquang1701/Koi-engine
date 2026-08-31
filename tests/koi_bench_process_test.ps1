@@ -91,3 +91,40 @@ foreach ($line in $timedLines[2..($timedLines.Count - 1)]) {
         throw "configured koi-bench emitted an invalid timed result: $line"
     }
 }
+
+$coldProfile = Join-Path $env:TEMP 'koi-bench-cold-profile.json'
+$warmProfile = Join-Path $env:TEMP 'koi-bench-warm-profile.json'
+Remove-Item -LiteralPath $coldProfile, $warmProfile -ErrorAction SilentlyContinue
+$cold = Invoke-Benchmark $BenchPath "--profile-json `"$coldProfile`""
+$warm = Invoke-Benchmark $BenchPath "--warm-hash --profile-json `"$warmProfile`""
+foreach ($profileRun in @($cold, $warm)) {
+    if ($profileRun.ExitCode -ne 0 -or $profileRun.Stderr.Length -ne 0) {
+        throw "profiled koi-bench run failed: $($profileRun.Stderr)"
+    }
+}
+foreach ($profilePath in @($coldProfile, $warmProfile)) {
+    if (-not (Test-Path -LiteralPath $profilePath -PathType Leaf)) {
+        throw "koi-bench did not write profile JSON: $profilePath"
+    }
+}
+$coldJson = Get-Content -LiteralPath $coldProfile -Raw | ConvertFrom-Json
+$warmJson = Get-Content -LiteralPath $warmProfile -Raw | ConvertFrom-Json
+if ($coldJson.schema -ne 'koi-bench-profile-v1' -or $coldJson.warm_hash -ne $false -or
+    $coldJson.positions.Count -lt 1) {
+    throw 'cold profile JSON must identify its schema, cold table state, and positions.'
+}
+if ($warmJson.schema -ne 'koi-bench-profile-v1' -or $warmJson.warm_hash -ne $true -or
+    $warmJson.positions.Count -ne $coldJson.positions.Count) {
+    throw 'warm profile JSON must identify shared table state and the same suite.'
+}
+foreach ($position in $coldJson.positions) {
+    foreach ($field in @('id', 'fen', 'limits', 'hash_mb', 'threads', 'speed', 'score_cp', 'pv',
+                          'nodes', 'qnodes', 'tt_hits', 'pruning', 'nps')) {
+        if ($null -eq $position.$field) {
+            throw "profile JSON position is missing $field"
+        }
+    }
+    if ($null -ne $position.elapsed_ms) {
+        throw 'untimed profile JSON must not include elapsed wall-clock data.'
+    }
+}

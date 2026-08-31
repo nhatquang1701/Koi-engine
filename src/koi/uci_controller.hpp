@@ -58,6 +58,8 @@ private:
     std::optional<SearchHandle> active_search_;
     std::optional<GameState> ponder_root_;
     std::optional<SearchLimits> ponder_limits_;
+    std::optional<Move> principal_variation_best_move_;
+    std::optional<Move> principal_variation_ponder_move_;
     bool active_ponder_ = false;
     std::size_t threads_ = 1;
     std::uint8_t speed_percent_ = 100;

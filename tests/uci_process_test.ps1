@@ -141,13 +141,23 @@ Send-UciCommand $session 'setoption name MultiPV value 3'
 Send-UciCommand $session 'setoption name Ponder value true'
 Send-UciCommand $session 'position startpos'
 Send-UciCommand $session 'go ponder depth 2'
-Send-UciCommand $session 'ponderhit'
 $ponderInfoLines = [System.Collections.Generic.List[string]]::new()
+$ponderDepthTwoSeen = $false
+while (-not $ponderDepthTwoSeen) {
+    $line = Read-UciLine $session 'depth-two ponder PV before ponderhit'
+    if (Test-SearchInfo $line) {
+        $ponderInfoLines.Add($line)
+        $ponderDepthTwoSeen = $line -match '^info depth 2 .* multipv 1 .* pv [a-h][1-8][a-h][1-8][nbrq]? [a-h][1-8][a-h][1-8][nbrq]?$'
+    } else {
+        throw "Invalid output before ponderhit: $line"
+    }
+}
+Send-UciCommand $session 'ponderhit'
 $ponderBestmove = $null
 while ($null -eq $ponderBestmove) {
     $line = Read-UciLine $session 'bestmove after ponderhit'
     if ($line -like 'bestmove *') {
-        if ($line -notmatch '^bestmove [a-h][1-8][a-h][1-8][nbrq]?$') {
+        if ($line -notmatch '^bestmove [a-h][1-8][a-h][1-8][nbrq]?( ponder [a-h][1-8][a-h][1-8][nbrq]?)?$') {
             throw "ponderhit emitted an invalid bestmove: $line"
         }
         $ponderBestmove = $line
@@ -338,33 +348,40 @@ $null = Complete-UciSession $asymmetricClock $true
 $infiniteNodes = Start-UciSession
 Send-UciCommand $infiniteNodes 'position startpos'
 Send-UciCommand $infiniteNodes 'go infinite nodes 1'
-Send-UciCommand $infiniteNodes 'isready'
-while ($true) {
-    $line = Read-UciLine $infiniteNodes 'readyok during infinite node-limit search'
-    if ($line -ceq 'readyok') {
-        break
-    }
-    if ($line -like 'bestmove *') {
-        throw "Infinite search honored a node limit before stop: $line"
-    }
-    if (-not (Test-SearchInfo $line)) {
-        throw "Invalid output during infinite node-limit search: $line"
-    }
-}
-Send-UciCommand $infiniteNodes 'stop'
 $infiniteNodesBestmove = $null
 while ($null -eq $infiniteNodesBestmove) {
-    $line = Read-UciLine $infiniteNodes 'bestmove after infinite node-limit stop'
+    $line = Read-UciLine $infiniteNodes 'bestmove after infinite node-limit search'
     if ($line -like 'bestmove *') {
         $infiniteNodesBestmove = $line
     } elseif (-not (Test-SearchInfo $line)) {
-        throw "Invalid output while stopping infinite node-limit search: $line"
+        throw "Invalid output during infinite node-limit search: $line"
     }
 }
 if ($infiniteNodesBestmove -notmatch '^bestmove [a-h][1-8][a-h][1-8][nbrq]?$') {
     throw "Infinite node-limit search emitted an invalid bestmove: $infiniteNodesBestmove"
 }
+Send-UciCommand $infiniteNodes 'isready'
+if ((Read-UciLine $infiniteNodes 'readyok after infinite node limit') -cne 'readyok') {
+    throw 'Infinite node-limit search did not complete before readyok.'
+}
 $null = Complete-UciSession $infiniteNodes $true
+
+$ponderNodes = Start-UciSession
+Send-UciCommand $ponderNodes 'position startpos'
+Send-UciCommand $ponderNodes 'go ponder nodes 1'
+$ponderNodesBestmove = $null
+while ($null -eq $ponderNodesBestmove) {
+    $line = Read-UciLine $ponderNodes 'bestmove after ponder node-limit search'
+    if ($line -like 'bestmove *') {
+        $ponderNodesBestmove = $line
+    } elseif (-not (Test-SearchInfo $line)) {
+        throw "Invalid output during ponder node-limit search: $line"
+    }
+}
+if ($ponderNodesBestmove -notmatch '^bestmove [a-h][1-8][a-h][1-8][nbrq]?( ponder [a-h][1-8][a-h][1-8][nbrq]?)?$') {
+    throw "Ponder node-limit search emitted an invalid bestmove: $ponderNodesBestmove"
+}
+$null = Complete-UciSession $ponderNodes $true
 
 $quitSession = Start-UciSession
 Send-UciCommand $quitSession 'position startpos'

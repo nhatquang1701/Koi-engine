@@ -89,9 +89,6 @@ std::optional<std::chrono::milliseconds> TimeManager::time_budget() const noexce
 }
 
 std::optional<std::uint64_t> TimeManager::node_limit() const noexcept {
-    if (limits_.infinite || limits_.ponder) {
-        return std::nullopt;
-    }
     return limits_.nodes;
 }
 

@@ -68,6 +68,7 @@ struct SearchResult {
     std::optional<int> mate;
     int completed_depth = 0;
     SearchStats stats;
+    std::optional<Move> ponder_move;
 };
 
 struct SearchEventSink {

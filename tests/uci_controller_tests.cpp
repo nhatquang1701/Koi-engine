@@ -14,6 +14,7 @@
 #include <vector>
 
 #include "koi/position.hpp"
+#include "koi/time_manager.hpp"
 #include "koi/uci_controller.hpp"
 
 namespace {
@@ -212,6 +213,22 @@ private:
     GatedInputBuffer& input_;
 };
 
+class ReleaseOnDepthBuffer final : public std::stringbuf {
+public:
+    ReleaseOnDepthBuffer(GatedInputBuffer& input, int depth) : input_(input), depth_(depth) {}
+
+    int sync() override {
+        if (str().find("info depth " + std::to_string(depth_) + " ") != std::string::npos) {
+            input_.mark_marker();
+        }
+        return std::stringbuf::sync();
+    }
+
+private:
+    GatedInputBuffer& input_;
+    int depth_;
+};
+
 void test_uci_handshake_has_identity_and_supported_options_in_order() {
     const ControllerResult result = run_controller("uci\nquit\n");
     const std::string expected =
@@ -368,18 +385,34 @@ void test_lucas_analysis_option_changes_suppress_the_active_generation() {
 }
 
 void test_ponderhit_restarts_the_ponder_search_once() {
-    const ControllerResult result = run_controller(
+    GatedInputBuffer input(
         "position startpos\n"
-        "go ponder depth 2\n"
+        "go ponder depth 2\n",
         "ponderhit\n"
         "stop\n"
         "quit\n");
+    std::istream input_stream(&input);
+    ReleaseOnDepthBuffer output_buffer(input, 2);
+    std::ostream output(&output_buffer);
+    std::ostringstream diagnostics;
+    int exit_code = -1;
+    std::thread controller_thread([&] {
+        UciController controller(input_stream, output, diagnostics);
+        exit_code = controller.run();
+    });
+    const bool marker_seen = input.wait_for_marker(std::chrono::seconds(5));
+    if (!marker_seen) {
+        input.release();
+    }
+    controller_thread.join();
     const std::vector<std::string> bestmoves =
-        lines_starting_with(output_lines(result.output), "bestmove ");
+        lines_starting_with(output_lines(output_buffer.str()), "bestmove ");
 
-    require(result.exit_code == 0, "ponderhit transcript must shut down normally");
-    require(bestmoves.size() == 1 && is_legal_move(Position{}, bestmoves[0].substr(9)),
-            "ponderhit must emit exactly one legal bestmove from its restarted search");
+    require(marker_seen, "ponderhit must wait for a completed two-move ponder PV");
+    require(exit_code == 0 && diagnostics.str().empty(), "ponderhit transcript must shut down normally");
+    require(bestmoves.size() == 1 && bestmoves[0].starts_with("bestmove ") &&
+                (bestmoves[0].size() == 13 || bestmoves[0].size() == 14),
+            "ponderhit must emit exactly one coordinate bestmove from its restarted search");
 }
 
 void test_quit_and_eof_suppress_a_ponderhit_replacement_search() {
@@ -546,6 +579,31 @@ void test_go_limit_parser_maps_each_supported_limit_exactly() {
     require(!limits.infinite, "ordinary limits must not enable infinite search");
 }
 
+void test_go_limit_parser_uses_a_scaled_bare_go_fallback_and_independent_clocks() {
+    using namespace std::chrono_literals;
+
+    const koi::SearchLimits bare = koi::uci::parse_go_limits("");
+    require(bare.movetime == 250ms, "bare go must use the approved 250 ms movetime fallback");
+    require(!bare.depth.has_value(), "bare go must not invent a depth limit");
+
+    const koi::TimeManager normal(bare, koi::Color::white, 100);
+    const koi::TimeManager slower(bare, koi::Color::white, 50);
+    require(normal.time_budget().has_value() && *normal.time_budget() <= 250ms,
+            "the bare-go fallback must remain a bounded time budget");
+    require(slower.time_budget().has_value() && *slower.time_budget() < *normal.time_budget(),
+            "Speed must scale the bare-go fallback without exceeding it");
+
+    const koi::SearchLimits white_only = koi::uci::parse_go_limits("wtime 1000 winc 25");
+    require(white_only.white_clock.has_value() && white_only.white_clock->remaining == 1000ms &&
+                white_only.white_clock->increment == 25ms && !white_only.black_clock.has_value(),
+            "white clock fields must be accepted without a black clock");
+
+    const koi::SearchLimits black_only = koi::uci::parse_go_limits("btime 1000 binc 25");
+    require(black_only.black_clock.has_value() && black_only.black_clock->remaining == 1000ms &&
+                black_only.black_clock->increment == 25ms && !black_only.white_clock.has_value(),
+            "black clock fields must be accepted without a white clock");
+}
+
 void test_go_limit_parser_supports_lucas_root_options_and_value_defaults() {
     const auto limits = koi::uci::parse_go_limits(
         "ponder searchmoves e2e4 g1f3 depth 5");
@@ -578,7 +636,7 @@ void test_go_limit_parser_supports_lucas_root_options_and_value_defaults() {
             "default SearchOptions must use one principal variation and normal mode");
 }
 
-void test_go_limit_parser_uses_depth_one_for_missing_malformed_overflow_and_asymmetric_clock_values() {
+void test_go_limit_parser_uses_fallback_for_missing_malformed_and_overflow_values() {
     const std::vector<std::string_view> commands{
         "",
         "depth nodes movetime wtime btime winc binc movestogo",
@@ -586,21 +644,67 @@ void test_go_limit_parser_uses_depth_one_for_missing_malformed_overflow_and_asym
         "depth 2147483648 nodes 18446744073709551616 movetime 9223372036854775808 "
         "wtime 9223372036854775808 btime 9223372036854775808 "
         "winc 9223372036854775808 binc 9223372036854775808 movestogo 4294967296",
-        "wtime 1000",
-        "btime 1000 binc 25",
     };
 
     for (const std::string_view command : commands) {
         const koi::SearchLimits limits = koi::uci::parse_go_limits(command);
 
-        require(limits.depth == 1, "an unusable go command must fall back to depth one");
-        require(!limits.nodes.has_value() && !limits.movetime.has_value(),
-                "invalid node and movetime values must be ignored");
+        require(limits.movetime == std::chrono::milliseconds{250},
+                "an unusable go command must fall back to the 250 ms movetime");
+        require(!limits.nodes.has_value(),
+                "invalid node values must not become explicit limits");
         require(!limits.white_clock.has_value() && !limits.black_clock.has_value(),
                 "invalid clock values must not create clock limits");
         require(!limits.moves_to_go.has_value() && !limits.infinite,
                 "invalid movestogo and absent infinite must remain unset");
     }
+}
+
+void test_ponder_option_emits_a_legal_second_pv_move() {
+    GatedInputBuffer input(
+        "setoption name Ponder value true\n"
+        "position startpos\n"
+        "go depth 2\n",
+        "stop\n"
+        "quit\n");
+    std::istream input_stream(&input);
+    ReleaseOnDepthBuffer output_buffer(input, 2);
+    std::ostream output(&output_buffer);
+    std::ostringstream diagnostics;
+    int exit_code = -1;
+    std::thread controller_thread([&] {
+        UciController controller(input_stream, output, diagnostics);
+        exit_code = controller.run();
+    });
+    const bool marker_seen = input.wait_for_marker(std::chrono::seconds(5));
+    if (!marker_seen) {
+        input.release();
+    }
+    controller_thread.join();
+    const std::vector<std::string> bestmoves =
+        lines_starting_with(output_lines(output_buffer.str()), "bestmove ");
+
+    require(marker_seen, "Ponder=true must receive a completed two-move PV");
+    require(exit_code == 0 && diagnostics.str().empty(), "Ponder=true transcript must shut down normally");
+    require(bestmoves.size() == 1, "a completed Ponder-enabled search must emit one result");
+    std::istringstream line(bestmoves.front());
+    std::string name;
+    std::string best;
+    std::string ponder_name;
+    std::string ponder;
+    require(line >> name >> best >> ponder_name >> ponder && name == "bestmove" &&
+                ponder_name == "ponder",
+            "Ponder=true must append the completed PV reply to bestmove");
+
+    const Position root;
+    require(is_legal_move(root, best), "the Ponder-enabled bestmove must be legal at the root");
+    const auto parsed_best = koi::Move::parse_uci(best);
+    const auto parsed_ponder = koi::Move::parse_uci(ponder);
+    require(parsed_best.has_value(), "the Ponder-enabled bestmove must parse");
+    require(parsed_ponder.has_value(), "the emitted ponder move must parse");
+    koi::GameState after_best = koi::GameState::startpos();
+    require(after_best.make_move(*parsed_best) && after_best.is_legal(*parsed_ponder),
+            "the emitted ponder move must be legal after the emitted bestmove");
 }
 
 void test_invalid_position_commands_preserve_the_previous_position() {
@@ -772,8 +876,10 @@ int main() {
         {"position startpos and FEN", test_startpos_and_fen_move_lists_define_the_search_root},
         {"go limits and malformed values", test_all_go_limits_and_malformed_values_are_accepted_without_crashing},
         {"go limit parser exact mapping", test_go_limit_parser_maps_each_supported_limit_exactly},
+        {"go limit fallback and clocks", test_go_limit_parser_uses_a_scaled_bare_go_fallback_and_independent_clocks},
         {"go limit parser Lucas root options", test_go_limit_parser_supports_lucas_root_options_and_value_defaults},
-        {"go limit parser fallback", test_go_limit_parser_uses_depth_one_for_missing_malformed_overflow_and_asymmetric_clock_values},
+        {"go limit parser fallback", test_go_limit_parser_uses_fallback_for_missing_malformed_and_overflow_values},
+        {"Ponder PV emission", test_ponder_option_emits_a_legal_second_pv_move},
         {"transactional invalid positions", test_invalid_position_commands_preserve_the_previous_position},
         {"terminal 0000", test_terminal_position_returns_0000},
         {"ready during search", test_isready_remains_responsive_during_infinite_search},

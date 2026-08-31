@@ -173,18 +173,20 @@ SearchLimits parse_go_limits(std::string_view arguments) {
         }
     }
 
-    if (white_time.has_value() && black_time.has_value()) {
+    if (white_time.has_value()) {
         limits.white_clock = ClockLimit{white_time.value_or(std::chrono::milliseconds::zero()),
                                         white_increment.value_or(std::chrono::milliseconds::zero())};
+    }
+    if (black_time.has_value()) {
         limits.black_clock = ClockLimit{black_time.value_or(std::chrono::milliseconds::zero()),
                                         black_increment.value_or(std::chrono::milliseconds::zero())};
     }
 
     const bool has_usable_limit = limits.depth.has_value() || limits.nodes.has_value() ||
         limits.movetime.has_value() || limits.white_clock.has_value() ||
-        limits.black_clock.has_value() || limits.infinite;
+        limits.black_clock.has_value() || limits.infinite || limits.ponder;
     if (!has_usable_limit) {
-        limits.depth = 1;
+        limits.movetime = std::chrono::milliseconds{250};
     }
     return limits;
 }
@@ -389,26 +391,66 @@ void UciController::handle_go(std::istream& command) {
 }
 
 void UciController::handle_ponderhit() {
-    if (!active_ponder_ || !ponder_root_.has_value() || !ponder_limits_.has_value()) {
+    std::optional<GameState> root;
+    std::optional<SearchLimits> limits;
+    std::optional<Move> expected_move;
+    {
+        std::lock_guard lock(output_mutex_);
+        if (!active_ponder_ || !ponder_root_.has_value() || !ponder_limits_.has_value()) {
+            return;
+        }
+        root = ponder_root_;
+        limits = ponder_limits_;
+        expected_move = principal_variation_ponder_move_;
+    }
+
+    stop_and_suppress_active_search();
+    if (!root.has_value() || !limits.has_value() || !expected_move.has_value() ||
+        !root->make_move(*expected_move)) {
         return;
     }
 
-    GameState root = *ponder_root_;
-    SearchLimits limits = *ponder_limits_;
-    limits.ponder = false;
-    stop_and_suppress_active_search();
-    start_search(std::move(root), std::move(limits));
+    limits->ponder = false;
+    const bool has_normal_limit = limits->depth.has_value() || limits->nodes.has_value() ||
+        limits->movetime.has_value() || limits->white_clock.has_value() ||
+        limits->black_clock.has_value() || limits->infinite;
+    if (!has_normal_limit) {
+        limits->movetime = std::chrono::milliseconds{250};
+    }
+    start_search(std::move(*root), std::move(*limits));
 }
 
 void UciController::start_search(GameState root, SearchLimits limits) {
     const std::uint64_t generation = begin_generation();
+    const GameState search_root = root;
+    const bool is_ponder_search = limits.ponder;
 
     SearchEventSink sink;
-    sink.on_info = [this, generation](const SearchInfo& info) {
+    sink.on_info = [this, generation, search_root, is_ponder_search](const SearchInfo& info) {
+        if (info.multipv == 1 && info.pv.size() >= 2) {
+            GameState after_best = search_root;
+            if (after_best.make_move(info.pv[0]) && after_best.is_legal(info.pv[1])) {
+                std::lock_guard lock(output_mutex_);
+                if (generation == generation_) {
+                    principal_variation_best_move_ = info.pv[0];
+                    principal_variation_ponder_move_ = info.pv[1];
+                    if (is_ponder_search) {
+                        ponder_root_ = std::move(after_best);
+                    }
+                }
+            }
+        }
         write_search_info(generation, info);
     };
     sink.on_complete = [this, generation](const SearchResult& result) {
-        write_search_completion(generation, result);
+        SearchResult completed = result;
+        {
+            std::lock_guard lock(output_mutex_);
+            if (generation == generation_ && result.best_move == principal_variation_best_move_) {
+                completed.ponder_move = principal_variation_ponder_move_;
+            }
+        }
+        write_search_completion(generation, completed);
     };
 
     SearchOptions options;
@@ -455,6 +497,8 @@ void UciController::clear_ponder_state() {
 
 std::uint64_t UciController::begin_generation() {
     std::lock_guard lock(output_mutex_);
+    principal_variation_best_move_.reset();
+    principal_variation_ponder_move_.reset();
     return ++generation_;
 }
 
@@ -508,8 +552,11 @@ void UciController::write_search_completion(std::uint64_t generation,
     }
 
     output_ << "bestmove "
-            << (result.best_move.has_value() ? result.best_move->uci() : "0000")
-            << '\n' << std::flush;
+            << (result.best_move.has_value() ? result.best_move->uci() : "0000");
+    if (ponder_enabled_ && result.best_move.has_value() && result.ponder_move.has_value()) {
+        output_ << " ponder " << result.ponder_move->uci();
+    }
+    output_ << '\n' << std::flush;
 }
 
 void UciController::write_position_error(const char* message) {

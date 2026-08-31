@@ -228,11 +228,11 @@ void test_time_manager_applies_move_time_and_clock_limits() {
     koi::SearchLimits infinite_nodes;
     infinite_nodes.infinite = true;
     infinite_nodes.nodes = 1;
-    koi::TimeManager unbounded_nodes(infinite_nodes, koi::Color::white);
-    require(!unbounded_nodes.node_limit().has_value(),
-            "infinite search must ignore a node limit");
-    require(!unbounded_nodes.should_stop(1),
-            "infinite search must not stop when its ignored node limit is reached");
+    koi::TimeManager infinite_node_limited(infinite_nodes, koi::Color::white);
+    require(infinite_node_limited.node_limit() == 1,
+            "infinite search must retain an explicit node limit");
+    require(infinite_node_limited.should_stop(1),
+            "infinite search must stop when its explicit node limit is reached");
 }
 
 void test_speed_scales_only_time_based_search_budgets() {
@@ -719,7 +719,6 @@ void test_ponder_search_runs_until_stopped_and_completes_once() {
     limits.depth = 1;
     limits.ponder = true;
     limits.movetime = 1ms;
-    limits.nodes = 1;
     limits.white_clock = koi::ClockLimit{1ms, 0ms};
     CompletedSearch completed;
 
@@ -770,7 +769,7 @@ void test_ponder_terminal_and_empty_roots_wait_for_stop() {
     require_parked(koi::GameState::startpos(), empty_filter_limits, "empty searchmoves root");
 }
 
-void test_ponder_ignores_time_and_node_limits() {
+void test_ponder_ignores_time_but_honors_node_limits() {
     koi::SearchLimits limits;
     limits.ponder = true;
     limits.movetime = 1ms;
@@ -779,8 +778,8 @@ void test_ponder_ignores_time_and_node_limits() {
 
     const koi::TimeManager manager(limits, koi::Color::white);
     require(!manager.time_budget().has_value(), "ponder must ignore movetime and clock budgets");
-    require(!manager.node_limit().has_value(), "ponder must ignore node limits");
-    require(!manager.should_stop(1), "ponder must not stop at its ignored node limit");
+    require(manager.node_limit() == 1, "ponder must retain an explicit node limit");
+    require(manager.should_stop(1), "ponder must stop at its explicit node limit");
 }
 
 void test_service_hash_configuration_survives_default_start_and_non_default_override() {
@@ -937,7 +936,7 @@ int main() {
         {"infinite search lifecycle", test_infinite_search_runs_until_stopped_and_completes_once},
         {"ponder search lifecycle", test_ponder_search_runs_until_stopped_and_completes_once},
         {"ponder terminal lifecycle", test_ponder_terminal_and_empty_roots_wait_for_stop},
-        {"ponder ignores time and nodes", test_ponder_ignores_time_and_node_limits},
+        {"ponder time and node limits", test_ponder_ignores_time_but_honors_node_limits},
         {"service hash persistence", test_service_hash_configuration_survives_default_start_and_non_default_override},
         {"hash bounds and clear", test_hash_configuration_clamps_to_uci_bounds_and_clear_discards_warmed_entries},
         {"transposition table", test_transposition_table_stores_probes_and_clears_entries},
