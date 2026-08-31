@@ -401,7 +401,7 @@ void UciController::handle_ponderhit() {
         }
         root = ponder_root_;
         limits = ponder_limits_;
-        expected_move = principal_variation_ponder_move_;
+        expected_move = ponder_expected_move_;
     }
 
     stop_and_suppress_active_search();
@@ -417,6 +417,8 @@ void UciController::handle_ponderhit() {
     if (!has_normal_limit) {
         limits->movetime = std::chrono::milliseconds{250};
     }
+    limits->search_moves_specified = false;
+    limits->search_moves.clear();
     start_search(std::move(*root), std::move(*limits));
 }
 
@@ -434,8 +436,9 @@ void UciController::start_search(GameState root, SearchLimits limits) {
                 if (generation == generation_) {
                     principal_variation_best_move_ = info.pv[0];
                     principal_variation_ponder_move_ = info.pv[1];
-                    if (is_ponder_search) {
+                    if (is_ponder_search && !ponder_expected_move_.has_value()) {
                         ponder_root_ = std::move(after_best);
+                        ponder_expected_move_ = info.pv[1];
                     }
                 }
             }
@@ -492,6 +495,7 @@ void UciController::stop_and_suppress_active_search() {
 void UciController::clear_ponder_state() {
     ponder_root_.reset();
     ponder_limits_.reset();
+    ponder_expected_move_.reset();
     active_ponder_ = false;
 }
 
@@ -499,6 +503,7 @@ std::uint64_t UciController::begin_generation() {
     std::lock_guard lock(output_mutex_);
     principal_variation_best_move_.reset();
     principal_variation_ponder_move_.reset();
+    ponder_expected_move_.reset();
     return ++generation_;
 }
 

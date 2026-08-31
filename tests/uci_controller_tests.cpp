@@ -387,7 +387,7 @@ void test_lucas_analysis_option_changes_suppress_the_active_generation() {
 void test_ponderhit_restarts_the_ponder_search_once() {
     GatedInputBuffer input(
         "position startpos\n"
-        "go ponder depth 2\n",
+        "go ponder searchmoves e2e4 depth 2\n",
         "ponderhit\n"
         "stop\n"
         "quit\n");
@@ -405,14 +405,41 @@ void test_ponderhit_restarts_the_ponder_search_once() {
         input.release();
     }
     controller_thread.join();
-    const std::vector<std::string> bestmoves =
-        lines_starting_with(output_lines(output_buffer.str()), "bestmove ");
+    const std::vector<std::string> lines = output_lines(output_buffer.str());
+    const std::vector<std::string> bestmoves = lines_starting_with(lines, "bestmove ");
+
+    std::vector<koi::Move> expected_pv;
+    for (const std::string& line : lines) {
+        if (!line.starts_with("info depth ") || line.find(" multipv 1 ") == std::string::npos) {
+            continue;
+        }
+        const std::size_t pv_start = line.find(" pv ");
+        if (pv_start == std::string::npos) {
+            continue;
+        }
+        std::istringstream pv_stream(line.substr(pv_start + 4));
+        for (std::string move; pv_stream >> move;) {
+            const auto parsed = koi::Move::parse_uci(move);
+            require(parsed.has_value(), "ponder PV must contain coordinate moves");
+            expected_pv.push_back(*parsed);
+        }
+        if (expected_pv.size() >= 2) {
+            break;
+        }
+        expected_pv.clear();
+    }
 
     require(marker_seen, "ponderhit must wait for a completed two-move ponder PV");
     require(exit_code == 0 && diagnostics.str().empty(), "ponderhit transcript must shut down normally");
-    require(bestmoves.size() == 1 && bestmoves[0].starts_with("bestmove ") &&
-                (bestmoves[0].size() == 13 || bestmoves[0].size() == 14),
-            "ponderhit must emit exactly one coordinate bestmove from its restarted search");
+    require(bestmoves.size() == 1, "ponderhit must emit exactly one completion result");
+    require(expected_pv.size() >= 2 && expected_pv[0].uci() == "e2e4",
+            "ponderhit must observe the filtered first PV and its expected reply");
+    koi::GameState after_expected_reply = koi::GameState::startpos();
+    require(after_expected_reply.make_move(expected_pv[0]) && after_expected_reply.make_move(expected_pv[1]),
+            "the observed ponder reply must be legal after the predicted first move");
+    const auto restarted_bestmove = koi::Move::parse_uci(bestmoves[0].substr(9));
+    require(restarted_bestmove.has_value() && after_expected_reply.is_legal(*restarted_bestmove),
+            "ponderhit must search from the position after the expected reply");
 }
 
 void test_quit_and_eof_suppress_a_ponderhit_replacement_search() {
@@ -597,11 +624,17 @@ void test_go_limit_parser_uses_a_scaled_bare_go_fallback_and_independent_clocks(
     require(white_only.white_clock.has_value() && white_only.white_clock->remaining == 1000ms &&
                 white_only.white_clock->increment == 25ms && !white_only.black_clock.has_value(),
             "white clock fields must be accepted without a black clock");
+    require(koi::TimeManager(white_only, koi::Color::white).time_budget().has_value() &&
+                !koi::TimeManager(white_only, koi::Color::black).time_budget().has_value(),
+            "a one-sided clock must budget only for the side whose clock was supplied");
 
     const koi::SearchLimits black_only = koi::uci::parse_go_limits("btime 1000 binc 25");
     require(black_only.black_clock.has_value() && black_only.black_clock->remaining == 1000ms &&
                 black_only.black_clock->increment == 25ms && !black_only.white_clock.has_value(),
             "black clock fields must be accepted without a white clock");
+    require(koi::TimeManager(black_only, koi::Color::black).time_budget().has_value() &&
+                !koi::TimeManager(black_only, koi::Color::white).time_budget().has_value(),
+            "the black one-sided clock must budget only for Black");
 }
 
 void test_go_limit_parser_supports_lucas_root_options_and_value_defaults() {

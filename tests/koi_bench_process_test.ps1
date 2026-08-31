@@ -94,21 +94,27 @@ foreach ($line in $timedLines[2..($timedLines.Count - 1)]) {
 
 $coldProfile = Join-Path $env:TEMP 'koi-bench-cold-profile.json'
 $warmProfile = Join-Path $env:TEMP 'koi-bench-warm-profile.json'
-Remove-Item -LiteralPath $coldProfile, $warmProfile -ErrorAction SilentlyContinue
+$timedProfile = Join-Path $env:TEMP 'koi-bench-timed-profile.json'
+Remove-Item -LiteralPath $coldProfile, $warmProfile, $timedProfile -ErrorAction SilentlyContinue
 $cold = Invoke-Benchmark $BenchPath "--profile-json `"$coldProfile`""
 $warm = Invoke-Benchmark $BenchPath "--warm-hash --profile-json `"$warmProfile`""
-foreach ($profileRun in @($cold, $warm)) {
+$timedProfileRun = Invoke-Benchmark $BenchPath "--timed --profile-json `"$timedProfile`""
+foreach ($profileRun in @($cold, $warm, $timedProfileRun)) {
     if ($profileRun.ExitCode -ne 0 -or $profileRun.Stderr.Length -ne 0) {
         throw "profiled koi-bench run failed: $($profileRun.Stderr)"
     }
 }
-foreach ($profilePath in @($coldProfile, $warmProfile)) {
+foreach ($profilePath in @($coldProfile, $warmProfile, $timedProfile)) {
     if (-not (Test-Path -LiteralPath $profilePath -PathType Leaf)) {
         throw "koi-bench did not write profile JSON: $profilePath"
     }
 }
 $coldJson = Get-Content -LiteralPath $coldProfile -Raw | ConvertFrom-Json
 $warmJson = Get-Content -LiteralPath $warmProfile -Raw | ConvertFrom-Json
+$timedJson = Get-Content -LiteralPath $timedProfile -Raw | ConvertFrom-Json
+if ($warm.Stdout -notmatch '(?m)^config threads 1 speed 100 timed 0 warm_hash 1\r?$') {
+    throw "--warm-hash must mark the normal deterministic text report: $($warm.Stdout)"
+}
 if ($coldJson.schema -ne 'koi-bench-profile-v1' -or $coldJson.warm_hash -ne $false -or
     $coldJson.positions.Count -lt 1) {
     throw 'cold profile JSON must identify its schema, cold table state, and positions.'
@@ -126,5 +132,22 @@ foreach ($position in $coldJson.positions) {
     }
     if ($null -ne $position.elapsed_ms) {
         throw 'untimed profile JSON must not include elapsed wall-clock data.'
+    }
+}
+if (-not @($coldJson.positions | Where-Object { $_.pv.Count -gt 1 })) {
+    throw 'profile JSON must retain at least one completed multi-move principal variation.'
+}
+foreach ($position in $timedJson.positions) {
+    if ($null -eq $position.elapsed_ms) {
+        throw 'timed profile JSON must include elapsed_ms.'
+    }
+    $visited = [uint64]$position.nodes + [uint64]$position.qnodes
+    $expectedNps = if ($position.elapsed_ms -gt 0) {
+        [uint64][Math]::Floor(([double]$visited * 1000) / $position.elapsed_ms)
+    } else {
+        $visited
+    }
+    if ([uint64]$position.nps -ne $expectedNps) {
+        throw "timed profile NPS must use elapsed_ms: expected $expectedNps, got $($position.nps)"
     }
 }

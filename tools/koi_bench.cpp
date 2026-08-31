@@ -28,6 +28,7 @@ struct BenchmarkConfig {
 struct BenchmarkRun {
     koi::SearchResult result;
     std::chrono::milliseconds wall_time{0};
+    std::vector<koi::Move> pv;
 };
 
 bool parse_uint64(std::string_view value, std::uint64_t& parsed) {
@@ -94,17 +95,23 @@ BenchmarkRun run_position(const koi::StrengthPosition& benchmark, const Benchmar
     options.speed_percent = config.speed_percent;
 
     std::optional<koi::SearchResult> result;
+    std::vector<koi::Move> pv;
     const auto started = std::chrono::steady_clock::now();
     koi::SearchHandle handle = service.start(*root, limits,
-        {.on_complete = [&result](const koi::SearchResult& completed) {
-            result = completed;
-        }}, options);
+        {.on_info = [&pv](const koi::SearchInfo& info) {
+             if (info.multipv == 1 && !info.pv.empty()) {
+                 pv = info.pv;
+             }
+         },
+         .on_complete = [&result](const koi::SearchResult& completed) {
+             result = completed;
+         }}, options);
     handle.wait();
     if (!result.has_value()) {
         throw std::runtime_error("benchmark search did not report a result");
     }
     return {*result, std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::steady_clock::now() - started)};
+        std::chrono::steady_clock::now() - started), std::move(pv)};
 }
 
 void write_json_string(std::ostream& output, std::string_view value) {
@@ -142,7 +149,8 @@ void write_profile_json(const std::string& path, const BenchmarkConfig& config,
         const auto& [benchmark, run] = runs[index];
         const koi::SearchResult& result = run.result;
         const std::uint64_t visited = result.stats.nodes + result.stats.qnodes;
-        const std::uint64_t elapsed = static_cast<std::uint64_t>(result.stats.elapsed.count());
+        const std::uint64_t elapsed = static_cast<std::uint64_t>(
+            (config.timed ? run.wall_time : result.stats.elapsed).count());
         output << "    {\"id\": ";
         write_json_string(output, benchmark.name);
         output << ", \"fen\": ";
@@ -151,7 +159,14 @@ void write_profile_json(const std::string& path, const BenchmarkConfig& config,
                << "}, \"hash_mb\": 16, \"threads\": " << config.threads
                << ", \"speed\": " << static_cast<unsigned>(config.speed_percent)
                << ", \"score_cp\": " << result.score_cp << ", \"pv\": [";
-        if (result.best_move.has_value()) {
+        if (!run.pv.empty()) {
+            for (std::size_t pv_index = 0; pv_index < run.pv.size(); ++pv_index) {
+                if (pv_index != 0) {
+                    output << ", ";
+                }
+                write_json_string(output, run.pv[pv_index].uci());
+            }
+        } else if (result.best_move.has_value()) {
             write_json_string(output, result.best_move->uci());
         }
         output << "], \"nodes\": " << result.stats.nodes
@@ -189,10 +204,14 @@ int main(int argc, char** argv) {
 
     try {
         std::cout << "Koi benchmark\n";
-        if (config->threads != 1 || config->speed_percent != 100 || config->timed) {
+        if (config->threads != 1 || config->speed_percent != 100 || config->timed || config->warm_hash) {
             std::cout << "config threads " << config->threads
                       << " speed " << static_cast<unsigned>(config->speed_percent)
-                      << " timed " << (config->timed ? 1 : 0) << '\n';
+                      << " timed " << (config->timed ? 1 : 0);
+            if (config->warm_hash) {
+                std::cout << " warm_hash 1";
+            }
+            std::cout << '\n';
         }
         std::vector<std::pair<koi::StrengthPosition, BenchmarkRun>> profile_runs;
         if (config->profile_json_path.has_value()) {
