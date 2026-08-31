@@ -59,11 +59,11 @@ struct SearchEventSink {
     std::function<void(const SearchInfo&)> on_info;
     std::function<void(const SearchResult&)> on_complete;
 };
-    std::size_t multi_pv = 1;
-    bool analyse_mode = false;
 
 struct SearchOptions {
     std::size_t hash_mb = 16;
+    std::size_t multi_pv = 1;
+    bool analyse_mode = false;
 };
 
 } // namespace koi

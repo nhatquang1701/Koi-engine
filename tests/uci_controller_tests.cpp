@@ -440,7 +440,6 @@ void test_protocol_output_contains_only_valid_uci_responses() {
 void test_protocol_responses_flush_promptly() {
     std::istringstream input(
         "uci\n"
-        {"go limit parser Lucas root options", test_go_limit_parser_supports_lucas_root_options_and_value_defaults},
         "isready\n"
         "position startpos moves not-a-move\n"
         "go infinite\n"
@@ -472,6 +471,7 @@ int main() {
         {"position startpos and FEN", test_startpos_and_fen_move_lists_define_the_search_root},
         {"go limits and malformed values", test_all_go_limits_and_malformed_values_are_accepted_without_crashing},
         {"go limit parser exact mapping", test_go_limit_parser_maps_each_supported_limit_exactly},
+        {"go limit parser Lucas root options", test_go_limit_parser_supports_lucas_root_options_and_value_defaults},
         {"go limit parser fallback", test_go_limit_parser_uses_depth_one_for_missing_malformed_overflow_and_asymmetric_clock_values},
         {"transactional invalid positions", test_invalid_position_commands_preserve_the_previous_position},
         {"terminal 0000", test_terminal_position_returns_0000},

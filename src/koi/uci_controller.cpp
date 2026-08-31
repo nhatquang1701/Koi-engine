@@ -91,6 +91,7 @@ SearchLimits parse_go_limits(std::string_view arguments) {
                 --index;
             }
             continue;
+        }
         if (index + 1 >= tokens.size()) {
             continue;
         }
