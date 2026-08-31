@@ -36,6 +36,7 @@ public:
     [[nodiscard]] SearchHandle start(GameState root, SearchLimits limits,
                                      SearchEventSink sink = {}, SearchOptions options = {});
     void set_hash_size_mb(std::size_t megabytes);
+    [[nodiscard]] std::size_t hash_size_mb() const noexcept;
     void clear_hash() noexcept;
 
 private:

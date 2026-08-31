@@ -4,6 +4,31 @@
 #include <limits>
 
 namespace koi {
+namespace {
+
+constexpr int kMateThreshold = 99'000;
+
+int score_for_storage(int score, int ply) noexcept {
+    if (score >= kMateThreshold) {
+        return score + ply;
+    }
+    if (score <= -kMateThreshold) {
+        return score - ply;
+    }
+    return score;
+}
+
+int score_for_probe(int score, int ply) noexcept {
+    if (score >= kMateThreshold) {
+        return score - ply;
+    }
+    if (score <= -kMateThreshold) {
+        return score + ply;
+    }
+    return score;
+}
+
+} // namespace
 
 TranspositionTable::TranspositionTable(std::size_t megabytes) {
     set_size_mb(megabytes);
@@ -43,14 +68,15 @@ void TranspositionTable::new_generation() noexcept {
     }
 }
 
-void TranspositionTable::store(std::uint64_t key, int depth, int score, TranspositionBound bound, Move best_move) noexcept {
+void TranspositionTable::store(std::uint64_t key, int depth, int score, TranspositionBound bound, Move best_move,
+                               int ply) noexcept {
     std::lock_guard lock(mutex_);
     if (entries_.empty()) {
         return;
     }
 
     TranspositionEntry& existing = entries_[key % entries_.size()];
-    const bool empty = existing.key == 0;
+    const bool empty = !existing.occupied;
     const bool same_key = existing.key == key;
     const bool older_generation = existing.generation != generation_;
     const bool deeper = depth > existing.depth;
@@ -59,20 +85,22 @@ void TranspositionTable::store(std::uint64_t key, int depth, int score, Transpos
         return;
     }
 
-    existing = TranspositionEntry{key, depth, score, bound, best_move, generation_};
+    existing = TranspositionEntry{key, depth, score_for_storage(score, ply), bound, best_move, generation_, true};
 }
 
-std::optional<TranspositionEntry> TranspositionTable::probe(std::uint64_t key) const noexcept {
+std::optional<TranspositionEntry> TranspositionTable::probe(std::uint64_t key, int ply) const noexcept {
     std::lock_guard lock(mutex_);
     if (entries_.empty()) {
         return std::nullopt;
     }
 
     const TranspositionEntry& entry = entries_[key % entries_.size()];
-    if (entry.key != key) {
+    if (!entry.occupied || entry.key != key) {
         return std::nullopt;
     }
-    return entry;
+    TranspositionEntry result = entry;
+    result.score = score_for_probe(result.score, ply);
+    return result;
 }
 
 } // namespace koi

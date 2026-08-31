@@ -19,6 +19,7 @@ struct TranspositionEntry {
     TranspositionBound bound = TranspositionBound::exact;
     Move best_move = Move::no_move();
     std::uint16_t generation = 0;
+    bool occupied = false;
 };
 
 class TranspositionTable {
@@ -29,8 +30,9 @@ public:
     [[nodiscard]] std::size_t size_mb() const noexcept;
     void clear() noexcept;
     void new_generation() noexcept;
-    void store(std::uint64_t key, int depth, int score, TranspositionBound bound, Move best_move) noexcept;
-    [[nodiscard]] std::optional<TranspositionEntry> probe(std::uint64_t key) const noexcept;
+    void store(std::uint64_t key, int depth, int score, TranspositionBound bound, Move best_move,
+               int ply = 0) noexcept;
+    [[nodiscard]] std::optional<TranspositionEntry> probe(std::uint64_t key, int ply = 0) const noexcept;
 
 private:
     [[nodiscard]] static std::size_t normalized_size_mb(std::size_t megabytes) noexcept;

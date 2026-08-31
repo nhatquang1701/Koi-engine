@@ -8,6 +8,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <vector>
 
 #include "koi/classical_evaluator.hpp"
@@ -32,7 +33,7 @@ koi::GameState require_state(std::string_view fen) {
 }
 
 struct CompletedSearch {
-    std::mutex mutex;
+    mutable std::mutex mutex;
     std::optional<koi::SearchResult> result;
     std::uint32_t completions = 0;
 
@@ -49,6 +50,11 @@ struct CompletedSearch {
         require(result.has_value(), "search must report a result");
         require(completions == 1, "search must report exactly one final result");
         return *result;
+    }
+
+    std::uint32_t completion_count() const {
+        std::lock_guard lock(mutex);
+        return completions;
     }
 };
 
@@ -140,11 +146,59 @@ void test_fixed_depth_search_is_deterministic_and_legal() {
     require(root.is_legal(*first.best_move), "search must only return legal root moves");
 }
 
+void test_infinite_search_runs_until_stopped_and_completes_once() {
+    auto evaluator = std::make_shared<koi::ClassicalEvaluator>();
+    koi::SearchService service(evaluator);
+    koi::SearchLimits limits;
+    limits.infinite = true;
+    limits.depth = 1;
+    CompletedSearch completed;
+
+    koi::SearchHandle handle = service.start(koi::GameState::startpos(), limits, completed.sink());
+    std::this_thread::sleep_for(50ms);
+    require(handle.running(), "infinite search must remain running instead of completing its depth limit");
+    require(completed.completion_count() == 0, "infinite search must not complete before cancellation");
+
+    handle.stop();
+    handle.wait();
+    require(!handle.running(), "stopped infinite search must join its worker");
+    const koi::SearchResult result = completed.take_result();
+    require(result.best_move.has_value(), "stopped non-terminal infinite search must retain a legal fallback move");
+}
+
+void test_service_hash_configuration_survives_default_start_and_non_default_override() {
+    auto evaluator = std::make_shared<koi::ClassicalEvaluator>();
+    koi::SearchService service(evaluator);
+    koi::SearchLimits limits;
+    limits.depth = 1;
+
+    service.set_hash_size_mb(1);
+    require(service.hash_size_mb() == 1, "service hash configuration must accept 1 MB");
+    search(service, koi::GameState::startpos(), limits);
+    require(service.hash_size_mb() == 1, "default SearchOptions must preserve the configured service hash size");
+
+    CompletedSearch completed;
+    koi::SearchOptions override;
+    override.hash_mb = 2;
+    koi::SearchHandle handle = service.start(koi::GameState::startpos(), limits, completed.sink(), override);
+    handle.wait();
+    completed.take_result();
+    require(service.hash_size_mb() == 2, "a non-default per-start hash option must explicitly reconfigure the service hash");
+}
+
 void test_transposition_table_stores_probes_and_clears_entries() {
     koi::TranspositionTable table;
     require(table.size_mb() == 16, "transposition table default must be 16 MB");
     const auto move = koi::Move::parse_uci("e2e4");
     require(move.has_value(), "test move must parse");
+
+    require(!table.probe(0).has_value(), "a fresh table must not report a zero-key entry");
+    table.store(0, 6, 17, koi::TranspositionBound::exact, *move);
+    const auto zero_key_entry = table.probe(0);
+    require(zero_key_entry.has_value() && zero_key_entry->score == 17,
+            "a stored zero key must probe successfully");
+    table.clear();
+    require(!table.probe(0).has_value(), "a cleared table must not report a zero-key entry");
 
     table.new_generation();
     table.store(0x0123456789abcdefULL, 7, 42, koi::TranspositionBound::exact, *move);
@@ -160,6 +214,22 @@ void test_transposition_table_stores_probes_and_clears_entries() {
     require(table.size_mb() == 1, "hash configuration must accept the lower 1 MB bound");
 }
 
+void test_transposition_table_preserves_mate_distance_across_plies() {
+    koi::TranspositionTable table;
+    const auto move = koi::Move::parse_uci("e2e4");
+    require(move.has_value(), "test move must parse");
+
+    table.store(0x1111ULL, 6, 99'993, koi::TranspositionBound::exact, *move, 7);
+    const auto winning_mate = table.probe(0x1111ULL, 3);
+    require(winning_mate.has_value() && winning_mate->score == 99'997,
+            "a winning mate score must be adjusted to the probing ply");
+
+    table.store(0x2222ULL, 6, -99'993, koi::TranspositionBound::exact, *move, 7);
+    const auto losing_mate = table.probe(0x2222ULL, 3);
+    require(losing_mate.has_value() && losing_mate->score == -99'997,
+            "a losing mate score must be adjusted to the probing ply");
+}
+
 struct TestCase {
     std::string_view name;
     void (*run)();
@@ -173,7 +243,10 @@ int main() {
         {"time manager", test_time_manager_applies_move_time_and_clock_limits},
         {"terminal search", test_terminal_roots_return_mate_or_stalemate_scores},
         {"deterministic legal search", test_fixed_depth_search_is_deterministic_and_legal},
+        {"infinite search lifecycle", test_infinite_search_runs_until_stopped_and_completes_once},
+        {"service hash persistence", test_service_hash_configuration_survives_default_start_and_non_default_override},
         {"transposition table", test_transposition_table_stores_probes_and_clears_entries},
+        {"transposition table mate normalization", test_transposition_table_preserves_mate_distance_across_plies},
     };
 
     for (const TestCase& test : tests) {

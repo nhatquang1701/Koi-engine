@@ -18,6 +18,7 @@ namespace {
 constexpr int kInfinity = 1'000'000;
 constexpr int kMateScore = 100'000;
 constexpr int kMateThreshold = 99'000;
+constexpr int kMaximumSearchDepth = 64;
 
 int promotion_value(Promotion promotion) noexcept {
     switch (promotion) {
@@ -182,10 +183,10 @@ struct SearchContext {
 
         const int original_alpha = alpha;
         std::optional<Move> tt_move;
-        if (const auto entry = table.probe(state.position_key()); entry.has_value()) {
+        if (const auto entry = table.probe(state.position_key(), ply); entry.has_value()) {
             ++stats.tt_hits;
             tt_move = entry->best_move.is_no_move() ? std::nullopt : std::optional<Move>{entry->best_move};
-            if (entry->depth >= depth) {
+            if (ply > 0 && entry->depth >= depth) {
                 if (entry->bound == TranspositionBound::exact) {
                     return entry->score;
                 }
@@ -231,7 +232,7 @@ struct SearchContext {
 
         const TranspositionBound bound = best_score <= original_alpha ? TranspositionBound::upper
             : best_score >= beta ? TranspositionBound::lower : TranspositionBound::exact;
-        table.store(state.position_key(), depth, best_score, bound, best_move);
+        table.store(state.position_key(), depth, best_score, bound, best_move, ply);
         return best_score;
     }
 };
@@ -314,7 +315,11 @@ SearchService::SearchService(std::shared_ptr<const Evaluator> evaluator) {
 }
 
 SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEventSink sink, SearchOptions options) {
-    impl_->table->set_size_mb(options.hash_mb);
+    // The default SearchOptions value means "use the service configuration".
+    // A non-default value explicitly reconfigures the shared service table.
+    if (options.hash_mb != SearchOptions{}.hash_mb) {
+        impl_->table->set_size_mb(options.hash_mb);
+    }
     auto state = std::make_shared<SearchHandle::State>();
     const auto evaluator = impl_->evaluator;
     const auto table = impl_->table;
@@ -336,8 +341,9 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
             result.score_cp = 0;
             result.best_move.reset();
         } else {
-            const int maximum_depth = std::max(1, limits.depth.value_or(64));
-            for (int depth = 1; depth <= maximum_depth; ++depth) {
+            const int maximum_depth = std::min(kMaximumSearchDepth, std::max(1, limits.depth.value_or(kMaximumSearchDepth)));
+            for (int depth = 1; limits.infinite || depth <= maximum_depth;
+                 depth = depth < maximum_depth ? depth + 1 : (limits.infinite ? maximum_depth : maximum_depth + 1)) {
                 if (context.interrupted()) {
                     break;
                 }
@@ -373,6 +379,10 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
 
 void SearchService::set_hash_size_mb(std::size_t megabytes) {
     impl_->table->set_size_mb(megabytes);
+}
+
+std::size_t SearchService::hash_size_mb() const noexcept {
+    return impl_->table->size_mb();
 }
 
 void SearchService::clear_hash() noexcept {
