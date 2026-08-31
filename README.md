@@ -90,6 +90,27 @@ without contaminating later positions. PGN Result headers match the adjudicated 
 lines and `#` comments are ignored). The replay executable is expected beside
 `koi-engine.exe` (or can be supplied as `-ReplayPath`).
 
+## Strength regression suite
+
+The deterministic `Threads=1`, `Speed=100` reference path includes a fixed-depth
+64-case tactical hard gate and a separate 128-case optional positional corpus. The
+hard gate covers mates, checks, evasions, forks, pins, poisoned captures, promotions,
+defensive choices, and pawn-race motifs. Each fixture records a stable ID, FEN, depth,
+category, and explicit accepted-move allowlist; multi-solution positions do not depend
+on one arbitrary root tie-break.
+
+Run the hard gate and the complete Release suite from an x64 Visual Studio developer
+shell:
+
+```powershell
+.\out\release-vs\koi_strength_tests.exe
+ctest --test-dir out\release-vs -C Release --output-on-failure
+```
+
+The optional corpus is retained for local tuning and is deliberately not an Elo or NPS
+CI threshold. NNUE, opening books, tablebases, and chess variants remain deferred;
+this engine continues to evaluate standard chess with its classical evaluator.
+
 ## UCI smoke test
 
 Run this PowerShell transcript after building:

@@ -98,6 +98,17 @@ void test_killer_tier_outranks_saturated_history() {
             "a killer must outrank even a repeatedly reinforced history move");
 }
 
+void test_quiet_checks_are_ordered_before_ordinary_quiet_moves() {
+    const koi::GameState state = require_state("k7/8/8/8/8/8/4Q3/4K3 w - - 0 1");
+    koi::detail::SearchMoveOrdering ordering;
+
+    std::vector<koi::Move> moves = quiet_moves(state, state.legal_moves());
+    ordering.order(state, moves, std::nullopt, 0);
+    const auto first = !moves.empty() ? state.describe_move(moves.front()) : std::nullopt;
+    require(first.has_value() && first->gives_check,
+            "a quiet checking move must be searched before ordinary quiet moves");
+}
+
 struct TestCase {
     std::string_view name;
     void (*run)();
@@ -110,6 +121,7 @@ int main() {
         {"TT and MVV-LVA ordering", test_tt_move_and_mvv_lva_capture_preference},
         {"killer history stable ordering", test_killer_history_and_tie_breaking_are_deterministic},
         {"killer tier outranks saturated history", test_killer_tier_outranks_saturated_history},
+        {"quiet checks before quiet moves", test_quiet_checks_are_ordered_before_ordinary_quiet_moves},
     };
 
     for (const TestCase& test : tests) {

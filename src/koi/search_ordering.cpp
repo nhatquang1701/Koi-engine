@@ -9,6 +9,7 @@ namespace {
 constexpr int kTtMovePriority = 1'000'000;
 constexpr int kCapturePriority = 500'000;
 constexpr int kPromotionPriority = 400'000;
+constexpr int kCheckingMovePriority = 350'000;
 constexpr int kKillerPriority = 300'000;
 constexpr int kMaximumHistoryScore = kKillerPriority - 1;
 constexpr int kMaximumPly = 64;
@@ -145,7 +146,9 @@ int SearchMoveOrdering::priority(const GameState& state, const MoveMetadata& met
     if (move.promotion() != Promotion::none) {
         return kPromotionPriority + promotion_value(move.promotion());
     }
-
+    if (metadata.gives_check) {
+        return kCheckingMovePriority;
+    }
     const int checked_ply = normalized_ply(ply);
     if (killers_[static_cast<std::size_t>(checked_ply)][0] == move) {
         return kKillerPriority + 1;

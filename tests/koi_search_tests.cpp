@@ -197,6 +197,17 @@ void test_evaluator_scores_backward_pawns_piece_mobility_and_dead_material() {
             "insufficient material must evaluate as a forced draw");
 }
 
+void test_evaluator_increases_advanced_passed_pawn_value_in_the_endgame() {
+    koi::ClassicalEvaluator evaluator;
+    const koi::GameState endgame = require_state("4k3/8/8/3P4/8/8/8/4K3 w - - 0 1");
+    const koi::GameState middlegame = require_state("4q2k/8/8/3P4/8/8/8/4Q2K w - - 0 1");
+
+    const auto endgame_score = evaluator.breakdown(endgame, koi::Color::white);
+    const auto middlegame_score = evaluator.breakdown(middlegame, koi::Color::white);
+    require(endgame_score.pawn_structure > middlegame_score.pawn_structure,
+            "an advanced passed pawn must receive additional weight as material leaves the board");
+}
+
 void test_time_manager_applies_move_time_and_clock_limits() {
     koi::SearchLimits move_time;
     move_time.movetime = 100ms;
@@ -1005,6 +1016,7 @@ int main() {
         {"classical evaluator breakdown", test_evaluator_breakdown_scores_structure_activity_and_king_safety},
         {"evaluator perspective symmetry", test_evaluator_breakdown_is_perspective_symmetric},
         {"evaluator endgame and mobility", test_evaluator_scores_backward_pawns_piece_mobility_and_dead_material},
+        {"evaluator passed pawn endgame scaling", test_evaluator_increases_advanced_passed_pawn_value_in_the_endgame},
         {"time manager", test_time_manager_applies_move_time_and_clock_limits},
         {"speed budgets", test_speed_scales_only_time_based_search_budgets},
         {"search options", test_search_options_include_thread_and_speed_controls},

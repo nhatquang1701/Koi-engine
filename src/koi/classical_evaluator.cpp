@@ -353,7 +353,8 @@ int pawn_structure_for(const PositionFeatures& features, Color color) noexcept {
         }
         if (passed) {
             const int advancement = color == Color::white ? rank : 7 - rank;
-            score += 20 + advancement * 4;
+            const int passed_bonus = 20 + advancement * 4;
+            score += passed_bonus * (32 - features.game_phase) / 24;
             if ((features.attacked_squares[own] & (std::uint64_t{1} << square)) != 0) {
                 score += 5;
             }
