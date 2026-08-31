@@ -379,6 +379,16 @@ void test_optional_strength_corpus_has_required_categories_and_metadata() {
     validate_fixture_contract(positions, 128, false);
 }
 
+void test_optional_strength_positions_are_not_rule_draws() {
+    for (const koi::StrengthPosition& position : koi::optional_strength_positions()) {
+        const auto state = koi::GameState::from_fen(position.fen);
+        require(state.has_value(), "optional strength fixture must contain a valid FEN");
+        require(!state->is_draw_by_rule(),
+                "optional strength fixture must not begin as a rule draw: " +
+                    std::string(position.name));
+    }
+}
+
 void test_strength_corpora_are_cross_distinct_and_standard_legal() {
     std::set<std::string_view> fens;
     const auto is_historical_legacy = [](std::string_view name) {
@@ -410,6 +420,7 @@ int main() {
     try {
         test_strength_suite_has_the_required_hard_gate_coverage();
         test_optional_strength_corpus_has_required_categories_and_metadata();
+        test_optional_strength_positions_are_not_rule_draws();
         test_strength_corpora_are_cross_distinct_and_standard_legal();
         test_strength_position_preserves_legacy_and_id_first_initialization();
         test_legacy_strength_rows_are_exact();
