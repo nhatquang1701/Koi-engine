@@ -1,9 +1,9 @@
 # Koi Engine v1
 
 Koi Engine v1 is a Windows x64 UCI chess engine for standard chess. It is
-written in C++26 and currently uses a random legal-move placeholder strategy:
-it chooses uniformly from the legal moves in the current position. It is not a
-search-strength engine.
+written in C++26 and uses deterministic iterative-deepening alpha-beta search
+with a classical evaluator and a persistent transposition table. Search runs on
+a cancellable worker so the UCI command loop remains responsive.
 
 ## Build prerequisites
 
@@ -34,29 +34,41 @@ $engine = (Resolve-Path .\build\koi-engine.exe).Path
     'uci'
     'isready'
     'position startpos'
-    'go'
+    'go depth 2'
+    'stop'
     'quit'
 ) | & $engine
 ```
 
 The output should include, in order, the engine identification lines, the
-`RandomSeed` option declaration, `uciok`, `readyok`, and one legal coordinate
-notation `bestmove` from the starting position (for example, `bestmove e2e4`).
+`RandomSeed`, `Hash`, and `Clear Hash` option declarations, `uciok`, `readyok`,
+zero or more valid `info` lines, and one legal coordinate-notation `bestmove`
+from the starting position (for example, `bestmove e2e4`).
 
 ## Supported UCI behavior
 
-- `uci` reports the engine identity and the `RandomSeed` spin option.
-- `isready` responds immediately with `readyok`.
+- `uci` reports the engine identity, the compatibility `RandomSeed` option,
+  `Hash` (default 16 MB, range 1–4096 MB), and the `Clear Hash` button. It does
+  not advertise `Threads` while search is single-worker.
+- `isready` responds immediately with `readyok`, including while searching.
 - `ucinewgame` resets the position; `position startpos` and `position fen ...`
-  set a position, optionally followed by legal UCI moves.
+  set a position, optionally followed by legal UCI moves. Replacing the root
+  cancels and joins the old search without leaking its result.
 - `setoption name RandomSeed value 0` uses runtime randomness (`RandomSeed 0`).
-  A nonzero seed is repeatable, so the same position and seed produce the same
-  choice.
-- `go` chooses and reports one legal move immediately; search limits are not
-  used by this v1 placeholder.
-- `stop` is accepted as a no-op because `go` completes immediately in v1.
+  A nonzero seed remains available to the compatibility random chooser, but
+  normal `go` search is deterministic and does not use it.
+- `setoption name Hash value <MB>` resizes the persistent search hash, and
+  `setoption name Clear Hash` clears it. Either command stops and joins an
+  active search before changing the table.
+- `go` accepts `depth`, `nodes`, `movetime`, `wtime`, `btime`, `winc`, `binc`,
+  `movestogo`, and `infinite`. Malformed limit values are ignored. A bare `go`
+  defaults to bounded depth 1.
+- Search may report completed iterations as UCI `info depth ... score ... nodes
+  ... nps ... time ... pv ...` lines.
+- `stop` cancels and joins the active worker and emits exactly one final legal
+  `bestmove` for that search.
 - A terminal position with no legal moves returns `bestmove 0000`.
-- `quit` exits the process.
+- `quit` and input EOF cancel and join the worker without late protocol output.
 
 ## Register in Lucas Chess
 

@@ -4,8 +4,9 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$TimeoutMilliseconds = 5000
 
-function Invoke-UciTranscript([string]$Transcript) {
+function Start-UciSession {
     $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
     $startInfo.FileName = $EnginePath
     $startInfo.UseShellExecute = $false
@@ -20,24 +21,81 @@ function Invoke-UciTranscript([string]$Transcript) {
         throw 'Unable to start koi-engine.'
     }
 
-    $stdoutTask = $process.StandardOutput.ReadToEndAsync()
-    $stderrTask = $process.StandardError.ReadToEndAsync()
-    $process.StandardInput.Write($Transcript)
-    $process.StandardInput.Close()
+    return [pscustomobject]@{
+        Process = $process
+        StderrTask = $process.StandardError.ReadToEndAsync()
+        Lines = [System.Collections.Generic.List[string]]::new()
+    }
+}
 
-    if (-not $process.WaitForExit(5000)) {
-        if (-not $process.HasExited) {
-            $process.Kill()
-        }
-        $process.WaitForExit()
-        throw 'koi-engine did not exit within 5000 ms.'
+function Stop-TimedOutSession($Session, [string]$Message) {
+    if (-not $Session.Process.HasExited) {
+        $Session.Process.Kill()
+        $Session.Process.WaitForExit()
+    }
+    throw $Message
+}
+
+function Send-UciCommand($Session, [string]$Command) {
+    $Session.Process.StandardInput.WriteLine($Command)
+    $Session.Process.StandardInput.Flush()
+}
+
+function Read-UciLine($Session, [string]$Description) {
+    $readTask = $Session.Process.StandardOutput.ReadLineAsync()
+    if (-not $readTask.Wait($TimeoutMilliseconds)) {
+        Stop-TimedOutSession $Session "Timed out waiting for $Description."
+    }
+
+    $line = $readTask.GetAwaiter().GetResult()
+    if ($null -eq $line) {
+        throw "koi-engine closed stdout while waiting for $Description."
+    }
+    $Session.Lines.Add($line)
+    return $line
+}
+
+function Complete-UciSession($Session, [bool]$SendQuit) {
+    $stdoutTailTask = $Session.Process.StandardOutput.ReadToEndAsync()
+    if ($SendQuit -and -not $Session.Process.HasExited) {
+        Send-UciCommand $Session 'quit'
+    }
+    $Session.Process.StandardInput.Close()
+
+    if (-not $Session.Process.WaitForExit($TimeoutMilliseconds)) {
+        Stop-TimedOutSession $Session 'koi-engine did not exit within 5000 ms.'
+    }
+
+    $tail = $stdoutTailTask.GetAwaiter().GetResult()
+    foreach ($line in @($tail -split "`r?`n" | Where-Object { $_.Length -ne 0 })) {
+        $Session.Lines.Add($line)
+    }
+    $diagnostics = $Session.StderrTask.GetAwaiter().GetResult()
+
+    if ($Session.Process.ExitCode -ne 0) {
+        throw "koi-engine exited with $($Session.Process.ExitCode): $diagnostics"
+    }
+    if ($diagnostics.Length -ne 0) {
+        throw "koi-engine wrote diagnostics for a valid transcript: $diagnostics"
+    }
+
+    return @($Session.Lines)
+}
+
+function Invoke-UciTranscript([string]$Transcript) {
+    $session = Start-UciSession
+    $stdoutTask = $session.Process.StandardOutput.ReadToEndAsync()
+    $session.Process.StandardInput.Write($Transcript)
+    $session.Process.StandardInput.Close()
+
+    if (-not $session.Process.WaitForExit($TimeoutMilliseconds)) {
+        Stop-TimedOutSession $session 'koi-engine transcript did not exit within 5000 ms.'
     }
 
     $output = $stdoutTask.GetAwaiter().GetResult()
-    $diagnostics = $stderrTask.GetAwaiter().GetResult()
-
-    if ($process.ExitCode -ne 0) {
-        throw "koi-engine exited with $($process.ExitCode): $diagnostics"
+    $diagnostics = $session.StderrTask.GetAwaiter().GetResult()
+    if ($session.Process.ExitCode -ne 0) {
+        throw "koi-engine exited with $($session.Process.ExitCode): $diagnostics"
     }
     if ($diagnostics.Length -ne 0) {
         throw "koi-engine wrote diagnostics for a valid transcript: $diagnostics"
@@ -46,21 +104,56 @@ function Invoke-UciTranscript([string]$Transcript) {
     return @($output -split "`r?`n" | Where-Object { $_.Length -ne 0 })
 }
 
-$handshake = @(Invoke-UciTranscript "uci`nisready`nposition startpos`ngo`nstop`nquit`n")
-$expectedPrefix = @(
+function Test-SearchInfo([string]$Line) {
+    return $Line -match '^info depth [1-9][0-9]* score (cp|mate) -?[0-9]+ nodes [0-9]+ nps [0-9]+ time [0-9]+ pv( [a-h][1-8][a-h][1-8][nbrq]?)*$'
+}
+
+$session = Start-UciSession
+Send-UciCommand $session 'uci'
+$expectedHandshake = @(
     'id name Koi Engine',
     'id author Koi Engine contributors',
     'option name RandomSeed type spin default 0 min 0 max 2147483647',
-    'uciok',
-    'readyok'
+    'option name Hash type spin default 16 min 1 max 4096',
+    'option name Clear Hash type button',
+    'uciok'
 )
-
-if ($handshake.Count -ne 6) {
-    throw "Unexpected handshake output: $($handshake -join ' | ')"
+foreach ($expected in $expectedHandshake) {
+    $actual = Read-UciLine $session $expected
+    if ($actual -cne $expected) {
+        throw "Unexpected handshake line. Expected '$expected', received '$actual'."
+    }
 }
-for ($index = 0; $index -lt $expectedPrefix.Count; ++$index) {
-    if ($handshake[$index] -cne $expectedPrefix[$index]) {
-        throw "Unexpected handshake output: $($handshake -join ' | ')"
+
+Send-UciCommand $session 'isready'
+if ((Read-UciLine $session 'initial readyok') -cne 'readyok') {
+    throw 'Expected readyok after the UCI handshake.'
+}
+
+Send-UciCommand $session 'position startpos'
+Send-UciCommand $session 'go infinite'
+Send-UciCommand $session 'isready'
+while ($true) {
+    $line = Read-UciLine $session 'readyok during infinite search'
+    if ($line -ceq 'readyok') {
+        break
+    }
+    if ($line -like 'bestmove *') {
+        throw "Infinite search completed before isready: $line"
+    }
+    if (-not (Test-SearchInfo $line)) {
+        throw "Invalid output during infinite search: $line"
+    }
+}
+
+Send-UciCommand $session 'stop'
+$bestmove = $null
+while ($null -eq $bestmove) {
+    $line = Read-UciLine $session 'bestmove after stop'
+    if ($line -like 'bestmove *') {
+        $bestmove = $line
+    } elseif (-not (Test-SearchInfo $line)) {
+        throw "Invalid output while stopping search: $line"
     }
 }
 
@@ -69,13 +162,106 @@ $initialMoves = @(
     'e2e3', 'e2e4', 'f2f3', 'f2f4', 'g2g3', 'g2g4', 'h2h3', 'h2h4',
     'b1a3', 'b1c3', 'g1f3', 'g1h3'
 )
-
-if ($handshake[5] -notmatch '^bestmove ([a-h][1-8][a-h][1-8][nbrq]?)$' -or
+if ($bestmove -notmatch '^bestmove ([a-h][1-8][a-h][1-8][nbrq]?)$' -or
     $initialMoves -notcontains $Matches[1]) {
-    throw "Expected a legal initial bestmove, received: $($handshake[5])"
+    throw "Expected a legal initial bestmove, received: $bestmove"
 }
 
-$checkmate = @(Invoke-UciTranscript "position fen 7k/6Q1/5K2/8/8/8/8/8 b - - 0 1`ngo`nquit`n")
-if ($checkmate.Count -ne 1 -or $checkmate[0] -cne 'bestmove 0000') {
-    throw "Expected checkmate to return bestmove 0000, received: $($checkmate -join ' | ')"
+Send-UciCommand $session 'stop'
+Send-UciCommand $session 'isready'
+while ($true) {
+    $line = Read-UciLine $session 'readyok after duplicate stop'
+    if ($line -ceq 'readyok') {
+        break
+    }
+    if ($line -like 'bestmove *') {
+        throw "Duplicate stop emitted another bestmove: $line"
+    }
+    if (-not (Test-SearchInfo $line)) {
+        throw "Invalid output after duplicate stop: $line"
+    }
+}
+$null = Complete-UciSession $session $true
+
+$replacement = Start-UciSession
+Send-UciCommand $replacement 'position startpos'
+Send-UciCommand $replacement 'go infinite'
+Send-UciCommand $replacement 'position fen 7k/6Q1/5K2/8/8/8/8/8 b - - 0 1'
+Send-UciCommand $replacement 'go infinite'
+Send-UciCommand $replacement 'stop'
+$replacementBestmoves = [System.Collections.Generic.List[string]]::new()
+while ($replacementBestmoves.Count -eq 0) {
+    $line = Read-UciLine $replacement 'replacement bestmove'
+    if ($line -like 'bestmove *') {
+        $replacementBestmoves.Add($line)
+    } elseif (-not (Test-SearchInfo $line)) {
+        throw "Invalid output during position replacement: $line"
+    }
+}
+Send-UciCommand $replacement 'isready'
+while ($true) {
+    $line = Read-UciLine $replacement 'replacement readyok fence'
+    if ($line -ceq 'readyok') {
+        break
+    }
+    if ($line -like 'bestmove *') {
+        $replacementBestmoves.Add($line)
+    } elseif (-not (Test-SearchInfo $line)) {
+        throw "Invalid output after position replacement: $line"
+    }
+}
+$null = Complete-UciSession $replacement $true
+if ($replacementBestmoves.Count -ne 1 -or $replacementBestmoves[0] -cne 'bestmove 0000') {
+    throw "Position replacement leaked a stale result: $($replacementBestmoves -join ' | ')"
+}
+
+$limitLines = @(Invoke-UciTranscript @'
+position startpos
+go depth 1
+stop
+go nodes 0
+stop
+go movetime 0
+stop
+go wtime 0 btime 0 winc 0 binc 0 movestogo 1
+stop
+go infinite
+stop
+go depth bad nodes -1 movetime -1 wtime bad btime -1 winc nope binc -4 movestogo 0
+stop
+go
+stop
+setoption name Hash value 1
+setoption name Clear Hash
+quit
+'@
+)
+$limitBestmoves = @($limitLines | Where-Object { $_ -like 'bestmove *' })
+if ($limitBestmoves.Count -ne 7) {
+    throw "Expected one bestmove for every go limit variant: $($limitLines -join ' | ')"
+}
+foreach ($line in $limitLines) {
+    if ($line -like 'bestmove *') {
+        if ($line -notmatch '^bestmove [a-h][1-8][a-h][1-8][nbrq]?$') {
+            throw "Invalid coordinate bestmove: $line"
+        }
+    } elseif (-not (Test-SearchInfo $line)) {
+        throw "Invalid limit transcript output: $line"
+    }
+}
+
+$quitSession = Start-UciSession
+Send-UciCommand $quitSession 'position startpos'
+Send-UciCommand $quitSession 'go infinite'
+$quitLines = @(Complete-UciSession $quitSession $true)
+if (@($quitLines | Where-Object { $_ -like 'bestmove *' }).Count -ne 0) {
+    throw "quit emitted a late bestmove: $($quitLines -join ' | ')"
+}
+
+$eofSession = Start-UciSession
+Send-UciCommand $eofSession 'position startpos'
+Send-UciCommand $eofSession 'go infinite'
+$eofLines = @(Complete-UciSession $eofSession $false)
+if (@($eofLines | Where-Object { $_ -like 'bestmove *' }).Count -ne 0) {
+    throw "EOF emitted a late bestmove: $($eofLines -join ' | ')"
 }

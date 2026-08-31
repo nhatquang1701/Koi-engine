@@ -1,13 +1,24 @@
 #include "koi/uci_controller.hpp"
 
 #include <charconv>
+#include <chrono>
+#include <cstdint>
+#include <limits>
+#include <memory>
 #include <sstream>
 #include <string>
+#include <utility>
 #include <vector>
+
+#include "koi/classical_evaluator.hpp"
 
 namespace koi {
 
 namespace {
+
+constexpr std::uint64_t kMaximumRandomSeed = 2'147'483'647;
+constexpr std::uint64_t kMinimumHashMegabytes = 1;
+constexpr std::uint64_t kMaximumHashMegabytes = 4'096;
 
 std::vector<std::string> remaining_tokens(std::istream& command) {
     std::vector<std::string> tokens;
@@ -17,15 +28,135 @@ std::vector<std::string> remaining_tokens(std::istream& command) {
     return tokens;
 }
 
+bool parse_uint64(const std::string& value, std::uint64_t& parsed) {
+    const auto [end, error] = std::from_chars(value.data(), value.data() + value.size(), parsed);
+    return error == std::errc{} && end == value.data() + value.size();
+}
+
 bool parse_random_seed(const std::string& value, std::uint32_t& seed) {
-    const auto [end, error] = std::from_chars(value.data(), value.data() + value.size(), seed);
-    return error == std::errc{} && end == value.data() + value.size() && seed <= 2147483647U;
+    std::uint64_t parsed = 0;
+    if (!parse_uint64(value, parsed) || parsed > kMaximumRandomSeed) {
+        return false;
+    }
+    seed = static_cast<std::uint32_t>(parsed);
+    return true;
+}
+
+bool parse_milliseconds(const std::string& value, std::chrono::milliseconds& duration) {
+    std::uint64_t parsed = 0;
+    using Rep = std::chrono::milliseconds::rep;
+    if (!parse_uint64(value, parsed) ||
+        parsed > static_cast<std::uint64_t>(std::numeric_limits<Rep>::max())) {
+        return false;
+    }
+    duration = std::chrono::milliseconds{static_cast<Rep>(parsed)};
+    return true;
+}
+
+SearchLimits parse_go_limits(std::istream& command) {
+    const std::vector<std::string> tokens = remaining_tokens(command);
+    SearchLimits limits;
+    std::optional<std::chrono::milliseconds> white_time;
+    std::optional<std::chrono::milliseconds> black_time;
+    std::optional<std::chrono::milliseconds> white_increment;
+    std::optional<std::chrono::milliseconds> black_increment;
+
+    for (std::size_t index = 0; index < tokens.size(); ++index) {
+        const std::string& token = tokens[index];
+        if (token == "infinite") {
+            limits.infinite = true;
+            continue;
+        }
+        if (index + 1 >= tokens.size()) {
+            continue;
+        }
+
+        const std::string& value = tokens[index + 1];
+        if (token == "depth") {
+            std::uint64_t parsed = 0;
+            if (parse_uint64(value, parsed) && parsed > 0 &&
+                parsed <= static_cast<std::uint64_t>(std::numeric_limits<int>::max())) {
+                limits.depth = static_cast<int>(parsed);
+            }
+            ++index;
+        } else if (token == "nodes") {
+            std::uint64_t parsed = 0;
+            if (parse_uint64(value, parsed)) {
+                limits.nodes = parsed;
+            }
+            ++index;
+        } else if (token == "movetime") {
+            std::chrono::milliseconds parsed;
+            if (parse_milliseconds(value, parsed)) {
+                limits.movetime = parsed;
+            }
+            ++index;
+        } else if (token == "wtime") {
+            std::chrono::milliseconds parsed;
+            if (parse_milliseconds(value, parsed)) {
+                white_time = parsed;
+            }
+            ++index;
+        } else if (token == "btime") {
+            std::chrono::milliseconds parsed;
+            if (parse_milliseconds(value, parsed)) {
+                black_time = parsed;
+            }
+            ++index;
+        } else if (token == "winc") {
+            std::chrono::milliseconds parsed;
+            if (parse_milliseconds(value, parsed)) {
+                white_increment = parsed;
+            }
+            ++index;
+        } else if (token == "binc") {
+            std::chrono::milliseconds parsed;
+            if (parse_milliseconds(value, parsed)) {
+                black_increment = parsed;
+            }
+            ++index;
+        } else if (token == "movestogo") {
+            std::uint64_t parsed = 0;
+            if (parse_uint64(value, parsed) && parsed > 0 &&
+                parsed <= static_cast<std::uint64_t>(std::numeric_limits<std::uint32_t>::max())) {
+                limits.moves_to_go = static_cast<std::uint32_t>(parsed);
+            }
+            ++index;
+        }
+    }
+
+    if (white_time.has_value() || white_increment.has_value()) {
+        limits.white_clock = ClockLimit{white_time.value_or(std::chrono::milliseconds::zero()),
+                                        white_increment.value_or(std::chrono::milliseconds::zero())};
+    }
+    if (black_time.has_value() || black_increment.has_value()) {
+        limits.black_clock = ClockLimit{black_time.value_or(std::chrono::milliseconds::zero()),
+                                        black_increment.value_or(std::chrono::milliseconds::zero())};
+    }
+
+    const bool has_usable_limit = limits.depth.has_value() || limits.nodes.has_value() ||
+        limits.movetime.has_value() || limits.white_clock.has_value() ||
+        limits.black_clock.has_value() || limits.infinite;
+    if (!has_usable_limit) {
+        limits.depth = 1;
+    }
+    return limits;
 }
 
 } // namespace
 
 UciController::UciController(std::istream& input, std::ostream& output, std::ostream& diagnostics)
-    : input_(input), output_(output), diagnostics_(diagnostics) {}
+    : UciController(input, output, diagnostics,
+                    SearchService{std::make_shared<ClassicalEvaluator>()}) {}
+
+UciController::UciController(std::istream& input, std::ostream& output,
+                             std::ostream& diagnostics, SearchService search_service)
+    : input_(input), output_(output), diagnostics_(diagnostics),
+      search_service_(std::move(search_service)) {}
+
+UciController::~UciController() {
+    stop_and_suppress_active_search();
+}
 
 int UciController::run() {
     for (std::string line; std::getline(input_, line);) {
@@ -36,26 +167,27 @@ int UciController::run() {
         }
 
         if (name == "uci") {
-            output_ << "id name Koi Engine\n"
-                       "id author Koi Engine contributors\n"
-                       "option name RandomSeed type spin default 0 min 0 max 2147483647\n"
-                       "uciok\n"
-                    << std::flush;
+            write_handshake();
         } else if (name == "isready") {
-            output_ << "readyok\n" << std::flush;
+            write_readyok();
         } else if (name == "ucinewgame") {
+            stop_and_suppress_active_search();
             position_ = GameState::startpos();
         } else if (name == "position") {
             handle_position(command);
         } else if (name == "setoption") {
             handle_setoption(command);
         } else if (name == "go") {
-            write_bestmove();
+            handle_go(command);
+        } else if (name == "stop") {
+            stop_active_search();
         } else if (name == "quit") {
+            stop_and_suppress_active_search();
             return 0;
         }
     }
 
+    stop_and_suppress_active_search();
     return 0;
 }
 
@@ -108,28 +240,137 @@ void UciController::handle_position(std::istream& command) {
         }
     }
 
+    stop_and_suppress_active_search();
     position_ = std::move(candidate);
 }
 
 void UciController::handle_setoption(std::istream& command) {
     const std::vector<std::string> tokens = remaining_tokens(command);
-    if (tokens.size() != 4 || tokens[0] != "name" || tokens[1] != "RandomSeed" ||
-        tokens[2] != "value") {
+    if (tokens.size() == 4 && tokens[0] == "name" && tokens[1] == "RandomSeed" &&
+        tokens[2] == "value") {
+        std::uint32_t seed = 0;
+        if (parse_random_seed(tokens[3], seed)) {
+            chooser_.set_seed(seed);
+        }
         return;
     }
 
-    std::uint32_t seed = 0;
-    if (parse_random_seed(tokens[3], seed)) {
-        chooser_.set_seed(seed);
+    if (tokens.size() == 4 && tokens[0] == "name" && tokens[1] == "Hash" &&
+        tokens[2] == "value") {
+        std::uint64_t megabytes = 0;
+        if (parse_uint64(tokens[3], megabytes) && megabytes >= kMinimumHashMegabytes &&
+            megabytes <= kMaximumHashMegabytes) {
+            stop_and_suppress_active_search();
+            search_service_.set_hash_size_mb(static_cast<std::size_t>(megabytes));
+        }
+        return;
+    }
+
+    if (tokens.size() == 3 && tokens[0] == "name" && tokens[1] == "Clear" &&
+        tokens[2] == "Hash") {
+        stop_and_suppress_active_search();
+        search_service_.clear_hash();
     }
 }
 
-void UciController::write_bestmove() {
-    output_ << "bestmove " << chooser_.choose(position_).uci() << '\n' << std::flush;
+void UciController::handle_go(std::istream& command) {
+    SearchLimits limits = parse_go_limits(command);
+    stop_and_suppress_active_search();
+    const std::uint64_t generation = begin_generation();
+
+    SearchEventSink sink;
+    sink.on_info = [this, generation](const SearchInfo& info) {
+        write_search_info(generation, info);
+    };
+    sink.on_complete = [this, generation](const SearchResult& result) {
+        write_search_completion(generation, result);
+    };
+
+    active_search_.emplace(search_service_.start(position_, std::move(limits), std::move(sink)));
+}
+
+void UciController::stop_active_search() {
+    if (!active_search_.has_value()) {
+        return;
+    }
+
+    active_search_->stop();
+    active_search_->wait();
+    active_search_.reset();
+}
+
+void UciController::stop_and_suppress_active_search() {
+    if (!active_search_.has_value()) {
+        return;
+    }
+
+    {
+        std::lock_guard lock(output_mutex_);
+        ++generation_;
+    }
+    active_search_->stop();
+    active_search_->wait();
+    active_search_.reset();
+}
+
+std::uint64_t UciController::begin_generation() {
+    std::lock_guard lock(output_mutex_);
+    return ++generation_;
+}
+
+void UciController::write_handshake() {
+    std::lock_guard lock(output_mutex_);
+    output_ << "id name Koi Engine\n"
+               "id author Koi Engine contributors\n"
+               "option name RandomSeed type spin default 0 min 0 max 2147483647\n"
+               "option name Hash type spin default 16 min 1 max 4096\n"
+               "option name Clear Hash type button\n"
+               "uciok\n"
+            << std::flush;
+}
+
+void UciController::write_readyok() {
+    std::lock_guard lock(output_mutex_);
+    output_ << "readyok\n" << std::flush;
+}
+
+void UciController::write_search_info(std::uint64_t generation, const SearchInfo& info) {
+    std::lock_guard lock(output_mutex_);
+    if (generation != generation_) {
+        return;
+    }
+
+    output_ << "info depth " << info.depth << " score ";
+    if (info.mate.has_value()) {
+        output_ << "mate " << *info.mate;
+    } else {
+        output_ << "cp " << info.score_cp;
+    }
+    output_ << " nodes " << info.nodes << " nps " << info.nps
+            << " time " << info.elapsed.count() << " pv";
+    for (const Move& move : info.pv) {
+        output_ << ' ' << move.uci();
+    }
+    output_ << '\n' << std::flush;
+}
+
+void UciController::write_search_completion(std::uint64_t generation,
+                                            const SearchResult& result) {
+    std::lock_guard lock(output_mutex_);
+    if (generation != generation_) {
+        return;
+    }
+
+    output_ << "bestmove "
+            << (result.best_move.has_value() ? result.best_move->uci() : "0000")
+            << '\n' << std::flush;
 }
 
 void UciController::write_position_error(const char* message) {
-    output_ << "info string " << message << '\n' << std::flush;
+    {
+        std::lock_guard lock(output_mutex_);
+        output_ << "info string " << message << '\n' << std::flush;
+    }
     diagnostics_ << "UCI position error: " << message << '\n';
 }
 

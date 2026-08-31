@@ -1,4 +1,7 @@
+#include <atomic>
+#include <cstdint>
 #include <iostream>
+#include <limits>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -42,6 +45,26 @@ std::vector<std::string> output_lines(std::string_view output) {
     return lines;
 }
 
+std::vector<std::string> lines_starting_with(const std::vector<std::string>& lines,
+                                             std::string_view prefix) {
+    std::vector<std::string> matches;
+    for (const std::string& line : lines) {
+        if (line.starts_with(prefix)) {
+            matches.push_back(line);
+        }
+    }
+    return matches;
+}
+
+std::size_t line_index(const std::vector<std::string>& lines, std::string_view expected) {
+    for (std::size_t index = 0; index < lines.size(); ++index) {
+        if (lines[index] == expected) {
+            return index;
+        }
+    }
+    return std::numeric_limits<std::size_t>::max();
+}
+
 bool is_legal_move(const Position& position, std::string_view uci) {
     for (const auto& move : position.legal_moves()) {
         if (move.uci() == uci) {
@@ -51,22 +74,56 @@ bool is_legal_move(const Position& position, std::string_view uci) {
     return false;
 }
 
+bool is_valid_search_info(std::string_view line) {
+    std::istringstream stream{std::string(line)};
+    std::string info;
+    std::string depth_name;
+    int depth = 0;
+    std::string score_name;
+    std::string score_kind;
+    int score = 0;
+    std::string nodes_name;
+    std::uint64_t nodes = 0;
+    std::string nps_name;
+    std::uint64_t nps = 0;
+    std::string time_name;
+    std::uint64_t time = 0;
+    std::string pv_name;
+
+    if (!(stream >> info >> depth_name >> depth >> score_name >> score_kind >> score >>
+          nodes_name >> nodes >> nps_name >> nps >> time_name >> time >> pv_name)) {
+        return false;
+    }
+    if (info != "info" || depth_name != "depth" || depth <= 0 || score_name != "score" ||
+        (score_kind != "cp" && score_kind != "mate") || nodes_name != "nodes" ||
+        nps_name != "nps" || time_name != "time" || pv_name != "pv") {
+        return false;
+    }
+
+    for (std::string move; stream >> move;) {
+        if (move.size() != 4 && move.size() != 5) {
+            return false;
+        }
+    }
+    return true;
+}
+
 class FlushTrackingBuffer final : public std::stringbuf {
 public:
     int sync() override {
-        ++sync_count_;
+        sync_count_.fetch_add(1, std::memory_order_relaxed);
         return std::stringbuf::sync();
     }
 
     [[nodiscard]] int sync_count() const noexcept {
-        return sync_count_;
+        return sync_count_.load(std::memory_order_relaxed);
     }
 
 private:
-    int sync_count_ = 0;
+    std::atomic_int sync_count_ = 0;
 };
 
-void test_uci_handshake_has_the_required_order() {
+void test_uci_handshake_has_identity_and_supported_options_in_order() {
     const ControllerResult result = run_controller("uci\nquit\n");
 
     require(result.exit_code == 0, "quit must cause a normal shutdown");
@@ -74,8 +131,12 @@ void test_uci_handshake_has_the_required_order() {
                 "id name Koi Engine\n"
                 "id author Koi Engine contributors\n"
                 "option name RandomSeed type spin default 0 min 0 max 2147483647\n"
+                "option name Hash type spin default 16 min 1 max 4096\n"
+                "option name Clear Hash type button\n"
                 "uciok\n",
-            "uci response must contain the required lines in order");
+            "uci response must preserve identity and advertise RandomSeed, Hash, and Clear Hash");
+    require(result.output.find("Threads") == std::string::npos,
+            "Threads must not be advertised before parallel search exists");
 }
 
 void test_isready_writes_readyok() {
@@ -84,34 +145,38 @@ void test_isready_writes_readyok() {
     require(result.output == "readyok\n", "isready must write readyok");
 }
 
-void test_reapplying_the_same_seed_repeats_the_best_move() {
+void test_deterministic_search_repeats_the_best_move_with_compatibility_seed() {
     const ControllerResult result = run_controller(
         "setoption name RandomSeed value 42\n"
         "position startpos\n"
-        "go\n"
+        "go depth 2\n"
+        "stop\n"
         "setoption name RandomSeed value 42\n"
         "position startpos\n"
-        "go\n"
+        "go depth 2\n"
+        "stop\n"
         "quit\n");
-    const std::vector<std::string> lines = output_lines(result.output);
+    const std::vector<std::string> bestmoves =
+        lines_starting_with(output_lines(result.output), "bestmove ");
     const Position initial;
 
-    require(lines.size() == 2, "each go command must emit exactly one response");
-    require(lines[0].starts_with("bestmove ") && lines[1].starts_with("bestmove "),
-            "go responses must use bestmove lines");
-    require(lines[0] == lines[1], "the same nonzero seed must repeat the selected move");
-    require(is_legal_move(initial, lines[0].substr(9)), "the selected start-position move must be legal");
+    require(bestmoves.size() == 2, "each stopped go command must emit exactly one bestmove");
+    require(bestmoves[0] == bestmoves[1], "deterministic search must repeat from the same root");
+    require(is_legal_move(initial, bestmoves[0].substr(9)),
+            "the deterministic start-position move must be legal");
 }
 
-void test_startpos_and_fen_move_lists_define_the_position_for_go() {
+void test_startpos_and_fen_move_lists_define_the_search_root() {
     const ControllerResult result = run_controller(
-        "setoption name RandomSeed value 9\n"
         "position startpos moves e2e4 e7e5 g1f3\n"
-        "go\n"
+        "go depth 1\n"
+        "stop\n"
         "position fen r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1 moves e1g1\n"
-        "go\n"
+        "go depth 1\n"
+        "stop\n"
         "quit\n");
-    const std::vector<std::string> lines = output_lines(result.output);
+    const std::vector<std::string> bestmoves =
+        lines_starting_with(output_lines(result.output), "bestmove ");
     Position after_startpos;
     Position after_fen("r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1");
 
@@ -119,28 +184,36 @@ void test_startpos_and_fen_move_lists_define_the_position_for_go() {
                 after_startpos.apply_uci("g1f3"),
             "test fixture start-position moves must be legal");
     require(after_fen.apply_uci("e1g1"), "test fixture FEN move must be legal");
-    require(lines.size() == 2, "both go commands must receive one response");
-    require(lines[0].starts_with("bestmove ") &&
-                is_legal_move(after_startpos, lines[0].substr(9)),
-            "startpos move list must be applied before choosing a move");
-    require(lines[1].starts_with("bestmove ") && is_legal_move(after_fen, lines[1].substr(9)),
-            "FEN move list must be applied before choosing a move");
+    require(bestmoves.size() == 2, "both go commands must receive one bestmove");
+    require(is_legal_move(after_startpos, bestmoves[0].substr(9)),
+            "startpos move list must be applied before searching");
+    require(is_legal_move(after_fen, bestmoves[1].substr(9)),
+            "FEN move list must be applied before searching");
 }
 
-void test_special_move_fen_still_returns_a_legal_bestmove() {
+void test_all_go_limits_and_malformed_values_are_accepted_without_crashing() {
     const ControllerResult result = run_controller(
-        "setoption name RandomSeed value 123\n"
         "position fen rnbqkbnr/pppp1ppp/8/3Pp3/8/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 2\n"
-        "go depth 8 wtime 1000 btime 1000 winc 0 binc 0 movestogo 20 movetime 50 infinite\n"
+        "go depth 1\nstop\n"
+        "go nodes 0\nstop\n"
+        "go movetime 0\nstop\n"
+        "go wtime 0 btime 0 winc 0 binc 0 movestogo 1\nstop\n"
+        "go infinite\nstop\n"
+        "go depth bad nodes -1 movetime -1 wtime bad btime -1 winc nope binc -4 movestogo 0\nstop\n"
+        "go\nstop\n"
         "quit\n");
-    const std::vector<std::string> lines = output_lines(result.output);
+    const std::vector<std::string> bestmoves =
+        lines_starting_with(output_lines(result.output), "bestmove ");
     const Position en_passant("rnbqkbnr/pppp1ppp/8/3Pp3/8/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 2");
 
-    require(lines.size() == 1 && lines[0].starts_with("bestmove "),
-            "go with accepted search tokens must emit one bestmove");
-    require(is_legal_move(en_passant, lines[0].substr(9)),
-            "a special-move FEN must use its legal move set");
-    require(lines[0].find(" ponder ") == std::string::npos, "go must never emit a ponder move");
+    require(result.exit_code == 0, "valid and malformed go tokens must not crash the controller");
+    require(bestmoves.size() == 7, "every stopped go variant must emit exactly one bestmove");
+    for (const std::string& bestmove : bestmoves) {
+        require(is_legal_move(en_passant, bestmove.substr(9)),
+                "every supported-limit search must retain a legal root move");
+        require(bestmove.find(" ponder ") == std::string::npos,
+                "go must never emit an unsupported ponder move");
+    }
 }
 
 void test_invalid_position_commands_preserve_the_previous_position() {
@@ -148,47 +221,122 @@ void test_invalid_position_commands_preserve_the_previous_position() {
         "position fen 7k/6Q1/5K2/8/8/8/8/8 b - - 0 1\n"
         "position startpos moves e2e4 not-a-move\n"
         "position fen malformed\n"
-        "go\n"
+        "go infinite\n"
+        "stop\n"
         "quit\n");
     const std::vector<std::string> lines = output_lines(result.output);
+    const std::vector<std::string> errors = lines_starting_with(lines, "info string ");
+    const std::vector<std::string> bestmoves = lines_starting_with(lines, "bestmove ");
 
-    require(lines.size() == 3, "each rejected position command must report one UCI error");
-    require(lines[0].starts_with("info string ") && lines[1].starts_with("info string "),
-            "invalid position input must report UCI info-string errors");
-    require(lines[2] == "bestmove 0000", "failed position commands must leave checkmate unchanged");
+    require(errors.size() == 2, "each rejected position command must report one UCI error");
+    require(bestmoves.size() == 1 && bestmoves[0] == "bestmove 0000",
+            "failed position commands must leave checkmate unchanged");
 }
 
 void test_terminal_position_returns_0000() {
     const ControllerResult result = run_controller(
         "position fen 7k/6Q1/5K2/8/8/8/8/8 b - - 0 1\n"
-        "go\n"
+        "go infinite\n"
+        "stop\n"
         "quit\n");
+    const std::vector<std::string> bestmoves =
+        lines_starting_with(output_lines(result.output), "bestmove ");
 
-    require(result.output == "bestmove 0000\n", "a terminal position must return bestmove 0000");
+    require(bestmoves.size() == 1 && bestmoves[0] == "bestmove 0000",
+            "a terminal position must return exactly one bestmove 0000");
+}
+
+void test_isready_remains_responsive_during_infinite_search() {
+    const ControllerResult result = run_controller(
+        "position startpos\n"
+        "go infinite\n"
+        "isready\n"
+        "stop\n"
+        "quit\n");
+    const std::vector<std::string> lines = output_lines(result.output);
+    const std::vector<std::string> bestmoves = lines_starting_with(lines, "bestmove ");
+    const std::size_t ready = line_index(lines, "readyok");
+    const std::size_t bestmove = bestmoves.empty() ? std::numeric_limits<std::size_t>::max()
+                                                   : line_index(lines, bestmoves[0]);
+
+    require(ready < bestmove, "isready must respond before stop completes an infinite search");
+    require(bestmoves.size() == 1, "stop must emit exactly one final bestmove");
+}
+
+void test_position_replacement_suppresses_the_stale_generation() {
+    const ControllerResult result = run_controller(
+        "position startpos\n"
+        "go infinite\n"
+        "position fen 7k/6Q1/5K2/8/8/8/8/8 b - - 0 1\n"
+        "go infinite\n"
+        "stop\n"
+        "stop\n"
+        "quit\n");
+    const std::vector<std::string> bestmoves =
+        lines_starting_with(output_lines(result.output), "bestmove ");
+
+    require(bestmoves.size() == 1 && bestmoves[0] == "bestmove 0000",
+            "position replacement must suppress the prior generation and duplicate stops");
+}
+
+void test_ucinewgame_and_hash_changes_suppress_active_generations() {
+    const ControllerResult result = run_controller(
+        "position fen 7k/6Q1/5K2/8/8/8/8/8 b - - 0 1\n"
+        "go infinite\n"
+        "ucinewgame\n"
+        "go infinite\n"
+        "setoption name Hash value 32\n"
+        "go infinite\n"
+        "setoption name Clear Hash\n"
+        "go infinite\n"
+        "stop\n"
+        "quit\n");
+    const std::vector<std::string> bestmoves =
+        lines_starting_with(output_lines(result.output), "bestmove ");
+    const Position initial;
+
+    require(bestmoves.size() == 1,
+            "ucinewgame, Hash, and Clear Hash must suppress each replaced generation");
+    require(is_legal_move(initial, bestmoves[0].substr(9)),
+            "the surviving post-option search must use the reset start position");
+}
+
+void test_quit_and_eof_join_without_late_bestmove() {
+    const ControllerResult quit = run_controller("position startpos\ngo infinite\nquit\n");
+    const ControllerResult eof = run_controller("position startpos\ngo infinite\n");
+
+    require(quit.exit_code == 0 && eof.exit_code == 0,
+            "quit and EOF must both shut down an active worker cleanly");
+    require(lines_starting_with(output_lines(quit.output), "bestmove ").empty(),
+            "quit must suppress the active generation's late bestmove");
+    require(lines_starting_with(output_lines(eof.output), "bestmove ").empty(),
+            "EOF must suppress output while joining the active worker");
 }
 
 void test_unknown_stop_and_blank_commands_are_quiet_and_quit() {
     const ControllerResult result = run_controller("\nunknown harmless command\nstop\nquit\n");
 
-    require(result.exit_code == 0, "unknown and stop commands must not prevent quit");
-    require(result.output.empty(), "blank, unknown, and stop commands must not write protocol output");
+    require(result.exit_code == 0, "unknown and idle stop commands must not prevent quit");
+    require(result.output.empty(), "blank, unknown, and idle stop commands must be quiet");
 }
 
-void test_protocol_output_contains_only_uci_responses() {
+void test_protocol_output_contains_only_valid_uci_responses() {
     const ControllerResult result = run_controller(
         "uci\n"
         "isready\n"
         "setoption name RandomSeed value 1\n"
         "position startpos\n"
-        "go\n"
+        "go depth 2\n"
+        "stop\n"
         "quit\n");
 
     for (const std::string& line : output_lines(result.output)) {
-        require(line.starts_with("id ") || line.starts_with("option ") || line == "uciok" ||
-                    line == "readyok" || line.starts_with("bestmove ") ||
-                    line.starts_with("info string "),
-                "stdout must contain only UCI protocol responses");
+        const bool valid = line.starts_with("id ") || line.starts_with("option ") ||
+            line == "uciok" || line == "readyok" || line.starts_with("bestmove ") ||
+            line.starts_with("info string ") || is_valid_search_info(line);
+        require(valid, "stdout must contain only valid UCI protocol responses");
     }
+    require(result.diagnostics.empty(), "a valid transcript must leave stderr clean");
 }
 
 void test_protocol_responses_flush_promptly() {
@@ -196,7 +344,8 @@ void test_protocol_responses_flush_promptly() {
         "uci\n"
         "isready\n"
         "position startpos moves not-a-move\n"
-        "go\n"
+        "go infinite\n"
+        "stop\n"
         "quit\n");
     FlushTrackingBuffer output_buffer;
     std::ostream output(&output_buffer);
@@ -204,8 +353,8 @@ void test_protocol_responses_flush_promptly() {
     UciController controller(input, output, diagnostics);
 
     require(controller.run() == 0, "flush test transcript must shut down normally");
-    require(output_buffer.sync_count() == 4,
-            "handshake, readyok, info-string errors, and bestmove must each flush promptly");
+    require(output_buffer.sync_count() >= 4,
+            "handshake, readyok, position error, and bestmove must each flush promptly");
 }
 
 struct TestCase {
@@ -217,27 +366,32 @@ struct TestCase {
 
 int main() {
     const std::vector<TestCase> tests{
-        {"uci handshake order", test_uci_handshake_has_the_required_order},
+        {"uci handshake and options", test_uci_handshake_has_identity_and_supported_options_in_order},
         {"ready response", test_isready_writes_readyok},
-        {"deterministic seed", test_reapplying_the_same_seed_repeats_the_best_move},
-        {"position startpos and FEN", test_startpos_and_fen_move_lists_define_the_position_for_go},
-        {"special-move FEN", test_special_move_fen_still_returns_a_legal_bestmove},
+        {"deterministic search", test_deterministic_search_repeats_the_best_move_with_compatibility_seed},
+        {"position startpos and FEN", test_startpos_and_fen_move_lists_define_the_search_root},
+        {"go limits and malformed values", test_all_go_limits_and_malformed_values_are_accepted_without_crashing},
         {"transactional invalid positions", test_invalid_position_commands_preserve_the_previous_position},
         {"terminal 0000", test_terminal_position_returns_0000},
+        {"ready during search", test_isready_remains_responsive_during_infinite_search},
+        {"position generation replacement", test_position_replacement_suppresses_the_stale_generation},
+        {"new game and hash generation replacement", test_ucinewgame_and_hash_changes_suppress_active_generations},
+        {"quit and EOF cleanup", test_quit_and_eof_join_without_late_bestmove},
         {"unknown stop quit", test_unknown_stop_and_blank_commands_are_quiet_and_quit},
-        {"protocol-clean output", test_protocol_output_contains_only_uci_responses},
+        {"protocol-clean output", test_protocol_output_contains_only_valid_uci_responses},
         {"promptly flushed responses", test_protocol_responses_flush_promptly},
     };
 
+    int failures = 0;
     for (const TestCase& test : tests) {
         try {
             test.run();
             std::cout << "PASS " << test.name << '\n';
         } catch (const std::exception& error) {
             std::cerr << "FAIL " << test.name << ": " << error.what() << '\n';
-            return 1;
+            ++failures;
         }
     }
 
-    return 0;
+    return failures == 0 ? 0 : 1;
 }

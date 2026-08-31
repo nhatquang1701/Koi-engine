@@ -107,3 +107,5 @@ add_test(
             "${CMAKE_CURRENT_SOURCE_DIR}/tests/uci_process_test.ps1"
             -EnginePath "$<TARGET_FILE:koi_engine>"
 )
+
+set_tests_properties(koi_engine_process PROPERTIES TIMEOUT 30)
