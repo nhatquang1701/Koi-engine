@@ -281,6 +281,55 @@ void test_position_features_are_safe_for_concurrent_const_reads() {
             "concurrent const feature reads must return complete identical position features");
 }
 
+void test_copying_a_const_state_is_safe_while_its_feature_cache_is_populated() {
+    const koi::GameState expected_state = koi::GameState::startpos();
+    const koi::PositionFeatures expected = expected_state.position_features();
+    const koi::GameState state = koi::GameState::startpos();
+    std::atomic_bool start = false;
+    std::atomic_bool mismatch = false;
+    std::atomic_uint ready = 0;
+    std::thread cache_populator([&] {
+        ready.fetch_add(1, std::memory_order_release);
+        while (!start.load(std::memory_order_acquire)) {
+            std::this_thread::yield();
+        }
+        for (int iteration = 0; iteration < 1'000; ++iteration) {
+            if (!same_features(state.position_features(), expected)) {
+                mismatch.store(true, std::memory_order_relaxed);
+            }
+        }
+    });
+    std::vector<std::thread> copiers;
+    copiers.reserve(4);
+    for (int copier = 0; copier < 4; ++copier) {
+        copiers.emplace_back([&] {
+            ready.fetch_add(1, std::memory_order_release);
+            while (!start.load(std::memory_order_acquire)) {
+                std::this_thread::yield();
+            }
+            for (int iteration = 0; iteration < 1'000; ++iteration) {
+                const koi::GameState constructed(state);
+                koi::GameState assigned;
+                assigned = state;
+                if (!same_features(constructed.position_features(), expected) ||
+                    !same_features(assigned.position_features(), expected)) {
+                    mismatch.store(true, std::memory_order_relaxed);
+                }
+            }
+        });
+    }
+    while (ready.load(std::memory_order_acquire) != copiers.size() + 1) {
+        std::this_thread::yield();
+    }
+    start.store(true, std::memory_order_release);
+    cache_populator.join();
+    for (std::thread& copier : copiers) {
+        copier.join();
+    }
+    require(!mismatch.load(std::memory_order_relaxed),
+            "copying a const state while its feature cache is populated must preserve complete features");
+}
+
 void test_tactical_generation_omits_quiet_checks_after_the_checking_horizon() {
     const auto quiet_check_state = koi::GameState::from_fen("k7/8/8/8/8/8/4Q3/4K3 w - - 0 1");
     require(quiet_check_state.has_value(), "quiet-check tactical fixture must be valid");
@@ -344,6 +393,7 @@ int main() {
         {"seeded chooser repeatability", test_seeded_choosers_are_repeatable},
         {"position feature freshness", test_position_features_refresh_after_make_and_unmake},
         {"position feature concurrent reads", test_position_features_are_safe_for_concurrent_const_reads},
+        {"position feature concurrent copy", test_copying_a_const_state_is_safe_while_its_feature_cache_is_populated},
         {"tactical checking horizon", test_tactical_generation_omits_quiet_checks_after_the_checking_horizon},
     };
 

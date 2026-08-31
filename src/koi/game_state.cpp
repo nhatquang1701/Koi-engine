@@ -440,6 +440,23 @@ public:
         PositionFeatures features;
     };
     mutable std::shared_ptr<const FeatureCache> feature_cache;
+
+    Impl() = default;
+
+    Impl(const Impl& other)
+        : board(other.board), history(other.history),
+          feature_cache(std::atomic_load_explicit(&other.feature_cache, std::memory_order_acquire)) {}
+
+    Impl& operator=(const Impl& other) {
+        if (this != &other) {
+            board = other.board;
+            history = other.history;
+            const std::shared_ptr<const FeatureCache> cache =
+                std::atomic_load_explicit(&other.feature_cache, std::memory_order_acquire);
+            std::atomic_store_explicit(&feature_cache, cache, std::memory_order_release);
+        }
+        return *this;
+    }
 };
 
 GameState::GameState() : impl_(std::make_unique<Impl>()) {}
