@@ -31,6 +31,21 @@ bool contains_uci_move(const Position& position, std::string_view expected) {
     return false;
 }
 
+bool same_features(const koi::PositionFeatures& first, const koi::PositionFeatures& second) {
+    if (first.attacked_squares != second.attacked_squares || first.mobility != second.mobility ||
+        first.king_squares != second.king_squares || first.pawn_file_masks != second.pawn_file_masks ||
+        first.game_phase != second.game_phase || first.side_to_move != second.side_to_move) {
+        return false;
+    }
+    for (std::size_t square = 0; square < first.board.size(); ++square) {
+        if (first.board[square].type != second.board[square].type ||
+            first.board[square].color != second.board[square].color) {
+            return false;
+        }
+    }
+    return true;
+}
+
 void test_default_position_has_initial_fen_and_twenty_moves() {
     const Position position;
 
@@ -207,6 +222,20 @@ void test_seeded_choosers_are_repeatable() {
     }
 }
 
+void test_position_features_refresh_after_make_and_unmake() {
+    koi::GameState state = koi::GameState::startpos();
+    const koi::Move move = *koi::Move::parse_uci("e2e4");
+    const auto before = state.position_features();
+    require(state.make_move(move), "feature-cache fixture move must be legal");
+    const auto advanced = state.position_features();
+    require(advanced.board[28].type == koi::PieceType::pawn && advanced.board[12].empty(),
+            "feature extraction must reflect the position after a pawn advance");
+    require(state.unmake_move(), "feature-cache fixture move must unmake");
+    const auto restored = state.position_features();
+    require(same_features(restored, before),
+            "feature extraction must not return stale data after make and unmake");
+}
+
 struct TestCase {
     std::string_view name;
     void (*run)();
@@ -231,6 +260,7 @@ int main() {
         {"checkmate and stalemate", test_checkmate_and_stalemate_have_no_legal_moves},
         {"random chooser legality", test_random_chooser_returns_a_legal_move},
         {"seeded chooser repeatability", test_seeded_choosers_are_repeatable},
+        {"position feature freshness", test_position_features_refresh_after_make_and_unmake},
     };
 
     for (const TestCase& test : tests) {

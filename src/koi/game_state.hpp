@@ -13,6 +13,8 @@
 
 namespace koi {
 
+class GameState;
+
 enum class PositionErrorCode : std::uint8_t { malformed_fen, illegal_position };
 
 struct PositionError {
@@ -33,6 +35,10 @@ struct MoveMetadata {
         return kind == MoveKind::capture || kind == MoveKind::en_passant;
     }
 };
+
+namespace detail {
+[[nodiscard]] int static_exchange_gain(const GameState&, const MoveMetadata&) noexcept;
+}
 
 inline constexpr std::size_t kMaximumLegalMoves = 256;
 
@@ -109,7 +115,8 @@ public:
     // promotions, and checking moves otherwise. The return value reports
     // whether any legal move exists, even when a quiet non-checking move was
     // intentionally omitted from the output.
-    [[nodiscard]] bool legal_tactical_moves_with_metadata(MoveMetadataList& moves) const noexcept;
+    [[nodiscard]] bool legal_tactical_moves_with_metadata(
+        MoveMetadataList& moves, bool include_quiet_checks = true) const noexcept;
     [[nodiscard]] std::optional<MoveMetadata> describe_move(const Move&) const noexcept;
     [[nodiscard]] PositionFeatures position_features() const noexcept;
     [[nodiscard]] bool is_legal(const Move& move) const noexcept;
@@ -132,6 +139,10 @@ public:
     [[nodiscard]] std::uint16_t halfmove_clock() const noexcept;
 
 private:
+    [[nodiscard]] int direct_static_exchange_gain(const MoveMetadata&) const noexcept;
+
+    friend int detail::static_exchange_gain(const GameState&, const MoveMetadata&) noexcept;
+
     class Impl;
     std::unique_ptr<Impl> impl_;
 };

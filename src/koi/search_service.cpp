@@ -240,7 +240,7 @@ struct SearchContext {
         MoveMetadataList moves;
         const bool has_legal_move = checked ?
             (state.legal_moves_with_metadata(moves), !moves.empty()) :
-            state.legal_tactical_moves_with_metadata(moves);
+            state.legal_tactical_moves_with_metadata(moves, qdepth < kMaximumQuiescenceCheckDepth);
         if (!has_legal_move) {
             return terminal_score(state, 0, ply);
         }
@@ -274,10 +274,6 @@ struct SearchContext {
                 return 0;
             }
             const Move move = metadata.move;
-            if (!checked && qdepth >= kMaximumQuiescenceCheckDepth && metadata.gives_check &&
-                !metadata.is_capture() && move.promotion() == Promotion::none) {
-                continue;
-            }
             if (!checked && metadata.is_capture() &&
                 move.promotion() == Promotion::none && !metadata.gives_check) {
                 if (detail::static_exchange_gain(state, metadata) < 0) {

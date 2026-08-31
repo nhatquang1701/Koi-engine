@@ -423,9 +423,17 @@ void UciController::handle_ponderhit() {
 }
 
 void UciController::start_search(GameState root, SearchLimits limits) {
+    const bool has_side_clock = root.side_to_move() == Color::white ? limits.white_clock.has_value()
+                                                                     : limits.black_clock.has_value();
+    if (!limits.infinite && !limits.ponder && !limits.depth.has_value() && !limits.nodes.has_value() &&
+        !limits.movetime.has_value() && !has_side_clock) {
+        limits.movetime = std::chrono::milliseconds{250};
+    }
+
     const std::uint64_t generation = begin_generation();
     const GameState search_root = root;
     const bool is_ponder_search = limits.ponder;
+    const bool can_report_ponder = !limits.ponder && !limits.infinite;
 
     SearchEventSink sink;
     sink.on_info = [this, generation, search_root, is_ponder_search](const SearchInfo& info) {
@@ -445,11 +453,12 @@ void UciController::start_search(GameState root, SearchLimits limits) {
         }
         write_search_info(generation, info);
     };
-    sink.on_complete = [this, generation](const SearchResult& result) {
+    sink.on_complete = [this, generation, can_report_ponder](const SearchResult& result) {
         SearchResult completed = result;
         {
             std::lock_guard lock(output_mutex_);
-            if (generation == generation_ && result.best_move == principal_variation_best_move_) {
+            if (can_report_ponder && generation == generation_ &&
+                result.best_move == principal_variation_best_move_) {
                 completed.ponder_move = principal_variation_ponder_move_;
             }
         }

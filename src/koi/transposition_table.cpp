@@ -5,6 +5,7 @@
 #include <atomic>
 #include <limits>
 #include <mutex>
+#include <shared_mutex>
 #include <utility>
 
 namespace koi {
@@ -41,7 +42,7 @@ struct TranspositionTable::Storage {
           size_mb(megabytes) {}
 
     std::vector<TranspositionEntry> entries;
-    std::array<std::mutex, kStripeCount> stripes;
+    std::array<std::shared_mutex, kStripeCount> stripes;
     const std::size_t size_mb;
     std::uint16_t generation = 1;
 };
@@ -76,9 +77,9 @@ void TranspositionTable::clear() noexcept {
         return;
     }
 
-    std::array<std::unique_lock<std::mutex>, kStripeCount> stripe_locks;
+    std::array<std::unique_lock<std::shared_mutex>, kStripeCount> stripe_locks;
     for (std::size_t index = 0; index < kStripeCount; ++index) {
-        stripe_locks[index] = std::unique_lock<std::mutex>(storage->stripes[index]);
+        stripe_locks[index] = std::unique_lock<std::shared_mutex>(storage->stripes[index]);
     }
     std::fill(storage->entries.begin(), storage->entries.end(), TranspositionEntry{});
 }
@@ -90,9 +91,9 @@ void TranspositionTable::new_generation() noexcept {
         return;
     }
 
-    std::array<std::unique_lock<std::mutex>, kStripeCount> stripe_locks;
+    std::array<std::unique_lock<std::shared_mutex>, kStripeCount> stripe_locks;
     for (std::size_t index = 0; index < kStripeCount; ++index) {
-        stripe_locks[index] = std::unique_lock<std::mutex>(storage->stripes[index]);
+        stripe_locks[index] = std::unique_lock<std::shared_mutex>(storage->stripes[index]);
     }
     ++storage->generation;
     if (storage->generation == 0) {
@@ -109,7 +110,7 @@ void TranspositionTable::store(std::uint64_t key, int depth, int score, Transpos
     }
 
     const std::size_t index = key % storage->entries.size();
-    std::lock_guard stripe_lock(storage->stripes[index % kStripeCount]);
+    std::unique_lock stripe_lock(storage->stripes[index % kStripeCount]);
     TranspositionEntry& existing = storage->entries[index];
     const bool empty = !existing.occupied;
     const bool same_key = existing.key == key;
@@ -131,7 +132,7 @@ std::optional<TranspositionEntry> TranspositionTable::probe(std::uint64_t key, i
     }
 
     const std::size_t index = key % storage->entries.size();
-    std::lock_guard stripe_lock(storage->stripes[index % kStripeCount]);
+    std::shared_lock stripe_lock(storage->stripes[index % kStripeCount]);
     const TranspositionEntry& entry = storage->entries[index];
     if (!entry.occupied || entry.key != key) {
         return std::nullopt;

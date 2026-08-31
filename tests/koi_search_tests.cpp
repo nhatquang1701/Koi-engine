@@ -643,6 +643,19 @@ void test_fixed_depth_search_is_deterministic_and_legal() {
     require(root.is_legal(*first.best_move), "search must only return legal root moves");
 }
 
+void test_fixed_depth_tactical_reference_output_is_preserved() {
+    koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>());
+    koi::SearchLimits limits;
+    limits.depth = 2;
+    const koi::GameState root = require_state("4k3/8/8/3q4/4Q3/8/8/4K3 w - - 0 1");
+
+    const koi::SearchResult result = search(service, root, limits);
+    const auto expected = koi::Move::parse_uci("e4d5");
+    require(expected.has_value(), "fixed-depth tactical reference move must parse");
+    require(result.completed_depth == 2 && result.best_move == expected && result.score_cp == 1026,
+            "single-thread fixed-depth tactical output must retain its reviewed move and score");
+}
+
 void test_search_reports_tactical_search_statistics() {
     auto evaluator = std::make_shared<koi::ClassicalEvaluator>();
     koi::SearchService service(evaluator);
@@ -679,6 +692,16 @@ void test_quiescence_keeps_searching_checked_evasions_past_normal_cap() {
             "the long checking line must still produce a legal root move");
     require(evaluator->checked_evaluations() == 0,
             "quiescence must search legal evasions instead of statically evaluating checked nodes");
+}
+
+void test_quiescence_keeps_bounded_checking_continuations() {
+    koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>());
+    koi::SearchLimits limits;
+    limits.depth = 2;
+    const koi::SearchResult result = search(
+        service, require_state("4k3/8/8/3p4/4Q3/8/8/4K3 w - - 0 1"), limits);
+    require(result.stats.qchecks > 0,
+            "quiescence must retain checking continuations before its checking horizon");
 }
 
 void test_iterative_deepening_uses_aspiration_windows() {
@@ -899,6 +922,36 @@ void test_transposition_table_survives_concurrent_probe_store_and_maintenance() 
             "concurrent TT access must never return an entry for a different key");
 }
 
+void test_transposition_table_survives_concurrent_probe_store_and_resize() {
+    koi::TranspositionTable table(1);
+    const auto move = koi::Move::parse_uci("e2e4");
+    require(move.has_value(), "test move must parse");
+    std::atomic_bool invalid_entry = false;
+    std::vector<std::thread> workers;
+    for (std::uint64_t worker = 0; worker < 4; ++worker) {
+        workers.emplace_back([&table, &invalid_entry, move, worker] {
+            for (std::uint64_t iteration = 0; iteration < 2'000; ++iteration) {
+                const std::uint64_t key = (worker + 7) * 0x100000001b3ULL + iteration;
+                table.store(key, static_cast<int>(iteration % 8), static_cast<int>(worker),
+                            koi::TranspositionBound::lower, *move);
+                if (const auto entry = table.probe(key); entry.has_value() && entry->key != key) {
+                    invalid_entry.store(true, std::memory_order_relaxed);
+                }
+            }
+        });
+    }
+    for (int iteration = 0; iteration < 40; ++iteration) {
+        const std::size_t megabytes = iteration % 2 == 0 ? 1 : 2;
+        table.set_size_mb(megabytes);
+        require(table.size_mb() == megabytes, "serialized resize must publish the requested table size");
+    }
+    for (std::thread& worker : workers) {
+        worker.join();
+    }
+    require(!invalid_entry.load(std::memory_order_relaxed),
+            "concurrent resize must not expose a transposition entry for another key");
+}
+
 struct TestCase {
     std::string_view name;
     void (*run)();
@@ -929,9 +982,11 @@ int main() {
         {"evaluator cross-handle safety", test_non_concurrent_evaluators_are_serialized_across_simultaneous_handles},
         {"terminal search", test_terminal_roots_return_mate_or_stalemate_scores},
         {"deterministic legal search", test_fixed_depth_search_is_deterministic_and_legal},
+        {"fixed-depth tactical reference", test_fixed_depth_tactical_reference_output_is_preserved},
         {"tactical search statistics", test_search_reports_tactical_search_statistics},
         {"check extensions", test_search_extends_checked_positions},
         {"checked quiescence cap", test_quiescence_keeps_searching_checked_evasions_past_normal_cap},
+        {"bounded quiescence checks", test_quiescence_keeps_bounded_checking_continuations},
         {"aspiration windows", test_iterative_deepening_uses_aspiration_windows},
         {"infinite search lifecycle", test_infinite_search_runs_until_stopped_and_completes_once},
         {"ponder search lifecycle", test_ponder_search_runs_until_stopped_and_completes_once},
@@ -942,6 +997,7 @@ int main() {
         {"transposition table", test_transposition_table_stores_probes_and_clears_entries},
         {"transposition table mate normalization", test_transposition_table_preserves_mate_distance_across_plies},
         {"transposition table concurrency", test_transposition_table_survives_concurrent_probe_store_and_maintenance},
+        {"transposition table resize concurrency", test_transposition_table_survives_concurrent_probe_store_and_resize},
     };
 
     const char* filter = std::getenv("KOI_TEST_FILTER");

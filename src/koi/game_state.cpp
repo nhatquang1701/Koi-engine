@@ -306,6 +306,122 @@ MoveMetadata metadata_for_native_move(const chess::Board& board, chess::Move nat
     return metadata;
 }
 
+constexpr int exchange_piece_value(PieceType type) noexcept {
+    switch (type) {
+    case PieceType::pawn:
+        return 100;
+    case PieceType::knight:
+        return 320;
+    case PieceType::bishop:
+        return 330;
+    case PieceType::rook:
+        return 500;
+    case PieceType::queen:
+        return 900;
+    case PieceType::king:
+        return 20'000;
+    case PieceType::none:
+        return 0;
+    }
+    return 0;
+}
+
+constexpr PieceType promotion_piece_type(Promotion promotion) noexcept {
+    switch (promotion) {
+    case Promotion::knight:
+        return PieceType::knight;
+    case Promotion::bishop:
+        return PieceType::bishop;
+    case Promotion::rook:
+        return PieceType::rook;
+    case Promotion::queen:
+        return PieceType::queen;
+    case Promotion::none:
+        return PieceType::pawn;
+    }
+    return PieceType::pawn;
+}
+
+constexpr int promotion_exchange_gain(Promotion promotion) noexcept {
+    return exchange_piece_value(promotion_piece_type(promotion)) - exchange_piece_value(PieceType::pawn);
+}
+
+bool exchange_piece_attacks_square(const std::array<Piece, 64>& board, int source, int target) noexcept {
+    const Piece piece = board[static_cast<std::size_t>(source)];
+    if (piece.empty() || source == target) {
+        return false;
+    }
+
+    const int source_file = source % 8;
+    const int source_rank = source / 8;
+    const int target_file = target % 8;
+    const int target_rank = target / 8;
+    const int file_delta = target_file - source_file;
+    const int rank_delta = target_rank - source_rank;
+    const int abs_file_delta = std::abs(file_delta);
+    const int abs_rank_delta = std::abs(rank_delta);
+
+    if (piece.type == PieceType::pawn) {
+        const int direction = piece.color == Color::white ? 1 : -1;
+        return rank_delta == direction && abs_file_delta == 1;
+    }
+    if (piece.type == PieceType::knight) {
+        return (abs_file_delta == 1 && abs_rank_delta == 2) ||
+               (abs_file_delta == 2 && abs_rank_delta == 1);
+    }
+    if (piece.type == PieceType::king) {
+        return abs_file_delta <= 1 && abs_rank_delta <= 1;
+    }
+
+    const bool diagonal = abs_file_delta == abs_rank_delta;
+    const bool orthogonal = file_delta == 0 || rank_delta == 0;
+    if ((piece.type == PieceType::bishop && !diagonal) ||
+        (piece.type == PieceType::rook && !orthogonal) ||
+        (piece.type == PieceType::queen && !diagonal && !orthogonal) ||
+        (piece.type != PieceType::bishop && piece.type != PieceType::rook && piece.type != PieceType::queen)) {
+        return false;
+    }
+
+    const int file_step = file_delta == 0 ? 0 : (file_delta > 0 ? 1 : -1);
+    const int rank_step = rank_delta == 0 ? 0 : (rank_delta > 0 ? 1 : -1);
+    for (int file = source_file + file_step, rank = source_rank + rank_step;
+         file != target_file || rank != target_rank; file += file_step, rank += rank_step) {
+        if (!board[static_cast<std::size_t>(rank * 8 + file)].empty()) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool exchange_square_attacked_by(const std::array<Piece, 64>& board, int target, Color attacker) noexcept {
+    for (int source = 0; source < 64; ++source) {
+        if (board[static_cast<std::size_t>(source)].color == attacker &&
+            exchange_piece_attacks_square(board, source, target)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool exchange_recapture_is_legal(std::array<Piece, 64>& board, std::array<int, 2>& king_squares,
+                                  Color side, int source, int target, Piece placed_piece) noexcept {
+    const Piece moving_piece = board[static_cast<std::size_t>(source)];
+    const Piece captured_piece = board[static_cast<std::size_t>(target)];
+    const std::size_t side_index = side == Color::white ? 0 : 1;
+    const int saved_king_square = king_squares[side_index];
+
+    board[static_cast<std::size_t>(source)] = {};
+    board[static_cast<std::size_t>(target)] = placed_piece;
+    if (moving_piece.type == PieceType::king) {
+        king_squares[side_index] = target;
+    }
+    const bool legal = !exchange_square_attacked_by(board, king_squares[side_index], opposite(side));
+    board[static_cast<std::size_t>(source)] = moving_piece;
+    board[static_cast<std::size_t>(target)] = captured_piece;
+    king_squares[side_index] = saved_king_square;
+    return legal;
+}
+
 } // namespace
 
 class GameState::Impl {
@@ -317,6 +433,12 @@ public:
 
     chess::Board board{};
     std::vector<HistoryRecord> history;
+    struct FeatureCache {
+        std::uint64_t position_key = 0;
+        PositionFeatures features;
+        bool valid = false;
+    };
+    mutable FeatureCache feature_cache;
 };
 
 GameState::GameState() : impl_(std::make_unique<Impl>()) {}
@@ -372,6 +494,120 @@ Piece GameState::piece_at(Square square) const noexcept {
         return {};
     }
     return {koi_piece_type(piece.type()), koi_color(piece.color())};
+}
+
+int GameState::direct_static_exchange_gain(const MoveMetadata& initial) const noexcept {
+    const Move move = initial.move;
+    if (move.is_no_move() || move.from().index() == Square::kInvalid || move.to().index() == Square::kInvalid) {
+        return 0;
+    }
+    if (!initial.is_capture() && initial.captured_piece == PieceType::none &&
+        move.promotion() == Promotion::none) {
+        return 0;
+    }
+
+    std::array<Piece, 64> board{};
+    std::array<int, 2> king_squares{-1, -1};
+    for (int square = 0; square < 64; ++square) {
+        const chess::Piece native_piece = impl_->board.at(chess::Square(square));
+        if (native_piece == chess::Piece::NONE) {
+            continue;
+        }
+        const Piece piece{koi_piece_type(native_piece.type()), koi_color(native_piece.color())};
+        board[static_cast<std::size_t>(square)] = piece;
+        if (piece.type == PieceType::king) {
+            king_squares[piece.color == Color::white ? 0 : 1] = square;
+        }
+    }
+
+    const int source = move.from().index();
+    const int target = move.to().index();
+    const Piece moving_piece = board[static_cast<std::size_t>(source)];
+    if (moving_piece.empty() || moving_piece.color != side_to_move() || moving_piece.type != initial.moving_piece ||
+        king_squares[0] < 0 || king_squares[1] < 0) {
+        return 0;
+    }
+
+    int captured_square = target;
+    if (initial.kind == MoveKind::en_passant) {
+        captured_square += moving_piece.color == Color::white ? -8 : 8;
+    }
+    if (captured_square < 0 || captured_square >= 64) {
+        return 0;
+    }
+
+    constexpr std::size_t kMaximumExchangeDepth = 32;
+    std::array<int, kMaximumExchangeDepth> gains{};
+    const Piece captured_piece = board[static_cast<std::size_t>(captured_square)];
+    gains[0] = exchange_piece_value(captured_piece.type) + promotion_exchange_gain(move.promotion());
+
+    Piece placed_piece = moving_piece;
+    if (move.promotion() != Promotion::none) {
+        placed_piece.type = promotion_piece_type(move.promotion());
+    }
+    board[static_cast<std::size_t>(source)] = {};
+    board[static_cast<std::size_t>(captured_square)] = {};
+    board[static_cast<std::size_t>(target)] = placed_piece;
+    if (moving_piece.type == PieceType::king) {
+        king_squares[moving_piece.color == Color::white ? 0 : 1] = target;
+    }
+
+    Color side = opposite(moving_piece.color);
+    std::size_t depth = 0;
+    for (;;) {
+        int attacker_square = -1;
+        int attacker_value = std::numeric_limits<int>::max();
+        Piece recapturing_piece{};
+        int recapture_promotion_gain = 0;
+
+        for (int square = 0; square < 64; ++square) {
+            const Piece candidate = board[static_cast<std::size_t>(square)];
+            if (candidate.empty() || candidate.color != side ||
+                !exchange_piece_attacks_square(board, square, target)) {
+                continue;
+            }
+
+            Piece replacement = candidate;
+            int candidate_promotion_gain = 0;
+            if (candidate.type == PieceType::pawn && (target / 8 == 0 || target / 8 == 7)) {
+                replacement.type = PieceType::queen;
+                candidate_promotion_gain = exchange_piece_value(PieceType::queen) - exchange_piece_value(PieceType::pawn);
+            }
+            if (!exchange_recapture_is_legal(board, king_squares, side, square, target, replacement)) {
+                continue;
+            }
+
+            const int value = exchange_piece_value(candidate.type);
+            if (value < attacker_value) {
+                attacker_square = square;
+                attacker_value = value;
+                recapturing_piece = replacement;
+                recapture_promotion_gain = candidate_promotion_gain;
+            }
+        }
+
+        if (attacker_square < 0 || depth + 1 >= kMaximumExchangeDepth) {
+            break;
+        }
+
+        const Piece target_piece = board[static_cast<std::size_t>(target)];
+        ++depth;
+        gains[depth] = exchange_piece_value(target_piece.type) - gains[depth - 1] + recapture_promotion_gain;
+
+        const Piece departing_piece = board[static_cast<std::size_t>(attacker_square)];
+        board[static_cast<std::size_t>(attacker_square)] = {};
+        board[static_cast<std::size_t>(target)] = recapturing_piece;
+        if (departing_piece.type == PieceType::king) {
+            king_squares[side == Color::white ? 0 : 1] = target;
+        }
+        side = opposite(side);
+    }
+
+    while (depth > 0) {
+        gains[depth - 1] = -std::max(-gains[depth - 1], gains[depth]);
+        --depth;
+    }
+    return gains[0];
 }
 
 std::vector<Move> GameState::legal_moves() const {
@@ -431,7 +667,8 @@ void GameState::legal_moves_with_metadata(MoveMetadataList& moves,
     }
 }
 
-bool GameState::legal_tactical_moves_with_metadata(MoveMetadataList& moves) const noexcept {
+bool GameState::legal_tactical_moves_with_metadata(MoveMetadataList& moves,
+                                                   bool include_quiet_checks) const noexcept {
     moves.clear();
 
     const chess::Color side_to_move = impl_->board.sideToMove();
@@ -441,8 +678,9 @@ bool GameState::legal_tactical_moves_with_metadata(MoveMetadataList& moves) cons
     const bool checked = impl_->board.inCheck();
     bool has_legal_move = false;
 
-    const auto append_if_legal = [&](chess::Move native_move, bool tactical_only) noexcept {
-        if (sanitize_opponent_check && !impl_->board.isLegal(native_move)) {
+    const auto append_if_legal = [&](chess::Move native_move, bool tactical_only,
+                                     bool verify_legality = false) noexcept {
+        if ((sanitize_opponent_check || verify_legality) && !impl_->board.isLegal(native_move)) {
             return;
         }
 
@@ -472,16 +710,43 @@ bool GameState::legal_tactical_moves_with_metadata(MoveMetadataList& moves) cons
         return has_legal_move;
     }
 
+    has_legal_move = sanitize_opponent_check ? [&] {
+        chess::Movelist legal_moves;
+        chess::movegen::legalmoves(legal_moves, impl_->board);
+        return std::any_of(legal_moves.begin(), legal_moves.end(), [this](chess::Move native_move) {
+            return impl_->board.isLegal(native_move);
+        });
+    }() : chess::movegen::anylegalmoves(impl_->board);
+
     chess::Movelist captures;
     chess::movegen::legalmoves<chess::movegen::MoveGenType::CAPTURE>(captures, impl_->board);
     for (chess::Move native_move : captures) {
         append_if_legal(native_move, true);
     }
 
-    chess::Movelist quiet_moves;
-    chess::movegen::legalmoves<chess::movegen::MoveGenType::QUIET>(quiet_moves, impl_->board);
-    for (chess::Move native_move : quiet_moves) {
-        append_if_legal(native_move, true);
+    if (include_quiet_checks) {
+        chess::Movelist quiet_moves;
+        chess::movegen::legalmoves<chess::movegen::MoveGenType::QUIET>(quiet_moves, impl_->board);
+        for (chess::Move native_move : quiet_moves) {
+            append_if_legal(native_move, true);
+        }
+    } else {
+        const int source_rank = side_to_move == chess::Color::WHITE ? 6 : 1;
+        const int target_rank = side_to_move == chess::Color::WHITE ? 7 : 0;
+        for (int file = 0; file < 8; ++file) {
+            const chess::Square source(source_rank * 8 + file);
+            const chess::Square target(target_rank * 8 + file);
+            if (impl_->board.at(source).type() != chess::PieceType::PAWN ||
+                impl_->board.at(source).color() != side_to_move ||
+                impl_->board.at(target) != chess::Piece::NONE) {
+                continue;
+            }
+            for (const chess::PieceType promotion : {chess::PieceType::QUEEN, chess::PieceType::ROOK,
+                                                      chess::PieceType::BISHOP, chess::PieceType::KNIGHT}) {
+                append_if_legal(chess::Move::make<chess::Move::PROMOTION>(source, target, promotion), true,
+                                true);
+            }
+        }
     }
 
     return has_legal_move;
@@ -501,6 +766,11 @@ std::optional<MoveMetadata> GameState::describe_move(const Move& move) const noe
 }
 
 PositionFeatures GameState::position_features() const noexcept {
+    const std::uint64_t key = position_key();
+    if (impl_->feature_cache.valid && impl_->feature_cache.position_key == key) {
+        return impl_->feature_cache.features;
+    }
+
     PositionFeatures features;
     features.side_to_move = side_to_move();
     std::array<std::uint64_t, 2> attacks{};
@@ -571,6 +841,7 @@ PositionFeatures GameState::position_features() const noexcept {
         features.king_squares[color_index] = Square::from_index(
             static_cast<std::uint8_t>(impl_->board.kingSq(color).index()));
     }
+    impl_->feature_cache = Impl::FeatureCache{key, features, true};
     return features;
 }
 
