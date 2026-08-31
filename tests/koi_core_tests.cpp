@@ -121,13 +121,13 @@ void test_malformed_uci_is_rejected_transactionally() {
     require(position.fen() == original, "malformed UCI input must leave the position unchanged");
 }
 
-void test_position_fen_matches_the_underlying_board() {
+void test_position_forwards_fen_and_move_application() {
     Position position;
     require(position.apply_uci("e2e4"), "e2e4 must be legal");
     require(position.apply_uci("e7e5"), "e7e5 must be legal");
 
-    require(position.fen() == position.board().getFen(),
-            "adapter FEN must match the underlying board FEN");
+    require(position.fen() == "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2",
+            "compatibility position must forward FEN and move application");
 }
 
 void test_special_move_positions_accept_valid_uci_moves() {
@@ -159,20 +159,20 @@ void test_checkmate_and_stalemate_have_no_legal_moves() {
 }
 
 void test_random_chooser_returns_a_legal_move() {
-    const Position position;
+    const koi::GameState state;
     RandomMoveChooser chooser(1234);
 
-    const Move selected = chooser.choose(position);
-    require(contains_uci_move(position, selected.uci()), "random chooser must return a legal move");
+    const Move selected = chooser.choose(state);
+    require(state.is_legal(selected), "random chooser must return a legal move");
 }
 
 void test_seeded_choosers_are_repeatable() {
-    const Position position;
+    const koi::GameState state;
     RandomMoveChooser first(5678);
     RandomMoveChooser second(5678);
 
     for (int i = 0; i < 12; ++i) {
-        require(first.choose(position).uci() == second.choose(position).uci(),
+        require(first.choose(state).uci() == second.choose(state).uci(),
                 "choosers with the same seed must produce the same sequence");
     }
 }
@@ -195,7 +195,7 @@ int main() {
         {"triple-check rejection", test_impossible_triple_check_is_rejected_transactionally},
         {"invalid UCI rejection", test_invalid_uci_is_rejected_transactionally},
         {"malformed UCI rejection", test_malformed_uci_is_rejected_transactionally},
-        {"adapter FEN matches board", test_position_fen_matches_the_underlying_board},
+        {"compatibility position forwarding", test_position_forwards_fen_and_move_application},
         {"checkmate and stalemate", test_checkmate_and_stalemate_have_no_legal_moves},
         {"random chooser legality", test_random_chooser_returns_a_legal_move},
         {"seeded chooser repeatability", test_seeded_choosers_are_repeatable},

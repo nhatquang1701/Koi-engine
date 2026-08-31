@@ -3,16 +3,15 @@
 #include <cstdint>
 #include <random>
 
+#include "koi/game_state.hpp"
 #include "koi/move.hpp"
 
 namespace koi {
 
-class Position;
-
 class MoveChooser {
 public:
     virtual ~MoveChooser() = default;
-    [[nodiscard]] virtual Move choose(const Position& position) = 0;
+    [[nodiscard]] virtual Move choose(const GameState& state) = 0;
 };
 
 class RandomMoveChooser final : public MoveChooser {
@@ -21,7 +20,7 @@ public:
 
     void set_seed(std::uint32_t seed);
 
-    [[nodiscard]] Move choose(const Position& position) override;
+    [[nodiscard]] Move choose(const GameState& state) override;
 
 private:
     std::mt19937 engine_;

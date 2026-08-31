@@ -2,8 +2,8 @@
 
 #include <iosfwd>
 
+#include "koi/game_state.hpp"
 #include "koi/move_chooser.hpp"
-#include "koi/position.hpp"
 
 namespace koi {
 
@@ -22,7 +22,7 @@ private:
     std::istream& input_;
     std::ostream& output_;
     std::ostream& diagnostics_;
-    Position position_;
+    GameState position_;
     RandomMoveChooser chooser_{0};
 };
 

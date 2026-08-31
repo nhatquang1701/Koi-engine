@@ -4,9 +4,7 @@
 #include <string_view>
 #include <vector>
 
-#include <chess.hpp>
-
-#include "koi/move.hpp"
+#include "koi/game_state.hpp"
 
 namespace koi {
 
@@ -19,10 +17,9 @@ public:
     [[nodiscard]] std::vector<Move> legal_moves() const;
     bool apply_uci(std::string_view uci);
     bool set_fen(std::string_view fen);
-    [[nodiscard]] const chess::Board& board() const noexcept;
 
 private:
-    chess::Board board_{};
+    GameState state_;
 };
 
 } // namespace koi

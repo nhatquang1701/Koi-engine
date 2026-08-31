@@ -44,7 +44,7 @@ int UciController::run() {
         } else if (name == "isready") {
             output_ << "readyok\n" << std::flush;
         } else if (name == "ucinewgame") {
-            position_ = Position{};
+            position_ = GameState::startpos();
         } else if (name == "position") {
             handle_position(command);
         } else if (name == "setoption") {
@@ -66,7 +66,7 @@ void UciController::handle_position(std::istream& command) {
         return;
     }
 
-    Position candidate;
+    GameState candidate = GameState::startpos();
     std::size_t next = 0;
     if (tokens[0] == "startpos") {
         next = 1;
@@ -81,10 +81,12 @@ void UciController::handle_position(std::istream& command) {
             fen += ' ';
             fen += tokens[field];
         }
-        if (!candidate.set_fen(fen)) {
+        const auto parsed = GameState::from_fen(fen);
+        if (!parsed) {
             write_position_error("invalid FEN");
             return;
         }
+        candidate = *parsed;
         next = 7;
     } else {
         write_position_error("invalid position");
@@ -98,7 +100,8 @@ void UciController::handle_position(std::istream& command) {
         }
         ++next;
         for (; next < tokens.size(); ++next) {
-            if (!candidate.apply_uci(tokens[next])) {
+            const auto move = Move::parse_uci(tokens[next]);
+            if (!move || !candidate.make_move(*move)) {
                 write_position_error("invalid move");
                 return;
             }

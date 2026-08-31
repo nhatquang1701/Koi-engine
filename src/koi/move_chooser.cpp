@@ -2,8 +2,6 @@
 
 #include <chrono>
 
-#include "koi/position.hpp"
-
 namespace koi {
 
 namespace {
@@ -23,8 +21,8 @@ void RandomMoveChooser::set_seed(std::uint32_t seed) {
     engine_.seed(seed == 0 ? runtime_seed() : seed);
 }
 
-Move RandomMoveChooser::choose(const Position& position) {
-    const std::vector<Move> moves = position.legal_moves();
+Move RandomMoveChooser::choose(const GameState& state) {
+    const std::vector<Move> moves = state.legal_moves();
     if (moves.empty()) {
         return Move::no_move();
     }

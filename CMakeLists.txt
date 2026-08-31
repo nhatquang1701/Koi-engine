@@ -26,6 +26,7 @@ include(CTest)
 enable_testing()
 
 add_library(koi_core
+    src/koi/game_state.cpp
     src/koi/move.cpp
     src/koi/move_chooser.cpp
     src/koi/position.cpp
@@ -34,6 +35,9 @@ add_library(koi_core
 
 target_include_directories(koi_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+target_include_directories(koi_core PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/chess-library
 )
 
@@ -44,6 +48,14 @@ add_executable(koi_core_tests
 target_link_libraries(koi_core_tests PRIVATE koi_core)
 
 add_test(NAME koi_core_tests COMMAND koi_core_tests)
+
+add_executable(koi_rules_tests
+    tests/koi_rules_tests.cpp
+)
+
+target_link_libraries(koi_rules_tests PRIVATE koi_core)
+
+add_test(NAME koi_rules_tests COMMAND koi_rules_tests)
 
 add_executable(uci_controller_tests
     tests/uci_controller_tests.cpp
