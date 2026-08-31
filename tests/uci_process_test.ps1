@@ -250,6 +250,27 @@ foreach ($line in $limitLines) {
     }
 }
 
+$asymmetricClock = Start-UciSession
+Send-UciCommand $asymmetricClock 'position fen 4k3/8/8/8/8/8/4P3/4K3 b - - 0 1'
+Send-UciCommand $asymmetricClock 'go wtime 1000'
+$asymmetricBestmove = $null
+while ($null -eq $asymmetricBestmove) {
+    $line = Read-UciLine $asymmetricClock 'bestmove after asymmetric clock command'
+    if ($line -like 'bestmove *') {
+        $asymmetricBestmove = $line
+    } elseif (-not (Test-SearchInfo $line)) {
+        throw "Invalid output for asymmetric clock command: $line"
+    }
+}
+if ($asymmetricBestmove -notmatch '^bestmove [a-h][1-8][a-h][1-8][nbrq]?$') {
+    throw "Asymmetric clock command did not return a coordinate bestmove: $asymmetricBestmove"
+}
+Send-UciCommand $asymmetricClock 'isready'
+if ((Read-UciLine $asymmetricClock 'readyok after asymmetric clock command') -cne 'readyok') {
+    throw 'Asymmetric clock command did not complete before readyok.'
+}
+$null = Complete-UciSession $asymmetricClock $true
+
 $quitSession = Start-UciSession
 Send-UciCommand $quitSession 'position startpos'
 Send-UciCommand $quitSession 'go infinite'

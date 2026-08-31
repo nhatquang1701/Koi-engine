@@ -130,11 +130,9 @@ SearchLimits parse_go_limits(std::string_view arguments) {
         }
     }
 
-    if (white_time.has_value() || white_increment.has_value()) {
+    if (white_time.has_value() && black_time.has_value()) {
         limits.white_clock = ClockLimit{white_time.value_or(std::chrono::milliseconds::zero()),
                                         white_increment.value_or(std::chrono::milliseconds::zero())};
-    }
-    if (black_time.has_value() || black_increment.has_value()) {
         limits.black_clock = ClockLimit{black_time.value_or(std::chrono::milliseconds::zero()),
                                         black_increment.value_or(std::chrono::milliseconds::zero())};
     }

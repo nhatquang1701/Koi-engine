@@ -60,6 +60,9 @@ bool valid_piece_placement(std::string_view placement, FenLayout& layout) {
             if (width >= 8 || rank < 0) {
                 return false;
             }
+            if ((character == 'P' || character == 'p') && (rank == 0 || rank == 7)) {
+                return false;
+            }
             const int square = rank * 8 + width;
             layout.squares[static_cast<std::size_t>(square)] = character;
             if (character == 'K') {
@@ -110,12 +113,26 @@ bool valid_castling(std::string_view castling, const FenLayout& layout) {
            (!castling.contains('q') || (piece_at(60) == 'k' && piece_at(56) == 'r'));
 }
 
-bool valid_en_passant(std::string_view en_passant, std::string_view side_to_move) {
+bool valid_en_passant(std::string_view en_passant, std::string_view side_to_move,
+                      std::string_view halfmove_clock, const FenLayout& layout) {
     if (en_passant == "-") {
         return true;
     }
-    return en_passant.size() == 2 && en_passant[0] >= 'a' && en_passant[0] <= 'h' &&
-           ((side_to_move == "w" && en_passant[1] == '6') || (side_to_move == "b" && en_passant[1] == '3'));
+    if (en_passant.size() != 2 || en_passant[0] < 'a' || en_passant[0] > 'h' ||
+        !((side_to_move == "w" && en_passant[1] == '6') || (side_to_move == "b" && en_passant[1] == '3')) ||
+        halfmove_clock != "0") {
+        return false;
+    }
+
+    const int target_file = en_passant[0] - 'a';
+    const int target_rank = en_passant[1] - '1';
+    const int target_square = target_rank * 8 + target_file;
+    const int pawn_square = (side_to_move == "w" ? target_rank - 1 : target_rank + 1) * 8 + target_file;
+    const int origin_square = (side_to_move == "w" ? target_rank + 1 : target_rank - 1) * 8 + target_file;
+    const char pawn = side_to_move == "w" ? 'p' : 'P';
+    return layout.squares[static_cast<std::size_t>(target_square)] == '\0' &&
+           layout.squares[static_cast<std::size_t>(pawn_square)] == pawn &&
+           layout.squares[static_cast<std::size_t>(origin_square)] == '\0';
 }
 
 bool valid_counter(std::string_view counter, bool allow_zero, std::uint32_t maximum) {
@@ -130,7 +147,7 @@ bool valid_fen_syntax(std::string_view fen) {
     FenLayout layout;
     return split_fen_fields(fen, fields) && valid_piece_placement(fields[0], layout) &&
            (fields[1] == "w" || fields[1] == "b") && valid_castling(fields[2], layout) &&
-           valid_en_passant(fields[3], fields[1]) && valid_counter(fields[4], true, 255) &&
+           valid_en_passant(fields[3], fields[1], fields[4], layout) && valid_counter(fields[4], true, 255) &&
            valid_counter(fields[5], false, 32768);
 }
 

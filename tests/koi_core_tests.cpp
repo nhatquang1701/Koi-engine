@@ -72,6 +72,36 @@ void test_malformed_fens_are_rejected_transactionally() {
     }
 }
 
+void test_pawns_on_back_ranks_are_rejected_transactionally() {
+    Position position;
+    const std::string original = position.fen();
+
+    for (std::string_view fen : {
+             "4k3/8/8/8/8/8/8/P3K3 w - - 0 1",
+             "p3k3/8/8/8/8/8/8/4K3 w - - 0 1",
+         }) {
+        require(!position.set_fen(fen), "FEN with a pawn on rank one or eight must be rejected");
+        require(position.fen() == original, "rejected back-rank pawn FEN must leave the position unchanged");
+    }
+}
+
+void test_incoherent_en_passant_targets_are_rejected_transactionally() {
+    Position position;
+    const std::string original = position.fen();
+
+    for (std::string_view fen : {
+             "4k3/8/8/8/8/8/8/4K3 w - e6 0 1",
+             "4k3/8/8/4p3/8/8/8/4K3 w - e6 1 1",
+             "4k3/4P3/8/4p3/8/8/8/4K3 w - e6 0 1",
+         }) {
+        require(!position.set_fen(fen), "en-passant target must describe the immediately preceding pawn double push");
+        require(position.fen() == original, "rejected en-passant FEN must leave the position unchanged");
+    }
+
+    require(position.set_fen("4k3/8/8/4p3/8/8/8/4K3 w - e6 0 1"),
+            "a coherent en-passant target must remain valid even without a capture available");
+}
+
 void test_adjacent_kings_are_rejected_transactionally() {
     Position position;
     const std::string original = position.fen();
@@ -190,6 +220,8 @@ int main() {
         {"legal UCI sequence", test_legal_uci_sequence_updates_position},
         {"special moves", test_special_move_positions_accept_valid_uci_moves},
         {"malformed FEN rejection", test_malformed_fens_are_rejected_transactionally},
+        {"back-rank pawn rejection", test_pawns_on_back_ranks_are_rejected_transactionally},
+        {"en-passant state validation", test_incoherent_en_passant_targets_are_rejected_transactionally},
         {"adjacent king rejection", test_adjacent_kings_are_rejected_transactionally},
         {"castling-rights validation", test_castling_rights_require_the_standard_pieces},
         {"triple-check rejection", test_impossible_triple_check_is_rejected_transactionally},
