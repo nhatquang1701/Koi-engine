@@ -72,6 +72,25 @@ SearchLimits parse_go_limits(std::string_view arguments) {
             limits.infinite = true;
             continue;
         }
+        if (token == "ponder") {
+            limits.ponder = true;
+            continue;
+        }
+        if (token == "searchmoves") {
+            limits.search_moves_specified = true;
+            ++index;
+            while (index < tokens.size()) {
+                const auto move = Move::parse_uci(tokens[index]);
+                if (!move.has_value()) {
+                    break;
+                }
+                limits.search_moves.push_back(*move);
+                ++index;
+            }
+            if (index < tokens.size()) {
+                --index;
+            }
+            continue;
         if (index + 1 >= tokens.size()) {
             continue;
         }

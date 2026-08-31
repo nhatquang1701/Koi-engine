@@ -257,6 +257,37 @@ void test_go_limit_parser_maps_each_supported_limit_exactly() {
     require(limits.moves_to_go == 40, "movestogo must map to SearchLimits::moves_to_go");
     require(!limits.infinite, "ordinary limits must not enable infinite search");
 }
+void test_go_limit_parser_supports_lucas_root_options_and_value_defaults() {
+    const auto limits = koi::uci::parse_go_limits(
+        "ponder searchmoves e2e4 g1f3 depth 5");
+    require(limits.ponder, "ponder must be parsed");
+    require(limits.search_moves_specified && limits.search_moves.size() == 2,
+            "searchmoves must preserve both coordinate moves");
+    require(limits.search_moves[0].uci() == "e2e4" && limits.search_moves[1].uci() == "g1f3",
+            "searchmoves must parse coordinate moves through Move::parse_uci");
+    require(limits.depth == 5, "searchmoves must not consume a following depth field");
+
+    const auto single_move = koi::uci::parse_go_limits("searchmoves a2a3");
+    require(single_move.search_moves_specified && single_move.search_moves.size() == 1,
+            "searchmoves must keep its restriction flag with one coordinate move");
+
+    const auto no_valid_moves = koi::uci::parse_go_limits("searchmoves depth 5");
+    require(no_valid_moves.search_moves_specified && no_valid_moves.search_moves.empty(),
+            "searchmoves without a syntactically valid move must keep an empty restriction");
+    require(no_valid_moves.depth == 5,
+            "searchmoves without a move must leave the following depth field available");
+
+    const auto absent = koi::uci::parse_go_limits("depth 5");
+    require(!absent.search_moves_specified && absent.search_moves.empty(),
+            "absent searchmoves must leave the restriction clear");
+
+    const koi::SearchInfo info;
+    require(info.multipv == 1, "default SearchInfo must use multipv 1");
+
+    const koi::SearchOptions options;
+    require(options.multi_pv == 1 && !options.analyse_mode,
+            "default SearchOptions must use one principal variation and normal mode");
+}
 
 void test_go_limit_parser_uses_depth_one_for_missing_malformed_overflow_and_asymmetric_clock_values() {
     const std::vector<std::string_view> commands{
@@ -409,6 +440,7 @@ void test_protocol_output_contains_only_valid_uci_responses() {
 void test_protocol_responses_flush_promptly() {
     std::istringstream input(
         "uci\n"
+        {"go limit parser Lucas root options", test_go_limit_parser_supports_lucas_root_options_and_value_defaults},
         "isready\n"
         "position startpos moves not-a-move\n"
         "go infinite\n"

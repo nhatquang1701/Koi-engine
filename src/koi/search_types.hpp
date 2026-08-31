@@ -24,6 +24,9 @@ struct SearchLimits {
     std::optional<ClockLimit> black_clock;
     std::optional<std::uint32_t> moves_to_go;
     bool infinite = false;
+    bool ponder = false;
+    bool search_moves_specified = false;
+    std::vector<Move> search_moves;
 };
 
 struct SearchStats {
@@ -41,6 +44,7 @@ struct SearchInfo {
     std::uint64_t nps = 0;
     std::chrono::milliseconds elapsed{0};
     std::vector<Move> pv;
+    int multipv = 1;
 };
 
 struct SearchResult {
@@ -55,6 +59,8 @@ struct SearchEventSink {
     std::function<void(const SearchInfo&)> on_info;
     std::function<void(const SearchResult&)> on_complete;
 };
+    std::size_t multi_pv = 1;
+    bool analyse_mode = false;
 
 struct SearchOptions {
     std::size_t hash_mb = 16;
