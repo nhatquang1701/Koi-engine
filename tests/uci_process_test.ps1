@@ -5,6 +5,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $TimeoutMilliseconds = 5000
+$MaximumThreads = [Math]::Max(1, [Math]::Min(64, [Environment]::ProcessorCount))
 
 function Start-UciSession {
     $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
@@ -105,7 +106,7 @@ function Invoke-UciTranscript([string]$Transcript) {
 }
 
 function Test-SearchInfo([string]$Line) {
-    return $Line -match '^info depth [1-9][0-9]* score (cp|mate) -?[0-9]+ nodes [0-9]+ nps [0-9]+ time [0-9]+ pv( [a-h][1-8][a-h][1-8][nbrq]?)*$'
+    return $Line -match '^info depth [1-9][0-9]* seldepth [0-9]+ multipv [1-9][0-6]? score (cp|mate) -?[0-9]+ nodes [0-9]+ nps [0-9]+ time [0-9]+ pv( [a-h][1-8][a-h][1-8][nbrq]?)*$'
 }
 
 $session = Start-UciSession
@@ -115,6 +116,11 @@ $expectedHandshake = @(
     'id author Koi Engine contributors',
     'option name RandomSeed type spin default 0 min 0 max 2147483647',
     'option name Hash type spin default 16 min 1 max 4096',
+    "option name Threads type spin default 1 min 1 max $MaximumThreads",
+    'option name Speed type spin default 100 min 1 max 100',
+    'option name UCI_AnalyseMode type check default false',
+    'option name MultiPV type spin default 1 min 1 max 16',
+    'option name Ponder type check default false',
     'option name Clear Hash type button',
     'uciok'
 )
@@ -130,7 +136,63 @@ if ((Read-UciLine $session 'initial readyok') -cne 'readyok') {
     throw 'Expected readyok after the UCI handshake.'
 }
 
+Send-UciCommand $session 'setoption name UCI_AnalyseMode value true'
+Send-UciCommand $session 'setoption name MultiPV value 3'
+Send-UciCommand $session 'setoption name Ponder value true'
 Send-UciCommand $session 'position startpos'
+Send-UciCommand $session 'go ponder depth 2'
+Send-UciCommand $session 'ponderhit'
+$ponderInfoLines = [System.Collections.Generic.List[string]]::new()
+$ponderBestmove = $null
+while ($null -eq $ponderBestmove) {
+    $line = Read-UciLine $session 'bestmove after ponderhit'
+    if ($line -like 'bestmove *') {
+        if ($line -notmatch '^bestmove [a-h][1-8][a-h][1-8][nbrq]?$') {
+            throw "ponderhit emitted an invalid bestmove: $line"
+        }
+        $ponderBestmove = $line
+    } elseif (Test-SearchInfo $line) {
+        $ponderInfoLines.Add($line)
+    } else {
+        throw "Invalid output after ponderhit: $line"
+    }
+}
+if (-not @($ponderInfoLines | Where-Object { $_ -match ' multipv 2 score ' })) {
+    throw "Ponder MultiPV search did not emit rank two: $($ponderInfoLines -join ' | ')"
+}
+Send-UciCommand $session 'isready'
+while ($true) {
+    $line = Read-UciLine $session 'readyok after ponderhit'
+    if ($line -ceq 'readyok') {
+        break
+    }
+    if ($line -like 'bestmove *') {
+        throw "ponderhit emitted a duplicate bestmove: $line"
+    }
+    if (-not (Test-SearchInfo $line)) {
+        throw "Invalid output after ponderhit: $line"
+    }
+}
+
+Send-UciCommand $session 'position startpos'
+Send-UciCommand $session 'go ponder searchmoves e2e4'
+Send-UciCommand $session 'stop'
+$searchmovesBestmove = $null
+while ($null -eq $searchmovesBestmove) {
+    $line = Read-UciLine $session 'bestmove after ponder searchmoves stop'
+    if ($line -like 'bestmove *') {
+        $searchmovesBestmove = $line
+    } elseif (-not (Test-SearchInfo $line)) {
+        throw "Invalid output while stopping ponder searchmoves: $line"
+    }
+}
+if ($searchmovesBestmove -cne 'bestmove e2e4') {
+    throw "Ponder searchmoves did not preserve the root filter: $searchmovesBestmove"
+}
+
+Send-UciCommand $session 'position startpos'
+Send-UciCommand $session "setoption name Threads value $MaximumThreads"
+Send-UciCommand $session 'setoption name Speed value 50'
 Send-UciCommand $session 'go infinite'
 Send-UciCommand $session 'isready'
 while ($true) {
@@ -227,10 +289,12 @@ go wtime 0 btime 0 winc 0 binc 0 movestogo 1
 stop
 go infinite
 stop
-go depth bad nodes -1 movetime -1 wtime bad btime -1 winc nope binc -4 movestogo 0
+  go depth bad nodes -1 movetime -1 wtime bad btime -1 winc nope binc -4 movestogo 0
 stop
 go
 stop
+setoption name Threads value 1
+setoption name Speed value 100
 setoption name Hash value 1
 setoption name Clear Hash
 quit
@@ -271,6 +335,37 @@ if ((Read-UciLine $asymmetricClock 'readyok after asymmetric clock command') -cn
 }
 $null = Complete-UciSession $asymmetricClock $true
 
+$infiniteNodes = Start-UciSession
+Send-UciCommand $infiniteNodes 'position startpos'
+Send-UciCommand $infiniteNodes 'go infinite nodes 1'
+Send-UciCommand $infiniteNodes 'isready'
+while ($true) {
+    $line = Read-UciLine $infiniteNodes 'readyok during infinite node-limit search'
+    if ($line -ceq 'readyok') {
+        break
+    }
+    if ($line -like 'bestmove *') {
+        throw "Infinite search honored a node limit before stop: $line"
+    }
+    if (-not (Test-SearchInfo $line)) {
+        throw "Invalid output during infinite node-limit search: $line"
+    }
+}
+Send-UciCommand $infiniteNodes 'stop'
+$infiniteNodesBestmove = $null
+while ($null -eq $infiniteNodesBestmove) {
+    $line = Read-UciLine $infiniteNodes 'bestmove after infinite node-limit stop'
+    if ($line -like 'bestmove *') {
+        $infiniteNodesBestmove = $line
+    } elseif (-not (Test-SearchInfo $line)) {
+        throw "Invalid output while stopping infinite node-limit search: $line"
+    }
+}
+if ($infiniteNodesBestmove -notmatch '^bestmove [a-h][1-8][a-h][1-8][nbrq]?$') {
+    throw "Infinite node-limit search emitted an invalid bestmove: $infiniteNodesBestmove"
+}
+$null = Complete-UciSession $infiniteNodes $true
+
 $quitSession = Start-UciSession
 Send-UciCommand $quitSession 'position startpos'
 Send-UciCommand $quitSession 'go infinite'
@@ -286,3 +381,40 @@ $eofLines = @(Complete-UciSession $eofSession $false)
 if (@($eofLines | Where-Object { $_ -like 'bestmove *' }).Count -ne 0) {
     throw "EOF emitted a late bestmove: $($eofLines -join ' | ')"
 }
+
+$gameSession = Start-UciSession
+Send-UciCommand $gameSession 'uci'
+foreach ($expected in $expectedHandshake) {
+    if ((Read-UciLine $gameSession $expected) -cne $expected) {
+        throw "Unexpected multi-ply handshake line. Expected '$expected'."
+    }
+}
+Send-UciCommand $gameSession "setoption name Threads value $MaximumThreads"
+Send-UciCommand $gameSession 'setoption name Speed value 50'
+$gameMoves = [System.Collections.Generic.List[string]]::new()
+for ($ply = 0; $ply -lt 6; $ply++) {
+    $positionCommand = 'position startpos'
+    if ($gameMoves.Count -gt 0) {
+        $positionCommand += ' moves ' + ($gameMoves -join ' ')
+    }
+    Send-UciCommand $gameSession $positionCommand
+    Send-UciCommand $gameSession 'go depth 1'
+    $gameBestmove = $null
+    while ($null -eq $gameBestmove) {
+        $line = Read-UciLine $gameSession "multi-ply bestmove $ply"
+        if ($line -like 'bestmove *') {
+            if ($line -notmatch '^bestmove ([a-h][1-8][a-h][1-8][nbrq]?)$') {
+                throw "Multi-ply game emitted an invalid bestmove: $line"
+            }
+            $gameBestmove = $Matches[1]
+            $gameMoves.Add($gameBestmove)
+        } elseif (-not (Test-SearchInfo $line)) {
+            throw "Invalid multi-ply game output: $line"
+        }
+    }
+    Send-UciCommand $gameSession 'isready'
+    if ((Read-UciLine $gameSession "multi-ply readyok $ply") -cne 'readyok') {
+        throw "Multi-ply game did not fence the completed search at ply $ply."
+    }
+}
+$null = Complete-UciSession $gameSession $true
