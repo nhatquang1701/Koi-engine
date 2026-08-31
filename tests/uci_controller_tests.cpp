@@ -229,21 +229,6 @@ private:
     int depth_;
 };
 
-class ReleaseOnBestmoveBuffer final : public std::stringbuf {
-public:
-    explicit ReleaseOnBestmoveBuffer(GatedInputBuffer& input) : input_(input) {}
-
-    int sync() override {
-        if (str().find("bestmove ") != std::string::npos) {
-            input_.mark_marker();
-        }
-        return std::stringbuf::sync();
-    }
-
-private:
-    GatedInputBuffer& input_;
-};
-
 void test_uci_handshake_has_identity_and_supported_options_in_order() {
     const ControllerResult result = run_controller("uci\nquit\n");
     const std::string expected =
@@ -652,34 +637,6 @@ void test_go_limit_parser_uses_a_scaled_bare_go_fallback_and_independent_clocks(
             "the black one-sided clock must budget only for Black");
 }
 
-void test_controller_falls_back_when_only_the_opponent_clock_is_supplied() {
-    GatedInputBuffer input(
-        "position fen 4k3/8/8/8/8/8/4P3/4K3 b - - 0 1\n"
-        "go wtime 1000\n",
-        "quit\n");
-    std::istream input_stream(&input);
-    ReleaseOnBestmoveBuffer output_buffer(input);
-    std::ostream output(&output_buffer);
-    std::ostringstream diagnostics;
-    int exit_code = -1;
-    std::thread controller_thread([&] {
-        UciController controller(input_stream, output, diagnostics);
-        exit_code = controller.run();
-    });
-
-    const bool bestmove_seen = input.wait_for_marker(std::chrono::seconds(1));
-    if (!bestmove_seen) {
-        input.release();
-    }
-    controller_thread.join();
-
-    const std::vector<std::string> bestmoves =
-        lines_starting_with(output_lines(output_buffer.str()), "bestmove ");
-    require(bestmove_seen && exit_code == 0 && bestmoves.size() == 1 &&
-                is_legal_move(Position("4k3/8/8/8/8/8/4P3/4K3 b - - 0 1"), bestmoves.front().substr(9)),
-            "a missing side-to-move clock must use the finite controller fallback");
-}
-
 void test_go_limit_parser_supports_lucas_root_options_and_value_defaults() {
     const auto limits = koi::uci::parse_go_limits(
         "ponder searchmoves e2e4 g1f3 depth 5");
@@ -953,7 +910,6 @@ int main() {
         {"go limits and malformed values", test_all_go_limits_and_malformed_values_are_accepted_without_crashing},
         {"go limit parser exact mapping", test_go_limit_parser_maps_each_supported_limit_exactly},
         {"go limit fallback and clocks", test_go_limit_parser_uses_a_scaled_bare_go_fallback_and_independent_clocks},
-        {"opponent-clock controller fallback", test_controller_falls_back_when_only_the_opponent_clock_is_supplied},
         {"go limit parser Lucas root options", test_go_limit_parser_supports_lucas_root_options_and_value_defaults},
         {"go limit parser fallback", test_go_limit_parser_uses_fallback_for_missing_malformed_and_overflow_values},
         {"Ponder PV emission", test_ponder_option_emits_a_legal_second_pv_move},

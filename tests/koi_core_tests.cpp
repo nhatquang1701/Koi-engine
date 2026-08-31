@@ -1,9 +1,12 @@
+#include <atomic>
 #include <iostream>
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <vector>
 
+#include "koi/game_state.hpp"
 #include "koi/position.hpp"
 #include "koi/move_chooser.hpp"
 
@@ -44,6 +47,15 @@ bool same_features(const koi::PositionFeatures& first, const koi::PositionFeatur
         }
     }
     return true;
+}
+
+bool contains_metadata_move(const koi::MoveMetadataList& moves, std::string_view expected) {
+    for (const koi::MoveMetadata& metadata : moves) {
+        if (metadata.move.uci() == expected) {
+            return true;
+        }
+    }
+    return false;
 }
 
 void test_default_position_has_initial_fen_and_twenty_moves() {
@@ -236,6 +248,76 @@ void test_position_features_refresh_after_make_and_unmake() {
             "feature extraction must not return stale data after make and unmake");
 }
 
+void test_position_features_are_safe_for_concurrent_const_reads() {
+    const koi::GameState expected_state = koi::GameState::startpos();
+    const koi::PositionFeatures expected = expected_state.position_features();
+    const koi::GameState state = koi::GameState::startpos();
+    std::atomic_bool start = false;
+    std::atomic_bool mismatch = false;
+    std::atomic_uint ready = 0;
+    std::vector<std::thread> readers;
+    readers.reserve(8);
+    for (int reader = 0; reader < 8; ++reader) {
+        readers.emplace_back([&] {
+            ready.fetch_add(1, std::memory_order_release);
+            while (!start.load(std::memory_order_acquire)) {
+                std::this_thread::yield();
+            }
+            for (int iteration = 0; iteration < 256; ++iteration) {
+                if (!same_features(state.position_features(), expected)) {
+                    mismatch.store(true, std::memory_order_relaxed);
+                }
+            }
+        });
+    }
+    while (ready.load(std::memory_order_acquire) != readers.size()) {
+        std::this_thread::yield();
+    }
+    start.store(true, std::memory_order_release);
+    for (std::thread& reader : readers) {
+        reader.join();
+    }
+    require(!mismatch.load(std::memory_order_relaxed),
+            "concurrent const feature reads must return complete identical position features");
+}
+
+void test_tactical_generation_omits_quiet_checks_after_the_checking_horizon() {
+    const auto quiet_check_state = koi::GameState::from_fen("k7/8/8/8/8/8/4Q3/4K3 w - - 0 1");
+    require(quiet_check_state.has_value(), "quiet-check tactical fixture must be valid");
+    koi::MoveMetadataList tactical;
+    require(quiet_check_state->legal_tactical_moves_with_metadata(tactical, false),
+            "quiet-check tactical fixture must have legal moves");
+    require(!contains_metadata_move(tactical, "e2e8"),
+            "the checking horizon must omit quiet checks from tactical generation");
+
+    const auto capture_state = koi::GameState::from_fen("k7/8/8/3q4/4Q3/8/8/4K3 w - - 0 1");
+    require(capture_state.has_value(), "capture tactical fixture must be valid");
+    require(capture_state->legal_tactical_moves_with_metadata(tactical, false),
+            "capture tactical fixture must have legal moves");
+    require(contains_metadata_move(tactical, "e4d5"),
+            "the checking horizon must retain legal captures");
+
+    const auto promotion_state = koi::GameState::from_fen("4k3/P7/8/8/8/8/8/4K3 w - - 0 1");
+    require(promotion_state.has_value(), "promotion tactical fixture must be valid");
+    require(promotion_state->legal_tactical_moves_with_metadata(tactical, false),
+            "promotion tactical fixture must have legal moves");
+    for (const std::string_view promotion : {"q", "r", "b", "n"}) {
+        require(contains_metadata_move(tactical, "a7a8" + std::string(promotion)),
+                "the checking horizon must retain every legal promotion");
+    }
+
+    const auto evasion_state = koi::GameState::from_fen("k3r3/8/8/8/8/8/8/4K3 w - - 0 1");
+    require(evasion_state.has_value(), "evasion tactical fixture must be valid");
+    const std::vector<koi::Move> evasions = evasion_state->legal_moves();
+    require(evasion_state->legal_tactical_moves_with_metadata(tactical, false),
+            "evasion tactical fixture must have legal moves");
+    require(tactical.size() == evasions.size(), "checked tactical generation must retain every legal evasion");
+    for (const koi::Move& evasion : evasions) {
+        require(contains_metadata_move(tactical, evasion.uci()),
+                "checked tactical generation must retain each legal evasion");
+    }
+}
+
 struct TestCase {
     std::string_view name;
     void (*run)();
@@ -261,6 +343,8 @@ int main() {
         {"random chooser legality", test_random_chooser_returns_a_legal_move},
         {"seeded chooser repeatability", test_seeded_choosers_are_repeatable},
         {"position feature freshness", test_position_features_refresh_after_make_and_unmake},
+        {"position feature concurrent reads", test_position_features_are_safe_for_concurrent_const_reads},
+        {"tactical checking horizon", test_tactical_generation_omits_quiet_checks_after_the_checking_horizon},
     };
 
     for (const TestCase& test : tests) {

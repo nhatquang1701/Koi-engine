@@ -1,11 +1,13 @@
 #include "koi/game_state.hpp"
 
+#include <atomic>
 #include <array>
 #include <bit>
 #include <charconv>
 #include <cctype>
 #include <cstdlib>
 #include <limits>
+#include <memory>
 #include <utility>
 
 #include <chess.hpp>
@@ -434,11 +436,10 @@ public:
     chess::Board board{};
     std::vector<HistoryRecord> history;
     struct FeatureCache {
-        std::uint64_t position_key = 0;
+        std::uint64_t position_key;
         PositionFeatures features;
-        bool valid = false;
     };
-    mutable FeatureCache feature_cache;
+    mutable std::shared_ptr<const FeatureCache> feature_cache;
 };
 
 GameState::GameState() : impl_(std::make_unique<Impl>()) {}
@@ -501,8 +502,7 @@ int GameState::direct_static_exchange_gain(const MoveMetadata& initial) const no
     if (move.is_no_move() || move.from().index() == Square::kInvalid || move.to().index() == Square::kInvalid) {
         return 0;
     }
-    if (!initial.is_capture() && initial.captured_piece == PieceType::none &&
-        move.promotion() == Promotion::none) {
+    if (!initial.is_capture() && initial.captured_piece == PieceType::none) {
         return 0;
     }
 
@@ -767,8 +767,10 @@ std::optional<MoveMetadata> GameState::describe_move(const Move& move) const noe
 
 PositionFeatures GameState::position_features() const noexcept {
     const std::uint64_t key = position_key();
-    if (impl_->feature_cache.valid && impl_->feature_cache.position_key == key) {
-        return impl_->feature_cache.features;
+    const std::shared_ptr<const Impl::FeatureCache> cached =
+        std::atomic_load_explicit(&impl_->feature_cache, std::memory_order_acquire);
+    if (cached != nullptr && cached->position_key == key) {
+        return cached->features;
     }
 
     PositionFeatures features;
@@ -841,7 +843,12 @@ PositionFeatures GameState::position_features() const noexcept {
         features.king_squares[color_index] = Square::from_index(
             static_cast<std::uint8_t>(impl_->board.kingSq(color).index()));
     }
-    impl_->feature_cache = Impl::FeatureCache{key, features, true};
+    try {
+        auto replacement = std::make_shared<const Impl::FeatureCache>(Impl::FeatureCache{key, features});
+        std::atomic_store_explicit(&impl_->feature_cache, std::move(replacement), std::memory_order_release);
+    } catch (const std::bad_alloc&) {
+        // The cache is optional; feature extraction remains valid if allocating it fails.
+    }
     return features;
 }
 

@@ -952,6 +952,46 @@ void test_transposition_table_survives_concurrent_probe_store_and_resize() {
             "concurrent resize must not expose a transposition entry for another key");
 }
 
+void test_transposition_table_survives_mixed_concurrent_maintenance() {
+    koi::TranspositionTable table(1);
+    const auto move = koi::Move::parse_uci("e2e4");
+    require(move.has_value(), "test move must parse");
+    std::atomic_bool invalid_entry = false;
+    std::atomic_bool invalid_size = false;
+    std::vector<std::thread> workers;
+    for (std::uint64_t worker = 0; worker < 6; ++worker) {
+        workers.emplace_back([&table, &invalid_entry, move, worker] {
+            for (std::uint64_t iteration = 0; iteration < 2'000; ++iteration) {
+                const std::uint64_t key = (worker + 13) * 0x100000001b3ULL + iteration;
+                table.store(key, static_cast<int>(iteration % 8), static_cast<int>(worker),
+                            koi::TranspositionBound::exact, *move);
+                if (const auto entry = table.probe(key); entry.has_value() && entry->key != key) {
+                    invalid_entry.store(true, std::memory_order_relaxed);
+                }
+            }
+        });
+    }
+    std::thread maintenance([&] {
+        for (int iteration = 0; iteration < 80; ++iteration) {
+            table.new_generation();
+            table.clear();
+            const std::size_t megabytes = iteration % 2 == 0 ? 1 : 2;
+            table.set_size_mb(megabytes);
+            if (table.size_mb() != megabytes) {
+                invalid_size.store(true, std::memory_order_relaxed);
+            }
+        }
+    });
+    for (std::thread& worker : workers) {
+        worker.join();
+    }
+    maintenance.join();
+    require(!invalid_entry.load(std::memory_order_relaxed),
+            "mixed TT maintenance must never expose an entry for another key");
+    require(!invalid_size.load(std::memory_order_relaxed),
+            "mixed TT maintenance must publish every requested resize");
+}
+
 struct TestCase {
     std::string_view name;
     void (*run)();
@@ -998,6 +1038,7 @@ int main() {
         {"transposition table mate normalization", test_transposition_table_preserves_mate_distance_across_plies},
         {"transposition table concurrency", test_transposition_table_survives_concurrent_probe_store_and_maintenance},
         {"transposition table resize concurrency", test_transposition_table_survives_concurrent_probe_store_and_resize},
+        {"transposition table mixed maintenance", test_transposition_table_survives_mixed_concurrent_maintenance},
     };
 
     const char* filter = std::getenv("KOI_TEST_FILTER");
