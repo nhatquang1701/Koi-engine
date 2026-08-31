@@ -1,15 +1,21 @@
 #include "koi/search_service.hpp"
 
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <chrono>
-#include <cmath>
+#include <condition_variable>
+#include <cstdint>
 #include <exception>
+#include <memory>
+#include <mutex>
 #include <stdexcept>
 #include <thread>
 #include <utility>
+#include <vector>
 
 #include "koi/detail/search_ordering.hpp"
+#include "koi/detail/static_exchange.hpp"
 #include "koi/time_manager.hpp"
 #include "koi/transposition_table.hpp"
 
@@ -20,6 +26,11 @@ constexpr int kInfinity = 1'000'000;
 constexpr int kMateScore = 100'000;
 constexpr int kMateThreshold = 99'000;
 constexpr int kMaximumSearchDepth = 64;
+constexpr int kMaximumQuiescenceDepth = 16;
+constexpr int kMaximumQuiescenceSafetyDepth = 64;
+constexpr int kMaximumQuiescenceCheckDepth = 2;
+constexpr int kAspirationWindow = 50;
+constexpr std::size_t kMaximumMultiPv = 16;
 
 std::optional<int> mate_from_score(int score) noexcept {
     if (score >= kMateThreshold) {
@@ -31,73 +42,262 @@ std::optional<int> mate_from_score(int score) noexcept {
     return std::nullopt;
 }
 
+std::size_t normalized_threads(std::size_t threads) noexcept {
+    return std::clamp(threads, std::size_t{1}, maximum_search_threads());
+}
+
+std::uint8_t normalized_speed(std::uint8_t speed_percent) noexcept {
+    return static_cast<std::uint8_t>(std::clamp<std::uint32_t>(speed_percent, 1, 100));
+}
+
+std::size_t normalized_multi_pv(std::size_t multi_pv) noexcept {
+    return std::clamp(multi_pv, std::size_t{1}, kMaximumMultiPv);
+}
+
+constexpr int piece_value(PieceType type) noexcept {
+    switch (type) {
+    case PieceType::pawn:
+        return 100;
+    case PieceType::knight:
+        return 320;
+    case PieceType::bishop:
+        return 330;
+    case PieceType::rook:
+        return 500;
+    case PieceType::queen:
+        return 900;
+    case PieceType::king:
+        return 20'000;
+    case PieceType::none:
+        return 0;
+    }
+    return 0;
+}
+
+constexpr std::size_t kMaximumPvLength = static_cast<std::size_t>(kMaximumSearchDepth);
+
+struct PrincipalVariation {
+    std::array<Move, kMaximumPvLength> moves{};
+    std::uint8_t length = 0;
+
+    void prepend(Move move, const PrincipalVariation& child) noexcept {
+        const std::size_t child_length =
+            std::min<std::size_t>(child.length, kMaximumPvLength - 1);
+        moves[0] = move;
+        std::copy_n(child.moves.data(), child_length, moves.data() + 1);
+        length = static_cast<std::uint8_t>(child_length + 1);
+    }
+
+    [[nodiscard]] std::vector<Move> to_vector() const {
+        return {moves.begin(), moves.begin() + length};
+    }
+};
+
+void accumulate_stats(SearchStats& total, const SearchStats& partial) noexcept {
+    total.nodes += partial.nodes;
+    total.qnodes += partial.qnodes;
+    total.tt_hits += partial.tt_hits;
+    total.pvs_searches += partial.pvs_searches;
+    total.pvs_researches += partial.pvs_researches;
+    total.aspiration_researches += partial.aspiration_researches;
+    total.check_extensions += partial.check_extensions;
+    total.qchecks += partial.qchecks;
+    total.see_prunes += partial.see_prunes;
+    total.delta_prunes += partial.delta_prunes;
+    total.null_cutoffs += partial.null_cutoffs;
+    total.lmr_reductions += partial.lmr_reductions;
+    total.seldepth = std::max(total.seldepth, partial.seldepth);
+}
+
 struct SearchContext {
     const Evaluator& evaluator;
     TranspositionTable& table;
-    TimeManager time_manager;
+    TimeManager& time_manager;
     std::atomic_bool& stop_requested;
+    std::atomic<std::uint64_t>* global_nodes = nullptr;
+    std::mutex* evaluator_mutex = nullptr;
+    const MoveMetadataList* root_moves = nullptr;
+    std::atomic_bool* iteration_aborted = nullptr;
     detail::SearchMoveOrdering ordering;
     SearchStats stats;
     bool aborted = false;
 
-    SearchContext(const Evaluator& evaluator, TranspositionTable& table, const SearchLimits& limits,
-                  Color side_to_move, std::atomic_bool& stop_requested)
-        : evaluator(evaluator), table(table), time_manager(limits, side_to_move), stop_requested(stop_requested) {}
+    SearchContext(const Evaluator& evaluator, TranspositionTable& table, TimeManager& time_manager,
+                  std::atomic_bool& stop_requested,
+                  std::atomic<std::uint64_t>* global_nodes = nullptr,
+                  std::mutex* evaluator_mutex = nullptr,
+                  const MoveMetadataList* root_moves = nullptr)
+        : evaluator(evaluator), table(table), time_manager(time_manager), stop_requested(stop_requested),
+          global_nodes(global_nodes), evaluator_mutex(evaluator_mutex), root_moves(root_moves) {}
 
-    bool interrupted() {
-        if (stop_requested.load(std::memory_order_relaxed) || time_manager.should_stop(stats.nodes + stats.qnodes)) {
+    void begin_iteration(std::atomic_bool* shared_abort) noexcept {
+        stats = {};
+        aborted = false;
+        iteration_aborted = shared_abort;
+    }
+
+    void request_abort() noexcept {
+        aborted = true;
+        if (iteration_aborted != nullptr) {
+            iteration_aborted->store(true, std::memory_order_relaxed);
+        }
+    }
+
+    [[nodiscard]] std::uint64_t visited_nodes() const noexcept {
+        if (global_nodes != nullptr) {
+            return global_nodes->load(std::memory_order_relaxed);
+        }
+        return stats.nodes + stats.qnodes;
+    }
+
+    [[nodiscard]] bool reserve_global_node() noexcept {
+        if (global_nodes == nullptr) {
+            if (const std::optional<std::uint64_t> limit = time_manager.node_limit(); limit.has_value() &&
+                stats.nodes + stats.qnodes >= *limit) {
+                return false;
+            }
+            return true;
+        }
+
+        const std::optional<std::uint64_t> limit = time_manager.node_limit();
+        if (!limit.has_value()) {
+            global_nodes->fetch_add(1, std::memory_order_relaxed);
+            return true;
+        }
+
+        std::uint64_t observed = global_nodes->load(std::memory_order_relaxed);
+        for (;;) {
+            if (observed >= *limit) {
+                return false;
+            }
+            if (global_nodes->compare_exchange_weak(observed, observed + 1,
+                                                    std::memory_order_relaxed,
+                                                    std::memory_order_relaxed)) {
+                return true;
+            }
+        }
+    }
+
+    [[nodiscard]] bool interrupted() noexcept {
+        if (stop_requested.load(std::memory_order_relaxed) ||
+            (iteration_aborted != nullptr && iteration_aborted->load(std::memory_order_relaxed))) {
             aborted = true;
+            return true;
+        }
+        if (time_manager.should_stop(visited_nodes())) {
+            request_abort();
             return true;
         }
         return false;
     }
 
-    int terminal_score(const GameState& state, const std::vector<Move>& moves, int ply) const {
-        if (!moves.empty()) {
+    [[nodiscard]] bool count_node(bool quiescence) noexcept {
+        if (stop_requested.load(std::memory_order_relaxed) ||
+            (iteration_aborted != nullptr && iteration_aborted->load(std::memory_order_relaxed))) {
+            aborted = true;
+            return false;
+        }
+        if (!reserve_global_node()) {
+            request_abort();
+            return false;
+        }
+
+        if (quiescence) {
+            ++stats.qnodes;
+        } else {
+            ++stats.nodes;
+        }
+        return !interrupted();
+    }
+
+    [[nodiscard]] int terminal_score(const GameState& state, std::size_t move_count,
+                                     int ply) const noexcept {
+        if (move_count != 0) {
             return 0;
         }
         return state.in_check() ? -kMateScore + ply : 0;
     }
 
-    int quiescence(GameState& state, int alpha, int beta, int ply) {
-        ++stats.qnodes;
-        if (interrupted()) {
-            return 0;
+    [[nodiscard]] int evaluate(const GameState& state, Color perspective) const {
+        if (evaluator_mutex != nullptr) {
+            std::lock_guard lock(*evaluator_mutex);
+            return evaluator.evaluate(state, perspective);
         }
+        return evaluator.evaluate(state, perspective);
+    }
 
-        std::vector<Move> moves = state.legal_moves();
-        if (moves.empty()) {
-            return terminal_score(state, moves, ply);
-        }
-        if (state.is_terminal()) {
+    void record_ply(int ply) noexcept {
+        stats.seldepth = std::max(stats.seldepth, ply);
+    }
+
+    int quiescence(GameState& state, int alpha, int beta, int ply, int qdepth = 0) {
+        if (!count_node(true)) {
             return 0;
         }
+        record_ply(ply);
 
         const bool checked = state.in_check();
+        MoveMetadataList moves;
+        const bool has_legal_move = checked ?
+            (state.legal_moves_with_metadata(moves), !moves.empty()) :
+            state.legal_tactical_moves_with_metadata(moves);
+        if (!has_legal_move) {
+            return terminal_score(state, 0, ply);
+        }
+        if (state.is_draw_by_rule()) {
+            return 0;
+        }
+
         int best = -kInfinity;
         if (!checked) {
-            best = evaluator.evaluate(state, state.side_to_move());
+            best = evaluate(state, state.side_to_move());
             if (best >= beta) {
                 return best;
             }
             alpha = std::max(alpha, best);
-            moves.erase(std::remove_if(moves.begin(), moves.end(), [&state](const Move& move) {
-                return !state.is_capture(move) && move.promotion() == Promotion::none;
-            }), moves.end());
+            if (qdepth >= kMaximumQuiescenceDepth) {
+                return best;
+            }
             if (moves.empty()) {
                 return best;
             }
+        } else if (qdepth >= kMaximumQuiescenceSafetyDepth) {
+            // A checked position has no stand-pat score: the side to move must
+            // play an evasion.  The safety limit only prevents pathological
+            // perpetual-check trees from exhausting the call stack.
+            return 0;
         }
 
         ordering.order(state, moves, std::nullopt, ply);
-        for (const Move& move : moves) {
+        for (const MoveMetadata& metadata : moves) {
             if (interrupted()) {
                 return 0;
             }
-            if (!state.make_move(move)) {
+            const Move move = metadata.move;
+            if (!checked && qdepth >= kMaximumQuiescenceCheckDepth && metadata.gives_check &&
+                !metadata.is_capture() && move.promotion() == Promotion::none) {
                 continue;
             }
-            const int score = -quiescence(state, -beta, -alpha, ply + 1);
+            if (!checked && metadata.is_capture() &&
+                move.promotion() == Promotion::none && !metadata.gives_check) {
+                if (detail::static_exchange_gain(state, metadata) < 0) {
+                    ++stats.see_prunes;
+                    continue;
+                }
+                const int delta = piece_value(metadata.captured_piece) + 100;
+                if (best + delta < alpha) {
+                    ++stats.delta_prunes;
+                    continue;
+                }
+            }
+            if (metadata.gives_check &&
+                (checked || qdepth < kMaximumQuiescenceCheckDepth)) {
+                ++stats.qchecks;
+            }
+            if (!state.make_legal_move(metadata)) {
+                continue;
+            }
+            const int score = -quiescence(state, -beta, -alpha, ply + 1, qdepth + 1);
             state.unmake_move();
             if (aborted) {
                 return 0;
@@ -111,24 +311,40 @@ struct SearchContext {
         return best;
     }
 
-    int negamax(GameState& state, int depth, int alpha, int beta, int ply, std::vector<Move>& pv) {
-        ++stats.nodes;
-        if (interrupted()) {
+    int negamax(GameState& state, int depth, int alpha, int beta, int ply,
+                PrincipalVariation& pv) {
+        if (!count_node(false)) {
             return 0;
         }
+        record_ply(ply);
 
-        std::vector<Move> moves = state.legal_moves();
-        if (moves.empty()) {
-            return terminal_score(state, moves, ply);
-        }
-        if (state.is_terminal()) {
-            return 0;
-        }
+        // Quiescence performs its own terminal-aware tactical/evasion move
+        // generation. Do not build and annotate the full legal move list here
+        // only to discard it immediately at the depth boundary.
         if (depth <= 0) {
             return quiescence(state, alpha, beta, ply);
         }
 
+        const bool checked = state.in_check();
+        MoveMetadataList moves;
+        if (ply == 0 && root_moves != nullptr) {
+            moves = *root_moves;
+        } else {
+            state.legal_moves_with_metadata(moves, false);
+        }
+        if (moves.empty()) {
+            return terminal_score(state, moves.size(), ply);
+        }
+        if (state.is_draw_by_rule()) {
+            return 0;
+        }
+        if (checked && depth < kMaximumSearchDepth) {
+            ++stats.check_extensions;
+            ++depth;
+        }
+
         const int original_alpha = alpha;
+        const int original_beta = beta;
         std::optional<Move> tt_move;
         if (const auto entry = table.probe(state.position_key(), ply); entry.has_value()) {
             ++stats.tt_hits;
@@ -148,44 +364,281 @@ struct SearchContext {
             }
         }
 
+        if (!checked && depth >= 3 && beta < kInfinity && beta > -kInfinity &&
+            beta - alpha <= 1 && state.has_non_pawn_material(state.side_to_move())) {
+            if (state.make_null_move()) {
+                PrincipalVariation null_pv;
+                const int reduction = depth >= 6 ? 3 : 2;
+                const int null_depth = std::max(0, depth - 1 - reduction);
+                const int null_score = -negamax(state, null_depth, -beta, -beta + 1, ply + 1, null_pv);
+                state.unmake_null_move();
+                if (aborted) {
+                    return 0;
+                }
+                if (null_score >= beta) {
+                    ++stats.null_cutoffs;
+                    table.store(state.position_key(), depth, null_score,
+                                TranspositionBound::lower, Move::no_move(), ply);
+                    return null_score;
+                }
+            }
+        }
+
         ordering.order(state, moves, tt_move, ply);
         int best_score = -kInfinity;
         Move best_move = Move::no_move();
-        for (const Move& move : moves) {
+        int move_number = 0;
+        for (const MoveMetadata& metadata : moves) {
             if (interrupted()) {
                 return 0;
             }
-            if (!state.make_move(move)) {
+            const Move move = metadata.move;
+            if (!state.make_legal_move(metadata)) {
                 continue;
             }
-            std::vector<Move> child_pv;
-            const int score = -negamax(state, depth - 1, -beta, -alpha, ply + 1, child_pv);
+
+            const bool reduced = move_number >= 4 && depth >= 4 && !checked && !state.in_check() &&
+                !metadata.is_capture() && move.promotion() == Promotion::none;
+            const int full_child_depth = depth - 1;
+            const int child_depth = reduced ? std::max(0, full_child_depth - 1) : full_child_depth;
+            if (reduced) {
+                ++stats.lmr_reductions;
+            }
+
+            PrincipalVariation child_pv;
+            int score = 0;
+            if (move_number == 0) {
+                score = -negamax(state, child_depth, -beta, -alpha, ply + 1, child_pv);
+            } else {
+                ++stats.pvs_searches;
+                score = -negamax(state, child_depth, -alpha - 1, -alpha, ply + 1, child_pv);
+                if (!aborted && score > alpha && score < beta) {
+                    ++stats.pvs_researches;
+                    child_pv = {};
+                    score = -negamax(state, full_child_depth, -beta, -alpha, ply + 1, child_pv);
+                }
+            }
             state.unmake_move();
             if (aborted) {
                 return 0;
             }
+
             if (score > best_score) {
                 best_score = score;
                 best_move = move;
-                pv.clear();
-                pv.push_back(move);
-                pv.insert(pv.end(), child_pv.begin(), child_pv.end());
+                pv.prepend(move, child_pv);
             }
             alpha = std::max(alpha, score);
             if (alpha >= beta) {
-                if (!state.is_capture(move) && move.promotion() == Promotion::none) {
+                if (!metadata.is_capture() && move.promotion() == Promotion::none) {
                     ordering.record_quiet_cutoff(state.side_to_move(), move, ply, depth);
                 }
                 break;
             }
+            ++move_number;
         }
 
         const TranspositionBound bound = best_score <= original_alpha ? TranspositionBound::upper
-            : best_score >= beta ? TranspositionBound::lower : TranspositionBound::exact;
+            : best_score >= original_beta ? TranspositionBound::lower : TranspositionBound::exact;
         table.store(state.position_key(), depth, best_score, bound, best_move, ply);
         return best_score;
     }
 };
+
+struct RootLine {
+    bool completed = false;
+    int score = -kInfinity;
+    std::size_t original_index = 0;
+    PrincipalVariation pv;
+};
+
+class RootWorkerPool {
+public:
+    RootWorkerPool(std::size_t worker_count, const Evaluator& evaluator, TranspositionTable& table,
+                   TimeManager& time_manager, std::atomic_bool& stop_requested,
+                   std::atomic<std::uint64_t>& global_nodes, std::mutex* evaluator_mutex)
+        : worker_count_(std::max<std::size_t>(1, worker_count)), evaluator_(evaluator), table_(table),
+          time_manager_(time_manager), stop_requested_(stop_requested), global_nodes_(global_nodes),
+          evaluator_mutex_(evaluator_mutex), worker_stats_(worker_count_) {
+        workers_.reserve(worker_count_);
+        try {
+            for (std::size_t index = 0; index < worker_count_; ++index) {
+                workers_.emplace_back(&RootWorkerPool::worker_loop, this, index);
+            }
+        } catch (...) {
+            shutdown();
+            throw;
+        }
+    }
+
+    RootWorkerPool(const RootWorkerPool&) = delete;
+    RootWorkerPool& operator=(const RootWorkerPool&) = delete;
+
+    ~RootWorkerPool() {
+        shutdown();
+    }
+
+    void run(const GameState& root, const MoveMetadataList& root_moves, int depth,
+             int alpha, int beta, const std::vector<std::size_t>& original_root_indices,
+             std::vector<RootLine>& lines,
+             SearchStats& stats, bool& aborted) {
+        auto job = std::make_shared<Job>();
+        job->root = &root;
+        job->root_moves = &root_moves;
+        job->depth = depth;
+        job->alpha = alpha;
+        job->beta = beta;
+        job->original_root_indices = &original_root_indices;
+        job->lines = &lines;
+        job->worker_stats = &worker_stats_;
+
+        {
+            std::lock_guard lock(mutex_);
+            ++sequence_;
+            job->sequence = sequence_;
+            finished_workers_ = 0;
+            job_ = job;
+        }
+        work_available_.notify_all();
+
+        {
+            std::unique_lock lock(mutex_);
+            work_finished_.wait(lock, [this] { return finished_workers_ == worker_count_; });
+        }
+
+        stats = {};
+        for (const SearchStats& worker_stats : worker_stats_) {
+            accumulate_stats(stats, worker_stats);
+        }
+        aborted = job->aborted.load(std::memory_order_relaxed) ||
+            stop_requested_.load(std::memory_order_relaxed);
+    }
+
+private:
+    struct Job {
+        const GameState* root = nullptr;
+        const MoveMetadataList* root_moves = nullptr;
+        int depth = 0;
+        int alpha = -kInfinity;
+        int beta = kInfinity;
+        const std::vector<std::size_t>* original_root_indices = nullptr;
+        std::vector<RootLine>* lines = nullptr;
+        std::vector<SearchStats>* worker_stats = nullptr;
+        std::atomic<std::size_t> next_move = 0;
+        std::atomic_bool aborted = false;
+        std::uint64_t sequence = 0;
+    };
+
+    void worker_loop(std::size_t worker_index) {
+        SearchContext context(evaluator_, table_, time_manager_, stop_requested_, &global_nodes_,
+                              evaluator_mutex_);
+        std::uint64_t seen_sequence = 0;
+
+        for (;;) {
+            std::shared_ptr<Job> job;
+            {
+                std::unique_lock lock(mutex_);
+                work_available_.wait(lock, [this, seen_sequence] {
+                    return stopping_ || (job_ != nullptr && job_->sequence != seen_sequence);
+                });
+                if (stopping_) {
+                    return;
+                }
+                job = job_;
+            }
+
+            seen_sequence = job->sequence;
+            context.begin_iteration(&job->aborted);
+            while (!job->aborted.load(std::memory_order_relaxed) &&
+                   !stop_requested_.load(std::memory_order_relaxed)) {
+                const std::size_t move_index = job->next_move.fetch_add(1, std::memory_order_relaxed);
+                if (move_index >= job->root_moves->size()) {
+                    break;
+                }
+
+                const MoveMetadata& root_move = (*job->root_moves)[move_index];
+                try {
+                    GameState child = *job->root;
+                    if (!child.make_legal_move(root_move)) {
+                        continue;
+                    }
+
+                    PrincipalVariation child_pv;
+                    const int score = -context.negamax(child, job->depth - 1,
+                                                       -job->beta, -job->alpha, 1, child_pv);
+                    if (context.aborted) {
+                        job->aborted.store(true, std::memory_order_relaxed);
+                        break;
+                    }
+
+                    RootLine& line = (*job->lines)[move_index];
+                    line.score = score;
+                    line.original_index = (*job->original_root_indices)[move_index];
+                    line.pv.prepend(root_move.move, child_pv);
+                    line.completed = true;
+                } catch (...) {
+                    context.request_abort();
+                    job->aborted.store(true, std::memory_order_relaxed);
+                    break;
+                }
+            }
+
+            (*job->worker_stats)[worker_index] = context.stats;
+            {
+                std::lock_guard lock(mutex_);
+                ++finished_workers_;
+            }
+            work_finished_.notify_one();
+        }
+    }
+
+    void shutdown() noexcept {
+        {
+            std::lock_guard lock(mutex_);
+            stopping_ = true;
+        }
+        work_available_.notify_all();
+        for (std::thread& worker : workers_) {
+            if (worker.joinable()) {
+                worker.join();
+            }
+        }
+    }
+
+    const std::size_t worker_count_;
+    const Evaluator& evaluator_;
+    TranspositionTable& table_;
+    TimeManager& time_manager_;
+    std::atomic_bool& stop_requested_;
+    std::atomic<std::uint64_t>& global_nodes_;
+    std::mutex* evaluator_mutex_;
+    std::vector<std::thread> workers_;
+    std::vector<SearchStats> worker_stats_;
+    std::mutex mutex_;
+    std::condition_variable work_available_;
+    std::condition_variable work_finished_;
+    std::shared_ptr<Job> job_;
+    std::size_t finished_workers_ = 0;
+    std::uint64_t sequence_ = 0;
+    bool stopping_ = false;
+};
+
+std::vector<std::size_t> rank_root_lines(const std::vector<RootLine>& lines) {
+    std::vector<std::size_t> ranked;
+    ranked.reserve(lines.size());
+    for (std::size_t index = 0; index < lines.size(); ++index) {
+        if (lines[index].completed) {
+            ranked.push_back(index);
+        }
+    }
+    std::sort(ranked.begin(), ranked.end(), [&lines](std::size_t left, std::size_t right) {
+        if (lines[left].score != lines[right].score) {
+            return lines[left].score > lines[right].score;
+        }
+        return lines[left].original_index < lines[right].original_index;
+    });
+    return ranked;
+}
 
 void safely_report_info(const SearchEventSink& sink, const SearchInfo& info) {
     if (!sink.on_info) {
@@ -217,10 +670,12 @@ struct SearchHandle::State {
 
 struct SearchService::Impl {
     explicit Impl(std::shared_ptr<const Evaluator> evaluator)
-        : evaluator(std::move(evaluator)), table(std::make_shared<TranspositionTable>()) {}
+        : evaluator(std::move(evaluator)), table(std::make_shared<TranspositionTable>()),
+          evaluator_mutex(std::make_shared<std::mutex>()) {}
 
     std::shared_ptr<const Evaluator> evaluator;
     std::shared_ptr<TranspositionTable> table;
+    std::shared_ptr<std::mutex> evaluator_mutex;
 };
 
 SearchHandle::SearchHandle(std::shared_ptr<State> state) noexcept : state_(std::move(state)) {}
@@ -264,41 +719,91 @@ SearchService::SearchService(std::shared_ptr<const Evaluator> evaluator) {
     impl_ = std::make_shared<Impl>(std::move(evaluator));
 }
 
-SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEventSink sink, SearchOptions options) {
-    // The default SearchOptions value means "use the service configuration".
+SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEventSink sink,
+                                  SearchOptions options) {
+    // The default SearchOptions hash value means "use the service configuration".
     // A non-default value explicitly reconfigures the shared service table.
     if (options.hash_mb != SearchOptions{}.hash_mb) {
         impl_->table->set_size_mb(options.hash_mb);
     }
+
+    options.threads = normalized_threads(options.threads);
+    options.speed_percent = normalized_speed(options.speed_percent);
+    options.multi_pv = normalized_multi_pv(options.multi_pv);
+
     auto state = std::make_shared<SearchHandle::State>();
     const auto evaluator = impl_->evaluator;
     const auto table = impl_->table;
-    state->worker = std::thread([state, evaluator, table, root = std::move(root), limits = std::move(limits), sink = std::move(sink)]() mutable {
+    const auto evaluator_mutex = impl_->evaluator_mutex;
+    state->worker = std::thread([state, evaluator, table, root = std::move(root), limits = std::move(limits),
+                                 sink = std::move(sink), options, evaluator_mutex]() mutable {
         const auto started = std::chrono::steady_clock::now();
         table->new_generation();
-        SearchContext context(*evaluator, *table, limits, root.side_to_move(), state->stop_requested);
+        TimeManager time_manager(limits, root.side_to_move(), options.speed_percent);
 
-        std::vector<Move> legal_moves = root.legal_moves();
-        context.ordering.order(root, legal_moves, std::nullopt, 0);
+        std::mutex* evaluator_mutex_ptr = evaluator->supports_concurrent_evaluation() ?
+            nullptr : evaluator_mutex.get();
+
         SearchResult result;
-        result.best_move = legal_moves.empty() ? std::nullopt : std::optional<Move>{legal_moves.front()};
-        result.score_cp = evaluator->evaluate(root, root.side_to_move());
+        MoveMetadataList legal_moves;
+        root.legal_moves_with_metadata(legal_moves);
+        const MoveMetadataList generated_legal_moves = legal_moves;
+        if (limits.search_moves_specified) {
+            MoveMetadataList filtered_moves;
+            for (const MoveMetadata& metadata : legal_moves) {
+                if (std::find(limits.search_moves.begin(), limits.search_moves.end(), metadata.move) !=
+                    limits.search_moves.end()) {
+                    (void)filtered_moves.push_back(metadata);
+                }
+            }
+            legal_moves = filtered_moves;
+        }
+        result.best_move = legal_moves.empty() ? std::nullopt :
+            std::optional<Move>{legal_moves.front().move};
+        if (evaluator_mutex_ptr != nullptr) {
+            std::lock_guard lock(*evaluator_mutex_ptr);
+            result.score_cp = evaluator->evaluate(root, root.side_to_move());
+        } else {
+            result.score_cp = evaluator->evaluate(root, root.side_to_move());
+        }
 
         if (legal_moves.empty()) {
             result.score_cp = root.in_check() ? -kMateScore : 0;
             result.mate = mate_from_score(result.score_cp);
-        } else if (root.is_terminal()) {
+        } else if (root.is_draw_by_rule()) {
             result.score_cp = 0;
             result.best_move.reset();
-        } else {
-            const int maximum_depth = std::min(kMaximumSearchDepth, std::max(1, limits.depth.value_or(kMaximumSearchDepth)));
-            for (int depth = 1; limits.infinite || depth <= maximum_depth;
-                 depth = depth < maximum_depth ? depth + 1 : (limits.infinite ? maximum_depth : maximum_depth + 1)) {
+        } else if (options.threads == 1 && options.multi_pv == 1) {
+            SearchContext context(*evaluator, *table, time_manager, state->stop_requested,
+                                  nullptr, evaluator_mutex_ptr, &legal_moves);
+            context.ordering.order(root, legal_moves, std::nullopt, 0);
+            result.best_move = legal_moves.front().move;
+
+            const int maximum_depth =
+                std::min(kMaximumSearchDepth, std::max(1, limits.depth.value_or(kMaximumSearchDepth)));
+            std::optional<int> previous_score;
+            for (int depth = 1;; depth = depth < maximum_depth ? depth + 1 : maximum_depth) {
+                if (!limits.infinite && depth > maximum_depth) {
+                    break;
+                }
                 if (context.interrupted()) {
                     break;
                 }
-                std::vector<Move> pv;
-                const int score = context.negamax(root, depth, -kInfinity, kInfinity, 0, pv);
+                PrincipalVariation pv;
+                int alpha = -kInfinity;
+                int beta = kInfinity;
+                if (previous_score.has_value()) {
+                    alpha = std::max(-kInfinity, *previous_score - kAspirationWindow);
+                    beta = std::min(kInfinity, *previous_score + kAspirationWindow);
+                }
+
+                int score = context.negamax(root, depth, alpha, beta, 0, pv);
+                if (!context.aborted && previous_score.has_value() &&
+                    (score <= alpha || score >= beta)) {
+                    ++context.stats.aspiration_researches;
+                    pv = {};
+                    score = context.negamax(root, depth, -kInfinity, kInfinity, 0, pv);
+                }
                 if (context.aborted) {
                     break;
                 }
@@ -306,20 +811,174 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                 result.completed_depth = depth;
                 result.score_cp = score;
                 result.mate = mate_from_score(score);
-                if (!pv.empty()) {
-                    result.best_move = pv.front();
+                if (pv.length > 0) {
+                    result.best_move = pv.moves[0];
                 }
 
-                const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started);
+                const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::steady_clock::now() - started);
                 const std::uint64_t visited = context.stats.nodes + context.stats.qnodes;
-                safely_report_info(sink, SearchInfo{depth, score, result.mate, context.stats.nodes,
-                    elapsed.count() > 0 ? visited * 1000 / static_cast<std::uint64_t>(elapsed.count()) : visited,
-                    elapsed, std::move(pv)});
+                SearchInfo info{depth, score, result.mate, visited,
+                                elapsed.count() > 0 ? visited * 1000 /
+                                    static_cast<std::uint64_t>(elapsed.count()) : visited,
+                                elapsed, pv.to_vector()};
+                info.seldepth = context.stats.seldepth;
+                info.qnodes = context.stats.qnodes;
+                info.tt_hits = context.stats.tt_hits;
+                safely_report_info(sink, info);
+                previous_score = score;
+
+                if (!limits.infinite && depth == maximum_depth) {
+                    break;
+                }
             }
+            result.stats = context.stats;
+        } else {
+            std::atomic<std::uint64_t> global_nodes = 0;
+            const std::size_t worker_count = std::min(options.threads, legal_moves.size());
+            RootWorkerPool pool(worker_count, *evaluator, *table, time_manager,
+                                state->stop_requested, global_nodes, evaluator_mutex_ptr);
+            detail::SearchMoveOrdering root_ordering;
+            root_ordering.order(root, legal_moves, std::nullopt, 0);
+
+            SearchStats total_stats;
+            SearchContext root_context(*evaluator, *table, time_manager, state->stop_requested,
+                                       &global_nodes, evaluator_mutex_ptr);
+            const bool multi_pv = options.multi_pv > 1;
+            const int maximum_depth =
+                std::min(kMaximumSearchDepth, std::max(1, limits.depth.value_or(kMaximumSearchDepth)));
+            std::optional<int> previous_score;
+            for (int depth = 1;; depth = depth < maximum_depth ? depth + 1 : maximum_depth) {
+                if (!limits.infinite && depth > maximum_depth) {
+                    break;
+                }
+                if (state->stop_requested.load(std::memory_order_relaxed) ||
+                    time_manager.should_stop(global_nodes.load(std::memory_order_relaxed))) {
+                    break;
+                }
+
+                root_context.begin_iteration(nullptr);
+                if (!root_context.count_node(false)) {
+                    accumulate_stats(total_stats, root_context.stats);
+                    break;
+                }
+
+                std::optional<Move> tt_move;
+                if (const auto entry = table->probe(root.position_key(), 0); entry.has_value()) {
+                    ++root_context.stats.tt_hits;
+                    if (!entry->best_move.is_no_move()) {
+                        tt_move = entry->best_move;
+                    }
+                }
+                root_ordering.order(root, legal_moves, tt_move, 0);
+                std::vector<std::size_t> original_root_indices;
+                original_root_indices.reserve(legal_moves.size());
+                for (const MoveMetadata& metadata : legal_moves) {
+                    const auto original = std::find_if(
+                        generated_legal_moves.begin(), generated_legal_moves.end(),
+                        [&metadata](const MoveMetadata& candidate) {
+                            return candidate.move == metadata.move;
+                        });
+                    original_root_indices.push_back(static_cast<std::size_t>(
+                        std::distance(generated_legal_moves.begin(), original)));
+                }
+
+                std::vector<RootLine> lines(legal_moves.size());
+                int alpha = -kInfinity;
+                int beta = kInfinity;
+                if (!multi_pv && previous_score.has_value()) {
+                    alpha = std::max(-kInfinity, *previous_score - kAspirationWindow);
+                    beta = std::min(kInfinity, *previous_score + kAspirationWindow);
+                }
+
+                SearchStats iteration_stats;
+                bool aborted = false;
+                pool.run(root, legal_moves, depth, alpha, beta, original_root_indices,
+                         lines, iteration_stats, aborted);
+                accumulate_stats(iteration_stats, root_context.stats);
+
+                if (!multi_pv && !aborted && previous_score.has_value()) {
+                    int best_score = -kInfinity;
+                    bool failed_high = false;
+                    for (const RootLine& line : lines) {
+                        if (!line.completed) {
+                            continue;
+                        }
+                        best_score = std::max(best_score, line.score);
+                        failed_high = failed_high || line.score >= beta;
+                    }
+                    if (best_score <= alpha || failed_high) {
+                        ++iteration_stats.aspiration_researches;
+                        lines.assign(legal_moves.size(), RootLine{});
+                        SearchStats research_stats;
+                        bool research_aborted = false;
+                        pool.run(root, legal_moves, depth, -kInfinity, kInfinity,
+                                 original_root_indices, lines, research_stats, research_aborted);
+                        accumulate_stats(iteration_stats, research_stats);
+                        aborted = research_aborted;
+                    }
+                }
+                accumulate_stats(total_stats, iteration_stats);
+                if (aborted) {
+                    break;
+                }
+
+                std::vector<std::size_t> ranked_indices;
+                if (multi_pv) {
+                    ranked_indices = rank_root_lines(lines);
+                } else {
+                    ranked_indices.reserve(lines.size());
+                    for (std::size_t index = 0; index < lines.size(); ++index) {
+                        if (lines[index].completed) {
+                            ranked_indices.push_back(index);
+                        }
+                    }
+                    std::stable_sort(ranked_indices.begin(), ranked_indices.end(),
+                                     [&lines](std::size_t left, std::size_t right) {
+                                         return lines[left].score > lines[right].score;
+                                     });
+                }
+                if (ranked_indices.empty()) {
+                    break;
+                }
+
+                const std::size_t best_index = ranked_indices.front();
+                const RootLine& best_line = lines[best_index];
+
+                result.completed_depth = depth;
+                result.score_cp = best_line.score;
+                result.mate = mate_from_score(best_line.score);
+                result.best_move = best_line.pv.length > 0 ?
+                    std::optional<Move>{best_line.pv.moves[0]} : result.best_move;
+
+                const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::steady_clock::now() - started);
+                const std::uint64_t visited = total_stats.nodes + total_stats.qnodes;
+                const std::uint64_t nps = elapsed.count() > 0 ? visited * 1000 /
+                    static_cast<std::uint64_t>(elapsed.count()) : visited;
+                const std::size_t line_count = multi_pv ?
+                    std::min(options.multi_pv, ranked_indices.size()) : std::size_t{1};
+                for (std::size_t rank = 0; rank < line_count; ++rank) {
+                    const RootLine& line = lines[ranked_indices[rank]];
+                    SearchInfo info{depth, line.score, mate_from_score(line.score), visited,
+                                    nps, elapsed, line.pv.to_vector()};
+                    info.seldepth = total_stats.seldepth;
+                    info.qnodes = total_stats.qnodes;
+                    info.tt_hits = total_stats.tt_hits;
+                    info.multipv = static_cast<int>(rank + 1);
+                    safely_report_info(sink, info);
+                }
+                previous_score = best_line.score;
+
+                if (!limits.infinite && depth == maximum_depth) {
+                    break;
+                }
+            }
+            result.stats = total_stats;
         }
 
-        result.stats = context.stats;
-        result.stats.elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started);
+        result.stats.elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - started);
         result.mate = mate_from_score(result.score_cp);
         state->running.store(false, std::memory_order_release);
         safely_report_completion(sink, result);
