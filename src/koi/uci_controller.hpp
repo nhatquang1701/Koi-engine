@@ -59,7 +59,6 @@ private:
     std::optional<GameState> ponder_root_;
     std::optional<SearchLimits> ponder_limits_;
     bool active_ponder_ = false;
-    bool restarted_from_ponder_ = false;
     std::size_t threads_ = 1;
     std::uint8_t speed_percent_ = 100;
     bool analyse_mode_ = false;

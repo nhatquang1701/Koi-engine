@@ -665,6 +665,8 @@ void safely_report_completion(const SearchEventSink& sink, const SearchResult& r
 struct SearchHandle::State {
     std::atomic_bool stop_requested = false;
     std::atomic_bool running = true;
+    std::mutex stop_mutex;
+    std::condition_variable stop_condition;
     std::thread worker;
 };
 
@@ -699,6 +701,7 @@ SearchHandle::~SearchHandle() {
 void SearchHandle::stop() noexcept {
     if (state_) {
         state_->stop_requested.store(true, std::memory_order_relaxed);
+        state_->stop_condition.notify_all();
     }
 }
 
@@ -977,6 +980,13 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                 }
             }
             result.stats = total_stats;
+        }
+
+        if (limits.ponder && (legal_moves.empty() || root.is_draw_by_rule())) {
+            std::unique_lock lock(state->stop_mutex);
+            state->stop_condition.wait(lock, [state] {
+                return state->stop_requested.load(std::memory_order_relaxed);
+            });
         }
 
         result.stats.elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(

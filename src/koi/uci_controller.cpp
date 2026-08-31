@@ -230,20 +230,12 @@ int UciController::run() {
         } else if (name == "stop") {
             stop_active_search();
         } else if (name == "quit") {
-            if (restarted_from_ponder_) {
-                stop_active_search();
-            } else {
-                stop_and_suppress_active_search();
-            }
+            stop_and_suppress_active_search();
             return 0;
         }
     }
 
-    if (restarted_from_ponder_) {
-        stop_active_search();
-    } else {
-        stop_and_suppress_active_search();
-    }
+    stop_and_suppress_active_search();
     return 0;
 }
 
@@ -406,7 +398,6 @@ void UciController::handle_ponderhit() {
     limits.ponder = false;
     stop_and_suppress_active_search();
     start_search(std::move(root), std::move(limits));
-    restarted_from_ponder_ = true;
 }
 
 void UciController::start_search(GameState root, SearchLimits limits) {
@@ -460,7 +451,6 @@ void UciController::clear_ponder_state() {
     ponder_root_.reset();
     ponder_limits_.reset();
     active_ponder_ = false;
-    restarted_from_ponder_ = false;
 }
 
 std::uint64_t UciController::begin_generation() {

@@ -273,7 +273,7 @@ void test_ponderhit_restarts_the_ponder_search_once() {
         "position startpos\n"
         "go ponder depth 2\n"
         "ponderhit\n"
-        "isready\n"
+        "stop\n"
         "quit\n");
     const std::vector<std::string> bestmoves =
         lines_starting_with(output_lines(result.output), "bestmove ");
@@ -281,6 +281,32 @@ void test_ponderhit_restarts_the_ponder_search_once() {
     require(result.exit_code == 0, "ponderhit transcript must shut down normally");
     require(bestmoves.size() == 1 && is_legal_move(Position{}, bestmoves[0].substr(9)),
             "ponderhit must emit exactly one legal bestmove from its restarted search");
+}
+
+void test_quit_and_eof_suppress_a_ponderhit_replacement_search() {
+    const ControllerResult quit = run_controller(
+        "position startpos\n"
+        "go ponder depth 2\n"
+        "ponderhit\n"
+        "quit\n");
+    const ControllerResult eof = run_controller(
+        "position startpos\n"
+        "go ponder depth 2\n"
+        "ponderhit\n");
+
+    require(quit.exit_code == 0 && eof.exit_code == 0,
+            "quit and EOF must both shut down a restarted ponder search cleanly");
+    require(lines_starting_with(output_lines(quit.output), "bestmove ").empty(),
+            "quit must suppress a ponderhit replacement search's late bestmove");
+    require(lines_starting_with(output_lines(eof.output), "bestmove ").empty(),
+            "EOF must suppress a ponderhit replacement search's late bestmove");
+}
+
+void test_idle_ponderhit_is_quiet() {
+    const ControllerResult result = run_controller("ponderhit\nquit\n");
+
+    require(result.exit_code == 0, "an idle ponderhit transcript must shut down normally");
+    require(result.output.empty(), "ponderhit without an active ponder search must be quiet");
 }
 
 void test_stopping_ponder_search_emits_one_legal_bestmove() {
@@ -308,6 +334,19 @@ void test_stopping_ponder_search_preserves_the_searchmoves_root_filter() {
 
     require(bestmoves.size() == 1 && bestmoves[0] == "bestmove e2e4",
             "stopping a filtered ponder search must retain its only legal root move");
+}
+
+void test_stopping_terminal_ponder_search_emits_0000() {
+    const ControllerResult result = run_controller(
+        "position fen 7k/6Q1/5K2/8/8/8/8/8 b - - 0 1\n"
+        "go ponder\n"
+        "stop\n"
+        "quit\n");
+    const std::vector<std::string> bestmoves =
+        lines_starting_with(output_lines(result.output), "bestmove ");
+
+    require(bestmoves.size() == 1 && bestmoves[0] == "bestmove 0000",
+            "stopping a terminal ponder search must emit exactly one bestmove 0000");
 }
 
 void test_isready_writes_readyok() {
@@ -624,8 +663,11 @@ int main() {
         {"Lucas analysis option generation replacement",
          test_lucas_analysis_option_changes_suppress_the_active_generation},
         {"ponderhit restart lifecycle", test_ponderhit_restarts_the_ponder_search_once},
+        {"ponderhit shutdown suppression", test_quit_and_eof_suppress_a_ponderhit_replacement_search},
+        {"idle ponderhit", test_idle_ponderhit_is_quiet},
         {"ponder stop lifecycle", test_stopping_ponder_search_emits_one_legal_bestmove},
         {"ponder root filtering", test_stopping_ponder_search_preserves_the_searchmoves_root_filter},
+        {"ponder terminal result", test_stopping_terminal_ponder_search_emits_0000},
         {"ready response", test_isready_writes_readyok},
         {"deterministic search", test_deterministic_search_repeats_the_best_move_with_compatibility_seed},
         {"position startpos and FEN", test_startpos_and_fen_move_lists_define_the_search_root},

@@ -718,6 +718,9 @@ void test_ponder_search_runs_until_stopped_and_completes_once() {
     koi::SearchLimits limits;
     limits.depth = 1;
     limits.ponder = true;
+    limits.movetime = 1ms;
+    limits.nodes = 1;
+    limits.white_clock = koi::ClockLimit{1ms, 0ms};
     CompletedSearch completed;
 
     koi::SearchHandle handle = service.start(koi::GameState::startpos(), limits, completed.sink());
@@ -730,6 +733,54 @@ void test_ponder_search_runs_until_stopped_and_completes_once() {
     require(!handle.running(), "stopped ponder search must join its worker");
     const koi::SearchResult result = completed.take_result();
     require(result.best_move.has_value(), "stopped ponder search must retain a legal fallback move");
+}
+
+void test_ponder_terminal_and_empty_roots_wait_for_stop() {
+    auto evaluator = std::make_shared<koi::ClassicalEvaluator>();
+    koi::SearchService service(evaluator);
+
+    const auto require_parked = [&service](koi::GameState root, koi::SearchLimits limits,
+                                           std::string_view description) {
+        CompletedSearch completed;
+        koi::SearchHandle handle = service.start(std::move(root), std::move(limits), completed.sink());
+        std::this_thread::sleep_for(20ms);
+        require(handle.running(), std::string("ponder ") + std::string(description) +
+                                      " must remain running until stop");
+        require(completed.completion_count() == 0, std::string("ponder ") + std::string(description) +
+                                                   " must not complete before stop");
+
+        handle.stop();
+        handle.wait();
+        const koi::SearchResult result = completed.take_result();
+        require(!result.best_move.has_value(), std::string("stopped ponder ") + std::string(description) +
+                                                 " must report no legal best move");
+    };
+
+    koi::SearchLimits terminal_limits;
+    terminal_limits.ponder = true;
+    require_parked(require_state("7k/6Q1/5K2/8/8/8/8/8 b - - 0 1"), terminal_limits, "checkmate root");
+
+    koi::SearchLimits draw_limits;
+    draw_limits.ponder = true;
+    require_parked(require_state("4k3/8/8/8/8/8/8/R3K3 w - - 100 1"), draw_limits, "rule-draw root");
+
+    koi::SearchLimits empty_filter_limits;
+    empty_filter_limits.ponder = true;
+    empty_filter_limits.search_moves_specified = true;
+    require_parked(koi::GameState::startpos(), empty_filter_limits, "empty searchmoves root");
+}
+
+void test_ponder_ignores_time_and_node_limits() {
+    koi::SearchLimits limits;
+    limits.ponder = true;
+    limits.movetime = 1ms;
+    limits.nodes = 1;
+    limits.white_clock = koi::ClockLimit{1ms, 0ms};
+
+    const koi::TimeManager manager(limits, koi::Color::white);
+    require(!manager.time_budget().has_value(), "ponder must ignore movetime and clock budgets");
+    require(!manager.node_limit().has_value(), "ponder must ignore node limits");
+    require(!manager.should_stop(1), "ponder must not stop at its ignored node limit");
 }
 
 void test_service_hash_configuration_survives_default_start_and_non_default_override() {
@@ -885,6 +936,8 @@ int main() {
         {"aspiration windows", test_iterative_deepening_uses_aspiration_windows},
         {"infinite search lifecycle", test_infinite_search_runs_until_stopped_and_completes_once},
         {"ponder search lifecycle", test_ponder_search_runs_until_stopped_and_completes_once},
+        {"ponder terminal lifecycle", test_ponder_terminal_and_empty_roots_wait_for_stop},
+        {"ponder ignores time and nodes", test_ponder_ignores_time_and_node_limits},
         {"service hash persistence", test_service_hash_configuration_survives_default_start_and_non_default_override},
         {"hash bounds and clear", test_hash_configuration_clamps_to_uci_bounds_and_clear_discards_warmed_entries},
         {"transposition table", test_transposition_table_stores_probes_and_clears_entries},
