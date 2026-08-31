@@ -268,6 +268,48 @@ void test_lucas_analysis_option_changes_suppress_the_active_generation() {
             "changing Lucas analysis options must suppress replaced search generations");
 }
 
+void test_ponderhit_restarts_the_ponder_search_once() {
+    const ControllerResult result = run_controller(
+        "position startpos\n"
+        "go ponder depth 2\n"
+        "ponderhit\n"
+        "isready\n"
+        "quit\n");
+    const std::vector<std::string> bestmoves =
+        lines_starting_with(output_lines(result.output), "bestmove ");
+
+    require(result.exit_code == 0, "ponderhit transcript must shut down normally");
+    require(bestmoves.size() == 1 && is_legal_move(Position{}, bestmoves[0].substr(9)),
+            "ponderhit must emit exactly one legal bestmove from its restarted search");
+}
+
+void test_stopping_ponder_search_emits_one_legal_bestmove() {
+    const ControllerResult result = run_controller(
+        "position startpos\n"
+        "go ponder depth 2\n"
+        "stop\n"
+        "quit\n");
+    const std::vector<std::string> bestmoves =
+        lines_starting_with(output_lines(result.output), "bestmove ");
+
+    require(result.exit_code == 0, "ponder stop transcript must shut down normally");
+    require(bestmoves.size() == 1 && is_legal_move(Position{}, bestmoves[0].substr(9)),
+            "stopping ponder must emit exactly one legal bestmove");
+}
+
+void test_stopping_ponder_search_preserves_the_searchmoves_root_filter() {
+    const ControllerResult result = run_controller(
+        "position startpos\n"
+        "go ponder searchmoves e2e4\n"
+        "stop\n"
+        "quit\n");
+    const std::vector<std::string> bestmoves =
+        lines_starting_with(output_lines(result.output), "bestmove ");
+
+    require(bestmoves.size() == 1 && bestmoves[0] == "bestmove e2e4",
+            "stopping a filtered ponder search must retain its only legal root move");
+}
+
 void test_isready_writes_readyok() {
     const ControllerResult result = run_controller("isready\nquit\n");
 
@@ -581,6 +623,9 @@ int main() {
          test_lucas_analysis_options_accept_valid_values_ignore_invalid_values_and_emit_multipv},
         {"Lucas analysis option generation replacement",
          test_lucas_analysis_option_changes_suppress_the_active_generation},
+        {"ponderhit restart lifecycle", test_ponderhit_restarts_the_ponder_search_once},
+        {"ponder stop lifecycle", test_stopping_ponder_search_emits_one_legal_bestmove},
+        {"ponder root filtering", test_stopping_ponder_search_preserves_the_searchmoves_root_filter},
         {"ready response", test_isready_writes_readyok},
         {"deterministic search", test_deterministic_search_repeats_the_best_move_with_compatibility_seed},
         {"position startpos and FEN", test_startpos_and_fen_move_lists_define_the_search_root},

@@ -36,8 +36,11 @@ private:
     void handle_position(std::istream& command);
     void handle_setoption(std::istream& command);
     void handle_go(std::istream& command);
+    void handle_ponderhit();
+    void start_search(GameState root, SearchLimits limits);
     void stop_active_search();
     void stop_and_suppress_active_search();
+    void clear_ponder_state();
     [[nodiscard]] std::uint64_t begin_generation();
     void write_handshake();
     void write_readyok();
@@ -53,6 +56,10 @@ private:
     RandomMoveChooser chooser_{0};
     SearchService search_service_;
     std::optional<SearchHandle> active_search_;
+    std::optional<GameState> ponder_root_;
+    std::optional<SearchLimits> ponder_limits_;
+    bool active_ponder_ = false;
+    bool restarted_from_ponder_ = false;
     std::size_t threads_ = 1;
     std::uint8_t speed_percent_ = 100;
     bool analyse_mode_ = false;

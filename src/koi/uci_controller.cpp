@@ -225,15 +225,25 @@ int UciController::run() {
             handle_setoption(command);
         } else if (name == "go") {
             handle_go(command);
+        } else if (name == "ponderhit") {
+            handle_ponderhit();
         } else if (name == "stop") {
             stop_active_search();
         } else if (name == "quit") {
-            stop_and_suppress_active_search();
+            if (restarted_from_ponder_) {
+                stop_active_search();
+            } else {
+                stop_and_suppress_active_search();
+            }
             return 0;
         }
     }
 
-    stop_and_suppress_active_search();
+    if (restarted_from_ponder_) {
+        stop_active_search();
+    } else {
+        stop_and_suppress_active_search();
+    }
     return 0;
 }
 
@@ -296,6 +306,7 @@ void UciController::handle_setoption(std::istream& command) {
         tokens[2] == "value") {
         std::uint32_t seed = 0;
         if (parse_random_seed(tokens[3], seed)) {
+            stop_and_suppress_active_search();
             chooser_.set_seed(seed);
         }
         return;
@@ -376,6 +387,29 @@ void UciController::handle_go(std::istream& command) {
     std::getline(command, arguments);
     SearchLimits limits = uci::parse_go_limits(arguments);
     stop_and_suppress_active_search();
+
+    if (limits.ponder) {
+        ponder_root_ = position_;
+        ponder_limits_ = limits;
+        active_ponder_ = true;
+    }
+    start_search(position_, std::move(limits));
+}
+
+void UciController::handle_ponderhit() {
+    if (!active_ponder_ || !ponder_root_.has_value() || !ponder_limits_.has_value()) {
+        return;
+    }
+
+    GameState root = *ponder_root_;
+    SearchLimits limits = *ponder_limits_;
+    limits.ponder = false;
+    stop_and_suppress_active_search();
+    start_search(std::move(root), std::move(limits));
+    restarted_from_ponder_ = true;
+}
+
+void UciController::start_search(GameState root, SearchLimits limits) {
     const std::uint64_t generation = begin_generation();
 
     SearchEventSink sink;
@@ -391,21 +425,24 @@ void UciController::handle_go(std::istream& command) {
     options.speed_percent = speed_percent_;
     options.multi_pv = multi_pv_;
     options.analyse_mode = analyse_mode_;
-    active_search_.emplace(search_service_.start(position_, std::move(limits), std::move(sink), options));
+    active_search_.emplace(search_service_.start(std::move(root), std::move(limits), std::move(sink), options));
 }
 
 void UciController::stop_active_search() {
     if (!active_search_.has_value()) {
+        clear_ponder_state();
         return;
     }
 
     active_search_->stop();
     active_search_->wait();
     active_search_.reset();
+    clear_ponder_state();
 }
 
 void UciController::stop_and_suppress_active_search() {
     if (!active_search_.has_value()) {
+        clear_ponder_state();
         return;
     }
 
@@ -416,6 +453,14 @@ void UciController::stop_and_suppress_active_search() {
     active_search_->stop();
     active_search_->wait();
     active_search_.reset();
+    clear_ponder_state();
+}
+
+void UciController::clear_ponder_state() {
+    ponder_root_.reset();
+    ponder_limits_.reset();
+    active_ponder_ = false;
+    restarted_from_ponder_ = false;
 }
 
 std::uint64_t UciController::begin_generation() {

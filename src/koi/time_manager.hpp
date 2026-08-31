@@ -10,9 +10,10 @@ namespace koi {
 
 class TimeManager {
 public:
-    TimeManager(SearchLimits limits, Color side_to_move);
+    TimeManager(SearchLimits limits, Color side_to_move, std::uint8_t speed_percent = 100);
 
     [[nodiscard]] std::optional<std::chrono::milliseconds> time_budget() const noexcept;
+    [[nodiscard]] std::optional<std::uint64_t> node_limit() const noexcept;
     [[nodiscard]] bool should_stop(std::uint64_t nodes) const noexcept;
 
 private:

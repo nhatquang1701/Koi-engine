@@ -712,6 +712,26 @@ void test_infinite_search_runs_until_stopped_and_completes_once() {
     require(result.best_move.has_value(), "stopped non-terminal infinite search must retain a legal fallback move");
 }
 
+void test_ponder_search_runs_until_stopped_and_completes_once() {
+    auto evaluator = std::make_shared<koi::ClassicalEvaluator>();
+    koi::SearchService service(evaluator);
+    koi::SearchLimits limits;
+    limits.depth = 1;
+    limits.ponder = true;
+    CompletedSearch completed;
+
+    koi::SearchHandle handle = service.start(koi::GameState::startpos(), limits, completed.sink());
+    std::this_thread::sleep_for(50ms);
+    require(handle.running(), "ponder search must remain running instead of completing its depth limit");
+    require(completed.completion_count() == 0, "ponder search must not complete before cancellation");
+
+    handle.stop();
+    handle.wait();
+    require(!handle.running(), "stopped ponder search must join its worker");
+    const koi::SearchResult result = completed.take_result();
+    require(result.best_move.has_value(), "stopped ponder search must retain a legal fallback move");
+}
+
 void test_service_hash_configuration_survives_default_start_and_non_default_override() {
     auto evaluator = std::make_shared<koi::ClassicalEvaluator>();
     koi::SearchService service(evaluator);
@@ -864,6 +884,7 @@ int main() {
         {"checked quiescence cap", test_quiescence_keeps_searching_checked_evasions_past_normal_cap},
         {"aspiration windows", test_iterative_deepening_uses_aspiration_windows},
         {"infinite search lifecycle", test_infinite_search_runs_until_stopped_and_completes_once},
+        {"ponder search lifecycle", test_ponder_search_runs_until_stopped_and_completes_once},
         {"service hash persistence", test_service_hash_configuration_survives_default_start_and_non_default_override},
         {"hash bounds and clear", test_hash_configuration_clamps_to_uci_bounds_and_clear_discards_warmed_entries},
         {"transposition table", test_transposition_table_stores_probes_and_clears_entries},

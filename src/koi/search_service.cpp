@@ -781,9 +781,10 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
 
             const int maximum_depth =
                 std::min(kMaximumSearchDepth, std::max(1, limits.depth.value_or(kMaximumSearchDepth)));
+            const bool unbounded = limits.infinite || limits.ponder;
             std::optional<int> previous_score;
             for (int depth = 1;; depth = depth < maximum_depth ? depth + 1 : maximum_depth) {
-                if (!limits.infinite && depth > maximum_depth) {
+                if (!unbounded && depth > maximum_depth) {
                     break;
                 }
                 if (context.interrupted()) {
@@ -828,7 +829,7 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                 safely_report_info(sink, info);
                 previous_score = score;
 
-                if (!limits.infinite && depth == maximum_depth) {
+                if (!unbounded && depth == maximum_depth) {
                     break;
                 }
             }
@@ -847,9 +848,10 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
             const bool multi_pv = options.multi_pv > 1;
             const int maximum_depth =
                 std::min(kMaximumSearchDepth, std::max(1, limits.depth.value_or(kMaximumSearchDepth)));
+            const bool unbounded = limits.infinite || limits.ponder;
             std::optional<int> previous_score;
             for (int depth = 1;; depth = depth < maximum_depth ? depth + 1 : maximum_depth) {
-                if (!limits.infinite && depth > maximum_depth) {
+                if (!unbounded && depth > maximum_depth) {
                     break;
                 }
                 if (state->stop_requested.load(std::memory_order_relaxed) ||
@@ -970,7 +972,7 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                 }
                 previous_score = best_line.score;
 
-                if (!limits.infinite && depth == maximum_depth) {
+                if (!unbounded && depth == maximum_depth) {
                     break;
                 }
             }
