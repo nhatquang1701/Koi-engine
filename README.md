@@ -135,7 +135,7 @@ from the starting position (for example, `bestmove e2e4`).
   the new snapshot is used by the next `go` command.
 - `go` accepts `depth`, `nodes`, `movetime`, `wtime`, `btime`, `winc`, `binc`,
   `movestogo`, and `infinite`. Malformed limit values are ignored. A bare `go`
-  defaults to bounded depth 1.
+  uses a 250 ms move-time fallback, scaled by `Speed`.
 - A depth limit is capped internally at 64 plies. `nodes`, `movetime`, and
   side-to-move clock limits stop search at their requested boundary; `infinite`
   continues until `stop`.
