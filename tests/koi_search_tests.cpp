@@ -471,7 +471,7 @@ void test_equal_root_scores_keep_the_earliest_ordered_move() {
             "threaded equal scores must retain the earliest move from root ordering");
 }
 
-void test_threaded_multipv_equal_scores_keep_original_legal_root_order() {
+void test_threaded_multipv_equal_scores_use_stable_ordered_root_tie_breaking() {
     const koi::GameState root = require_state("4k3/8/8/8/8/8/P6r/4K2R w - - 0 1");
     const std::vector<koi::Move> generated_moves = root.legal_moves();
     require(!generated_moves.empty(), "the equal-score fixture must have legal root moves");
@@ -480,7 +480,7 @@ void test_threaded_multipv_equal_scores_keep_original_legal_root_order() {
             "the fixture must distinguish generated legal order from root move ordering");
 
     koi::SearchLimits limits;
-    limits.depth = 1;
+    limits.depth = 2;
     koi::SearchOptions options;
     options.threads = 2;
     options.multi_pv = 3;
@@ -514,11 +514,56 @@ void test_threaded_multipv_equal_scores_keep_original_legal_root_order() {
                 "threaded MultiPV root moves must be distinct");
         first_moves.push_back(info.pv.front());
     }
-    require(final_depth.front().pv.front() == generated_moves.front(),
-            "equal-score threaded MultiPV must retain the earliest generated legal root move");
+    require(final_depth.front().pv.front() == *ordered_capture,
+            "equal-score threaded MultiPV must retain the earliest stable ordered root move");
     require(result.has_value() && result->best_move == final_depth.front().pv.front() &&
                 result->score_cp == final_depth.front().score_cp,
             "threaded MultiPV completion must match its rank-one line");
+}
+
+void test_threaded_multipv_is_stable_after_warming_the_shared_hash() {
+    const koi::GameState root = require_state("4k3/8/8/8/8/8/P6r/4K2R w - - 0 1");
+    const auto ordered_capture = koi::Move::parse_uci("h1h2");
+    require(ordered_capture.has_value(), "the stable-order fixture must parse");
+
+    koi::SearchLimits limits;
+    limits.depth = 2;
+    koi::SearchOptions options;
+    options.threads = 2;
+    options.multi_pv = 3;
+    koi::SearchService service(std::make_shared<ConcurrencyEvaluator>());
+
+    const auto run = [&] {
+        std::vector<koi::SearchInfo> final_depth;
+        std::optional<koi::SearchResult> result;
+        koi::SearchHandle handle = service.start(
+            root, limits,
+            {.on_info = [&final_depth](const koi::SearchInfo& info) {
+                 if (info.depth == 2) {
+                     final_depth.push_back(info);
+                 }
+             },
+             .on_complete = [&result](const koi::SearchResult& completed) { result = completed; }},
+            options);
+        handle.wait();
+        require(result.has_value() && final_depth.size() == 3,
+                "repeated threaded MultiPV searches must finish three final-depth lines");
+        require(final_depth.front().pv.front() == *ordered_capture,
+                "warmed threaded MultiPV must retain the stable ordered root prefix");
+        return std::pair{std::move(final_depth), *result};
+    };
+
+    (void)run();
+    const auto first = run();
+    const auto second = run();
+    require(first.second.stats.tt_hits > 0 && second.second.stats.tt_hits > 0,
+            "repeated threaded MultiPV searches must probe entries warmed through the shared hash");
+    for (std::size_t index = 0; index < first.first.size(); ++index) {
+        require(first.first[index].score_cp == second.first[index].score_cp &&
+                    first.first[index].pv == second.first[index].pv &&
+                    first.first[index].multipv == second.first[index].multipv,
+                "warmed threaded MultiPV must remain deterministic across repeated searches");
+    }
 }
 
 void test_threaded_node_limit_is_global_and_never_exceeded() {
@@ -1026,7 +1071,8 @@ int main() {
         {"threaded root search", test_threaded_search_uses_multiple_root_workers_and_matches_reference_result},
         {"classical threaded parity", test_classical_threaded_search_matches_reference_result},
         {"stable root ties", test_equal_root_scores_keep_the_earliest_ordered_move},
-        {"threaded multipv original root ties", test_threaded_multipv_equal_scores_keep_original_legal_root_order},
+        {"threaded multipv ordered root ties", test_threaded_multipv_equal_scores_use_stable_ordered_root_tie_breaking},
+        {"threaded multipv warmed hash", test_threaded_multipv_is_stable_after_warming_the_shared_hash},
         {"threaded global nodes", test_threaded_node_limit_is_global_and_never_exceeded},
         {"threaded node parity", test_threaded_and_reference_node_limits_have_matching_accounting},
         {"search info accounting", test_search_info_nodes_reports_all_visited_nodes},
