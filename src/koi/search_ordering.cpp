@@ -10,6 +10,7 @@ constexpr int kTtMovePriority = 1'000'000;
 constexpr int kCapturePriority = 500'000;
 constexpr int kPromotionPriority = 400'000;
 constexpr int kKillerPriority = 300'000;
+constexpr int kMaximumHistoryScore = kKillerPriority - 1;
 constexpr int kMaximumPly = 64;
 
 int color_index(Color color) noexcept {
@@ -113,9 +114,9 @@ void SearchMoveOrdering::record_quiet_cutoff(Color side, Move move, int ply, int
     }
 
     int& history = history_[static_cast<std::size_t>(color_index(side))][move_index(move)];
-    const int depth_bonus = std::max(1, depth);
+    const int depth_bonus = std::clamp(depth, 1, kMaximumPly);
     const int bonus = depth_bonus * depth_bonus;
-    history = std::min(std::numeric_limits<int>::max() - bonus, history) + bonus;
+    history = std::min(kMaximumHistoryScore - bonus, history) + bonus;
 }
 
 } // namespace koi::detail

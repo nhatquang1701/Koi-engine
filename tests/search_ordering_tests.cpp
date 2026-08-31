@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <iostream>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -80,6 +81,23 @@ void test_killer_history_and_tie_breaking_are_deterministic() {
     require(first == second, "equal-priority moves must have a stable deterministic order");
 }
 
+void test_killer_tier_outranks_saturated_history() {
+    const koi::GameState state = koi::GameState::startpos();
+    const koi::Move killer = require_move("g1f3");
+    const koi::Move history = require_move("b1c3");
+    koi::detail::SearchMoveOrdering ordering;
+
+    ordering.record_quiet_cutoff(state.side_to_move(), killer, 0, 4);
+    for (int count = 0; count < 100; ++count) {
+        ordering.record_quiet_cutoff(state.side_to_move(), history, 1, 64);
+    }
+
+    std::vector<koi::Move> moves = quiet_moves(state, state.legal_moves());
+    ordering.order(state, moves, std::nullopt, 0);
+    require(!moves.empty() && moves.front() == killer,
+            "a killer must outrank even a repeatedly reinforced history move");
+}
+
 struct TestCase {
     std::string_view name;
     void (*run)();
@@ -91,13 +109,15 @@ int main() {
     const std::vector<TestCase> tests{
         {"TT and MVV-LVA ordering", test_tt_move_and_mvv_lva_capture_preference},
         {"killer history stable ordering", test_killer_history_and_tie_breaking_are_deterministic},
+        {"killer tier outranks saturated history", test_killer_tier_outranks_saturated_history},
     };
 
     for (const TestCase& test : tests) {
         try {
             test.run();
         } catch (const std::exception& error) {
-            throw std::runtime_error(std::string(test.name) + ": " + error.what());
+            std::cerr << "FAIL " << test.name << ": " << error.what() << '\n';
+            return 1;
         }
     }
     return 0;
