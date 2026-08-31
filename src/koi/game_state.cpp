@@ -257,8 +257,13 @@ bool GameState::make_move(const Move& move) noexcept {
     }
     try {
         const chess::Move native_move = chess::uci::uciToMove(impl_->board, move.uci());
-        impl_->board.makeMove(native_move);
         impl_->history.push_back(native_move);
+        try {
+            impl_->board.makeMove(native_move);
+        } catch (...) {
+            impl_->history.pop_back();
+            return false;
+        }
         return true;
     } catch (...) {
         return false;

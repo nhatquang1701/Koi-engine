@@ -1,4 +1,7 @@
+#include <atomic>
+#include <cstdlib>
 #include <iostream>
+#include <new>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -11,6 +14,8 @@
 #endif
 
 namespace {
+
+std::atomic_bool fail_next_allocation = false;
 
 using koi::GameState;
 using koi::Move;
@@ -74,6 +79,22 @@ void test_make_and_unmake_restore_fen_and_key() {
     require(state.position_key() == original_key, "unmake must restore the original position key");
 }
 
+void test_failed_history_recording_leaves_state_unchanged() {
+    GameState state = GameState::startpos();
+    const std::string original_fen = state.fen();
+    const std::uint64_t original_key = state.position_key();
+    const Move move = require_move("e2e4");
+
+    fail_next_allocation = true;
+    const bool made_move = state.make_move(move);
+    fail_next_allocation = false;
+
+    require(!made_move, "history-allocation failure must make the move fail");
+    require(state.fen() == original_fen, "failed move must preserve FEN");
+    require(state.position_key() == original_key, "failed move must preserve the position key");
+    require(!state.unmake_move(), "failed move must not add an undo entry");
+}
+
 void test_start_position_has_twenty_legal_moves() {
     const GameState state = GameState::startpos();
     require(state.fen() == kInitialFen, "startpos must use the standard initial FEN");
@@ -87,12 +108,32 @@ struct TestCase {
 
 } // namespace
 
+void* operator new(std::size_t size) {
+    if (fail_next_allocation.exchange(false)) {
+        throw std::bad_alloc();
+    }
+
+    if (void* memory = std::malloc(size == 0 ? 1 : size)) {
+        return memory;
+    }
+    throw std::bad_alloc();
+}
+
+void operator delete(void* memory) noexcept {
+    std::free(memory);
+}
+
+void operator delete(void* memory, std::size_t) noexcept {
+    std::free(memory);
+}
+
 int main() {
     const std::vector<TestCase> tests{
         {"Koi-owned move coordinates", test_move_uses_koi_coordinates_and_formats_uci},
         {"FEN construction", test_fen_constructs_a_game_state},
         {"legal special moves", test_game_state_exposes_legal_special_moves},
         {"make/unmake restoration", test_make_and_unmake_restore_fen_and_key},
+        {"transactional history failure", test_failed_history_recording_leaves_state_unchanged},
         {"start-position move count", test_start_position_has_twenty_legal_moves},
     };
 
