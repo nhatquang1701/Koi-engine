@@ -5,6 +5,22 @@ written in C++26 and uses deterministic iterative-deepening alpha-beta search
 with a classical evaluator and a persistent transposition table. Search runs on
 a cancellable worker so the UCI command loop remains responsive.
 
+## Architecture
+
+The engine is deliberately layered so the chess rules implementation remains a
+private dependency. Public Koi rules types (`Move`, `GameState`, `Position`)
+never expose `chess.hpp`; `GameState` converts to the vendored chess-library
+only in its implementation. `ClassicalEvaluator`, time management, the
+transposition table, and the single-worker `SearchService` build on those Koi
+types. The UCI controller owns the current position and worker lifecycle, and
+is the only layer that writes protocol output.
+
+Search ordering is also an internal search concern: TT best moves are tried
+first, followed by MVV-LVA captures/promotions, two killer moves, and quiet-move
+history. Stable UCI-coordinate tie-breaking keeps repeated searches
+deterministic. There is no public rule API for these policies and no advertised
+`Threads` option while search remains single-worker.
+
 ## Build prerequisites
 
 - A C++26-capable x64 MSVC toolchain (the current CMake configuration selects
@@ -18,18 +34,34 @@ a cancellable worker so the UCI command loop remains responsive.
 From an x64 Visual Studio developer shell in the repository root:
 
 ```powershell
-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=cl
-cmake --build build --config Release
+cmake -S . -B out\release-vs -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=cl
+cmake --build out\release-vs --config Release
+ctest --test-dir out\release-vs -C Release --output-on-failure
 ```
 
-The resulting executable is `build\koi-engine.exe`.
+For a Debug build, substitute `debug-vs` and `Debug` in those commands. The
+resulting engine executable is `out\release-vs\koi-engine.exe`.
+
+## Developer tools
+
+From the configured build directory:
+
+```powershell
+.\out\release-vs\koi-perft.exe 4
+.\out\release-vs\koi-bench.exe
+```
+
+`koi-perft` counts legal nodes from the standard starting position at the given
+non-negative depth. `koi-bench` runs fixed depth-3 positions and writes only a
+deterministic benchmark report to its own stdout; it is a separate process and
+never writes to the UCI engine's stdout.
 
 ## UCI smoke test
 
 Run this PowerShell transcript after building:
 
 ```powershell
-$engine = (Resolve-Path .\build\koi-engine.exe).Path
+$engine = (Resolve-Path .\out\release-vs\koi-engine.exe).Path
 @(
     'uci'
     'isready'
@@ -63,6 +95,9 @@ from the starting position (for example, `bestmove e2e4`).
 - `go` accepts `depth`, `nodes`, `movetime`, `wtime`, `btime`, `winc`, `binc`,
   `movestogo`, and `infinite`. Malformed limit values are ignored. A bare `go`
   defaults to bounded depth 1.
+- A depth limit is capped internally at 64 plies. `nodes`, `movetime`, and
+  side-to-move clock limits stop search at their requested boundary; `infinite`
+  continues until `stop`.
 - Search may report completed iterations as UCI `info depth ... score ... nodes
   ... nps ... time ... pv ...` lines.
 - `stop` cancels and joins the active worker and emits exactly one final legal
@@ -86,6 +121,12 @@ the smoke test, also confirm that stderr is empty for a valid transcript. If
 Lucas Chess cannot start the engine, verify the executable path, that the
 Windows x64 build exists, and that the process can complete the `uci` / `isready`
 handshake from PowerShell.
+
+For final Lucas acceptance, play at least one short standard game after the
+handshake succeeds. Confirm that the GUI receives a legal move after `go`,
+remains responsive while the engine is thinking, and can stop or start a new
+game without a duplicate `bestmove`. This repository automates the UCI process
+transcript but cannot automate a locally installed Lucas Chess GUI.
 
 ## References
 

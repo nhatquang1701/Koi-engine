@@ -186,6 +186,26 @@ void test_service_hash_configuration_survives_default_start_and_non_default_over
     require(service.hash_size_mb() == 2, "a non-default per-start hash option must explicitly reconfigure the service hash");
 }
 
+void test_hash_configuration_clamps_to_uci_bounds_and_clear_discards_warmed_entries() {
+    auto evaluator = std::make_shared<koi::ClassicalEvaluator>();
+    koi::SearchService service(evaluator);
+    koi::SearchLimits limits;
+    limits.depth = 3;
+
+    require(service.hash_size_mb() == 16, "SearchService must retain the 16 MB default hash size");
+    const koi::SearchResult warmed = search(service, koi::GameState::startpos(), limits);
+    require(warmed.stats.tt_hits > 0, "a completed iterative search must warm the transposition table");
+
+    service.clear_hash();
+    koi::SearchLimits one_ply;
+    one_ply.depth = 1;
+    const koi::SearchResult cleared = search(service, koi::GameState::startpos(), one_ply);
+    require(cleared.stats.tt_hits == 0, "Clear Hash must remove entries used by a subsequent root search");
+
+    service.set_hash_size_mb(0);
+    require(service.hash_size_mb() == 1, "hash size must clamp to the UCI lower bound of 1 MB");
+}
+
 void test_transposition_table_stores_probes_and_clears_entries() {
     koi::TranspositionTable table;
     require(table.size_mb() == 16, "transposition table default must be 16 MB");
@@ -245,6 +265,7 @@ int main() {
         {"deterministic legal search", test_fixed_depth_search_is_deterministic_and_legal},
         {"infinite search lifecycle", test_infinite_search_runs_until_stopped_and_completes_once},
         {"service hash persistence", test_service_hash_configuration_survives_default_start_and_non_default_override},
+        {"hash bounds and clear", test_hash_configuration_clamps_to_uci_bounds_and_clear_discards_warmed_entries},
         {"transposition table", test_transposition_table_stores_probes_and_clears_entries},
         {"transposition table mate normalization", test_transposition_table_preserves_mate_distance_across_plies},
     };

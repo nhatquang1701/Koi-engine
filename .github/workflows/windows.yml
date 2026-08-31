@@ -1,0 +1,30 @@
+name: Windows CTest
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        configuration:
+          - Debug
+          - Release
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure x64 MSVC environment and build
+        shell: cmd
+        run: |
+          call "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64
+          if errorlevel 1 exit /b 1
+          where cl
+          cl 2>&1 | findstr /C:"x64" >nul
+          if errorlevel 1 exit /b 1
+          cmake -S . -B out\ci-${{ matrix.configuration }} -G Ninja -DCMAKE_BUILD_TYPE=${{ matrix.configuration }} -DCMAKE_CXX_COMPILER=cl
+          if errorlevel 1 exit /b 1
+          cmake --build out\ci-${{ matrix.configuration }} --config ${{ matrix.configuration }}
+          if errorlevel 1 exit /b 1
+          ctest --test-dir out\ci-${{ matrix.configuration }} -C ${{ matrix.configuration }} --output-on-failure

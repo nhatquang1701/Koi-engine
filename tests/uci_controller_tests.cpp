@@ -140,6 +140,26 @@ void test_uci_handshake_has_identity_and_supported_options_in_order() {
             "Threads must not be advertised before parallel search exists");
 }
 
+void test_hash_options_preserve_the_contract_and_never_advertise_threads() {
+    const ControllerResult result = run_controller(
+        "uci\n"
+        "setoption name Hash value 1\n"
+        "setoption name Hash value 0\n"
+        "setoption name Hash value 4097\n"
+        "setoption name Clear Hash\n"
+        "isready\n"
+        "quit\n");
+
+    require(result.exit_code == 0, "Hash and Clear Hash commands must leave the controller usable");
+    require(result.output.find("option name Hash type spin default 16 min 1 max 4096\n") != std::string::npos,
+            "the Hash option must retain its documented default and bounds");
+    require(result.output.find("option name Clear Hash type button\n") != std::string::npos,
+            "Clear Hash must remain a UCI button option");
+    require(result.output.find("Threads") == std::string::npos,
+            "Threads must remain absent until a parallel search implementation exists");
+    require(result.output.ends_with("readyok\n"), "Hash option changes and Clear Hash must not disrupt isready");
+}
+
 void test_isready_writes_readyok() {
     const ControllerResult result = run_controller("isready\nquit\n");
 
@@ -412,6 +432,7 @@ struct TestCase {
 int main() {
     const std::vector<TestCase> tests{
         {"uci handshake and options", test_uci_handshake_has_identity_and_supported_options_in_order},
+        {"Hash and Clear Hash contract", test_hash_options_preserve_the_contract_and_never_advertise_threads},
         {"ready response", test_isready_writes_readyok},
         {"deterministic search", test_deterministic_search_repeats_the_best_move_with_compatibility_seed},
         {"position startpos and FEN", test_startpos_and_fen_move_lists_define_the_search_root},

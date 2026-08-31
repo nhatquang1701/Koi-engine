@@ -9,6 +9,7 @@
 #include <thread>
 #include <utility>
 
+#include "koi/detail/search_ordering.hpp"
 #include "koi/time_manager.hpp"
 #include "koi/transposition_table.hpp"
 
@@ -19,61 +20,6 @@ constexpr int kInfinity = 1'000'000;
 constexpr int kMateScore = 100'000;
 constexpr int kMateThreshold = 99'000;
 constexpr int kMaximumSearchDepth = 64;
-
-int promotion_value(Promotion promotion) noexcept {
-    switch (promotion) {
-    case Promotion::queen:
-        return 900;
-    case Promotion::rook:
-        return 500;
-    case Promotion::bishop:
-        return 330;
-    case Promotion::knight:
-        return 320;
-    case Promotion::none:
-        return 0;
-    }
-    return 0;
-}
-
-int piece_value(PieceType type) noexcept {
-    switch (type) {
-    case PieceType::pawn:
-        return 100;
-    case PieceType::knight:
-        return 320;
-    case PieceType::bishop:
-        return 330;
-    case PieceType::rook:
-        return 500;
-    case PieceType::queen:
-        return 900;
-    case PieceType::king:
-    case PieceType::none:
-        return 0;
-    }
-    return 0;
-}
-
-int move_priority(const GameState& state, const Move& move, const std::optional<Move>& tt_move) {
-    if (tt_move.has_value() && move == *tt_move) {
-        return 100'000;
-    }
-    const int promotion = promotion_value(move.promotion());
-    const int capture = state.is_capture(move) ? 10'000 + piece_value(state.piece_at(move.to()).type) : 0;
-    return promotion + capture;
-}
-
-void order_moves(const GameState& state, std::vector<Move>& moves, const std::optional<Move>& tt_move = std::nullopt) {
-    std::stable_sort(moves.begin(), moves.end(), [&state, &tt_move](const Move& lhs, const Move& rhs) {
-        const int lhs_priority = move_priority(state, lhs, tt_move);
-        const int rhs_priority = move_priority(state, rhs, tt_move);
-        if (lhs_priority != rhs_priority) {
-            return lhs_priority > rhs_priority;
-        }
-        return lhs.uci() < rhs.uci();
-    });
-}
 
 std::optional<int> mate_from_score(int score) noexcept {
     if (score >= kMateThreshold) {
@@ -90,6 +36,7 @@ struct SearchContext {
     TranspositionTable& table;
     TimeManager time_manager;
     std::atomic_bool& stop_requested;
+    detail::SearchMoveOrdering ordering;
     SearchStats stats;
     bool aborted = false;
 
@@ -142,7 +89,7 @@ struct SearchContext {
             }
         }
 
-        order_moves(state, moves);
+        ordering.order(state, moves, std::nullopt, ply);
         for (const Move& move : moves) {
             if (interrupted()) {
                 return 0;
@@ -201,7 +148,7 @@ struct SearchContext {
             }
         }
 
-        order_moves(state, moves, tt_move);
+        ordering.order(state, moves, tt_move, ply);
         int best_score = -kInfinity;
         Move best_move = Move::no_move();
         for (const Move& move : moves) {
@@ -226,6 +173,9 @@ struct SearchContext {
             }
             alpha = std::max(alpha, score);
             if (alpha >= beta) {
+                if (!state.is_capture(move) && move.promotion() == Promotion::none) {
+                    ordering.record_quiet_cutoff(state.side_to_move(), move, ply, depth);
+                }
                 break;
             }
         }
@@ -329,7 +279,7 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
         SearchContext context(*evaluator, *table, limits, root.side_to_move(), state->stop_requested);
 
         std::vector<Move> legal_moves = root.legal_moves();
-        order_moves(root, legal_moves);
+        context.ordering.order(root, legal_moves, std::nullopt, 0);
         SearchResult result;
         result.best_move = legal_moves.empty() ? std::nullopt : std::optional<Move>{legal_moves.front()};
         result.score_cp = evaluator->evaluate(root, root.side_to_move());

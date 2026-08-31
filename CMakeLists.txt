@@ -33,6 +33,7 @@ add_library(koi_core
     src/koi/perft.cpp
     src/koi/position.cpp
     src/koi/search_service.cpp
+    src/koi/search_ordering.cpp
     src/koi/time_manager.cpp
     src/koi/transposition_table.cpp
     src/koi/uci_controller.cpp
@@ -78,6 +79,14 @@ target_link_libraries(koi_search_tests PRIVATE koi_core)
 
 add_test(NAME koi_search_tests COMMAND koi_search_tests)
 
+add_executable(search_ordering_tests
+    tests/search_ordering_tests.cpp
+)
+
+target_link_libraries(search_ordering_tests PRIVATE koi_core)
+
+add_test(NAME search_ordering_tests COMMAND search_ordering_tests)
+
 add_executable(perft_tests
     tests/perft_tests.cpp
 )
@@ -91,6 +100,13 @@ add_executable(koi_perft
 )
 
 target_link_libraries(koi_perft PRIVATE koi_core)
+
+add_executable(koi_bench
+    tools/koi_bench.cpp
+)
+
+target_link_libraries(koi_bench PRIVATE koi_core)
+set_target_properties(koi_bench PROPERTIES OUTPUT_NAME "koi-bench")
 
 add_executable(koi_engine
     src/main.cpp
@@ -109,3 +125,18 @@ add_test(
 )
 
 set_tests_properties(koi_engine_process PROPERTIES TIMEOUT 30)
+
+add_test(
+    NAME koi_benchmark_process
+    COMMAND ${POWERSHELL_EXECUTABLE} -NoProfile -ExecutionPolicy Bypass -File
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/koi_bench_process_test.ps1"
+            -BenchPath "$<TARGET_FILE_DIR:koi_engine>/koi-bench.exe"
+)
+
+set_tests_properties(koi_benchmark_process PROPERTIES TIMEOUT 30)
+
+add_test(
+    NAME windows_ci_configuration
+    COMMAND ${POWERSHELL_EXECUTABLE} -NoProfile -ExecutionPolicy Bypass -File
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/ci_configuration_test.ps1"
+)
