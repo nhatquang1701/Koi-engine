@@ -1,5 +1,6 @@
 #include "koi/uci_controller.hpp"
 
+#include <cctype>
 #include <charconv>
 #include <chrono>
 #include <cstdint>
@@ -19,6 +20,10 @@ namespace {
 constexpr std::uint64_t kMaximumRandomSeed = 2'147'483'647;
 constexpr std::uint64_t kMinimumHashMegabytes = 1;
 constexpr std::uint64_t kMaximumHashMegabytes = 4'096;
+constexpr std::uint64_t kMinimumSpeedPercent = 1;
+constexpr std::uint64_t kMaximumSpeedPercent = 100;
+constexpr std::uint64_t kMinimumMultiPv = 1;
+constexpr std::uint64_t kMaximumMultiPv = 16;
 
 std::vector<std::string> remaining_tokens(std::istream& command) {
     std::vector<std::string> tokens;
@@ -31,6 +36,24 @@ std::vector<std::string> remaining_tokens(std::istream& command) {
 bool parse_uint64(const std::string& value, std::uint64_t& parsed) {
     const auto [end, error] = std::from_chars(value.data(), value.data() + value.size(), parsed);
     return error == std::errc{} && end == value.data() + value.size();
+}
+
+bool parse_boolean(const std::string& value, bool& parsed) {
+    std::string normalized;
+    normalized.reserve(value.size());
+    for (const unsigned char character : value) {
+        normalized.push_back(static_cast<char>(std::tolower(character)));
+    }
+
+    if (normalized == "true") {
+        parsed = true;
+        return true;
+    }
+    if (normalized == "false") {
+        parsed = false;
+        return true;
+    }
+    return false;
 }
 
 bool parse_random_seed(const std::string& value, std::uint32_t& seed) {
@@ -289,6 +312,58 @@ void UciController::handle_setoption(std::istream& command) {
         return;
     }
 
+    if (tokens.size() == 4 && tokens[0] == "name" && tokens[1] == "Threads" &&
+        tokens[2] == "value") {
+        std::uint64_t threads = 0;
+        if (parse_uint64(tokens[3], threads) && threads >= 1 && threads <= maximum_search_threads()) {
+            stop_and_suppress_active_search();
+            threads_ = static_cast<std::size_t>(threads);
+        }
+        return;
+    }
+
+    if (tokens.size() == 4 && tokens[0] == "name" && tokens[1] == "Speed" &&
+        tokens[2] == "value") {
+        std::uint64_t speed = 0;
+        if (parse_uint64(tokens[3], speed) && speed >= kMinimumSpeedPercent &&
+            speed <= kMaximumSpeedPercent) {
+            stop_and_suppress_active_search();
+            speed_percent_ = static_cast<std::uint8_t>(speed);
+        }
+        return;
+    }
+
+    if (tokens.size() == 4 && tokens[0] == "name" && tokens[1] == "UCI_AnalyseMode" &&
+        tokens[2] == "value") {
+        bool analyse_mode = false;
+        if (parse_boolean(tokens[3], analyse_mode) && analyse_mode_ != analyse_mode) {
+            stop_and_suppress_active_search();
+            analyse_mode_ = analyse_mode;
+        }
+        return;
+    }
+
+    if (tokens.size() == 4 && tokens[0] == "name" && tokens[1] == "MultiPV" &&
+        tokens[2] == "value") {
+        std::uint64_t multi_pv = 0;
+        if (parse_uint64(tokens[3], multi_pv) && multi_pv >= kMinimumMultiPv &&
+            multi_pv <= kMaximumMultiPv) {
+            stop_and_suppress_active_search();
+            multi_pv_ = static_cast<std::size_t>(multi_pv);
+        }
+        return;
+    }
+
+    if (tokens.size() == 4 && tokens[0] == "name" && tokens[1] == "Ponder" &&
+        tokens[2] == "value") {
+        bool ponder_enabled = false;
+        if (parse_boolean(tokens[3], ponder_enabled)) {
+            stop_and_suppress_active_search();
+            ponder_enabled_ = ponder_enabled;
+        }
+        return;
+    }
+
     if (tokens.size() == 3 && tokens[0] == "name" && tokens[1] == "Clear" &&
         tokens[2] == "Hash") {
         stop_and_suppress_active_search();
@@ -311,7 +386,12 @@ void UciController::handle_go(std::istream& command) {
         write_search_completion(generation, result);
     };
 
-    active_search_.emplace(search_service_.start(position_, std::move(limits), std::move(sink)));
+    SearchOptions options;
+    options.threads = threads_;
+    options.speed_percent = speed_percent_;
+    options.multi_pv = multi_pv_;
+    options.analyse_mode = analyse_mode_;
+    active_search_.emplace(search_service_.start(position_, std::move(limits), std::move(sink), options));
 }
 
 void UciController::stop_active_search() {
@@ -349,6 +429,11 @@ void UciController::write_handshake() {
                "id author Koi Engine contributors\n"
                "option name RandomSeed type spin default 0 min 0 max 2147483647\n"
                "option name Hash type spin default 16 min 1 max 4096\n"
+               "option name Threads type spin default 1 min 1 max " << maximum_search_threads() << "\n"
+               "option name Speed type spin default 100 min 1 max 100\n"
+               "option name UCI_AnalyseMode type check default false\n"
+               "option name MultiPV type spin default 1 min 1 max 16\n"
+               "option name Ponder type check default false\n"
                "option name Clear Hash type button\n"
                "uciok\n"
             << std::flush;
@@ -365,7 +450,8 @@ void UciController::write_search_info(std::uint64_t generation, const SearchInfo
         return;
     }
 
-    output_ << "info depth " << info.depth << " score ";
+    output_ << "info depth " << info.depth << " seldepth " << info.seldepth
+            << " multipv " << info.multipv << " score ";
     if (info.mate.has_value()) {
         output_ << "mate " << *info.mate;
     } else {

@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cstdint>
@@ -7,6 +8,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <vector>
 
 #include "koi/position.hpp"
@@ -27,6 +29,11 @@ void require(bool condition, std::string_view message) {
     if (!condition) {
         throw std::runtime_error(std::string(message));
     }
+}
+
+std::size_t maximum_threads() {
+    const unsigned hardware = std::thread::hardware_concurrency();
+    return std::max<std::size_t>(1, std::min<std::size_t>(64, hardware == 0 ? 1 : hardware));
 }
 
 ControllerResult run_controller(std::string_view transcript) {
@@ -80,6 +87,10 @@ bool is_valid_search_info(std::string_view line) {
     std::string info;
     std::string depth_name;
     int depth = 0;
+    std::string seldepth_name;
+    int seldepth = 0;
+    std::string multipv_name;
+    int multipv = 0;
     std::string score_name;
     std::string score_kind;
     int score = 0;
@@ -91,11 +102,13 @@ bool is_valid_search_info(std::string_view line) {
     std::uint64_t time = 0;
     std::string pv_name;
 
-    if (!(stream >> info >> depth_name >> depth >> score_name >> score_kind >> score >>
+    if (!(stream >> info >> depth_name >> depth >> seldepth_name >> seldepth >> multipv_name >> multipv >>
+          score_name >> score_kind >> score >>
           nodes_name >> nodes >> nps_name >> nps >> time_name >> time >> pv_name)) {
         return false;
     }
-    if (info != "info" || depth_name != "depth" || depth <= 0 || score_name != "score" ||
+    if (info != "info" || depth_name != "depth" || depth <= 0 || seldepth_name != "seldepth" ||
+        seldepth < depth || multipv_name != "multipv" || multipv < 1 || multipv > 16 || score_name != "score" ||
         (score_kind != "cp" && score_kind != "mate") || nodes_name != "nodes" ||
         nps_name != "nps" || time_name != "time" || pv_name != "pv") {
         return false;
@@ -126,18 +139,22 @@ private:
 
 void test_uci_handshake_has_identity_and_supported_options_in_order() {
     const ControllerResult result = run_controller("uci\nquit\n");
+    const std::string expected =
+        "id name Koi Engine\n"
+        "id author Koi Engine contributors\n"
+        "option name RandomSeed type spin default 0 min 0 max 2147483647\n"
+        "option name Hash type spin default 16 min 1 max 4096\n"
+        "option name Threads type spin default 1 min 1 max " + std::to_string(maximum_threads()) + "\n"
+        "option name Speed type spin default 100 min 1 max 100\n"
+        "option name UCI_AnalyseMode type check default false\n"
+        "option name MultiPV type spin default 1 min 1 max 16\n"
+        "option name Ponder type check default false\n"
+        "option name Clear Hash type button\n"
+        "uciok\n";
 
     require(result.exit_code == 0, "quit must cause a normal shutdown");
-    require(result.output ==
-                "id name Koi Engine\n"
-                "id author Koi Engine contributors\n"
-                "option name RandomSeed type spin default 0 min 0 max 2147483647\n"
-                "option name Hash type spin default 16 min 1 max 4096\n"
-                "option name Clear Hash type button\n"
-                "uciok\n",
-            "uci response must preserve identity and advertise RandomSeed, Hash, and Clear Hash");
-    require(result.output.find("Threads") == std::string::npos,
-            "Threads must not be advertised before parallel search exists");
+    require(result.output == expected,
+            "uci response must advertise the identity, hash, thread, speed, and clear-hash options");
 }
 
 void test_hash_options_preserve_the_contract_and_never_advertise_threads() {
@@ -155,9 +172,100 @@ void test_hash_options_preserve_the_contract_and_never_advertise_threads() {
             "the Hash option must retain its documented default and bounds");
     require(result.output.find("option name Clear Hash type button\n") != std::string::npos,
             "Clear Hash must remain a UCI button option");
-    require(result.output.find("Threads") == std::string::npos,
-            "Threads must remain absent until a parallel search implementation exists");
+    require(result.output.find("option name Threads type spin default 1 min 1 max ") != std::string::npos,
+            "Threads must remain a valid advertised UCI option");
+    require(result.output.find("option name Speed type spin default 100 min 1 max 100\n") != std::string::npos,
+            "Speed must be advertised with its documented bounds");
+    require(result.output.find("option name UCI_AnalyseMode type check default false\n") != std::string::npos,
+            "UCI_AnalyseMode must be advertised for Lucas Chess");
+    require(result.output.find("option name MultiPV type spin default 1 min 1 max 16\n") != std::string::npos,
+            "MultiPV must retain its Lucas Chess range");
+    require(result.output.find("option name Ponder type check default false\n") != std::string::npos,
+            "Ponder must be advertised for Lucas Chess");
     require(result.output.ends_with("readyok\n"), "Hash option changes and Clear Hash must not disrupt isready");
+}
+
+void test_threads_and_speed_options_accept_valid_values_and_ignore_invalid_values() {
+    const std::string valid_threads = std::to_string(maximum_threads());
+    const ControllerResult result = run_controller(
+        "setoption name Threads value " + valid_threads + "\n"
+        "setoption name Threads value 0\n"
+        "setoption name Threads value 65\n"
+        "setoption name Speed value 50\n"
+        "setoption name Speed value 0\n"
+        "setoption name Speed value 101\n"
+        "position startpos\n"
+        "go depth 1\n"
+        "stop\n"
+        "quit\n");
+    const std::vector<std::string> bestmoves =
+        lines_starting_with(output_lines(result.output), "bestmove ");
+    require(result.exit_code == 0, "valid and invalid speed/thread options must not crash the controller");
+    require(bestmoves.size() == 1 && bestmoves[0].starts_with("bestmove "),
+            "accepted options must leave the controller able to search");
+}
+
+void test_threads_and_speed_changes_suppress_the_active_generation() {
+    const std::string valid_threads = std::to_string(std::min<std::size_t>(2, maximum_threads()));
+    const ControllerResult result = run_controller(
+        "position startpos\n"
+        "go infinite\n"
+        "setoption name Threads value " + valid_threads + "\n"
+        "go infinite\n"
+        "setoption name Speed value 50\n"
+        "go infinite\n"
+        "stop\n"
+        "quit\n");
+    const std::vector<std::string> bestmoves =
+        lines_starting_with(output_lines(result.output), "bestmove ");
+    require(bestmoves.size() == 1, "changing Threads or Speed must suppress the replaced search result");
+    require(is_legal_move(Position{}, bestmoves[0].substr(9)),
+            "the surviving search after an option change must return a legal move");
+}
+
+void test_lucas_analysis_options_accept_valid_values_ignore_invalid_values_and_emit_multipv() {
+    const ControllerResult result = run_controller(
+        "setoption name UCI_AnalyseMode value TRUE\n"
+        "setoption name MultiPV value 3\n"
+        "setoption name Ponder value TrUe\n"
+        "setoption name MultiPV value 0\n"
+        "setoption name MultiPV value 17\n"
+        "setoption name Ponder value maybe\n"
+        "position startpos\n"
+        "go depth 2\n"
+        "stop\n"
+        "quit\n");
+    const std::vector<std::string> lines = output_lines(result.output);
+    const std::vector<std::string> infos = lines_starting_with(lines, "info ");
+    const std::vector<std::string> bestmoves = lines_starting_with(lines, "bestmove ");
+
+    require(result.exit_code == 0 && result.diagnostics.empty(),
+            "valid and invalid Lucas analysis options must leave the controller usable and quiet");
+    for (const std::string& info : infos) {
+        require(is_valid_search_info(info),
+                "every search info line must include a valid multipv field between seldepth and score");
+    }
+    require(bestmoves.size() == 1 && is_legal_move(Position{}, bestmoves[0].substr(9)),
+            "Lucas analysis options must retain exactly one legal bestmove");
+}
+
+void test_lucas_analysis_option_changes_suppress_the_active_generation() {
+    const ControllerResult result = run_controller(
+        "position startpos\n"
+        "go infinite\n"
+        "setoption name UCI_AnalyseMode value true\n"
+        "go infinite\n"
+        "setoption name MultiPV value 3\n"
+        "go infinite\n"
+        "setoption name Ponder value true\n"
+        "go infinite\n"
+        "stop\n"
+        "quit\n");
+    const std::vector<std::string> bestmoves =
+        lines_starting_with(output_lines(result.output), "bestmove ");
+
+    require(bestmoves.size() == 1 && is_legal_move(Position{}, bestmoves[0].substr(9)),
+            "changing Lucas analysis options must suppress replaced search generations");
 }
 
 void test_isready_writes_readyok() {
@@ -257,6 +365,7 @@ void test_go_limit_parser_maps_each_supported_limit_exactly() {
     require(limits.moves_to_go == 40, "movestogo must map to SearchLimits::moves_to_go");
     require(!limits.infinite, "ordinary limits must not enable infinite search");
 }
+
 void test_go_limit_parser_supports_lucas_root_options_and_value_defaults() {
     const auto limits = koi::uci::parse_go_limits(
         "ponder searchmoves e2e4 g1f3 depth 5");
@@ -466,6 +575,12 @@ int main() {
     const std::vector<TestCase> tests{
         {"uci handshake and options", test_uci_handshake_has_identity_and_supported_options_in_order},
         {"Hash and Clear Hash contract", test_hash_options_preserve_the_contract_and_never_advertise_threads},
+        {"Threads and Speed validation", test_threads_and_speed_options_accept_valid_values_and_ignore_invalid_values},
+        {"Threads and Speed generation replacement", test_threads_and_speed_changes_suppress_the_active_generation},
+        {"Lucas analysis options and multipv output",
+         test_lucas_analysis_options_accept_valid_values_ignore_invalid_values_and_emit_multipv},
+        {"Lucas analysis option generation replacement",
+         test_lucas_analysis_option_changes_suppress_the_active_generation},
         {"ready response", test_isready_writes_readyok},
         {"deterministic search", test_deterministic_search_repeats_the_best_move_with_compatibility_seed},
         {"position startpos and FEN", test_startpos_and_fen_move_lists_define_the_search_root},

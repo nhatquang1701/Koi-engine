@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <iosfwd>
 #include <mutex>
@@ -52,6 +53,11 @@ private:
     RandomMoveChooser chooser_{0};
     SearchService search_service_;
     std::optional<SearchHandle> active_search_;
+    std::size_t threads_ = 1;
+    std::uint8_t speed_percent_ = 100;
+    bool analyse_mode_ = false;
+    std::size_t multi_pv_ = 1;
+    bool ponder_enabled_ = false;
     std::uint64_t generation_ = 0;
 };
 
