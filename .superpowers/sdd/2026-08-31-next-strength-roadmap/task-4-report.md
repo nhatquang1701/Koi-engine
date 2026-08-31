@@ -1,5 +1,10 @@
 # Task 4 implementation report — tactical suite and classical tuning
 
+> Historical implementation report for the initial `cf065e4` snapshot. The
+> final reviewed corpus was subsequently repaired and validated in `8ddf79d`,
+> `e349bc7`, `bedb27c`, and `981ebe7`; the current inventory below reflects
+> that final state.
+
 ## Commit
 
 Task implementation commit SHA: `cf065e40d96fce9f440373fdd262b0853ddea3b1`
@@ -24,14 +29,14 @@ Task implementation commit SHA: `cf065e40d96fce9f440373fdd262b0853ddea3b1`
 
 ## Fixture inventory
 
-Hard gate: 64 fixed-depth `Threads=1` records, 8 records in each category: mate,
-check, evasion, fork, pin, poisoned capture, promotion, and defense/pawn race.
-Every record has a nonzero unique ID, FEN, fixed depth, category, and explicit
-accepted-move allowlist.
+Hard gate: 64 fixed-depth `Threads=1` records: seven records in each of mate,
+check, evasion, fork, pin, poisoned capture, promotion, defense, and pawn-race,
+plus the retained `queen_capture` record. Every record has a nonzero unique ID,
+FEN, fixed depth, category, and explicit accepted-move allowlist.
 
 Optional corpus: 128 records for local tuning, not a CI Elo/NPS gate. Category totals:
-56 positional, 48 endgame, and 24 king-safety records. Each record is FEN-validated
-and carries the same metadata/allowlist contract.
+43 positional, 43 king-safety, and 42 endgame records. Each record is FEN-validated,
+not an automatic rule draw, and carries the same metadata/allowlist contract.
 
 ## TDD red evidence
 
