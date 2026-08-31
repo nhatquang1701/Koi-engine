@@ -4,12 +4,20 @@
 #include <iosfwd>
 #include <mutex>
 #include <optional>
+#include <string_view>
 
 #include "koi/game_state.hpp"
 #include "koi/move_chooser.hpp"
 #include "koi/search_service.hpp"
 
 namespace koi {
+
+namespace uci {
+
+// Parses the portion of a UCI "go" command following the command name.
+[[nodiscard]] SearchLimits parse_go_limits(std::string_view arguments);
+
+} // namespace uci
 
 class UciController {
 public:

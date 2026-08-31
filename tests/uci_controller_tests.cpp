@@ -1,4 +1,5 @@
 #include <atomic>
+#include <chrono>
 #include <cstdint>
 #include <iostream>
 #include <limits>
@@ -216,6 +217,50 @@ void test_all_go_limits_and_malformed_values_are_accepted_without_crashing() {
     }
 }
 
+void test_go_limit_parser_maps_each_supported_limit_exactly() {
+    using namespace std::chrono_literals;
+
+    const koi::SearchLimits limits = koi::uci::parse_go_limits(
+        "depth 7 nodes 18446744073709551615 movetime 0 "
+        "wtime 600000 btime 123456 winc 3500 binc 17 movestogo 40");
+
+    require(limits.depth == 7, "depth must map to SearchLimits::depth");
+    require(limits.nodes == std::numeric_limits<std::uint64_t>::max(),
+            "nodes must preserve the full uint64 range");
+    require(limits.movetime == 0ms, "movetime must map to milliseconds exactly");
+    require(limits.white_clock.has_value() && limits.white_clock->remaining == 600000ms &&
+                limits.white_clock->increment == 3500ms,
+            "wtime and winc must map to the white clock exactly");
+    require(limits.black_clock.has_value() && limits.black_clock->remaining == 123456ms &&
+                limits.black_clock->increment == 17ms,
+            "btime and binc must map to the black clock exactly");
+    require(limits.moves_to_go == 40, "movestogo must map to SearchLimits::moves_to_go");
+    require(!limits.infinite, "ordinary limits must not enable infinite search");
+}
+
+void test_go_limit_parser_uses_depth_one_for_missing_malformed_and_overflow_values() {
+    const std::vector<std::string_view> commands{
+        "",
+        "depth nodes movetime wtime btime winc binc movestogo",
+        "depth 0 nodes nope movetime -1 wtime bad btime -1 winc nope binc -4 movestogo 0",
+        "depth 2147483648 nodes 18446744073709551616 movetime 9223372036854775808 "
+        "wtime 9223372036854775808 btime 9223372036854775808 "
+        "winc 9223372036854775808 binc 9223372036854775808 movestogo 4294967296",
+    };
+
+    for (const std::string_view command : commands) {
+        const koi::SearchLimits limits = koi::uci::parse_go_limits(command);
+
+        require(limits.depth == 1, "an unusable go command must fall back to depth one");
+        require(!limits.nodes.has_value() && !limits.movetime.has_value(),
+                "invalid node and movetime values must be ignored");
+        require(!limits.white_clock.has_value() && !limits.black_clock.has_value(),
+                "invalid clock values must not create clock limits");
+        require(!limits.moves_to_go.has_value() && !limits.infinite,
+                "invalid movestogo and absent infinite must remain unset");
+    }
+}
+
 void test_invalid_position_commands_preserve_the_previous_position() {
     const ControllerResult result = run_controller(
         "position fen 7k/6Q1/5K2/8/8/8/8/8 b - - 0 1\n"
@@ -371,6 +416,8 @@ int main() {
         {"deterministic search", test_deterministic_search_repeats_the_best_move_with_compatibility_seed},
         {"position startpos and FEN", test_startpos_and_fen_move_lists_define_the_search_root},
         {"go limits and malformed values", test_all_go_limits_and_malformed_values_are_accepted_without_crashing},
+        {"go limit parser exact mapping", test_go_limit_parser_maps_each_supported_limit_exactly},
+        {"go limit parser fallback", test_go_limit_parser_uses_depth_one_for_missing_malformed_and_overflow_values},
         {"transactional invalid positions", test_invalid_position_commands_preserve_the_previous_position},
         {"terminal 0000", test_terminal_position_returns_0000},
         {"ready during search", test_isready_remains_responsive_during_infinite_search},

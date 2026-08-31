@@ -53,7 +53,12 @@ bool parse_milliseconds(const std::string& value, std::chrono::milliseconds& dur
     return true;
 }
 
-SearchLimits parse_go_limits(std::istream& command) {
+} // namespace
+
+namespace uci {
+
+SearchLimits parse_go_limits(std::string_view arguments) {
+    std::istringstream command{std::string(arguments)};
     const std::vector<std::string> tokens = remaining_tokens(command);
     SearchLimits limits;
     std::optional<std::chrono::milliseconds> white_time;
@@ -143,7 +148,7 @@ SearchLimits parse_go_limits(std::istream& command) {
     return limits;
 }
 
-} // namespace
+} // namespace uci
 
 UciController::UciController(std::istream& input, std::ostream& output, std::ostream& diagnostics)
     : UciController(input, output, diagnostics,
@@ -274,7 +279,9 @@ void UciController::handle_setoption(std::istream& command) {
 }
 
 void UciController::handle_go(std::istream& command) {
-    SearchLimits limits = parse_go_limits(command);
+    std::string arguments;
+    std::getline(command, arguments);
+    SearchLimits limits = uci::parse_go_limits(arguments);
     stop_and_suppress_active_search();
     const std::uint64_t generation = begin_generation();
 
