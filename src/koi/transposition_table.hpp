@@ -1,7 +1,9 @@
 #pragma once
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <mutex>
 #include <optional>
 #include <vector>
@@ -35,12 +37,15 @@ public:
     [[nodiscard]] std::optional<TranspositionEntry> probe(std::uint64_t key, int ply = 0) const noexcept;
 
 private:
-    [[nodiscard]] static std::size_t normalized_size_mb(std::size_t megabytes) noexcept;
+    struct Storage;
 
-    mutable std::mutex mutex_;
-    std::vector<TranspositionEntry> entries_;
-    std::size_t size_mb_ = 16;
-    std::uint16_t generation_ = 1;
+    [[nodiscard]] static std::size_t normalized_size_mb(std::size_t megabytes) noexcept;
+    [[nodiscard]] std::shared_ptr<Storage> snapshot() const noexcept;
+
+    static constexpr std::size_t kStripeCount = 64;
+
+    mutable std::mutex maintenance_mutex_;
+    std::shared_ptr<Storage> storage_;
 };
 
 } // namespace koi

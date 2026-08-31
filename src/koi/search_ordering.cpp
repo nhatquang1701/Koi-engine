@@ -62,20 +62,84 @@ std::size_t move_index(Move move) noexcept {
 
 } // namespace
 
+std::uint32_t move_tie_break_key(Move move) noexcept {
+    const auto square_key = [](Square square) noexcept -> std::uint32_t {
+        if (square.index() == Square::kInvalid) {
+            return 64;
+        }
+        return static_cast<std::uint32_t>(square.index() % 8) * 8U + square.index() / 8U;
+    };
+
+    std::uint32_t promotion_key = 0;
+    switch (move.promotion()) {
+    case Promotion::bishop:
+        promotion_key = 1;
+        break;
+    case Promotion::knight:
+        promotion_key = 2;
+        break;
+    case Promotion::queen:
+        promotion_key = 3;
+        break;
+    case Promotion::rook:
+        promotion_key = 4;
+        break;
+    case Promotion::none:
+        break;
+    }
+
+    return (square_key(move.from()) * 64U + square_key(move.to())) * 5U + promotion_key;
+}
+
 void SearchMoveOrdering::clear() noexcept {
     killers_ = {};
     history_ = {};
+    scored_moves_.clear();
 }
 
-int SearchMoveOrdering::priority(const GameState& state, Move move, std::optional<Move> tt_move, int ply) const {
+void SearchMoveOrdering::order(const GameState& state, std::vector<Move>& moves,
+                               std::optional<Move> tt_move, int ply) const {
+    std::vector<MoveMetadata> metadata;
+    metadata.reserve(moves.size());
+    for (const Move move : moves) {
+        if (const auto described = state.describe_move(move); described.has_value()) {
+            metadata.push_back(*described);
+        }
+    }
+    order(state, metadata, tt_move, ply);
+    for (std::size_t index = 0; index < metadata.size(); ++index) {
+        moves[index] = metadata[index].move;
+    }
+}
+
+void SearchMoveOrdering::order(const GameState& state, MoveMetadataList& moves,
+                               std::optional<Move> tt_move, int ply) const {
+    scored_moves_.clear();
+    scored_moves_.reserve(moves.size());
+    for (const MoveMetadata& metadata : moves) {
+        scored_moves_.push_back(ScoredMove{metadata, priority(state, metadata, tt_move, ply),
+                                           move_tie_break_key(metadata.move)});
+    }
+
+    std::sort(scored_moves_.begin(), scored_moves_.end(), [](const ScoredMove& lhs, const ScoredMove& rhs) {
+        return lhs.priority != rhs.priority ? lhs.priority > rhs.priority : lhs.tie_break < rhs.tie_break;
+    });
+
+    for (std::size_t index = 0; index < moves.size(); ++index) {
+        moves[index] = scored_moves_[index].metadata;
+    }
+}
+
+int SearchMoveOrdering::priority(const GameState& state, const MoveMetadata& metadata,
+                                 std::optional<Move> tt_move, int ply) const {
+    const Move move = metadata.move;
     if (tt_move.has_value() && move == *tt_move) {
         return kTtMovePriority;
     }
 
-    if (state.is_capture(move)) {
-        const Piece victim = state.piece_at(move.to());
-        const int victim_value = victim.empty() ? piece_value(PieceType::pawn) : piece_value(victim.type);
-        const int attacker_value = piece_value(state.piece_at(move.from()).type);
+    if (metadata.is_capture()) {
+        const int victim_value = piece_value(metadata.captured_piece);
+        const int attacker_value = piece_value(metadata.moving_piece);
         return kCapturePriority + (victim_value * 16) - attacker_value + promotion_value(move.promotion());
     }
     if (move.promotion() != Promotion::none) {
@@ -92,13 +156,23 @@ int SearchMoveOrdering::priority(const GameState& state, Move move, std::optiona
     return history_[static_cast<std::size_t>(color_index(state.side_to_move()))][move_index(move)];
 }
 
-void SearchMoveOrdering::order(const GameState& state, std::vector<Move>& moves, std::optional<Move> tt_move,
+void SearchMoveOrdering::order(const GameState& state, std::vector<MoveMetadata>& moves,
+                               std::optional<Move> tt_move,
                                int ply) const {
-    std::stable_sort(moves.begin(), moves.end(), [&state, tt_move, ply, this](const Move& lhs, const Move& rhs) {
-        const int lhs_priority = priority(state, lhs, tt_move, ply);
-        const int rhs_priority = priority(state, rhs, tt_move, ply);
-        return lhs_priority != rhs_priority ? lhs_priority > rhs_priority : lhs.uci() < rhs.uci();
+    scored_moves_.clear();
+    scored_moves_.reserve(moves.size());
+    for (const MoveMetadata& metadata : moves) {
+        scored_moves_.push_back(ScoredMove{metadata, priority(state, metadata, tt_move, ply),
+                                           move_tie_break_key(metadata.move)});
+    }
+
+    std::sort(scored_moves_.begin(), scored_moves_.end(), [](const ScoredMove& lhs, const ScoredMove& rhs) {
+        return lhs.priority != rhs.priority ? lhs.priority > rhs.priority : lhs.tie_break < rhs.tie_break;
     });
+
+    for (std::size_t index = 0; index < moves.size(); ++index) {
+        moves[index] = scored_moves_[index].metadata;
+    }
 }
 
 void SearchMoveOrdering::record_quiet_cutoff(Color side, Move move, int ply, int depth) noexcept {

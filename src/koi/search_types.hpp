@@ -1,10 +1,12 @@
 #pragma once
 
+#include <algorithm>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <optional>
+#include <thread>
 #include <vector>
 
 #include "koi/move.hpp"
@@ -33,6 +35,16 @@ struct SearchStats {
     std::uint64_t nodes = 0;
     std::uint64_t qnodes = 0;
     std::uint64_t tt_hits = 0;
+    std::uint64_t pvs_searches = 0;
+    std::uint64_t pvs_researches = 0;
+    std::uint64_t aspiration_researches = 0;
+    std::uint64_t check_extensions = 0;
+    std::uint64_t qchecks = 0;
+    std::uint64_t see_prunes = 0;
+    std::uint64_t delta_prunes = 0;
+    std::uint64_t null_cutoffs = 0;
+    std::uint64_t lmr_reductions = 0;
+    int seldepth = 0;
     std::chrono::milliseconds elapsed{0};
 };
 
@@ -44,6 +56,9 @@ struct SearchInfo {
     std::uint64_t nps = 0;
     std::chrono::milliseconds elapsed{0};
     std::vector<Move> pv;
+    int seldepth = 0;
+    std::uint64_t qnodes = 0;
+    std::uint64_t tt_hits = 0;
     int multipv = 1;
 };
 
@@ -62,8 +77,15 @@ struct SearchEventSink {
 
 struct SearchOptions {
     std::size_t hash_mb = 16;
+    std::size_t threads = 1;
+    std::uint8_t speed_percent = 100;
     std::size_t multi_pv = 1;
     bool analyse_mode = false;
 };
+
+[[nodiscard]] inline std::size_t maximum_search_threads() noexcept {
+    const unsigned hardware = std::thread::hardware_concurrency();
+    return std::max<std::size_t>(1, std::min<std::size_t>(64, hardware == 0 ? 1 : hardware));
+}
 
 } // namespace koi

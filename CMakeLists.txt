@@ -22,6 +22,16 @@ if(MSVC AND NOT DEFINED CMAKE_CXX26_STANDARD_COMPILE_OPTION)
     set(CMAKE_CXX26_STANDARD_COMPILE_OPTION "/std:c++latest")
 endif()
 
+if(MSVC)
+    include(CheckIPOSupported)
+    check_ipo_supported(RESULT KOI_IPO_SUPPORTED OUTPUT KOI_IPO_ERROR LANGUAGES CXX)
+    if(KOI_IPO_SUPPORTED)
+        set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
+    else()
+        message(WARNING "Koi Engine Release IPO/LTO is unavailable: ${KOI_IPO_ERROR}")
+    endif()
+endif()
+
 include(CTest)
 enable_testing()
 
@@ -34,6 +44,8 @@ add_library(koi_core
     src/koi/position.cpp
     src/koi/search_service.cpp
     src/koi/search_ordering.cpp
+    src/koi/static_exchange.cpp
+    src/koi/strength_suite.cpp
     src/koi/time_manager.cpp
     src/koi/transposition_table.cpp
     src/koi/uci_controller.cpp
@@ -87,6 +99,22 @@ target_link_libraries(search_ordering_tests PRIVATE koi_core)
 
 add_test(NAME search_ordering_tests COMMAND search_ordering_tests)
 
+add_executable(static_exchange_tests
+    tests/static_exchange_tests.cpp
+)
+
+target_link_libraries(static_exchange_tests PRIVATE koi_core)
+
+add_test(NAME static_exchange_tests COMMAND static_exchange_tests)
+
+add_executable(koi_strength_tests
+    tests/koi_strength_tests.cpp
+)
+
+target_link_libraries(koi_strength_tests PRIVATE koi_core)
+
+add_test(NAME koi_strength_tests COMMAND koi_strength_tests)
+
 add_executable(perft_tests
     tests/perft_tests.cpp
 )
@@ -134,6 +162,15 @@ add_test(
 )
 
 set_tests_properties(koi_benchmark_process PROPERTIES TIMEOUT 30)
+
+add_test(
+    NAME koi_uci_match_process
+    COMMAND ${POWERSHELL_EXECUTABLE} -NoProfile -ExecutionPolicy Bypass -File
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/uci_match_process_test.ps1"
+            -EnginePath "$<TARGET_FILE:koi_engine>"
+)
+
+set_tests_properties(koi_uci_match_process PROPERTIES TIMEOUT 30)
 
 add_test(
     NAME windows_ci_configuration

@@ -1,7 +1,11 @@
 #include "koi/transposition_table.hpp"
 
 #include <algorithm>
+#include <array>
+#include <atomic>
 #include <limits>
+#include <mutex>
+#include <utility>
 
 namespace koi {
 namespace {
@@ -30,8 +34,23 @@ int score_for_probe(int score, int ply) noexcept {
 
 } // namespace
 
-TranspositionTable::TranspositionTable(std::size_t megabytes) {
-    set_size_mb(megabytes);
+struct TranspositionTable::Storage {
+    explicit Storage(std::size_t megabytes)
+        : entries(std::max<std::size_t>(1, (megabytes * 1024ULL * 1024ULL) /
+                                             sizeof(TranspositionEntry))),
+          size_mb(megabytes) {}
+
+    std::vector<TranspositionEntry> entries;
+    std::array<std::mutex, kStripeCount> stripes;
+    const std::size_t size_mb;
+    std::uint16_t generation = 1;
+};
+
+TranspositionTable::TranspositionTable(std::size_t megabytes)
+    : storage_(std::make_shared<Storage>(normalized_size_mb(megabytes))) {}
+
+std::shared_ptr<TranspositionTable::Storage> TranspositionTable::snapshot() const noexcept {
+    return std::atomic_load_explicit(&storage_, std::memory_order_acquire);
 }
 
 std::size_t TranspositionTable::normalized_size_mb(std::size_t megabytes) noexcept {
@@ -40,61 +59,80 @@ std::size_t TranspositionTable::normalized_size_mb(std::size_t megabytes) noexce
 
 void TranspositionTable::set_size_mb(std::size_t megabytes) {
     const std::size_t normalized = normalized_size_mb(megabytes);
-    const std::size_t entry_count = std::max<std::size_t>(1, (normalized * 1024ULL * 1024ULL) / sizeof(TranspositionEntry));
-    std::vector<TranspositionEntry> entries(entry_count);
-
-    std::lock_guard lock(mutex_);
-    entries_ = std::move(entries);
-    size_mb_ = normalized;
-    generation_ = 1;
+    auto replacement = std::make_shared<Storage>(normalized);
+    std::lock_guard lock(maintenance_mutex_);
+    std::atomic_store_explicit(&storage_, std::move(replacement), std::memory_order_release);
 }
 
 std::size_t TranspositionTable::size_mb() const noexcept {
-    std::lock_guard lock(mutex_);
-    return size_mb_;
+    const auto storage = snapshot();
+    return storage == nullptr ? 0 : storage->size_mb;
 }
 
 void TranspositionTable::clear() noexcept {
-    std::lock_guard lock(mutex_);
-    std::fill(entries_.begin(), entries_.end(), TranspositionEntry{});
+    std::lock_guard maintenance_lock(maintenance_mutex_);
+    const auto storage = snapshot();
+    if (storage == nullptr) {
+        return;
+    }
+
+    std::array<std::unique_lock<std::mutex>, kStripeCount> stripe_locks;
+    for (std::size_t index = 0; index < kStripeCount; ++index) {
+        stripe_locks[index] = std::unique_lock<std::mutex>(storage->stripes[index]);
+    }
+    std::fill(storage->entries.begin(), storage->entries.end(), TranspositionEntry{});
 }
 
 void TranspositionTable::new_generation() noexcept {
-    std::lock_guard lock(mutex_);
-    ++generation_;
-    if (generation_ == 0) {
-        generation_ = 1;
-        std::fill(entries_.begin(), entries_.end(), TranspositionEntry{});
+    std::lock_guard maintenance_lock(maintenance_mutex_);
+    const auto storage = snapshot();
+    if (storage == nullptr) {
+        return;
+    }
+
+    std::array<std::unique_lock<std::mutex>, kStripeCount> stripe_locks;
+    for (std::size_t index = 0; index < kStripeCount; ++index) {
+        stripe_locks[index] = std::unique_lock<std::mutex>(storage->stripes[index]);
+    }
+    ++storage->generation;
+    if (storage->generation == 0) {
+        storage->generation = 1;
+        std::fill(storage->entries.begin(), storage->entries.end(), TranspositionEntry{});
     }
 }
 
 void TranspositionTable::store(std::uint64_t key, int depth, int score, TranspositionBound bound, Move best_move,
                                int ply) noexcept {
-    std::lock_guard lock(mutex_);
-    if (entries_.empty()) {
+    const auto storage = snapshot();
+    if (storage == nullptr || storage->entries.empty()) {
         return;
     }
 
-    TranspositionEntry& existing = entries_[key % entries_.size()];
+    const std::size_t index = key % storage->entries.size();
+    std::lock_guard stripe_lock(storage->stripes[index % kStripeCount]);
+    TranspositionEntry& existing = storage->entries[index];
     const bool empty = !existing.occupied;
     const bool same_key = existing.key == key;
-    const bool older_generation = existing.generation != generation_;
+    const bool older_generation = existing.generation != storage->generation;
     const bool deeper = depth > existing.depth;
     const bool deterministic_tie_break = depth == existing.depth && key < existing.key;
     if (!empty && !same_key && !older_generation && !deeper && !deterministic_tie_break) {
         return;
     }
 
-    existing = TranspositionEntry{key, depth, score_for_storage(score, ply), bound, best_move, generation_, true};
+    existing = TranspositionEntry{key, depth, score_for_storage(score, ply), bound, best_move,
+                                  storage->generation, true};
 }
 
 std::optional<TranspositionEntry> TranspositionTable::probe(std::uint64_t key, int ply) const noexcept {
-    std::lock_guard lock(mutex_);
-    if (entries_.empty()) {
+    const auto storage = snapshot();
+    if (storage == nullptr || storage->entries.empty()) {
         return std::nullopt;
     }
 
-    const TranspositionEntry& entry = entries_[key % entries_.size()];
+    const std::size_t index = key % storage->entries.size();
+    std::lock_guard stripe_lock(storage->stripes[index % kStripeCount]);
+    const TranspositionEntry& entry = storage->entries[index];
     if (!entry.occupied || entry.key != key) {
         return std::nullopt;
     }

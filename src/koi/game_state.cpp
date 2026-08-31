@@ -1,8 +1,10 @@
 #include "koi/game_state.hpp"
 
 #include <array>
+#include <bit>
 #include <charconv>
 #include <cctype>
+#include <cstdlib>
 #include <limits>
 #include <utility>
 
@@ -178,12 +180,143 @@ PieceType koi_piece_type(chess::PieceType type) {
     return PieceType::none;
 }
 
+chess::PieceType native_promotion_type(Promotion promotion) noexcept {
+    switch (promotion) {
+    case Promotion::knight:
+        return chess::PieceType::KNIGHT;
+    case Promotion::bishop:
+        return chess::PieceType::BISHOP;
+    case Promotion::rook:
+        return chess::PieceType::ROOK;
+    case Promotion::queen:
+        return chess::PieceType::QUEEN;
+    case Promotion::none:
+        return chess::PieceType::NONE;
+    }
+    return chess::PieceType::NONE;
+}
+
+Promotion koi_promotion_type(chess::PieceType promotion) noexcept {
+    if (promotion == chess::PieceType::KNIGHT) return Promotion::knight;
+    if (promotion == chess::PieceType::BISHOP) return Promotion::bishop;
+    if (promotion == chess::PieceType::ROOK) return Promotion::rook;
+    if (promotion == chess::PieceType::QUEEN) return Promotion::queen;
+    return Promotion::none;
+}
+
+chess::Move native_move_for(const chess::Board& board, const Move& move) noexcept {
+    if (move.is_no_move() || move.from().index() == Square::kInvalid ||
+        move.to().index() == Square::kInvalid) {
+        return chess::Move{chess::Move::NO_MOVE};
+    }
+
+    const chess::Square source(move.from().index());
+    const chess::Square target(move.to().index());
+    const chess::Piece piece = board.at(source);
+    if (piece == chess::Piece::NONE) {
+        return chess::Move{chess::Move::NO_MOVE};
+    }
+
+    if (piece.type() == chess::PieceType::KING && source.rank() == target.rank() &&
+        std::abs(static_cast<int>(source.file()) - static_cast<int>(target.file())) == 2) {
+        const chess::File rook_file = target > source ? chess::File::FILE_H : chess::File::FILE_A;
+        return chess::Move::make<chess::Move::CASTLING>(source, chess::Square(rook_file, source.rank()));
+    }
+
+    if (piece.type() == chess::PieceType::PAWN && target == board.enpassantSq()) {
+        return chess::Move::make<chess::Move::ENPASSANT>(source, target);
+    }
+
+    if (move.promotion() != Promotion::none) {
+        if (piece.type() != chess::PieceType::PAWN ||
+            !chess::Square::back_rank(target, ~board.sideToMove())) {
+            return chess::Move{chess::Move::NO_MOVE};
+        }
+        return chess::Move::make<chess::Move::PROMOTION>(source, target,
+                                                         native_promotion_type(move.promotion()));
+    }
+
+    return chess::Move::make<chess::Move::NORMAL>(source, target);
+}
+
+chess::Move native_move_for_metadata(const MoveMetadata& metadata) noexcept {
+    const Move& move = metadata.move;
+    if (move.is_no_move() || move.from().index() == Square::kInvalid ||
+        move.to().index() == Square::kInvalid) {
+        return chess::Move{chess::Move::NO_MOVE};
+    }
+
+    const chess::Square source(move.from().index());
+    const chess::Square target(move.to().index());
+    switch (metadata.kind) {
+    case MoveKind::castling: {
+        const chess::File rook_file = target > source ? chess::File::FILE_H : chess::File::FILE_A;
+        return chess::Move::make<chess::Move::CASTLING>(source,
+                                                        chess::Square(rook_file, source.rank()));
+    }
+    case MoveKind::en_passant:
+        return chess::Move::make<chess::Move::ENPASSANT>(source, target);
+    case MoveKind::promotion:
+        if (metadata.moving_piece != PieceType::pawn) {
+            return chess::Move{chess::Move::NO_MOVE};
+        }
+        return chess::Move::make<chess::Move::PROMOTION>(source, target,
+                                                         native_promotion_type(move.promotion()));
+    case MoveKind::quiet:
+    case MoveKind::capture:
+        return chess::Move::make<chess::Move::NORMAL>(source, target);
+    }
+    return chess::Move{chess::Move::NO_MOVE};
+}
+
+Move koi_move_for(chess::Move move) noexcept {
+    if (move.move() == chess::Move::NO_MOVE) {
+        return Move::no_move();
+    }
+
+    const Square from = Square::from_index(move.from().index());
+    Square to = Square::from_index(move.to().index());
+    Promotion promotion = Promotion::none;
+    if (move.typeOf() == chess::Move::CASTLING) {
+        const std::uint8_t file = move.to() > move.from() ? 6 : 2;
+        to = Square::from_index(static_cast<std::uint8_t>(move.from().rank() * 8 + file));
+    } else if (move.typeOf() == chess::Move::PROMOTION) {
+        promotion = koi_promotion_type(move.promotionType());
+    }
+    return Move(from, to, promotion);
+}
+
+MoveMetadata metadata_for_native_move(const chess::Board& board, chess::Move native_move,
+                                      Move move, bool gives_check) noexcept {
+    const chess::Piece moving_piece = board.at(native_move.from());
+    MoveMetadata metadata;
+    metadata.move = move;
+    metadata.moving_piece = koi_piece_type(moving_piece.type());
+    metadata.captured_piece = koi_piece_type(board.getCapturing<chess::PieceType>(native_move));
+    if (native_move.typeOf() == chess::Move::CASTLING) {
+        metadata.kind = MoveKind::castling;
+    } else if (native_move.typeOf() == chess::Move::ENPASSANT) {
+        metadata.kind = MoveKind::en_passant;
+    } else if (native_move.typeOf() == chess::Move::PROMOTION) {
+        metadata.kind = MoveKind::promotion;
+    } else if (board.isCapture(native_move)) {
+        metadata.kind = MoveKind::capture;
+    }
+    metadata.gives_check = gives_check;
+    return metadata;
+}
+
 } // namespace
 
 class GameState::Impl {
 public:
+    struct HistoryRecord {
+        chess::Move move;
+        bool null_move = false;
+    };
+
     chess::Board board{};
-    std::vector<chess::Move> history;
+    std::vector<HistoryRecord> history;
 };
 
 GameState::GameState() : impl_(std::make_unique<Impl>()) {}
@@ -247,34 +380,237 @@ std::vector<Move> GameState::legal_moves() const {
 
     std::vector<Move> moves;
     moves.reserve(static_cast<std::size_t>(native_moves.size()));
+    // The native generator is already legal for normal game positions. If an
+    // externally supplied FEN has the opponent already in check, it can also
+    // expose a king-capture pseudo-move; sanitize only that invalid-position
+    // boundary instead of paying isLegal() for every move in every node.
+    const chess::Color side_to_move = impl_->board.sideToMove();
+    const bool sanitize_opponent_check =
+        chess::attacks::attackers(impl_->board, side_to_move,
+                                  impl_->board.kingSq(~side_to_move)).count() != 0;
     for (chess::Move native_move : native_moves) {
-        const auto move = Move::parse_uci(chess::uci::moveToUci(native_move));
-        if (move) {
-            moves.push_back(*move);
+        if (!sanitize_opponent_check || impl_->board.isLegal(native_move)) {
+            moves.push_back(koi_move_for(native_move));
         }
     }
     return moves;
+}
+
+std::vector<MoveMetadata> GameState::legal_moves_with_metadata() const {
+    MoveMetadataList fixed_moves;
+    legal_moves_with_metadata(fixed_moves);
+
+    std::vector<MoveMetadata> moves;
+    moves.reserve(fixed_moves.size());
+    for (const MoveMetadata& metadata : fixed_moves) {
+        moves.push_back(metadata);
+    }
+    return moves;
+}
+
+void GameState::legal_moves_with_metadata(MoveMetadataList& moves,
+                                          bool include_check_flags) const noexcept {
+    moves.clear();
+    chess::Movelist native_moves;
+    chess::movegen::legalmoves(native_moves, impl_->board);
+
+    const chess::Color side_to_move = impl_->board.sideToMove();
+    const bool sanitize_opponent_check =
+        chess::attacks::attackers(impl_->board, side_to_move,
+                                  impl_->board.kingSq(~side_to_move)).count() != 0;
+    for (chess::Move native_move : native_moves) {
+        if (sanitize_opponent_check && !impl_->board.isLegal(native_move)) {
+            continue;
+        }
+        const Move move = koi_move_for(native_move);
+        const bool gives_check = include_check_flags &&
+            impl_->board.givesCheck(native_move) != chess::CheckType::NO_CHECK;
+        if (!moves.push_back(metadata_for_native_move(impl_->board, native_move, move, gives_check))) {
+            break;
+        }
+    }
+}
+
+bool GameState::legal_tactical_moves_with_metadata(MoveMetadataList& moves) const noexcept {
+    moves.clear();
+
+    const chess::Color side_to_move = impl_->board.sideToMove();
+    const bool sanitize_opponent_check =
+        chess::attacks::attackers(impl_->board, side_to_move,
+                                  impl_->board.kingSq(~side_to_move)).count() != 0;
+    const bool checked = impl_->board.inCheck();
+    bool has_legal_move = false;
+
+    const auto append_if_legal = [&](chess::Move native_move, bool tactical_only) noexcept {
+        if (sanitize_opponent_check && !impl_->board.isLegal(native_move)) {
+            return;
+        }
+
+        has_legal_move = true;
+        if (tactical_only) {
+            const bool gives_check = impl_->board.givesCheck(native_move) != chess::CheckType::NO_CHECK;
+            if (native_move.typeOf() != chess::Move::PROMOTION &&
+                !impl_->board.isCapture(native_move) && !gives_check) {
+                return;
+            }
+            const Move move = koi_move_for(native_move);
+            (void)moves.push_back(metadata_for_native_move(impl_->board, native_move, move, gives_check));
+            return;
+        }
+
+        const Move move = koi_move_for(native_move);
+        const bool gives_check = impl_->board.givesCheck(native_move) != chess::CheckType::NO_CHECK;
+        (void)moves.push_back(metadata_for_native_move(impl_->board, native_move, move, gives_check));
+    };
+
+    if (checked) {
+        chess::Movelist evasions;
+        chess::movegen::legalmoves(evasions, impl_->board);
+        for (chess::Move native_move : evasions) {
+            append_if_legal(native_move, false);
+        }
+        return has_legal_move;
+    }
+
+    chess::Movelist captures;
+    chess::movegen::legalmoves<chess::movegen::MoveGenType::CAPTURE>(captures, impl_->board);
+    for (chess::Move native_move : captures) {
+        append_if_legal(native_move, true);
+    }
+
+    chess::Movelist quiet_moves;
+    chess::movegen::legalmoves<chess::movegen::MoveGenType::QUIET>(quiet_moves, impl_->board);
+    for (chess::Move native_move : quiet_moves) {
+        append_if_legal(native_move, true);
+    }
+
+    return has_legal_move;
+}
+
+std::optional<MoveMetadata> GameState::describe_move(const Move& move) const noexcept {
+    if (move.is_no_move()) {
+        return std::nullopt;
+    }
+
+    const chess::Move native_move = native_move_for(impl_->board, move);
+    if (native_move.move() == chess::Move::NO_MOVE || !impl_->board.isLegal(native_move)) {
+        return std::nullopt;
+    }
+    const bool gives_check = impl_->board.givesCheck(native_move) != chess::CheckType::NO_CHECK;
+    return metadata_for_native_move(impl_->board, native_move, move, gives_check);
+}
+
+PositionFeatures GameState::position_features() const noexcept {
+    PositionFeatures features;
+    features.side_to_move = side_to_move();
+    std::array<std::uint64_t, 2> attacks{};
+    const chess::Bitboard occupied = impl_->board.occ();
+    for (std::uint8_t index = 0; index < 64; ++index) {
+        const chess::Piece piece = impl_->board.at(chess::Square(index));
+        if (piece == chess::Piece::NONE) {
+            continue;
+        }
+
+        features.board[index] = {koi_piece_type(piece.type()), koi_color(piece.color())};
+        const chess::Square square(index);
+        const std::size_t color_index = piece.color() == chess::Color::WHITE ? 0 : 1;
+        if (piece.type() == chess::PieceType::PAWN) {
+            features.pawn_file_masks[color_index] = static_cast<std::uint8_t>(
+                features.pawn_file_masks[color_index] | (std::uint8_t{1} << square.file()));
+        }
+        switch (static_cast<int>(piece.type())) {
+        case static_cast<int>(chess::PieceType::KNIGHT):
+        case static_cast<int>(chess::PieceType::BISHOP):
+            features.game_phase = static_cast<std::uint8_t>(features.game_phase + 1);
+            break;
+        case static_cast<int>(chess::PieceType::ROOK):
+            features.game_phase = static_cast<std::uint8_t>(features.game_phase + 2);
+            break;
+        case static_cast<int>(chess::PieceType::QUEEN):
+            features.game_phase = static_cast<std::uint8_t>(features.game_phase + 4);
+            break;
+        default:
+            break;
+        }
+
+        chess::Bitboard piece_attacks;
+        switch (static_cast<int>(piece.type())) {
+        case static_cast<int>(chess::PieceType::PAWN):
+            piece_attacks = chess::attacks::pawn(piece.color(), square);
+            break;
+        case static_cast<int>(chess::PieceType::KNIGHT):
+            piece_attacks = chess::attacks::knight(square);
+            break;
+        case static_cast<int>(chess::PieceType::BISHOP):
+            piece_attacks = chess::attacks::bishop(square, occupied);
+            break;
+        case static_cast<int>(chess::PieceType::ROOK):
+            piece_attacks = chess::attacks::rook(square, occupied);
+            break;
+        case static_cast<int>(chess::PieceType::QUEEN):
+            piece_attacks = chess::attacks::queen(square, occupied);
+            break;
+        case static_cast<int>(chess::PieceType::KING):
+            piece_attacks = chess::attacks::king(square);
+            break;
+        case static_cast<int>(chess::PieceType::NONE):
+            continue;
+        }
+        attacks[color_index] |= piece_attacks.getBits();
+    }
+
+    features.game_phase = std::min<std::uint8_t>(features.game_phase, 24);
+
+    const chess::Color colors[] = {chess::Color::WHITE, chess::Color::BLACK};
+    for (std::size_t color_index = 0; color_index < 2; ++color_index) {
+        const chess::Color color = colors[color_index];
+        features.attacked_squares[color_index] = attacks[color_index];
+        const std::uint64_t own = impl_->board.us(color).getBits();
+        features.mobility[color_index] = static_cast<std::uint16_t>(
+            std::popcount(attacks[color_index] & ~own));
+        features.king_squares[color_index] = Square::from_index(
+            static_cast<std::uint8_t>(impl_->board.kingSq(color).index()));
+    }
+    return features;
 }
 
 bool GameState::is_legal(const Move& move) const noexcept {
     if (move.is_no_move()) {
         return false;
     }
+    const chess::Move native_move = native_move_for(impl_->board, move);
+    return native_move.move() != chess::Move::NO_MOVE && impl_->board.isLegal(native_move);
+}
+
+bool GameState::make_move(const Move& move) noexcept {
+    const chess::Move native_move = native_move_for(impl_->board, move);
+    if (native_move.move() == chess::Move::NO_MOVE) {
+        return false;
+    }
+    if (!impl_->board.isLegal(native_move)) {
+        return false;
+    }
     try {
-        const chess::Move native_move = chess::uci::uciToMove(impl_->board, move.uci());
-        return native_move.move() != chess::Move::NO_MOVE && impl_->board.isLegal(native_move);
+        impl_->history.push_back(Impl::HistoryRecord{native_move, false});
+        try {
+            impl_->board.makeMove(native_move);
+        } catch (...) {
+            impl_->history.pop_back();
+            return false;
+        }
+        return true;
     } catch (...) {
         return false;
     }
 }
 
-bool GameState::make_move(const Move& move) noexcept {
-    if (!is_legal(move)) {
+bool GameState::make_legal_move(const MoveMetadata& metadata) noexcept {
+    const chess::Move native_move = native_move_for_metadata(metadata);
+    if (native_move.move() == chess::Move::NO_MOVE) {
         return false;
     }
     try {
-        const chess::Move native_move = chess::uci::uciToMove(impl_->board, move.uci());
-        impl_->history.push_back(native_move);
+        impl_->history.push_back(Impl::HistoryRecord{native_move, false});
         try {
             impl_->board.makeMove(native_move);
         } catch (...) {
@@ -291,7 +627,36 @@ bool GameState::unmake_move() noexcept {
     if (impl_->history.empty()) {
         return false;
     }
-    impl_->board.unmakeMove(impl_->history.back());
+    const Impl::HistoryRecord record = impl_->history.back();
+    if (record.null_move) {
+        return false;
+    }
+    impl_->board.unmakeMove(record.move);
+    impl_->history.pop_back();
+    return true;
+}
+
+bool GameState::make_null_move() noexcept {
+    try {
+        impl_->history.push_back(Impl::HistoryRecord{
+            chess::Move{chess::Move::NULL_MOVE}, true});
+        try {
+            impl_->board.makeNullMove();
+        } catch (...) {
+            impl_->history.pop_back();
+            return false;
+        }
+        return true;
+    } catch (...) {
+        return false;
+    }
+}
+
+bool GameState::unmake_null_move() noexcept {
+    if (impl_->history.empty() || !impl_->history.back().null_move) {
+        return false;
+    }
+    impl_->board.unmakeNullMove();
     impl_->history.pop_back();
     return true;
 }
@@ -300,13 +665,9 @@ bool GameState::is_capture(const Move& move) const noexcept {
     if (move.is_no_move()) {
         return false;
     }
-    try {
-        const chess::Move native_move = chess::uci::uciToMove(impl_->board, move.uci());
-        return native_move.move() != chess::Move::NO_MOVE && impl_->board.isLegal(native_move) &&
-               impl_->board.isCapture(native_move);
-    } catch (...) {
-        return false;
-    }
+    const chess::Move native_move = native_move_for(impl_->board, move);
+    return native_move.move() != chess::Move::NO_MOVE && impl_->board.isLegal(native_move) &&
+           impl_->board.isCapture(native_move);
 }
 
 bool GameState::in_check() const noexcept {
@@ -316,6 +677,19 @@ bool GameState::in_check() const noexcept {
 bool GameState::in_check(Color color) const noexcept {
     const chess::Color native = native_color(color);
     return chess::attacks::attackers(impl_->board, ~native, impl_->board.kingSq(native)).count() != 0;
+}
+
+bool GameState::has_non_pawn_material(Color color) const noexcept {
+    const chess::Color native = native_color(color);
+    const std::uint64_t non_pawn = impl_->board.us(native).getBits() &
+        ~(impl_->board.pieces(chess::PieceType::PAWN, native).getBits() |
+          impl_->board.pieces(chess::PieceType::KING, native).getBits());
+    return non_pawn != 0;
+}
+
+bool GameState::is_draw_by_rule() const noexcept {
+    return impl_->board.isHalfMoveDraw() || impl_->board.isInsufficientMaterial() ||
+        impl_->board.isRepetition();
 }
 
 bool GameState::is_terminal() const noexcept {
