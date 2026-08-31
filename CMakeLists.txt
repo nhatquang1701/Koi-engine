@@ -26,10 +26,15 @@ include(CTest)
 enable_testing()
 
 add_library(koi_core
+    src/koi/classical_evaluator.cpp
     src/koi/game_state.cpp
     src/koi/move.cpp
     src/koi/move_chooser.cpp
+    src/koi/perft.cpp
     src/koi/position.cpp
+    src/koi/search_service.cpp
+    src/koi/time_manager.cpp
+    src/koi/transposition_table.cpp
     src/koi/uci_controller.cpp
 )
 
@@ -64,6 +69,28 @@ add_executable(uci_controller_tests
 target_link_libraries(uci_controller_tests PRIVATE koi_core)
 
 add_test(NAME uci_controller_tests COMMAND uci_controller_tests)
+
+add_executable(koi_search_tests
+    tests/koi_search_tests.cpp
+)
+
+target_link_libraries(koi_search_tests PRIVATE koi_core)
+
+add_test(NAME koi_search_tests COMMAND koi_search_tests)
+
+add_executable(perft_tests
+    tests/perft_tests.cpp
+)
+
+target_link_libraries(perft_tests PRIVATE koi_core)
+
+add_test(NAME perft_tests COMMAND perft_tests)
+
+add_executable(koi_perft
+    tools/perft.cpp
+)
+
+target_link_libraries(koi_perft PRIVATE koi_core)
 
 add_executable(koi_engine
     src/main.cpp
