@@ -57,7 +57,11 @@ function Assert-BenchmarkOutput($Result) {
             throw "koi-bench must not emit UCI protocol output: $line"
         }
     }
-    foreach ($line in $lines[1..($lines.Count - 1)]) {
+    $positionLines = @($lines | Where-Object { $_ -like 'position *' })
+    if ($positionLines.Count -eq 0) {
+        throw "koi-bench did not emit any position rows: $($Result.Stdout)"
+    }
+    foreach ($line in $positionLines) {
         if ($line -notmatch '^position [a-z0-9_-]+ depth [1-9][0-9]* nodes [0-9]+ qnodes [0-9]+ tt_hits [0-9]+ score -?[0-9]+ expected ([a-h][1-8][a-h][1-8][nbrq]?) move ([a-h][1-8][a-h][1-8][nbrq]?|0000) match [01]$') {
             throw "koi-bench emitted an invalid benchmark result: $line"
         }
@@ -93,25 +97,35 @@ foreach ($line in $timedLines[2..($timedLines.Count - 1)]) {
 }
 
 $coldProfile = Join-Path $env:TEMP 'koi-bench-cold-profile.json'
+$coldReplayProfile = Join-Path $env:TEMP 'koi-bench-cold-replay-profile.json'
 $warmProfile = Join-Path $env:TEMP 'koi-bench-warm-profile.json'
 $timedProfile = Join-Path $env:TEMP 'koi-bench-timed-profile.json'
-Remove-Item -LiteralPath $coldProfile, $warmProfile, $timedProfile -ErrorAction SilentlyContinue
+$optionalProfile = Join-Path $env:TEMP 'koi-bench-optional-profile.json'
+Remove-Item -LiteralPath $coldProfile, $coldReplayProfile, $warmProfile, $timedProfile, $optionalProfile -ErrorAction SilentlyContinue
 $cold = Invoke-Benchmark $BenchPath "--profile-json `"$coldProfile`""
+$coldReplay = Invoke-Benchmark $BenchPath "--profile-json `"$coldReplayProfile`""
 $warm = Invoke-Benchmark $BenchPath "--warm-hash --profile-json `"$warmProfile`""
 $timedProfileRun = Invoke-Benchmark $BenchPath "--timed --profile-json `"$timedProfile`""
-foreach ($profileRun in @($cold, $warm, $timedProfileRun)) {
+foreach ($profileRun in @($cold, $coldReplay, $warm, $timedProfileRun)) {
     if ($profileRun.ExitCode -ne 0 -or $profileRun.Stderr.Length -ne 0) {
         throw "profiled koi-bench run failed: $($profileRun.Stderr)"
     }
 }
-foreach ($profilePath in @($coldProfile, $warmProfile, $timedProfile)) {
+foreach ($profilePath in @($coldProfile, $coldReplayProfile, $warmProfile, $timedProfile)) {
     if (-not (Test-Path -LiteralPath $profilePath -PathType Leaf)) {
         throw "koi-bench did not write profile JSON: $profilePath"
     }
 }
 $coldJson = Get-Content -LiteralPath $coldProfile -Raw | ConvertFrom-Json
+$coldReplayText = Get-Content -LiteralPath $coldReplayProfile -Raw
 $warmJson = Get-Content -LiteralPath $warmProfile -Raw | ConvertFrom-Json
 $timedJson = Get-Content -LiteralPath $timedProfile -Raw | ConvertFrom-Json
+if ((Get-Content -LiteralPath $coldProfile -Raw) -cne $coldReplayText) {
+    throw 'untimed profile JSON must be byte-identical across repeated runs.'
+}
+if ($coldJson.build -cne 'Koi Engine 1.0') {
+    throw "untimed profile JSON must expose a stable build identity, got: $($coldJson.build)"
+}
 if ($warm.Stdout -notmatch '(?m)^config threads 1 speed 100 timed 0 warm_hash 1\r?$') {
     throw "--warm-hash must mark the normal deterministic text report: $($warm.Stdout)"
 }
@@ -133,6 +147,9 @@ foreach ($position in $coldJson.positions) {
     if ($null -ne $position.elapsed_ms) {
         throw 'untimed profile JSON must not include elapsed wall-clock data.'
     }
+    if ([uint64]$position.nps -ne 0) {
+        throw 'untimed profile JSON must mark NPS as unmeasured.'
+    }
 }
 if (-not @($coldJson.positions | Where-Object { $_.pv.Count -gt 1 })) {
     throw 'profile JSON must retain at least one completed multi-move principal variation.'
@@ -150,4 +167,19 @@ foreach ($position in $timedJson.positions) {
     if ([uint64]$position.nps -ne $expectedNps) {
         throw "timed profile NPS must use elapsed_ms: expected $expectedNps, got $($position.nps)"
     }
+}
+
+$optional = Invoke-Benchmark $BenchPath "--optional --profile-json `"$optionalProfile`""
+Assert-BenchmarkOutput $optional
+if (-not (Test-Path -LiteralPath $optionalProfile -PathType Leaf)) {
+    throw "koi-bench did not write the optional profile JSON: $optionalProfile"
+}
+$optionalJson = Get-Content -LiteralPath $optionalProfile -Raw | ConvertFrom-Json
+if ($optionalJson.suite -cne 'optional_strength' -or $optionalJson.positions.Count -ne 128) {
+    throw 'the optional benchmark profile must identify and contain all 128 optional strength positions.'
+}
+$optionalRows = @($optional.Stdout -split "`r?`n" | Where-Object { $_ -like 'position *' })
+if ($optional.Stdout -notmatch '(?m)^config threads 1 speed 100 timed 0 suite optional_strength\r?$' -or
+    $optionalRows.Count -ne 128) {
+    throw "the optional benchmark text report must identify its suite and report 128 positions: $($optional.Stdout)"
 }

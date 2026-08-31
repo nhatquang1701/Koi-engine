@@ -23,6 +23,7 @@ if(MSVC AND NOT DEFINED CMAKE_CXX26_STANDARD_COMPILE_OPTION)
 endif()
 
 if(MSVC)
+    add_compile_options(/permissive-)
     include(CheckIPOSupported)
     check_ipo_supported(RESULT KOI_IPO_SUPPORTED OUTPUT KOI_IPO_ERROR LANGUAGES CXX)
     if(KOI_IPO_SUPPORTED)
@@ -57,6 +58,10 @@ target_include_directories(koi_core PUBLIC
 
 target_include_directories(koi_core PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/chess-library
+)
+
+target_compile_definitions(koi_core PUBLIC
+    KOI_ENGINE_BUILD_VERSION="${PROJECT_VERSION}"
 )
 
 add_executable(koi_core_tests
@@ -183,7 +188,7 @@ add_test(
             -BenchPath "$<TARGET_FILE_DIR:koi_engine>/koi-bench.exe"
 )
 
-set_tests_properties(koi_benchmark_process PROPERTIES TIMEOUT 30)
+set_tests_properties(koi_benchmark_process PROPERTIES TIMEOUT 60)
 
 add_test(
     NAME koi_uci_match_process

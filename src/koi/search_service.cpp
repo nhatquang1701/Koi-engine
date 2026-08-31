@@ -444,7 +444,7 @@ struct SearchContext {
 struct RootLine {
     bool completed = false;
     int score = -kInfinity;
-    std::size_t original_index = 0;
+    std::size_t stable_index = 0;
     PrincipalVariation pv;
 };
 
@@ -452,7 +452,7 @@ class RootWorkerPool {
 public:
     RootWorkerPool(std::size_t worker_count, const Evaluator& evaluator, TranspositionTable& table,
                    TimeManager& time_manager, std::atomic_bool& stop_requested,
-                   std::atomic<std::uint64_t>& global_nodes, std::mutex* evaluator_mutex)
+                   std::atomic<std::uint64_t>* global_nodes, std::mutex* evaluator_mutex)
         : worker_count_(std::max<std::size_t>(1, worker_count)), evaluator_(evaluator), table_(table),
           time_manager_(time_manager), stop_requested_(stop_requested), global_nodes_(global_nodes),
           evaluator_mutex_(evaluator_mutex), worker_stats_(worker_count_) {
@@ -475,7 +475,7 @@ public:
     }
 
     void run(const GameState& root, const MoveMetadataList& root_moves, int depth,
-             int alpha, int beta, const std::vector<std::size_t>& original_root_indices,
+             int alpha, int beta, const std::vector<std::size_t>& stable_root_indices,
              std::vector<RootLine>& lines,
              SearchStats& stats, bool& aborted) {
         auto job = std::make_shared<Job>();
@@ -484,9 +484,13 @@ public:
         job->depth = depth;
         job->alpha = alpha;
         job->beta = beta;
-        job->original_root_indices = &original_root_indices;
+        job->stable_root_indices = &stable_root_indices;
         job->lines = &lines;
         job->worker_stats = &worker_stats_;
+        // Complete the stable PV/root prefix before sharing the remaining roots. This lets
+        // the preferred root warm the transposition table for the parallel remainder.
+        job->priority_root_count = std::min<std::size_t>(1, root_moves.size());
+        job->next_move.store(job->priority_root_count, std::memory_order_relaxed);
 
         {
             std::lock_guard lock(mutex_);
@@ -517,16 +521,18 @@ private:
         int depth = 0;
         int alpha = -kInfinity;
         int beta = kInfinity;
-        const std::vector<std::size_t>* original_root_indices = nullptr;
+        const std::vector<std::size_t>* stable_root_indices = nullptr;
         std::vector<RootLine>* lines = nullptr;
         std::vector<SearchStats>* worker_stats = nullptr;
+        std::size_t priority_root_count = 0;
         std::atomic<std::size_t> next_move = 0;
         std::atomic_bool aborted = false;
+        std::atomic_bool priority_ready = false;
         std::uint64_t sequence = 0;
     };
 
     void worker_loop(std::size_t worker_index) {
-        SearchContext context(evaluator_, table_, time_manager_, stop_requested_, &global_nodes_,
+        SearchContext context(evaluator_, table_, time_manager_, stop_requested_, global_nodes_,
                               evaluator_mutex_);
         std::uint64_t seen_sequence = 0;
 
@@ -545,18 +551,13 @@ private:
 
             seen_sequence = job->sequence;
             context.begin_iteration(&job->aborted);
-            while (!job->aborted.load(std::memory_order_relaxed) &&
-                   !stop_requested_.load(std::memory_order_relaxed)) {
-                const std::size_t move_index = job->next_move.fetch_add(1, std::memory_order_relaxed);
-                if (move_index >= job->root_moves->size()) {
-                    break;
-                }
 
+            const auto search_root = [&context, &job](std::size_t move_index) {
                 const MoveMetadata& root_move = (*job->root_moves)[move_index];
                 try {
                     GameState child = *job->root;
                     if (!child.make_legal_move(root_move)) {
-                        continue;
+                        return;
                     }
 
                     PrincipalVariation child_pv;
@@ -564,19 +565,47 @@ private:
                                                        -job->beta, -job->alpha, 1, child_pv);
                     if (context.aborted) {
                         job->aborted.store(true, std::memory_order_relaxed);
-                        break;
+                        return;
                     }
 
                     RootLine& line = (*job->lines)[move_index];
                     line.score = score;
-                    line.original_index = (*job->original_root_indices)[move_index];
+                    line.stable_index = (*job->stable_root_indices)[move_index];
                     line.pv.prepend(root_move.move, child_pv);
                     line.completed = true;
                 } catch (...) {
                     context.request_abort();
                     job->aborted.store(true, std::memory_order_relaxed);
+                }
+            };
+
+            if (worker_index == 0) {
+                for (std::size_t move_index = 0; move_index < job->priority_root_count; ++move_index) {
+                    if (job->aborted.load(std::memory_order_relaxed) ||
+                        stop_requested_.load(std::memory_order_relaxed)) {
+                        break;
+                    }
+                    search_root(move_index);
+                }
+                job->priority_ready.store(true, std::memory_order_release);
+                work_available_.notify_all();
+            } else {
+                std::unique_lock lock(mutex_);
+                work_available_.wait(lock, [this, job] {
+                    return stopping_ || job->priority_ready.load(std::memory_order_acquire);
+                });
+                if (stopping_) {
+                    return;
+                }
+            }
+
+            while (!job->aborted.load(std::memory_order_relaxed) &&
+                   !stop_requested_.load(std::memory_order_relaxed)) {
+                const std::size_t move_index = job->next_move.fetch_add(1, std::memory_order_relaxed);
+                if (move_index >= job->root_moves->size()) {
                     break;
                 }
+                search_root(move_index);
             }
 
             (*job->worker_stats)[worker_index] = context.stats;
@@ -606,7 +635,7 @@ private:
     TranspositionTable& table_;
     TimeManager& time_manager_;
     std::atomic_bool& stop_requested_;
-    std::atomic<std::uint64_t>& global_nodes_;
+    std::atomic<std::uint64_t>* global_nodes_;
     std::mutex* evaluator_mutex_;
     std::vector<std::thread> workers_;
     std::vector<SearchStats> worker_stats_;
@@ -631,7 +660,7 @@ std::vector<std::size_t> rank_root_lines(const std::vector<RootLine>& lines) {
         if (lines[left].score != lines[right].score) {
             return lines[left].score > lines[right].score;
         }
-        return lines[left].original_index < lines[right].original_index;
+        return lines[left].stable_index < lines[right].stable_index;
     });
     return ranked;
 }
@@ -746,7 +775,6 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
         SearchResult result;
         MoveMetadataList legal_moves;
         root.legal_moves_with_metadata(legal_moves);
-        const MoveMetadataList generated_legal_moves = legal_moves;
         if (limits.search_moves_specified) {
             MoveMetadataList filtered_moves;
             for (const MoveMetadata& metadata : legal_moves) {
@@ -835,15 +863,17 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
             result.stats = context.stats;
         } else {
             std::atomic<std::uint64_t> global_nodes = 0;
+            std::atomic<std::uint64_t>* global_nodes_ptr = time_manager.node_limit().has_value() ?
+                &global_nodes : nullptr;
             const std::size_t worker_count = std::min(options.threads, legal_moves.size());
             RootWorkerPool pool(worker_count, *evaluator, *table, time_manager,
-                                state->stop_requested, global_nodes, evaluator_mutex_ptr);
+                                state->stop_requested, global_nodes_ptr, evaluator_mutex_ptr);
             detail::SearchMoveOrdering root_ordering;
             root_ordering.order(root, legal_moves, std::nullopt, 0);
 
             SearchStats total_stats;
             SearchContext root_context(*evaluator, *table, time_manager, state->stop_requested,
-                                       &global_nodes, evaluator_mutex_ptr);
+                                       global_nodes_ptr, evaluator_mutex_ptr);
             const bool multi_pv = options.multi_pv > 1;
             const int maximum_depth =
                 std::min(kMaximumSearchDepth, std::max(1, limits.depth.value_or(kMaximumSearchDepth)));
@@ -854,7 +884,7 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                     break;
                 }
                 if (state->stop_requested.load(std::memory_order_relaxed) ||
-                    time_manager.should_stop(global_nodes.load(std::memory_order_relaxed))) {
+                    time_manager.should_stop(root_context.visited_nodes())) {
                     break;
                 }
 
@@ -872,16 +902,10 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                     }
                 }
                 root_ordering.order(root, legal_moves, tt_move, 0);
-                std::vector<std::size_t> original_root_indices;
-                original_root_indices.reserve(legal_moves.size());
-                for (const MoveMetadata& metadata : legal_moves) {
-                    const auto original = std::find_if(
-                        generated_legal_moves.begin(), generated_legal_moves.end(),
-                        [&metadata](const MoveMetadata& candidate) {
-                            return candidate.move == metadata.move;
-                        });
-                    original_root_indices.push_back(static_cast<std::size_t>(
-                        std::distance(generated_legal_moves.begin(), original)));
+                std::vector<std::size_t> stable_root_indices;
+                stable_root_indices.reserve(legal_moves.size());
+                for (std::size_t index = 0; index < legal_moves.size(); ++index) {
+                    stable_root_indices.push_back(index);
                 }
 
                 std::vector<RootLine> lines(legal_moves.size());
@@ -894,7 +918,7 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
 
                 SearchStats iteration_stats;
                 bool aborted = false;
-                pool.run(root, legal_moves, depth, alpha, beta, original_root_indices,
+                pool.run(root, legal_moves, depth, alpha, beta, stable_root_indices,
                          lines, iteration_stats, aborted);
                 accumulate_stats(iteration_stats, root_context.stats);
 
@@ -914,7 +938,7 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                         SearchStats research_stats;
                         bool research_aborted = false;
                         pool.run(root, legal_moves, depth, -kInfinity, kInfinity,
-                                 original_root_indices, lines, research_stats, research_aborted);
+                                 stable_root_indices, lines, research_stats, research_aborted);
                         accumulate_stats(iteration_stats, research_stats);
                         aborted = research_aborted;
                     }

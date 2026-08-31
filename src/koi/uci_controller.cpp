@@ -380,6 +380,17 @@ void UciController::handle_go(std::istream& command) {
     std::string arguments;
     std::getline(command, arguments);
     SearchLimits limits = uci::parse_go_limits(arguments);
+
+    const bool has_explicit_limit = limits.depth.has_value() || limits.nodes.has_value() ||
+        limits.movetime.has_value() || limits.infinite || limits.ponder;
+    const bool has_side_to_move_clock = position_.side_to_move() == Color::white ?
+        limits.white_clock.has_value() : limits.black_clock.has_value();
+    if (!has_explicit_limit && !has_side_to_move_clock) {
+        // A malformed or asymmetric clock command must still complete. The
+        // TimeManager intentionally leaves a clock for the other side unset;
+        // the controller supplies the same bounded fallback as bare `go`.
+        limits.movetime = std::chrono::milliseconds{250};
+    }
     stop_and_suppress_active_search();
 
     if (limits.ponder) {
@@ -405,15 +416,18 @@ void UciController::handle_ponderhit() {
     }
 
     stop_and_suppress_active_search();
-    if (!root.has_value() || !limits.has_value() || !expected_move.has_value() ||
-        !root->make_move(*expected_move)) {
+    if (!root.has_value() || !limits.has_value()) {
         return;
+    }
+    if (expected_move.has_value() && root->is_legal(*expected_move)) {
+        (void)root->make_move(*expected_move);
     }
 
     limits->ponder = false;
+    const bool has_side_to_move_clock = root->side_to_move() == Color::white ?
+        limits->white_clock.has_value() : limits->black_clock.has_value();
     const bool has_normal_limit = limits->depth.has_value() || limits->nodes.has_value() ||
-        limits->movetime.has_value() || limits->white_clock.has_value() ||
-        limits->black_clock.has_value() || limits->infinite;
+        limits->movetime.has_value() || has_side_to_move_clock || limits->infinite;
     if (!has_normal_limit) {
         limits->movetime = std::chrono::milliseconds{250};
     }

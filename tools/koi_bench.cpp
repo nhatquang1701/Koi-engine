@@ -6,6 +6,7 @@
 #include <iostream>
 #include <memory>
 #include <optional>
+#include <span>
 #include <stdexcept>
 #include <string_view>
 #include <utility>
@@ -15,6 +16,10 @@
 #include "koi/search_service.hpp"
 #include "koi/strength_suite.hpp"
 
+#ifndef KOI_ENGINE_BUILD_VERSION
+#define KOI_ENGINE_BUILD_VERSION "1.0"
+#endif
+
 namespace {
 
 struct BenchmarkConfig {
@@ -22,8 +27,13 @@ struct BenchmarkConfig {
     std::uint8_t speed_percent = 100;
     bool timed = false;
     bool warm_hash = false;
+    bool optional = false;
     std::optional<std::string> profile_json_path;
 };
+
+constexpr std::string_view suite_name(const BenchmarkConfig& config) noexcept {
+    return config.optional ? "optional_strength" : "strength";
+}
 
 struct BenchmarkRun {
     koi::SearchResult result;
@@ -51,6 +61,10 @@ std::optional<BenchmarkConfig> parse_arguments(int argc, char** argv) {
         }
         if (argument == "--warm-hash") {
             config.warm_hash = true;
+            continue;
+        }
+        if (argument == "--optional") {
+            config.optional = true;
             continue;
         }
         if (argument == "--profile-json") {
@@ -143,8 +157,8 @@ void write_profile_json(const std::string& path, const BenchmarkConfig& config,
 
     output << "{\n  \"schema\": \"koi-bench-profile-v1\",\n"
            << "  \"engine\": \"Koi Engine\",\n"
-           << "  \"build\": \"unknown\",\n"
-           << "  \"suite\": \"strength\",\n"
+           << "  \"build\": \"Koi Engine " KOI_ENGINE_BUILD_VERSION "\",\n"
+           << "  \"suite\": \"" << suite_name(config) << "\",\n"
            << "  \"warm_hash\": " << (config.warm_hash ? "true" : "false") << ",\n"
            << "  \"hash_mb\": 16,\n"
            << "  \"threads\": " << config.threads << ",\n"
@@ -154,8 +168,9 @@ void write_profile_json(const std::string& path, const BenchmarkConfig& config,
         const auto& [benchmark, run] = runs[index];
         const koi::SearchResult& result = run.result;
         const std::uint64_t visited = result.stats.nodes + result.stats.qnodes;
-        const std::uint64_t elapsed = static_cast<std::uint64_t>(
-            (config.timed ? run.wall_time : result.stats.elapsed).count());
+        const std::uint64_t elapsed = static_cast<std::uint64_t>(run.wall_time.count());
+        const std::uint64_t nps = config.timed ?
+            (elapsed > 0 ? visited * 1000 / elapsed : visited) : 0;
         output << "    {\"id\": ";
         write_json_string(output, benchmark.name);
         output << ", \"fen\": ";
@@ -175,18 +190,18 @@ void write_profile_json(const std::string& path, const BenchmarkConfig& config,
             write_json_string(output, result.best_move->uci());
         }
         output << "], \"nodes\": " << result.stats.nodes
-               << ", \"qnodes\": " << result.stats.qnodes
-               << ", \"tt_hits\": " << result.stats.tt_hits
+                << ", \"qnodes\": " << result.stats.qnodes
+                << ", \"tt_hits\": " << result.stats.tt_hits
                << ", \"pruning\": {\"pvs_searches\": " << result.stats.pvs_searches
                << ", \"pvs_researches\": " << result.stats.pvs_researches
                << ", \"aspiration_researches\": " << result.stats.aspiration_researches
                << ", \"check_extensions\": " << result.stats.check_extensions
                << ", \"qchecks\": " << result.stats.qchecks
                << ", \"see_prunes\": " << result.stats.see_prunes
-               << ", \"delta_prunes\": " << result.stats.delta_prunes
-               << ", \"null_cutoffs\": " << result.stats.null_cutoffs
-               << ", \"lmr_reductions\": " << result.stats.lmr_reductions
-               << "}, \"nps\": " << (elapsed > 0 ? visited * 1000 / elapsed : visited);
+                << ", \"delta_prunes\": " << result.stats.delta_prunes
+                << ", \"null_cutoffs\": " << result.stats.null_cutoffs
+                << ", \"lmr_reductions\": " << result.stats.lmr_reductions
+                << "}, \"nps\": " << nps;
         if (config.timed) {
             output << ", \"elapsed_ms\": " << run.wall_time.count();
         }
@@ -203,30 +218,36 @@ void write_profile_json(const std::string& path, const BenchmarkConfig& config,
 int main(int argc, char** argv) {
     const auto config = parse_arguments(argc, argv);
     if (!config.has_value()) {
-        std::cerr << "usage: koi-bench [--threads N] [--speed 1-100] [--timed] [--warm-hash] [--profile-json path]\n";
+        std::cerr << "usage: koi-bench [--threads N] [--speed 1-100] [--timed] [--warm-hash] [--optional] [--profile-json path]\n";
         return 2;
     }
 
     try {
         std::cout << "Koi benchmark\n";
-        if (config->threads != 1 || config->speed_percent != 100 || config->timed || config->warm_hash) {
+        if (config->threads != 1 || config->speed_percent != 100 || config->timed || config->warm_hash ||
+            config->optional) {
             std::cout << "config threads " << config->threads
                       << " speed " << static_cast<unsigned>(config->speed_percent)
                       << " timed " << (config->timed ? 1 : 0);
             if (config->warm_hash) {
                 std::cout << " warm_hash 1";
             }
+            if (config->optional) {
+                std::cout << " suite " << suite_name(*config);
+            }
             std::cout << '\n';
         }
+        const std::span<const koi::StrengthPosition> benchmarks = config->optional ?
+            koi::optional_strength_positions() : koi::strength_positions();
         std::vector<std::pair<koi::StrengthPosition, BenchmarkRun>> profile_runs;
         if (config->profile_json_path.has_value()) {
-            profile_runs.reserve(koi::strength_positions().size());
+            profile_runs.reserve(benchmarks.size());
         }
         std::optional<koi::SearchService> warm_service;
         if (config->warm_hash) {
             warm_service.emplace(std::make_shared<koi::ClassicalEvaluator>());
         }
-        for (const koi::StrengthPosition& benchmark : koi::strength_positions()) {
+        for (const koi::StrengthPosition& benchmark : benchmarks) {
             koi::SearchService cold_service(std::make_shared<koi::ClassicalEvaluator>());
             koi::SearchService& service = warm_service.has_value() ? *warm_service : cold_service;
             const BenchmarkRun run = run_position(benchmark, *config, service);

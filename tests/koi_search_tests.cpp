@@ -497,7 +497,7 @@ void test_threaded_multipv_equal_scores_use_stable_ordered_root_tie_breaking() {
 
     std::vector<koi::SearchInfo> final_depth;
     for (const koi::SearchInfo& info : infos) {
-        if (info.depth == 1) {
+        if (info.depth == limits.depth) {
             final_depth.push_back(info);
         }
     }
@@ -519,6 +519,48 @@ void test_threaded_multipv_equal_scores_use_stable_ordered_root_tie_breaking() {
     require(result.has_value() && result->best_move == final_depth.front().pv.front() &&
                 result->score_cp == final_depth.front().score_cp,
             "threaded MultiPV completion must match its rank-one line");
+}
+
+void test_threaded_multipv_matches_single_thread_at_final_depth() {
+    const koi::GameState root = require_state("4k3/8/8/8/8/8/P6r/4K2R w - - 0 1");
+    koi::SearchLimits limits;
+    limits.depth = 2;
+
+    const auto run = [&](std::size_t threads) {
+        koi::SearchOptions options;
+        options.threads = threads;
+        options.multi_pv = 3;
+        std::vector<koi::SearchInfo> final_depth;
+        std::optional<koi::SearchResult> result;
+        koi::SearchService service(std::make_shared<ConcurrencyEvaluator>());
+        koi::SearchHandle handle = service.start(
+            root, limits,
+            {.on_info = [&final_depth, &limits](const koi::SearchInfo& info) {
+                 if (info.depth == limits.depth) {
+                     final_depth.push_back(info);
+                 }
+             },
+             .on_complete = [&result](const koi::SearchResult& completed) { result = completed; }},
+            options);
+        handle.wait();
+        require(result.has_value() && final_depth.size() == 3,
+                "each final-depth MultiPV search must report three ranked lines");
+        return std::pair{std::move(final_depth), *result};
+    };
+
+    const auto single_thread = run(1);
+    const auto threaded = run(2);
+    for (std::size_t index = 0; index < single_thread.first.size(); ++index) {
+        const koi::SearchInfo& reference = single_thread.first[index];
+        const koi::SearchInfo& candidate = threaded.first[index];
+        require(reference.multipv == candidate.multipv && reference.score_cp == candidate.score_cp &&
+                    reference.mate == candidate.mate && !reference.pv.empty() && !candidate.pv.empty() &&
+                    reference.pv.front() == candidate.pv.front() && reference.pv == candidate.pv,
+                "Threads=1 and Threads=2 must retain rank, score, root move, and PV at final depth");
+    }
+    require(single_thread.second.best_move == single_thread.first.front().pv.front() &&
+                threaded.second.best_move == threaded.first.front().pv.front(),
+            "MultiPV completion must retain the final-depth rank-one root move for both thread counts");
 }
 
 void test_threaded_multipv_is_stable_after_warming_the_shared_hash() {
@@ -1072,6 +1114,7 @@ int main() {
         {"classical threaded parity", test_classical_threaded_search_matches_reference_result},
         {"stable root ties", test_equal_root_scores_keep_the_earliest_ordered_move},
         {"threaded multipv ordered root ties", test_threaded_multipv_equal_scores_use_stable_ordered_root_tie_breaking},
+        {"threaded multipv final-depth parity", test_threaded_multipv_matches_single_thread_at_final_depth},
         {"threaded multipv warmed hash", test_threaded_multipv_is_stable_after_warming_the_shared_hash},
         {"threaded global nodes", test_threaded_node_limit_is_global_and_never_exceeded},
         {"threaded node parity", test_threaded_and_reference_node_limits_have_matching_accounting},

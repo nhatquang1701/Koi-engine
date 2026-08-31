@@ -51,14 +51,19 @@ From the configured build directory:
 .\out\release-vs\koi-perft.exe 4
 .\out\release-vs\koi-bench.exe
 .\out\release-vs\koi-bench.exe --threads 4 --speed 100 --timed
+.\out\release-vs\koi-bench.exe --optional --profile-json optional-strength.json
 .\out\release-vs\koi-replay.exe startpos moves e2e4 e7e5 g1f3
 ```
 
 `koi-perft` counts legal nodes from the standard starting position at the given
-non-negative depth. `koi-bench` runs fixed-depth tactical positions and writes only a
-deterministic benchmark report to its own stdout by default. `--threads` and
-`--speed` select a benchmark configuration; `--timed` adds wall-clock timing
-fields. It is a separate process and never writes to the UCI engine's stdout.
+non-negative depth. `koi-bench` runs the 64-position fixed-depth tactical hard
+gate and writes only its deterministic benchmark report to stdout by default.
+`--optional` instead selects the 128-position optional strength corpus and labels
+that suite in both its text and JSON-profile output. `--threads` and `--speed`
+select a benchmark configuration; `--timed` adds wall-clock timing fields.
+Untimed JSON profiles use the stable `Koi Engine 1.0` build identity and record
+`nps` as unmeasured (`0`); `--timed` adds `elapsed_ms` and measured NPS. It is a
+separate process and never writes to the UCI engine's stdout.
 
 `koi-replay` is a separate rules-boundary tool for replaying coordinate moves without
 exposing the vendored chess library. Give it `startpos` or `fen <six-field FEN>`, then
@@ -157,7 +162,9 @@ from the starting position (for example, `bestmove e2e4`).
   the new snapshot is used by the next `go` command.
 - `go` accepts `depth`, `nodes`, `movetime`, `wtime`, `btime`, `winc`, `binc`,
   `movestogo`, and `infinite`. Malformed limit values are ignored. A bare `go`
-  uses a 250 ms move-time fallback, scaled by `Speed`.
+  uses a 250 ms move-time fallback, scaled by `Speed`. If a clock is supplied
+  only for the non-moving side, Koi uses the same bounded fallback so malformed
+  or asymmetric GUI commands cannot leave the engine searching indefinitely.
 - A depth limit is capped internally at 64 plies. `nodes`, `movetime`, and
   side-to-move clock limits stop search at their requested boundary; `infinite`
   continues until `stop`.
