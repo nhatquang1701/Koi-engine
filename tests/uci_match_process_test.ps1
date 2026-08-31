@@ -15,6 +15,45 @@ if (-not (Test-Path -LiteralPath $matchScript -PathType Leaf)) {
     throw "UCI match script is missing: $matchScript"
 }
 
+$replayPath = Join-Path (Split-Path -Parent $EnginePath) 'koi-replay.exe'
+if (-not (Test-Path -LiteralPath $replayPath -PathType Leaf)) {
+    throw "replay executable is missing: $replayPath"
+}
+
+$fixturePath = Join-Path (Split-Path -Parent $EnginePath) 'uci_match_fixture.exe'
+if (-not (Test-Path -LiteralPath $fixturePath -PathType Leaf)) {
+    throw "UCI match fixture executable is missing: $fixturePath"
+}
+
+function New-ScriptedUciEngine([string]$Directory, [string]$Name) {
+    $enginePath = Join-Path $Directory "$Name.exe"
+    Copy-Item -LiteralPath $fixturePath -Destination $enginePath
+    return [pscustomobject]@{
+        path = $enginePath
+        log = Join-Path $Directory "$Name.log"
+    }
+}
+
+function Invoke-ScriptedMatch([string]$KoiPath, [string]$OpponentPath, [string]$OutputDirectory,
+                               [int]$Games, [int]$MaxPlies, [int]$TimeoutMilliseconds = 5000) {
+    $output = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $matchScript `
+        -KoiPath $KoiPath -OpponentPath $OpponentPath -ReplayPath $replayPath `
+        -KoiColor white -Depth 1 -Games $Games -MaxPlies $MaxPlies `
+        -TimeoutMilliseconds $TimeoutMilliseconds -OutputDirectory $OutputDirectory
+    if ($LASTEXITCODE -ne 0) {
+        throw "scripted UCI match exited with ${LASTEXITCODE}: $($output -join ' | ')"
+    }
+    $jsonFiles = @(Get-ChildItem -LiteralPath $OutputDirectory -Filter '*.json' -File)
+    $pgnFiles = @(Get-ChildItem -LiteralPath $OutputDirectory -Filter '*.pgn' -File)
+    if ($jsonFiles.Count -ne 1 -or $pgnFiles.Count -ne 1) {
+        throw 'scripted UCI match must create one JSON and one PGN artifact.'
+    }
+    return [pscustomobject]@{
+        report = Get-Content -LiteralPath $jsonFiles[0].FullName -Raw | ConvertFrom-Json
+        pgn = Get-Content -LiteralPath $pgnFiles[0].FullName -Raw
+    }
+}
+
 $outputDirectory = Join-Path ([System.IO.Path]::GetTempPath()) ("koi-match-test-" + [guid]::NewGuid().ToString('N'))
 $fenFile = Join-Path $outputDirectory 'terminal.fen'
 try {
@@ -99,6 +138,46 @@ try {
     $terminalPgnContents = Get-Content -LiteralPath $terminalPgn[0].FullName -Raw
     if ($terminalPgnContents -notmatch '\[Result "1-0"\]' -or $terminalPgnContents -notmatch '1-0\s*$') {
         throw 'Terminal UCI match PGN result must match the adjudicated checkmate result.'
+    }
+
+    $repetitionDirectory = Join-Path $outputDirectory 'repetition'
+    New-Item -ItemType Directory -Path $repetitionDirectory -Force | Out-Null
+    $whiteRepeater = New-ScriptedUciEngine $repetitionDirectory 'white-repeater'
+    $blackRepeater = New-ScriptedUciEngine $repetitionDirectory 'black-repeater'
+    $repetitionMatch = Invoke-ScriptedMatch $whiteRepeater.path $blackRepeater.path $repetitionDirectory 1 8
+    $repetitionGame = $repetitionMatch.report.games[0]
+    if ($repetitionGame.result -ne '1/2-1/2' -or $repetitionGame.termination -ne 'rule draw' -or
+        $repetitionGame.moves.Count -ne 8) {
+        throw 'Replay validation must retain the full move history when adjudicating threefold repetition.'
+    }
+
+    $illegalDirectory = Join-Path $outputDirectory 'illegal-move'
+    New-Item -ItemType Directory -Path $illegalDirectory -Force | Out-Null
+    $illegalKoi = New-ScriptedUciEngine $illegalDirectory 'illegal-koi'
+    $unusedOpponent = New-ScriptedUciEngine $illegalDirectory 'unused-opponent'
+    $illegalMatch = Invoke-ScriptedMatch $illegalKoi.path $unusedOpponent.path $illegalDirectory 1 2
+    $illegalGame = $illegalMatch.report.games[0]
+    if ($illegalGame.termination -ne 'illegal move' -or $illegalGame.moves.Count -ne 1 -or
+        $illegalGame.moves[0].move -ne '0000' -or $illegalGame.moves[0].replay_legal -ne $false) {
+        throw 'An illegal bestmove must remain in the JSON diagnostic record.'
+    }
+    if ($illegalMatch.pgn -match '\b0000\b') {
+        throw 'Rejected moves must not be serialized into PGN movetext.'
+    }
+
+    $timeoutDirectory = Join-Path $outputDirectory 'timeout'
+    New-Item -ItemType Directory -Path $timeoutDirectory -Force | Out-Null
+    $slowKoi = New-ScriptedUciEngine $timeoutDirectory 'slow-koi'
+    $idleOpponent = New-ScriptedUciEngine $timeoutDirectory 'idle-opponent'
+    $timeoutMatch = Invoke-ScriptedMatch $slowKoi.path $idleOpponent.path $timeoutDirectory 2 2 1000
+    $timeoutGame = $timeoutMatch.report.games[0]
+    if ($timeoutMatch.report.games.Count -ne 1 -or $timeoutGame.termination -ne 'timeout' -or
+        $timeoutGame.process_status.koi -ne 'timeout') {
+        throw 'A timed-out engine must be retired before subsequent games can reuse it.'
+    }
+    $newGameCommands = @(Get-Content -LiteralPath $slowKoi.log | Where-Object { $_ -ceq 'ucinewgame' })
+    if ($newGameCommands.Count -ne 1) {
+        throw 'A timed-out engine must not receive a later-game ucinewgame command.'
     }
 }
 finally {

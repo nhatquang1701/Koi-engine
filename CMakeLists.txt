@@ -127,9 +127,15 @@ add_executable(koi_replay_tests
     tests/koi_replay_tests.cpp
 )
 
+add_dependencies(koi_replay_tests koi_replay)
+
 add_test(
     NAME koi_replay_tests
     COMMAND koi_replay_tests "$<TARGET_FILE:koi_replay>"
+)
+
+add_executable(uci_match_fixture
+    tests/uci_match_fixture.cpp
 )
 
 add_executable(koi_perft

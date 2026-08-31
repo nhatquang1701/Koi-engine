@@ -114,6 +114,8 @@ function Start-UciEngine([string]$Path, [string]$Label) {
         Output = [System.Collections.Generic.List[string]]::new()
         SentOptions = [System.Collections.Generic.List[string]]::new()
         Name = $Label
+        Retired = $false
+        StopResult = $null
     }
 }
 
@@ -125,28 +127,37 @@ function Send-UciLine($Engine, [string]$Command) {
     $Engine.Process.StandardInput.Flush()
 }
 
-function Stop-UciEngine($Engine) {
+function Stop-UciEngine($Engine, [bool]$KillImmediately = $false) {
     if ($null -eq $Engine) {
         return [pscustomobject]@{ status = 'process exit'; exit_code = $null; stderr = '' }
     }
 
     $status = 'clean shutdown'
     if (-not $Engine.Process.HasExited) {
-        try {
-            Send-UciLine $Engine 'quit'
-        } catch {
-            $status = 'process exit'
-        }
-        try {
-            $Engine.Process.StandardInput.Close()
-        } catch {
-        }
-        if (-not $Engine.Process.WaitForExit($TimeoutMilliseconds)) {
+        if ($KillImmediately) {
             $status = 'timeout'
             try {
                 $Engine.Process.Kill()
                 $Engine.Process.WaitForExit()
             } catch {
+            }
+        } else {
+            try {
+                Send-UciLine $Engine 'quit'
+            } catch {
+                $status = 'process exit'
+            }
+            try {
+                $Engine.Process.StandardInput.Close()
+            } catch {
+            }
+            if (-not $Engine.Process.WaitForExit($TimeoutMilliseconds)) {
+                $status = 'timeout'
+                try {
+                    $Engine.Process.Kill()
+                    $Engine.Process.WaitForExit()
+                } catch {
+                }
             }
         }
     }
@@ -398,7 +409,7 @@ function Format-Pgn($Position, $Game, [string]$WhiteName, [string]$BlackName, [s
     $moveNumber = if ($Position.Fen -ceq 'startpos') { 1 } else { [int]$fenFields[5] }
     $previousSide = $null
     $moveTokens = [System.Collections.Generic.List[string]]::new()
-    foreach ($move in @($Game.moves)) {
+    foreach ($move in @($Game.moves | Where-Object { $_.replay_legal })) {
         if ($move.side -ceq 'w') {
             $moveTokens.Add("$moveNumber. $($move.move)")
         } elseif ($previousSide -ne 'w') {
@@ -441,9 +452,16 @@ try {
     $opponentEngine = Start-UciEngine $opponentExecutable 'Opponent'
     Initialize-UciEngine $koiEngine
     Initialize-UciEngine $opponentEngine
+    $stopMatches = $false
 
     foreach ($position in $positions) {
+        if ($stopMatches) {
+            break
+        }
         for ($gameIndex = 1; $gameIndex -le $Games; ++$gameIndex) {
+            if ($stopMatches) {
+                break
+            }
             Send-UciLine $koiEngine 'ucinewgame'
             Send-UciLine $opponentEngine 'ucinewgame'
             Wait-UciReady $koiEngine 'new-game readyok'
@@ -472,6 +490,9 @@ try {
                     $termination = if ($_.Exception -is [System.TimeoutException]) { 'timeout' } else { 'process exit' }
                     $result = '*'
                     Set-EngineProcessStatus $processStatus $engine $termination
+                    $engine.StopResult = Stop-UciEngine $engine ($termination -eq 'timeout')
+                    $engine.Retired = $true
+                    $stopMatches = $true
                     break
                 }
                 $record = [ordered]@{
@@ -499,7 +520,8 @@ try {
                     break
                 }
                 try {
-                    $moveReplay = Invoke-KoiReplay $rootFen @($search.move)
+                    [string[]]$candidateMoves = @($moves) + @($search.move)
+                    $moveReplay = Invoke-KoiReplay $position.Fen $candidateMoves
                 } catch {
                     $termination = 'process exit'
                     $result = '*'
@@ -547,8 +569,16 @@ try {
     }
 }
 finally {
-    $koiStop = Stop-UciEngine $koiEngine
-    $opponentStop = Stop-UciEngine $opponentEngine
+    $koiStop = if ($null -ne $koiEngine -and $koiEngine.Retired -and $null -ne $koiEngine.StopResult) {
+        $koiEngine.StopResult
+    } else {
+        Stop-UciEngine $koiEngine
+    }
+    $opponentStop = if ($null -ne $opponentEngine -and $opponentEngine.Retired -and $null -ne $opponentEngine.StopResult) {
+        $opponentEngine.StopResult
+    } else {
+        Stop-UciEngine $opponentEngine
+    }
     foreach ($game in $gameRecords) {
         if ($game.process_status.koi -eq 'running') {
             $game.process_status.koi = $koiStop.status

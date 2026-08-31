@@ -51,6 +51,20 @@ std::map<std::string, std::string> run_replay(const std::filesystem::path& repla
     return fields;
 }
 
+int run_replay_exit_code(const std::filesystem::path& replay, std::string_view arguments) {
+    const std::string command = '"' + quote_argument(replay.string()) + ' ' +
+                                std::string(arguments) + '"';
+    FILE* pipe = _popen(command.c_str(), "r");
+    if (pipe == nullptr) {
+        throw std::runtime_error("unable to start koi-replay");
+    }
+
+    std::array<char, 256> buffer{};
+    while (std::fgets(buffer.data(), static_cast<int>(buffer.size()), pipe) != nullptr) {
+    }
+    return _pclose(pipe);
+}
+
 void require_field(const std::map<std::string, std::string>& fields, std::string_view field,
                    std::string_view expected) {
     const auto iterator = fields.find(std::string(field));
@@ -115,6 +129,20 @@ void test_rule_draw_classification(const std::filesystem::path& replay) {
     require_field(fields, "termination", "rule draw");
 }
 
+void test_repetition_draw_classification(const std::filesystem::path& replay) {
+    const auto fields = run_replay(
+        replay, "startpos moves g1f3 g8f6 f3g1 f6g8 g1f3 g8f6 f3g1 f6g8");
+    require_field(fields, "legal", "1");
+    require_field(fields, "result", "1/2-1/2");
+    require_field(fields, "termination", "rule draw");
+}
+
+void test_stray_move_is_rejected_without_moves_marker(const std::filesystem::path& replay) {
+    if (run_replay_exit_code(replay, "startpos e2e4") == 0) {
+        throw std::runtime_error("stray coordinate argument must be rejected without the moves marker");
+    }
+}
+
 struct TestCase {
     std::string_view name;
     void (*run)(const std::filesystem::path&);
@@ -138,6 +166,8 @@ int main(int argument_count, char* arguments[]) {
         {"checkmate classification", test_checkmate_classification},
         {"stalemate classification", test_stalemate_classification},
         {"rule draw classification", test_rule_draw_classification},
+        {"repetition draw classification", test_repetition_draw_classification},
+        {"stray move rejection", test_stray_move_is_rejected_without_moves_marker},
     };
 
     for (const TestCase& test : tests) {

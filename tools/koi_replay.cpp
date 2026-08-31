@@ -77,7 +77,8 @@ int main(int argument_count, char* arguments[]) {
     koi::GameState state;
     const std::string_view position = arguments[1];
     if (position == "startpos") {
-        if (move_start != 2 && move_start != argument_count) {
+        if ((move_start == argument_count && argument_count != 2) ||
+            (move_start != argument_count && move_start != 2)) {
             return usage();
         }
     } else {
