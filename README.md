@@ -95,7 +95,8 @@ lines and `#` comments are ignored). The replay executable is expected beside
 The deterministic `Threads=1`, `Speed=100` reference path includes a fixed-depth
 64-case tactical hard gate and a separate 128-case optional positional corpus. The
 hard gate covers mates, checks, evasions, forks, pins, poisoned captures, promotions,
-defensive choices, and pawn-race motifs. Each fixture records a stable ID, FEN, depth,
+defensive choices, and pawn-race motifs, plus the retained legacy queen-capture case.
+Each fixture records a stable ID, distinct legal FEN, depth,
 category, and explicit accepted-move allowlist; multi-solution positions do not depend
 on one arbitrary root tie-break.
 

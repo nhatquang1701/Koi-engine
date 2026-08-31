@@ -31,6 +31,11 @@ struct BenchmarkRun {
     std::vector<koi::Move> pv;
 };
 
+bool accepts_move(const koi::StrengthPosition& benchmark, const koi::Move& move) {
+    return std::find(benchmark.accepted_moves.begin(), benchmark.accepted_moves.end(), move.uci()) !=
+        benchmark.accepted_moves.end();
+}
+
 bool parse_uint64(std::string_view value, std::uint64_t& parsed) {
     const auto [end, error] = std::from_chars(value.data(), value.data() + value.size(), parsed);
     return error == std::errc{} && end == value.data() + value.size();
@@ -226,6 +231,7 @@ int main(int argc, char** argv) {
             koi::SearchService& service = warm_service.has_value() ? *warm_service : cold_service;
             const BenchmarkRun run = run_position(benchmark, *config, service);
             const koi::SearchResult& result = run.result;
+            const bool matched = result.best_move.has_value() && accepts_move(benchmark, *result.best_move);
             std::cout << "position " << benchmark.name
                       << " depth " << result.completed_depth
                       << " nodes " << result.stats.nodes
@@ -234,8 +240,7 @@ int main(int argc, char** argv) {
                       << " score " << result.score_cp
                       << " expected " << benchmark.expected_move
                       << " move " << (result.best_move.has_value() ? result.best_move->uci() : "0000")
-                      << " match " << (result.best_move.has_value() &&
-                                          result.best_move->uci() == benchmark.expected_move ? 1 : 0);
+                      << " match " << (matched ? 1 : 0);
             if (config->timed) {
                 const std::uint64_t visited = result.stats.nodes + result.stats.qnodes;
                 const std::uint64_t elapsed = static_cast<std::uint64_t>(run.wall_time.count());
