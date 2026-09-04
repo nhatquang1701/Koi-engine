@@ -200,7 +200,7 @@ continues to evaluate standard chess with its classical evaluator.
 
 Fresh Ninja builds were configured outside the checkout with Visual Studio 2022
 MSVC 19.44.35227.0 targeting x64, `/std:c++latest`, and CMake 4.4.2. Both Debug
-and Release builds completed. All 14 registered CTest targets passed in each
+and Release builds completed. All 15 registered CTest targets passed in each
 configuration: Debug in 73.24 seconds and Release in 32.18 seconds. This includes
 the process-level UCI transcript and benchmark tests, the book unit tests, and the
 64-case tactical suite.
