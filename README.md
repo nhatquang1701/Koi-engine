@@ -3,8 +3,9 @@
 Koi Engine v1 is a Windows x64 UCI chess engine for standard chess. It is
 written in C++26 and uses deterministic iterative-deepening alpha-beta search
 with a classical evaluator and a persistent transposition table. Search runs on
-a cancellable outer worker; `Threads > 1` enables deterministic root-parallel
-work while the UCI command loop remains responsive.
+a cancellable outer worker; `Threads > 1` enables deterministic speculative
+root-parallel work with serial reference confirmation while the UCI command loop
+remains responsive.
 
 ## Architecture
 
@@ -223,7 +224,8 @@ $engine = (Resolve-Path .\out\release-vs\koi-engine.exe).Path
 
 The output should include, in order, the engine identification lines, the
 `RandomSeed`, `Hash`, `Threads`, `Speed`, `UCI_AnalyseMode`, `MultiPV`, `Ponder`,
-and `Clear Hash` option declarations, `uciok`, `readyok`,
+`OwnBook`, `BookFile`, `BookDepth`, `BookRandom`, and `Clear Hash` option
+declarations, `uciok`, `readyok`,
 zero or more valid `info` lines, and one legal coordinate-notation `bestmove`
 from the starting position (for example, `bestmove e2e4`).
 
@@ -231,8 +233,8 @@ from the starting position (for example, `bestmove e2e4`).
 
 - `uci` reports the engine identity, the compatibility `RandomSeed` option,
   `Hash` (default 16 MB, range 1–4096 MB), `Threads` (default 1, capped at
-  `min(64, hardware_concurrency)`), `Speed` (1–100, default 100), and the
-  `Clear Hash` button.
+  `min(64, hardware_concurrency)`), `Speed` (1–100, default 100), the opening
+  book options, and the `Clear Hash` button.
 - `isready` responds immediately with `readyok`, including while searching.
 - `ucinewgame` resets the position; `position startpos` and `position fen ...`
   set a position, optionally followed by legal UCI moves. Replacing the root
@@ -248,6 +250,11 @@ from the starting position (for example, `bestmove e2e4`).
   clock-derived budgets; explicit depth, node, and infinite searches are
   unchanged. Changing either option stops and joins the active search before
   the new snapshot is used by the next `go` command.
+- `setoption name BookRandom value false` (the default) selects the highest-
+  weight legal Polyglot move, using deterministic coordinate ordering for equal
+  weights. `BookRandom true` enables weighted random selection; `RandomSeed 0`
+  is runtime-random only in that opt-in mode, while nonzero seeds remain
+  repeatable.
 - `go` accepts `depth`, `nodes`, `movetime`, `wtime`, `btime`, `winc`, `binc`,
   `movestogo`, and `infinite`. Malformed limit values are ignored. A bare `go`
   uses a 250 ms move-time fallback, scaled by `Speed`. If a clock is supplied
@@ -291,10 +298,13 @@ directory, not Lucas Chess's working directory. The relevant UCI options are:
 setoption name OwnBook value true
 setoption name BookFile value book.bin
 setoption name BookDepth value 16
+setoption name BookRandom value false
 ```
 
 `BookDepth 0` leaves the book unlimited; values from `1` through `40` limit
-the exclusive root ply depth. On a hit Koi writes
+the exclusive root ply depth. With `BookRandom false`, Koi chooses the
+highest-weight legal move deterministically; equal weights use coordinate
+ordering. Set `BookRandom true` only when weighted variety is wanted. On a hit Koi writes
 `info string book move <uci> depth <ply>` followed by that one legal
 `bestmove`. A missing or invalid book silently falls back to search.
 
