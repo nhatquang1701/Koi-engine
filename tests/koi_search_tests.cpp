@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <condition_variable>
 #include <cstdint>
 #include <cstdlib>
 #include <filesystem>
@@ -784,6 +785,52 @@ void test_threaded_infinite_search_cancels_and_completes_once() {
             "a cancelled threaded search must return a legal best move");
 }
 
+void test_threaded_timed_search_cancels_after_serial_confirmation() {
+    auto evaluator = std::make_shared<ConcurrencyEvaluator>();
+    koi::SearchService service(evaluator);
+    koi::SearchLimits limits;
+    limits.movetime = 5s;
+    koi::SearchOptions options;
+    options.threads = 2;
+    CompletedSearch completed;
+    std::mutex info_mutex;
+    std::condition_variable info_condition;
+    std::vector<int> info_depths;
+
+    koi::SearchHandle handle = service.start(koi::GameState::startpos(), limits,
+        {.on_info = [&info_mutex, &info_condition, &info_depths](const koi::SearchInfo& info) {
+            {
+                std::lock_guard lock(info_mutex);
+                info_depths.push_back(info.depth);
+            }
+            info_condition.notify_one();
+        },
+         .on_complete = completed.sink().on_complete}, options);
+
+    {
+        std::unique_lock lock(info_mutex);
+        require(info_condition.wait_for(lock, 2s, [&info_depths] { return !info_depths.empty(); }),
+                "Threads=2 timed search must reach serial confirmation before cancellation");
+    }
+    const auto stop_started = std::chrono::steady_clock::now();
+    handle.stop();
+    handle.wait();
+    const auto stop_elapsed = std::chrono::steady_clock::now() - stop_started;
+
+    require(!handle.running(), "Threads=2 timed cancellation must join speculative workers");
+    require(stop_elapsed < 2s, "Threads=2 timed cancellation must return promptly");
+    {
+        std::lock_guard lock(info_mutex);
+        require(!info_depths.empty() && info_depths.front() == 1,
+                "Threads=2 timed cancellation must observe the serial confirmation callback");
+        require(std::adjacent_find(info_depths.begin(), info_depths.end()) == info_depths.end(),
+                "Threads=2 timed cancellation must not duplicate info output");
+    }
+    const koi::SearchResult result = completed.take_result();
+    require(result.best_move.has_value() && koi::GameState::startpos().is_legal(*result.best_move),
+            "Threads=2 timed cancellation must return a legal fallback move");
+}
+
 void test_non_concurrent_evaluators_are_serialized_across_simultaneous_handles() {
     auto evaluator = std::make_shared<ConcurrencyEvaluator>(false);
     koi::SearchService service(evaluator);
@@ -1280,6 +1327,7 @@ int main() {
         {"threaded node parity", test_threaded_and_reference_node_limits_have_matching_accounting},
         {"search info accounting", test_search_info_nodes_reports_all_visited_nodes},
         {"threaded cancellation", test_threaded_infinite_search_cancels_and_completes_once},
+        {"threaded timed cancellation", test_threaded_timed_search_cancels_after_serial_confirmation},
         {"evaluator cross-handle safety", test_non_concurrent_evaluators_are_serialized_across_simultaneous_handles},
         {"terminal search", test_terminal_roots_return_mate_or_stalemate_scores},
         {"deterministic legal search", test_fixed_depth_search_is_deterministic_and_legal},
