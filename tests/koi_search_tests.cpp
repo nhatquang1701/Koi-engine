@@ -523,6 +523,29 @@ void test_classical_threaded_search_matches_reference_result() {
             "classical threaded search must match the single-thread reference result");
 }
 
+void test_threaded_evasion_06_matches_the_serial_allowlist() {
+    const koi::GameState root = require_state("7k/7b/8/8/4K3/8/8/6N1 w - - 0 1");
+    const std::array<std::string_view, 3> accepted{"e4f3", "e4d4", "e4f4"};
+    koi::SearchLimits limits;
+    limits.depth = 2;
+
+    koi::SearchService serial_service(std::make_shared<koi::ClassicalEvaluator>());
+    const koi::SearchResult serial = search(serial_service, root, limits);
+    require(serial.best_move.has_value() &&
+                std::find(accepted.begin(), accepted.end(), serial.best_move->uci()) != accepted.end(),
+            "evasion_06 must retain a serial accepted evasion");
+
+    for (const std::size_t threads : {std::size_t{2}, std::size_t{4}}) {
+        koi::SearchOptions threaded_options;
+        threaded_options.threads = threads;
+        koi::SearchService threaded_service(std::make_shared<koi::ClassicalEvaluator>());
+        const koi::SearchResult threaded = search(threaded_service, root, limits, threaded_options);
+        require(threaded.completed_depth == serial.completed_depth && threaded.best_move == serial.best_move &&
+                    threaded.score_cp == serial.score_cp,
+                "evasion_06 must retain the serial fixed-depth move and score at Threads=2 and Threads=4");
+    }
+}
+
 void test_equal_root_scores_keep_the_earliest_ordered_move() {
     const koi::GameState root = require_state("4k3/8/8/8/8/8/P6r/4K2R w - - 0 1");
     const auto expected = koi::Move::parse_uci("h1h2");
@@ -1248,6 +1271,7 @@ int main() {
         {"deterministic multipv", test_deterministic_multipv_reports_sorted_distinct_legal_lines},
         {"threaded root search", test_threaded_search_uses_multiple_root_workers_and_matches_reference_result},
         {"classical threaded parity", test_classical_threaded_search_matches_reference_result},
+        {"threaded evasion_06 parity", test_threaded_evasion_06_matches_the_serial_allowlist},
         {"stable root ties", test_equal_root_scores_keep_the_earliest_ordered_move},
         {"threaded multipv ordered root ties", test_threaded_multipv_equal_scores_use_stable_ordered_root_tie_breaking},
         {"threaded multipv final-depth parity", test_threaded_multipv_matches_single_thread_at_final_depth},

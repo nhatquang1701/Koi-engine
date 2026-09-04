@@ -297,7 +297,7 @@ $initialMoves = @(
     'e2e3', 'e2e4', 'f2f3', 'f2f4', 'g2g3', 'g2g4', 'h2h3', 'h2h4',
     'b1a3', 'b1c3', 'g1f3', 'g1h3'
 )
-if ($bestmove -notmatch '^bestmove ([a-h][1-8][a-h][1-8][nbrq]?)$' -or
+if ($bestmove -notmatch '^bestmove ([a-h][1-8][a-h][1-8][nbrq]?)( ponder [a-h][1-8][a-h][1-8][nbrq]?)?$' -or
     $initialMoves -notcontains $Matches[1]) {
     throw "Expected a legal initial bestmove, received: $bestmove"
 }
