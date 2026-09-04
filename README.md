@@ -85,6 +85,37 @@ When Python 3 and `python-chess` are available at CMake configure time, the same
 is registered as `elo_oracle_python` in CTest; otherwise the C++ test suite is unchanged
 and CMake reports that the optional test was skipped.
 
+To analyze a supplied standard-SAN PGN with Stockfish as the position oracle, keep the
+JSON output outside this checkout and provide the exact executable/version and PGN
+provenance alongside the report:
+
+```powershell
+python .\tools\elo_oracle.py `
+  --pgn C:\Koi-inputs\game.pgn `
+  --koi .\out\release-vs\koi-engine.exe `
+  --stockfish C:\Engines\stockfish.exe `
+  --output C:\Koi-results\elo-oracle.json `
+  --movetime-ms 250 --threads 4
+```
+
+Use `--extract-only` to test PGN/FEN extraction without either engine. Run the licensed
+opening book as a separate audit so its `book_used`, `book_move`, and Stockfish CPL are
+kept outside the normal search metrics:
+
+```powershell
+python .\tools\elo_oracle.py `
+  --pgn C:\Koi-inputs\game.pgn `
+  --koi .\out\release-vs\koi-engine.exe `
+  --stockfish C:\Engines\stockfish.exe `
+  --book C:\LicensedBooks\book.bin --book-audit `
+  --output C:\Koi-results\book-audit.json `
+  --movetime-ms 250 --threads 4
+```
+
+The PGN, Stockfish executable/version, and licensed `book.bin` are external inputs;
+none are assumed to exist in this repository. Do not report an Elo or CPL improvement
+until both a comparable baseline and an after-change report have been generated.
+
 For a reproducible local match against Stockfish or another UCI engine, use the
 optional PowerShell harness:
 
