@@ -58,6 +58,9 @@ int main(int argument_count, char* arguments[]) {
                 std::this_thread::sleep_for(std::chrono::seconds(5));
             }
             const std::size_t index = std::min(go_count, moves.size() - 1);
+            if (name.contains("book-koi")) {
+                std::cout << "info string book move " << moves[index] << " depth 1\n";
+            }
             std::cout << "bestmove " << moves[index] << '\n' << std::flush;
             ++go_count;
         } else if (line == "quit") {

@@ -11,8 +11,12 @@ if (-not (Test-Path -LiteralPath $EnginePath -PathType Leaf)) {
 
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
 $matchScript = Join-Path $repositoryRoot 'tools\uci_match.ps1'
+$openingFile = Join-Path $repositoryRoot 'tests\data\elo-openings.txt'
 if (-not (Test-Path -LiteralPath $matchScript -PathType Leaf)) {
     throw "UCI match script is missing: $matchScript"
+}
+if (-not (Test-Path -LiteralPath $openingFile -PathType Leaf)) {
+    throw "Elo opening suite is missing: $openingFile"
 }
 
 $replayPath = Join-Path (Split-Path -Parent $EnginePath) 'koi-replay.exe'
@@ -35,11 +39,20 @@ function New-ScriptedUciEngine([string]$Directory, [string]$Name) {
 }
 
 function Invoke-ScriptedMatch([string]$KoiPath, [string]$OpponentPath, [string]$OutputDirectory,
-                               [int]$Games, [int]$MaxPlies, [int]$TimeoutMilliseconds = 5000) {
+                               [int]$Games, [int]$MaxPlies, [int]$TimeoutMilliseconds = 5000,
+                               [string]$OpeningFile = '', [string]$TimeControl = '',
+                               [string]$KoiColor = 'white') {
+    $optionalArguments = @()
+    if (-not [string]::IsNullOrWhiteSpace($OpeningFile)) {
+        $optionalArguments += @('-OpeningFile', $OpeningFile)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($TimeControl)) {
+        $optionalArguments += @('-TimeControl', $TimeControl)
+    }
     $output = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $matchScript `
         -KoiPath $KoiPath -OpponentPath $OpponentPath -ReplayPath $replayPath `
-        -KoiColor white -Depth 1 -Games $Games -MaxPlies $MaxPlies `
-        -TimeoutMilliseconds $TimeoutMilliseconds -OutputDirectory $OutputDirectory
+        -KoiColor $KoiColor -Depth 1 -Games $Games -MaxPlies $MaxPlies `
+        -TimeoutMilliseconds $TimeoutMilliseconds -OutputDirectory $OutputDirectory @optionalArguments
     if ($LASTEXITCODE -ne 0) {
         throw "scripted UCI match exited with ${LASTEXITCODE}: $($output -join ' | ')"
     }
@@ -163,6 +176,60 @@ try {
     }
     if ($illegalMatch.pgn -match '\b0000\b') {
         throw 'Rejected moves must not be serialized into PGN movetext.'
+    }
+
+    $openingDirectory = Join-Path $outputDirectory 'opening-clock-book'
+    New-Item -ItemType Directory -Path $openingDirectory -Force | Out-Null
+    $bookKoi = New-ScriptedUciEngine $openingDirectory 'book-koi'
+    $openingOpponent = New-ScriptedUciEngine $openingDirectory 'opening-opponent'
+    $openingMatch = Invoke-ScriptedMatch $bookKoi.path $openingOpponent.path $openingDirectory 1 1 5000 $openingFile '1+0' 'black'
+    $openingReport = $openingMatch.report
+    if ($openingReport.schema -ne 'koi-uci-match-v2' -or $openingReport.games.Count -ne 8 -or
+        $openingReport.configuration.time_control -ne '1+0' -or
+        $openingReport.configuration.koi_color -ne 'black') {
+        throw 'Opening matches must preserve the v2 report while replaying every named opening with Koi as Black.'
+    }
+    $e4Game = @($openingReport.games | Where-Object { $_.position -eq 'e4' })[0]
+    if ($null -eq $e4Game -or $e4Game.koi_color -ne 'black' -or
+        $e4Game.moves.Count -lt 2 -or $e4Game.moves[0].move -ne 'e2e4' -or
+        $e4Game.moves[0].replay_legal -ne $true -or
+        $e4Game.moves[1].side -ne 'b' -or $e4Game.moves[1].engine_label -ne 'Koi' -or
+        $e4Game.moves[1].position_command -ne 'position startpos moves e2e4') {
+        throw 'Opening replay must establish the requested position and swap Koi to the selected color before search.'
+    }
+    $clockCommand = $e4Game.moves[1].go_command
+    if ($clockCommand -notmatch '^go wtime 60000 btime 60000 winc 0 binc 0$') {
+        throw "Clock matches must send both clocks and increments on every search. Actual: $clockCommand"
+    }
+    $koiOptions = @($openingReport.engines | Where-Object { $_.label -eq 'Koi' })[0].options
+    foreach ($option in @(
+        'setoption name RandomSeed value 1',
+        'setoption name OwnBook value true',
+        'setoption name BookFile value book.bin',
+        'setoption name BookDepth value 16'
+    )) {
+        if ($koiOptions -notcontains $option) {
+            throw "Koi opening-book match configuration must send '$option'."
+        }
+    }
+    if ($e4Game.moves[1].book_used -ne $true -or $e4Game.moves[1].book_move -ne 'e7e5' -or
+        $e4Game.moves[1].final_info -ne $null -or
+        $e4Game.moves[1].all_info_lines -notcontains 'info string book move e7e5 depth 1') {
+        throw 'Book diagnostics must be recorded separately from search PV information.'
+    }
+
+    $invalidOpeningDirectory = Join-Path $outputDirectory 'invalid-opening'
+    New-Item -ItemType Directory -Path $invalidOpeningDirectory -Force | Out-Null
+    $invalidOpeningFile = Join-Path $invalidOpeningDirectory 'invalid-openings.txt'
+    Set-Content -LiteralPath $invalidOpeningFile -Value 'illegal | e2e5' -Encoding UTF8
+    $preflightKoi = New-ScriptedUciEngine $invalidOpeningDirectory 'preflight-koi'
+    $preflightOpponent = New-ScriptedUciEngine $invalidOpeningDirectory 'preflight-opponent'
+    $invalidOutput = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $matchScript `
+        -KoiPath $preflightKoi.path -OpponentPath $preflightOpponent.path -ReplayPath $replayPath `
+        -OpeningFile $invalidOpeningFile -OutputDirectory $invalidOpeningDirectory
+    if ($LASTEXITCODE -eq 0 -or (Test-Path -LiteralPath $preflightKoi.log) -or
+        (Test-Path -LiteralPath $preflightOpponent.log)) {
+        throw 'Illegal opening moves must fail replay validation before either engine begins a game.'
     }
 
     $timeoutDirectory = Join-Path $outputDirectory 'timeout'

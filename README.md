@@ -95,6 +95,29 @@ without contaminating later positions. PGN Result headers match the adjudicated 
 lines and `#` comments are ignored). The replay executable is expected beside
 `koi-engine.exe` (or can be supplied as `-ReplayPath`).
 
+For paired Elo measurements, supply the checked-in eight-opening suite (or another
+file in the same `name | uci move uci move` format) and a chess clock:
+
+```powershell
+.\tools\uci_match.ps1 `
+  -KoiPath .\out\release-vs\koi-engine.exe `
+  -OpponentPath C:\Engines\stockfish.exe `
+  -OpeningFile .\tests\data\elo-openings.txt `
+  -TimeControl 1+0 -KoiColor black `
+  -KoiRandomSeed 1 -KoiOwnBook:$false `
+  -OutputDirectory .\match-results
+```
+
+`-TimeControl` accepts only `<minutes>+<increment>` (for example `1+0` or `5+3`)
+and sends `wtime`, `btime`, `winc`, and `binc` on every `go`; elapsed time is deducted
+from the moving side before its increment is added. Opening sequences are replayed and
+rejected before either engine starts a game. The JSON configuration records the clock
+and Koi `RandomSeed`, `OwnBook`, `BookFile`, and `BookDepth` values. Per-ply
+`book_used` and `book_move` record an `info string book move <uci> depth <ply>` marker
+separately from normal search PV data. The harness sends Koi's book options without
+requiring a book reader or any Jack dependency; Koi versions predating book support
+ignore those UCI options safely.
+
 ## Strength regression suite
 
 The deterministic `Threads=1`, `Speed=100` reference path includes a fixed-depth

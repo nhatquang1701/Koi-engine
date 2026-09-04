@@ -10,6 +10,11 @@ param(
 
     [string]$FenFile,
 
+    [string]$OpeningFile,
+
+    [ValidatePattern('^[1-9][0-9]*\+[0-9]+$')]
+    [string]$TimeControl,
+
     [string]$OutputDirectory = (Join-Path (Get-Location) 'match-results'),
 
     [ValidateRange(1, 64)]
@@ -22,6 +27,15 @@ param(
     [int]$MovetimeMs = 0,
 
     [uint64]$Nodes = 0,
+
+    [uint64]$KoiRandomSeed = 1,
+
+    [bool]$KoiOwnBook = $true,
+
+    [string]$KoiBookFile = 'book.bin',
+
+    [ValidateRange(0, 40)]
+    [int]$KoiBookDepth = 16,
 
     [ValidateRange(1, 64)]
     [int]$Threads = 1,
@@ -47,6 +61,12 @@ $ErrorActionPreference = 'Stop'
 if ($MovetimeMs -gt 0 -and $Nodes -gt 0) {
     throw 'Choose at most one of -MovetimeMs and -Nodes.'
 }
+if (-not [string]::IsNullOrWhiteSpace($TimeControl) -and ($MovetimeMs -gt 0 -or $Nodes -gt 0)) {
+    throw 'Choose -TimeControl or one of -MovetimeMs and -Nodes.'
+}
+if (-not [string]::IsNullOrWhiteSpace($FenFile) -and -not [string]::IsNullOrWhiteSpace($OpeningFile)) {
+    throw 'Choose at most one of -FenFile and -OpeningFile.'
+}
 
 function Resolve-Executable([string]$Path, [string]$Label) {
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
@@ -57,7 +77,7 @@ function Resolve-Executable([string]$Path, [string]$Label) {
 
 function Read-PositionSpecs {
     if ([string]::IsNullOrWhiteSpace($FenFile)) {
-        return @([pscustomobject]@{ Name = 'startpos'; Fen = 'startpos' })
+        return @([pscustomobject]@{ Name = 'startpos'; Fen = 'startpos'; Moves = @() })
     }
 
     if (-not (Test-Path -LiteralPath $FenFile -PathType Leaf)) {
@@ -81,11 +101,41 @@ function Read-PositionSpecs {
         if ($fen -ne 'startpos' -and ($fen -split '\s+').Count -ne 6) {
             throw "FEN file entry '$name' must contain startpos or six FEN fields."
         }
-        $specs.Add([pscustomobject]@{ Name = $name; Fen = $fen })
+        $specs.Add([pscustomobject]@{ Name = $name; Fen = $fen; Moves = @() })
     }
 
     if ($specs.Count -eq 0) {
         throw "FEN file contains no positions: $FenFile"
+    }
+    return @($specs)
+}
+
+function Read-OpeningSpecs {
+    if ([string]::IsNullOrWhiteSpace($OpeningFile)) {
+        return $null
+    }
+    if (-not (Test-Path -LiteralPath $OpeningFile -PathType Leaf)) {
+        throw "Opening file is missing: $OpeningFile"
+    }
+
+    $specs = [System.Collections.Generic.List[object]]::new()
+    foreach ($line in Get-Content -LiteralPath $OpeningFile) {
+        $trimmed = $line.Trim()
+        if ($trimmed.Length -eq 0 -or $trimmed.StartsWith('#')) {
+            continue
+        }
+        $match = [regex]::Match($trimmed, '^(?<name>[^|#\s]+)\s*\|\s*(?<moves>[a-h][1-8][a-h][1-8][nbrq]?(?:\s+[a-h][1-8][a-h][1-8][nbrq]?)*?)\s*$')
+        if (-not $match.Success) {
+            throw "Invalid opening file line. Expected name | UCI move UCI move: $trimmed"
+        }
+        $specs.Add([pscustomobject]@{
+            Name = $match.Groups['name'].Value
+            Fen = 'startpos'
+            Moves = @($match.Groups['moves'].Value -split '\s+' | ForEach-Object { $_.ToLowerInvariant() })
+        })
+    }
+    if ($specs.Count -eq 0) {
+        throw "Opening file contains no positions: $OpeningFile"
     }
     return @($specs)
 }
@@ -206,6 +256,17 @@ function Initialize-UciEngine($Engine) {
         Send-UciLine $Engine $option
         $Engine.SentOptions.Add($option)
     }
+    if ($Engine.Label -ceq 'Koi') {
+        foreach ($option in @(
+            "setoption name RandomSeed value $KoiRandomSeed",
+            "setoption name OwnBook value $($KoiOwnBook.ToString().ToLowerInvariant())",
+            "setoption name BookFile value $KoiBookFile",
+            "setoption name BookDepth value $KoiBookDepth"
+        )) {
+            Send-UciLine $Engine $option
+            $Engine.SentOptions.Add($option)
+        }
+    }
 
     Send-UciLine $Engine 'isready'
     while ((Read-UciLine $Engine 'readyok') -cne 'readyok') {
@@ -235,7 +296,10 @@ function Format-PositionCommand($Position, $Moves) {
     return $command
 }
 
-function Get-GoCommand {
+function Get-GoCommand($Clock) {
+    if ($null -ne $Clock) {
+        return "go wtime $($Clock.white_ms) btime $($Clock.black_ms) winc $($Clock.increment_ms) binc $($Clock.increment_ms)"
+    }
     if ($MovetimeMs -gt 0) {
         return "go movetime $MovetimeMs"
     }
@@ -245,8 +309,17 @@ function Get-GoCommand {
     return "go depth $Depth"
 }
 
+function Update-Clock($Clock, [string]$Side, [int64]$ElapsedMilliseconds) {
+    if ($null -eq $Clock) {
+        return
+    }
+    $property = if ($Side -ceq 'w') { 'white_ms' } else { 'black_ms' }
+    $remaining = [Math]::Max([int64]0, [int64]$Clock.$property - $ElapsedMilliseconds)
+    $Clock.$property = $remaining + $Clock.increment_ms
+}
+
 function Parse-InfoLine([string]$Line) {
-    if ($Line -notmatch '^info(?:\s|$)') {
+    if ($Line -notmatch '^info(?:\s|$)' -or $Line -match '^info string book move\s+') {
         return $null
     }
 
@@ -271,21 +344,32 @@ function Parse-InfoLine([string]$Line) {
     }
 }
 
-function Search-UciEngine($Engine, $Position, $Moves) {
+function Search-UciEngine($Engine, $Position, $Moves, $Clock) {
     $positionCommand = Format-PositionCommand $Position $Moves
     Send-UciLine $Engine $positionCommand
-    $goCommand = Get-GoCommand
+    $goCommand = Get-GoCommand $Clock
     $started = [System.Diagnostics.Stopwatch]::StartNew()
     Send-UciLine $Engine $goCommand
 
     $infos = [System.Collections.Generic.List[object]]::new()
+    $allInfoLines = [System.Collections.Generic.List[string]]::new()
     $bestMove = $null
     $bestMoveLine = $null
+    $bookUsed = $false
+    $bookMove = $null
     while ($null -eq $bestMove) {
         $line = Read-UciLine $Engine 'bestmove'
+        $bookMatch = [regex]::Match($line, '^info string book move\s+([a-h][1-8][a-h][1-8][nbrq]?)\s+depth\s+(\d+)\s*$')
+        if ($bookMatch.Success) {
+            $bookUsed = $true
+            $bookMove = $bookMatch.Groups[1].Value.ToLowerInvariant()
+            $allInfoLines.Add($line)
+            continue
+        }
         $info = Parse-InfoLine $line
         if ($null -ne $info) {
             $infos.Add($info)
+            $allInfoLines.Add($line)
             continue
         }
         $bestMatch = [regex]::Match($line, '^bestmove\s+(\S+)')
@@ -306,7 +390,10 @@ function Search-UciEngine($Engine, $Position, $Moves) {
         elapsed_ms = [int64]$started.ElapsedMilliseconds
         evaluation = $lastInfo
         infos = @($infos)
+        all_info_lines = @($allInfoLines)
         bestmove_line = $bestMoveLine
+        book_used = $bookUsed
+        book_move = $bookMove
     }
 }
 
@@ -430,14 +517,29 @@ $koiExecutable = Resolve-Executable $KoiPath 'Koi'
 $opponentExecutable = Resolve-Executable $OpponentPath 'opponent'
 $defaultReplayPath = Join-Path (Split-Path -Parent $koiExecutable) 'koi-replay.exe'
 $replayExecutable = Resolve-Executable $(if ([string]::IsNullOrWhiteSpace($ReplayPath)) { $defaultReplayPath } else { $ReplayPath }) 'koi-replay'
-$positions = Read-PositionSpecs
+$positions = Read-OpeningSpecs
+if ($null -eq $positions) {
+    $positions = Read-PositionSpecs
+}
 $KoiColor = $KoiColor.ToLowerInvariant()
 $maximumThreads = [Math]::Max(1, [Math]::Min(64, [Environment]::ProcessorCount))
 $Threads = [Math]::Max(1, [Math]::Min($Threads, $maximumThreads))
-$timeControl = if ($MovetimeMs -gt 0) { "movetime $MovetimeMs" } elseif ($Nodes -gt 0) {
+$pgnTimeControl = if (-not [string]::IsNullOrWhiteSpace($TimeControl)) { $TimeControl } elseif ($MovetimeMs -gt 0) { "movetime $MovetimeMs" } elseif ($Nodes -gt 0) {
     "nodes $Nodes"
 } else {
     "depth $Depth"
+}
+$clockParts = if (-not [string]::IsNullOrWhiteSpace($TimeControl)) { $TimeControl -split '\+' } else { $null }
+$clockInitialMilliseconds = if ($null -ne $clockParts) { [int64]$clockParts[0] * 60000 } else { [int64]0 }
+$clockIncrementMilliseconds = if ($null -ne $clockParts) { [int64]$clockParts[1] * 1000 } else { [int64]0 }
+
+foreach ($position in $positions) {
+    if ($position.Moves.Count -gt 0) {
+        $openingReplay = Invoke-KoiReplay $position.Fen $position.Moves
+        if (-not $openingReplay.legal) {
+            throw "Opening '$($position.Name)' contains an illegal move sequence."
+        }
+    }
 }
 
 $koiEngine = $null
@@ -467,13 +569,47 @@ try {
             Wait-UciReady $koiEngine 'new-game readyok'
             Wait-UciReady $opponentEngine 'new-game readyok'
 
-            $moves = [System.Collections.Generic.List[string]]::new()
             $moveRecords = [System.Collections.Generic.List[object]]::new()
+            $moves = [System.Collections.Generic.List[string]]::new()
             $replay = Invoke-KoiReplay $position.Fen
             $rootFen = $replay.fen
             $result = $replay.result
             $termination = if ($result -ne '*') { $replay.termination } else { $null }
             $processStatus = [pscustomobject][ordered]@{ koi = 'running'; opponent = 'running' }
+            $clock = if ($null -ne $clockParts) {
+                [pscustomobject]@{ white_ms = $clockInitialMilliseconds; black_ms = $clockInitialMilliseconds; increment_ms = $clockIncrementMilliseconds }
+            } else { $null }
+
+            foreach ($openingMove in $position.Moves) {
+                $side = Get-SideFromFen $rootFen
+                [string[]]$candidateMoves = @($moves) + @($openingMove)
+                $openingMoveReplay = Invoke-KoiReplay $position.Fen $candidateMoves
+                $moveRecords.Add([pscustomobject][ordered]@{
+                    ply = $moveRecords.Count + 1
+                    root_fen = $rootFen
+                    side = $side
+                    engine = 'opening'
+                    engine_label = 'opening'
+                    position_command = Format-PositionCommand $position $moves
+                    go_command = $null
+                    move = $openingMove
+                    replay_legal = $openingMoveReplay.legal
+                    elapsed_ms = [int64]0
+                    final_info = $null
+                    evaluation = $null
+                    all_info_lines = @()
+                    infos = @()
+                    bestmove_line = $null
+                    book_used = $false
+                    book_move = $null
+                })
+                $moves.Add($openingMove)
+                $rootFen = $openingMoveReplay.fen
+                $result = $openingMoveReplay.result
+                if ($result -ne '*') {
+                    $termination = $openingMoveReplay.termination
+                }
+            }
 
             for ($ply = 0; $ply -lt $MaxPlies; ++$ply) {
                 if ($null -ne $termination) {
@@ -485,7 +621,7 @@ try {
                 $engine = if ($koiTurn) { $koiEngine } else { $opponentEngine }
                 $positionCommand = Format-PositionCommand $position $moves
                 try {
-                    $search = Search-UciEngine $engine $position $moves
+                    $search = Search-UciEngine $engine $position $moves $clock
                 } catch {
                     $termination = if ($_.Exception -is [System.TimeoutException]) { 'timeout' } else { 'process exit' }
                     $result = '*'
@@ -496,7 +632,7 @@ try {
                     break
                 }
                 $record = [ordered]@{
-                    ply = $ply + 1
+                    ply = $moveRecords.Count + 1
                     root_fen = $rootFen
                     side = $side
                     engine = $engine.Name
@@ -508,9 +644,11 @@ try {
                     elapsed_ms = $search.elapsed_ms
                     final_info = $search.evaluation
                     evaluation = $search.evaluation
-                    all_info_lines = @($search.infos | ForEach-Object { $_.raw })
+                    all_info_lines = $search.all_info_lines
                     infos = $search.infos
                     bestmove_line = $search.bestmove_line
+                    book_used = $search.book_used
+                    book_move = $search.book_move
                 }
 
                 if ($search.move -ceq '0000') {
@@ -538,6 +676,7 @@ try {
 
                 $moves.Add($search.move)
                 $rootFen = $moveReplay.fen
+                Update-Clock $clock $side $search.elapsed_ms
                 $result = $moveReplay.result
                 if ($result -ne '*') {
                     $termination = $moveReplay.termination
@@ -564,7 +703,7 @@ try {
             }
             $gameObject = [pscustomobject]$game
             $gameRecords.Add($gameObject)
-            $pgnGames.Add((Format-Pgn $position $gameObject $whiteName $blackName $timeControl))
+            $pgnGames.Add((Format-Pgn $position $gameObject $whiteName $blackName $pgnTimeControl))
         }
     }
 }
@@ -633,7 +772,11 @@ $report = [ordered]@{
         timeout_ms = $TimeoutMilliseconds
         games_per_position = $Games
         koi_color = $KoiColor
-        time_control = $timeControl
+        time_control = $pgnTimeControl
+        koi_random_seed = $KoiRandomSeed
+        koi_own_book = $KoiOwnBook
+        koi_book_file = $KoiBookFile
+        koi_book_depth = $KoiBookDepth
     }
     engines = $engineSummary
     positions = @($positions)
