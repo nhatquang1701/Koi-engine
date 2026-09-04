@@ -363,6 +363,9 @@ function Search-UciEngine($Engine, $Position, $Moves, $Clock) {
         $line = Read-UciLine $Engine 'bestmove'
         $bookMatch = [regex]::Match($line, '^info string book move\s+([a-h][1-8][a-h][1-8][nbrq]?)\s+depth\s+(\d+)\s*$')
         if ($bookMatch.Success) {
+            if ($bookUsed) {
+                throw "Engine emitted more than one book marker before bestmove: $line"
+            }
             $bookUsed = $true
             $bookMove = $bookMatch.Groups[1].Value.ToLowerInvariant()
             $allInfoLines.Add($line)
@@ -377,6 +380,9 @@ function Search-UciEngine($Engine, $Position, $Moves, $Clock) {
         $bestMatch = [regex]::Match($line, '^bestmove\s+(\S+)')
         if ($bestMatch.Success) {
             $bestMove = $bestMatch.Groups[1].Value.ToLowerInvariant()
+            if ($bookUsed -and $bestMove -ne $bookMove) {
+                throw "Book marker '$bookMove' does not match bestmove '$bestMove'."
+            }
             $bestMoveLine = $line
         }
     }

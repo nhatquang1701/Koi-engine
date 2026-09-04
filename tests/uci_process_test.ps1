@@ -109,6 +109,14 @@ function Test-SearchInfo([string]$Line) {
     return $Line -match '^info depth [1-9][0-9]* seldepth [0-9]+ multipv [1-9][0-6]? score (cp|mate) -?[0-9]+ nodes [0-9]+ nps [0-9]+ time [0-9]+ pv( [a-h][1-8][a-h][1-8][nbrq]?)*$'
 }
 
+function Write-StartPositionBook([string]$Path) {
+    [byte[]]$bytes = @(
+        0x46, 0x3b, 0x96, 0x18, 0x16, 0x91, 0xfc, 0x9c,
+        0x07, 0x0c, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00
+    )
+    [System.IO.File]::WriteAllBytes($Path, $bytes)
+}
+
 $session = Start-UciSession
 Send-UciCommand $session 'uci'
 $expectedHandshake = @(
@@ -121,6 +129,9 @@ $expectedHandshake = @(
     'option name UCI_AnalyseMode type check default false',
     'option name MultiPV type spin default 1 min 1 max 16',
     'option name Ponder type check default false',
+    'option name OwnBook type check default true',
+    'option name BookFile type string default book.bin',
+    'option name BookDepth type spin default 16 min 0 max 40',
     'option name Clear Hash type button',
     'uciok'
 )
@@ -134,6 +145,39 @@ foreach ($expected in $expectedHandshake) {
 Send-UciCommand $session 'isready'
 if ((Read-UciLine $session 'initial readyok') -cne 'readyok') {
     throw 'Expected readyok after the UCI handshake.'
+}
+
+$bookFileName = "uci-process-book-$([guid]::NewGuid().ToString('N')).bin"
+$bookPath = Join-Path (Split-Path -Parent $EnginePath) $bookFileName
+try {
+    Write-StartPositionBook $bookPath
+    $bookSession = Start-UciSession
+    Send-UciCommand $bookSession 'uci'
+    foreach ($expected in $expectedHandshake) {
+        if ((Read-UciLine $bookSession $expected) -cne $expected) {
+            throw "Unexpected book-session handshake line. Expected '$expected'."
+        }
+    }
+    Send-UciCommand $bookSession 'setoption name RandomSeed value 29'
+    Send-UciCommand $bookSession "setoption name BookFile value $bookFileName"
+    Send-UciCommand $bookSession 'setoption name BookDepth value 16'
+    Send-UciCommand $bookSession 'position startpos'
+    Send-UciCommand $bookSession 'go depth 1'
+    if ((Read-UciLine $bookSession 'executable-relative book marker') -cne 'info string book move e2e4 depth 0') {
+        throw 'A book beside koi-engine.exe must emit its standard marker before bestmove.'
+    }
+    if ((Read-UciLine $bookSession 'executable-relative book bestmove') -cne 'bestmove e2e4') {
+        throw 'A book hit must emit exactly the selected legal bestmove.'
+    }
+    Send-UciCommand $bookSession 'isready'
+    if ((Read-UciLine $bookSession 'readyok after book bestmove') -cne 'readyok') {
+        throw 'A book hit must not emit a duplicate bestmove before readyok.'
+    }
+    $null = Complete-UciSession $bookSession $true
+} finally {
+    if (Test-Path -LiteralPath $bookPath) {
+        Remove-Item -LiteralPath $bookPath -Force
+    }
 }
 
 Send-UciCommand $session 'setoption name UCI_AnalyseMode value true'

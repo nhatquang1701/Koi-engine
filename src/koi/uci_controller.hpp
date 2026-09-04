@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <filesystem>
 #include <iosfwd>
 #include <mutex>
 #include <optional>
@@ -9,6 +10,7 @@
 
 #include "koi/game_state.hpp"
 #include "koi/move_chooser.hpp"
+#include "koi/opening_book.hpp"
 #include "koi/search_service.hpp"
 
 namespace koi {
@@ -24,7 +26,8 @@ class UciController {
 public:
     UciController(std::istream& input, std::ostream& output, std::ostream& diagnostics);
     UciController(std::istream& input, std::ostream& output, std::ostream& diagnostics,
-                  SearchService search_service);
+                  SearchService search_service,
+                  std::filesystem::path executable_directory = {});
     ~UciController();
 
     UciController(const UciController&) = delete;
@@ -46,6 +49,8 @@ private:
     void write_readyok();
     void write_search_info(std::uint64_t generation, const SearchInfo& info);
     void write_search_completion(std::uint64_t generation, const SearchResult& result);
+    void write_book_completion(std::uint64_t generation, const BookChoice& choice,
+                               std::uint32_t root_ply);
     void write_position_error(const char* message);
 
     std::istream& input_;
@@ -54,6 +59,7 @@ private:
     std::mutex output_mutex_;
     GameState position_;
     RandomMoveChooser chooser_{0};
+    OpeningBook opening_book_;
     SearchService search_service_;
     std::optional<SearchHandle> active_search_;
     std::optional<GameState> ponder_root_;
@@ -67,6 +73,9 @@ private:
     bool analyse_mode_ = false;
     std::size_t multi_pv_ = 1;
     bool ponder_enabled_ = false;
+    bool own_book_ = true;
+    std::uint8_t book_depth_ = 16;
+    std::uint32_t random_seed_ = 0;
     std::uint64_t generation_ = 0;
 };
 

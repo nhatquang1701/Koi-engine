@@ -3,6 +3,8 @@
 #include <chrono>
 #include <condition_variable>
 #include <cstdint>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <limits>
 #include <mutex>
@@ -21,6 +23,13 @@ namespace {
 
 using koi::Position;
 using koi::UciController;
+
+struct BookRecord {
+    std::uint64_t key;
+    std::uint16_t move;
+    std::uint16_t weight;
+    std::uint32_t learn;
+};
 
 struct ControllerResult {
     int exit_code;
@@ -46,6 +55,55 @@ ControllerResult run_controller(std::string_view transcript) {
     UciController controller(input, output, diagnostics);
     return {controller.run(), output.str(), diagnostics.str()};
 }
+
+template <class UInt>
+void append_big_endian(std::vector<char>& bytes, UInt value) {
+    for (int shift = static_cast<int>(sizeof(UInt) * 8) - 8; shift >= 0; shift -= 8) {
+        bytes.push_back(static_cast<char>((value >> shift) & 0xff));
+    }
+}
+
+void write_book(const std::filesystem::path& path, const std::vector<BookRecord>& records) {
+    std::vector<char> bytes;
+    bytes.reserve(records.size() * 16);
+    for (const BookRecord& record : records) {
+        append_big_endian(bytes, record.key);
+        append_big_endian(bytes, record.move);
+        append_big_endian(bytes, record.weight);
+        append_big_endian(bytes, record.learn);
+    }
+    std::ofstream stream(path, std::ios::binary | std::ios::trunc);
+    require(stream.good(), "test book must be writable");
+    stream.write(bytes.data(), static_cast<std::streamsize>(bytes.size()));
+    require(stream.good(), "test book must be completely written");
+}
+
+std::uint16_t polyglot_move(std::string_view from, std::string_view to) {
+    const auto source = koi::Square::parse(from);
+    const auto target = koi::Square::parse(to);
+    require(source.has_value() && target.has_value(), "Polyglot coordinates must be valid");
+    return static_cast<std::uint16_t>(source->index() | (target->index() << 6));
+}
+
+class TestDirectory {
+public:
+    TestDirectory()
+        : path_(std::filesystem::temp_directory_path() /
+                ("koi-uci-controller-tests-" +
+                 std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()))) {
+        std::filesystem::create_directories(path_);
+    }
+
+    ~TestDirectory() {
+        std::error_code ignored;
+        std::filesystem::remove_all(path_, ignored);
+    }
+
+    [[nodiscard]] const std::filesystem::path& path() const noexcept { return path_; }
+
+private:
+    std::filesystem::path path_;
+};
 
 std::vector<std::string> output_lines(std::string_view output) {
     std::vector<std::string> lines;
@@ -241,12 +299,97 @@ void test_uci_handshake_has_identity_and_supported_options_in_order() {
         "option name UCI_AnalyseMode type check default false\n"
         "option name MultiPV type spin default 1 min 1 max 16\n"
         "option name Ponder type check default false\n"
+        "option name OwnBook type check default true\n"
+        "option name BookFile type string default book.bin\n"
+        "option name BookDepth type spin default 16 min 0 max 40\n"
         "option name Clear Hash type button\n"
         "uciok\n";
 
     require(result.exit_code == 0, "quit must cause a normal shutdown");
     require(result.output == expected,
             "uci response must advertise the identity, hash, thread, speed, and clear-hash options");
+}
+
+void test_book_options_emit_one_seeded_marker_and_bestmove_for_normal_play() {
+    TestDirectory files;
+    const std::filesystem::path book = files.path() / "controller-book.bin";
+    const koi::GameState start = koi::GameState::startpos();
+    write_book(book, {
+        {start.polyglot_key(), polyglot_move("e2", "e4"), 1, 0},
+        {start.polyglot_key(), polyglot_move("d2", "d4"), 100, 0},
+    });
+
+    const ControllerResult result = run_controller(
+        "setoption name RandomSeed value 29\n"
+        "setoption name OwnBook value false\n"
+        "setoption name OwnBook value true\n"
+        "setoption name OwnBook value invalid\n"
+        "setoption name BookFile value " + book.string() + "\n"
+        "setoption name BookDepth value 0\n"
+        "setoption name BookDepth value 41\n"
+        "position startpos\n"
+        "go depth 1\n"
+        "go depth 1\n"
+        "quit\n");
+    const std::vector<std::string> lines = output_lines(result.output);
+    const std::vector<std::string> markers = lines_starting_with(lines, "info string book move ");
+    const std::vector<std::string> bestmoves = lines_starting_with(lines, "bestmove ");
+
+    require(result.exit_code == 0 && result.diagnostics.empty(),
+            "valid and invalid book options must leave a normal transcript clean");
+    require(markers.size() == 2 && bestmoves.size() == 2,
+            "each normal book hit must emit exactly one marker and one bestmove");
+    require(lines.size() == 4 && lines[0] == markers[0] && lines[1] == bestmoves[0] &&
+                lines[2] == markers[1] && lines[3] == bestmoves[1],
+            "each book marker must be immediately followed by its one bestmove");
+    require(markers[0] == markers[1], "a nonzero RandomSeed must choose the same book move at the same root");
+    require(markers[0].starts_with("info string book move ") && markers[0].ends_with(" depth 0"),
+            "a valid unlimited BookDepth must survive an invalid replacement");
+    const std::string move = markers[0].substr(std::string("info string book move ").size(), 4);
+    require(bestmoves[0] == "bestmove " + move && bestmoves[1] == "bestmove " + move,
+            "every book bestmove must be the legal selected move");
+}
+
+void test_book_fallback_and_analysis_style_commands_search_without_markers() {
+    TestDirectory files;
+    const std::filesystem::path book = files.path() / "controller-book.bin";
+    const koi::GameState start = koi::GameState::startpos();
+    write_book(book, {{start.polyglot_key(), polyglot_move("e2", "e4"), 1, 0}});
+
+    const ControllerResult fallback = run_controller(
+        "setoption name BookFile value " + (files.path() / "missing.bin").string() + "\n"
+        "position startpos\n"
+        "go infinite\n"
+        "stop\n"
+        "quit\n");
+    require(lines_starting_with(output_lines(fallback.output), "info string book move ").empty(),
+            "a missing book must silently fall back to search");
+    require(lines_starting_with(output_lines(fallback.output), "bestmove ").size() == 1,
+            "missing-book fallback must still emit exactly one bestmove");
+
+    const ControllerResult bypass = run_controller(
+        "setoption name BookFile value " + book.string() + "\n"
+        "setoption name UCI_AnalyseMode value true\n"
+        "position startpos\n"
+        "go depth 1\n"
+        "stop\n"
+        "setoption name UCI_AnalyseMode value false\n"
+        "go infinite\n"
+        "stop\n"
+        "go ponder depth 1\n"
+        "stop\n"
+        "go searchmoves e2e4 depth 1\n"
+        "stop\n"
+        "quit\n");
+    const std::vector<std::string> markers =
+        lines_starting_with(output_lines(bypass.output), "info string book move ");
+    const std::vector<std::string> bestmoves =
+        lines_starting_with(output_lines(bypass.output), "bestmove ");
+    require(bypass.exit_code == 0 && bypass.diagnostics.empty(),
+            "analysis-style book bypass commands must leave stderr clean");
+    require(markers.empty(), "analysis, infinite, ponder, and searchmoves commands must bypass the book");
+    require(bestmoves.size() == 4 && bestmoves.back() == "bestmove e2e4",
+            "every bypassed command must preserve its exactly-once search completion");
 }
 
 void test_hash_options_preserve_the_contract_and_never_advertise_threads() {
@@ -891,6 +1034,8 @@ struct TestCase {
 int main() {
     const std::vector<TestCase> tests{
         {"uci handshake and options", test_uci_handshake_has_identity_and_supported_options_in_order},
+        {"opening-book normal play", test_book_options_emit_one_seeded_marker_and_bestmove_for_normal_play},
+        {"opening-book fallback and bypass", test_book_fallback_and_analysis_style_commands_search_without_markers},
         {"Hash and Clear Hash contract", test_hash_options_preserve_the_contract_and_never_advertise_threads},
         {"Threads and Speed validation", test_threads_and_speed_options_accept_valid_values_and_ignore_invalid_values},
         {"Threads and Speed generation replacement", test_threads_and_speed_changes_suppress_the_active_generation},

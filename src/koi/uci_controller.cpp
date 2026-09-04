@@ -24,6 +24,7 @@ constexpr std::uint64_t kMinimumSpeedPercent = 1;
 constexpr std::uint64_t kMaximumSpeedPercent = 100;
 constexpr std::uint64_t kMinimumMultiPv = 1;
 constexpr std::uint64_t kMaximumMultiPv = 16;
+constexpr std::uint64_t kMaximumBookDepth = 40;
 
 std::vector<std::string> remaining_tokens(std::istream& command) {
     std::vector<std::string> tokens;
@@ -74,6 +75,11 @@ bool parse_milliseconds(const std::string& value, std::chrono::milliseconds& dur
     }
     duration = std::chrono::milliseconds{static_cast<Rep>(parsed)};
     return true;
+}
+
+std::uint32_t root_ply(const GameState& state) {
+    const std::uint32_t completed_fullmoves = static_cast<std::uint32_t>(state.fullmove_number() - 1);
+    return completed_fullmoves * 2 + (state.side_to_move() == Color::black ? 1U : 0U);
 }
 
 } // namespace
@@ -198,8 +204,10 @@ UciController::UciController(std::istream& input, std::ostream& output, std::ost
                     SearchService{std::make_shared<ClassicalEvaluator>()}) {}
 
 UciController::UciController(std::istream& input, std::ostream& output,
-                             std::ostream& diagnostics, SearchService search_service)
+                             std::ostream& diagnostics, SearchService search_service,
+                             std::filesystem::path executable_directory)
     : input_(input), output_(output), diagnostics_(diagnostics),
+      opening_book_(std::move(executable_directory)),
       search_service_(std::move(search_service)) {}
 
 UciController::~UciController() {
@@ -302,6 +310,7 @@ void UciController::handle_setoption(std::istream& command) {
         if (parse_random_seed(tokens[3], seed)) {
             stop_and_suppress_active_search();
             chooser_.set_seed(seed);
+            random_seed_ = seed;
         }
         return;
     }
@@ -365,6 +374,40 @@ void UciController::handle_setoption(std::istream& command) {
         if (parse_boolean(tokens[3], ponder_enabled)) {
             stop_and_suppress_active_search();
             ponder_enabled_ = ponder_enabled;
+        }
+        return;
+    }
+
+    if (tokens.size() == 4 && tokens[0] == "name" && tokens[1] == "OwnBook" &&
+        tokens[2] == "value") {
+        bool own_book = false;
+        if (parse_boolean(tokens[3], own_book)) {
+            stop_and_suppress_active_search();
+            own_book_ = own_book;
+        }
+        return;
+    }
+
+    if (tokens.size() >= 4 && tokens[0] == "name" && tokens[1] == "BookFile" &&
+        tokens[2] == "value") {
+        std::string filename = tokens[3];
+        for (std::size_t index = 4; index < tokens.size(); ++index) {
+            filename += ' ';
+            filename += tokens[index];
+        }
+        if (!filename.empty()) {
+            stop_and_suppress_active_search();
+            opening_book_.set_file(std::move(filename));
+        }
+        return;
+    }
+
+    if (tokens.size() == 4 && tokens[0] == "name" && tokens[1] == "BookDepth" &&
+        tokens[2] == "value") {
+        std::uint64_t book_depth = 0;
+        if (parse_uint64(tokens[3], book_depth) && book_depth <= kMaximumBookDepth) {
+            stop_and_suppress_active_search();
+            book_depth_ = static_cast<std::uint8_t>(book_depth);
         }
         return;
     }
@@ -438,6 +481,17 @@ void UciController::handle_ponderhit() {
 
 void UciController::start_search(GameState root, SearchLimits limits) {
     const std::uint64_t generation = begin_generation();
+    const bool book_eligible = !analyse_mode_ && !limits.infinite && !limits.ponder &&
+        !limits.search_moves_specified;
+    if (book_eligible) {
+        const std::uint32_t ply = root_ply(root);
+        const std::optional<BookChoice> choice =
+            opening_book_.choose(root, ply, own_book_, book_depth_, random_seed_);
+        if (choice.has_value()) {
+            write_book_completion(generation, *choice, ply);
+            return;
+        }
+    }
     const GameState search_root = root;
     const bool is_ponder_search = limits.ponder;
 
@@ -532,6 +586,9 @@ void UciController::write_handshake() {
                "option name UCI_AnalyseMode type check default false\n"
                "option name MultiPV type spin default 1 min 1 max 16\n"
                "option name Ponder type check default false\n"
+               "option name OwnBook type check default true\n"
+               "option name BookFile type string default book.bin\n"
+               "option name BookDepth type spin default 16 min 0 max 40\n"
                "option name Clear Hash type button\n"
                "uciok\n"
             << std::flush;
@@ -576,6 +633,17 @@ void UciController::write_search_completion(std::uint64_t generation,
         output_ << " ponder " << result.ponder_move->uci();
     }
     output_ << '\n' << std::flush;
+}
+
+void UciController::write_book_completion(std::uint64_t generation, const BookChoice& choice,
+                                          std::uint32_t ply) {
+    std::lock_guard lock(output_mutex_);
+    if (generation != generation_) {
+        return;
+    }
+
+    output_ << "info string book move " << choice.move.uci() << " depth " << ply << '\n'
+            << "bestmove " << choice.move.uci() << '\n' << std::flush;
 }
 
 void UciController::write_position_error(const char* message) {

@@ -218,6 +218,21 @@ Reduce `Hash` or `Threads` if other applications need the memory or CPU.
 
 ### Lucas Chess workflows
 
+Koi enables its Polyglot opening book by default. Place `book.bin` beside
+`koi-engine.exe`; a relative `BookFile` is resolved from that executable
+directory, not Lucas Chess's working directory. The relevant UCI options are:
+
+```text
+setoption name OwnBook value true
+setoption name BookFile value book.bin
+setoption name BookDepth value 16
+```
+
+`BookDepth 0` leaves the book unlimited; values from `1` through `40` limit
+the exclusive root ply depth. On a hit Koi writes
+`info string book move <uci> depth <ply>` followed by that one legal
+`bestmove`. A missing or invalid book silently falls back to search.
+
 For normal play, set the position supplied by Lucas Chess and use its clock
 limits, for example `go wtime 60000 btime 60000`. Koi returns one final legal
 `bestmove` for that search.
@@ -242,6 +257,9 @@ go depth 12
 Koi emits one `info` line per principal variation, with `multipv 1` as the
 best-ranked line. Use `go ... searchmoves e2e4` (with any legal coordinate
 moves required) to restrict the legal root moves considered by that search.
+Opening-book selection is intentionally disabled for `UCI_AnalyseMode`,
+`go infinite`, `go ponder`, and any `go ... searchmoves ...` command, so those
+Lucas Chess tutor and analysis workflows always use search results.
 
 For ponder support, enable it before Lucas Chess begins pondering:
 
