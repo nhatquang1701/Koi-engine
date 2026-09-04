@@ -95,17 +95,27 @@ without contaminating later positions. PGN Result headers match the adjudicated 
 lines and `#` comments are ignored). The replay executable is expected beside
 `koi-engine.exe` (or can be supplied as `-ReplayPath`).
 
-For paired Elo measurements, supply the checked-in eight-opening suite (or another
-file in the same `name | uci move uci move` format) and a chess clock:
+For color-balanced paired Elo measurements, supply the checked-in eight-opening
+suite (or another file in the same `name | uci move uci move` format) and a chess
+clock. `-Games` is the number of games run for each selected opening, so use 20 as
+Koi White and 20 as Koi Black for 40 games per opening and condition. Run both
+book-disabled and licensed-book conditions at both clocks:
 
 ```powershell
 .\tools\uci_match.ps1 `
   -KoiPath .\out\release-vs\koi-engine.exe `
   -OpponentPath C:\Engines\stockfish.exe `
   -OpeningFile .\tests\data\elo-openings.txt `
-  -TimeControl 1+0 -KoiColor black `
+  -TimeControl 1+0 -Games 20 -KoiColor white `
   -KoiRandomSeed 1 -KoiOwnBook false `
-  -OutputDirectory .\match-results
+  -OutputDirectory C:\Koi-results\no-book-1p0-white
+.\tools\uci_match.ps1 -KoiPath .\out\release-vs\koi-engine.exe -OpponentPath C:\Engines\stockfish.exe -OpeningFile .\tests\data\elo-openings.txt -TimeControl 1+0 -Games 20 -KoiColor black -KoiRandomSeed 1 -KoiOwnBook false -OutputDirectory C:\Koi-results\no-book-1p0-black
+.\tools\uci_match.ps1 -KoiPath .\out\release-vs\koi-engine.exe -OpponentPath C:\Engines\stockfish.exe -OpeningFile .\tests\data\elo-openings.txt -TimeControl 1+0 -Games 20 -KoiColor white -KoiRandomSeed 1 -KoiOwnBook true -KoiBookFile C:\LicensedBooks\book.bin -KoiBookDepth 16 -OutputDirectory C:\Koi-results\book-1p0-white
+.\tools\uci_match.ps1 -KoiPath .\out\release-vs\koi-engine.exe -OpponentPath C:\Engines\stockfish.exe -OpeningFile .\tests\data\elo-openings.txt -TimeControl 1+0 -Games 20 -KoiColor black -KoiRandomSeed 1 -KoiOwnBook true -KoiBookFile C:\LicensedBooks\book.bin -KoiBookDepth 16 -OutputDirectory C:\Koi-results\book-1p0-black
+.\tools\uci_match.ps1 -KoiPath .\out\release-vs\koi-engine.exe -OpponentPath C:\Engines\stockfish.exe -OpeningFile .\tests\data\elo-openings.txt -TimeControl 5+3 -Games 20 -KoiColor white -KoiRandomSeed 1 -KoiOwnBook false -OutputDirectory C:\Koi-results\no-book-5p3-white
+.\tools\uci_match.ps1 -KoiPath .\out\release-vs\koi-engine.exe -OpponentPath C:\Engines\stockfish.exe -OpeningFile .\tests\data\elo-openings.txt -TimeControl 5+3 -Games 20 -KoiColor black -KoiRandomSeed 1 -KoiOwnBook false -OutputDirectory C:\Koi-results\no-book-5p3-black
+.\tools\uci_match.ps1 -KoiPath .\out\release-vs\koi-engine.exe -OpponentPath C:\Engines\stockfish.exe -OpeningFile .\tests\data\elo-openings.txt -TimeControl 5+3 -Games 20 -KoiColor white -KoiRandomSeed 1 -KoiOwnBook true -KoiBookFile C:\LicensedBooks\book.bin -KoiBookDepth 16 -OutputDirectory C:\Koi-results\book-5p3-white
+.\tools\uci_match.ps1 -KoiPath .\out\release-vs\koi-engine.exe -OpponentPath C:\Engines\stockfish.exe -OpeningFile .\tests\data\elo-openings.txt -TimeControl 5+3 -Games 20 -KoiColor black -KoiRandomSeed 1 -KoiOwnBook true -KoiBookFile C:\LicensedBooks\book.bin -KoiBookDepth 16 -OutputDirectory C:\Koi-results\book-5p3-black
 ```
 
 `-TimeControl` accepts only `<minutes>+<increment>` (for example `1+0` or `5+3`)
@@ -168,16 +178,16 @@ input EOF. A supplied executable-relative Polyglot book gives a legal weighted
 choice that repeats for a nonzero seed; normal play defaults to `OwnBook=true`,
 `BookFile=book.bin`, and `BookDepth=16`. Put `book.bin` beside `koi-engine.exe`.
 A missing, malformed, unusable, disabled, or depth-exhausted book falls through to
-normal search and never prevents startup. Analysis mode, `go infinite`, `go ponder`,
-and `searchmoves` deliberately bypass the book.
+normal search and never prevents startup. Analysis mode, `MultiPV>1`, `go infinite`,
+`go ponder`, and `searchmoves` deliberately bypass the book.
 
 The recorded `Get-Command stockfish` and `Get-Command Stockfish` checks returned no
-executable, and no supplied UCI opponent was available, so no 40-game paired
-1+0/5+3 measurements were fabricated. To perform them, supply an opponent and run
-the paired command in [Developer tools](#developer-tools) once with
-`-KoiOwnBook false`, then again with the licensed `book.bin` and `-KoiOwnBook true`;
-retain the JSON and PGN output outside the checkout. Lucas Chess was not installed
-or accessible in this environment, so manual registration was not performed. Use
+executable, and no supplied UCI opponent was available, so no color-balanced
+40-game-per-opening 1+0/5+3 measurements were fabricated. To perform them, supply
+an opponent and run the explicit 20-white/20-black no-book and licensed-book matrix
+in [Developer tools](#developer-tools); retain the JSON and PGN output outside the
+checkout. Lucas Chess was not installed or accessible in this environment, so manual
+registration was not performed. Use
 the Release `koi-engine.exe` and the Lucas settings listed below (`Hash 512`,
 `Threads 4`, `Speed 100`, `OwnBook true`, `BookFile book.bin`, `BookDepth 16`) to
 complete that GUI check.
@@ -299,9 +309,9 @@ go depth 12
 Koi emits one `info` line per principal variation, with `multipv 1` as the
 best-ranked line. Use `go ... searchmoves e2e4` (with any legal coordinate
 moves required) to restrict the legal root moves considered by that search.
-Opening-book selection is intentionally disabled for `UCI_AnalyseMode`,
-`go infinite`, `go ponder`, and any `go ... searchmoves ...` command, so those
-Lucas Chess tutor and analysis workflows always use search results.
+Opening-book selection is intentionally disabled for `UCI_AnalyseMode`, `MultiPV`
+values greater than one, `go infinite`, `go ponder`, and any `go ... searchmoves ...`
+command, so those Lucas Chess tutor and analysis workflows always use search results.
 
 For ponder support, enable it before Lucas Chess begins pondering:
 

@@ -181,6 +181,36 @@ try {
     if ((Read-UciLine $bookSession 'readyok after book bestmove') -cne 'readyok') {
         throw 'A book hit must not emit a duplicate bestmove before readyok.'
     }
+    Send-UciCommand $bookSession 'setoption name MultiPV value 3'
+    Send-UciCommand $bookSession 'position startpos'
+    Send-UciCommand $bookSession 'go depth 1'
+    $multiPvRanks = [System.Collections.Generic.HashSet[int]]::new()
+    $multiPvBestmove = $null
+    while ($null -eq $multiPvBestmove) {
+        $line = Read-UciLine $bookSession 'normal MultiPV search with matching book'
+        if ($line -like 'info string book move *') {
+            throw "MultiPV greater than one must search instead of using the book: $line"
+        }
+        if ($line -like 'bestmove *') {
+            if ($line -notmatch '^bestmove [a-h][1-8][a-h][1-8][nbrq]?$') {
+                throw "MultiPV search emitted an invalid bestmove: $line"
+            }
+            $multiPvBestmove = $line
+        } elseif (Test-SearchInfo $line) {
+            if ($line -match ' multipv ([1-9][0-9]*) score ') {
+                $null = $multiPvRanks.Add([int]$Matches[1])
+            }
+        } else {
+            throw "Invalid normal MultiPV output: $line"
+        }
+    }
+    if (-not ($multiPvRanks.Contains(1) -and $multiPvRanks.Contains(2) -and $multiPvRanks.Contains(3))) {
+        throw "Normal MultiPV search did not emit all three ranked variations: $($multiPvRanks -join ', ')"
+    }
+    Send-UciCommand $bookSession 'isready'
+    if ((Read-UciLine $bookSession 'readyok after MultiPV search') -cne 'readyok') {
+        throw 'MultiPV search emitted a duplicate bestmove before readyok.'
+    }
     $null = Complete-UciSession $bookSession $true
 } finally {
     if ($null -ne $bookSession -and -not $bookSession.Process.HasExited) {

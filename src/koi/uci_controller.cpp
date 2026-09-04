@@ -481,8 +481,8 @@ void UciController::handle_ponderhit() {
 
 void UciController::start_search(GameState root, SearchLimits limits, bool skip_book) {
     const std::uint64_t generation = begin_generation();
-    const bool book_eligible = !skip_book && !analyse_mode_ && !limits.infinite && !limits.ponder &&
-        !limits.search_moves_specified;
+    const bool book_eligible = !skip_book && !analyse_mode_ && multi_pv_ == 1 && !limits.infinite &&
+        !limits.ponder && !limits.search_moves_specified;
     if (book_eligible) {
         const std::uint32_t ply = root_ply(root);
         const std::optional<BookChoice> choice =

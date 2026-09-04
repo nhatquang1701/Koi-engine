@@ -291,6 +291,23 @@ private:
     GatedInputBuffer& input_;
 };
 
+class ReleaseOnMultiPvOrBookBuffer final : public std::stringbuf {
+public:
+    explicit ReleaseOnMultiPvOrBookBuffer(GatedInputBuffer& input) : input_(input) {}
+
+    int sync() override {
+        const std::string output = str();
+        if (output.find(" multipv 3 ") != std::string::npos ||
+            output.find("info string book move ") != std::string::npos) {
+            input_.mark_marker();
+        }
+        return std::stringbuf::sync();
+    }
+
+private:
+    GatedInputBuffer& input_;
+};
+
 class ReleaseOnDepthBuffer final : public std::stringbuf {
 public:
     ReleaseOnDepthBuffer(GatedInputBuffer& input, int depth) : input_(input), depth_(depth) {}
@@ -427,6 +444,57 @@ void test_book_fallback_and_analysis_style_commands_search_without_markers() {
     require(markers.empty(), "analysis, infinite, ponder, and searchmoves commands must bypass the book");
     require(bestmoves.size() == 4 && bestmoves.back() == "bestmove e2e4",
             "every bypassed command must preserve its exactly-once search completion");
+}
+
+void test_multipv_search_bypasses_a_matching_book_without_analysis_mode() {
+    TestDirectory files;
+    const std::filesystem::path book = files.path() / "multipv-book.bin";
+    const koi::GameState start = koi::GameState::startpos();
+    write_book(book, {{start.polyglot_key(), polyglot_move("e2", "e4"), 1, 0}});
+
+    GatedInputBuffer input(
+        "setoption name BookFile value " + book.string() + "\n"
+        "setoption name MultiPV value 3\n"
+        "position startpos\n"
+        "go depth 1\n",
+        "stop\nquit\n");
+    std::istream input_stream(&input);
+    ReleaseOnMultiPvOrBookBuffer output_buffer(input);
+    std::ostream output(&output_buffer);
+    std::ostringstream diagnostics;
+    int exit_code = -1;
+    std::thread controller_thread([&] {
+        UciController controller(input_stream, output, diagnostics);
+        exit_code = controller.run();
+    });
+    const bool marker_seen = input.wait_for_marker(std::chrono::seconds(5));
+    if (!marker_seen) {
+        input.release();
+    }
+    controller_thread.join();
+
+    const std::vector<std::string> lines = output_lines(output_buffer.str());
+    const std::vector<std::string> infos = lines_starting_with(lines, "info depth ");
+    const std::vector<std::string> bestmoves = lines_starting_with(lines, "bestmove ");
+
+    require(marker_seen, "MultiPV search must reach its third variation rather than stop at a book hit");
+    require(exit_code == 0 && diagnostics.str().empty(),
+            "a normal MultiPV transcript with a matching book must remain protocol-clean");
+    require(lines_starting_with(lines, "info string book move ").empty(),
+            "MultiPV greater than one must bypass a matching opening-book entry");
+    bool saw_multipv_one = false;
+    bool saw_multipv_two = false;
+    bool saw_multipv_three = false;
+    for (const std::string& info : infos) {
+        require(is_valid_search_info(info), "MultiPV book bypass must emit valid search info");
+        saw_multipv_one = saw_multipv_one || info.find(" multipv 1 ") != std::string::npos;
+        saw_multipv_two = saw_multipv_two || info.find(" multipv 2 ") != std::string::npos;
+        saw_multipv_three = saw_multipv_three || info.find(" multipv 3 ") != std::string::npos;
+    }
+    require(saw_multipv_one && saw_multipv_two && saw_multipv_three,
+            "MultiPV book bypass must retain all requested ranked search variations");
+    require(bestmoves.size() == 1 && is_legal_move(Position{}, bestmoves[0].substr(9)),
+            "MultiPV book bypass must retain exactly one legal search completion");
 }
 
 void test_ponderhit_keeps_the_entire_ponder_workflow_out_of_the_book() {
@@ -1165,6 +1233,7 @@ int main() {
         {"uci handshake and options", test_uci_handshake_has_identity_and_supported_options_in_order},
         {"opening-book normal play", test_book_options_emit_one_seeded_marker_and_bestmove_for_normal_play},
         {"opening-book fallback and bypass", test_book_fallback_and_analysis_style_commands_search_without_markers},
+        {"opening-book MultiPV bypass", test_multipv_search_bypasses_a_matching_book_without_analysis_mode},
         {"ponderhit book bypass", test_ponderhit_keeps_the_entire_ponder_workflow_out_of_the_book},
         {"opening-book depth boundaries", test_book_depth_boundaries_and_invalid_values_preserve_the_previous_limit},
         {"opening-book option generation replacement", test_book_option_changes_suppress_active_search_generations},

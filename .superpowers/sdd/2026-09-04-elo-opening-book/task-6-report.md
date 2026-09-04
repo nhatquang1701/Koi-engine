@@ -112,18 +112,23 @@ contained only UCI protocol lines, including the advertised options, `uciok`,
 ## External verification limitations
 
 `Get-Command stockfish` and `Get-Command Stockfish` returned no executable, and
-there was no supplied UCI opponent. Therefore no 40-game paired measurements at
-1+0 or 5+3 were run and no results were invented. When an opponent is supplied,
-run the checked-in harness twice for each clock, once without and once with the
-licensed book:
+there was no supplied UCI opponent. Therefore no color-balanced 40-game-per-opening
+measurements at 1+0 or 5+3 were run and no results were invented. `-Games` is the
+number of games per selected opening, so the reproducible 40-game recipe is 20 Koi
+White plus 20 Koi Black games for each clock and book condition. When an opponent
+and licensed book are supplied, run all of these commands and retain every JSON/PGN
+outside the repository:
 
 ```powershell
-.\tools\uci_match.ps1 -KoiPath "$env:TEMP\koi-task6-20260904\release\koi-engine.exe" -OpponentPath C:\Engines\stockfish.exe -OpeningFile .\tests\data\elo-openings.txt -TimeControl 1+0 -Games 40 -KoiRandomSeed 1 -KoiOwnBook false -OutputDirectory C:\Koi-results\no-book-1p0
-.\tools\uci_match.ps1 -KoiPath "$env:TEMP\koi-task6-20260904\release\koi-engine.exe" -OpponentPath C:\Engines\stockfish.exe -OpeningFile .\tests\data\elo-openings.txt -TimeControl 1+0 -Games 40 -KoiRandomSeed 1 -KoiOwnBook true -KoiBookFile C:\LicensedBooks\book.bin -KoiBookDepth 16 -OutputDirectory C:\Koi-results\book-1p0
+.\tools\uci_match.ps1 -KoiPath "$env:TEMP\koi-task6-20260904\release\koi-engine.exe" -OpponentPath C:\Engines\stockfish.exe -OpeningFile .\tests\data\elo-openings.txt -TimeControl 1+0 -Games 20 -KoiColor white -KoiRandomSeed 1 -KoiOwnBook false -OutputDirectory C:\Koi-results\no-book-1p0-white
+.\tools\uci_match.ps1 -KoiPath "$env:TEMP\koi-task6-20260904\release\koi-engine.exe" -OpponentPath C:\Engines\stockfish.exe -OpeningFile .\tests\data\elo-openings.txt -TimeControl 1+0 -Games 20 -KoiColor black -KoiRandomSeed 1 -KoiOwnBook false -OutputDirectory C:\Koi-results\no-book-1p0-black
+.\tools\uci_match.ps1 -KoiPath "$env:TEMP\koi-task6-20260904\release\koi-engine.exe" -OpponentPath C:\Engines\stockfish.exe -OpeningFile .\tests\data\elo-openings.txt -TimeControl 1+0 -Games 20 -KoiColor white -KoiRandomSeed 1 -KoiOwnBook true -KoiBookFile C:\LicensedBooks\book.bin -KoiBookDepth 16 -OutputDirectory C:\Koi-results\book-1p0-white
+.\tools\uci_match.ps1 -KoiPath "$env:TEMP\koi-task6-20260904\release\koi-engine.exe" -OpponentPath C:\Engines\stockfish.exe -OpeningFile .\tests\data\elo-openings.txt -TimeControl 1+0 -Games 20 -KoiColor black -KoiRandomSeed 1 -KoiOwnBook true -KoiBookFile C:\LicensedBooks\book.bin -KoiBookDepth 16 -OutputDirectory C:\Koi-results\book-1p0-black
+.\tools\uci_match.ps1 -KoiPath "$env:TEMP\koi-task6-20260904\release\koi-engine.exe" -OpponentPath C:\Engines\stockfish.exe -OpeningFile .\tests\data\elo-openings.txt -TimeControl 5+3 -Games 20 -KoiColor white -KoiRandomSeed 1 -KoiOwnBook false -OutputDirectory C:\Koi-results\no-book-5p3-white
+.\tools\uci_match.ps1 -KoiPath "$env:TEMP\koi-task6-20260904\release\koi-engine.exe" -OpponentPath C:\Engines\stockfish.exe -OpeningFile .\tests\data\elo-openings.txt -TimeControl 5+3 -Games 20 -KoiColor black -KoiRandomSeed 1 -KoiOwnBook false -OutputDirectory C:\Koi-results\no-book-5p3-black
+.\tools\uci_match.ps1 -KoiPath "$env:TEMP\koi-task6-20260904\release\koi-engine.exe" -OpponentPath C:\Engines\stockfish.exe -OpeningFile .\tests\data\elo-openings.txt -TimeControl 5+3 -Games 20 -KoiColor white -KoiRandomSeed 1 -KoiOwnBook true -KoiBookFile C:\LicensedBooks\book.bin -KoiBookDepth 16 -OutputDirectory C:\Koi-results\book-5p3-white
+.\tools\uci_match.ps1 -KoiPath "$env:TEMP\koi-task6-20260904\release\koi-engine.exe" -OpponentPath C:\Engines\stockfish.exe -OpeningFile .\tests\data\elo-openings.txt -TimeControl 5+3 -Games 20 -KoiColor black -KoiRandomSeed 1 -KoiOwnBook true -KoiBookFile C:\LicensedBooks\book.bin -KoiBookDepth 16 -OutputDirectory C:\Koi-results\book-5p3-black
 ```
-
-Repeat the two commands with `-TimeControl 5+3`; preserve each generated JSON/PGN
-outside the repository.
 
 No Lucas Chess executable or accessible installation was found, so manual GUI
 registration was not claimed. The user can register
