@@ -41,7 +41,9 @@ function New-ScriptedUciEngine([string]$Directory, [string]$Name) {
 function Invoke-ScriptedMatch([string]$KoiPath, [string]$OpponentPath, [string]$OutputDirectory,
                                [int]$Games, [int]$MaxPlies, [int]$TimeoutMilliseconds = 5000,
                                [string]$OpeningFile = '', [string]$TimeControl = '',
-                               [string]$KoiColor = 'white') {
+                               [string]$KoiColor = 'white', [uint64]$KoiRandomSeed = 1,
+                               [bool]$KoiOwnBook = $true, [string]$KoiBookFile = 'book.bin',
+                               [int]$KoiBookDepth = 16) {
     $optionalArguments = @()
     if (-not [string]::IsNullOrWhiteSpace($OpeningFile)) {
         $optionalArguments += @('-OpeningFile', $OpeningFile)
@@ -52,7 +54,9 @@ function Invoke-ScriptedMatch([string]$KoiPath, [string]$OpponentPath, [string]$
     $output = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $matchScript `
         -KoiPath $KoiPath -OpponentPath $OpponentPath -ReplayPath $replayPath `
         -KoiColor $KoiColor -Depth 1 -Games $Games -MaxPlies $MaxPlies `
-        -TimeoutMilliseconds $TimeoutMilliseconds -OutputDirectory $OutputDirectory @optionalArguments
+        -TimeoutMilliseconds $TimeoutMilliseconds -OutputDirectory $OutputDirectory `
+        -KoiRandomSeed $KoiRandomSeed -KoiOwnBook $KoiOwnBook.ToString().ToLowerInvariant() `
+        -KoiBookFile $KoiBookFile -KoiBookDepth $KoiBookDepth @optionalArguments
     if ($LASTEXITCODE -ne 0) {
         throw "scripted UCI match exited with ${LASTEXITCODE}: $($output -join ' | ')"
     }
@@ -182,35 +186,62 @@ try {
     New-Item -ItemType Directory -Path $openingDirectory -Force | Out-Null
     $bookKoi = New-ScriptedUciEngine $openingDirectory 'book-koi'
     $openingOpponent = New-ScriptedUciEngine $openingDirectory 'opening-opponent'
-    $openingMatch = Invoke-ScriptedMatch $bookKoi.path $openingOpponent.path $openingDirectory 1 1 5000 $openingFile '1+0' 'black'
+    $openingMatch = Invoke-ScriptedMatch $bookKoi.path $openingOpponent.path $openingDirectory `
+        1 1 5000 $openingFile '1+0' 'black' 29 $false 'fixtures\elo-book.bin' 7
     $openingReport = $openingMatch.report
     if ($openingReport.schema -ne 'koi-uci-match-v2' -or $openingReport.games.Count -ne 8 -or
         $openingReport.configuration.time_control -ne '1+0' -or
-        $openingReport.configuration.koi_color -ne 'black') {
+        $openingReport.configuration.koi_color -ne 'black' -or
+        $openingReport.configuration.koi_random_seed -ne 29 -or
+        $openingReport.configuration.koi_own_book -ne $false -or
+        $openingReport.configuration.koi_book_file -ne 'fixtures\elo-book.bin' -or
+        $openingReport.configuration.koi_book_depth -ne 7) {
         throw 'Opening matches must preserve the v2 report while replaying every named opening with Koi as Black.'
     }
-    $e4Game = @($openingReport.games | Where-Object { $_.position -eq 'e4' })[0]
-    if ($null -eq $e4Game -or $e4Game.koi_color -ne 'black' -or
-        $e4Game.moves.Count -lt 2 -or $e4Game.moves[0].move -ne 'e2e4' -or
-        $e4Game.moves[0].replay_legal -ne $true -or
-        $e4Game.moves[1].side -ne 'b' -or $e4Game.moves[1].engine_label -ne 'Koi' -or
-        $e4Game.moves[1].position_command -ne 'position startpos moves e2e4') {
-        throw 'Opening replay must establish the requested position and swap Koi to the selected color before search.'
+    $expectedOpenings = @{
+        e4 = @{ moves = @('e2e4'); side = 'b'; engine = 'Koi' }
+        d4 = @{ moves = @('d2d4'); side = 'b'; engine = 'Koi' }
+        english = @{ moves = @('c2c4'); side = 'b'; engine = 'Koi' }
+        scandinavian = @{ moves = @('e2e4', 'd7d5'); side = 'w'; engine = 'Opponent' }
+        french = @{ moves = @('e2e4', 'e7e6'); side = 'w'; engine = 'Opponent' }
+        'caro-kann' = @{ moves = @('e2e4', 'c7c6'); side = 'w'; engine = 'Opponent' }
+        sicilian = @{ moves = @('e2e4', 'c7c5'); side = 'w'; engine = 'Opponent' }
+        'queens-gambit' = @{ moves = @('d2d4', 'd7d5', 'c2c4'); side = 'b'; engine = 'Koi' }
     }
+    foreach ($name in $expectedOpenings.Keys) {
+        $expected = $expectedOpenings[$name]
+        $game = @($openingReport.games | Where-Object { $_.position -eq $name })[0]
+        $expectedCommand = 'position startpos moves ' + ($expected.moves -join ' ')
+        $openingMoves = @($game.moves | Select-Object -First $expected.moves.Count)
+        if ($null -eq $game -or $game.koi_color -ne 'black' -or
+            $game.moves.Count -ne ($expected.moves.Count + 1) -or
+            (@($openingMoves.move) -join ' ') -ne ($expected.moves -join ' ') -or
+            @($openingMoves | Where-Object { $_.replay_legal -ne $true }).Count -ne 0 -or
+            $game.moves[$expected.moves.Count].side -ne $expected.side -or
+            $game.moves[$expected.moves.Count].engine_label -ne $expected.engine -or
+            $game.moves[$expected.moves.Count].position_command -ne $expectedCommand) {
+            throw "Opening '$name' must replay its exact legal sequence and assign the next side to the correct engine."
+        }
+    }
+    $e4Game = @($openingReport.games | Where-Object { $_.position -eq 'e4' })[0]
     $clockCommand = $e4Game.moves[1].go_command
     if ($clockCommand -notmatch '^go wtime 60000 btime 60000 winc 0 binc 0$') {
         throw "Clock matches must send both clocks and increments on every search. Actual: $clockCommand"
     }
     $koiOptions = @($openingReport.engines | Where-Object { $_.label -eq 'Koi' })[0].options
     foreach ($option in @(
-        'setoption name RandomSeed value 1',
-        'setoption name OwnBook value true',
-        'setoption name BookFile value book.bin',
-        'setoption name BookDepth value 16'
+        'setoption name RandomSeed value 29',
+        'setoption name OwnBook value false',
+        'setoption name BookFile value fixtures\elo-book.bin',
+        'setoption name BookDepth value 7'
     )) {
         if ($koiOptions -notcontains $option) {
             throw "Koi opening-book match configuration must send '$option'."
         }
+    }
+    $opponentOptions = @($openingReport.engines | Where-Object { $_.label -eq 'Opponent' })[0].options
+    if (@($opponentOptions | Where-Object { $_ -match '^setoption name (RandomSeed|OwnBook|BookFile|BookDepth) value ' }).Count -ne 0) {
+        throw 'Koi-specific seed and book options must not be sent to the opponent.'
     }
     if ($e4Game.moves[1].book_used -ne $true -or $e4Game.moves[1].book_move -ne 'e7e5' -or
         $e4Game.moves[1].final_info -ne $null -or

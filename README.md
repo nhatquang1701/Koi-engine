@@ -104,7 +104,7 @@ file in the same `name | uci move uci move` format) and a chess clock:
   -OpponentPath C:\Engines\stockfish.exe `
   -OpeningFile .\tests\data\elo-openings.txt `
   -TimeControl 1+0 -KoiColor black `
-  -KoiRandomSeed 1 -KoiOwnBook:$false `
+  -KoiRandomSeed 1 -KoiOwnBook false `
   -OutputDirectory .\match-results
 ```
 

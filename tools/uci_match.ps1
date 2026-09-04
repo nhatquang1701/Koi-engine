@@ -30,7 +30,8 @@ param(
 
     [uint64]$KoiRandomSeed = 1,
 
-    [bool]$KoiOwnBook = $true,
+    [ValidateSet('true', 'false', '1', '0')]
+    [string]$KoiOwnBook = 'true',
 
     [string]$KoiBookFile = 'book.bin',
 
@@ -57,6 +58,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$KoiOwnBook = $KoiOwnBook -in @('true', '1')
 
 if ($MovetimeMs -gt 0 -and $Nodes -gt 0) {
     throw 'Choose at most one of -MovetimeMs and -Nodes.'
