@@ -137,8 +137,9 @@ ctest --test-dir out\release-vs -C Release --output-on-failure
 ```
 
 The optional corpus is retained for local tuning and is deliberately not an Elo or NPS
-CI threshold. NNUE, opening books, tablebases, and chess variants remain deferred;
-this engine continues to evaluate standard chess with its classical evaluator.
+CI threshold. NNUE, tablebases, and chess variants remain deferred; opening-book
+defaults, placement, fallback, and bypass behavior are documented below. This engine
+continues to evaluate standard chess with its classical evaluator.
 
 ### Local verification baseline (2026-09-04)
 
@@ -170,15 +171,16 @@ A missing, malformed, unusable, disabled, or depth-exhausted book falls through 
 normal search and never prevents startup. Analysis mode, `go infinite`, `go ponder`,
 and `searchmoves` deliberately bypass the book.
 
-No Stockfish or other UCI opponent executable was available on this machine's
-`PATH`, so no 40-game paired 1+0/5+3 measurements were fabricated. To perform
-them, supply an opponent and run the paired command in [Developer tools](#developer-tools)
-once with `-KoiOwnBook false`, then again with the licensed `book.bin` and
-`-KoiOwnBook true`; retain the JSON and PGN output outside the checkout. Lucas Chess
-was not installed or accessible in this environment, so manual registration was not
-performed. Use the Release `koi-engine.exe` and the Lucas settings listed below
-(`Hash 512`, `Threads 4`, `Speed 100`, `OwnBook true`, `BookFile book.bin`,
-`BookDepth 16`) to complete that GUI check.
+The recorded `Get-Command stockfish` and `Get-Command Stockfish` checks returned no
+executable, and no supplied UCI opponent was available, so no 40-game paired
+1+0/5+3 measurements were fabricated. To perform them, supply an opponent and run
+the paired command in [Developer tools](#developer-tools) once with
+`-KoiOwnBook false`, then again with the licensed `book.bin` and `-KoiOwnBook true`;
+retain the JSON and PGN output outside the checkout. Lucas Chess was not installed
+or accessible in this environment, so manual registration was not performed. Use
+the Release `koi-engine.exe` and the Lucas settings listed below (`Hash 512`,
+`Threads 4`, `Speed 100`, `OwnBook true`, `BookFile book.bin`, `BookDepth 16`) to
+complete that GUI check.
 
 ## UCI smoke test
 

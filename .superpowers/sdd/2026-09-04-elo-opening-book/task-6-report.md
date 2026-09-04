@@ -14,7 +14,7 @@ Fresh build directories were created outside the repository:
 The requested Visual Studio x64 environment was loaded with:
 
 ```powershell
-"C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64
+cmd /c ""C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64"
 ```
 
 The first `cmake` found on `PATH` was `C:\MinGW\bin\cmake.exe`, version 3.27.1,
@@ -149,3 +149,18 @@ confirm a legal move, responsive stop/new-game handling, and no duplicate bestmo
 
 `CMakeLists.txt` was not changed: the existing 14 registered targets already cover
 the requested test categories.
+
+## Fix round 1 details
+
+Documentation-only reviewer fixes were applied from current commit `982fd3a`:
+
+- README no longer says opening books remain deferred; it points to the implemented
+  book defaults, placement, fallback, and bypass documentation.
+- README now limits the unavailable-opponent statement to the recorded
+  `Get-Command stockfish`/`Stockfish` checks and the absence of a supplied UCI
+  opponent. The 40-game matrix and Lucas GUI registration remain unverified because
+  no opponent, licensed book, or Lucas installation was available.
+- The Visual Studio environment setup snippet now uses an explicit `cmd /c` wrapper
+  so it is directly runnable from PowerShell.
+
+No engine code, tests, UCI behavior, or CMake configuration was changed.
