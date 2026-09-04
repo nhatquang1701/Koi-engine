@@ -136,7 +136,9 @@ public:
     [[nodiscard]] bool is_draw_by_rule() const noexcept;
     [[nodiscard]] bool is_terminal() const noexcept;
     [[nodiscard]] std::uint64_t position_key() const noexcept;
+    [[nodiscard]] std::uint64_t polyglot_key() const noexcept;
     [[nodiscard]] std::uint16_t halfmove_clock() const noexcept;
+    [[nodiscard]] std::uint16_t fullmove_number() const noexcept;
 
 private:
     [[nodiscard]] int direct_static_exchange_gain(const MoveMetadata&) const noexcept;

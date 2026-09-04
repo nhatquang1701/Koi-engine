@@ -41,6 +41,7 @@ add_library(koi_core
     src/koi/game_state.cpp
     src/koi/move.cpp
     src/koi/move_chooser.cpp
+    src/koi/opening_book.cpp
     src/koi/perft.cpp
     src/koi/position.cpp
     src/koi/search_service.cpp
@@ -79,6 +80,14 @@ add_executable(koi_rules_tests
 target_link_libraries(koi_rules_tests PRIVATE koi_core)
 
 add_test(NAME koi_rules_tests COMMAND koi_rules_tests)
+
+add_executable(opening_book_tests
+    tests/opening_book_tests.cpp
+)
+
+target_link_libraries(opening_book_tests PRIVATE koi_core)
+
+add_test(NAME opening_book_tests COMMAND opening_book_tests)
 
 add_executable(uci_controller_tests
     tests/uci_controller_tests.cpp
