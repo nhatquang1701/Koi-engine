@@ -476,12 +476,12 @@ void UciController::handle_ponderhit() {
     }
     limits->search_moves_specified = false;
     limits->search_moves.clear();
-    start_search(std::move(*root), std::move(*limits));
+    start_search(std::move(*root), std::move(*limits), true);
 }
 
-void UciController::start_search(GameState root, SearchLimits limits) {
+void UciController::start_search(GameState root, SearchLimits limits, bool skip_book) {
     const std::uint64_t generation = begin_generation();
-    const bool book_eligible = !analyse_mode_ && !limits.infinite && !limits.ponder &&
+    const bool book_eligible = !skip_book && !analyse_mode_ && !limits.infinite && !limits.ponder &&
         !limits.search_moves_specified;
     if (book_eligible) {
         const std::uint32_t ply = root_ply(root);

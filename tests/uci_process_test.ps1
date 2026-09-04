@@ -7,9 +7,12 @@ $ErrorActionPreference = 'Stop'
 $TimeoutMilliseconds = 5000
 $MaximumThreads = [Math]::Max(1, [Math]::Min(64, [Environment]::ProcessorCount))
 
-function Start-UciSession {
+function Start-UciSession([string]$Executable = $EnginePath, [string]$WorkingDirectory = '') {
     $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
-    $startInfo.FileName = $EnginePath
+    $startInfo.FileName = $Executable
+    if (-not [string]::IsNullOrWhiteSpace($WorkingDirectory)) {
+        $startInfo.WorkingDirectory = $WorkingDirectory
+    }
     $startInfo.UseShellExecute = $false
     $startInfo.CreateNoWindow = $true
     $startInfo.RedirectStandardInput = $true
@@ -149,9 +152,14 @@ if ((Read-UciLine $session 'initial readyok') -cne 'readyok') {
 
 $bookFileName = "uci-process-book-$([guid]::NewGuid().ToString('N')).bin"
 $bookPath = Join-Path (Split-Path -Parent $EnginePath) $bookFileName
+$bookLaunchDirectory = Join-Path ([System.IO.Path]::GetTempPath()) "koi-uci-process-$([guid]::NewGuid().ToString('N'))"
+$originalPath = $env:PATH
+$bookSession = $null
 try {
     Write-StartPositionBook $bookPath
-    $bookSession = Start-UciSession
+    New-Item -ItemType Directory -Path $bookLaunchDirectory | Out-Null
+    $env:PATH = "$(Split-Path -Parent $EnginePath);$originalPath"
+    $bookSession = Start-UciSession 'koi-engine.exe' $bookLaunchDirectory
     Send-UciCommand $bookSession 'uci'
     foreach ($expected in $expectedHandshake) {
         if ((Read-UciLine $bookSession $expected) -cne $expected) {
@@ -175,8 +183,19 @@ try {
     }
     $null = Complete-UciSession $bookSession $true
 } finally {
+    if ($null -ne $bookSession -and -not $bookSession.Process.HasExited) {
+        $bookSession.Process.StandardInput.Close()
+        if (-not $bookSession.Process.WaitForExit($TimeoutMilliseconds)) {
+            $bookSession.Process.Kill()
+            $bookSession.Process.WaitForExit()
+        }
+    }
+    $env:PATH = $originalPath
     if (Test-Path -LiteralPath $bookPath) {
         Remove-Item -LiteralPath $bookPath -Force
+    }
+    if (Test-Path -LiteralPath $bookLaunchDirectory) {
+        Remove-Item -LiteralPath $bookLaunchDirectory -Recurse -Force
     }
 }
 

@@ -85,6 +85,26 @@ std::uint16_t polyglot_move(std::string_view from, std::string_view to) {
     return static_cast<std::uint16_t>(source->index() | (target->index() << 6));
 }
 
+koi::GameState position_after(const std::vector<std::string_view>& moves) {
+    koi::GameState state = koi::GameState::startpos();
+    for (const std::string_view uci : moves) {
+        const auto move = koi::Move::parse_uci(uci);
+        require(move.has_value() && state.make_move(*move), "test move sequence must be legal");
+    }
+    return state;
+}
+
+std::string join_moves(const std::vector<std::string_view>& moves) {
+    std::string joined;
+    for (const std::string_view move : moves) {
+        if (!joined.empty()) {
+            joined += ' ';
+        }
+        joined += move;
+    }
+    return joined;
+}
+
 class TestDirectory {
 public:
     TestDirectory()
@@ -356,16 +376,33 @@ void test_book_fallback_and_analysis_style_commands_search_without_markers() {
     const koi::GameState start = koi::GameState::startpos();
     write_book(book, {{start.polyglot_key(), polyglot_move("e2", "e4"), 1, 0}});
 
-    const ControllerResult fallback = run_controller(
+    const std::filesystem::path malformed = files.path() / "malformed.bin";
+    {
+        std::ofstream stream(malformed, std::ios::binary);
+        stream.put('x');
+    }
+    const ControllerResult missing_fallback = run_controller(
         "setoption name BookFile value " + (files.path() / "missing.bin").string() + "\n"
         "position startpos\n"
-        "go infinite\n"
+        "go depth 1\n"
         "stop\n"
         "quit\n");
-    require(lines_starting_with(output_lines(fallback.output), "info string book move ").empty(),
-            "a missing book must silently fall back to search");
-    require(lines_starting_with(output_lines(fallback.output), "bestmove ").size() == 1,
-            "missing-book fallback must still emit exactly one bestmove");
+    const ControllerResult malformed_fallback = run_controller(
+        "setoption name BookFile value " + malformed.string() + "\n"
+        "position startpos\n"
+        "go depth 1\n"
+        "stop\n"
+        "quit\n");
+    for (const ControllerResult* fallback : {&missing_fallback, &malformed_fallback}) {
+        const std::vector<std::string> lines = output_lines(fallback->output);
+        const std::vector<std::string> bestmoves = lines_starting_with(lines, "bestmove ");
+        require(fallback->exit_code == 0 && fallback->diagnostics.empty(),
+                "unusable books must leave normal-play fallback transcripts clean");
+        require(lines_starting_with(lines, "info string book move ").empty(),
+                "a missing or malformed book must silently fall back to search");
+        require(bestmoves.size() == 1 && is_legal_move(Position{}, bestmoves[0].substr(9)),
+                "unusable book fallback must emit one legal normal-search bestmove");
+    }
 
     const ControllerResult bypass = run_controller(
         "setoption name BookFile value " + book.string() + "\n"
@@ -390,6 +427,98 @@ void test_book_fallback_and_analysis_style_commands_search_without_markers() {
     require(markers.empty(), "analysis, infinite, ponder, and searchmoves commands must bypass the book");
     require(bestmoves.size() == 4 && bestmoves.back() == "bestmove e2e4",
             "every bypassed command must preserve its exactly-once search completion");
+}
+
+void test_ponderhit_keeps_the_entire_ponder_workflow_out_of_the_book() {
+    TestDirectory files;
+    const std::filesystem::path book = files.path() / "ponder-book.bin";
+    const koi::GameState start = koi::GameState::startpos();
+    write_book(book, {{start.polyglot_key(), polyglot_move("e2", "e4"), 1, 0}});
+
+    const ControllerResult result = run_controller(
+        "setoption name BookFile value " + book.string() + "\n"
+        "position startpos\n"
+        "go ponder depth 1\n"
+        "ponderhit\n"
+        "stop\n"
+        "quit\n");
+    const std::vector<std::string> lines = output_lines(result.output);
+    const std::vector<std::string> bestmoves = lines_starting_with(lines, "bestmove ");
+
+    require(result.exit_code == 0 && result.diagnostics.empty(),
+            "a ponderhit transcript must shut down cleanly");
+    require(lines_starting_with(lines, "info string book move ").empty(),
+            "ponderhit must not turn a ponder workflow into a book search");
+    require(bestmoves.size() == 1 && is_legal_move(Position{}, bestmoves[0].substr(9)),
+            "ponderhit must retain one legal search completion");
+}
+
+void test_book_depth_boundaries_and_invalid_values_preserve_the_previous_limit() {
+    TestDirectory files;
+    const std::filesystem::path book = files.path() / "depth-book.bin";
+    const std::vector<std::string_view> first_fifteen{
+        "g1f3", "g8f6", "f3g1", "f6g8", "g1f3", "g8f6", "f3g1", "f6g8",
+        "g1f3", "g8f6", "f3g1", "f6g8", "g1f3", "g8f6", "f3g1",
+    };
+    const std::vector<std::string_view> first_sixteen{
+        "g1f3", "g8f6", "f3g1", "f6g8", "g1f3", "g8f6", "f3g1", "f6g8",
+        "g1f3", "g8f6", "f3g1", "f6g8", "g1f3", "g8f6", "f3g1", "f6g8",
+    };
+    const koi::GameState ply_fifteen = position_after(first_fifteen);
+    const koi::GameState ply_sixteen = position_after(first_sixteen);
+    write_book(book, {
+        {ply_fifteen.polyglot_key(), polyglot_move("e7", "e5"), 1, 0},
+        {ply_sixteen.polyglot_key(), polyglot_move("e2", "e4"), 1, 0},
+    });
+
+    const ControllerResult result = run_controller(
+        "setoption name BookFile value " + book.string() + "\n"
+        "setoption name BookDepth value 16\n"
+        "position startpos moves " + join_moves(first_fifteen) + "\n"
+        "go depth 1\n"
+        "position startpos moves " + join_moves(first_sixteen) + "\n"
+        "go depth 1\n"
+        "stop\n"
+        "setoption name BookDepth value 0\n"
+        "position startpos moves " + join_moves(first_sixteen) + "\n"
+        "go depth 1\n"
+        "setoption name BookDepth value 41\n"
+        "position startpos moves " + join_moves(first_sixteen) + "\n"
+        "go depth 1\n"
+        "quit\n");
+    const std::vector<std::string> markers =
+        lines_starting_with(output_lines(result.output), "info string book move ");
+
+    require(result.exit_code == 0 && result.diagnostics.empty(),
+            "book-depth boundary commands must leave a clean transcript");
+    require(markers.size() == 3, "BookDepth 16 must exclude ply 16 while zero remains unlimited");
+    require(markers[0] == "info string book move e7e5 depth 15",
+            "BookDepth 16 must still use a book move at ply 15");
+    require(markers[1] == "info string book move e2e4 depth 16" &&
+                markers[2] == "info string book move e2e4 depth 16",
+            "unlimited BookDepth and an invalid replacement must both retain ply-16 book use");
+}
+
+void test_book_option_changes_suppress_active_search_generations() {
+    const ControllerResult result = run_controller(
+        "position startpos\n"
+        "go infinite\n"
+        "setoption name OwnBook value false\n"
+        "go infinite\n"
+        "setoption name BookFile value missing.bin\n"
+        "go infinite\n"
+        "setoption name BookDepth value 0\n"
+        "go infinite\n"
+        "stop\n"
+        "stop\n"
+        "quit\n");
+    const std::vector<std::string> bestmoves =
+        lines_starting_with(output_lines(result.output), "bestmove ");
+
+    require(result.exit_code == 0 && result.diagnostics.empty(),
+            "book option changes during search must leave a clean transcript");
+    require(bestmoves.size() == 1 && is_legal_move(Position{}, bestmoves[0].substr(9)),
+            "each book option change must suppress stale searches and leave one current completion");
 }
 
 void test_hash_options_preserve_the_contract_and_never_advertise_threads() {
@@ -1036,6 +1165,9 @@ int main() {
         {"uci handshake and options", test_uci_handshake_has_identity_and_supported_options_in_order},
         {"opening-book normal play", test_book_options_emit_one_seeded_marker_and_bestmove_for_normal_play},
         {"opening-book fallback and bypass", test_book_fallback_and_analysis_style_commands_search_without_markers},
+        {"ponderhit book bypass", test_ponderhit_keeps_the_entire_ponder_workflow_out_of_the_book},
+        {"opening-book depth boundaries", test_book_depth_boundaries_and_invalid_values_preserve_the_previous_limit},
+        {"opening-book option generation replacement", test_book_option_changes_suppress_active_search_generations},
         {"Hash and Clear Hash contract", test_hash_options_preserve_the_contract_and_never_advertise_threads},
         {"Threads and Speed validation", test_threads_and_speed_options_accept_valid_values_and_ignore_invalid_values},
         {"Threads and Speed generation replacement", test_threads_and_speed_changes_suppress_the_active_generation},

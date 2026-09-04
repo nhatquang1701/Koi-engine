@@ -40,7 +40,7 @@ private:
     void handle_setoption(std::istream& command);
     void handle_go(std::istream& command);
     void handle_ponderhit();
-    void start_search(GameState root, SearchLimits limits);
+    void start_search(GameState root, SearchLimits limits, bool skip_book = false);
     void stop_active_search();
     void stop_and_suppress_active_search();
     void clear_ponder_state();
