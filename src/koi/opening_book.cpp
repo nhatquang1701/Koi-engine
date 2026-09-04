@@ -1,5 +1,6 @@
 #include "koi/opening_book.hpp"
 
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <fstream>
@@ -100,6 +101,35 @@ std::optional<Move> decode_move(std::uint16_t encoded, const GameState& state) {
     return state.is_legal(move) ? std::optional<Move>(move) : std::nullopt;
 }
 
+std::uint32_t book_move_tie_break_key(Move move) noexcept {
+    const auto square_key = [](Square square) noexcept -> std::uint32_t {
+        if (square.index() == Square::kInvalid) {
+            return 64;
+        }
+        return static_cast<std::uint32_t>(square.index() % 8) * 8U + square.index() / 8U;
+    };
+
+    std::uint32_t promotion_key = 0;
+    switch (move.promotion()) {
+    case Promotion::bishop:
+        promotion_key = 1;
+        break;
+    case Promotion::knight:
+        promotion_key = 2;
+        break;
+    case Promotion::queen:
+        promotion_key = 3;
+        break;
+    case Promotion::rook:
+        promotion_key = 4;
+        break;
+    case Promotion::none:
+        break;
+    }
+
+    return (square_key(move.from()) * 64U + square_key(move.to())) * 5U + promotion_key;
+}
+
 } // namespace
 
 class OpeningBook::Impl {
@@ -198,7 +228,7 @@ void OpeningBook::clear_cache() noexcept {
 
 std::optional<BookChoice> OpeningBook::choose(
     const GameState& state, std::uint32_t root_ply, bool enabled,
-    std::uint8_t maximum_depth, std::uint64_t random_seed) const {
+    std::uint8_t maximum_depth, std::uint64_t random_seed, bool random_selection) const {
     if (!enabled || (maximum_depth != 0 && root_ply >= maximum_depth)) {
         return std::nullopt;
     }
@@ -228,6 +258,17 @@ std::optional<BookChoice> OpeningBook::choose(
     }
     if (choices.empty() || total_weight == 0) {
         return std::nullopt;
+    }
+
+    if (!random_selection) {
+        const auto best = std::max_element(
+            choices.begin(), choices.end(), [](const BookChoice& left, const BookChoice& right) {
+                if (left.weight != right.weight) {
+                    return left.weight < right.weight;
+                }
+                return book_move_tie_break_key(left.move) > book_move_tie_break_key(right.move);
+            });
+        return best == choices.end() ? std::nullopt : std::optional<BookChoice>{*best};
     }
 
     std::uint64_t seed = random_seed ^ key;

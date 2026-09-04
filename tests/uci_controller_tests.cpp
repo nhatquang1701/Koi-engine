@@ -339,6 +339,7 @@ void test_uci_handshake_has_identity_and_supported_options_in_order() {
         "option name OwnBook type check default true\n"
         "option name BookFile type string default book.bin\n"
         "option name BookDepth type spin default 16 min 0 max 40\n"
+        "option name BookRandom type check default false\n"
         "option name Clear Hash type button\n"
         "uciok\n";
 
@@ -385,6 +386,34 @@ void test_book_options_emit_one_seeded_marker_and_bestmove_for_normal_play() {
     const std::string move = markers[0].substr(std::string("info string book move ").size(), 4);
     require(bestmoves[0] == "bestmove " + move && bestmoves[1] == "bestmove " + move,
             "every book bestmove must be the legal selected move");
+}
+
+void test_book_random_option_accepts_valid_values_and_ignores_invalid_values() {
+    TestDirectory files;
+    const std::filesystem::path book = files.path() / "deterministic-controller-book.bin";
+    const koi::GameState start = koi::GameState::startpos();
+    write_book(book, {
+        {start.polyglot_key(), polyglot_move("e2", "e4"), 1, 0},
+        {start.polyglot_key(), polyglot_move("d2", "d4"), 100, 0},
+    });
+
+    const ControllerResult result = run_controller(
+        "setoption name BookFile value " + book.string() + "\n"
+        "setoption name BookRandom value false\n"
+        "setoption name BookRandom value invalid\n"
+        "position startpos\n"
+        "go depth 1\n"
+        "quit\n");
+    const std::vector<std::string> lines = output_lines(result.output);
+    const std::vector<std::string> markers = lines_starting_with(lines, "info string book move ");
+    const std::vector<std::string> bestmoves = lines_starting_with(lines, "bestmove ");
+
+    require(result.exit_code == 0 && result.diagnostics.empty(),
+            "valid and invalid BookRandom values must remain protocol-clean");
+    require(markers.size() == 1 && markers[0] == "info string book move d2d4 depth 0",
+            "BookRandom false and an invalid replacement must retain deterministic selection");
+    require(bestmoves.size() == 1 && bestmoves[0] == "bestmove d2d4",
+            "deterministic book selection must emit the selected legal move");
 }
 
 void test_book_fallback_and_analysis_style_commands_search_without_markers() {
@@ -572,6 +601,10 @@ void test_book_option_changes_suppress_active_search_generations() {
         "position startpos\n"
         "go infinite\n"
         "setoption name OwnBook value false\n"
+        "go infinite\n"
+        "setoption name BookRandom value true\n"
+        "go infinite\n"
+        "setoption name BookRandom value invalid\n"
         "go infinite\n"
         "setoption name BookFile value missing.bin\n"
         "go infinite\n"
@@ -1232,6 +1265,7 @@ int main() {
     const std::vector<TestCase> tests{
         {"uci handshake and options", test_uci_handshake_has_identity_and_supported_options_in_order},
         {"opening-book normal play", test_book_options_emit_one_seeded_marker_and_bestmove_for_normal_play},
+        {"opening-book random option", test_book_random_option_accepts_valid_values_and_ignores_invalid_values},
         {"opening-book fallback and bypass", test_book_fallback_and_analysis_style_commands_search_without_markers},
         {"opening-book MultiPV bypass", test_multipv_search_bypasses_a_matching_book_without_analysis_mode},
         {"ponderhit book bypass", test_ponderhit_keeps_the_entire_ponder_workflow_out_of_the_book},

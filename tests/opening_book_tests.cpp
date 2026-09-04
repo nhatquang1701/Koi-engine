@@ -164,8 +164,8 @@ void test_book_filters_illegal_and_zero_weight_entries_and_is_seeded() {
 
     OpeningBook book(files.path());
     book.set_file(book_path);
-    const auto first = book.choose(state, 0, true, 16, 42);
-    const auto second = book.choose(state, 0, true, 16, 42);
+    const auto first = book.choose(state, 0, true, 16, 42, true);
+    const auto second = book.choose(state, 0, true, 16, 42, true);
     require(first && second && first->move == second->move,
             "a nonzero seed must select the same weighted legal book move repeatedly");
     require(first->move == require_move("e2e4") || first->move == require_move("d2d4"),
@@ -175,7 +175,7 @@ void test_book_filters_illegal_and_zero_weight_entries_and_is_seeded() {
     std::size_t e4_count = 0;
     std::size_t d4_count = 0;
     for (std::uint64_t seed = 1; seed <= 128; ++seed) {
-        const auto choice = book.choose(state, 0, true, 16, seed);
+        const auto choice = book.choose(state, 0, true, 16, seed, true);
         require(choice.has_value(), "positive-weight legal entries must be selectable");
         if (choice->move == require_move("e2e4")) {
             ++e4_count;
@@ -186,6 +186,36 @@ void test_book_filters_illegal_and_zero_weight_entries_and_is_seeded() {
         }
     }
     require(d4_count > e4_count, "higher weights must win more seeded selections than lower weights");
+}
+
+void test_book_defaults_to_highest_weight_and_coordinate_tie_breaking() {
+    TestDirectory files;
+    const GameState state = GameState::startpos();
+    const auto weighted = files.path() / "deterministic.bin";
+    write_book(weighted, {
+        {state.polyglot_key(), polyglot_move("e2", "e4"), 1, 0},
+        {state.polyglot_key(), polyglot_move("d2", "d4"), 100, 0},
+    });
+
+    OpeningBook book(files.path());
+    book.set_file(weighted);
+    for (const std::uint64_t seed : {std::uint64_t{0}, std::uint64_t{1}, std::uint64_t{42}}) {
+        const auto choice = book.choose(state, 0, true, 16, seed, false);
+        require(choice && choice->move == require_move("d2d4"),
+                "default book mode must choose the highest-weight legal move");
+    }
+
+    const auto tied = files.path() / "tied.bin";
+    write_book(tied, {
+        {state.polyglot_key(), polyglot_move("e2", "e4"), 100, 0},
+        {state.polyglot_key(), polyglot_move("d2", "d4"), 100, 0},
+    });
+    book.set_file(tied);
+    for (const std::uint64_t seed : {std::uint64_t{0}, std::uint64_t{1}, std::uint64_t{42}}) {
+        const auto choice = book.choose(state, 0, true, 16, seed, false);
+        require(choice && choice->move == require_move("d2d4"),
+                "equal book weights must use deterministic coordinate ordering");
+    }
 }
 
 void test_book_falls_back_for_unavailable_or_unusable_inputs() {
@@ -228,6 +258,7 @@ int main() {
         {"reference Polyglot keys", test_polyglot_keys_match_reference_positions},
         {"special Polyglot moves", test_book_decodes_castling_en_passant_and_promotions},
         {"weighted legal selection", test_book_filters_illegal_and_zero_weight_entries_and_is_seeded},
+        {"deterministic highest-weight selection", test_book_defaults_to_highest_weight_and_coordinate_tie_breaking},
         {"book fallback behavior", test_book_falls_back_for_unavailable_or_unusable_inputs},
     };
 

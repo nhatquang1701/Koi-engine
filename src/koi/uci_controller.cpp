@@ -388,6 +388,16 @@ void UciController::handle_setoption(std::istream& command) {
         return;
     }
 
+    if (tokens.size() == 4 && tokens[0] == "name" && tokens[1] == "BookRandom" &&
+        tokens[2] == "value") {
+        bool book_random = false;
+        if (parse_boolean(tokens[3], book_random)) {
+            stop_and_suppress_active_search();
+            book_random_ = book_random;
+        }
+        return;
+    }
+
     if (tokens.size() >= 4 && tokens[0] == "name" && tokens[1] == "BookFile" &&
         tokens[2] == "value") {
         std::string filename = tokens[3];
@@ -486,7 +496,7 @@ void UciController::start_search(GameState root, SearchLimits limits, bool skip_
     if (book_eligible) {
         const std::uint32_t ply = root_ply(root);
         const std::optional<BookChoice> choice =
-            opening_book_.choose(root, ply, own_book_, book_depth_, random_seed_);
+            opening_book_.choose(root, ply, own_book_, book_depth_, random_seed_, book_random_);
         if (choice.has_value()) {
             write_book_completion(generation, *choice, ply);
             return;
@@ -589,6 +599,7 @@ void UciController::write_handshake() {
                "option name OwnBook type check default true\n"
                "option name BookFile type string default book.bin\n"
                "option name BookDepth type spin default 16 min 0 max 40\n"
+               "option name BookRandom type check default false\n"
                "option name Clear Hash type button\n"
                "uciok\n"
             << std::flush;

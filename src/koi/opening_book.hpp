@@ -24,7 +24,8 @@ public:
     void clear_cache() noexcept;
     [[nodiscard]] std::optional<BookChoice> choose(
         const GameState& state, std::uint32_t root_ply, bool enabled,
-        std::uint8_t maximum_depth, std::uint64_t random_seed) const;
+        std::uint8_t maximum_depth, std::uint64_t random_seed,
+        bool random_selection = false) const;
 
 private:
     class Impl;

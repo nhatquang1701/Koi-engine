@@ -74,6 +74,7 @@ private:
     std::size_t multi_pv_ = 1;
     bool ponder_enabled_ = false;
     bool own_book_ = true;
+    bool book_random_ = false;
     std::uint8_t book_depth_ = 16;
     std::uint32_t random_seed_ = 0;
     std::uint64_t generation_ = 0;
