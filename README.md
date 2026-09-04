@@ -140,6 +140,46 @@ The optional corpus is retained for local tuning and is deliberately not an Elo 
 CI threshold. NNUE, opening books, tablebases, and chess variants remain deferred;
 this engine continues to evaluate standard chess with its classical evaluator.
 
+### Local verification baseline (2026-09-04)
+
+Fresh Ninja builds were configured outside the checkout with Visual Studio 2022
+MSVC 19.44.35227.0 targeting x64, `/std:c++latest`, and CMake 4.4.2. Both Debug
+and Release builds completed. All 14 registered CTest targets passed in each
+configuration: Debug in 73.24 seconds and Release in 32.18 seconds. This includes
+the process-level UCI transcript and benchmark tests, the book unit tests, and the
+64-case tactical suite.
+
+The Release hard gate was run directly at `Threads` 1, 2, and 4 (`Speed 100`): all
+three runs accepted 64/64 fixtures. Threads 1 and 2/4 had identical fixed-depth
+move and score rows, which is the deterministic-threading check; node counts and
+wall time are intentionally not expected to match. The optional 128-position
+corpus also completed locally (34 accepted fixture moves; it is diagnostic rather
+than a pass/fail Elo gate). A timed Release run at `Threads 2`, `Speed 50` visited
+181,322 nodes plus quiescence nodes over 155 ms (about 1.17M visited nodes/s when
+aggregated). NPS is sensitive to CPU load, timer granularity, thread count, hash
+warmth, and speed settings; untimed profiles deliberately report NPS as zero. No
+approved historical NPS baseline was available locally, so a 20% performance-floor
+comparison has not been claimed.
+
+The automated UCI harness verified the handshake, analysis-mode and tutor `MultiPV`
+output, ponder/`ponderhit`, book hit and missing-book fallback, `stop`, `quit`, and
+input EOF. A supplied executable-relative Polyglot book gives a legal weighted
+choice that repeats for a nonzero seed; normal play defaults to `OwnBook=true`,
+`BookFile=book.bin`, and `BookDepth=16`. Put `book.bin` beside `koi-engine.exe`.
+A missing, malformed, unusable, disabled, or depth-exhausted book falls through to
+normal search and never prevents startup. Analysis mode, `go infinite`, `go ponder`,
+and `searchmoves` deliberately bypass the book.
+
+No Stockfish or other UCI opponent executable was available on this machine's
+`PATH`, so no 40-game paired 1+0/5+3 measurements were fabricated. To perform
+them, supply an opponent and run the paired command in [Developer tools](#developer-tools)
+once with `-KoiOwnBook false`, then again with the licensed `book.bin` and
+`-KoiOwnBook true`; retain the JSON and PGN output outside the checkout. Lucas Chess
+was not installed or accessible in this environment, so manual registration was not
+performed. Use the Release `koi-engine.exe` and the Lucas settings listed below
+(`Hash 512`, `Threads 4`, `Speed 100`, `OwnBook true`, `BookFile book.bin`,
+`BookDepth 16`) to complete that GUI check.
+
 ## UCI smoke test
 
 Run this PowerShell transcript after building:
