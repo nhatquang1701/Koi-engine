@@ -971,6 +971,15 @@ def _positive_int(value: str) -> int:
     return parsed
 
 
+def _oracle_threads(value: str) -> int:
+    parsed = _positive_int(value)
+    if parsed != DEFAULT_THREADS:
+        raise argparse.ArgumentTypeError(
+            f"must be exactly {DEFAULT_THREADS} for the approved Elo oracle contract"
+        )
+    return parsed
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--pgn", required=True, type=Path, help="input PGN path")
@@ -978,7 +987,12 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--stockfish", type=Path, help="Stockfish UCI executable path")
     parser.add_argument("--output", required=True, type=Path, help="output JSON report path")
     parser.add_argument("--movetime-ms", type=_positive_int, default=DEFAULT_MOVETIME_MS)
-    parser.add_argument("--threads", type=_positive_int, default=DEFAULT_THREADS)
+    parser.add_argument(
+        "--threads",
+        type=_oracle_threads,
+        default=DEFAULT_THREADS,
+        help="oracle thread count; the approved contract requires 4",
+    )
     parser.add_argument(
         "--book",
         type=Path,

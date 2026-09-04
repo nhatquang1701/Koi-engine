@@ -213,3 +213,34 @@ add_test(
     COMMAND ${POWERSHELL_EXECUTABLE} -NoProfile -ExecutionPolicy Bypass -File
             "${CMAKE_CURRENT_SOURCE_DIR}/tests/ci_configuration_test.ps1"
 )
+
+find_package(Python3 COMPONENTS Interpreter QUIET)
+if(Python3_Interpreter_FOUND)
+    execute_process(
+        COMMAND "${Python3_EXECUTABLE}" -c "import chess"
+        RESULT_VARIABLE ELO_ORACLE_PYTHON_CHESS_RESULT
+        OUTPUT_QUIET
+        ERROR_QUIET
+    )
+    if(ELO_ORACLE_PYTHON_CHESS_RESULT EQUAL 0)
+        add_test(
+            NAME elo_oracle_python
+            COMMAND "${Python3_EXECUTABLE}" -m unittest tests/elo_oracle_test.py -v
+        )
+        set_tests_properties(
+            elo_oracle_python
+            PROPERTIES
+                WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+                ENVIRONMENT "PYTHONDONTWRITEBYTECODE=1"
+        )
+    else()
+        message(STATUS
+            "Skipping elo_oracle_python: python-chess is unavailable. "
+            "Install tools/requirements-elo-oracle.txt to register the test."
+        )
+    endif()
+else()
+    message(STATUS
+        "Skipping elo_oracle_python: Python 3 interpreter is unavailable."
+    )
+endif()

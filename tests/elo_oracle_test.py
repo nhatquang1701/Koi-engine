@@ -114,6 +114,33 @@ class EloOracleExtractionTests(unittest.TestCase):
         self.assertIn("--koi", completed.stderr)
         self.assertIn("--stockfish", completed.stderr)
 
+    def test_cli_rejects_threads_other_than_the_approved_four(self):
+        with tempfile.TemporaryDirectory(prefix="koi oracle ") as temporary_directory:
+            temporary_path = Path(temporary_directory)
+            pgn_path = temporary_path / "fixture.pgn"
+            report_path = temporary_path / "report.json"
+            pgn_path.write_text('[Result "*"]\n\n1. e4 *\n', encoding="utf-8")
+
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    str(ORACLE_SCRIPT),
+                    "--pgn",
+                    str(pgn_path),
+                    "--output",
+                    str(report_path),
+                    "--extract-only",
+                    "--threads",
+                    "1",
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+        self.assertNotEqual(completed.returncode, 0)
+        self.assertIn("exactly 4", completed.stderr)
+
     def test_analysis_records_separate_cpl_values_and_engine_options(self):
         with tempfile.TemporaryDirectory(prefix="koi oracle ") as temporary_directory:
             temporary_path = Path(temporary_directory)
