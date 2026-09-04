@@ -27,6 +27,12 @@ std::vector<std::string> moves_for(std::string_view name) {
     if (name.contains("illegal-koi")) {
         return {"0000"};
     }
+    if (name.contains("clock-koi")) {
+        return {"e2e4", "g1f3"};
+    }
+    if (name.contains("clock-opponent")) {
+        return {"e7e5", "b8c6"};
+    }
     if (name.contains("slow-koi")) {
         return {"e2e4"};
     }
@@ -56,6 +62,9 @@ int main(int argument_count, char* arguments[]) {
         } else if (line.starts_with("go ")) {
             if (name.contains("slow-koi") && go_count == 0) {
                 std::this_thread::sleep_for(std::chrono::seconds(5));
+            }
+            if (name.contains("clock-")) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(25));
             }
             const std::size_t index = std::min(go_count, moves.size() - 1);
             if (name.contains("book-koi")) {

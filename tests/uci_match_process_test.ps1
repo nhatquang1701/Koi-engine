@@ -249,6 +249,25 @@ try {
         throw 'Book diagnostics must be recorded separately from search PV information.'
     }
 
+    $clockDirectory = Join-Path $outputDirectory 'five-plus-three-clock'
+    New-Item -ItemType Directory -Path $clockDirectory -Force | Out-Null
+    $clockKoi = New-ScriptedUciEngine $clockDirectory 'clock-koi'
+    $clockOpponent = New-ScriptedUciEngine $clockDirectory 'clock-opponent'
+    $clockMatch = Invoke-ScriptedMatch $clockKoi.path $clockOpponent.path $clockDirectory 1 3 5000 '' '5+3' 'white'
+    $clockGame = $clockMatch.report.games[0]
+    if ($clockMatch.report.configuration.time_control -ne '5+3' -or $clockGame.moves.Count -ne 3) {
+        throw 'Clock matches must accept 5+3 and play enough plies to observe post-move accounting.'
+    }
+    $firstClockPly = $clockGame.moves[0]
+    $secondClockPly = $clockGame.moves[1]
+    $thirdClockPly = $clockGame.moves[2]
+    if ($firstClockPly.elapsed_ms -le 0 -or $secondClockPly.elapsed_ms -le 0 -or
+        $firstClockPly.go_command -ne 'go wtime 300000 btime 300000 winc 3000 binc 3000' -or
+        $thirdClockPly.go_command -ne ("go wtime {0} btime {1} winc 3000 binc 3000" -f
+            (303000 - $firstClockPly.elapsed_ms), (303000 - $secondClockPly.elapsed_ms))) {
+        throw 'A 5+3 match must subtract measured move time and then add the increment before the next clock command.'
+    }
+
     $invalidOpeningDirectory = Join-Path $outputDirectory 'invalid-opening'
     New-Item -ItemType Directory -Path $invalidOpeningDirectory -Force | Out-Null
     $invalidOpeningFile = Join-Path $invalidOpeningDirectory 'invalid-openings.txt'
