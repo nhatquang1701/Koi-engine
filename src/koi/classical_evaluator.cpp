@@ -8,18 +8,53 @@
 namespace koi {
 namespace {
 
+struct EvaluationParameters {
+    int pawn_value = 100;
+    int knight_value = 320;
+    int bishop_value = 330;
+    int rook_value = 500;
+    int queen_value = 900;
+    int maximum_phase = 24;
+    int mobility_weight = 4;
+    int doubled_pawn_penalty = 12;
+    int isolated_pawn_penalty = 10;
+    int pawn_island_penalty = 4;
+    int passed_pawn_base = 20;
+    int passed_pawn_advance_weight = 4;
+    int passed_pawn_phase_base = 32;
+    int passed_pawn_protection_bonus = 5;
+    int direct_passed_pawn_blockade_penalty = 14;
+    int connected_pawn_bonus = 6;
+    int attacked_pawn_penalty = 6;
+    int backward_pawn_penalty = 8;
+    int bishop_mobility_weight = 2;
+    int knight_outpost_bonus = 12;
+    int rook_semi_open_file_bonus = 10;
+    int rook_open_file_bonus = 20;
+    int rook_seventh_rank_bonus = 15;
+    int queen_mobility_weight = 1;
+    int bishop_pair_bonus = 30;
+    int king_shield_bonus = 14;
+    int king_open_file_penalty = 10;
+    int king_zone_attack_penalty = 8;
+    int king_safety_phase_offset = 8;
+    int king_safety_phase_divisor = 32;
+};
+
+constexpr EvaluationParameters kEvaluation{};
+
 constexpr int piece_value(PieceType type) noexcept {
     switch (type) {
     case PieceType::pawn:
-        return 100;
+        return kEvaluation.pawn_value;
     case PieceType::knight:
-        return 320;
+        return kEvaluation.knight_value;
     case PieceType::bishop:
-        return 330;
+        return kEvaluation.bishop_value;
     case PieceType::rook:
-        return 500;
+        return kEvaluation.rook_value;
     case PieceType::queen:
-        return 900;
+        return kEvaluation.queen_value;
     case PieceType::king:
     case PieceType::none:
         return 0;
@@ -291,7 +326,8 @@ int sliding_mobility(const PositionFeatures& features, std::uint8_t square,
 int tapered_piece_square(PieceType type, std::uint8_t square, int phase) noexcept {
     const int middle = middle_game_table(type)[square];
     const int end = end_game_table(type)[square];
-    return (middle * phase + end * (24 - phase)) / 24;
+    return (middle * phase + end * (kEvaluation.maximum_phase - phase)) /
+        kEvaluation.maximum_phase;
 }
 
 bool has_pawn_on_file(const PositionFeatures& features, int color, int file) noexcept {
@@ -322,14 +358,14 @@ int pawn_structure_for(const PositionFeatures& features, Color color) noexcept {
             ++islands;
         }
         previous_file = occupied;
-        score -= std::max(0, own_file_counts[file] - 1) * 12;
+        score -= std::max(0, own_file_counts[file] - 1) * kEvaluation.doubled_pawn_penalty;
         const bool left_file = file > 0 && own_file_counts[file - 1] > 0;
         const bool right_file = file < 7 && own_file_counts[file + 1] > 0;
         if (occupied && !left_file && !right_file) {
-            score -= own_file_counts[file] * 10;
+            score -= own_file_counts[file] * kEvaluation.isolated_pawn_penalty;
         }
     }
-    score -= std::max(0, islands - 1) * 4;
+    score -= std::max(0, islands - 1) * kEvaluation.pawn_island_penalty;
 
     for (std::uint8_t square = 0; square < 64; ++square) {
         const Piece pawn = features.board[square];
@@ -340,6 +376,7 @@ int pawn_structure_for(const PositionFeatures& features, Color color) noexcept {
         const int file = square % 8;
         const int rank = square / 8;
         const int direction = color == Color::white ? 1 : -1;
+        const int forward_rank = rank + direction;
         bool passed = true;
         for (int candidate_file = std::max(0, file - 1); candidate_file <= std::min(7, file + 1);
              ++candidate_file) {
@@ -353,10 +390,18 @@ int pawn_structure_for(const PositionFeatures& features, Color color) noexcept {
         }
         if (passed) {
             const int advancement = color == Color::white ? rank : 7 - rank;
-            const int passed_bonus = 20 + advancement * 4;
-            score += passed_bonus * (32 - features.game_phase) / 24;
+            const int passed_bonus = kEvaluation.passed_pawn_base +
+                advancement * kEvaluation.passed_pawn_advance_weight;
+            score += passed_bonus * (kEvaluation.passed_pawn_phase_base - features.game_phase) /
+                kEvaluation.maximum_phase;
             if ((features.attacked_squares[own] & (std::uint64_t{1} << square)) != 0) {
-                score += 5;
+                score += kEvaluation.passed_pawn_protection_bonus;
+            }
+            if (forward_rank >= 0 && forward_rank < 8) {
+                const Piece blocker = features.board[static_cast<std::size_t>(forward_rank * 8 + file)];
+                if (!blocker.empty() && color_index(blocker.color) == enemy) {
+                    score -= kEvaluation.direct_passed_pawn_blockade_penalty;
+                }
             }
         }
 
@@ -374,14 +419,13 @@ int pawn_structure_for(const PositionFeatures& features, Color color) noexcept {
             }
         }
         if (connected) {
-            score += 6;
+            score += kEvaluation.connected_pawn_bonus;
         }
 
-        const int forward_rank = rank + direction;
         if (forward_rank >= 0 && forward_rank < 8) {
             const std::uint64_t forward_bit = std::uint64_t{1} << (forward_rank * 8 + file);
             if ((features.attacked_squares[enemy] & forward_bit) != 0) {
-                score -= 6;
+                score -= kEvaluation.attacked_pawn_penalty;
             }
 
             bool has_advanced_support = false;
@@ -404,7 +448,7 @@ int pawn_structure_for(const PositionFeatures& features, Color color) noexcept {
                 }
             }
             if (!has_advanced_support && (features.attacked_squares[enemy] & forward_bit) != 0) {
-                score -= 8;
+                score -= kEvaluation.backward_pawn_penalty;
             }
         }
     }
@@ -423,29 +467,30 @@ int activity_for(const PositionFeatures& features, Color color) noexcept {
         }
         if (piece.type == PieceType::bishop) {
             ++bishops;
-            score += sliding_mobility(features, square, PieceType::bishop) * 2;
+            score += sliding_mobility(features, square, PieceType::bishop) * kEvaluation.bishop_mobility_weight;
         } else if (piece.type == PieceType::knight) {
             const int file = square % 8;
             const int rank = square / 8;
             if (file >= 2 && file <= 5 && rank >= 2 && rank <= 5 &&
                 (features.attacked_squares[enemy] & (std::uint64_t{1} << square)) == 0) {
-                score += 12;
+                score += kEvaluation.knight_outpost_bonus;
             }
         } else if (piece.type == PieceType::rook) {
             const int file = square % 8;
             if (!has_pawn_on_file(features, own, file)) {
-                score += has_pawn_on_file(features, enemy, file) ? 10 : 20;
+                score += has_pawn_on_file(features, enemy, file) ?
+                    kEvaluation.rook_semi_open_file_bonus : kEvaluation.rook_open_file_bonus;
             }
             if ((color == Color::white && square / 8 == 6) ||
                 (color == Color::black && square / 8 == 1)) {
-                score += 15;
+                score += kEvaluation.rook_seventh_rank_bonus;
             }
         } else if (piece.type == PieceType::queen) {
-            score += sliding_mobility(features, square, PieceType::queen);
+            score += sliding_mobility(features, square, PieceType::queen) * kEvaluation.queen_mobility_weight;
         }
     }
     if (bishops >= 2) {
-        score += 30;
+        score += kEvaluation.bishop_pair_bonus;
     }
     return score;
 }
@@ -467,15 +512,15 @@ int king_safety_for(const PositionFeatures& features, Color color) noexcept {
              ++shield_file) {
             const Piece shield = features.board[static_cast<std::size_t>(shield_rank * 8 + shield_file)];
             if (shield.type == PieceType::pawn && color_index(shield.color) == own) {
-                score += 14;
+                score += kEvaluation.king_shield_bonus;
             }
         }
     }
     if (!has_pawn_on_file(features, own, file)) {
-        score -= 10;
+        score -= kEvaluation.king_open_file_penalty;
     }
     const std::uint64_t zone = king_zone(king);
-    score -= std::popcount(features.attacked_squares[enemy] & zone) * 8;
+    score -= std::popcount(features.attacked_squares[enemy] & zone) * kEvaluation.king_zone_attack_penalty;
     return score;
 }
 
@@ -501,13 +546,14 @@ EvaluationBreakdown ClassicalEvaluator::breakdown(const GameState& state, Color 
     }
 
     score.mobility = (static_cast<int>(features.mobility[0]) -
-                      static_cast<int>(features.mobility[1])) * 4;
+                      static_cast<int>(features.mobility[1])) * kEvaluation.mobility_weight;
     score.pawn_structure = pawn_structure_for(features, Color::white) -
                            pawn_structure_for(features, Color::black);
     score.activity = activity_for(features, Color::white) - activity_for(features, Color::black);
     score.king_safety = king_safety_for(features, Color::white) -
                         king_safety_for(features, Color::black);
-    score.king_safety = score.king_safety * (phase + 8) / 32;
+    score.king_safety = score.king_safety * (phase + kEvaluation.king_safety_phase_offset) /
+        kEvaluation.king_safety_phase_divisor;
     score.total = score.material + score.piece_square + score.mobility + score.pawn_structure +
                   score.activity + score.king_safety;
     if (dead_material) {

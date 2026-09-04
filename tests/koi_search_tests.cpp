@@ -3,6 +3,8 @@
 #include <chrono>
 #include <cstdint>
 #include <cstdlib>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <memory>
 #include <mutex>
@@ -33,6 +35,26 @@ koi::GameState require_state(std::string_view fen) {
     const auto state = koi::GameState::from_fen(fen);
     require(state.has_value(), "test FEN must construct a game state");
     return *state;
+}
+
+koi::GameState require_evaluation_fixture(std::string_view name) {
+    const std::filesystem::path path = std::filesystem::path(__FILE__).parent_path() /
+        "data" / "evaluation-positions.txt";
+    std::ifstream input(path);
+    require(input.good(), "evaluation fixture data must be readable");
+
+    std::string line;
+    while (std::getline(input, line)) {
+        if (line.empty() || line.front() == '#') {
+            continue;
+        }
+        const std::size_t separator = line.find('|');
+        require(separator != std::string::npos, "evaluation fixture must contain a name and FEN");
+        if (std::string_view(line).substr(0, separator) == name) {
+            return require_state(std::string_view(line).substr(separator + 1));
+        }
+    }
+    throw std::runtime_error("missing evaluation fixture: " + std::string(name));
 }
 
 struct CompletedSearch {
@@ -206,6 +228,15 @@ void test_evaluator_increases_advanced_passed_pawn_value_in_the_endgame() {
     const auto middlegame_score = evaluator.breakdown(middlegame, koi::Color::white);
     require(endgame_score.pawn_structure > middlegame_score.pawn_structure,
             "an advanced passed pawn must receive additional weight as material leaves the board");
+}
+
+void test_evaluator_penalizes_a_directly_blockaded_passed_pawn() {
+    koi::ClassicalEvaluator evaluator;
+    const auto advanced = evaluator.breakdown(require_evaluation_fixture("advanced_passed"), koi::Color::white);
+    const auto blockaded = evaluator.breakdown(require_evaluation_fixture("blockaded_passed"), koi::Color::white);
+
+    require(advanced.pawn_structure >= blockaded.pawn_structure + 10,
+            "a directly blockaded passed pawn must lose meaningful structure credit against an unobstructed passer");
 }
 
 void test_time_manager_applies_move_time_and_clock_limits() {
@@ -1104,6 +1135,7 @@ int main() {
         {"evaluator perspective symmetry", test_evaluator_breakdown_is_perspective_symmetric},
         {"evaluator endgame and mobility", test_evaluator_scores_backward_pawns_piece_mobility_and_dead_material},
         {"evaluator passed pawn endgame scaling", test_evaluator_increases_advanced_passed_pawn_value_in_the_endgame},
+        {"evaluator passed pawn blockade", test_evaluator_penalizes_a_directly_blockaded_passed_pawn},
         {"time manager", test_time_manager_applies_move_time_and_clock_limits},
         {"speed budgets", test_speed_scales_only_time_based_search_budgets},
         {"search options", test_search_options_include_thread_and_speed_controls},

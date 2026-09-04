@@ -54,6 +54,22 @@ void test_tt_move_and_mvv_lva_capture_preference() {
             "a legal TT best move must outrank every tactical move");
 }
 
+void test_static_exchange_orders_safe_captures_ahead_of_poisoned_captures() {
+    const koi::GameState state = require_state("3qk3/8/8/3r1p2/4Q1P1/8/8/4K3 w - - 0 1");
+    const koi::Move poisoned_queen_capture = require_move("e4d5");
+    const koi::Move safe_pawn_capture = require_move("g4f5");
+    koi::detail::SearchMoveOrdering ordering;
+
+    std::vector<koi::Move> captures = state.legal_moves();
+    ordering.order(state, captures, std::nullopt, 0);
+    const auto poisoned = std::find(captures.begin(), captures.end(), poisoned_queen_capture);
+    const auto safe = std::find(captures.begin(), captures.end(), safe_pawn_capture);
+    require(poisoned != captures.end() && safe != captures.end(),
+            "the ordering fixture must retain both legal captures");
+    require(safe < poisoned,
+            "a free capture must be ordered ahead of a materially losing capture");
+}
+
 void test_killer_history_and_tie_breaking_are_deterministic() {
     const koi::GameState state = koi::GameState::startpos();
     const koi::Move killer = require_move("g1f3");
@@ -119,6 +135,7 @@ struct TestCase {
 int main() {
     const std::vector<TestCase> tests{
         {"TT and MVV-LVA ordering", test_tt_move_and_mvv_lva_capture_preference},
+        {"SEE capture ordering", test_static_exchange_orders_safe_captures_ahead_of_poisoned_captures},
         {"killer history stable ordering", test_killer_history_and_tie_breaking_are_deterministic},
         {"killer tier outranks saturated history", test_killer_tier_outranks_saturated_history},
         {"quiet checks before quiet moves", test_quiet_checks_are_ordered_before_ordinary_quiet_moves},

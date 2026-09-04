@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <limits>
 
+#include "koi/detail/static_exchange.hpp"
+
 namespace koi::detail {
 namespace {
 
@@ -13,6 +15,7 @@ constexpr int kCheckingMovePriority = 350'000;
 constexpr int kKillerPriority = 300'000;
 constexpr int kMaximumHistoryScore = kKillerPriority - 1;
 constexpr int kMaximumPly = 64;
+constexpr int kSeeOrderingWeight = 12;
 
 int color_index(Color color) noexcept {
     return color == Color::white ? 0 : 1;
@@ -141,7 +144,10 @@ int SearchMoveOrdering::priority(const GameState& state, const MoveMetadata& met
     if (metadata.is_capture()) {
         const int victim_value = piece_value(metadata.captured_piece);
         const int attacker_value = piece_value(metadata.moving_piece);
-        return kCapturePriority + (victim_value * 16) - attacker_value + promotion_value(move.promotion());
+        const int see = std::clamp(static_exchange_gain(state, metadata), -piece_value(PieceType::queen),
+                                   piece_value(PieceType::queen));
+        return kCapturePriority + (victim_value * 16) - attacker_value +
+            promotion_value(move.promotion()) + see * kSeeOrderingWeight;
     }
     if (move.promotion() != Promotion::none) {
         return kPromotionPriority + promotion_value(move.promotion());
