@@ -106,6 +106,7 @@ void accumulate_stats(SearchStats& total, const SearchStats& partial) noexcept {
     total.delta_prunes += partial.delta_prunes;
     total.null_cutoffs += partial.null_cutoffs;
     total.lmr_reductions += partial.lmr_reductions;
+    total.lmr_verifications += partial.lmr_verifications;
     total.seldepth = std::max(total.seldepth, partial.seldepth);
 }
 
@@ -329,7 +330,7 @@ struct SearchContext {
         if (ply == 0 && root_moves != nullptr) {
             moves = *root_moves;
         } else {
-            state.legal_moves_with_metadata(moves, false);
+            state.legal_moves_with_metadata(moves, true);
         }
         if (moves.empty()) {
             return terminal_score(state, moves.size(), ply);
@@ -366,7 +367,8 @@ struct SearchContext {
         }
 
         if (!checked && depth >= 3 && beta < kInfinity && beta > -kInfinity &&
-            beta - alpha <= 1 && state.has_non_pawn_material(state.side_to_move())) {
+            beta - alpha <= 1 && state.position_features().game_phase >= 8 &&
+            state.has_non_pawn_material(state.side_to_move())) {
             if (state.make_null_move()) {
                 PrincipalVariation null_pv;
                 const int reduction = depth >= 6 ? 3 : 2;
@@ -400,8 +402,10 @@ struct SearchContext {
                 continue;
             }
 
+            const bool is_tt_move = tt_move.has_value() && move == *tt_move;
             const bool reduced = move_number >= 4 && depth >= 4 && !checked && !state.in_check() &&
-                !metadata.is_capture() && move.promotion() == Promotion::none;
+                !metadata.gives_check && !metadata.is_capture() && move.promotion() == Promotion::none &&
+                !is_tt_move && !ordering.is_killer(move, ply);
             const int full_child_depth = depth - 1;
             const int child_depth = reduced ? std::max(0, full_child_depth - 1) : full_child_depth;
             if (reduced) {
@@ -415,7 +419,11 @@ struct SearchContext {
             } else {
                 ++stats.pvs_searches;
                 score = -negamax(state, child_depth, -alpha - 1, -alpha, ply + 1, child_pv);
-                if (!aborted && score > alpha && score < beta) {
+                if (!aborted && reduced && score > alpha) {
+                    ++stats.lmr_verifications;
+                    child_pv = {};
+                    score = -negamax(state, full_child_depth, -beta, -alpha, ply + 1, child_pv);
+                } else if (!aborted && !reduced && score > alpha && score < beta) {
                     ++stats.pvs_researches;
                     child_pv = {};
                     score = -negamax(state, full_child_depth, -beta, -alpha, ply + 1, child_pv);

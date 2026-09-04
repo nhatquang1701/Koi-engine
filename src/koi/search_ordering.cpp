@@ -101,6 +101,12 @@ void SearchMoveOrdering::clear() noexcept {
     scored_moves_.clear();
 }
 
+bool SearchMoveOrdering::is_killer(Move move, int ply) const noexcept {
+    const int checked_ply = normalized_ply(ply);
+    const auto& killers = killers_[static_cast<std::size_t>(checked_ply)];
+    return killers[0] == move || killers[1] == move;
+}
+
 void SearchMoveOrdering::order(const GameState& state, std::vector<Move>& moves,
                                std::optional<Move> tt_move, int ply) const {
     std::vector<MoveMetadata> metadata;

@@ -23,6 +23,7 @@ public:
     void order(const GameState& state, std::vector<MoveMetadata>& moves,
                std::optional<Move> tt_move, int ply) const;
     void record_quiet_cutoff(Color side, Move move, int ply, int depth) noexcept;
+    [[nodiscard]] bool is_killer(Move move, int ply) const noexcept;
 
 private:
     static constexpr int kMaximumPly = 64;

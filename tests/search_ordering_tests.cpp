@@ -115,13 +115,27 @@ void test_killer_tier_outranks_saturated_history() {
 }
 
 void test_quiet_checks_are_ordered_before_ordinary_quiet_moves() {
-    const koi::GameState state = require_state("k7/8/8/8/8/8/4Q3/4K3 w - - 0 1");
+    const koi::GameState state = require_state("k7/8/8/8/8/8/1q2Q3/4K3 w - - 0 1");
     koi::detail::SearchMoveOrdering ordering;
 
-    std::vector<koi::Move> moves = quiet_moves(state, state.legal_moves());
+    std::vector<koi::Move> moves = state.legal_moves();
     ordering.order(state, moves, std::nullopt, 0);
-    const auto first = !moves.empty() ? state.describe_move(moves.front()) : std::nullopt;
-    require(first.has_value() && first->gives_check,
+    const koi::Move capture = require_move("e2b2");
+    const auto checking = std::find_if(moves.begin(), moves.end(), [&state](const koi::Move& move) {
+        const auto metadata = state.describe_move(move);
+        return metadata.has_value() && metadata->gives_check && !metadata->is_capture();
+    });
+    const auto ordinary = std::find_if(moves.begin(), moves.end(), [&state](const koi::Move& move) {
+        const auto metadata = state.describe_move(move);
+        return metadata.has_value() && !metadata->gives_check && !metadata->is_capture() &&
+            move.promotion() == koi::Promotion::none;
+    });
+    const auto captured = std::find(moves.begin(), moves.end(), capture);
+    require(checking != moves.end() && ordinary != moves.end() && captured != moves.end(),
+            "the ordering fixture must contain a quiet check, ordinary quiet move, and capture");
+    require(captured < checking,
+            "a higher-priority capture must remain ahead of a quiet checking move");
+    require(checking < ordinary,
             "a quiet checking move must be searched before ordinary quiet moves");
 }
 

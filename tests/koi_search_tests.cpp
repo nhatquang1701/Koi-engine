@@ -133,6 +133,22 @@ private:
     mutable std::atomic_int checked_evaluations_ = 0;
 };
 
+class LateMoveVerificationEvaluator final : public koi::Evaluator {
+public:
+    [[nodiscard]] int evaluate(const koi::GameState& state, koi::Color perspective) const override {
+        const koi::Piece h3 = state.piece_at(*koi::Square::parse("h3"));
+        const bool target_line = h3.type == koi::PieceType::pawn && h3.color == koi::Color::white;
+        const bool reduced_leaf = state.fullmove_number() == 2 &&
+            state.side_to_move() == koi::Color::black;
+        const bool full_leaf = state.fullmove_number() >= 3 &&
+            state.side_to_move() == koi::Color::white;
+        const int white_score = target_line ? (reduced_leaf ? 2'000 : full_leaf ? -1'000 : 0) : 0;
+        return perspective == koi::Color::white ? white_score : -white_score;
+    }
+
+    [[nodiscard]] bool supports_concurrent_evaluation() const noexcept override { return true; }
+};
+
 koi::SearchResult search(koi::SearchService& service, koi::GameState root, koi::SearchLimits limits,
                          koi::SearchOptions options = {}) {
     CompletedSearch completed;
@@ -954,6 +970,29 @@ void test_search_reports_mate_in_one_distance() {
             "a forced mate in one must report a one-move mate distance");
 }
 
+void test_search_prefers_the_shorter_forced_mate() {
+    koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>());
+    koi::SearchLimits limits;
+    limits.depth = 5;
+    const koi::GameState root = require_state("k7/8/K7/8/8/8/8/Q7 w - - 0 1");
+    const auto mate_in_one = koi::Move::parse_uci("a1h8");
+    const auto mate_in_two = koi::Move::parse_uci("a6b6");
+    require(mate_in_one.has_value() && mate_in_two.has_value() && root.is_legal(*mate_in_one) &&
+                root.is_legal(*mate_in_two),
+            "the mate-distance fixture must contain both candidate moves");
+
+    koi::GameState after_mate = root;
+    require(after_mate.make_move(*mate_in_one) && after_mate.in_check() && after_mate.legal_moves().empty(),
+            "the fast candidate must be an immediate checkmate");
+    koi::GameState after_slow = root;
+    require(after_slow.make_move(*mate_in_two) && !after_slow.legal_moves().empty(),
+            "the slow candidate must leave a legal reply instead of mating immediately");
+
+    const koi::SearchResult result = search(service, root, limits);
+    require(result.best_move == mate_in_one && result.mate == std::optional<int>{1},
+            "search must prefer the shorter forced mate when a longer mate is also available");
+}
+
 void test_pawn_only_zugzwang_search_skips_null_pruning() {
     koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>());
     koi::SearchLimits limits;
@@ -967,6 +1006,23 @@ void test_pawn_only_zugzwang_search_skips_null_pruning() {
             "null-move pruning must stay disabled in the pawn-only zugzwang endgame");
 }
 
+void test_low_phase_search_skips_null_pruning() {
+    koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>());
+    koi::SearchLimits limits;
+    limits.depth = 5;
+    const koi::GameState root = require_state("4kn2/pppp4/8/8/8/8/PPPP4/4K1N1 w - - 0 1");
+    require(root.position_features().game_phase < 8 &&
+                root.has_non_pawn_material(root.side_to_move()) &&
+                root.has_non_pawn_material(koi::opposite(root.side_to_move())),
+            "the low-phase null fixture must contain non-pawn material for both sides");
+
+    const koi::SearchResult result = search(service, root, limits);
+    require(result.best_move.has_value() && root.is_legal(*result.best_move),
+            "a low-phase search must return a legal move");
+    require(result.stats.null_cutoffs == 0,
+            "null-move pruning must stay disabled below the safe game-phase threshold");
+}
+
 void test_search_reduces_late_quiet_moves_without_losing_root_legality() {
     koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>());
     koi::SearchLimits limits;
@@ -978,6 +1034,32 @@ void test_search_reduces_late_quiet_moves_without_losing_root_legality() {
             "late-move reduction search must preserve a legal root move");
     require(result.stats.lmr_reductions > 0,
             "a multi-move quiet root must exercise late-move reductions");
+}
+
+void test_reduced_late_move_is_verified_at_full_child_depth() {
+    koi::SearchService service(std::make_shared<LateMoveVerificationEvaluator>());
+    koi::SearchLimits limits;
+    limits.depth = 4;
+    limits.search_moves_specified = true;
+    for (const std::string_view uci : {"b1c3", "a2a3", "a2a4", "b2b3", "b2b4", "h2h3"}) {
+        const auto move = koi::Move::parse_uci(uci);
+        require(move.has_value(), "the late-move verification fixture must parse every root move");
+        limits.search_moves.push_back(*move);
+    }
+    const koi::GameState root = require_state(
+        "4k3/pppp4/8/8/8/8/PPPP3P/RN2K2R w K - 0 1");
+    const auto expected = koi::Move::parse_uci("a2a3");
+    const auto target = koi::Move::parse_uci("h2h3");
+    require(expected.has_value() && target.has_value() && root.position_features().game_phase < 8,
+            "the late-move verification fixture must remain a low-phase legal position");
+
+    const koi::SearchResult result = search(service, root, limits);
+    require(result.stats.lmr_reductions > 0,
+            "the late-move verification fixture must exercise a reduced root move");
+    require(result.stats.lmr_verifications > 0,
+            "a reduced move that exceeds alpha must receive a full-depth verification search");
+    require(result.best_move == expected && result.best_move != target && result.score_cp == 0,
+            "full-depth verification must replace a reduced fail-high line before selecting it");
 }
 
 void test_quiescence_keeps_searching_checked_evasions_past_normal_cap() {
@@ -1336,8 +1418,11 @@ int main() {
         {"check extensions", test_search_extends_checked_positions},
         {"forced quiet evasion", test_search_keeps_a_forced_quiet_evasion},
         {"mate in one distance", test_search_reports_mate_in_one_distance},
+        {"shorter mate preference", test_search_prefers_the_shorter_forced_mate},
         {"pawn-only zugzwang null safety", test_pawn_only_zugzwang_search_skips_null_pruning},
+        {"low-phase null safety", test_low_phase_search_skips_null_pruning},
         {"late quiet move reductions", test_search_reduces_late_quiet_moves_without_losing_root_legality},
+        {"late move full-depth verification", test_reduced_late_move_is_verified_at_full_child_depth},
         {"checked quiescence cap", test_quiescence_keeps_searching_checked_evasions_past_normal_cap},
         {"bounded quiescence checks", test_quiescence_keeps_bounded_checking_continuations},
         {"aspiration windows", test_iterative_deepening_uses_aspiration_windows},
