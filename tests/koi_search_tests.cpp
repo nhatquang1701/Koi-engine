@@ -239,6 +239,50 @@ void test_evaluator_penalizes_a_directly_blockaded_passed_pawn() {
             "a directly blockaded passed pawn must lose meaningful structure credit against an unobstructed passer");
 }
 
+void test_evaluator_mirrors_terms_and_black_passed_pawn_blockades() {
+    koi::ClassicalEvaluator evaluator;
+    const auto white_terms = evaluator.breakdown(require_evaluation_fixture("term_mirror_white"), koi::Color::white);
+    const auto black_terms = evaluator.breakdown(require_evaluation_fixture("term_mirror_black"), koi::Color::black);
+
+    require(white_terms.material == black_terms.material &&
+                white_terms.piece_square == black_terms.piece_square &&
+                white_terms.mobility == black_terms.mobility &&
+                white_terms.pawn_structure == black_terms.pawn_structure &&
+                white_terms.activity == black_terms.activity &&
+                white_terms.king_safety == black_terms.king_safety &&
+                white_terms.total == black_terms.total,
+            "a color-and-rank mirrored position must preserve every evaluator term");
+    require(white_terms.mobility != 0 && white_terms.pawn_structure != 0 &&
+                white_terms.activity != 0 && white_terms.king_safety != 0,
+            "the mirrored evaluator fixture must exercise mobility, pawn, activity, and king-safety terms");
+
+    const auto black_advanced =
+        evaluator.breakdown(require_evaluation_fixture("black_advanced_passed"), koi::Color::black);
+    const auto black_blockaded =
+        evaluator.breakdown(require_evaluation_fixture("black_blockaded_passed"), koi::Color::black);
+    require(black_advanced.pawn_structure >= black_blockaded.pawn_structure + 10,
+            "a directly blockaded black passed pawn must lose meaningful structure credit");
+}
+
+void test_evaluator_endgame_passer_scaling_is_color_symmetric() {
+    koi::ClassicalEvaluator evaluator;
+    const auto white_endgame =
+        evaluator.breakdown(require_evaluation_fixture("endgame_passer_white"), koi::Color::white);
+    const auto white_middlegame =
+        evaluator.breakdown(require_evaluation_fixture("middlegame_passer_white"), koi::Color::white);
+    const auto black_endgame =
+        evaluator.breakdown(require_evaluation_fixture("endgame_passer_black"), koi::Color::black);
+    const auto black_middlegame =
+        evaluator.breakdown(require_evaluation_fixture("middlegame_passer_black"), koi::Color::black);
+
+    require(white_endgame.pawn_structure > white_middlegame.pawn_structure &&
+                black_endgame.pawn_structure > black_middlegame.pawn_structure,
+            "advanced passed pawns must gain endgame structure weight for both colors");
+    require(white_endgame.pawn_structure == black_endgame.pawn_structure &&
+                white_middlegame.pawn_structure == black_middlegame.pawn_structure,
+            "endgame passed-pawn scaling must remain color symmetric");
+}
+
 void test_time_manager_applies_move_time_and_clock_limits() {
     koi::SearchLimits move_time;
     move_time.movetime = 100ms;
@@ -808,6 +852,64 @@ void test_search_extends_checked_positions() {
             "a checking tactical line must use at least one check extension");
 }
 
+void test_search_keeps_a_forced_quiet_evasion() {
+    koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>());
+    koi::SearchLimits limits;
+    limits.depth = 3;
+    const koi::GameState root = require_state("k3r3/8/8/8/8/8/3N1N2/2NNKN2 w - - 0 1");
+    const auto quiet_block = koi::Move::parse_uci("c1e2");
+    require(quiet_block.has_value() && root.in_check(),
+            "the quiet-defense fixture must begin with a checked king and a parsable interposition");
+    const std::vector<koi::Move> evasions = root.legal_moves();
+    require(std::find(evasions.begin(), evasions.end(), *quiet_block) != evasions.end() &&
+                std::all_of(evasions.begin(), evasions.end(), [&root](const koi::Move& move) {
+                    return !root.is_capture(move) && move.promotion() == koi::Promotion::none;
+                }),
+            "the quiet-defense fixture must allow only non-capturing interpositions");
+
+    const koi::SearchResult result = search(service, root, limits);
+    require(result.completed_depth == 3 && result.best_move.has_value() &&
+                std::find(evasions.begin(), evasions.end(), *result.best_move) != evasions.end(),
+            "search must retain a quiet interposition while resolving check");
+}
+
+void test_search_reports_mate_in_one_distance() {
+    koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>());
+    koi::SearchLimits limits;
+    limits.depth = 3;
+    const koi::SearchResult result = search(
+        service, require_state("7k/5Q2/6K1/8/8/8/8/8 w - - 0 1"), limits);
+
+    require(result.best_move.has_value() && result.mate == std::optional<int>{1},
+            "a forced mate in one must report a one-move mate distance");
+}
+
+void test_pawn_only_zugzwang_search_skips_null_pruning() {
+    koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>());
+    koi::SearchLimits limits;
+    limits.depth = 5;
+    const koi::GameState root = require_state("8/8/8/3k4/3P4/3K4/8/8 w - - 0 1");
+    const koi::SearchResult result = search(service, root, limits);
+
+    require(result.best_move.has_value() && root.is_legal(*result.best_move),
+            "a pawn-only zugzwang search must return a legal move");
+    require(result.stats.null_cutoffs == 0,
+            "null-move pruning must stay disabled in the pawn-only zugzwang endgame");
+}
+
+void test_search_reduces_late_quiet_moves_without_losing_root_legality() {
+    koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>());
+    koi::SearchLimits limits;
+    limits.depth = 4;
+    const koi::GameState root = koi::GameState::startpos();
+    const koi::SearchResult result = search(service, root, limits);
+
+    require(result.best_move.has_value() && root.is_legal(*result.best_move),
+            "late-move reduction search must preserve a legal root move");
+    require(result.stats.lmr_reductions > 0,
+            "a multi-move quiet root must exercise late-move reductions");
+}
+
 void test_quiescence_keeps_searching_checked_evasions_past_normal_cap() {
     auto evaluator = std::make_shared<CheckedPositionEvaluator>();
     koi::SearchService service(evaluator);
@@ -1136,6 +1238,8 @@ int main() {
         {"evaluator endgame and mobility", test_evaluator_scores_backward_pawns_piece_mobility_and_dead_material},
         {"evaluator passed pawn endgame scaling", test_evaluator_increases_advanced_passed_pawn_value_in_the_endgame},
         {"evaluator passed pawn blockade", test_evaluator_penalizes_a_directly_blockaded_passed_pawn},
+        {"evaluator mirrored terms and black blockade", test_evaluator_mirrors_terms_and_black_passed_pawn_blockades},
+        {"evaluator color symmetric endgame passer", test_evaluator_endgame_passer_scaling_is_color_symmetric},
         {"time manager", test_time_manager_applies_move_time_and_clock_limits},
         {"speed budgets", test_speed_scales_only_time_based_search_budgets},
         {"search options", test_search_options_include_thread_and_speed_controls},
@@ -1158,6 +1262,10 @@ int main() {
         {"fixed-depth tactical reference", test_fixed_depth_tactical_reference_output_is_preserved},
         {"tactical search statistics", test_search_reports_tactical_search_statistics},
         {"check extensions", test_search_extends_checked_positions},
+        {"forced quiet evasion", test_search_keeps_a_forced_quiet_evasion},
+        {"mate in one distance", test_search_reports_mate_in_one_distance},
+        {"pawn-only zugzwang null safety", test_pawn_only_zugzwang_search_skips_null_pruning},
+        {"late quiet move reductions", test_search_reduces_late_quiet_moves_without_losing_root_legality},
         {"checked quiescence cap", test_quiescence_keeps_searching_checked_evasions_past_normal_cap},
         {"bounded quiescence checks", test_quiescence_keeps_bounded_checking_continuations},
         {"aspiration windows", test_iterative_deepening_uses_aspiration_windows},
