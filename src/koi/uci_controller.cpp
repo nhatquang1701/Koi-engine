@@ -810,7 +810,7 @@ void UciController::rotate_debug_file_if_needed(std::size_t incoming_bytes) {
     if (debug_file_.is_open()) {
         debug_file_.close();
     }
-    for (int backup = 3; backup >= 1; --backup) {
+    for (int backup = 2; backup >= 1; --backup) {
         const std::filesystem::path source = path.string() + "." + std::to_string(backup);
         const std::filesystem::path target = path.string() + "." + std::to_string(backup + 1);
         std::filesystem::remove(target, error);

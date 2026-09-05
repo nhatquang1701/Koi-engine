@@ -113,3 +113,50 @@ ctest --test-dir out\task1-final-release2 -C Release --output-on-failure
 Result: `100% tests passed, 0 tests failed out of 15` (38.18 seconds).
 
 Final `git diff --check` reported no whitespace errors. The self-review found no unresolved functional concerns. The only environmental note is that fresh configuration requires CMake 3.31+ to be selected explicitly on this machine.
+
+## Round 1 review fix - backup retention
+
+Review finding: the rotation loop iterated from backup `3` down to `1`, which moved `.3` to `.4` and could retain four backups. The rotation test was strengthened to pre-populate `.1`, `.2`, and `.3`, then assert `.4` is absent after rotation. Existing valid-option coverage remains in `test_task1_public_options_accept_valid_and_ignore_invalid_values`; the dedicated WDL test verifies that a valid `UCI_ShowWDL` value is applied.
+
+### RED - strengthened regression against the reviewed implementation
+
+The amended test was run before the production change with:
+
+```powershell
+& 'C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\Tools\Launch-VsDevShell.ps1' -Arch amd64 -HostArch amd64 -SkipAutomaticLocation
+& 'C:\msys64\ucrt64\bin\cmake.exe' --build out\task1-final-debug2 --parallel
+ctest --test-dir out\task1-final-debug2 -C Debug -R '^uci_controller_tests$' --output-on-failure
+```
+
+The first amended run also exposed a brittle test-only WDL assertion because the valid-options transcript quit before producing an `info` line; that assertion was removed because valid WDL behavior is already covered by `test_task1_wdl_output_is_optional_and_mate_scores_are_converted`. The isolated RED rerun then reported:
+
+```text
+PASS Task 1 option values
+PASS Task 1 WDL
+FAIL Task 1 hidden diagnostics: debug rotation must not create a fourth backup file
+...
+0% tests passed, 1 tests failed out of 1
+```
+
+Root cause: `src/koi/uci_controller.cpp` renamed `.3` to `.4` before renaming the active file to `.1`.
+
+### GREEN - minimal production correction
+
+The loop bound was changed from `backup = 3` to `backup = 2`, retaining only `.1` through `.3`. Verification was run with:
+
+```powershell
+& 'C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\Tools\Launch-VsDevShell.ps1' -Arch amd64 -HostArch amd64 -SkipAutomaticLocation
+& 'C:\msys64\ucrt64\bin\cmake.exe' --build out\task1-final-debug2 --parallel
+ctest --test-dir out\task1-final-debug2 -C Debug -R "^uci_controller_tests$|^koi_search_tests$|^koi_engine_process$" --output-on-failure
+```
+
+Output:
+
+```text
+1/3 Test #4: uci_controller_tests ............. Passed 2.05 sec
+2/3 Test #5: koi_search_tests ................. Passed 21.69 sec
+3/3 Test #11: koi_engine_process ............... Passed 2.34 sec
+100% tests passed, 0 tests failed out of 3
+```
+
+The strengthened test now verifies that `.1`, `.2`, and `.3` exist and `.4` does not exist after rotation. No production behavior outside the requested rotation bound was changed.

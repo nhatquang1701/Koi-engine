@@ -457,6 +457,11 @@ void test_task1_hidden_debug_file_is_relative_rotated_and_off_stdio() {
             existing.write(block.data(), static_cast<std::streamsize>(block.size()));
         }
     }
+    for (int backup = 1; backup <= 3; ++backup) {
+        std::ofstream existing(files.path() / ("koi-debug.log." + std::to_string(backup)),
+                               std::ios::binary | std::ios::trunc);
+        existing << "backup " << backup << '\n';
+    }
     const ControllerResult result = run_controller_in_directory(
         "setoption name Debug value true\n"
         "setoption name DebugFile value relative-debug.log\n"
@@ -480,6 +485,11 @@ void test_task1_hidden_debug_file_is_relative_rotated_and_off_stdio() {
             "Debug with an empty path must create koi-debug.log beside the executable");
     require(std::filesystem::exists(files.path() / "koi-debug.log.1"),
             "debug logs must rotate at 8 MiB");
+    require(std::filesystem::exists(files.path() / "koi-debug.log.2") &&
+                std::filesystem::exists(files.path() / "koi-debug.log.3"),
+            "debug rotation must retain the three newest backup files");
+    require(!std::filesystem::exists(files.path() / "koi-debug.log.4"),
+            "debug rotation must not create a fourth backup file");
 }
 
 void test_task1_option_change_emits_exactly_one_bestmove() {
