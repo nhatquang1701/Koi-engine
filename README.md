@@ -4,9 +4,8 @@ Koi Engine v1 is a Windows x64 UCI chess engine for standard chess. It is
 written in C++26 and is documented and process-tested against En Croissant as
 the primary GUI workflow. It uses deterministic iterative-deepening alpha-beta search
 with a classical evaluator and a persistent transposition table. Search runs on
-a cancellable outer worker; `Threads > 1` enables deterministic speculative
-root-parallel work with serial reference confirmation while the UCI command loop
-remains responsive.
+a cancellable outer worker; `Threads > 1` enables deterministic authoritative
+root-parallel work while the UCI command loop remains responsive.
 
 ## Architecture
 
@@ -49,7 +48,7 @@ For an independently reproducible release gate, run the checked-in harness from
 an x64 Visual Studio developer shell. It configures and builds fresh external
 Debug and Release trees, runs all CTest/process tests, checks tactical
 Threads 1/2/4 when the host supports them (with an explicit maximum-thread
-fallback), and writes benchmark, UCI, replay, and Lucas-style artifacts outside
+fallback), and writes benchmark, UCI, replay, and En Croissant-style artifacts outside
 the checkout:
 
 ```powershell
@@ -61,7 +60,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\task5_release_verify
 The harness rejects an output directory inside the repository and records the
 exact Debug/Release configure, build, CTest, benchmark, transcript, replay, and
 match command outputs under the supplied external directory. It makes no
-Stockfish/CPL or Lucas GUI availability assumption.
+Stockfish/CPL or En Croissant GUI availability assumption.
 
 ## Developer tools
 

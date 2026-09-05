@@ -776,9 +776,23 @@ void test_threaded_root_in_check_matches_serial_fixed_depth() {
                 std::find(accepted.begin(), accepted.end(), serial.best_move->uci()) != accepted.end(),
             "the root-in-check fixture must retain a serial accepted evasion");
 
+    const std::size_t legal_root_moves = root.legal_moves().size();
     for (const std::size_t threads : {std::size_t{2}, std::size_t{4}}) {
         koi::SearchOptions threaded_options;
         threaded_options.threads = threads;
+
+        auto concurrency_evaluator = std::make_shared<ConcurrencyEvaluator>();
+        koi::SearchService concurrency_service(concurrency_evaluator);
+        (void)search(concurrency_service, root, limits, threaded_options);
+        const std::size_t effective_threads = std::min({threads, koi::maximum_search_threads(), legal_root_moves});
+        if (effective_threads > 1) {
+            require(concurrency_evaluator->maximum_active() >= 2,
+                    "root-in-check search must use effective concurrent root workers when available");
+        } else {
+            require(concurrency_evaluator->maximum_active() >= 1,
+                    "root-in-check search must still evaluate on a single-thread host");
+        }
+
         koi::SearchService threaded_service(std::make_shared<koi::ClassicalEvaluator>());
         const koi::SearchResult threaded = search(threaded_service, root, limits, threaded_options);
         require(threaded.completed_depth == serial.completed_depth && threaded.best_move == serial.best_move &&
