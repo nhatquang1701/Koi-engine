@@ -160,6 +160,8 @@ void write_profile_json(const std::string& path, const BenchmarkConfig& config,
            << "  \"build\": \"Koi Engine " KOI_ENGINE_BUILD_VERSION "\",\n"
            << "  \"suite\": \"" << suite_name(config) << "\",\n"
            << "  \"warm_hash\": " << (config.warm_hash ? "true" : "false") << ",\n"
+           << "  \"hash_state\": \"" << (config.warm_hash ? "warm" : "cold") << "\",\n"
+           << "  \"timed\": " << (config.timed ? "true" : "false") << ",\n"
            << "  \"hash_mb\": 16,\n"
            << "  \"threads\": " << config.threads << ",\n"
            << "  \"speed\": " << static_cast<unsigned>(config.speed_percent) << ",\n"
@@ -176,7 +178,8 @@ void write_profile_json(const std::string& path, const BenchmarkConfig& config,
         output << ", \"fen\": ";
         write_json_string(output, benchmark.fen);
         output << ", \"limits\": {\"depth\": " << static_cast<unsigned>(benchmark.depth)
-               << "}, \"hash_mb\": 16, \"threads\": " << config.threads
+               << "}, \"hash_mb\": 16, \"hash_state\": \""
+               << (config.warm_hash ? "warm" : "cold") << "\", \"threads\": " << config.threads
                << ", \"speed\": " << static_cast<unsigned>(config.speed_percent)
                << ", \"score_cp\": " << result.score_cp << ", \"pv\": [";
         if (!run.pv.empty()) {
@@ -224,19 +227,14 @@ int main(int argc, char** argv) {
 
     try {
         std::cout << "Koi benchmark\n";
-        if (config->threads != 1 || config->speed_percent != 100 || config->timed || config->warm_hash ||
-            config->optional) {
-            std::cout << "config threads " << config->threads
-                      << " speed " << static_cast<unsigned>(config->speed_percent)
-                      << " timed " << (config->timed ? 1 : 0);
-            if (config->warm_hash) {
-                std::cout << " warm_hash 1";
-            }
-            if (config->optional) {
-                std::cout << " suite " << suite_name(*config);
-            }
-            std::cout << '\n';
+        std::cout << "config threads " << config->threads
+                  << " speed " << static_cast<unsigned>(config->speed_percent)
+                  << " timed " << (config->timed ? 1 : 0)
+                  << " hash " << (config->warm_hash ? "warm" : "cold");
+        if (config->optional) {
+            std::cout << " suite " << suite_name(*config);
         }
+        std::cout << '\n';
         const std::span<const koi::StrengthPosition> benchmarks = config->optional ?
             koi::optional_strength_positions() : koi::strength_positions();
         std::vector<std::pair<koi::StrengthPosition, BenchmarkRun>> profile_runs;

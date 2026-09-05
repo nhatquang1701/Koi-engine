@@ -52,7 +52,7 @@ From the configured build directory:
 .\out\release-vs\koi-perft.exe 4
 .\out\release-vs\koi-bench.exe
 .\out\release-vs\koi-bench.exe --threads 4 --speed 100 --timed
-.\out\release-vs\koi-bench.exe --optional --profile-json optional-strength.json
+.\out\release-vs\koi-bench.exe --optional --profile-json C:\Koi-results\optional-strength.json
 .\out\release-vs\koi-replay.exe startpos moves e2e4 e7e5 g1f3
 ```
 
@@ -60,11 +60,17 @@ From the configured build directory:
 non-negative depth. `koi-bench` runs the 64-position fixed-depth tactical hard
 gate and writes only its deterministic benchmark report to stdout by default.
 `--optional` instead selects the 128-position optional strength corpus and labels
-that suite in both its text and JSON-profile output. `--threads` and `--speed`
-select a benchmark configuration; `--timed` adds wall-clock timing fields.
-Untimed JSON profiles use the stable `Koi Engine 1.0` build identity and record
-`nps` as unmeasured (`0`); `--timed` adds `elapsed_ms` and measured NPS. It is a
-separate process and never writes to the UCI engine's stdout.
+that suite in both its text and JSON-profile output. `--threads N` and `--speed
+1..100` are recorded in every report and use the same deterministic search
+configuration as the corresponding engine controls. Every text report includes
+`hash cold` or `hash warm`; `--warm-hash` reuses one search service across rows
+and is useful for comparing warmed-table behavior. The default is cold.
+`--timed` is opt-in and adds wall-clock `elapsed_ms` and measured NPS to text and
+JSON; it is intentionally absent from the default CI-shaped output. Untimed JSON
+profiles use the stable `Koi Engine 1.0` build identity, set `timed` to `false`,
+and record `nps` as unmeasured (`0`). Each profile carries `hash_state` (`cold` or
+`warm`) at the top level and on every position. It is a separate process and never
+writes to the UCI engine's stdout.
 
 `koi-replay` is a separate rules-boundary tool for replaying coordinate moves without
 exposing the vendored chess library. Give it `startpos` or `fen <six-field FEN>`, then
@@ -124,7 +130,7 @@ optional PowerShell harness:
   -KoiPath .\out\release-vs\koi-engine.exe `
   -OpponentPath C:\Engines\stockfish.exe `
   -Depth 6 -Threads 4 -Speed 100 -Hash 512 `
-  -OutputDirectory .\match-results
+  -OutputDirectory C:\Koi-results\match-results
 ```
 
 The harness writes a `koi-uci-match-v2` JSON report plus matching `.pgn`. It records
@@ -196,46 +202,37 @@ CI threshold. NNUE, tablebases, and chess variants remain deferred; opening-book
 defaults, placement, fallback, and bypass behavior are documented below. This engine
 continues to evaluate standard chess with its classical evaluator.
 
-### Local verification baseline (2026-09-04)
+### Task 5 release verification (2026-09-05)
 
-Fresh Ninja builds were configured outside the checkout with Visual Studio 2022
-MSVC 19.44.35227.0 targeting x64, `/std:c++latest`, and CMake 4.4.2. Both Debug
-and Release builds completed. All 15 registered CTest targets passed in each
-configuration: Debug in 73.24 seconds and Release in 32.18 seconds. This includes
-the process-level UCI transcript and benchmark tests, the book unit tests, and the
-64-case tactical suite.
+Fresh external Ninja builds used Visual Studio 2022 MSVC 19.44.35228.0 targeting
+x64, `/std:c++latest`, and CMake 4.4.2. Debug and Release each configured and
+built from scratch; all 17 registered CTest targets passed. Debug completed in
+84.74 seconds and Release in 43.44 seconds. This includes all C++ tests, process
+tests, replay validation, UCI transcripts, benchmark/profile checks, and optional
+Python tests.
 
-The Release hard gate was run directly at `Threads` 1, 2, and 4 (`Speed 100`): all
-three runs accepted 64/64 fixtures. Threads 1 and 2/4 had identical fixed-depth
-move and score rows, which is the deterministic-threading check; node counts and
-wall time are intentionally not expected to match. The optional 128-position
-corpus also completed locally (34 accepted fixture moves; it is diagnostic rather
-than a pass/fail Elo gate). A timed Release run at `Threads 2`, `Speed 50` visited
-181,322 nodes plus quiescence nodes over 155 ms (about 1.17M visited nodes/s when
-aggregated). NPS is sensitive to CPU load, timer granularity, thread count, hash
-warmth, and speed settings; untimed profiles deliberately report NPS as zero. No
-approved historical NPS baseline was available locally, so a 20% performance-floor
-comparison has not been claimed.
+The fresh Release hard gate ran at `Threads` 1, 2, and 4 with `Speed 100`: each
+reported 64/64 accepted tactical rows, and normalized move/score rows were
+identical across all three runs. Node counts and elapsed times are intentionally
+not required to match. The optional 128-position profile completed with 32
+accepted rows and is diagnostic rather than a pass/fail Elo gate. A timed Release
+run at `Threads 4`, `Speed 100` visited 183,807 nodes plus quiescence nodes over
+157 ms (about 1.17M visited nodes/s aggregated). Timing is machine-sensitive;
+untimed profiles report NPS as zero and identify `hash_state` as `cold` or `warm`.
 
-The automated UCI harness verified the handshake, analysis-mode and tutor `MultiPV`
-output, ponder/`ponderhit`, book hit and missing-book fallback, `stop`, `quit`, and
-input EOF. A supplied executable-relative Polyglot book gives a legal weighted
-choice that repeats for a nonzero seed; normal play defaults to `OwnBook=true`,
-`BookFile=book.bin`, and `BookDepth=16`. Put `book.bin` beside `koi-engine.exe`.
-A missing, malformed, unusable, disabled, or depth-exhausted book falls through to
-normal search and never prevents startup. Analysis mode, `MultiPV>1`, `go infinite`,
-`go ponder`, and `searchmoves` deliberately bypass the book.
+The fresh UCI smoke transcript produced 26 lines, 21 option declarations, one
+legal coordinate `bestmove`, and empty stderr. CTest and the direct Release
+process checks covered the handshake, analysis/tutor `MultiPV`, ponder/`ponderhit`,
+book hit and missing-book fallback, `stop`, `quit`, input EOF, and clean stdout.
+The fresh Lucas-style process scenario completed 24 legal plies with `Hash=512`,
+`Threads=4`, and `Speed=100`; both engine processes shut down cleanly. Direct
+replay output classified the repeated knight sequence as a legal rule draw.
 
-The recorded `Get-Command stockfish` and `Get-Command Stockfish` checks returned no
-executable, and no supplied UCI opponent was available, so no color-balanced
-40-game-per-opening 1+0/5+3 measurements were fabricated. To perform them, supply
-an opponent and run the explicit 20-white/20-black no-book and licensed-book matrix
-in [Developer tools](#developer-tools); retain the JSON and PGN output outside the
-checkout. Lucas Chess was not installed or accessible in this environment, so manual
-registration was not performed. Use
-the Release `koi-engine.exe` and the Lucas settings listed below (`Hash 512`,
-`Threads 4`, `Speed 100`, `OwnBook true`, `BookFile book.bin`, `BookDepth 16`) to
-complete that GUI check.
+No Stockfish executable, fresh CPL corpus, or fresh color-balanced match data was
+available in this environment. Therefore this release verification makes no Elo,
+CPL, or playing-strength improvement claim. Lucas Chess itself was not installed
+for GUI automation; use the Release executable and the settings below for the
+remaining manual registration/play check.
 
 ## UCI smoke test
 
@@ -300,6 +297,50 @@ from the starting position (for example, `bestmove e2e4`).
   `bestmove` for that search.
 - A terminal position with no legal moves returns `bestmove 0000`.
 - `quit` and input EOF cancel and join the worker without late protocol output.
+
+### Timing controls
+
+Koi separates search limits from time-allocation policy. Explicit `go depth`,
+`go nodes`, and `go infinite` searches are not given an artificial time limit.
+For `movetime` and clock searches, the requested budget is adjusted in this
+order: `Slow Mover`, then `Speed`, then `Move Overhead` is subtracted, followed
+by the existing safety margin and minimum safe budget. `Move Overhead` defaults
+to 10 ms and accepts 0..5000; `Slow Mover` defaults to 100 and accepts 10..1000.
+`Speed` defaults to 100 and accepts 1..100. These controls affect allocation,
+not explicit depth or node limits, and changing one while searching cancels and
+joins the old generation before the next search uses the new snapshot.
+
+### WDL and strength controls
+
+`UCI_ShowWDL` defaults to false. When enabled, ordinary `info` lines append a
+deterministic `wdl W D L` triplet; it is omitted when disabled. `UCI_LimitStrength`
+defaults to false and `UCI_Elo` defaults to 1320 with a 1320..3190 range. These
+are Stockfish-compatible configuration controls. The current release keeps the
+normal deterministic search path unchanged and does not add random weakening;
+the strength hook is reserved for a later calibrated profile.
+
+### Optional Syzygy tablebases
+
+Syzygy support is optional and never requires tablebase files for build, startup,
+or ordinary search. Set `SyzygyPath` to a directory containing licensed `.rtbw`
+and `.rtbz` files. `SyzygyProbeLimit` accepts 0..5 pieces (default 5),
+`SyzygyProbeDepth` accepts 1..100 (default 1), and `Syzygy50MoveRule` defaults to
+true. An empty, missing, unreadable, malformed, over-limit, or unsupported
+position safely falls back to normal search. Root WDL/DTZ selection is used only
+for eligible single-PV play searches; analysis mode, `MultiPV > 1`, ponder, and
+`searchmoves` retain their documented search paths. Successful probes may be
+reported as `tbhits` in valid `info` lines. No tablebase data is distributed
+with Koi.
+
+### Hidden developer diagnostics
+
+The unadvertised `Debug` check option and `DebugFile` string option are for local
+diagnostics only. `Debug` defaults to false. With an empty `DebugFile`, Koi writes
+`koi-debug.log` beside the executable; a relative path is also resolved beside
+the executable, while an absolute path is used as supplied. Logs are best-effort,
+rotate at 8 MiB, and retain three backups. Debug events never go to UCI stdout
+or normal stderr, so a valid Lucas or automation transcript remains protocol
+clean. Leave this option disabled for normal release use.
 
 ## Register in Lucas Chess
 
@@ -394,6 +435,33 @@ handshake succeeds. Confirm that the GUI receives a legal move after `go`,
 remains responsive while the engine is thinking, and can stop or start a new
 game without a duplicate `bestmove`. This repository automates the UCI process
 transcript but cannot automate a locally installed Lucas Chess GUI.
+
+## Configuration and release packaging
+
+Koi has no required configuration file. Lucas Chess or another UCI GUI sends
+the options at session start; the portable release defaults are `Hash=16`,
+`Threads=1`, `Speed=100`, `OwnBook=true`, `BookFile=book.bin`, `BookDepth=16`,
+`BookRandom=false`, `UCI_ShowWDL=false`, `Move Overhead=10`, `Slow Mover=100`,
+`UCI_LimitStrength=false`, `UCI_Elo=1320`, and `Syzygy50MoveRule=true`.
+For the recommended Lucas smoke scenario, use `Hash=512`, `Threads=4`, and
+`Speed=100`, then keep the book and Syzygy paths explicitly configured if those
+assets are available.
+
+The Polyglot `book.bin` is an external licensed asset. Do not commit it, embed
+it in the executable, or redistribute it as part of an unlicensed Koi archive.
+For a release package, place the user-supplied `book.bin` beside `koi-engine.exe`
+only when its license permits that distribution, and retain these repository
+licenses with the package:
+
+- `third_party/chess-library/LICENSE` for the vendored chess-library code.
+- `third_party/fathom/LICENSE` for the optional Syzygy adapter code.
+
+The release archive should also retain the README and the exact build identity.
+Do not include generated benchmark profiles, match JSON/PGN, debug logs, or
+tablebase data in the repository release commit; write those artifacts under an
+external results directory such as `C:\Koi-results`. An Elo, CPL, or strength
+claim requires fresh comparable Stockfish CPL or match data with the executable,
+options, time control, and input provenance recorded alongside the report.
 
 ## References
 

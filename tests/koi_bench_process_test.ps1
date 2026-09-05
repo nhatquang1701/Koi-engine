@@ -48,7 +48,8 @@ function Assert-BenchmarkOutput($Result) {
     }
 
     $lines = @($Result.Stdout -split "`r?`n" | Where-Object { $_.Length -ne 0 })
-    if ($lines.Count -lt 2 -or $lines[0] -cne 'Koi benchmark') {
+    if ($lines.Count -lt 3 -or $lines[0] -cne 'Koi benchmark' -or
+        $lines[1] -notmatch '^config threads [1-9][0-9]* speed (?:[1-9]|[1-9][0-9]|100) timed [01] hash (?:cold|warm)(?: suite optional_strength)?$') {
         throw "koi-bench must begin with its benchmark header: $($Result.Stdout)"
     }
 
@@ -68,10 +69,13 @@ function Assert-BenchmarkOutput($Result) {
     }
 }
 
-$first = Invoke-Benchmark $BenchPath
-$second = Invoke-Benchmark $BenchPath
+$first = Invoke-Benchmark $BenchPath '--threads 1 --speed 100'
+$second = Invoke-Benchmark $BenchPath '--threads 1 --speed 100'
 Assert-BenchmarkOutput $first
 Assert-BenchmarkOutput $second
+if ($first.Stdout -notmatch '(?m)^config threads 1 speed 100 timed 0 hash cold\r?$') {
+    throw "the default reference benchmark must identify its cold hash state: $($first.Stdout)"
+}
 if ($first.Stdout -cne $second.Stdout) {
     throw "koi-bench output must be byte-identical across runs: first=$($first.Stdout) second=$($second.Stdout)"
 }
@@ -87,7 +91,7 @@ if ($timed.Stderr.Length -ne 0) {
 }
 $timedLines = @($timed.Stdout -split "`r?`n" | Where-Object { $_.Length -ne 0 })
 if ($timedLines.Count -lt 3 -or $timedLines[0] -cne 'Koi benchmark' -or
-    $timedLines[1] -cne "config threads $benchmarkThreads speed 50 timed 1") {
+    $timedLines[1] -cne "config threads $benchmarkThreads speed 50 timed 1 hash cold") {
     throw "configured koi-bench must report its thread, speed, and timed settings: $($timed.Stdout)"
 }
 foreach ($line in $timedLines[2..($timedLines.Count - 1)]) {
@@ -126,19 +130,21 @@ if ((Get-Content -LiteralPath $coldProfile -Raw) -cne $coldReplayText) {
 if ($coldJson.build -cne 'Koi Engine 1.0') {
     throw "untimed profile JSON must expose a stable build identity, got: $($coldJson.build)"
 }
-if ($warm.Stdout -notmatch '(?m)^config threads 1 speed 100 timed 0 warm_hash 1\r?$') {
+if ($warm.Stdout -notmatch '(?m)^config threads 1 speed 100 timed 0 hash warm\r?$') {
     throw "--warm-hash must mark the normal deterministic text report: $($warm.Stdout)"
 }
 if ($coldJson.schema -ne 'koi-bench-profile-v1' -or $coldJson.warm_hash -ne $false -or
+    $coldJson.hash_state -cne 'cold' -or $coldJson.timed -ne $false -or
     $coldJson.positions.Count -lt 1) {
     throw 'cold profile JSON must identify its schema, cold table state, and positions.'
 }
 if ($warmJson.schema -ne 'koi-bench-profile-v1' -or $warmJson.warm_hash -ne $true -or
+    $warmJson.hash_state -cne 'warm' -or $warmJson.timed -ne $false -or
     $warmJson.positions.Count -ne $coldJson.positions.Count) {
     throw 'warm profile JSON must identify shared table state and the same suite.'
 }
 foreach ($position in $coldJson.positions) {
-    foreach ($field in @('id', 'fen', 'limits', 'hash_mb', 'threads', 'speed', 'score_cp', 'pv',
+    foreach ($field in @('id', 'fen', 'limits', 'hash_mb', 'hash_state', 'threads', 'speed', 'score_cp', 'pv',
                           'nodes', 'qnodes', 'tt_hits', 'pruning', 'nps')) {
         if ($null -eq $position.$field) {
             throw "profile JSON position is missing $field"
@@ -146,6 +152,9 @@ foreach ($position in $coldJson.positions) {
     }
     if ($null -ne $position.elapsed_ms) {
         throw 'untimed profile JSON must not include elapsed wall-clock data.'
+    }
+    if ($position.hash_state -cne $coldJson.hash_state) {
+        throw 'profile JSON position hash state must match its top-level hash state.'
     }
     if ([uint64]$position.nps -ne 0) {
         throw 'untimed profile JSON must mark NPS as unmeasured.'
@@ -179,7 +188,7 @@ if ($optionalJson.suite -cne 'optional_strength' -or $optionalJson.positions.Cou
     throw 'the optional benchmark profile must identify and contain all 128 optional strength positions.'
 }
 $optionalRows = @($optional.Stdout -split "`r?`n" | Where-Object { $_ -like 'position *' })
-if ($optional.Stdout -notmatch '(?m)^config threads 1 speed 100 timed 0 suite optional_strength\r?$' -or
+if ($optional.Stdout -notmatch '(?m)^config threads 1 speed 100 timed 0 hash cold suite optional_strength\r?$' -or
     $optionalRows.Count -ne 128) {
     throw "the optional benchmark text report must identify its suite and report 128 positions: $($optional.Stdout)"
 }
