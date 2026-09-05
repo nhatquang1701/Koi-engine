@@ -63,6 +63,20 @@ struct ParsedOption {
     std::string value;
 };
 
+bool equals_ignore_case(std::string_view left, std::string_view right) {
+    if (left.size() != right.size()) {
+        return false;
+    }
+    for (std::size_t index = 0; index < left.size(); ++index) {
+        const auto left_character = static_cast<unsigned char>(left[index]);
+        const auto right_character = static_cast<unsigned char>(right[index]);
+        if (std::tolower(left_character) != std::tolower(right_character)) {
+            return false;
+        }
+    }
+    return true;
+}
+
 std::optional<ParsedOption> parse_setoption(const std::vector<std::string>& tokens) {
     if (tokens.size() < 2 || tokens[0] != "name") {
         return std::nullopt;
@@ -372,7 +386,7 @@ void UciController::handle_setoption(std::istream& command) {
     const std::string& name = parsed->name;
     const std::string& value = parsed->value;
 
-    if (name == "RandomSeed") {
+    if (equals_ignore_case(name, "RandomSeed")) {
         std::uint32_t seed = 0;
         if (parse_random_seed(value, seed)) {
             stop_and_suppress_active_search();
@@ -382,7 +396,7 @@ void UciController::handle_setoption(std::istream& command) {
         return;
     }
 
-    if (name == "Hash") {
+    if (equals_ignore_case(name, "Hash")) {
         std::uint64_t megabytes = 0;
         if (parse_uint64(value, megabytes) && megabytes >= kMinimumHashMegabytes &&
             megabytes <= kMaximumHashMegabytes) {
@@ -392,7 +406,7 @@ void UciController::handle_setoption(std::istream& command) {
         return;
     }
 
-    if (name == "Threads") {
+    if (equals_ignore_case(name, "Threads")) {
         std::uint64_t threads = 0;
         if (parse_uint64(value, threads) && threads >= 1 && threads <= maximum_search_threads()) {
             stop_and_suppress_active_search();
@@ -401,7 +415,7 @@ void UciController::handle_setoption(std::istream& command) {
         return;
     }
 
-    if (name == "Speed") {
+    if (equals_ignore_case(name, "Speed")) {
         std::uint64_t speed = 0;
         if (parse_uint64(value, speed) && speed >= kMinimumSpeedPercent &&
             speed <= kMaximumSpeedPercent) {
@@ -411,7 +425,7 @@ void UciController::handle_setoption(std::istream& command) {
         return;
     }
 
-    if (name == "UCI_AnalyseMode") {
+    if (equals_ignore_case(name, "UCI_AnalyseMode")) {
         bool analyse_mode = false;
         if (parse_boolean(value, analyse_mode) && analyse_mode_ != analyse_mode) {
             stop_and_suppress_active_search();
@@ -420,7 +434,7 @@ void UciController::handle_setoption(std::istream& command) {
         return;
     }
 
-    if (name == "MultiPV") {
+    if (equals_ignore_case(name, "MultiPV")) {
         std::uint64_t multi_pv = 0;
         if (parse_uint64(value, multi_pv) && multi_pv >= kMinimumMultiPv &&
             multi_pv <= kMaximumMultiPv) {
@@ -430,7 +444,7 @@ void UciController::handle_setoption(std::istream& command) {
         return;
     }
 
-    if (name == "Ponder") {
+    if (equals_ignore_case(name, "Ponder")) {
         bool ponder_enabled = false;
         if (parse_boolean(value, ponder_enabled)) {
             stop_and_suppress_active_search();
@@ -439,7 +453,7 @@ void UciController::handle_setoption(std::istream& command) {
         return;
     }
 
-    if (name == "OwnBook") {
+    if (equals_ignore_case(name, "OwnBook")) {
         bool own_book = false;
         if (parse_boolean(value, own_book)) {
             stop_and_suppress_active_search();
@@ -448,7 +462,7 @@ void UciController::handle_setoption(std::istream& command) {
         return;
     }
 
-    if (name == "BookRandom") {
+    if (equals_ignore_case(name, "BookRandom")) {
         bool book_random = false;
         if (parse_boolean(value, book_random)) {
             stop_and_suppress_active_search();
@@ -457,7 +471,7 @@ void UciController::handle_setoption(std::istream& command) {
         return;
     }
 
-    if (name == "BookFile") {
+    if (equals_ignore_case(name, "BookFile")) {
         if (!value.empty()) {
             stop_and_suppress_active_search();
             opening_book_.set_file(value);
@@ -465,7 +479,7 @@ void UciController::handle_setoption(std::istream& command) {
         return;
     }
 
-    if (name == "BookDepth") {
+    if (equals_ignore_case(name, "BookDepth")) {
         std::uint64_t book_depth = 0;
         if (parse_uint64(value, book_depth) && book_depth <= kMaximumBookDepth) {
             stop_and_suppress_active_search();
@@ -474,12 +488,12 @@ void UciController::handle_setoption(std::istream& command) {
         return;
     }
 
-    if (name == "Clear Hash") {
+    if (equals_ignore_case(name, "Clear Hash")) {
         stop_and_suppress_active_search();
         search_service_.clear_hash();
     }
 
-    if (name == "UCI_ShowWDL") {
+    if (equals_ignore_case(name, "UCI_ShowWDL")) {
         bool show_wdl = false;
         if (parse_boolean(value, show_wdl)) {
             stop_and_suppress_active_search();
@@ -488,7 +502,7 @@ void UciController::handle_setoption(std::istream& command) {
         return;
     }
 
-    if (name == "Move Overhead") {
+    if (equals_ignore_case(name, "Move Overhead")) {
         std::uint64_t overhead = 0;
         if (parse_uint64(value, overhead) && overhead <= kMaximumMoveOverheadMs) {
             stop_and_suppress_active_search();
@@ -497,7 +511,7 @@ void UciController::handle_setoption(std::istream& command) {
         return;
     }
 
-    if (name == "Slow Mover") {
+    if (equals_ignore_case(name, "Slow Mover")) {
         std::uint64_t slow_mover = 0;
         if (parse_uint64(value, slow_mover) && slow_mover >= kMinimumSlowMoverPercent &&
             slow_mover <= kMaximumSlowMoverPercent) {
@@ -507,7 +521,7 @@ void UciController::handle_setoption(std::istream& command) {
         return;
     }
 
-    if (name == "UCI_LimitStrength") {
+    if (equals_ignore_case(name, "UCI_LimitStrength")) {
         bool limit_strength = false;
         if (parse_boolean(value, limit_strength)) {
             stop_and_suppress_active_search();
@@ -516,7 +530,7 @@ void UciController::handle_setoption(std::istream& command) {
         return;
     }
 
-    if (name == "UCI_Elo") {
+    if (equals_ignore_case(name, "UCI_Elo")) {
         std::uint64_t elo = 0;
         if (parse_uint64(value, elo) && elo >= kMinimumElo && elo <= kMaximumElo) {
             stop_and_suppress_active_search();
@@ -525,14 +539,14 @@ void UciController::handle_setoption(std::istream& command) {
         return;
     }
 
-    if (name == "SyzygyPath") {
+    if (equals_ignore_case(name, "SyzygyPath")) {
         stop_and_suppress_active_search();
         syzygy_path_ = value;
         rebuild_syzygy();
         return;
     }
 
-    if (name == "SyzygyProbeDepth") {
+    if (equals_ignore_case(name, "SyzygyProbeDepth")) {
         std::uint64_t depth = 0;
         if (parse_uint64(value, depth) && depth >= kMinimumSyzygyProbeDepth &&
             depth <= kMaximumSyzygyProbeDepth) {
@@ -543,7 +557,7 @@ void UciController::handle_setoption(std::istream& command) {
         return;
     }
 
-    if (name == "SyzygyProbeLimit") {
+    if (equals_ignore_case(name, "SyzygyProbeLimit")) {
         std::uint64_t limit = 0;
         if (parse_uint64(value, limit) && limit <= kMaximumSyzygyProbeLimit) {
             stop_and_suppress_active_search();
@@ -553,7 +567,7 @@ void UciController::handle_setoption(std::istream& command) {
         return;
     }
 
-    if (name == "Syzygy50MoveRule") {
+    if (equals_ignore_case(name, "Syzygy50MoveRule")) {
         bool fifty_move_rule = false;
         if (parse_boolean(value, fifty_move_rule)) {
             stop_and_suppress_active_search();
@@ -563,7 +577,7 @@ void UciController::handle_setoption(std::istream& command) {
         return;
     }
 
-    if (name == "Debug") {
+    if (equals_ignore_case(name, "Debug")) {
         bool debug = false;
         if (parse_boolean(value, debug)) {
             stop_and_suppress_active_search();
@@ -573,7 +587,7 @@ void UciController::handle_setoption(std::istream& command) {
         return;
     }
 
-    if (name == "DebugFile") {
+    if (equals_ignore_case(name, "DebugFile")) {
         stop_and_suppress_active_search();
         debug_file_path_ = value;
         if (debug_enabled_) {

@@ -204,6 +204,15 @@ add_test(
 set_tests_properties(koi_engine_process PROPERTIES TIMEOUT 30)
 
 add_test(
+    NAME koi_engine_en_croissant_process
+    COMMAND ${POWERSHELL_EXECUTABLE} -NoProfile -ExecutionPolicy Bypass -File
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/en_croissant_uci_test.ps1"
+            -EnginePath "$<TARGET_FILE:koi_engine>"
+)
+
+set_tests_properties(koi_engine_en_croissant_process PROPERTIES TIMEOUT 30)
+
+add_test(
     NAME koi_benchmark_process
     COMMAND ${POWERSHELL_EXECUTABLE} -NoProfile -ExecutionPolicy Bypass -File
             "${CMAKE_CURRENT_SOURCE_DIR}/tests/koi_bench_process_test.ps1"

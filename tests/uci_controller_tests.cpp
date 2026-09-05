@@ -426,6 +426,49 @@ void test_task1_public_options_accept_valid_and_ignore_invalid_values() {
     require(result.diagnostics.empty(), "valid and invalid Task 1 options must be quiet");
 }
 
+void test_en_croissant_option_names_are_case_insensitive() {
+    TestDirectory files;
+    const std::filesystem::path book = files.path() / "en-croissant-book.bin";
+    write_book(book, {{koi::GameState::startpos().polyglot_key(),
+                       polyglot_move("e2", "e4"), 100, 0}});
+
+    const ControllerResult book_file = run_controller_in_directory(
+        "setoption name bookfile value en-croissant-book.bin\n"
+        "position startpos\n"
+        "go depth 1\n"
+        "quit\n",
+        files.path());
+    require(book_file.exit_code == 0 && book_file.diagnostics.empty() &&
+                book_file.output.find("info string book move e2e4") != std::string::npos,
+            "lowercase bookfile must be accepted by the En Croissant UCI workflow");
+
+    const ControllerResult multipv = run_controller_in_directory(
+        "setoption name BookFile value en-croissant-book.bin\n"
+        "setoption name multipv value 2\n"
+        "position startpos\n"
+        "go depth 1\n"
+        "stop\n"
+        "quit\n",
+        files.path());
+    require(multipv.output.find("info string book move ") == std::string::npos,
+            "lowercase multipv must bypass the opening book for analysis variations");
+
+    const ControllerResult analysis = run_controller_in_directory(
+        "setoption name BookFile value en-croissant-book.bin\n"
+        "setoption name uci_analysemode value true\n"
+        "position startpos\n"
+        "go depth 1\n"
+        "stop\n"
+        "quit\n",
+        files.path());
+    const std::vector<std::string> bestmoves =
+        lines_starting_with(output_lines(analysis.output), "bestmove ");
+    require(analysis.exit_code == 0 && analysis.diagnostics.empty() &&
+                analysis.output.find("info string book move ") == std::string::npos &&
+                bestmoves.size() == 1 && is_legal_move(Position{}, bestmoves.front().substr(9)),
+            "lowercase uci_analysemode must bypass the book and return one legal move");
+}
+
 void test_task1_wdl_output_is_optional_and_mate_scores_are_converted() {
     const ControllerResult omitted = run_controller(
         "setoption name OwnBook value false\n"
@@ -1466,6 +1509,7 @@ int main() {
         {"Syzygy option values", test_syzygy_options_accept_valid_values_and_ignore_invalid_values},
         {"Task 1 handshake", test_task1_handshake_appends_exact_compatibility_options},
         {"Task 1 option values", test_task1_public_options_accept_valid_and_ignore_invalid_values},
+        {"En Croissant option casing", test_en_croissant_option_names_are_case_insensitive},
         {"Task 1 WDL", test_task1_wdl_output_is_optional_and_mate_scores_are_converted},
         {"Task 1 hidden diagnostics", test_task1_hidden_debug_file_is_relative_rotated_and_off_stdio},
         {"Task 1 option replacement", test_task1_option_change_emits_exactly_one_bestmove},

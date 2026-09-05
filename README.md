@@ -1,7 +1,8 @@
 # Koi Engine v1
 
 Koi Engine v1 is a Windows x64 UCI chess engine for standard chess. It is
-written in C++26 and uses deterministic iterative-deepening alpha-beta search
+written in C++26 and is documented and process-tested against En Croissant as
+the primary GUI workflow. It uses deterministic iterative-deepening alpha-beta search
 with a classical evaluator and a persistent transposition table. Search runs on
 a cancellable outer worker; `Threads > 1` enables deterministic speculative
 root-parallel work with serial reference confirmation while the UCI command loop
@@ -360,7 +361,44 @@ rotate at 8 MiB, and retain three backups. Debug events never go to UCI stdout
 or normal stderr, so a valid Lucas or automation transcript remains protocol
 clean. Leave this option disabled for normal release use.
 
-## Register in Lucas Chess
+## Register in En Croissant (primary)
+
+1. Build the Windows x64 Release target and resolve the absolute path to
+   `out\release-vs\koi-engine.exe` (or the executable in your chosen build
+   directory).
+2. In En Croissant, add a UCI engine and select that `koi-engine.exe` path.
+   Keep the engine's working directory beside the executable when configuring
+   the engine so portable relative assets resolve predictably.
+3. If using the opening book, place the user-supplied licensed `book.bin` in
+   the same directory as `koi-engine.exe`. Do not add book data to this
+   repository or redistribute it without its license.
+
+Recommended starting options are:
+
+```text
+setoption name Hash value 512
+setoption name Threads value 4
+setoption name Speed value 100
+setoption name OwnBook value true
+setoption name BookFile value book.bin
+setoption name BookDepth value 16
+setoption name BookRandom value false
+```
+
+For normal play, let En Croissant provide the position and clock limits. For
+analysis, enable `UCI_AnalyseMode` and use `go infinite`; send `stop` when the
+analysis view is closed. Tutor and MultiPV views should set `MultiPV` to the
+number of variations requested (for example, `3`) and use a finite depth or
+clock search. Analysis mode, `MultiPV > 1`, `go infinite`, ponder, and
+`searchmoves` intentionally bypass the opening book so these views receive
+search variations rather than a book move.
+
+En Croissant uses the standard UCI protocol: the checked-in process transcript
+covers the handshake, options, positions with moves, stopped searches,
+MultiPV, infinite analysis, and clean quit with exactly one legal `bestmove`
+per search. Any other standard UCI GUI can use the same executable and options.
+
+## Register in Lucas Chess (generic UCI fallback)
 
 1. Build the engine and resolve the path to `koi-engine.exe`.
 2. In Lucas Chess, open the engine-management or configuration dialog and add
