@@ -24,6 +24,25 @@ tablebase lifecycle, book safety, UCI process behavior, En Croissant-style
 process behavior, benchmark process output, match replay, Windows
 configuration, and Python tooling.
 
+## Post-fix Release verification
+
+The final-review fix build was rerun from the current branch in:
+
+`C:\Users\ntATh\AppData\Local\Temp\koi-task8-fix-final-20260906`
+
+The fresh x64 Release incremental build completed with exit code 0 and
+produced `Release\koi-engine.exe` plus all test and tooling targets. MSVC
+reported only its expected temporary-directory incremental-build warning
+(`MSB8029`); no compilation or link errors occurred.
+
+The required fresh Release CTest command completed with exit code 0:
+
+`ctest --test-dir C:\Users\ntATh\AppData\Local\Temp\koi-task8-fix-final-20260906 -C Release --output-on-failure`
+
+All 18/18 tests passed in 155.74 seconds. This rerun includes the bounded
+opening-book fallback and updated default-documentation fixes from the final
+review wave.
+
 ## Thread, benchmark, and process gates
 
 The fresh Release validation produced:
