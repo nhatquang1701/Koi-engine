@@ -1642,6 +1642,51 @@ PositionFeatures GameState::position_features() const noexcept {
     return features;
 }
 
+std::size_t TablebaseSnapshot::piece_count() const noexcept {
+    std::size_t count = 0;
+    for (const auto& colors : piece_bitboards) {
+        for (const std::uint64_t bitboard : colors) {
+            count += static_cast<std::size_t>(std::popcount(bitboard));
+        }
+    }
+    return count;
+}
+
+TablebaseSnapshot GameState::tablebase_snapshot() const noexcept {
+    TablebaseSnapshot snapshot;
+    snapshot.side_to_move = side_to_move();
+    snapshot.halfmove_clock = halfmove_clock();
+    const chess::Board::CastlingRights rights = impl_->board.castlingRights();
+    if (rights.has(chess::Color::WHITE, chess::Board::CastlingRights::Side::KING_SIDE)) {
+        snapshot.castling_rights |= kWhiteKingSideCastling;
+    }
+    if (rights.has(chess::Color::WHITE, chess::Board::CastlingRights::Side::QUEEN_SIDE)) {
+        snapshot.castling_rights |= kWhiteQueenSideCastling;
+    }
+    if (rights.has(chess::Color::BLACK, chess::Board::CastlingRights::Side::KING_SIDE)) {
+        snapshot.castling_rights |= kBlackKingSideCastling;
+    }
+    if (rights.has(chess::Color::BLACK, chess::Board::CastlingRights::Side::QUEEN_SIDE)) {
+        snapshot.castling_rights |= kBlackQueenSideCastling;
+    }
+
+    const chess::Square en_passant = impl_->board.enpassantSq();
+    if (en_passant != chess::Square::NO_SQ) {
+        snapshot.en_passant_square = Square::from_index(static_cast<std::uint8_t>(en_passant.index()));
+    }
+
+    const chess::Color colors[] = {chess::Color::WHITE, chess::Color::BLACK};
+    const chess::PieceType types[] = {
+        chess::PieceType::PAWN, chess::PieceType::KNIGHT, chess::PieceType::BISHOP,
+        chess::PieceType::ROOK, chess::PieceType::QUEEN, chess::PieceType::KING};
+    for (std::size_t color = 0; color < 2; ++color) {
+        for (std::size_t type = 0; type < 6; ++type) {
+            snapshot.piece_bitboards[color][type] = impl_->board.pieces(types[type], colors[color]).getBits();
+        }
+    }
+    return snapshot;
+}
+
 bool GameState::is_legal(const Move& move) const noexcept {
     if (move.is_no_move()) {
         return false;

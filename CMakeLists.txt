@@ -47,6 +47,7 @@ add_library(koi_core
     src/koi/search_service.cpp
     src/koi/search_ordering.cpp
     src/koi/static_exchange.cpp
+    src/koi/syzygy_tablebase.cpp
     src/koi/strength_suite.cpp
     src/koi/time_manager.cpp
     src/koi/transposition_table.cpp
@@ -59,7 +60,11 @@ target_include_directories(koi_core PUBLIC
 
 target_include_directories(koi_core PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/chess-library
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/fathom
 )
+
+set_source_files_properties(third_party/fathom/tbprobe.c PROPERTIES LANGUAGE CXX)
+target_sources(koi_core PRIVATE third_party/fathom/tbprobe.c)
 
 target_compile_definitions(koi_core PUBLIC
     KOI_ENGINE_BUILD_VERSION="${PROJECT_VERSION}"
@@ -72,6 +77,14 @@ add_executable(koi_core_tests
 target_link_libraries(koi_core_tests PRIVATE koi_core)
 
 add_test(NAME koi_core_tests COMMAND koi_core_tests)
+
+add_executable(syzygy_tablebase_tests
+    tests/syzygy_tablebase_tests.cpp
+)
+
+target_link_libraries(syzygy_tablebase_tests PRIVATE koi_core)
+
+add_test(NAME syzygy_tablebase_tests COMMAND syzygy_tablebase_tests)
 
 add_executable(koi_rules_tests
     tests/koi_rules_tests.cpp

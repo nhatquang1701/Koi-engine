@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <optional>
 #include <thread>
 #include <vector>
@@ -12,6 +13,8 @@
 #include "koi/move.hpp"
 
 namespace koi {
+
+class SyzygyTablebase;
 
 struct ClockLimit {
     std::chrono::milliseconds remaining{0};
@@ -50,6 +53,7 @@ struct SearchStats {
     std::uint64_t razoring_prunes = 0;
     std::uint64_t quiet_history_updates = 0;
     std::uint64_t continuation_history_updates = 0;
+    std::uint64_t tbhits = 0;
     int seldepth = 0;
     std::chrono::milliseconds elapsed{0};
 };
@@ -66,6 +70,7 @@ struct SearchInfo {
     std::uint64_t qnodes = 0;
     std::uint64_t tt_hits = 0;
     int multipv = 1;
+    std::uint64_t tbhits = 0;
 };
 
 struct SearchResult {
@@ -95,6 +100,7 @@ struct SearchOptions {
     std::uint32_t slow_mover_percent = 100;
     bool limit_strength = false;
     std::uint32_t elo = 1320;
+    std::shared_ptr<const SyzygyTablebase> syzygy;
     StrengthProfileHook strength_profile_hook;
 };
 

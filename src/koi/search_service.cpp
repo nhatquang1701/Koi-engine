@@ -16,6 +16,7 @@
 
 #include "koi/detail/search_ordering.hpp"
 #include "koi/detail/static_exchange.hpp"
+#include "koi/syzygy_tablebase.hpp"
 #include "koi/time_manager.hpp"
 #include "koi/transposition_table.hpp"
 
@@ -124,6 +125,7 @@ void accumulate_stats(SearchStats& total, const SearchStats& partial) noexcept {
     total.razoring_prunes += partial.razoring_prunes;
     total.quiet_history_updates += partial.quiet_history_updates;
     total.continuation_history_updates += partial.continuation_history_updates;
+    total.tbhits += partial.tbhits;
     total.seldepth = std::max(total.seldepth, partial.seldepth);
 }
 
@@ -904,12 +906,35 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
             result.score_cp = evaluator->evaluate(root, root.side_to_move());
         }
 
+        std::optional<SyzygyRootResult> tablebase_result;
+        if (options.syzygy && options.multi_pv == 1 && !options.analyse_mode &&
+            !limits.ponder && !limits.search_moves_specified &&
+            options.syzygy->allows_depth(limits.depth.value_or(1))) {
+            std::vector<Move> allowed_moves;
+            allowed_moves.reserve(legal_moves.size());
+            for (const MoveMetadata& metadata : legal_moves) {
+                allowed_moves.push_back(metadata.move);
+            }
+            tablebase_result = options.syzygy->probe_root(root, allowed_moves);
+        }
+
         if (legal_moves.empty()) {
             result.score_cp = root.in_check() ? -kMateScore : 0;
             result.mate = mate_from_score(result.score_cp);
         } else if (root.is_draw_by_rule()) {
             result.score_cp = 0;
             result.best_move.reset();
+        } else if (tablebase_result.has_value()) {
+            result.best_move = tablebase_result->moves.front();
+            result.score_cp = tablebase_result->score.score_cp;
+            result.mate = tablebase_result->score.mate;
+            result.completed_depth = 1;
+            result.stats.tbhits = 1;
+            const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now() - started);
+            SearchInfo info{1, result.score_cp, result.mate, 0, 0, elapsed,
+                            {result.best_move.value()}, 0, 0, 0, 1, 1};
+            safely_report_info(sink, info);
         } else if ((options.threads == 1 && options.multi_pv == 1) || legal_moves.size() < 2 ||
                    (time_manager.node_limit().has_value() && options.multi_pv == 1)) {
             SearchContext context(*evaluator, *table, time_manager, state->stop_requested,

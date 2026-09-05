@@ -109,7 +109,7 @@ function Invoke-UciTranscript([string]$Transcript) {
 }
 
 function Test-SearchInfo([string]$Line) {
-    return $Line -match '^info depth [1-9][0-9]* seldepth [0-9]+ multipv [1-9][0-6]? score (cp|mate) -?[0-9]+ nodes [0-9]+ nps [0-9]+ time [0-9]+ pv( [a-h][1-8][a-h][1-8][nbrq]?)*$'
+    return $Line -match '^info depth [1-9][0-9]* seldepth [0-9]+ multipv [1-9][0-6]? score (cp|mate) -?[0-9]+ nodes [0-9]+ nps [0-9]+ time [0-9]+ pv( [a-h][1-8][a-h][1-8][nbrq]?)*( tbhits [0-9]+)?$'
 }
 
 function Write-StartPositionBook([string]$Path) {
@@ -142,6 +142,10 @@ $expectedHandshake = @(
     'option name Slow Mover type spin default 100 min 10 max 1000',
     'option name UCI_LimitStrength type check default false',
     'option name UCI_Elo type spin default 1320 min 1320 max 3190',
+    'option name SyzygyPath type string default ',
+    'option name SyzygyProbeDepth type spin default 1 min 1 max 100',
+    'option name SyzygyProbeLimit type spin default 5 min 0 max 5',
+    'option name Syzygy50MoveRule type check default true',
     'uciok'
 )
 foreach ($expected in $expectedHandshake) {

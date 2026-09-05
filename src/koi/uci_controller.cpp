@@ -32,6 +32,9 @@ constexpr std::uint64_t kMaximumElo = 3'190;
 constexpr std::uint64_t kMinimumMultiPv = 1;
 constexpr std::uint64_t kMaximumMultiPv = 16;
 constexpr std::uint64_t kMaximumBookDepth = 40;
+constexpr std::uint64_t kMinimumSyzygyProbeDepth = 1;
+constexpr std::uint64_t kMaximumSyzygyProbeDepth = 100;
+constexpr std::uint64_t kMaximumSyzygyProbeLimit = 5;
 constexpr std::uintmax_t kDebugRotationBytes = 8U * 1024U * 1024U;
 constexpr int kWdlScoreLimit = 1'000;
 
@@ -522,6 +525,44 @@ void UciController::handle_setoption(std::istream& command) {
         return;
     }
 
+    if (name == "SyzygyPath") {
+        stop_and_suppress_active_search();
+        syzygy_path_ = value;
+        rebuild_syzygy();
+        return;
+    }
+
+    if (name == "SyzygyProbeDepth") {
+        std::uint64_t depth = 0;
+        if (parse_uint64(value, depth) && depth >= kMinimumSyzygyProbeDepth &&
+            depth <= kMaximumSyzygyProbeDepth) {
+            stop_and_suppress_active_search();
+            syzygy_probe_depth_ = static_cast<std::uint8_t>(depth);
+            rebuild_syzygy();
+        }
+        return;
+    }
+
+    if (name == "SyzygyProbeLimit") {
+        std::uint64_t limit = 0;
+        if (parse_uint64(value, limit) && limit <= kMaximumSyzygyProbeLimit) {
+            stop_and_suppress_active_search();
+            syzygy_probe_limit_ = static_cast<std::uint8_t>(limit);
+            rebuild_syzygy();
+        }
+        return;
+    }
+
+    if (name == "Syzygy50MoveRule") {
+        bool fifty_move_rule = false;
+        if (parse_boolean(value, fifty_move_rule)) {
+            stop_and_suppress_active_search();
+            syzygy_50_move_rule_ = fifty_move_rule;
+            rebuild_syzygy();
+        }
+        return;
+    }
+
     if (name == "Debug") {
         bool debug = false;
         if (parse_boolean(value, debug)) {
@@ -660,6 +701,7 @@ void UciController::start_search(GameState root, SearchLimits limits, bool skip_
     options.slow_mover_percent = slow_mover_percent_;
     options.limit_strength = limit_strength_;
     options.elo = elo_;
+    options.syzygy = syzygy_;
     active_search_.emplace(search_service_.start(std::move(root), std::move(limits), std::move(sink), options));
 }
 
@@ -729,6 +771,10 @@ void UciController::write_handshake() {
                "option name Slow Mover type spin default 100 min 10 max 1000\n"
                "option name UCI_LimitStrength type check default false\n"
                "option name UCI_Elo type spin default 1320 min 1320 max 3190\n"
+               "option name SyzygyPath type string default \n"
+               "option name SyzygyProbeDepth type spin default 1 min 1 max 100\n"
+               "option name SyzygyProbeLimit type spin default 5 min 0 max 5\n"
+               "option name Syzygy50MoveRule type check default true\n"
                "uciok\n"
             << std::flush;
 }
@@ -760,7 +806,16 @@ void UciController::write_search_info(std::uint64_t generation, const SearchInfo
     for (const Move& move : info.pv) {
         output_ << ' ' << move.uci();
     }
+    if (info.tbhits != 0) {
+        output_ << " tbhits " << info.tbhits;
+    }
     output_ << '\n' << std::flush;
+}
+
+void UciController::rebuild_syzygy() {
+    syzygy_.reset();
+    syzygy_ = std::make_shared<SyzygyTablebase>(
+        syzygy_path_, syzygy_probe_limit_, syzygy_probe_depth_, syzygy_50_move_rule_);
 }
 
 void UciController::write_search_completion(std::uint64_t generation,

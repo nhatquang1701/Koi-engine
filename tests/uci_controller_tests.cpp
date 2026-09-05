@@ -358,11 +358,37 @@ void test_uci_handshake_has_identity_and_supported_options_in_order() {
         "option name Slow Mover type spin default 100 min 10 max 1000\n"
         "option name UCI_LimitStrength type check default false\n"
         "option name UCI_Elo type spin default 1320 min 1320 max 3190\n"
+        "option name SyzygyPath type string default \n"
+        "option name SyzygyProbeDepth type spin default 1 min 1 max 100\n"
+        "option name SyzygyProbeLimit type spin default 5 min 0 max 5\n"
+        "option name Syzygy50MoveRule type check default true\n"
         "uciok\n";
 
     require(result.exit_code == 0, "quit must cause a normal shutdown");
     require(result.output == expected,
             "uci response must advertise the identity, hash, thread, speed, and clear-hash options");
+}
+
+void test_syzygy_options_accept_valid_values_and_ignore_invalid_values() {
+    const ControllerResult result = run_controller(
+        "uci\n"
+        "setoption name SyzygyPath value definitely-missing-syzygy-path\n"
+        "setoption name SyzygyPath value\n"
+        "setoption name SyzygyProbeDepth value 1\n"
+        "setoption name SyzygyProbeDepth value 0\n"
+        "setoption name SyzygyProbeDepth value 101\n"
+        "setoption name SyzygyProbeLimit value 5\n"
+        "setoption name SyzygyProbeLimit value 6\n"
+        "setoption name Syzygy50MoveRule value false\n"
+        "setoption name Syzygy50MoveRule value invalid\n"
+        "position fen 4k3/8/8/8/8/8/8/4K3 w - - 0 1\n"
+        "go depth 1\n"
+        "stop\n"
+        "quit\n");
+    require(result.exit_code == 0, "invalid Syzygy options must not crash the controller");
+    require(result.output.find("bestmove ") != std::string::npos,
+            "an absent Syzygy path must fall back to ordinary search");
+    require(result.diagnostics.empty(), "Syzygy option handling must keep diagnostics clean");
 }
 
 void test_task1_handshake_appends_exact_compatibility_options() {
@@ -1437,6 +1463,7 @@ struct TestCase {
 int main() {
     const std::vector<TestCase> tests{
         {"uci handshake and options", test_uci_handshake_has_identity_and_supported_options_in_order},
+        {"Syzygy option values", test_syzygy_options_accept_valid_values_and_ignore_invalid_values},
         {"Task 1 handshake", test_task1_handshake_appends_exact_compatibility_options},
         {"Task 1 option values", test_task1_public_options_accept_valid_and_ignore_invalid_values},
         {"Task 1 WDL", test_task1_wdl_output_is_optional_and_mate_scores_are_converted},

@@ -14,6 +14,7 @@
 #include "koi/move_chooser.hpp"
 #include "koi/opening_book.hpp"
 #include "koi/search_service.hpp"
+#include "koi/syzygy_tablebase.hpp"
 
 namespace koi {
 
@@ -56,6 +57,7 @@ private:
     void write_position_error(const char* message);
     void debug_event(std::string message) noexcept;
     void configure_debug_file();
+    void rebuild_syzygy();
     [[nodiscard]] std::filesystem::path debug_path() const;
     void rotate_debug_file_if_needed(std::size_t incoming_bytes);
 
@@ -93,6 +95,12 @@ private:
     bool book_random_ = false;
     std::uint8_t book_depth_ = 16;
     std::uint32_t random_seed_ = 0;
+    std::filesystem::path syzygy_path_;
+    std::uint8_t syzygy_probe_depth_ = 1;
+    std::uint8_t syzygy_probe_limit_ = 5;
+    bool syzygy_50_move_rule_ = true;
+    std::shared_ptr<const SyzygyTablebase> syzygy_ =
+        std::make_shared<SyzygyTablebase>();
     std::uint64_t generation_ = 0;
 };
 

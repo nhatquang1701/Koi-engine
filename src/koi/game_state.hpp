@@ -93,6 +93,24 @@ struct PositionFeatures {
     Color side_to_move = Color::white;
 };
 
+inline constexpr std::uint8_t kWhiteKingSideCastling = 0x1;
+inline constexpr std::uint8_t kWhiteQueenSideCastling = 0x2;
+inline constexpr std::uint8_t kBlackKingSideCastling = 0x4;
+inline constexpr std::uint8_t kBlackQueenSideCastling = 0x8;
+inline constexpr std::uint8_t kAllCastlingRights =
+    kWhiteKingSideCastling | kWhiteQueenSideCastling |
+    kBlackKingSideCastling | kBlackQueenSideCastling;
+
+struct TablebaseSnapshot {
+    std::array<std::array<std::uint64_t, 6>, 2> piece_bitboards{};
+    Color side_to_move = Color::white;
+    Square en_passant_square{};
+    std::uint16_t halfmove_clock = 0;
+    std::uint8_t castling_rights = 0;
+
+    [[nodiscard]] std::size_t piece_count() const noexcept;
+};
+
 class GameState {
 public:
     GameState();
@@ -119,6 +137,7 @@ public:
         MoveMetadataList& moves, bool include_quiet_checks = true) const noexcept;
     [[nodiscard]] std::optional<MoveMetadata> describe_move(const Move&) const noexcept;
     [[nodiscard]] PositionFeatures position_features() const noexcept;
+    [[nodiscard]] TablebaseSnapshot tablebase_snapshot() const noexcept;
     [[nodiscard]] bool is_legal(const Move& move) const noexcept;
     bool make_move(const Move& move) noexcept;
     // Fast path for metadata returned by legal_moves_with_metadata() for this
