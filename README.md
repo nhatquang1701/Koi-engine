@@ -366,8 +366,8 @@ diagnostics only. `Debug` defaults to false. With an empty `DebugFile`, Koi writ
 `koi-debug.log` beside the executable; a relative path is also resolved beside
 the executable, while an absolute path is used as supplied. Logs are best-effort,
 rotate at 8 MiB, and retain three backups. Debug events never go to UCI stdout
-or normal stderr, so a valid Lucas or automation transcript remains protocol
-clean. Leave this option disabled for normal release use.
+or normal stderr, so a valid En Croissant or other UCI transcript remains
+protocol clean. Leave this option disabled for normal release use.
 
 ## Register in En Croissant (primary)
 
@@ -506,12 +506,12 @@ transcript but cannot automate a locally installed Lucas Chess GUI.
 
 ## Configuration and release packaging
 
-Koi has no required configuration file. Lucas Chess or another UCI GUI sends
+Koi has no required configuration file. En Croissant or another UCI GUI sends
 the options at session start; the portable release defaults are `Hash=16`,
 `Threads=1`, `Speed=100`, `OwnBook=true`, `BookFile=book.bin`, `BookDepth=16`,
 `BookRandom=false`, `UCI_ShowWDL=false`, `Move Overhead=10`, `Slow Mover=100`,
 `UCI_LimitStrength=false`, `UCI_Elo=1320`, and `Syzygy50MoveRule=true`.
-For the recommended Lucas smoke scenario, use `Hash=512`, `Threads=4`, and
+For the recommended En Croissant smoke scenario, use `Hash=512`, `Threads=4`, and
 `Speed=100`, then keep the book and Syzygy paths explicitly configured if those
 assets are available.
 

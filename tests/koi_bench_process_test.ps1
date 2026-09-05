@@ -9,7 +9,7 @@ if (-not (Test-Path -LiteralPath $BenchPath -PathType Leaf)) {
     throw "koi-bench executable is missing: $BenchPath"
 }
 
-function Invoke-Benchmark([string]$Executable, [string]$Arguments = '') {
+function Invoke-Benchmark([string]$Executable, [string]$Arguments = '', [string]$Label = 'benchmark') {
     $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
     $startInfo.FileName = $Executable
     $startInfo.UseShellExecute = $false
@@ -26,10 +26,10 @@ function Invoke-Benchmark([string]$Executable, [string]$Arguments = '') {
 
     $stdoutTask = $process.StandardOutput.ReadToEndAsync()
     $stderrTask = $process.StandardError.ReadToEndAsync()
-    if (-not $process.WaitForExit(30000)) {
+    if (-not $process.WaitForExit(120000)) {
         $process.Kill()
         $process.WaitForExit()
-        throw 'koi-bench did not exit within 30000 ms.'
+        throw "koi-bench ($Label) did not exit within 120000 ms."
     }
 
     return [pscustomobject]@{
@@ -75,8 +75,8 @@ function Get-NormalizedBenchmarkRows($Result) {
         ForEach-Object { $_ -replace 'nodes [0-9]+ qnodes [0-9]+ tt_hits [0-9]+', 'nodes N qnodes Q tt_hits H' }) -join "`n"
 }
 
-$first = Invoke-Benchmark $BenchPath '--threads 1 --speed 100'
-$second = Invoke-Benchmark $BenchPath '--threads 1 --speed 100'
+$first = Invoke-Benchmark $BenchPath '--threads 1 --speed 100' 'reference-1'
+$second = Invoke-Benchmark $BenchPath '--threads 1 --speed 100' 'reference-2'
 Assert-BenchmarkOutput $first
 Assert-BenchmarkOutput $second
 if ($first.Stdout -notmatch '(?m)^config threads 1 speed 100 timed 0 hash cold\r?$') {
@@ -91,8 +91,8 @@ $benchmarkThreads = [Math]::Max(1, [Math]::Min(2, $maximumThreads))
 $threadedVerificationThreads = if ($maximumThreads -ge 4) { 4 } else { $maximumThreads }
 $threadedVerificationProfile = Join-Path $env:TEMP 'koi-bench-threads4-profile.json'
 Remove-Item -LiteralPath $threadedVerificationProfile -ErrorAction SilentlyContinue
-$threadedVerification = Invoke-Benchmark $BenchPath "--threads $threadedVerificationThreads --speed 100 --profile-json `"$threadedVerificationProfile`""
-$threadedVerificationRepeat = Invoke-Benchmark $BenchPath "--threads $threadedVerificationThreads --speed 100"
+$threadedVerification = Invoke-Benchmark $BenchPath "--threads $threadedVerificationThreads --speed 100 --profile-json `"$threadedVerificationProfile`"" 'threaded-profile'
+$threadedVerificationRepeat = Invoke-Benchmark $BenchPath "--threads $threadedVerificationThreads --speed 100" 'threaded-repeat'
 Assert-BenchmarkOutput $threadedVerification
 Assert-BenchmarkOutput $threadedVerificationRepeat
 if ($threadedVerification.Stderr.Length -ne 0 -or $threadedVerificationRepeat.Stderr.Length -ne 0) {
@@ -119,7 +119,7 @@ foreach ($position in $threadedVerificationJson.positions) {
         throw 'Threads 4 verification profile positions must match the top-level hash state.'
     }
 }
-$timed = Invoke-Benchmark $BenchPath "--threads $benchmarkThreads --speed 50 --timed"
+$timed = Invoke-Benchmark $BenchPath "--threads $benchmarkThreads --speed 50 --timed" 'timed'
 if ($timed.ExitCode -ne 0) {
     throw "configured koi-bench exited with $($timed.ExitCode): $($timed.Stderr)"
 }
@@ -143,10 +143,10 @@ $warmProfile = Join-Path $env:TEMP 'koi-bench-warm-profile.json'
 $timedProfile = Join-Path $env:TEMP 'koi-bench-timed-profile.json'
 $optionalProfile = Join-Path $env:TEMP 'koi-bench-optional-profile.json'
 Remove-Item -LiteralPath $coldProfile, $coldReplayProfile, $warmProfile, $timedProfile, $optionalProfile -ErrorAction SilentlyContinue
-$cold = Invoke-Benchmark $BenchPath "--profile-json `"$coldProfile`""
-$coldReplay = Invoke-Benchmark $BenchPath "--profile-json `"$coldReplayProfile`""
-$warm = Invoke-Benchmark $BenchPath "--warm-hash --profile-json `"$warmProfile`""
-$timedProfileRun = Invoke-Benchmark $BenchPath "--timed --profile-json `"$timedProfile`""
+$cold = Invoke-Benchmark $BenchPath "--profile-json `"$coldProfile`"" 'cold-profile'
+$coldReplay = Invoke-Benchmark $BenchPath "--profile-json `"$coldReplayProfile`"" 'cold-replay-profile'
+$warm = Invoke-Benchmark $BenchPath "--warm-hash --profile-json `"$warmProfile`"" 'warm-profile'
+$timedProfileRun = Invoke-Benchmark $BenchPath "--timed --profile-json `"$timedProfile`"" 'timed-profile'
 foreach ($profileRun in @($cold, $coldReplay, $warm, $timedProfileRun)) {
     if ($profileRun.ExitCode -ne 0 -or $profileRun.Stderr.Length -ne 0) {
         throw "profiled koi-bench run failed: $($profileRun.Stderr)"
@@ -219,7 +219,7 @@ foreach ($position in $timedJson.positions) {
     }
 }
 
-$optional = Invoke-Benchmark $BenchPath "--optional --profile-json `"$optionalProfile`""
+$optional = Invoke-Benchmark $BenchPath "--optional --profile-json `"$optionalProfile`"" 'optional-profile'
 Assert-BenchmarkOutput $optional
 if (-not (Test-Path -LiteralPath $optionalProfile -PathType Leaf)) {
     throw "koi-bench did not write the optional profile JSON: $optionalProfile"

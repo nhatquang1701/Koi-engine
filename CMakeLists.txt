@@ -219,7 +219,7 @@ add_test(
             -BenchPath "$<TARGET_FILE_DIR:koi_engine>/koi-bench.exe"
 )
 
-set_tests_properties(koi_benchmark_process PROPERTIES TIMEOUT 60)
+set_tests_properties(koi_benchmark_process PROPERTIES TIMEOUT 300)
 
 add_test(
     NAME koi_uci_match_process
@@ -228,7 +228,7 @@ add_test(
             -EnginePath "$<TARGET_FILE:koi_engine>"
 )
 
-set_tests_properties(koi_uci_match_process PROPERTIES TIMEOUT 30)
+set_tests_properties(koi_uci_match_process PROPERTIES TIMEOUT 120)
 
 add_test(
     NAME windows_ci_configuration

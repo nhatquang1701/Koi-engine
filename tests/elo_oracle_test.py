@@ -80,6 +80,12 @@ def write_fake_engine(temporary_path: Path, role: str) -> tuple[Path, Path]:
 
 
 class EloOracleExtractionTests(unittest.TestCase):
+    def test_parse_stockfish_terminal_none_bestmove_as_no_move(self):
+        self.assertEqual(
+            elo_oracle.parse_bestmove_line("bestmove (none)"),
+            ("0000", None),
+        )
+
     def test_normalize_score_uses_white_perspective_and_fixed_mate_scale(self):
         self.assertEqual(elo_oracle.normalize_score("cp", 37, "white"), 37)
         self.assertEqual(elo_oracle.normalize_score("cp", 37, "black"), -37)

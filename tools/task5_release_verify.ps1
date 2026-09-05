@@ -148,13 +148,31 @@ try {
         $configureLog = Join-Path $verificationRoot ("configure-$configuration.txt")
         $buildLog = Join-Path $verificationRoot ("build-$configuration.txt")
         $ctestLog = Join-Path $verificationRoot ("ctest-$configuration.txt")
-        Invoke-LoggedCommand $CMakePath @('-S', $repositoryRoot, '-B', $build, '-G', $Generator,
-            "-DCMAKE_BUILD_TYPE=$configuration", "-DCMAKE_CXX_COMPILER=$CxxCompiler") $configureLog | Out-Null
-        Invoke-LoggedCommand $CMakePath @('--build', $build, '--config', $configuration, '--', "-j$BuildJobs") $buildLog | Out-Null
+        $configureArguments = @('-S', $repositoryRoot, '-B', $build, '-G', $Generator)
+        if ($Generator -like 'Visual Studio*') {
+            $configureArguments += @('-A', 'x64')
+        } else {
+            $configureArguments += "-DCMAKE_BUILD_TYPE=$configuration"
+            if (-not [string]::IsNullOrWhiteSpace($CxxCompiler)) {
+                $configureArguments += "-DCMAKE_CXX_COMPILER=$CxxCompiler"
+            }
+        }
+        Invoke-LoggedCommand $CMakePath $configureArguments $configureLog | Out-Null
+        $buildArguments = @('--build', $build, '--config', $configuration)
+        if ($Generator -like 'Visual Studio*') {
+            $buildArguments += @('--parallel', "$BuildJobs")
+        } else {
+            $buildArguments += @('--', "-j$BuildJobs")
+        }
+        Invoke-LoggedCommand $CMakePath $buildArguments $buildLog | Out-Null
         Invoke-LoggedCommand $ctestPath @('--test-dir', $build, '-C', $configuration, '--output-on-failure') $ctestLog | Out-Null
     }
 
     $releaseBin = $releaseBuild
+    $releaseConfigurationDirectory = Join-Path $releaseBuild 'Release'
+    if (Test-Path -LiteralPath $releaseConfigurationDirectory -PathType Container) {
+        $releaseBin = $releaseConfigurationDirectory
+    }
     $benchPath = Join-Path $releaseBin 'koi-bench.exe'
     $enginePath = Join-Path $releaseBin 'koi-engine.exe'
     $replayPath = Join-Path $releaseBin 'koi-replay.exe'
@@ -229,28 +247,28 @@ try {
         throw 'Replay report did not classify the legal repetition as a rule draw'
     }
 
-    $lucasDirectory = Join-Path $verificationRoot 'lucas-style-24ply'
-    New-Item -ItemType Directory -Path $lucasDirectory -Force | Out-Null
-    $lucasThreads = if ($maximumThreads -ge 4) { 4 } else { $maximumThreads }
+    $enCroissantDirectory = Join-Path $verificationRoot 'en-croissant-style-24ply'
+    New-Item -ItemType Directory -Path $enCroissantDirectory -Force | Out-Null
+    $enCroissantThreads = if ($maximumThreads -ge 4) { 4 } else { $maximumThreads }
     $matchScript = Join-Path $repositoryRoot 'tools\uci_match.ps1'
     $matchOutput = Invoke-LoggedCommand 'powershell.exe' @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $matchScript,
         '-KoiPath', $enginePath, '-OpponentPath', $enginePath, '-ReplayPath', $replayPath,
         '-Depth', '2', '-Games', '1', '-MaxPlies', '24', '-TimeoutMilliseconds', '5000',
-        '-Threads', "$lucasThreads", '-Speed', '100', '-Hash', '512', '-KoiOwnBook', 'false',
-        '-OutputDirectory', $lucasDirectory) (Join-Path $verificationRoot 'lucas-style-command.txt')
-    $lucasJson = @(Get-ChildItem -LiteralPath $lucasDirectory -Filter '*.json' -File)
-    $lucasPgn = @(Get-ChildItem -LiteralPath $lucasDirectory -Filter '*.pgn' -File)
-    if ($lucasJson.Count -ne 1 -or $lucasPgn.Count -ne 1) {
-        throw 'Lucas-style scenario did not produce exactly one JSON and PGN report'
+        '-Threads', "$enCroissantThreads", '-Speed', '100', '-Hash', '512', '-KoiOwnBook', 'false',
+        '-OutputDirectory', $enCroissantDirectory) (Join-Path $verificationRoot 'en-croissant-style-command.txt')
+    $enCroissantJson = @(Get-ChildItem -LiteralPath $enCroissantDirectory -Filter '*.json' -File)
+    $enCroissantPgn = @(Get-ChildItem -LiteralPath $enCroissantDirectory -Filter '*.pgn' -File)
+    if ($enCroissantJson.Count -ne 1 -or $enCroissantPgn.Count -ne 1) {
+        throw 'En Croissant-style scenario did not produce exactly one JSON and PGN report'
     }
-    $lucasReport = Get-Content -LiteralPath $lucasJson[0].FullName -Raw | ConvertFrom-Json
-    $lucasGame = $lucasReport.games[0]
-    if ($lucasReport.configuration.hash_mb -ne 512 -or $lucasReport.configuration.threads -ne $lucasThreads -or
-        $lucasReport.configuration.speed -ne 100 -or $lucasGame.moves.Count -lt 20 -or
-        @($lucasGame.moves | Where-Object { $_.replay_legal -ne $true }).Count -ne 0 -or
-        $lucasGame.process_status.koi -ne 'clean shutdown' -or
-        $lucasGame.process_status.opponent -ne 'clean shutdown') {
-        throw 'Lucas-style scenario did not preserve configuration, 20+ legal plies, and clean shutdown'
+    $enCroissantReport = Get-Content -LiteralPath $enCroissantJson[0].FullName -Raw | ConvertFrom-Json
+    $enCroissantGame = $enCroissantReport.games[0]
+    if ($enCroissantReport.configuration.hash_mb -ne 512 -or $enCroissantReport.configuration.threads -ne $enCroissantThreads -or
+        $enCroissantReport.configuration.speed -ne 100 -or $enCroissantGame.moves.Count -lt 20 -or
+        @($enCroissantGame.moves | Where-Object { $_.replay_legal -ne $true }).Count -ne 0 -or
+        $enCroissantGame.process_status.koi -ne 'clean shutdown' -or
+        $enCroissantGame.process_status.opponent -ne 'clean shutdown') {
+        throw 'En Croissant-style scenario did not preserve configuration, 20+ legal plies, and clean shutdown'
     }
 
     Write-Output "verification_root=$verificationRoot"
@@ -261,10 +279,10 @@ try {
     foreach ($summary in $threadSummaries) {
         Write-Output $summary
     }
-    Write-Output ("Lucas-style plies=$($lucasGame.moves.Count) hash=$($lucasReport.configuration.hash_mb) threads=$($lucasReport.configuration.threads) speed=$($lucasReport.configuration.speed) replay_legal=all process_status=clean")
-    Write-Output "Lucas JSON=$($lucasJson[0].FullName)"
+    Write-Output ("En Croissant-style plies=$($enCroissantGame.moves.Count) hash=$($enCroissantReport.configuration.hash_mb) threads=$($enCroissantReport.configuration.threads) speed=$($enCroissantReport.configuration.speed) replay_legal=all process_status=clean")
+    Write-Output "En Croissant JSON=$($enCroissantJson[0].FullName)"
     Write-Output 'Stockfish CPL/match data: unavailable; no Elo claim'
-    Write-Output 'Lucas Chess GUI: unavailable; manual GUI gate not claimed'
+    Write-Output 'En Croissant GUI: unavailable; manual GUI gate not claimed'
 } finally {
     Pop-Location
 }

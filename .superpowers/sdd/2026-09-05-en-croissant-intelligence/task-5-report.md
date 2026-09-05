@@ -82,3 +82,41 @@ build remain part of the final Task 8 validation gate.
   reproducible.
 - A full Release build and full CTest run are intentionally deferred to Task 8
   after the Task 5 commit is reviewed.
+
+## Review fix round
+
+The scoped review identified that the first standalone gate could accept a
+faster candidate that stopped before the requested depth, that fixed execution
+order could bias timings, and that the new root-in-check test did not prove
+effective worker concurrency. Commit `ea584fa` addresses those findings:
+
+- `tools/task5_perf_gate.ps1` now validates the 64 timed stdout rows against
+  the JSON profile, checks completed depth against each fixture's requested
+  depth, requires accepted rows and baseline/candidate move-score parity, and
+  alternates baseline-first and candidate-first order across runs.
+- The output directory is canonicalized through the Windows final-path API
+  before the repository containment check, including an existing junction.
+- The root-in-check regression asserts concurrent evaluation when the host has
+  more than one effective worker and otherwise accepts the safe serial
+  fallback.
+- The README's architecture and release-gate wording now describes En
+  Croissant as primary and the authoritative threaded root path.
+
+RED evidence (external temporary output, not committed): the fake benchmark
+reported `Run 1 benchmark parity depth mismatch for position fixture-01` and
+exited `1`. GREEN evidence from the real Release benchmark executable:
+
+```text
+runs=3 threads=2 speed=100 suite=strength limits=fixed-depth hash=cold
+run=1 baseline_total_ms=288 candidate_total_ms=273 order=baseline,candidate
+run=2 baseline_total_ms=280 candidate_total_ms=285 order=candidate,baseline
+run=3 baseline_total_ms=274 candidate_total_ms=283 order=baseline,candidate
+baseline_median_ms=288.0
+candidate_median_ms=285.0
+candidate_vs_baseline=-1.04% regression_limit=5.00%
+result=PASS
+```
+
+After the fix, the rebuilt `koi_search_tests` passed `1/1`; PowerShell
+parsing passed; and the focused performance gate passed. Full Debug/Release
+validation remains the Task 8 gate.

@@ -156,13 +156,15 @@ def parse_book_info_line(line: str) -> Optional[Tuple[str, int]]:
 
 
 def parse_bestmove_line(line: str) -> Optional[Tuple[str, Optional[str]]]:
-    """Parse a coordinate UCI bestmove line."""
+    """Parse a coordinate UCI bestmove line, including Stockfish's terminal form."""
 
     match = BESTMOVE_RE.fullmatch(line)
     if match is None:
         return None
     move = match.group("move").lower()
     ponder = match.group("ponder")
+    if move == "(none)":
+        move = "0000"
     if not UCI_MOVE_RE.fullmatch(move):
         raise OracleError(f"Invalid UCI bestmove: {line}")
     if ponder is not None:
