@@ -1231,6 +1231,21 @@ void test_quiet_history_updates_use_saved_moving_side_after_unmake() {
             "quiet-history updates after unmake_move must use the saved moving side");
 }
 
+void test_throwing_history_diagnostic_hook_cannot_abort_search() {
+    koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>());
+    koi::SearchLimits limits;
+    limits.depth = 2;
+    koi::SearchOptions options;
+    options.quiet_history_side_hook = [](koi::Color, bool) -> koi::Color {
+        throw std::runtime_error("diagnostic hook failure");
+    };
+
+    const koi::GameState root = koi::GameState::startpos();
+    const koi::SearchResult result = search(service, root, limits, options);
+    require(result.best_move.has_value() && root.is_legal(*result.best_move),
+            "a throwing history diagnostic hook must not abort a legal search");
+}
+
 void test_search_reduces_late_quiet_moves_without_losing_root_legality() {
     koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>());
     koi::SearchLimits limits;
@@ -1641,6 +1656,7 @@ int main() {
         {"shallow futility tactical safety", test_shallow_futility_pruning_is_safe_in_tactical_positions},
         {"shallow futility accounting", test_shallow_futility_accounts_for_safe_quiet_prunes},
         {"quiet history moving side", test_quiet_history_updates_use_saved_moving_side_after_unmake},
+        {"quiet history hook exceptions", test_throwing_history_diagnostic_hook_cannot_abort_search},
         {"late quiet move reductions", test_search_reduces_late_quiet_moves_without_losing_root_legality},
         {"late move full-depth verification", test_reduced_late_move_is_verified_at_full_child_depth},
         {"checked quiescence cap", test_quiescence_keeps_searching_checked_evasions_past_normal_cap},

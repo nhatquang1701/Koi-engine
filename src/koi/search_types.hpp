@@ -90,7 +90,8 @@ struct SearchEventSink {
 struct SearchOptions {
     using StrengthProfileHook = std::function<void(SearchOptions&)>;
     // Optional test/diagnostic seam for checking which side is used by quiet history.
-    // The callback is not called unless explicitly configured.
+    // It is not called unless explicitly configured, may run concurrently on root workers,
+    // and exceptions are ignored by the search implementation.
     using QuietHistorySideHook = std::function<Color(Color candidate, bool after_unmake)>;
 
     std::size_t hash_mb = 16;

@@ -157,7 +157,16 @@ struct SearchContext {
           quiet_history_side_hook(std::move(quiet_history_side_hook)) {}
 
     [[nodiscard]] Color history_side(Color candidate, const bool after_unmake) const {
-        return quiet_history_side_hook ? quiet_history_side_hook(candidate, after_unmake) : candidate;
+        if (!quiet_history_side_hook) {
+            return candidate;
+        }
+        // This hook is test/diagnostic-only and can run on every root worker.
+        // A diagnostic callback must never be able to terminate the search.
+        try {
+            return quiet_history_side_hook(candidate, after_unmake);
+        } catch (...) {
+            return candidate;
+        }
     }
 
     void begin_iteration(std::atomic_bool* shared_abort) noexcept {
