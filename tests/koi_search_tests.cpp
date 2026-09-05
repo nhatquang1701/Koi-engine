@@ -196,6 +196,17 @@ void test_evaluator_breakdown_scores_structure_activity_and_king_safety() {
             "breakdown total must match the evaluator result");
 }
 
+void test_evaluator_rewards_a_bishop_pair() {
+    koi::ClassicalEvaluator evaluator;
+    const auto bishop_pair = evaluator.breakdown(
+        require_state("4k3/8/8/8/8/8/8/2B1KB2 w - - 0 1"), koi::Color::white);
+    const auto single_bishop = evaluator.breakdown(
+        require_state("4k3/8/8/8/8/8/8/2B1K3 w - - 0 1"), koi::Color::white);
+
+    require(bishop_pair.activity > single_bishop.activity,
+            "a same-side bishop pair must receive an activity bonus over one bishop");
+}
+
 void test_evaluator_breakdown_is_perspective_symmetric() {
     koi::ClassicalEvaluator evaluator;
     const koi::GameState state = require_state("r3k2r/pp2bppp/2p1pn2/8/2B5/2N1PN2/PPPQ1PPP/R3K2R w KQkq - 0 1");
@@ -504,7 +515,8 @@ void test_search_options_include_thread_and_speed_controls() {
     require(defaults.threads == 1, "SearchOptions must default to one search thread");
     require(defaults.speed_percent == 100, "SearchOptions must default to Speed 100");
     require(!defaults.show_wdl && defaults.move_overhead_ms == 10 &&
-                defaults.slow_mover_percent == 100 && !defaults.limit_strength && defaults.elo == 1320,
+                defaults.slow_mover_percent == 100 && !defaults.limit_strength && defaults.elo == 1320 &&
+                !defaults.strength_mode,
             "SearchOptions must default to the Task 1 compatibility values");
 
     koi::SearchOptions configured;
@@ -515,10 +527,11 @@ void test_search_options_include_thread_and_speed_controls() {
     configured.slow_mover_percent = 200;
     configured.limit_strength = true;
     configured.elo = 1500;
+    configured.strength_mode = true;
     require(configured.threads == 2 && configured.speed_percent == 50 && configured.show_wdl &&
                 configured.move_overhead_ms == 5000 && configured.slow_mover_percent == 200 &&
-                configured.limit_strength && configured.elo == 1500,
-            "SearchOptions must retain explicit Task 1 compatibility values");
+                configured.limit_strength && configured.elo == 1500 && configured.strength_mode,
+            "SearchOptions must retain explicit compatibility and strength-mode values");
 }
 
 void test_root_filtering_keeps_only_requested_legal_move() {

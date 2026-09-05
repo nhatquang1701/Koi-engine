@@ -144,6 +144,7 @@ $expectedHandshake = @(
     'option name Slow Mover type spin default 100 min 10 max 1000',
     'option name UCI_LimitStrength type check default false',
     'option name UCI_Elo type spin default 1320 min 1320 max 3190',
+    'option name StrengthMode type check default false',
     'option name SyzygyPath type string default ',
     'option name SyzygyProbeDepth type spin default 1 min 1 max 100',
     'option name SyzygyProbeLimit type spin default 5 min 0 max 5',

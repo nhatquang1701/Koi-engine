@@ -87,6 +87,7 @@ private:
     std::uint32_t slow_mover_percent_ = 100;
     bool limit_strength_ = false;
     std::uint32_t elo_ = 1320;
+    bool strength_mode_ = false;
     bool debug_enabled_ = false;
     bool analyse_mode_ = false;
     std::size_t multi_pv_ = 1;

@@ -104,6 +104,8 @@ struct SearchOptions {
     std::uint32_t slow_mover_percent = 100;
     bool limit_strength = false;
     std::uint32_t elo = 1320;
+    // Stable UCI snapshot for the future calibrated strength profile; currently neutral.
+    bool strength_mode = false;
     std::shared_ptr<const SyzygyTablebase> syzygy;
     StrengthProfileHook strength_profile_hook;
     QuietHistorySideHook quiet_history_side_hook;

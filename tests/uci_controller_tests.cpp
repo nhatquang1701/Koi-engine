@@ -360,6 +360,7 @@ void test_uci_handshake_has_identity_and_supported_options_in_order() {
         "option name Slow Mover type spin default 100 min 10 max 1000\n"
         "option name UCI_LimitStrength type check default false\n"
         "option name UCI_Elo type spin default 1320 min 1320 max 3190\n"
+        "option name StrengthMode type check default false\n"
         "option name SyzygyPath type string default \n"
         "option name SyzygyProbeDepth type spin default 1 min 1 max 100\n"
         "option name SyzygyProbeLimit type spin default 5 min 0 max 5\n"
@@ -576,6 +577,36 @@ void test_task1_option_change_emits_exactly_one_bestmove() {
         "stop\nquit\n");
     require(lines_starting_with(output_lines(result.output), "bestmove ").size() == 1,
             "changing Task 1 options must stop and join the replaced search once");
+}
+
+void test_task6_strength_mode_is_case_insensitive_and_cancels_active_search() {
+    GatedInputBuffer input(
+        "position startpos\n"
+        "go infinite\n",
+        "setoption name sTrEnGtHmOdE value TrUe\n"
+        "stop\n"
+        "quit\n");
+    std::istream input_stream(&input);
+    ReleaseOnDepthBuffer output_buffer(input, 1);
+    std::ostream output(&output_buffer);
+    std::ostringstream diagnostics;
+    int exit_code = -1;
+    std::thread controller_thread([&] {
+        UciController controller(input_stream, output, diagnostics);
+        exit_code = controller.run();
+    });
+    const bool marker_seen = input.wait_for_marker(std::chrono::seconds(5));
+    if (!marker_seen) {
+        input.release();
+    }
+    controller_thread.join();
+
+    const std::vector<std::string> bestmoves =
+        lines_starting_with(output_lines(output_buffer.str()), "bestmove ");
+    require(marker_seen && exit_code == 0 && diagnostics.str().empty(),
+            "StrengthMode must accept mixed-case UCI values while keeping the controller quiet");
+    require(bestmoves.empty(),
+            "changing StrengthMode must cancel and suppress the active search completion");
 }
 
 void test_book_options_emit_one_seeded_marker_and_bestmove_for_normal_play() {
@@ -1549,6 +1580,7 @@ int main() {
         {"Task 1 WDL", test_task1_wdl_output_is_optional_and_mate_scores_are_converted},
         {"Task 1 hidden diagnostics", test_task1_hidden_debug_file_is_relative_rotated_and_off_stdio},
         {"Task 1 option replacement", test_task1_option_change_emits_exactly_one_bestmove},
+        {"Task 6 StrengthMode", test_task6_strength_mode_is_case_insensitive_and_cancels_active_search},
         {"opening-book normal play", test_book_options_emit_one_seeded_marker_and_bestmove_for_normal_play},
         {"opening-book random option", test_book_random_option_accepts_valid_values_and_ignores_invalid_values},
         {"opening-book safety option", test_book_safety_options_reject_poisoned_moves_and_fallback_to_search},

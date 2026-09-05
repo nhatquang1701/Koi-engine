@@ -558,6 +558,15 @@ void UciController::handle_setoption(std::istream& command) {
         return;
     }
 
+    if (equals_ignore_case(name, "StrengthMode")) {
+        bool strength_mode = false;
+        if (parse_boolean(value, strength_mode) && strength_mode_ != strength_mode) {
+            stop_and_suppress_active_search();
+            strength_mode_ = strength_mode;
+        }
+        return;
+    }
+
     if (equals_ignore_case(name, "SyzygyPath")) {
         stop_and_suppress_active_search();
         syzygy_path_ = value;
@@ -735,6 +744,7 @@ void UciController::start_search(GameState root, SearchLimits limits, bool skip_
     options.slow_mover_percent = slow_mover_percent_;
     options.limit_strength = limit_strength_;
     options.elo = elo_;
+    options.strength_mode = strength_mode_;
     options.syzygy = syzygy_;
     active_search_.emplace(search_service_.start(std::move(root), std::move(limits), std::move(sink), options));
 }
@@ -807,6 +817,7 @@ void UciController::write_handshake() {
                "option name Slow Mover type spin default 100 min 10 max 1000\n"
                "option name UCI_LimitStrength type check default false\n"
                "option name UCI_Elo type spin default 1320 min 1320 max 3190\n"
+               "option name StrengthMode type check default false\n"
                "option name SyzygyPath type string default \n"
                "option name SyzygyProbeDepth type spin default 1 min 1 max 100\n"
                "option name SyzygyProbeLimit type spin default 5 min 0 max 5\n"
