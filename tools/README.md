@@ -5,6 +5,23 @@ C++ engine, and generated JSON/PGN reports default to the machine temporary
 directory (`%TEMP%\koi-results` on Windows) rather than this checkout. Keep PGN
 files, Stockfish executables, and licensed books outside the repository as well.
 
+## Fixed-depth performance gate
+
+`task5_perf_gate.ps1` compares two explicitly supplied `koi-bench` executables
+using repeated cold-hash, fixed-depth, timed runs of the 64-position strength
+suite. It reports the median total elapsed time for each executable and fails
+only when the candidate median is more than 5% slower. Profiles and logs must be
+written outside the checkout, and this is intentionally a standalone
+measurement command rather than a CTest threshold:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\task5_perf_gate.ps1 `
+  -BaselineExecutable C:\Koi\baseline\koi-bench.exe `
+  -CandidateExecutable C:\Koi\candidate\koi-bench.exe `
+  -Runs 5 -Threads 4 -Speed 100 `
+  -OutputDirectory C:\Koi-results\task5-perf
+```
+
 Install the pinned PGN dependency from the repository root:
 
 ```powershell

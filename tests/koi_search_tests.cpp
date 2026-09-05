@@ -84,6 +84,58 @@ struct CompletedSearch {
     }
 };
 
+struct FirstInfoBarrier {
+    mutable std::mutex mutex;
+    std::condition_variable condition;
+    std::optional<int> first_depth;
+    std::uint64_t evaluations_at_first_info = 0;
+    std::uint32_t info_count = 0;
+    bool released = false;
+
+    void observe(const koi::SearchInfo& info, std::uint64_t evaluations) {
+        std::unique_lock lock(mutex);
+        ++info_count;
+        if (first_depth.has_value()) {
+            return;
+        }
+        first_depth = info.depth;
+        evaluations_at_first_info = evaluations;
+        condition.notify_one();
+        condition.wait(lock, [this] { return released; });
+    }
+
+    void wait_for_first_info() {
+        std::unique_lock lock(mutex);
+        require(condition.wait_for(lock, 2s, [this] { return first_depth.has_value(); }),
+                "threaded cancellation must publish a completed root iteration before cancellation");
+    }
+
+    void release() {
+        {
+            std::lock_guard lock(mutex);
+            released = true;
+        }
+        condition.notify_one();
+    }
+
+    [[nodiscard]] int first_info_depth() const {
+        std::lock_guard lock(mutex);
+        require(first_depth.has_value(), "threaded cancellation must observe a first root callback");
+        return *first_depth;
+    }
+
+    [[nodiscard]] std::uint64_t first_info_evaluations() const {
+        std::lock_guard lock(mutex);
+        require(first_depth.has_value(), "threaded cancellation must record its first root callback");
+        return evaluations_at_first_info;
+    }
+
+    [[nodiscard]] std::uint32_t info_callback_count() const {
+        std::lock_guard lock(mutex);
+        return info_count;
+    }
+};
+
 class ConcurrencyEvaluator final : public koi::Evaluator {
 public:
     explicit ConcurrencyEvaluator(bool supports_concurrency = true)
@@ -711,8 +763,9 @@ void test_threaded_single_pv_does_not_repeat_root_search() {
             "a threaded single-PV search must not repeat the root search serially");
 }
 
-void test_threaded_evasion_06_matches_the_serial_allowlist() {
+void test_threaded_root_in_check_matches_serial_fixed_depth() {
     const koi::GameState root = require_state("7k/7b/8/8/4K3/8/8/6N1 w - - 0 1");
+    require(root.in_check(), "the threaded root-in-check fixture must begin with the king in check");
     const std::array<std::string_view, 3> accepted{"e4f3", "e4d4", "e4f4"};
     koi::SearchLimits limits;
     limits.depth = 2;
@@ -721,7 +774,7 @@ void test_threaded_evasion_06_matches_the_serial_allowlist() {
     const koi::SearchResult serial = search(serial_service, root, limits);
     require(serial.best_move.has_value() &&
                 std::find(accepted.begin(), accepted.end(), serial.best_move->uci()) != accepted.end(),
-            "evasion_06 must retain a serial accepted evasion");
+            "the root-in-check fixture must retain a serial accepted evasion");
 
     for (const std::size_t threads : {std::size_t{2}, std::size_t{4}}) {
         koi::SearchOptions threaded_options;
@@ -730,7 +783,7 @@ void test_threaded_evasion_06_matches_the_serial_allowlist() {
         const koi::SearchResult threaded = search(threaded_service, root, limits, threaded_options);
         require(threaded.completed_depth == serial.completed_depth && threaded.best_move == serial.best_move &&
                     threaded.score_cp == serial.score_cp,
-                "evasion_06 must retain the serial fixed-depth move and score at Threads=2 and Threads=4");
+                "root-in-check threaded search must retain the serial fixed-depth move and score at Threads=2 and Threads=4");
     }
 }
 
@@ -949,7 +1002,7 @@ void test_search_info_nodes_reports_all_visited_nodes() {
 }
 
 void test_threaded_infinite_search_cancels_and_completes_once() {
-    auto evaluator = std::make_shared<ConcurrencyEvaluator>();
+    auto evaluator = std::make_shared<CountingEvaluator>();
     koi::SearchService service(evaluator);
     koi::SearchLimits limits;
     limits.infinite = true;
@@ -957,63 +1010,69 @@ void test_threaded_infinite_search_cancels_and_completes_once() {
     koi::SearchOptions options;
     options.threads = 2;
     CompletedSearch completed;
+    FirstInfoBarrier first_info;
+    const std::uint64_t expected_evaluations = koi::GameState::startpos().legal_moves().size() + 1;
 
-    koi::SearchHandle handle = service.start(koi::GameState::startpos(), limits, completed.sink(), options);
-    std::this_thread::sleep_for(20ms);
+    koi::SearchHandle handle = service.start(koi::GameState::startpos(), limits,
+        {.on_info = [&first_info, &evaluator](const koi::SearchInfo& info) {
+             first_info.observe(info, evaluator->evaluations());
+         },
+         .on_complete = completed.sink().on_complete}, options);
+    first_info.wait_for_first_info();
     const auto stop_started = std::chrono::steady_clock::now();
     handle.stop();
+    first_info.release();
     handle.wait();
     const auto stop_elapsed = std::chrono::steady_clock::now() - stop_started;
 
     require(!handle.running(), "a stopped threaded search must join all internal workers");
     require(stop_elapsed < 2s, "threaded cancellation must return promptly");
     const koi::SearchResult result = completed.take_result();
+    require(first_info.first_info_depth() == 1 && result.completed_depth == 1,
+            "infinite cancellation must complete from the first authoritative threaded root iteration");
+    require(first_info.first_info_evaluations() == expected_evaluations &&
+                evaluator->evaluations() == expected_evaluations,
+            "infinite cancellation must not perform a serial confirmation search");
+    require(first_info.info_callback_count() == 1,
+            "infinite cancellation must publish only the completed iteration held by the stop barrier");
     require(result.best_move.has_value() && koi::GameState::startpos().is_legal(*result.best_move),
             "a cancelled threaded search must return a legal best move");
 }
 
 void test_threaded_timed_search_cancels_without_serial_confirmation() {
-    auto evaluator = std::make_shared<ConcurrencyEvaluator>();
+    auto evaluator = std::make_shared<CountingEvaluator>();
     koi::SearchService service(evaluator);
     koi::SearchLimits limits;
     limits.movetime = 5s;
     koi::SearchOptions options;
     options.threads = 2;
     CompletedSearch completed;
-    std::mutex info_mutex;
-    std::condition_variable info_condition;
-    std::vector<int> info_depths;
+    FirstInfoBarrier first_info;
+    const std::uint64_t expected_evaluations = koi::GameState::startpos().legal_moves().size() + 1;
 
     koi::SearchHandle handle = service.start(koi::GameState::startpos(), limits,
-        {.on_info = [&info_mutex, &info_condition, &info_depths](const koi::SearchInfo& info) {
-            {
-                std::lock_guard lock(info_mutex);
-                info_depths.push_back(info.depth);
-            }
-            info_condition.notify_one();
-        },
+        {.on_info = [&first_info, &evaluator](const koi::SearchInfo& info) {
+             first_info.observe(info, evaluator->evaluations());
+         },
          .on_complete = completed.sink().on_complete}, options);
 
-    {
-        std::unique_lock lock(info_mutex);
-        require(info_condition.wait_for(lock, 2s, [&info_depths] { return !info_depths.empty(); }),
-                "Threads=2 timed search must publish a completed threaded root iteration before cancellation");
-    }
+    first_info.wait_for_first_info();
     const auto stop_started = std::chrono::steady_clock::now();
     handle.stop();
+    first_info.release();
     handle.wait();
     const auto stop_elapsed = std::chrono::steady_clock::now() - stop_started;
 
-    require(!handle.running(), "Threads=2 timed cancellation must join speculative workers");
+    require(!handle.running(), "Threads=2 timed cancellation must join the authoritative threaded workers");
     require(stop_elapsed < 2s, "Threads=2 timed cancellation must return promptly");
-    {
-        std::lock_guard lock(info_mutex);
-        require(!info_depths.empty() && info_depths.front() == 1,
-                "Threads=2 timed cancellation must observe the threaded root callback");
-        require(std::adjacent_find(info_depths.begin(), info_depths.end()) == info_depths.end(),
-                "Threads=2 timed cancellation must not duplicate info output");
-    }
     const koi::SearchResult result = completed.take_result();
+    require(first_info.first_info_depth() == 1 && result.completed_depth == 1,
+            "Threads=2 timed cancellation must complete from the first authoritative threaded root iteration");
+    require(first_info.first_info_evaluations() == expected_evaluations &&
+                evaluator->evaluations() == expected_evaluations,
+            "Threads=2 timed cancellation must not perform a serial confirmation search");
+    require(first_info.info_callback_count() == 1,
+            "Threads=2 timed cancellation must publish only the completed iteration held by the stop barrier");
     require(result.best_move.has_value() && koi::GameState::startpos().is_legal(*result.best_move),
             "Threads=2 timed cancellation must return a legal fallback move");
 }
@@ -1680,7 +1739,7 @@ int main() {
         {"threaded root search", test_threaded_search_uses_multiple_root_workers_and_matches_reference_result},
         {"classical threaded parity", test_classical_threaded_search_matches_reference_result},
         {"threaded single-PV root is authoritative", test_threaded_single_pv_does_not_repeat_root_search},
-        {"threaded evasion_06 parity", test_threaded_evasion_06_matches_the_serial_allowlist},
+        {"threaded root-in-check parity", test_threaded_root_in_check_matches_serial_fixed_depth},
         {"stable root ties", test_equal_root_scores_keep_the_earliest_ordered_move},
         {"threaded multipv ordered root ties", test_threaded_multipv_equal_scores_use_stable_ordered_root_tie_breaking},
         {"threaded multipv final-depth parity", test_threaded_multipv_matches_single_thread_at_final_depth},
