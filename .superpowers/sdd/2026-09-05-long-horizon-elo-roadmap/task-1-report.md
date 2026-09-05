@@ -160,3 +160,5 @@ Output:
 ```
 
 The strengthened test now verifies that `.1`, `.2`, and `.3` exist and `.4` does not exist after rotation. No production behavior outside the requested rotation bound was changed.
+
+Round 1 implementation fix commit: `218ac14` (`fix: retain exactly three debug backups`).
