@@ -141,3 +141,67 @@ details, but there is no fixed-depth median node regression.
   external Python dependency was added.
 
 Final pre-commit check: `git diff --check` reported no whitespace errors.
+
+## Fix round 1 review findings
+
+Review findings addressed on 2026-09-05:
+
+1. Removed the pawn-presence dependency from endgame king activity and tempo.
+   Both terms now use the existing phase boundary (`game_phase <= 2`), so
+   pawnless K+R versus K endgames receive the same tapered king activity and
+   exactly-one-side-to-move tempo treatment as pawn endgames. This preserves
+   the reviewed phase-4 tactical score while covering the intended minor-piece
+   endgame phase. Perspective symmetry and insufficient-material behavior are
+   unchanged.
+2. Reworked `tools/tune_eval.py` to parse the canonical
+   `src/koi/evaluation_parameters.hpp` at generation time. It now emits the
+   canonical version and every integer parameter in header order, so changing
+   the C++ layout/value set cannot silently leave tuning metadata stale.
+3. Recorded the minor findings: removed the unused `io` import; the fallback
+   validator remains intentionally partial when `python-chess` is unavailable.
+
+### Fix-round TDD RED
+
+Added the pawnless rook regression and `tests/tune_eval_test.py`, then ran:
+
+```text
+ctest --test-dir out\task2-debug-vs -C Debug -R "^(koi_search_tests|tune_eval_python)$" --output-on-failure
+```
+
+Before the fixes, both tests failed for their target reasons:
+
+```text
+FAIL evaluator pawnless endgame terms: pawnless rook endgames must receive tapered king activity credit
+AssertionError: 'kTunedEvaluation_pawn_value = 100;' not found
+0% tests passed, 2 tests failed out of 2
+```
+
+### Fix-round GREEN and verification
+
+After the fixes, the same focused command passed:
+
+```text
+2/2 tests passed, 0 tests failed
+```
+
+Fresh x64 Release rebuild and complete suites were run with the Visual Studio
+x64 developer shell, MSVC 19.44.35228.0, and CMake 4.4.2:
+
+```text
+cmake --build out\task2-release-vs --config Release --parallel
+completed successfully
+ctest --test-dir out\task2-debug-vs -C Debug --output-on-failure
+100% tests passed, 0 tests failed out of 16
+ctest --test-dir out\task2-release-vs -C Release --output-on-failure
+100% tests passed, 0 tests failed out of 16
+```
+
+The deterministic post-fix benchmark was run twice at Threads=1:
+
+```text
+rows=64 repeat_byte_identical=True row_diff_count=0 gate_mismatches=0
+```
+
+The final self-review found no `has_any_pawn` gate, no `import io`, and the
+tool's `canonical_parameters()` is the sole source for emitted parameter
+names/values. `git diff --check` reported no whitespace errors.

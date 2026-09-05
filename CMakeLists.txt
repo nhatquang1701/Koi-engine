@@ -239,6 +239,16 @@ if(Python3_Interpreter_FOUND)
             "Install tools/requirements-elo-oracle.txt to register the test."
         )
     endif()
+    add_test(
+        NAME tune_eval_python
+        COMMAND "${Python3_EXECUTABLE}" -m unittest tests/tune_eval_test.py -v
+    )
+    set_tests_properties(
+        tune_eval_python
+        PROPERTIES
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+            ENVIRONMENT "PYTHONDONTWRITEBYTECODE=1"
+    )
 else()
     message(STATUS
         "Skipping elo_oracle_python: Python 3 interpreter is unavailable."

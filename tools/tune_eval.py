@@ -6,21 +6,25 @@ from __future__ import annotations
 import argparse
 import csv
 import hashlib
-import io
 import pathlib
+import re
 import sys
 from typing import Iterable
 
 
-PARAMETER_VERSION = "classical-eval-v2"
-SELECTED_COEFFICIENTS = {
-    "king_activity_weight": 1,
-    "passed_pawn_king_support_bonus": 12,
-    "passed_pawn_king_proximity_weight": 3,
-    "passed_pawn_promotion_weight": 8,
-    "tempo_bonus": 10,
-}
 RESULTS = {"1-0": "1-0", "0-1": "0-1", "1/2-1/2": "1/2-1/2", "1": "1-0", "-1": "0-1", "0": "1/2-1/2", "win": "1-0", "loss": "0-1", "draw": "1/2-1/2"}
+CANONICAL_HEADER = pathlib.Path(__file__).resolve().parents[1] / "src" / "koi" / "evaluation_parameters.hpp"
+
+
+def canonical_parameters(header_path: pathlib.Path = CANONICAL_HEADER) -> tuple[str, list[tuple[str, int]]]:
+    source = header_path.read_text(encoding="utf-8")
+    version_match = re.search(r'string_view\s+version\s*=\s*"([^"]+)"', source)
+    fields = [(name, int(value)) for name, value in re.findall(
+        r"\bint\s+(\w+)\s*=\s*(-?\d+);", source
+    )]
+    if version_match is None or not fields:
+        raise ValueError("canonical evaluation header has no versioned integer parameters")
+    return version_match.group(1), fields
 
 
 def fallback_valid_fen(fen: str) -> bool:
@@ -100,6 +104,7 @@ def parse_rows(text: str) -> list[tuple[str, str]]:
 def generated_header(rows: Iterable[tuple[str, str]]) -> str:
     normalized = "\n".join(f"{fen},{result}" for fen, result in rows) + "\n"
     corpus_hash = hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+    parameter_version, parameters = canonical_parameters()
     lines = [
         "#pragma once",
         "",
@@ -107,11 +112,11 @@ def generated_header(rows: Iterable[tuple[str, str]]) -> str:
         "",
         "namespace koi {",
         "",
-        f'inline constexpr std::string_view kTunedEvaluationParameterVersion = "{PARAMETER_VERSION}";',
+        f'inline constexpr std::string_view kTunedEvaluationParameterVersion = "{parameter_version}";',
         f'inline constexpr std::string_view kTunedEvaluationCorpusSha256 = "{corpus_hash}";',
         "",
     ]
-    for name, value in SELECTED_COEFFICIENTS.items():
+    for name, value in parameters:
         lines.append(f"inline constexpr int kTunedEvaluation_{name} = {value};")
     lines.extend(["", "} // namespace koi", ""])
     return "\n".join(lines)

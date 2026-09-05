@@ -352,6 +352,24 @@ void test_evaluator_applies_tempo_once_for_side_to_move() {
             "black to move must remove exactly one tempo bonus");
 }
 
+void test_evaluator_keeps_endgame_terms_for_pawnless_rook_endgames() {
+    koi::ClassicalEvaluator evaluator;
+    const auto active = evaluator.breakdown(
+        require_state("4k3/8/8/3R4/3K4/8/8/8 w - - 0 1"), koi::Color::white);
+    const auto idle = evaluator.breakdown(
+        require_state("4k3/8/8/3R4/8/8/8/K7 w - - 0 1"), koi::Color::white);
+    const auto white_to_move = evaluator.breakdown(
+        require_state("4k3/8/8/8/8/8/8/R3K3 w - - 0 1"), koi::Color::white);
+    const auto black_to_move = evaluator.breakdown(
+        require_state("4k3/8/8/8/8/8/8/R3K3 b - - 0 1"), koi::Color::white);
+
+    require(active.king_activity > idle.king_activity,
+            "pawnless rook endgames must receive tapered king activity credit");
+    require(white_to_move.tempo == evaluator.parameters().tempo_bonus &&
+                black_to_move.tempo == -evaluator.parameters().tempo_bonus,
+            "pawnless rook endgames must receive exactly one side-to-move tempo");
+}
+
 void test_evaluator_breakdown_accounts_for_every_component() {
     koi::ClassicalEvaluator evaluator;
     const auto score = evaluator.breakdown(
@@ -1501,6 +1519,7 @@ int main() {
         {"evaluator endgame king activity", test_evaluator_scores_endgame_king_activity},
         {"evaluator passer support and race", test_evaluator_scores_passed_pawn_support_and_promotion_race},
         {"evaluator tempo", test_evaluator_applies_tempo_once_for_side_to_move},
+        {"evaluator pawnless endgame terms", test_evaluator_keeps_endgame_terms_for_pawnless_rook_endgames},
         {"evaluator complete breakdown", test_evaluator_breakdown_accounts_for_every_component},
         {"time manager", test_time_manager_applies_move_time_and_clock_limits},
         {"speed budgets", test_speed_scales_only_time_based_search_budgets},

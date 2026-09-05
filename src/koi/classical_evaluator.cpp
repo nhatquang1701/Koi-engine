@@ -321,10 +321,6 @@ bool has_pawn_on_file(const PositionFeatures& features, int color, int file) noe
         (features.pawn_file_masks[static_cast<std::size_t>(color)] & (std::uint8_t{1} << file)) != 0;
 }
 
-bool has_any_pawn(const PositionFeatures& features) noexcept {
-    return features.pawn_file_masks[0] != 0 || features.pawn_file_masks[1] != 0;
-}
-
 int pawn_structure_for(const PositionFeatures& features, Color color) noexcept {
     const int own = color_index(color);
     const int enemy = 1 - own;
@@ -592,11 +588,11 @@ EvaluationBreakdown ClassicalEvaluator::breakdown(const GameState& state, Color 
                         king_safety_for(features, Color::black);
     score.king_safety = score.king_safety * (phase + kEvaluation.king_safety_phase_offset) /
         kEvaluation.king_safety_phase_divisor;
-    score.king_activity = has_any_pawn(features) ?
+    score.king_activity = phase <= 2 ?
         king_activity_for(features, Color::white) - king_activity_for(features, Color::black) : 0;
     score.passed_pawn = passed_pawn_for(features, Color::white) -
                         passed_pawn_for(features, Color::black);
-    score.tempo = has_any_pawn(features) ?
+    score.tempo = phase <= 2 ?
         (features.side_to_move == Color::white ? kEvaluation.tempo_bonus :
          -kEvaluation.tempo_bonus) : 0;
     score.total = score.material + score.piece_square + score.mobility + score.pawn_structure +
