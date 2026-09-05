@@ -13,6 +13,8 @@ import tools.elo_oracle as elo_oracle
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 ORACLE_SCRIPT = REPOSITORY_ROOT / "tools" / "elo_oracle.py"
+MATCH_SCRIPT = REPOSITORY_ROOT / "tools" / "stockfish_match.py"
+BOOK_AUDIT_SCRIPT = REPOSITORY_ROOT / "tools" / "book_audit.py"
 
 
 FAKE_ENGINE_SOURCE = textwrap.dedent(
@@ -266,6 +268,13 @@ class EloOracleExtractionTests(unittest.TestCase):
 [Result \"*\"]
 
 1. a8=Q+ *
+
+[Event \"Black FEN\"]
+[SetUp \"1\"]
+[FEN \"7k/8/8/8/8/8/8/7K b - - 7 23\"]
+[Result \"*\"]
+
+23... Kg8 *
 """
 
         with tempfile.TemporaryDirectory(prefix="koi oracle ") as temporary_directory:
@@ -308,7 +317,7 @@ class EloOracleExtractionTests(unittest.TestCase):
         )
         self.assertRegex(report["created_at"], r"^20\d\d-\d\d-\d\dT")
 
-        self.assertEqual(len(report["games"]), 2)
+        self.assertEqual(len(report["games"]), 3)
         first_game = report["games"][0]
         self.assertEqual(len(first_game["positions"]), 8)
         self.assertEqual(first_game["positions"][0]["fen"], "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
@@ -331,6 +340,165 @@ class EloOracleExtractionTests(unittest.TestCase):
         self.assertEqual(promotion_position["side"], "white")
         self.assertEqual(promotion_position["actual_move_uci"], "a7a8q")
         self.assertEqual(promotion_position["actual_move_san"], "a8=Q+")
+
+        black_fen_position = report["games"][2]["positions"][0]
+        self.assertEqual(black_fen_position["ply"], 1)
+        self.assertEqual(black_fen_position["move_number"], 23)
+        self.assertEqual(black_fen_position["side"], "black")
+        self.assertEqual(black_fen_position["fen"], "7k/8/8/8/8/8/8/7K b - - 7 23")
+        self.assertEqual(black_fen_position["actual_move_uci"], "h8g8")
+        self.assertEqual(black_fen_position["actual_move_san"], "Kg8")
+
+    def test_match_entrypoint_preserves_zero_random_seed_and_shell_free_arguments(self):
+        import tools.stockfish_match as stockfish_match
+
+        args = stockfish_match._build_parser().parse_args(
+            [
+                "--koi",
+                "C:\\Koi Engine\\koi.exe",
+                "--stockfish",
+                "C:\\Engines\\stockfish.exe",
+                "--random-seed",
+                "0",
+                "--movetime-ms",
+                "25",
+            ]
+        )
+        command = stockfish_match.build_command(args, powershell="pwsh-test")
+
+        self.assertEqual(command[0], "pwsh-test")
+        self.assertIn("-KoiRandomSeed", command)
+        self.assertEqual(command[command.index("-KoiRandomSeed") + 1], "0")
+        self.assertIn("-MovetimeMs", command)
+        self.assertNotIn("-Depth", command)
+        self.assertFalse(args.output_directory.resolve().is_relative_to(REPOSITORY_ROOT.resolve()))
+
+    def test_extract_only_defaults_to_an_external_report_and_announces_path(self):
+        with tempfile.TemporaryDirectory(prefix="koi oracle ") as temporary_directory:
+            temporary_path = Path(temporary_directory)
+            pgn_path = temporary_path / "fixture.pgn"
+            pgn_path.write_text('[Result "*"]\n\n1. e4 *\n', encoding="utf-8")
+
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    str(ORACLE_SCRIPT),
+                    "--pgn",
+                    str(pgn_path),
+                    "--extract-only",
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(completed.stderr, "")
+        report_lines = [line for line in completed.stdout.splitlines() if line.startswith("report ")]
+        self.assertEqual(len(report_lines), 1, completed.stdout)
+        report_path = Path(report_lines[0].split(" ", 1)[1]).resolve()
+        self.assertFalse(report_path.is_relative_to(REPOSITORY_ROOT.resolve()))
+        self.assertTrue(report_path.is_file())
+        self.assertEqual(json.loads(report_path.read_text(encoding="utf-8"))["mode"], "extract-only")
+
+    def test_named_tool_entrypoints_have_safe_help_without_starting_engines(self):
+        for script, required_text in (
+            (MATCH_SCRIPT, "--koi"),
+            (BOOK_AUDIT_SCRIPT, "--book"),
+        ):
+            completed = subprocess.run(
+                [sys.executable, str(script), "--help"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertEqual(completed.stderr, "")
+            self.assertIn(required_text, completed.stdout)
+
+    def test_book_audit_entrypoint_forwards_to_the_existing_report_schema(self):
+        with tempfile.TemporaryDirectory(prefix="koi oracle ") as temporary_directory:
+            temporary_path = Path(temporary_directory)
+            pgn_path = temporary_path / "fixture game.pgn"
+            book_path = temporary_path / "licensed book.bin"
+            report_path = temporary_path / "book audit report.json"
+            pgn_path.write_text('[Result "*"]\n\n1. e4 *\n', encoding="utf-8")
+            book_path.write_bytes(b"synthetic test book")
+            koi_path, _koi_log_path = write_fake_engine(temporary_path, "koi")
+            stockfish_path, _stockfish_log_path = write_fake_engine(temporary_path, "stockfish")
+
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    str(BOOK_AUDIT_SCRIPT),
+                    "--pgn",
+                    str(pgn_path),
+                    "--koi",
+                    str(koi_path),
+                    "--stockfish",
+                    str(stockfish_path),
+                    "--book",
+                    str(book_path),
+                    "--output",
+                    str(report_path),
+                    "--movetime-ms",
+                    "1",
+                    "--threads",
+                    "4",
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(report["schema"], "koi-elo-oracle")
+        self.assertEqual(report["mode"], "book-audit")
+
+    def test_book_audit_entrypoint_defaults_to_an_external_report(self):
+        with tempfile.TemporaryDirectory(prefix="koi oracle ") as temporary_directory:
+            temporary_path = Path(temporary_directory)
+            pgn_path = temporary_path / "fixture.pgn"
+            book_path = temporary_path / "licensed book.bin"
+            pgn_path.write_text('[Result "*"]\n\n1. e4 *\n', encoding="utf-8")
+            book_path.write_bytes(b"synthetic test book")
+            koi_path, _koi_log_path = write_fake_engine(temporary_path, "koi")
+            stockfish_path, _stockfish_log_path = write_fake_engine(temporary_path, "stockfish")
+
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    str(BOOK_AUDIT_SCRIPT),
+                    "--pgn",
+                    str(pgn_path),
+                    "--koi",
+                    str(koi_path),
+                    "--stockfish",
+                    str(stockfish_path),
+                    "--book",
+                    str(book_path),
+                    "--movetime-ms",
+                    "1",
+                    "--threads",
+                    "4",
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(completed.stderr, "")
+        report_lines = [line for line in completed.stdout.splitlines() if line.startswith("report ")]
+        self.assertEqual(len(report_lines), 1, completed.stdout)
+        report_path = Path(report_lines[0].split(" ", 1)[1]).resolve()
+        self.assertFalse(report_path.is_relative_to(REPOSITORY_ROOT.resolve()))
+        self.assertTrue(report_path.is_file())
+        self.assertEqual(json.loads(report_path.read_text(encoding="utf-8"))["mode"], "book-audit")
+
+        report_path.unlink(missing_ok=True)
 
 
 if __name__ == "__main__":

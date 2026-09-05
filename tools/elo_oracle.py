@@ -8,10 +8,12 @@ import copy
 import hashlib
 import json
 import math
+import os
 import queue
 import re
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 from dataclasses import dataclass
@@ -184,6 +186,19 @@ def _load_chess_modules() -> Tuple[Any, Any]:
 
 def _utc_timestamp() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+
+
+def default_results_directory() -> Path:
+    """Return the machine temporary directory used for generated reports."""
+
+    return Path(tempfile.gettempdir()) / "koi-results"
+
+
+def default_report_path(stem: str = "elo-oracle") -> Path:
+    """Return a unique report path outside the repository by default."""
+
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S-%fZ")
+    return default_results_directory() / f"{stem}-{timestamp}-{os.getpid()}.json"
 
 
 def _read_pgn(path: Path) -> Tuple[str, bytes]:
@@ -985,7 +1000,11 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--pgn", required=True, type=Path, help="input PGN path")
     parser.add_argument("--koi", type=Path, help="Koi UCI executable path")
     parser.add_argument("--stockfish", type=Path, help="Stockfish UCI executable path")
-    parser.add_argument("--output", required=True, type=Path, help="output JSON report path")
+    parser.add_argument(
+        "--output",
+        type=Path,
+        help="output JSON report path (default: external temporary results directory)",
+    )
     parser.add_argument("--movetime-ms", type=_positive_int, default=DEFAULT_MOVETIME_MS)
     parser.add_argument(
         "--threads",
@@ -1032,6 +1051,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     pgn_sha256 = hashlib.sha256(pgn_bytes).hexdigest()
     games = extract_games(pgn_text)
 
+    output_path = args.output or default_report_path()
+
     if args.extract_only:
         report = build_extraction_report(
             pgn_path,
@@ -1070,7 +1091,8 @@ def main(argv: Optional[List[str]] = None) -> int:
             args.threads,
         )
 
-    _write_json(args.output, report)
+    _write_json(output_path, report)
+    print(f"report {output_path}")
     return 0
 
 

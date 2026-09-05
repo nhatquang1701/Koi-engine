@@ -106,6 +106,9 @@ python -m pip install -r .\tools\requirements-elo-oracle.txt
 python -m unittest .\tests\elo_oracle_test.py -v
 ```
 
+See [`tools/README.md`](tools/README.md) for the extract-only schema, the named
+book-audit and match entrypoints, and the external-results workflow.
+
 When Python 3 and `python-chess` are available at CMake configure time, the same test
 is registered as `elo_oracle_python` in CTest; otherwise the C++ test suite is unchanged
 and CMake reports that the optional test was skipped.
