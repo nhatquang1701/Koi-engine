@@ -205,6 +205,8 @@ void test_evaluator_breakdown_is_perspective_symmetric() {
     require(white.material == -black.material && white.piece_square == -black.piece_square &&
                 white.mobility == -black.mobility && white.pawn_structure == -black.pawn_structure &&
                 white.activity == -black.activity && white.king_safety == -black.king_safety &&
+                white.king_activity == -black.king_activity && white.passed_pawn == -black.passed_pawn &&
+                white.tempo == -black.tempo &&
                 white.total == -black.total,
             "every evaluation component must negate under a perspective flip");
 }
@@ -298,6 +300,67 @@ void test_evaluator_endgame_passer_scaling_is_color_symmetric() {
     require(white_endgame.pawn_structure == black_endgame.pawn_structure &&
                 white_middlegame.pawn_structure == black_middlegame.pawn_structure,
             "endgame passed-pawn scaling must remain color symmetric");
+}
+
+void test_evaluator_exposes_versioned_classical_parameters() {
+    koi::ClassicalEvaluator evaluator;
+    const auto& parameters = evaluator.parameters();
+
+    require(!parameters.version.empty(), "classical evaluator parameters must expose a version");
+    require(parameters.maximum_phase > 0, "classical evaluator parameters must expose the phase scale");
+    require(parameters.tempo_bonus > 0, "classical evaluator parameters must expose the tempo bonus");
+}
+
+void test_evaluator_scores_endgame_king_activity() {
+    koi::ClassicalEvaluator evaluator;
+    const auto active = evaluator.breakdown(
+        require_state("4k3/8/8/3P4/3K4/8/8/8 w - - 0 1"), koi::Color::white);
+    const auto idle = evaluator.breakdown(
+        require_state("4k3/8/8/3P4/8/8/8/K7 w - - 0 1"), koi::Color::white);
+
+    require(active.king_activity > idle.king_activity,
+            "a centralized king must receive more tapered endgame activity credit");
+}
+
+void test_evaluator_scores_passed_pawn_support_and_promotion_race() {
+    koi::ClassicalEvaluator evaluator;
+    const auto supported = evaluator.breakdown(
+        require_state("4k3/8/8/3P4/3K4/8/8/8 w - - 0 1"), koi::Color::white);
+    const auto unsupported = evaluator.breakdown(
+        require_state("4k3/8/8/3P4/8/8/8/K7 w - - 0 1"), koi::Color::white);
+    const auto advanced = evaluator.breakdown(
+        require_state("k7/6P1/8/8/8/8/8/K7 w - - 0 1"), koi::Color::white);
+    const auto unadvanced = evaluator.breakdown(
+        require_state("k7/8/8/3P4/8/8/8/K7 w - - 0 1"), koi::Color::white);
+
+    require(supported.passed_pawn > unsupported.passed_pawn,
+            "a king supporting a passed pawn must improve passed-pawn scoring");
+    require(advanced.passed_pawn > unadvanced.passed_pawn,
+            "a passed pawn closer to promotion must receive race value");
+}
+
+void test_evaluator_applies_tempo_once_for_side_to_move() {
+    koi::ClassicalEvaluator evaluator;
+    const auto white_to_move = evaluator.breakdown(
+        require_state("4k3/8/8/8/8/8/P7/4K3 w - - 0 1"), koi::Color::white);
+    const auto black_to_move = evaluator.breakdown(
+        require_state("4k3/8/8/8/8/8/P7/4K3 b - - 0 1"), koi::Color::white);
+
+    require(white_to_move.tempo == evaluator.parameters().tempo_bonus,
+            "white to move must receive exactly one tempo bonus");
+    require(black_to_move.tempo == -evaluator.parameters().tempo_bonus,
+            "black to move must remove exactly one tempo bonus");
+}
+
+void test_evaluator_breakdown_accounts_for_every_component() {
+    koi::ClassicalEvaluator evaluator;
+    const auto score = evaluator.breakdown(
+        require_state("4k3/8/8/3P4/3K4/8/8/8 w - - 0 1"), koi::Color::white);
+
+    require(score.total == score.material + score.piece_square + score.mobility +
+                score.pawn_structure + score.activity + score.king_safety +
+                score.king_activity + score.passed_pawn + score.tempo,
+            "breakdown total must account for every evaluation component");
 }
 
 void test_time_manager_applies_move_time_and_clock_limits() {
@@ -1434,6 +1497,11 @@ int main() {
         {"evaluator passed pawn blockade", test_evaluator_penalizes_a_directly_blockaded_passed_pawn},
         {"evaluator mirrored terms and black blockade", test_evaluator_mirrors_terms_and_black_passed_pawn_blockades},
         {"evaluator color symmetric endgame passer", test_evaluator_endgame_passer_scaling_is_color_symmetric},
+        {"evaluator versioned parameters", test_evaluator_exposes_versioned_classical_parameters},
+        {"evaluator endgame king activity", test_evaluator_scores_endgame_king_activity},
+        {"evaluator passer support and race", test_evaluator_scores_passed_pawn_support_and_promotion_race},
+        {"evaluator tempo", test_evaluator_applies_tempo_once_for_side_to_move},
+        {"evaluator complete breakdown", test_evaluator_breakdown_accounts_for_every_component},
         {"time manager", test_time_manager_applies_move_time_and_clock_limits},
         {"speed budgets", test_speed_scales_only_time_based_search_budgets},
         {"compatibility timing controls", test_move_overhead_and_slow_mover_scale_time_in_order},

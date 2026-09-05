@@ -343,6 +343,7 @@ void test_strength_positions_are_valid_and_tactical_moves_are_found() {
     auto evaluator = std::make_shared<koi::ClassicalEvaluator>();
     koi::SearchService service(evaluator);
     for (const koi::StrengthPosition& position : koi::strength_positions()) {
+        service.clear_hash();
         const auto state = koi::GameState::from_fen(position.fen);
         require(state.has_value(), "every strength fixture must contain valid FEN");
         koi::SearchLimits limits;

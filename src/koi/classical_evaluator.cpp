@@ -4,44 +4,12 @@
 #include <array>
 #include <bit>
 #include <cstdint>
+#include <cstdlib>
 
 namespace koi {
 namespace {
 
-struct EvaluationParameters {
-    int pawn_value = 100;
-    int knight_value = 320;
-    int bishop_value = 330;
-    int rook_value = 500;
-    int queen_value = 900;
-    int maximum_phase = 24;
-    int mobility_weight = 4;
-    int doubled_pawn_penalty = 12;
-    int isolated_pawn_penalty = 10;
-    int pawn_island_penalty = 4;
-    int passed_pawn_base = 20;
-    int passed_pawn_advance_weight = 4;
-    int passed_pawn_phase_base = 32;
-    int passed_pawn_protection_bonus = 5;
-    int direct_passed_pawn_blockade_penalty = 14;
-    int connected_pawn_bonus = 6;
-    int attacked_pawn_penalty = 6;
-    int backward_pawn_penalty = 8;
-    int bishop_mobility_weight = 2;
-    int knight_outpost_bonus = 12;
-    int rook_semi_open_file_bonus = 10;
-    int rook_open_file_bonus = 20;
-    int rook_seventh_rank_bonus = 15;
-    int queen_mobility_weight = 1;
-    int bishop_pair_bonus = 30;
-    int king_shield_bonus = 14;
-    int king_open_file_penalty = 10;
-    int king_zone_attack_penalty = 8;
-    int king_safety_phase_offset = 8;
-    int king_safety_phase_divisor = 32;
-};
-
-constexpr EvaluationParameters kEvaluation{};
+constexpr const auto& kEvaluation = kClassicalEvaluationParameters;
 
 constexpr int piece_value(PieceType type) noexcept {
     switch (type) {
@@ -330,9 +298,31 @@ int tapered_piece_square(PieceType type, std::uint8_t square, int phase) noexcep
         kEvaluation.maximum_phase;
 }
 
+int king_activity_for(const PositionFeatures& features, Color color) noexcept {
+    const int own = color_index(color);
+    const std::uint8_t king = features.king_squares[own].index();
+    if (king >= 64) {
+        return 0;
+    }
+
+    const int file = king % 8;
+    const int rank = king / 8;
+    const int distance_from_center =
+        std::min(std::abs(file - 3), std::abs(file - 4)) +
+        std::min(std::abs(rank - 3), std::abs(rank - 4));
+    const int centrality = std::max(0, 6 - distance_from_center);
+    const int endgame_phase = kEvaluation.maximum_phase - features.game_phase;
+    return centrality * kEvaluation.king_activity_weight * endgame_phase /
+        kEvaluation.maximum_phase;
+}
+
 bool has_pawn_on_file(const PositionFeatures& features, int color, int file) noexcept {
     return file >= 0 && file < 8 &&
         (features.pawn_file_masks[static_cast<std::size_t>(color)] & (std::uint8_t{1} << file)) != 0;
+}
+
+bool has_any_pawn(const PositionFeatures& features) noexcept {
+    return features.pawn_file_masks[0] != 0 || features.pawn_file_masks[1] != 0;
 }
 
 int pawn_structure_for(const PositionFeatures& features, Color color) noexcept {
@@ -455,6 +445,54 @@ int pawn_structure_for(const PositionFeatures& features, Color color) noexcept {
     return score;
 }
 
+int passed_pawn_for(const PositionFeatures& features, Color color) noexcept {
+    const int own = color_index(color);
+    const int direction = color == Color::white ? 1 : -1;
+    const std::uint8_t king = features.king_squares[own].index();
+    const int king_file = king < 64 ? king % 8 : 0;
+    const int king_rank = king < 64 ? king / 8 : 0;
+    const int endgame_phase = kEvaluation.maximum_phase - features.game_phase;
+    int score = 0;
+
+    for (std::uint8_t square = 0; square < 64; ++square) {
+        const Piece pawn = features.board[square];
+        if (pawn.type != PieceType::pawn || color_index(pawn.color) != own) {
+            continue;
+        }
+
+        const int file = square % 8;
+        const int rank = square / 8;
+        bool passed = true;
+        for (int candidate_file = std::max(0, file - 1);
+             candidate_file <= std::min(7, file + 1); ++candidate_file) {
+            for (int candidate_rank = rank + direction;
+                 candidate_rank >= 0 && candidate_rank < 8;
+                 candidate_rank += direction) {
+                const Piece candidate = features.board[
+                    static_cast<std::size_t>(candidate_rank * 8 + candidate_file)];
+                if (candidate.type == PieceType::pawn && color_index(candidate.color) != own) {
+                    passed = false;
+                }
+            }
+        }
+        if (!passed) {
+            continue;
+        }
+
+        const int king_distance = std::max(std::abs(file - king_file), std::abs(rank - king_rank));
+        if (king_distance <= 2) {
+            score += kEvaluation.passed_pawn_king_support_bonus;
+        }
+        score += std::max(0, 4 - king_distance) *
+            kEvaluation.passed_pawn_king_proximity_weight;
+
+        const int advancement = color == Color::white ? rank : 7 - rank;
+        score += advancement * kEvaluation.passed_pawn_promotion_weight * endgame_phase /
+            kEvaluation.maximum_phase;
+    }
+    return score;
+}
+
 int activity_for(const PositionFeatures& features, Color color) noexcept {
     const int own = color_index(color);
     const int enemy = 1 - own;
@@ -554,8 +592,16 @@ EvaluationBreakdown ClassicalEvaluator::breakdown(const GameState& state, Color 
                         king_safety_for(features, Color::black);
     score.king_safety = score.king_safety * (phase + kEvaluation.king_safety_phase_offset) /
         kEvaluation.king_safety_phase_divisor;
+    score.king_activity = has_any_pawn(features) ?
+        king_activity_for(features, Color::white) - king_activity_for(features, Color::black) : 0;
+    score.passed_pawn = passed_pawn_for(features, Color::white) -
+                        passed_pawn_for(features, Color::black);
+    score.tempo = has_any_pawn(features) ?
+        (features.side_to_move == Color::white ? kEvaluation.tempo_bonus :
+         -kEvaluation.tempo_bonus) : 0;
     score.total = score.material + score.piece_square + score.mobility + score.pawn_structure +
-                  score.activity + score.king_safety;
+                  score.activity + score.king_safety + score.king_activity + score.passed_pawn +
+                  score.tempo;
     if (dead_material) {
         score.total = 0;
     }
@@ -567,6 +613,9 @@ EvaluationBreakdown ClassicalEvaluator::breakdown(const GameState& state, Color 
         score.pawn_structure = -score.pawn_structure;
         score.activity = -score.activity;
         score.king_safety = -score.king_safety;
+        score.king_activity = -score.king_activity;
+        score.passed_pawn = -score.passed_pawn;
+        score.tempo = -score.tempo;
         score.total = -score.total;
     }
     return score;
