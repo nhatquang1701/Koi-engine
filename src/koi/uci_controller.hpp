@@ -3,9 +3,11 @@
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <fstream>
 #include <iosfwd>
 #include <mutex>
 #include <optional>
+#include <string>
 #include <string_view>
 
 #include "koi/game_state.hpp"
@@ -52,11 +54,19 @@ private:
     void write_book_completion(std::uint64_t generation, const BookChoice& choice,
                                std::uint32_t root_ply);
     void write_position_error(const char* message);
+    void debug_event(std::string message) noexcept;
+    void configure_debug_file();
+    [[nodiscard]] std::filesystem::path debug_path() const;
+    void rotate_debug_file_if_needed(std::size_t incoming_bytes);
 
     std::istream& input_;
     std::ostream& output_;
     std::ostream& diagnostics_;
     std::mutex output_mutex_;
+    std::mutex debug_mutex_;
+    std::filesystem::path executable_directory_;
+    std::filesystem::path debug_file_path_;
+    std::ofstream debug_file_;
     GameState position_;
     RandomMoveChooser chooser_{0};
     OpeningBook opening_book_;
@@ -70,6 +80,12 @@ private:
     bool active_ponder_ = false;
     std::size_t threads_ = 1;
     std::uint8_t speed_percent_ = 100;
+    bool show_wdl_ = false;
+    std::uint32_t move_overhead_ms_ = 10;
+    std::uint32_t slow_mover_percent_ = 100;
+    bool limit_strength_ = false;
+    std::uint32_t elo_ = 1320;
+    bool debug_enabled_ = false;
     bool analyse_mode_ = false;
     std::size_t multi_pv_ = 1;
     bool ponder_enabled_ = false;

@@ -386,16 +386,58 @@ void test_speed_scales_only_time_based_search_budgets() {
             "Speed must not add a time budget to infinite searches");
 }
 
+void test_move_overhead_and_slow_mover_scale_time_in_order() {
+    koi::SearchLimits move_time;
+    move_time.movetime = 1s;
+    const koi::TimeManager configured(move_time, koi::Color::white, 50, 10, 50);
+    require(configured.time_budget().has_value() && *configured.time_budget() == 228ms,
+            "time budgets must apply Slow Mover, then Speed, then Move Overhead and safety margin");
+
+    koi::SearchLimits clock;
+    clock.white_clock = koi::ClockLimit{10s, 1s};
+    clock.moves_to_go = 20;
+    const koi::TimeManager configured_clock(clock, koi::Color::white, 50, 10, 50);
+    require(configured_clock.time_budget().has_value() && *configured_clock.time_budget() == 287ms,
+            "clock allocations must use both new compatibility timing controls");
+}
+
+void test_explicit_depth_and_nodes_remain_untimed_with_clock_fields() {
+    koi::SearchLimits depth_with_clock;
+    depth_with_clock.depth = 3;
+    depth_with_clock.movetime = 1ms;
+    depth_with_clock.white_clock = koi::ClockLimit{1s, 1s};
+    const koi::TimeManager depth_manager(depth_with_clock, koi::Color::white);
+    require(!depth_manager.time_budget().has_value(),
+            "explicit depth must remain untimed even when time fields are also present");
+
+    koi::SearchLimits nodes_with_clock;
+    nodes_with_clock.nodes = 100;
+    nodes_with_clock.black_clock = koi::ClockLimit{1s, 1s};
+    const koi::TimeManager nodes_manager(nodes_with_clock, koi::Color::black);
+    require(!nodes_manager.time_budget().has_value(),
+            "explicit nodes must remain untimed even when clock fields are also present");
+}
+
 void test_search_options_include_thread_and_speed_controls() {
     const koi::SearchOptions defaults;
     require(defaults.threads == 1, "SearchOptions must default to one search thread");
     require(defaults.speed_percent == 100, "SearchOptions must default to Speed 100");
+    require(!defaults.show_wdl && defaults.move_overhead_ms == 10 &&
+                defaults.slow_mover_percent == 100 && !defaults.limit_strength && defaults.elo == 1320,
+            "SearchOptions must default to the Task 1 compatibility values");
 
     koi::SearchOptions configured;
     configured.threads = 2;
     configured.speed_percent = 50;
-    require(configured.threads == 2 && configured.speed_percent == 50,
-            "SearchOptions must retain explicit thread and speed values");
+    configured.show_wdl = true;
+    configured.move_overhead_ms = 5000;
+    configured.slow_mover_percent = 200;
+    configured.limit_strength = true;
+    configured.elo = 1500;
+    require(configured.threads == 2 && configured.speed_percent == 50 && configured.show_wdl &&
+                configured.move_overhead_ms == 5000 && configured.slow_mover_percent == 200 &&
+                configured.limit_strength && configured.elo == 1500,
+            "SearchOptions must retain explicit Task 1 compatibility values");
 }
 
 void test_root_filtering_keeps_only_requested_legal_move() {
@@ -1394,6 +1436,8 @@ int main() {
         {"evaluator color symmetric endgame passer", test_evaluator_endgame_passer_scaling_is_color_symmetric},
         {"time manager", test_time_manager_applies_move_time_and_clock_limits},
         {"speed budgets", test_speed_scales_only_time_based_search_budgets},
+        {"compatibility timing controls", test_move_overhead_and_slow_mover_scale_time_in_order},
+        {"explicit limits remain untimed", test_explicit_depth_and_nodes_remain_untimed_with_clock_fields},
         {"search options", test_search_options_include_thread_and_speed_controls},
         {"root filtering legal move", test_root_filtering_keeps_only_requested_legal_move},
         {"root filtering illegal move", test_root_filtering_ignores_syntactically_valid_illegal_move},

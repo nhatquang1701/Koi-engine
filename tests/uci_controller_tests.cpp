@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <iterator>
 #include <limits>
 #include <mutex>
 #include <sstream>
@@ -16,6 +17,7 @@
 #include <vector>
 
 #include "koi/position.hpp"
+#include "koi/classical_evaluator.hpp"
 #include "koi/time_manager.hpp"
 #include "koi/uci_controller.hpp"
 
@@ -53,6 +55,16 @@ ControllerResult run_controller(std::string_view transcript) {
     std::ostringstream output;
     std::ostringstream diagnostics;
     UciController controller(input, output, diagnostics);
+    return {controller.run(), output.str(), diagnostics.str()};
+}
+
+ControllerResult run_controller_in_directory(std::string_view transcript,
+                                              const std::filesystem::path& directory) {
+    std::istringstream input{std::string(transcript)};
+    std::ostringstream output;
+    std::ostringstream diagnostics;
+    UciController controller(input, output, diagnostics, koi::SearchService{
+        std::make_shared<koi::ClassicalEvaluator>()}, directory);
     return {controller.run(), output.str(), diagnostics.str()};
 }
 
@@ -341,11 +353,148 @@ void test_uci_handshake_has_identity_and_supported_options_in_order() {
         "option name BookDepth type spin default 16 min 0 max 40\n"
         "option name BookRandom type check default false\n"
         "option name Clear Hash type button\n"
+        "option name UCI_ShowWDL type check default false\n"
+        "option name Move Overhead type spin default 10 min 0 max 5000\n"
+        "option name Slow Mover type spin default 100 min 10 max 1000\n"
+        "option name UCI_LimitStrength type check default false\n"
+        "option name UCI_Elo type spin default 1320 min 1320 max 3190\n"
         "uciok\n";
 
     require(result.exit_code == 0, "quit must cause a normal shutdown");
     require(result.output == expected,
             "uci response must advertise the identity, hash, thread, speed, and clear-hash options");
+}
+
+void test_task1_handshake_appends_exact_compatibility_options() {
+    const ControllerResult result = run_controller("uci\nquit\n");
+    const std::string expected =
+        "option name UCI_ShowWDL type check default false\n"
+        "option name Move Overhead type spin default 10 min 0 max 5000\n"
+        "option name Slow Mover type spin default 100 min 10 max 1000\n"
+        "option name UCI_LimitStrength type check default false\n"
+        "option name UCI_Elo type spin default 1320 min 1320 max 3190\n";
+    const std::size_t clear_hash = result.output.find("option name Clear Hash type button\n");
+    const std::size_t appended = clear_hash == std::string::npos ? clear_hash : clear_hash +
+        std::string("option name Clear Hash type button\n").size();
+    require(appended != std::string::npos && result.output.substr(appended).starts_with(expected),
+            "Task 1 public options must be appended after the existing handshake options");
+}
+
+void test_task1_public_options_accept_valid_and_ignore_invalid_values() {
+    const ControllerResult result = run_controller(
+        "setoption name UCI_ShowWDL value true\n"
+        "setoption name UCI_ShowWDL value invalid\n"
+        "setoption name Move Overhead value 5000\n"
+        "setoption name Move Overhead value 5001\n"
+        "setoption name Slow Mover value 10\n"
+        "setoption name Slow Mover value 9\n"
+        "setoption name UCI_LimitStrength value true\n"
+        "setoption name UCI_LimitStrength value maybe\n"
+        "setoption name UCI_Elo value 3190\n"
+        "setoption name UCI_Elo value 3191\n"
+        "position startpos\n"
+        "go depth 1\nquit\n");
+    require(result.exit_code == 0, "Task 1 option values must never crash the controller");
+    require(lines_starting_with(output_lines(result.output), "bestmove ").size() <= 1,
+            "option parsing must not duplicate a search completion");
+    require(result.diagnostics.empty(), "valid and invalid Task 1 options must be quiet");
+}
+
+void test_task1_wdl_output_is_optional_and_mate_scores_are_converted() {
+    const ControllerResult omitted = run_controller(
+        "setoption name OwnBook value false\n"
+        "position startpos\n"
+        "go infinite\nstop\nquit\n");
+    for (const std::string& line : output_lines(omitted.output)) {
+        if (line.starts_with("info depth ")) {
+            require(line.find(" wdl ") == std::string::npos,
+                    "WDL must be omitted when UCI_ShowWDL is disabled");
+        }
+    }
+
+    GatedInputBuffer shown_input(
+        "setoption name UCI_ShowWDL value true\n"
+        "setoption name OwnBook value false\n"
+        "position fen 7k/5Q2/6K1/8/8/8/8/8 w - - 0 1\n"
+        "go infinite\n", "stop\nquit\n");
+    std::istream shown_input_stream(&shown_input);
+    ReleaseOnDepthBuffer shown_output_buffer(shown_input, 1);
+    std::ostream shown_output_stream(&shown_output_buffer);
+    std::ostringstream shown_diagnostics;
+    int shown_exit_code = -1;
+    std::thread shown_controller_thread([&] {
+        UciController controller(shown_input_stream, shown_output_stream, shown_diagnostics);
+        shown_exit_code = controller.run();
+    });
+    const bool shown_marker = shown_input.wait_for_marker(std::chrono::seconds(5));
+    shown_input.release();
+    shown_controller_thread.join();
+    const std::string shown_output = shown_output_buffer.str();
+    bool saw_wdl = false;
+    bool saw_mate_wdl = false;
+    require(shown_marker && shown_exit_code == 0 && shown_diagnostics.str().empty(),
+            "the mate WDL transcript must complete cleanly after its first info line");
+    for (const std::string& line : output_lines(shown_output)) {
+        if (!line.starts_with("info depth ")) {
+            continue;
+        }
+        const std::size_t wdl = line.find(" wdl ");
+        require(wdl != std::string::npos, "enabled WDL output must contain a wdl triplet");
+        saw_wdl = true;
+        saw_mate_wdl = saw_mate_wdl || line.find(" wdl 1000 0 0") != std::string::npos;
+    }
+    require(saw_wdl && saw_mate_wdl,
+            "mate scores must use the deterministic winning WDL conversion: " + shown_output);
+}
+
+void test_task1_hidden_debug_file_is_relative_rotated_and_off_stdio() {
+    TestDirectory files;
+    const std::filesystem::path log = files.path() / "koi-debug.log";
+    {
+        std::ofstream existing(log, std::ios::binary | std::ios::trunc);
+        std::string block(1024 * 1024, 'x');
+        for (int index = 0; index < 8; ++index) {
+            existing.write(block.data(), static_cast<std::streamsize>(block.size()));
+        }
+    }
+    const ControllerResult result = run_controller_in_directory(
+        "setoption name Debug value true\n"
+        "setoption name DebugFile value relative-debug.log\n"
+        "position startpos\n"
+        "go depth 1\nquit\n", files.path());
+    require(result.exit_code == 0 && result.diagnostics.empty(),
+            "hidden diagnostics must not write to stderr");
+    require(result.output.find("debug") == std::string::npos,
+            "hidden diagnostics must not write arbitrary text to UCI stdout");
+    require(std::filesystem::exists(files.path() / "relative-debug.log"),
+            "relative DebugFile paths must resolve beside the executable");
+    std::ifstream relative_log(files.path() / "relative-debug.log", std::ios::binary);
+    const std::string relative_contents((std::istreambuf_iterator<char>(relative_log)), {});
+    require(relative_contents.find("command position startpos") != std::string::npos &&
+                relative_contents.find("search start generation") != std::string::npos,
+            "debug files must include command and search lifecycle events");
+
+    const ControllerResult defaulted = run_controller_in_directory(
+        "setoption name Debug value true\nquit\n", files.path());
+    require(defaulted.exit_code == 0 && std::filesystem::exists(log),
+            "Debug with an empty path must create koi-debug.log beside the executable");
+    require(std::filesystem::exists(files.path() / "koi-debug.log.1"),
+            "debug logs must rotate at 8 MiB");
+}
+
+void test_task1_option_change_emits_exactly_one_bestmove() {
+    const ControllerResult result = run_controller(
+        "setoption name OwnBook value false\n"
+        "position startpos\n"
+        "go infinite\n"
+        "setoption name Move Overhead value 20\n"
+        "setoption name Slow Mover value 200\n"
+        "setoption name UCI_LimitStrength value true\n"
+        "setoption name UCI_Elo value 1500\n"
+        "go depth 1\n"
+        "stop\nquit\n");
+    require(lines_starting_with(output_lines(result.output), "bestmove ").size() == 1,
+            "changing Task 1 options must stop and join the replaced search once");
 }
 
 void test_book_options_emit_one_seeded_marker_and_bestmove_for_normal_play() {
@@ -908,6 +1057,20 @@ void test_deterministic_search_repeats_the_best_move_with_compatibility_seed() {
             "the deterministic start-position move must be legal");
 }
 
+void test_task1_disabled_strength_limit_preserves_fixed_depth_output() {
+    const ControllerResult result = run_controller(
+        "setoption name UCI_LimitStrength value false\n"
+        "setoption name UCI_Elo value 3190\n"
+        "position startpos\n"
+        "go depth 2\nstop\n"
+        "position startpos\n"
+        "go depth 2\nstop\nquit\n");
+    const std::vector<std::string> bestmoves =
+        lines_starting_with(output_lines(result.output), "bestmove ");
+    require(bestmoves.size() == 2 && bestmoves[0] == bestmoves[1],
+            "UCI_LimitStrength=false must preserve repeated fixed-depth output regardless of UCI_Elo");
+}
+
 void test_startpos_and_fen_move_lists_define_the_search_root() {
     const ControllerResult result = run_controller(
         "position startpos moves e2e4 e7e5 g1f3\n"
@@ -1264,6 +1427,11 @@ struct TestCase {
 int main() {
     const std::vector<TestCase> tests{
         {"uci handshake and options", test_uci_handshake_has_identity_and_supported_options_in_order},
+        {"Task 1 handshake", test_task1_handshake_appends_exact_compatibility_options},
+        {"Task 1 option values", test_task1_public_options_accept_valid_and_ignore_invalid_values},
+        {"Task 1 WDL", test_task1_wdl_output_is_optional_and_mate_scores_are_converted},
+        {"Task 1 hidden diagnostics", test_task1_hidden_debug_file_is_relative_rotated_and_off_stdio},
+        {"Task 1 option replacement", test_task1_option_change_emits_exactly_one_bestmove},
         {"opening-book normal play", test_book_options_emit_one_seeded_marker_and_bestmove_for_normal_play},
         {"opening-book random option", test_book_random_option_accepts_valid_values_and_ignores_invalid_values},
         {"opening-book fallback and bypass", test_book_fallback_and_analysis_style_commands_search_without_markers},
@@ -1286,6 +1454,7 @@ int main() {
         {"ponder terminal result", test_stopping_terminal_ponder_search_emits_0000},
         {"ready response", test_isready_writes_readyok},
         {"deterministic search", test_deterministic_search_repeats_the_best_move_with_compatibility_seed},
+        {"disabled strength limit", test_task1_disabled_strength_limit_preserves_fixed_depth_output},
         {"position startpos and FEN", test_startpos_and_fen_move_lists_define_the_search_root},
         {"go limits and malformed values", test_all_go_limits_and_malformed_values_are_accepted_without_crashing},
         {"go limit parser exact mapping", test_go_limit_parser_maps_each_supported_limit_exactly},

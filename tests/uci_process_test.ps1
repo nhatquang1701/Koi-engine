@@ -137,6 +137,11 @@ $expectedHandshake = @(
     'option name BookDepth type spin default 16 min 0 max 40',
     'option name BookRandom type check default false',
     'option name Clear Hash type button',
+    'option name UCI_ShowWDL type check default false',
+    'option name Move Overhead type spin default 10 min 0 max 5000',
+    'option name Slow Mover type spin default 100 min 10 max 1000',
+    'option name UCI_LimitStrength type check default false',
+    'option name UCI_Elo type spin default 1320 min 1320 max 3190',
     'uciok'
 )
 foreach ($expected in $expectedHandshake) {

@@ -78,11 +78,19 @@ struct SearchEventSink {
 };
 
 struct SearchOptions {
+    using StrengthProfileHook = std::function<void(SearchOptions&)>;
+
     std::size_t hash_mb = 16;
     std::size_t threads = 1;
     std::uint8_t speed_percent = 100;
     std::size_t multi_pv = 1;
     bool analyse_mode = false;
+    bool show_wdl = false;
+    std::uint32_t move_overhead_ms = 10;
+    std::uint32_t slow_mover_percent = 100;
+    bool limit_strength = false;
+    std::uint32_t elo = 1320;
+    StrengthProfileHook strength_profile_hook;
 };
 
 [[nodiscard]] inline std::size_t maximum_search_threads() noexcept {

@@ -54,6 +54,18 @@ std::size_t normalized_multi_pv(std::size_t multi_pv) noexcept {
     return std::clamp(multi_pv, std::size_t{1}, kMaximumMultiPv);
 }
 
+std::uint32_t normalized_move_overhead(std::uint32_t move_overhead_ms) noexcept {
+    return std::min<std::uint32_t>(move_overhead_ms, 5'000);
+}
+
+std::uint32_t normalized_slow_mover(std::uint32_t slow_mover_percent) noexcept {
+    return std::clamp<std::uint32_t>(slow_mover_percent, 10, 1'000);
+}
+
+std::uint32_t normalized_elo(std::uint32_t elo) noexcept {
+    return std::clamp<std::uint32_t>(elo, 1'320, 3'190);
+}
+
 constexpr int piece_value(PieceType type) noexcept {
     switch (type) {
     case PieceType::pawn:
@@ -780,6 +792,12 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
     options.threads = normalized_threads(options.threads);
     options.speed_percent = normalized_speed(options.speed_percent);
     options.multi_pv = normalized_multi_pv(options.multi_pv);
+    options.move_overhead_ms = normalized_move_overhead(options.move_overhead_ms);
+    options.slow_mover_percent = normalized_slow_mover(options.slow_mover_percent);
+    options.elo = normalized_elo(options.elo);
+    if (options.limit_strength && options.strength_profile_hook) {
+        options.strength_profile_hook(options);
+    }
 
     auto state = std::make_shared<SearchHandle::State>();
     const auto evaluator = impl_->evaluator;
@@ -789,7 +807,8 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                                  sink = std::move(sink), options, evaluator_mutex]() mutable {
         const auto started = std::chrono::steady_clock::now();
         table->new_generation();
-        TimeManager time_manager(limits, root.side_to_move(), options.speed_percent);
+        TimeManager time_manager(limits, root.side_to_move(), options.speed_percent,
+                                 options.move_overhead_ms, options.slow_mover_percent);
 
         std::mutex* evaluator_mutex_ptr = evaluator->supports_concurrent_evaluation() ?
             nullptr : evaluator_mutex.get();

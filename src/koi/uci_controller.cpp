@@ -1,9 +1,11 @@
 #include "koi/uci_controller.hpp"
 
+#include <algorithm>
 #include <cctype>
 #include <charconv>
 #include <chrono>
 #include <cstdint>
+#include <cstdlib>
 #include <limits>
 #include <memory>
 #include <sstream>
@@ -22,9 +24,16 @@ constexpr std::uint64_t kMinimumHashMegabytes = 1;
 constexpr std::uint64_t kMaximumHashMegabytes = 4'096;
 constexpr std::uint64_t kMinimumSpeedPercent = 1;
 constexpr std::uint64_t kMaximumSpeedPercent = 100;
+constexpr std::uint64_t kMinimumSlowMoverPercent = 10;
+constexpr std::uint64_t kMaximumSlowMoverPercent = 1'000;
+constexpr std::uint64_t kMaximumMoveOverheadMs = 5'000;
+constexpr std::uint64_t kMinimumElo = 1'320;
+constexpr std::uint64_t kMaximumElo = 3'190;
 constexpr std::uint64_t kMinimumMultiPv = 1;
 constexpr std::uint64_t kMaximumMultiPv = 16;
 constexpr std::uint64_t kMaximumBookDepth = 40;
+constexpr std::uintmax_t kDebugRotationBytes = 8U * 1024U * 1024U;
+constexpr int kWdlScoreLimit = 1'000;
 
 std::vector<std::string> remaining_tokens(std::istream& command) {
     std::vector<std::string> tokens;
@@ -32,6 +41,36 @@ std::vector<std::string> remaining_tokens(std::istream& command) {
         tokens.push_back(std::move(token));
     }
     return tokens;
+}
+
+std::string join_tokens(const std::vector<std::string>& tokens, std::size_t first,
+                        std::size_t last) {
+    std::string result;
+    for (std::size_t index = first; index < last; ++index) {
+        if (!result.empty()) {
+            result += ' ';
+        }
+        result += tokens[index];
+    }
+    return result;
+}
+
+struct ParsedOption {
+    std::string name;
+    std::string value;
+};
+
+std::optional<ParsedOption> parse_setoption(const std::vector<std::string>& tokens) {
+    if (tokens.size() < 2 || tokens[0] != "name") {
+        return std::nullopt;
+    }
+    const auto value = std::find(tokens.begin() + 1, tokens.end(), "value");
+    const std::size_t value_index = static_cast<std::size_t>(value - tokens.begin());
+    if (value == tokens.end() || value_index == 1) {
+        return ParsedOption{join_tokens(tokens, 1, tokens.size()), {}};
+    }
+    return ParsedOption{join_tokens(tokens, 1, value_index),
+                        join_tokens(tokens, value_index + 1, tokens.size())};
 }
 
 bool parse_uint64(const std::string& value, std::uint64_t& parsed) {
@@ -80,6 +119,23 @@ bool parse_milliseconds(const std::string& value, std::chrono::milliseconds& dur
 std::uint32_t root_ply(const GameState& state) {
     const std::uint32_t completed_fullmoves = static_cast<std::uint32_t>(state.fullmove_number() - 1);
     return completed_fullmoves * 2 + (state.side_to_move() == Color::black ? 1U : 0U);
+}
+
+struct Wdl {
+    int win = 0;
+    int draw = 0;
+    int loss = 0;
+};
+
+Wdl score_to_wdl(const SearchInfo& info) noexcept {
+    if (info.mate.has_value()) {
+        return *info.mate > 0 ? Wdl{1'000, 0, 0} : Wdl{0, 0, 1'000};
+    }
+    const int score = std::clamp(info.score_cp, -kWdlScoreLimit, kWdlScoreLimit);
+    const int draw = std::max(0, 300 - std::abs(score) / 4);
+    const int decisive = 1'000 - draw;
+    const int win = decisive * (score + kWdlScoreLimit) / (2 * kWdlScoreLimit);
+    return Wdl{win, draw, decisive - win};
 }
 
 } // namespace
@@ -207,7 +263,8 @@ UciController::UciController(std::istream& input, std::ostream& output,
                              std::ostream& diagnostics, SearchService search_service,
                              std::filesystem::path executable_directory)
     : input_(input), output_(output), diagnostics_(diagnostics),
-      opening_book_(std::move(executable_directory)),
+      executable_directory_(std::move(executable_directory)),
+      opening_book_(executable_directory_),
       search_service_(std::move(search_service)) {}
 
 UciController::~UciController() {
@@ -216,6 +273,7 @@ UciController::~UciController() {
 
 int UciController::run() {
     for (std::string line; std::getline(input_, line);) {
+        debug_event("command " + line);
         std::istringstream command(line);
         std::string name;
         if (!(command >> name)) {
@@ -304,10 +362,16 @@ void UciController::handle_position(std::istream& command) {
 
 void UciController::handle_setoption(std::istream& command) {
     const std::vector<std::string> tokens = remaining_tokens(command);
-    if (tokens.size() == 4 && tokens[0] == "name" && tokens[1] == "RandomSeed" &&
-        tokens[2] == "value") {
+    const std::optional<ParsedOption> parsed = parse_setoption(tokens);
+    if (!parsed.has_value()) {
+        return;
+    }
+    const std::string& name = parsed->name;
+    const std::string& value = parsed->value;
+
+    if (name == "RandomSeed") {
         std::uint32_t seed = 0;
-        if (parse_random_seed(tokens[3], seed)) {
+        if (parse_random_seed(value, seed)) {
             stop_and_suppress_active_search();
             chooser_.set_seed(seed);
             random_seed_ = seed;
@@ -315,10 +379,9 @@ void UciController::handle_setoption(std::istream& command) {
         return;
     }
 
-    if (tokens.size() == 4 && tokens[0] == "name" && tokens[1] == "Hash" &&
-        tokens[2] == "value") {
+    if (name == "Hash") {
         std::uint64_t megabytes = 0;
-        if (parse_uint64(tokens[3], megabytes) && megabytes >= kMinimumHashMegabytes &&
+        if (parse_uint64(value, megabytes) && megabytes >= kMinimumHashMegabytes &&
             megabytes <= kMaximumHashMegabytes) {
             stop_and_suppress_active_search();
             search_service_.set_hash_size_mb(static_cast<std::size_t>(megabytes));
@@ -326,20 +389,18 @@ void UciController::handle_setoption(std::istream& command) {
         return;
     }
 
-    if (tokens.size() == 4 && tokens[0] == "name" && tokens[1] == "Threads" &&
-        tokens[2] == "value") {
+    if (name == "Threads") {
         std::uint64_t threads = 0;
-        if (parse_uint64(tokens[3], threads) && threads >= 1 && threads <= maximum_search_threads()) {
+        if (parse_uint64(value, threads) && threads >= 1 && threads <= maximum_search_threads()) {
             stop_and_suppress_active_search();
             threads_ = static_cast<std::size_t>(threads);
         }
         return;
     }
 
-    if (tokens.size() == 4 && tokens[0] == "name" && tokens[1] == "Speed" &&
-        tokens[2] == "value") {
+    if (name == "Speed") {
         std::uint64_t speed = 0;
-        if (parse_uint64(tokens[3], speed) && speed >= kMinimumSpeedPercent &&
+        if (parse_uint64(value, speed) && speed >= kMinimumSpeedPercent &&
             speed <= kMaximumSpeedPercent) {
             stop_and_suppress_active_search();
             speed_percent_ = static_cast<std::uint8_t>(speed);
@@ -347,20 +408,18 @@ void UciController::handle_setoption(std::istream& command) {
         return;
     }
 
-    if (tokens.size() == 4 && tokens[0] == "name" && tokens[1] == "UCI_AnalyseMode" &&
-        tokens[2] == "value") {
+    if (name == "UCI_AnalyseMode") {
         bool analyse_mode = false;
-        if (parse_boolean(tokens[3], analyse_mode) && analyse_mode_ != analyse_mode) {
+        if (parse_boolean(value, analyse_mode) && analyse_mode_ != analyse_mode) {
             stop_and_suppress_active_search();
             analyse_mode_ = analyse_mode;
         }
         return;
     }
 
-    if (tokens.size() == 4 && tokens[0] == "name" && tokens[1] == "MultiPV" &&
-        tokens[2] == "value") {
+    if (name == "MultiPV") {
         std::uint64_t multi_pv = 0;
-        if (parse_uint64(tokens[3], multi_pv) && multi_pv >= kMinimumMultiPv &&
+        if (parse_uint64(value, multi_pv) && multi_pv >= kMinimumMultiPv &&
             multi_pv <= kMaximumMultiPv) {
             stop_and_suppress_active_search();
             multi_pv_ = static_cast<std::size_t>(multi_pv);
@@ -368,64 +427,117 @@ void UciController::handle_setoption(std::istream& command) {
         return;
     }
 
-    if (tokens.size() == 4 && tokens[0] == "name" && tokens[1] == "Ponder" &&
-        tokens[2] == "value") {
+    if (name == "Ponder") {
         bool ponder_enabled = false;
-        if (parse_boolean(tokens[3], ponder_enabled)) {
+        if (parse_boolean(value, ponder_enabled)) {
             stop_and_suppress_active_search();
             ponder_enabled_ = ponder_enabled;
         }
         return;
     }
 
-    if (tokens.size() == 4 && tokens[0] == "name" && tokens[1] == "OwnBook" &&
-        tokens[2] == "value") {
+    if (name == "OwnBook") {
         bool own_book = false;
-        if (parse_boolean(tokens[3], own_book)) {
+        if (parse_boolean(value, own_book)) {
             stop_and_suppress_active_search();
             own_book_ = own_book;
         }
         return;
     }
 
-    if (tokens.size() == 4 && tokens[0] == "name" && tokens[1] == "BookRandom" &&
-        tokens[2] == "value") {
+    if (name == "BookRandom") {
         bool book_random = false;
-        if (parse_boolean(tokens[3], book_random)) {
+        if (parse_boolean(value, book_random)) {
             stop_and_suppress_active_search();
             book_random_ = book_random;
         }
         return;
     }
 
-    if (tokens.size() >= 4 && tokens[0] == "name" && tokens[1] == "BookFile" &&
-        tokens[2] == "value") {
-        std::string filename = tokens[3];
-        for (std::size_t index = 4; index < tokens.size(); ++index) {
-            filename += ' ';
-            filename += tokens[index];
-        }
-        if (!filename.empty()) {
+    if (name == "BookFile") {
+        if (!value.empty()) {
             stop_and_suppress_active_search();
-            opening_book_.set_file(std::move(filename));
+            opening_book_.set_file(value);
         }
         return;
     }
 
-    if (tokens.size() == 4 && tokens[0] == "name" && tokens[1] == "BookDepth" &&
-        tokens[2] == "value") {
+    if (name == "BookDepth") {
         std::uint64_t book_depth = 0;
-        if (parse_uint64(tokens[3], book_depth) && book_depth <= kMaximumBookDepth) {
+        if (parse_uint64(value, book_depth) && book_depth <= kMaximumBookDepth) {
             stop_and_suppress_active_search();
             book_depth_ = static_cast<std::uint8_t>(book_depth);
         }
         return;
     }
 
-    if (tokens.size() == 3 && tokens[0] == "name" && tokens[1] == "Clear" &&
-        tokens[2] == "Hash") {
+    if (name == "Clear Hash") {
         stop_and_suppress_active_search();
         search_service_.clear_hash();
+    }
+
+    if (name == "UCI_ShowWDL") {
+        bool show_wdl = false;
+        if (parse_boolean(value, show_wdl)) {
+            stop_and_suppress_active_search();
+            show_wdl_ = show_wdl;
+        }
+        return;
+    }
+
+    if (name == "Move Overhead") {
+        std::uint64_t overhead = 0;
+        if (parse_uint64(value, overhead) && overhead <= kMaximumMoveOverheadMs) {
+            stop_and_suppress_active_search();
+            move_overhead_ms_ = static_cast<std::uint32_t>(overhead);
+        }
+        return;
+    }
+
+    if (name == "Slow Mover") {
+        std::uint64_t slow_mover = 0;
+        if (parse_uint64(value, slow_mover) && slow_mover >= kMinimumSlowMoverPercent &&
+            slow_mover <= kMaximumSlowMoverPercent) {
+            stop_and_suppress_active_search();
+            slow_mover_percent_ = static_cast<std::uint32_t>(slow_mover);
+        }
+        return;
+    }
+
+    if (name == "UCI_LimitStrength") {
+        bool limit_strength = false;
+        if (parse_boolean(value, limit_strength)) {
+            stop_and_suppress_active_search();
+            limit_strength_ = limit_strength;
+        }
+        return;
+    }
+
+    if (name == "UCI_Elo") {
+        std::uint64_t elo = 0;
+        if (parse_uint64(value, elo) && elo >= kMinimumElo && elo <= kMaximumElo) {
+            stop_and_suppress_active_search();
+            elo_ = static_cast<std::uint32_t>(elo);
+        }
+        return;
+    }
+
+    if (name == "Debug") {
+        bool debug = false;
+        if (parse_boolean(value, debug)) {
+            stop_and_suppress_active_search();
+            debug_enabled_ = debug;
+            configure_debug_file();
+        }
+        return;
+    }
+
+    if (name == "DebugFile") {
+        stop_and_suppress_active_search();
+        debug_file_path_ = value;
+        if (debug_enabled_) {
+            configure_debug_file();
+        }
     }
 }
 
@@ -491,6 +603,7 @@ void UciController::handle_ponderhit() {
 
 void UciController::start_search(GameState root, SearchLimits limits, bool skip_book) {
     const std::uint64_t generation = begin_generation();
+    debug_event("search start generation " + std::to_string(generation));
     const bool book_eligible = !skip_book && !analyse_mode_ && multi_pv_ == 1 && !limits.infinite &&
         !limits.ponder && !limits.search_moves_specified;
     if (book_eligible) {
@@ -504,6 +617,7 @@ void UciController::start_search(GameState root, SearchLimits limits, bool skip_
     }
     const GameState search_root = root;
     const bool is_ponder_search = limits.ponder;
+    const bool allow_ponder_move = !limits.search_moves_specified;
 
     SearchEventSink sink;
     sink.on_info = [this, generation, search_root, is_ponder_search](const SearchInfo& info) {
@@ -523,11 +637,13 @@ void UciController::start_search(GameState root, SearchLimits limits, bool skip_
         }
         write_search_info(generation, info);
     };
-    sink.on_complete = [this, generation](const SearchResult& result) {
+    sink.on_complete = [this, generation, allow_ponder_move](const SearchResult& result) {
+        debug_event("search complete generation " + std::to_string(generation));
         SearchResult completed = result;
         {
             std::lock_guard lock(output_mutex_);
-            if (generation == generation_ && result.best_move == principal_variation_best_move_) {
+            if (generation == generation_ && allow_ponder_move &&
+                result.best_move == principal_variation_best_move_) {
                 completed.ponder_move = principal_variation_ponder_move_;
             }
         }
@@ -539,6 +655,11 @@ void UciController::start_search(GameState root, SearchLimits limits, bool skip_
     options.speed_percent = speed_percent_;
     options.multi_pv = multi_pv_;
     options.analyse_mode = analyse_mode_;
+    options.show_wdl = show_wdl_;
+    options.move_overhead_ms = move_overhead_ms_;
+    options.slow_mover_percent = slow_mover_percent_;
+    options.limit_strength = limit_strength_;
+    options.elo = elo_;
     active_search_.emplace(search_service_.start(std::move(root), std::move(limits), std::move(sink), options));
 }
 
@@ -548,6 +669,7 @@ void UciController::stop_active_search() {
         return;
     }
 
+    debug_event("search cancellation requested");
     active_search_->stop();
     active_search_->wait();
     active_search_.reset();
@@ -564,6 +686,7 @@ void UciController::stop_and_suppress_active_search() {
         std::lock_guard lock(output_mutex_);
         ++generation_;
     }
+    debug_event("search cancellation requested with generation suppression");
     active_search_->stop();
     active_search_->wait();
     active_search_.reset();
@@ -601,6 +724,11 @@ void UciController::write_handshake() {
                "option name BookDepth type spin default 16 min 0 max 40\n"
                "option name BookRandom type check default false\n"
                "option name Clear Hash type button\n"
+               "option name UCI_ShowWDL type check default false\n"
+               "option name Move Overhead type spin default 10 min 0 max 5000\n"
+               "option name Slow Mover type spin default 100 min 10 max 1000\n"
+               "option name UCI_LimitStrength type check default false\n"
+               "option name UCI_Elo type spin default 1320 min 1320 max 3190\n"
                "uciok\n"
             << std::flush;
 }
@@ -622,6 +750,10 @@ void UciController::write_search_info(std::uint64_t generation, const SearchInfo
         output_ << "mate " << *info.mate;
     } else {
         output_ << "cp " << info.score_cp;
+    }
+    if (show_wdl_) {
+        const Wdl wdl = score_to_wdl(info);
+        output_ << " wdl " << wdl.win << ' ' << wdl.draw << ' ' << wdl.loss;
     }
     output_ << " nodes " << info.nodes << " nps " << info.nps
             << " time " << info.elapsed.count() << " pv";
@@ -647,14 +779,95 @@ void UciController::write_search_completion(std::uint64_t generation,
 }
 
 void UciController::write_book_completion(std::uint64_t generation, const BookChoice& choice,
-                                          std::uint32_t ply) {
+                                           std::uint32_t ply) {
     std::lock_guard lock(output_mutex_);
     if (generation != generation_) {
         return;
     }
 
     output_ << "info string book move " << choice.move.uci() << " depth " << ply << '\n'
-            << "bestmove " << choice.move.uci() << '\n' << std::flush;
+             << "bestmove " << choice.move.uci() << '\n' << std::flush;
+}
+
+std::filesystem::path UciController::debug_path() const {
+    const std::filesystem::path base = executable_directory_.empty() ?
+        std::filesystem::current_path() : executable_directory_;
+    const std::filesystem::path requested = debug_file_path_.empty() ?
+        std::filesystem::path{"koi-debug.log"} : debug_file_path_;
+    return requested.is_absolute() ? requested : base / requested;
+}
+
+void UciController::rotate_debug_file_if_needed(std::size_t incoming_bytes) {
+    const std::filesystem::path path = debug_path();
+    std::error_code error;
+    const std::uintmax_t current_size = std::filesystem::exists(path, error) && !error ?
+        std::filesystem::file_size(path, error) : 0;
+    if (error || current_size < kDebugRotationBytes &&
+        incoming_bytes <= kDebugRotationBytes - current_size) {
+        return;
+    }
+
+    if (debug_file_.is_open()) {
+        debug_file_.close();
+    }
+    for (int backup = 3; backup >= 1; --backup) {
+        const std::filesystem::path source = path.string() + "." + std::to_string(backup);
+        const std::filesystem::path target = path.string() + "." + std::to_string(backup + 1);
+        std::filesystem::remove(target, error);
+        error.clear();
+        if (std::filesystem::exists(source, error) && !error) {
+            std::filesystem::rename(source, target, error);
+            error.clear();
+        }
+    }
+    std::filesystem::rename(path, path.string() + ".1", error);
+}
+
+void UciController::configure_debug_file() {
+    std::lock_guard lock(debug_mutex_);
+    if (debug_file_.is_open()) {
+        debug_file_.close();
+    }
+    if (!debug_enabled_) {
+        return;
+    }
+
+    const std::filesystem::path path = debug_path();
+    std::error_code error;
+    const bool oversized = std::filesystem::exists(path, error) && !error &&
+        std::filesystem::file_size(path, error) >= kDebugRotationBytes;
+    if (oversized && !error) {
+        rotate_debug_file_if_needed(0);
+    }
+    debug_file_.open(path, std::ios::binary | std::ios::app);
+}
+
+void UciController::debug_event(std::string message) noexcept {
+    try {
+        std::lock_guard lock(debug_mutex_);
+        if (!debug_enabled_) {
+            return;
+        }
+        if (!debug_file_.is_open()) {
+            const std::filesystem::path path = debug_path();
+            debug_file_.open(path, std::ios::binary | std::ios::app);
+        }
+        if (!debug_file_.is_open()) {
+            return;
+        }
+        message.push_back('\n');
+        rotate_debug_file_if_needed(message.size());
+        if (!debug_file_.is_open()) {
+            debug_file_.open(debug_path(), std::ios::binary | std::ios::app);
+        }
+        if (!debug_file_.is_open()) {
+            return;
+        }
+        debug_file_.write(message.data(), static_cast<std::streamsize>(message.size()));
+        debug_file_.flush();
+    } catch (...) {
+        // Developer diagnostics are strictly best effort and never affect UCI.
+    }
 }
 
 void UciController::write_position_error(const char* message) {
