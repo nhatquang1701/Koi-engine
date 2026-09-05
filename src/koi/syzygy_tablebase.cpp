@@ -15,10 +15,6 @@ std::mutex& fathom_mutex() {
     return mutex;
 }
 
-SyzygyWdl wdl_from_rank(int rank) noexcept {
-    return rank > 0 ? SyzygyWdl::win : rank < 0 ? SyzygyWdl::loss : SyzygyWdl::draw;
-}
-
 std::optional<Move> move_from_fathom(const TbMove move) noexcept {
     const Square from = Square::from_index(static_cast<std::uint8_t>(TB_MOVE_FROM(move)));
     const Square to = Square::from_index(static_cast<std::uint8_t>(TB_MOVE_TO(move)));
@@ -74,15 +70,25 @@ public:
 SyzygyScore syzygy_score(const SyzygyWdl wdl) noexcept {
     switch (wdl) {
     case SyzygyWdl::win:
-    case SyzygyWdl::cursed_win:
         return {100'000 - 1, 1};
     case SyzygyWdl::loss:
-    case SyzygyWdl::blessed_loss:
         return {-100'000 + 1, -1};
+    case SyzygyWdl::cursed_win:
+        return {1, std::nullopt};
+    case SyzygyWdl::blessed_loss:
+        return {-1, std::nullopt};
     case SyzygyWdl::draw:
         return {0, std::nullopt};
     }
     return {};
+}
+
+SyzygyWdl syzygy_wdl_from_rank(const int rank) noexcept {
+    if (rank >= 1'000) return SyzygyWdl::win;
+    if (rank > 0) return SyzygyWdl::cursed_win;
+    if (rank <= -1'000) return SyzygyWdl::loss;
+    if (rank < 0) return SyzygyWdl::blessed_loss;
+    return SyzygyWdl::draw;
 }
 
 SyzygyTablebase::SyzygyTablebase(std::filesystem::path path, const std::uint8_t probe_limit,
@@ -122,6 +128,9 @@ bool SyzygyTablebase::allows_depth(const int depth) const noexcept {
 std::uint8_t SyzygyTablebase::probe_limit() const noexcept { return impl_->probe_limit; }
 std::uint8_t SyzygyTablebase::probe_depth() const noexcept { return impl_->probe_depth; }
 bool SyzygyTablebase::fifty_move_rule() const noexcept { return impl_->fifty_move_rule; }
+bool SyzygyTablebase::uses_clock_aware_root_probe() const noexcept {
+    return impl_->fifty_move_rule;
+}
 
 std::optional<SyzygyWdl> SyzygyTablebase::probe_wdl(
     const TablebaseSnapshot& snapshot) const noexcept {
@@ -158,17 +167,23 @@ std::optional<SyzygyRootResult> SyzygyTablebase::probe_root(
     native_bitboards(snapshot, white, black, kings, queens, rooks, bishops, knights, pawns);
     TbRootMoves root_moves{};
     std::lock_guard lock(fathom_mutex());
-    if (tb_probe_root_wdl(white, black, kings, queens, rooks, bishops, knights, pawns,
+    const int probe_succeeded = impl_->fifty_move_rule ?
+        tb_probe_root_dtz(white, black, kings, queens, rooks, bishops, knights, pawns,
                           snapshot.halfmove_clock, snapshot.castling_rights,
                           native_ep(snapshot), snapshot.side_to_move == Color::white,
-                          impl_->fifty_move_rule, &root_moves) == 0 || root_moves.size == 0) {
+                          false, true, &root_moves) :
+        tb_probe_root_wdl(white, black, kings, queens, rooks, bishops, knights, pawns,
+                          snapshot.halfmove_clock, snapshot.castling_rights,
+                          native_ep(snapshot), snapshot.side_to_move == Color::white,
+                          false, &root_moves);
+    if (probe_succeeded == 0 || root_moves.size == 0) {
         return std::nullopt;
     }
     int best_rank = std::numeric_limits<int>::min();
     for (unsigned index = 0; index < root_moves.size; ++index) {
         best_rank = std::max(best_rank, root_moves.moves[index].tbRank);
     }
-    const SyzygyWdl wdl = wdl_from_rank(best_rank);
+    const SyzygyWdl wdl = syzygy_wdl_from_rank(best_rank);
     SyzygyRootResult result{wdl, syzygy_score(wdl), {}};
     const auto permitted = [&allowed_moves](const Move& move) {
         return allowed_moves.empty() || std::find(allowed_moves.begin(), allowed_moves.end(), move) !=

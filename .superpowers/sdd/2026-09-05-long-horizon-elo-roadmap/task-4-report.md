@@ -69,3 +69,44 @@ The direct focused Debug core, rules, search, and UCI runs also passed. The Koi-
 ## Commit
 
 The implementation and this report are committed together with a focused Task 4 subject after the verification above.
+
+## Fix round 1 - review findings
+
+Addressed both Important findings against commit `5caa22141af0d0da2cf54e52f25c88309a36d34f`.
+
+### 50-move rule and DTZ root probing
+
+Root probing now selects Fathom's `tb_probe_root_dtz` path whenever `Syzygy50MoveRule=true`, passing the current halfmove clock and the configured rule behavior. This preserves clock-aware DTZ ranking at positions near the 50-move boundary, including halfmove-99 positions. When the option is false, the adapter uses Fathom's WDL root path and intentionally ignores the 50-move clock. The test suite covers the probe-path selection contract; no external tablebase fixture was available to exercise a real halfmove-99 move ranking.
+
+### Cursed-win and blessed-loss conversion
+
+Fathom rank conversion now preserves the five outcomes: ranks `>=1000` and `<=-1000` remain true win/loss, ranks `899` and `-899` become cursed-win/blessed-loss, and rank `0` remains draw. Only true win/loss convert to mate scores. Cursed wins convert to positive non-mate `+1` cp and blessed losses to negative non-mate `-1` cp. Focused tests assert all four rank boundaries and both non-mate score conversions.
+
+### Fix-round TDD evidence
+
+RED was captured before the fix:
+
+```text
+cmake --build out/task4-green-vs --target syzygy_tablebase_tests -- -j2
+error C2039: 'syzygy_wdl_from_rank' is not a member of 'koi'
+error C2039: 'uses_clock_aware_root_probe' is not a member of 'koi::SyzygyTablebase'
+```
+
+GREEN focused verification:
+
+```text
+out/task4-green-vs/syzygy_tablebase_tests.exe
+PASS syzygy tablebase tests
+
+ctest --test-dir out/task4-green-vs -C Debug -R 'syzygy_tablebase_tests|uci_controller_tests|koi_rules_tests|koi_search_tests' --output-on-failure
+100% tests passed, 0 tests failed out of 4
+
+ctest --test-dir out/task4-release-vs -C Release -R 'syzygy_tablebase_tests|uci_controller_tests|koi_rules_tests|koi_search_tests' --output-on-failure
+100% tests passed, 0 tests failed out of 4
+```
+
+Both Debug and Release full builds completed with the Visual Studio x64 toolchain. No tablebase fixture files were added or bundled.
+
+### Deferred minor finding
+
+Recorded for a later cleanup: a readable empty directory can make `tb_init` allocate Fathom resources while `TB_LARGEST` remains zero, and the current disabled adapter destructor does not call `tb_free`. This fix round leaves that minor lifecycle issue unchanged as requested.

@@ -82,6 +82,21 @@ void test_wdl_conversion_and_concurrent_disabled_probes() {
             "draw WDL must convert to a zero score");
     require(koi::syzygy_score(koi::SyzygyWdl::loss).score_cp < 0,
             "losing WDL must convert to a negative score");
+    require(koi::syzygy_score(koi::SyzygyWdl::cursed_win).score_cp > 0 &&
+                !koi::syzygy_score(koi::SyzygyWdl::cursed_win).mate.has_value(),
+            "cursed wins must be positive non-mate scores");
+    require(koi::syzygy_score(koi::SyzygyWdl::blessed_loss).score_cp < 0 &&
+                !koi::syzygy_score(koi::SyzygyWdl::blessed_loss).mate.has_value(),
+            "blessed losses must be negative non-mate scores");
+
+    require(koi::syzygy_wdl_from_rank(1000) == koi::SyzygyWdl::win,
+            "rank 1000 must remain a true win");
+    require(koi::syzygy_wdl_from_rank(899) == koi::SyzygyWdl::cursed_win,
+            "rank 899 must remain a cursed win");
+    require(koi::syzygy_wdl_from_rank(-899) == koi::SyzygyWdl::blessed_loss,
+            "rank -899 must remain a blessed loss");
+    require(koi::syzygy_wdl_from_rank(-1000) == koi::SyzygyWdl::loss,
+            "rank -1000 must remain a true loss");
 
     const koi::SyzygyTablebase tablebase("missing-syzygy-path", 5, 1, true);
     const koi::TablebaseSnapshot snapshot = state_from_fen(
@@ -102,6 +117,15 @@ void test_wdl_conversion_and_concurrent_disabled_probes() {
             "concurrent WDL probes must be safe when probing is disabled");
 }
 
+void test_50_move_rule_selects_clock_aware_root_probe() {
+    const koi::SyzygyTablebase with_rule({}, 5, 1, true);
+    const koi::SyzygyTablebase without_rule({}, 5, 1, false);
+    require(with_rule.uses_clock_aware_root_probe(),
+            "the 50-move rule must select Fathom's DTZ root path");
+    require(!without_rule.uses_clock_aware_root_probe(),
+            "disabling the 50-move rule must select the WDL root path");
+}
+
 } // namespace
 
 int main() {
@@ -110,6 +134,7 @@ int main() {
         test_absent_and_malformed_paths_disable_probing_safely();
         test_piece_count_and_castling_gate_probing();
         test_wdl_conversion_and_concurrent_disabled_probes();
+        test_50_move_rule_selects_clock_aware_root_probe();
         std::cout << "PASS syzygy tablebase tests\n";
         return 0;
     } catch (const std::exception& error) {

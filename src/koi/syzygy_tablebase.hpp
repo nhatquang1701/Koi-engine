@@ -26,6 +26,7 @@ struct SyzygyScore {
 };
 
 [[nodiscard]] SyzygyScore syzygy_score(SyzygyWdl wdl) noexcept;
+[[nodiscard]] SyzygyWdl syzygy_wdl_from_rank(int rank) noexcept;
 
 struct SyzygyRootResult {
     SyzygyWdl wdl = SyzygyWdl::draw;
@@ -48,6 +49,7 @@ public:
     [[nodiscard]] std::uint8_t probe_limit() const noexcept;
     [[nodiscard]] std::uint8_t probe_depth() const noexcept;
     [[nodiscard]] bool fifty_move_rule() const noexcept;
+    [[nodiscard]] bool uses_clock_aware_root_probe() const noexcept;
     [[nodiscard]] std::optional<SyzygyWdl> probe_wdl(const TablebaseSnapshot& snapshot) const noexcept;
     [[nodiscard]] std::optional<SyzygyRootResult> probe_root(
         const GameState& state, const std::vector<Move>& allowed_moves = {}) const noexcept;
