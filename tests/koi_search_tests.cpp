@@ -1146,6 +1146,20 @@ void test_low_phase_search_skips_null_pruning() {
             "null-move pruning must stay disabled below the safe game-phase threshold");
 }
 
+void test_eligible_null_move_receives_verification() {
+    koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>());
+    koi::SearchLimits limits;
+    limits.depth = 7;
+    limits.nodes = 50'000;
+    const koi::GameState root = koi::GameState::startpos();
+    const koi::SearchResult result = search(service, root, limits);
+
+    require(result.best_move.has_value() && root.is_legal(*result.best_move),
+            "a null-verification search must preserve a legal root move");
+    require(result.stats.null_verifications > 0,
+            "an eligible null-move fail-high must receive verification");
+}
+
 void test_shallow_futility_pruning_is_safe_in_tactical_positions() {
     koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>());
     koi::SearchLimits limits;
@@ -1589,6 +1603,7 @@ int main() {
         {"shorter mate preference", test_search_prefers_the_shorter_forced_mate},
         {"pawn-only zugzwang null safety", test_pawn_only_zugzwang_search_skips_null_pruning},
         {"low-phase null safety", test_low_phase_search_skips_null_pruning},
+        {"eligible null verification", test_eligible_null_move_receives_verification},
         {"shallow futility tactical safety", test_shallow_futility_pruning_is_safe_in_tactical_positions},
         {"shallow futility accounting", test_shallow_futility_accounts_for_safe_quiet_prunes},
         {"late quiet move reductions", test_search_reduces_late_quiet_moves_without_losing_root_legality},

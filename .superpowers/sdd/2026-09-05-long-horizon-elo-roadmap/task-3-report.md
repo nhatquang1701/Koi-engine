@@ -118,3 +118,60 @@ introduced only with a new tactical-gate RED/GREEN cycle.
 
 Final pre-commit status was limited to the Task 3 files listed above plus the
 unrelated untracked Python bytecode artifact.
+
+## Fix round 1 review findings
+
+Review date: 2026-09-05
+
+### Important finding 1: signed history-update overflow
+
+The continuation update path can pass `delta == 8192` at depth 64. The
+previous expression multiplied signed `int` values before clamping, so a
+near-saturated score could invoke undefined behavior. `update_history` now
+promotes score, delta, absolute delta, and the product to `std::int64_t`,
+performs the bounded gravity update in the wider type, and clamps before the
+result is converted back to `int`.
+
+The new ordering regression performs 500 depth-64 quiet-cutoff updates keyed
+by a prior move and asserts the resulting score remains in the documented
+bounded range. It passed in both configurations:
+
+```text
+search_ordering_tests.exe: PASS history saturation overflow safety
+ctest --test-dir out\task2-debug-vs -C Debug -R "^(search_ordering_tests|koi_search_tests)$" --output-on-failure
+100% tests passed, 0 tests failed out of 2
+ctest --test-dir out\task2-release-vs -C Release -R "^(search_ordering_tests|koi_search_tests)$" --output-on-failure
+100% tests passed, 0 tests failed out of 2
+```
+
+### Important finding 2: direct null-verification regression
+
+Added `eligible null verification` to `koi_search_tests`. It searches the
+standard start position at fixed depth 7 with a 50,000-node cap, preserves a
+legal root move, and asserts `result.stats.null_verifications > 0`. The first
+compact-material candidate correctly produced a behavioral RED because it
+reached the node cap without an eligible null fail-high; the fixture was
+refined to startpos so the test exercises the intended path rather than
+testing a non-triggering position. The corrected focused test output is:
+
+```text
+PASS eligible null verification
+```
+
+The existing sparse/pawn-only and low-phase tests remain in the same focused
+run and continue to assert zero null cutoffs in unsafe endgames.
+
+### Fix-round build and review evidence
+
+```text
+cmake --build out\task2-debug-vs --config Debug --parallel --target search_ordering_tests koi_search_tests
+completed successfully
+cmake --build out\task2-release-vs --config Release --parallel --target search_ordering_tests koi_search_tests
+completed successfully
+git diff --check
+no whitespace errors
+```
+
+The untracked `tests/__pycache__/tune_eval_test.cpython-314.pyc` artifact was
+not modified or staged. No other source, UCI, opening-book, or build-portability
+behavior changed. The fix commit is the next commit after `fa97d4d`.

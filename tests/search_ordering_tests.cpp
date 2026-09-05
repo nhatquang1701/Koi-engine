@@ -159,6 +159,21 @@ void test_history_malus_and_continuation_history_shape_quiet_ordering() {
             "continuation history bonus and quiet history malus must shape quiet ordering");
 }
 
+void test_history_saturation_does_not_overflow_signed_intermediates() {
+    const koi::GameState state = koi::GameState::startpos();
+    const koi::Move prior = require_move("e2e4");
+    const koi::Move move = require_move("b1c3");
+    koi::detail::SearchMoveOrdering ordering;
+
+    for (int count = 0; count < 500; ++count) {
+        ordering.record_quiet_cutoff(state.side_to_move(), move, 0, 64, prior);
+    }
+
+    const int score = ordering.quiet_history_score(state.side_to_move(), move, prior);
+    require(score >= 0 && score <= 299'999,
+            "saturated quiet and continuation history must remain within signed bounds");
+}
+
 struct TestCase {
     std::string_view name;
     void (*run)();
@@ -174,6 +189,7 @@ int main() {
         {"killer tier outranks saturated history", test_killer_tier_outranks_saturated_history},
         {"quiet checks before quiet moves", test_quiet_checks_are_ordered_before_ordinary_quiet_moves},
         {"history malus and continuation ordering", test_history_malus_and_continuation_history_shape_quiet_ordering},
+        {"history saturation overflow safety", test_history_saturation_does_not_overflow_signed_intermediates},
     };
 
     for (const TestCase& test : tests) {

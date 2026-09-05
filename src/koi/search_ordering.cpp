@@ -71,8 +71,12 @@ std::size_t continuation_index(Move previous_move, Move move) noexcept {
 
 void update_history(int& score, int delta) noexcept {
     constexpr int maximum = 299'998;
-    score += delta - score * std::abs(delta) / maximum;
-    score = std::clamp(score, -maximum, maximum);
+    const std::int64_t wide_score = score;
+    const std::int64_t wide_delta = delta;
+    const std::int64_t wide_abs_delta = wide_delta < 0 ? -wide_delta : wide_delta;
+    const std::int64_t updated = wide_score + wide_delta -
+        (wide_score * wide_abs_delta) / maximum;
+    score = static_cast<int>(std::clamp<std::int64_t>(updated, -maximum, maximum));
 }
 
 } // namespace
