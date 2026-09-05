@@ -93,6 +93,28 @@ void test_empty_and_valid_paths_preserve_optional_fallback() {
     std::filesystem::remove_all(root);
 }
 
+void test_wrong_sized_fixture_disables_probing_safely() {
+    const std::filesystem::path root = std::filesystem::temp_directory_path() /
+        ("koi-task-2-syzygy-malformed-" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    std::filesystem::create_directories(root);
+    {
+        std::ofstream tablebase(root / "KQvK.rtbw", std::ios::binary);
+        tablebase.write(std::string(79, '\0').data(), 79);
+    }
+
+    const koi::GameState state = state_from_fen(
+        "4k3/8/8/8/8/8/8/3QK3 w - - 0 1");
+    const koi::SyzygyTablebase tablebase(root, 5, 1, true);
+    require(!tablebase.enabled(), "a wrong-sized Syzygy file must disable probing");
+    require(!tablebase.probe_wdl(state.tablebase_snapshot()).has_value(),
+            "a wrong-sized Syzygy file must fall back from WDL probing");
+    require(!tablebase.probe_root(state).has_value(),
+            "a wrong-sized Syzygy file must fall back from root probing");
+
+    std::filesystem::remove_all(root);
+}
+
 void test_tablebase_instances_share_fathom_lifetime_in_both_clear_orders() {
     const std::filesystem::path root = std::filesystem::temp_directory_path() /
         ("koi-task-2-syzygy-lifetime-" + std::to_string(
@@ -201,6 +223,7 @@ int main() {
         test_snapshot_converts_rule_metadata_and_piece_bitboards();
         test_absent_and_malformed_paths_disable_probing_safely();
         test_empty_and_valid_paths_preserve_optional_fallback();
+        test_wrong_sized_fixture_disables_probing_safely();
         test_tablebase_instances_share_fathom_lifetime_in_both_clear_orders();
         test_piece_count_and_castling_gate_probing();
         test_wdl_conversion_and_concurrent_disabled_probes();

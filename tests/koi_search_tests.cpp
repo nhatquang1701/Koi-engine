@@ -18,7 +18,6 @@
 #include <vector>
 
 #include "koi/classical_evaluator.hpp"
-#include "koi/detail/search_ordering.hpp"
 #include "koi/search_service.hpp"
 #include "koi/time_manager.hpp"
 #include "koi/transposition_table.hpp"
@@ -1201,45 +1200,35 @@ void test_shallow_futility_accounts_for_safe_quiet_prunes() {
 void test_quiet_history_updates_use_saved_moving_side_after_unmake() {
     const auto quiet_move = koi::Move::parse_uci("e8d7");
     require(quiet_move.has_value(), "the quiet-history regression move must parse");
-    koi::GameState state = require_state("4k3/8/8/8/8/8/8/4K2R b - - 0 1");
+    const koi::GameState state = require_state("4k3/8/8/8/8/8/8/4K2R b - - 0 1");
     require(state.is_legal(*quiet_move), "the quiet-history regression move must be legal");
-    const koi::Color moving_side = state.side_to_move();
-    require(state.make_move(*quiet_move), "the quiet-history regression move must be made");
-    require(state.unmake_move(), "the quiet-history regression move must be unmade");
-
-    koi::detail::SearchMoveOrdering ordering;
-    ordering.record_quiet_fail(moving_side, *quiet_move, 1, 4);
-    require(ordering.quiet_history_score(moving_side, *quiet_move) < 0,
-            "a quiet-history update after unmake_move must affect the moving side");
-    const koi::Color other_side = moving_side == koi::Color::white ? koi::Color::black : koi::Color::white;
-    require(ordering.quiet_history_score(other_side, *quiet_move) == 0,
-            "a quiet-history update after unmake_move must not affect the other side");
 
     koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>());
     koi::SearchLimits limits;
     limits.depth = 3;
-    const koi::SearchResult result = search(service, state, limits);
-    require(result.stats.quiet_history_updates > 0,
-            "the regression position must exercise a quiet-history update after unmake_move");
+    std::atomic_int before_move = 0;
+    std::atomic_int after_unmake = 0;
+    std::atomic_bool wrong_side = false;
+    koi::SearchOptions options;
+    options.quiet_history_side_hook = [&](koi::Color candidate, bool after_move) {
+        if (!after_move) {
+            before_move.fetch_add(1, std::memory_order_relaxed);
+            return koi::Color::black;
+        }
+        after_unmake.fetch_add(1, std::memory_order_relaxed);
+        if (candidate != koi::Color::black) {
+            wrong_side.store(true, std::memory_order_relaxed);
+        }
+        return candidate;
+    };
 
-    const std::filesystem::path source_path = std::filesystem::path(__FILE__).parent_path().parent_path() /
-        "src" / "koi" / "search_service.cpp";
-    std::ifstream source(source_path);
-    require(source.good(), "search service source must be readable for the history regression");
-
-    const std::string implementation((std::istreambuf_iterator<char>(source)),
-                                     std::istreambuf_iterator<char>());
-    const std::size_t child_search = implementation.find("PrincipalVariation child_pv;");
-    const std::size_t unmake = implementation.find(
-        "state.unmake_move();\n            if (aborted)", child_search);
-    require(unmake != std::string::npos,
-            "the quiet-history update must follow the searched move's unmake_move");
-    const std::size_t update = implementation.find("record_quiet_fail(moving_side", unmake);
-    require(update != std::string::npos,
-            "quiet-history failure updates must use the saved moving side after unmake_move");
-    const std::size_t cutoff = implementation.find("record_quiet_cutoff(moving_side", unmake);
-    require(cutoff != std::string::npos,
-            "quiet-history cutoff updates must use the saved moving side after unmake_move");
+    const koi::SearchResult result = search(service, state, limits, options);
+    require(result.stats.quiet_history_updates > 0 && before_move.load(std::memory_order_relaxed) > 0,
+            "the regression position must exercise quiet-history updates after unmake_move");
+    require(after_unmake.load(std::memory_order_relaxed) > 0,
+            "quiet-history updates must report their post-unmake attribution side");
+    require(!wrong_side.load(std::memory_order_relaxed),
+            "quiet-history updates after unmake_move must use the saved moving side");
 }
 
 void test_search_reduces_late_quiet_moves_without_losing_root_legality() {

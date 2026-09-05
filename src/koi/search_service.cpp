@@ -139,6 +139,7 @@ struct SearchContext {
     const MoveMetadataList* root_moves = nullptr;
     bool use_transposition_table = true;
     std::atomic_bool* iteration_aborted = nullptr;
+    SearchOptions::QuietHistorySideHook quiet_history_side_hook;
     detail::SearchMoveOrdering ordering;
     SearchStats stats;
     bool aborted = false;
@@ -148,10 +149,16 @@ struct SearchContext {
                   std::atomic<std::uint64_t>* global_nodes = nullptr,
                   std::mutex* evaluator_mutex = nullptr,
                   const MoveMetadataList* root_moves = nullptr,
-                  bool use_transposition_table = true)
+                  bool use_transposition_table = true,
+                  SearchOptions::QuietHistorySideHook quiet_history_side_hook = {})
         : evaluator(evaluator), table(table), time_manager(time_manager), stop_requested(stop_requested),
           global_nodes(global_nodes), evaluator_mutex(evaluator_mutex), root_moves(root_moves),
-          use_transposition_table(use_transposition_table) {}
+          use_transposition_table(use_transposition_table),
+          quiet_history_side_hook(std::move(quiet_history_side_hook)) {}
+
+    [[nodiscard]] Color history_side(Color candidate, const bool after_unmake) const {
+        return quiet_history_side_hook ? quiet_history_side_hook(candidate, after_unmake) : candidate;
+    }
 
     void begin_iteration(std::atomic_bool* shared_abort) noexcept {
         stats = {};
@@ -448,7 +455,7 @@ struct SearchContext {
                 return 0;
             }
             const Move move = metadata.move;
-            const Color moving_side = state.side_to_move();
+            const Color moving_side = history_side(state.side_to_move(), false);
             if (!state.make_legal_move(metadata)) {
                 continue;
             }
@@ -513,7 +520,9 @@ struct SearchContext {
             alpha = std::max(alpha, score);
             if (alpha >= beta) {
                 if (ply > 0 && !metadata.is_capture() && move.promotion() == Promotion::none) {
-                    ordering.record_quiet_cutoff(moving_side, move, ply, depth, previous_move);
+                    const Color history_side_after_unmake = history_side(moving_side, true);
+                    ordering.record_quiet_cutoff(history_side_after_unmake, move, ply, depth,
+                                                 previous_move);
                     ++stats.quiet_history_updates;
                     if (previous_move.has_value()) {
                         ++stats.continuation_history_updates;
@@ -522,7 +531,9 @@ struct SearchContext {
                 break;
             }
             if (ply > 0 && !metadata.is_capture() && move.promotion() == Promotion::none) {
-                ordering.record_quiet_fail(moving_side, move, ply, depth, previous_move);
+                const Color history_side_after_unmake = history_side(moving_side, true);
+                ordering.record_quiet_fail(history_side_after_unmake, move, ply, depth,
+                                           previous_move);
                 ++stats.quiet_history_updates;
                 if (previous_move.has_value()) {
                     ++stats.continuation_history_updates;
@@ -552,11 +563,12 @@ public:
     RootWorkerPool(std::size_t worker_count, const Evaluator& evaluator, TranspositionTable& table,
                    TimeManager& time_manager, std::atomic_bool& stop_requested,
                    std::atomic<std::uint64_t>* global_nodes, std::mutex* evaluator_mutex,
-                   bool use_transposition_table)
+                   bool use_transposition_table,
+                   SearchOptions::QuietHistorySideHook quiet_history_side_hook = {})
         : worker_count_(std::max<std::size_t>(1, worker_count)), evaluator_(evaluator), table_(table),
           time_manager_(time_manager), stop_requested_(stop_requested), global_nodes_(global_nodes),
           evaluator_mutex_(evaluator_mutex), use_transposition_table_(use_transposition_table),
-          worker_stats_(worker_count_) {
+          quiet_history_side_hook_(std::move(quiet_history_side_hook)), worker_stats_(worker_count_) {
         workers_.reserve(worker_count_);
         try {
             for (std::size_t index = 0; index < worker_count_; ++index) {
@@ -636,7 +648,8 @@ private:
         // Single-PV root jobs are speculative. Keeping their TT activity local prevents a racing
         // null-window result from changing the serial iteration that is ultimately published.
         SearchContext context(evaluator_, table_, time_manager_, stop_requested_, global_nodes_,
-                              evaluator_mutex_, nullptr, use_transposition_table_);
+                              evaluator_mutex_, nullptr, use_transposition_table_,
+                              quiet_history_side_hook_);
         std::uint64_t seen_sequence = 0;
 
         for (;;) {
@@ -742,6 +755,7 @@ private:
     std::atomic<std::uint64_t>* global_nodes_;
     std::mutex* evaluator_mutex_;
     bool use_transposition_table_;
+    SearchOptions::QuietHistorySideHook quiet_history_side_hook_;
     std::vector<std::thread> workers_;
     std::vector<SearchStats> worker_stats_;
     std::mutex mutex_;
@@ -938,7 +952,8 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
         } else if ((options.threads == 1 && options.multi_pv == 1) || legal_moves.size() < 2 ||
                    (time_manager.node_limit().has_value() && options.multi_pv == 1)) {
             SearchContext context(*evaluator, *table, time_manager, state->stop_requested,
-                                  nullptr, evaluator_mutex_ptr, &legal_moves);
+                                  nullptr, evaluator_mutex_ptr, &legal_moves, true,
+                                  options.quiet_history_side_hook);
             context.ordering.order(root, legal_moves, std::nullopt, 0);
             result.best_move = legal_moves.front().move;
 
@@ -1004,13 +1019,16 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
             const std::size_t worker_count = std::min(options.threads, legal_moves.size());
             const bool multi_pv = options.multi_pv > 1;
             RootWorkerPool pool(worker_count, *evaluator, *table, time_manager,
-                                state->stop_requested, global_nodes_ptr, evaluator_mutex_ptr, multi_pv);
+                                state->stop_requested, global_nodes_ptr, evaluator_mutex_ptr, multi_pv,
+                                options.quiet_history_side_hook);
             SearchStats total_stats;
             SearchContext root_context(*evaluator, *table, time_manager, state->stop_requested,
-                                       global_nodes_ptr, evaluator_mutex_ptr);
+                                       global_nodes_ptr, evaluator_mutex_ptr, nullptr, true,
+                                       options.quiet_history_side_hook);
             MoveMetadataList reference_moves = legal_moves;
             SearchContext reference_context(*evaluator, *table, time_manager, state->stop_requested,
-                                            nullptr, evaluator_mutex_ptr, &reference_moves);
+                                            nullptr, evaluator_mutex_ptr, &reference_moves, true,
+                                            options.quiet_history_side_hook);
             if (!multi_pv) {
                 reference_context.ordering.order(root, reference_moves, std::nullopt, 0);
             }

@@ -89,6 +89,9 @@ struct SearchEventSink {
 
 struct SearchOptions {
     using StrengthProfileHook = std::function<void(SearchOptions&)>;
+    // Optional test/diagnostic seam for checking which side is used by quiet history.
+    // The callback is not called unless explicitly configured.
+    using QuietHistorySideHook = std::function<Color(Color candidate, bool after_unmake)>;
 
     std::size_t hash_mb = 16;
     std::size_t threads = 1;
@@ -102,6 +105,7 @@ struct SearchOptions {
     std::uint32_t elo = 1320;
     std::shared_ptr<const SyzygyTablebase> syzygy;
     StrengthProfileHook strength_profile_hook;
+    QuietHistorySideHook quiet_history_side_hook;
 };
 
 [[nodiscard]] inline std::size_t maximum_search_threads() noexcept {

@@ -42,6 +42,26 @@ Result:
 100% tests passed, 0 tests failed out of 2
 ```
 
+### Review fix round 1
+
+The first review correctly rejected a source-text assertion for the history
+bug and a path-only assertion for malformed data. The fix replaced the source
+inspection with a test-only `SearchOptions::QuietHistorySideHook` seam that
+observes the side used by the real search after unmake, and added a temporary
+79-byte `KQvK.rtbw` fixture. The focused Release verification after wiring the
+hook through serial and root-worker contexts was:
+
+```text
+cmake --build out/task1-vs --config Release --parallel 2
+ctest --test-dir out/task1-vs -C Release -R "koi_search_tests|syzygy_tablebase_tests|koi_engine_en_croissant_process" --output-on-failure
+```
+
+Result:
+
+```text
+100% tests passed, 0 tests failed out of 3
+```
+
 ## Fixture limitation
 
 The repository does not bundle Syzygy tablebase data. The lifecycle tests create
@@ -55,6 +75,7 @@ tested as disabled fallbacks and do not require any tablebase data.
 ## Changed files
 
 - `src/koi/search_service.cpp`
+- `src/koi/search_types.hpp`
 - `src/koi/syzygy_tablebase.hpp`
 - `src/koi/syzygy_tablebase.cpp`
 - `tests/koi_search_tests.cpp`
