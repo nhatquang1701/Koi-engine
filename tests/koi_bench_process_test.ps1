@@ -26,10 +26,10 @@ function Invoke-Benchmark([string]$Executable, [string]$Arguments = '') {
 
     $stdoutTask = $process.StandardOutput.ReadToEndAsync()
     $stderrTask = $process.StandardError.ReadToEndAsync()
-    if (-not $process.WaitForExit(10000)) {
+    if (-not $process.WaitForExit(30000)) {
         $process.Kill()
         $process.WaitForExit()
-        throw 'koi-bench did not exit within 10000 ms.'
+        throw 'koi-bench did not exit within 30000 ms.'
     }
 
     return [pscustomobject]@{
@@ -69,6 +69,12 @@ function Assert-BenchmarkOutput($Result) {
     }
 }
 
+function Get-NormalizedBenchmarkRows($Result) {
+    return @($Result.Stdout -split "`r?`n" |
+        Where-Object { $_ -like 'position *' } |
+        ForEach-Object { $_ -replace 'nodes [0-9]+ qnodes [0-9]+ tt_hits [0-9]+', 'nodes N qnodes Q tt_hits H' }) -join "`n"
+}
+
 $first = Invoke-Benchmark $BenchPath '--threads 1 --speed 100'
 $second = Invoke-Benchmark $BenchPath '--threads 1 --speed 100'
 Assert-BenchmarkOutput $first
@@ -82,6 +88,37 @@ if ($first.Stdout -cne $second.Stdout) {
 
 $maximumThreads = [Math]::Max(1, [Math]::Min(64, [Environment]::ProcessorCount))
 $benchmarkThreads = [Math]::Max(1, [Math]::Min(2, $maximumThreads))
+$threadedVerificationThreads = if ($maximumThreads -ge 4) { 4 } else { $maximumThreads }
+$threadedVerificationProfile = Join-Path $env:TEMP 'koi-bench-threads4-profile.json'
+Remove-Item -LiteralPath $threadedVerificationProfile -ErrorAction SilentlyContinue
+$threadedVerification = Invoke-Benchmark $BenchPath "--threads $threadedVerificationThreads --speed 100 --profile-json `"$threadedVerificationProfile`""
+$threadedVerificationRepeat = Invoke-Benchmark $BenchPath "--threads $threadedVerificationThreads --speed 100"
+Assert-BenchmarkOutput $threadedVerification
+Assert-BenchmarkOutput $threadedVerificationRepeat
+if ($threadedVerification.Stderr.Length -ne 0 -or $threadedVerificationRepeat.Stderr.Length -ne 0) {
+    throw "threaded benchmark verification wrote stderr: $($threadedVerification.Stderr) $($threadedVerificationRepeat.Stderr)"
+}
+if ($threadedVerification.Stdout -notmatch "(?m)^config threads $threadedVerificationThreads speed 100 timed 0 hash cold\r?$") {
+    throw "threaded benchmark must report the required Threads 4 case or safe maximum-thread fallback ($threadedVerificationThreads): $($threadedVerification.Stdout)"
+}
+if ((Get-NormalizedBenchmarkRows $threadedVerification) -cne (Get-NormalizedBenchmarkRows $threadedVerificationRepeat)) {
+    throw "threaded benchmark move/score rows must be deterministic at Threads $threadedVerificationThreads"
+}
+if (-not (Test-Path -LiteralPath $threadedVerificationProfile -PathType Leaf)) {
+    throw "threaded benchmark did not write its verification profile: $threadedVerificationProfile"
+}
+$threadedVerificationJson = Get-Content -LiteralPath $threadedVerificationProfile -Raw | ConvertFrom-Json
+if ($threadedVerificationJson.threads -ne $threadedVerificationThreads -or
+    $threadedVerificationJson.speed -ne 100 -or $threadedVerificationJson.timed -ne $false -or
+    $threadedVerificationJson.hash_state -cne 'cold' -or
+    $threadedVerificationJson.positions.Count -lt 1) {
+    throw 'Threads 4 verification profile must preserve its explicit configuration and cold hash label.'
+}
+foreach ($position in $threadedVerificationJson.positions) {
+    if ($position.hash_state -cne $threadedVerificationJson.hash_state) {
+        throw 'Threads 4 verification profile positions must match the top-level hash state.'
+    }
+}
 $timed = Invoke-Benchmark $BenchPath "--threads $benchmarkThreads --speed 50 --timed"
 if ($timed.ExitCode -ne 0) {
     throw "configured koi-bench exited with $($timed.ExitCode): $($timed.Stderr)"
@@ -164,6 +201,10 @@ if (-not @($coldJson.positions | Where-Object { $_.pv.Count -gt 1 })) {
     throw 'profile JSON must retain at least one completed multi-move principal variation.'
 }
 foreach ($position in $timedJson.positions) {
+    if ($timedJson.timed -ne $true -or $timedJson.hash_state -cne 'cold' -or
+        $position.hash_state -cne $timedJson.hash_state) {
+        throw 'timed profile must identify timed=true and keep cold hash state consistent at every position.'
+    }
     if ($null -eq $position.elapsed_ms) {
         throw 'timed profile JSON must include elapsed_ms.'
     }

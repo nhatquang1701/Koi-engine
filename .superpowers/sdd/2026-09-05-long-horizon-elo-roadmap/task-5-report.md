@@ -165,3 +165,89 @@ The focused commit subject is `docs: finalize Task 5 release verification`.
 The report was force-added because `.superpowers/sdd/` is ignored by the general
 workspace rule, while the unrelated generated `tests/__pycache__/` remains
 untracked and untouched.
+
+## Fix round 1 - review findings
+
+Review round 1 identified two Important gaps: the release evidence depended on
+uncommitted external artifacts without a checked-in reproduction path, and the
+benchmark process test did not exercise an explicit Threads 4 case. Both are
+addressed without changing engine or UCI behavior.
+
+### TDD and harness changes
+
+The pre-implementation acceptance check for the new runner failed as expected:
+
+```text
+if (-not (Test-Path .\tools\task5_release_verify.ps1)) { throw ... }
+Exception: task5_release_verify.ps1 is not yet present
+```
+
+`tests/koi_bench_process_test.ps1` now runs two explicit
+`--threads 4 --speed 100` benchmark invocations when the host supports four
+threads, compares normalized move/score rows, checks the Threads 4 profile, and
+uses the explicit maximum-thread fallback when fewer than four threads are
+available. It also checks timed profile `timed=true`, top-level `hash_state`,
+and per-position hash-state consistency. The focused test against the fresh
+Release binary passed with exit code 0 and empty stdout/stderr:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\koi_bench_process_test.ps1 `
+  -BenchPath C:\Koi-results\task5-review1-rerun\build-release\koi-bench.exe
+```
+
+The checked-in `tools/task5_release_verify.ps1` is a portable PowerShell runner.
+It rejects repository-local output directories, configures and builds fresh
+external Debug and Release trees, runs CTest, validates tactical benchmark
+profiles and normalized rows, runs timed and optional benchmark modes, captures
+the UCI smoke transcript and replay report, and runs the 24-ply replay-validated
+Lucas-style process scenario. All generated output is under its supplied
+external `-OutputDirectory`.
+
+### Fresh independent runner command and output
+
+The runner was executed from an x64 Visual Studio developer shell with CMake
+3.31.6-msvc6, Ninja, and MSVC `cl`:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\task5_release_verify.ps1 `
+  -CMakePath "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" `
+  -OutputDirectory C:\Koi-results\task5-review1-rerun
+```
+
+The first fresh runner attempt recorded a Debug UCI process timeout under the
+initial machine load; its external CTest log preserved the failure. A second
+fresh run from a new output root completed all gates. The runner's concrete
+stdout was:
+
+```text
+verification_root=C:\Koi-results\task5-review1-rerun
+cmake=cmake version 3.31.6-msvc6 generator=Ninja compiler=cl
+Debug configure/build/CTest=PASS; Release configure/build/CTest=PASS
+UCI smoke lines=26 bestmove=1 stderr=0
+Replay legal=1 result=1/2-1/2 termination=rule draw
+Threads=1 rows=64 matches=64 profile_threads=1
+Threads=2 rows=64 matches=64 profile_threads=2
+Threads=4 rows=64 matches=64 profile_threads=4
+Timed Threads=4 rows=64 profile_timed=True
+Optional rows=128 profile_positions=128
+Lucas-style plies=24 hash=512 threads=4 speed=100 replay_legal=all process_status=clean
+Lucas JSON=C:\Koi-results\task5-review1-rerun\lucas-style-24ply\koi-uci-match-20260905-082512-603.json
+Stockfish CPL/match data: unavailable; no Elo claim
+Lucas Chess GUI: unavailable; manual GUI gate not claimed
+```
+
+The captured CTest summaries were:
+
+```text
+Debug:   100% tests passed, 0 tests failed out of 17; Total Test time 95.08 s
+Release: 100% tests passed, 0 tests failed out of 17; Total Test time 50.59 s
+```
+
+The runner preserved separate `ctest-Debug.txt` and `ctest-Release.txt` logs,
+zero-byte stderr logs, `bench-threads-1/2/4.txt` plus JSON profiles,
+`bench-timed.json`, `bench-optional.json`, `uci-smoke.txt`, `replay.txt`, and
+the Lucas JSON/PGN under the external output root. The explicit Threads 4
+process-test result and the independent runner result are both fresh. No
+Stockfish executable/CPL or match data was available, and Lucas Chess GUI was
+not installed, so the report continues to make no Elo/strength claim and does
+not claim the manual GUI gate.

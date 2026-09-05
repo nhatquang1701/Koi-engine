@@ -44,6 +44,24 @@ ctest --test-dir out\release-vs -C Release --output-on-failure
 For a Debug build, substitute `debug-vs` and `Debug` in those commands. The
 resulting engine executable is `out\release-vs\koi-engine.exe`.
 
+For an independently reproducible release gate, run the checked-in harness from
+an x64 Visual Studio developer shell. It configures and builds fresh external
+Debug and Release trees, runs all CTest/process tests, checks tactical
+Threads 1/2/4 when the host supports them (with an explicit maximum-thread
+fallback), and writes benchmark, UCI, replay, and Lucas-style artifacts outside
+the checkout:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\task5_release_verify.ps1 `
+  -CMakePath "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" `
+  -OutputDirectory C:\Koi-results\task5-run
+```
+
+The harness rejects an output directory inside the repository and records the
+exact Debug/Release configure, build, CTest, benchmark, transcript, replay, and
+match command outputs under the supplied external directory. It makes no
+Stockfish/CPL or Lucas GUI availability assumption.
+
 ## Developer tools
 
 From the configured build directory:
