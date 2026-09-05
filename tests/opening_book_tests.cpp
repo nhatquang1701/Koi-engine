@@ -246,6 +246,30 @@ void test_book_falls_back_for_unavailable_or_unusable_inputs() {
     require(!book.choose(state, 0, true, 16, 1), "a book with no usable moves must fall back");
 }
 
+void test_book_rejects_oversized_record_aligned_input_without_throwing() {
+    TestDirectory files;
+    const GameState state = GameState::startpos();
+    const auto oversized = files.path() / "oversized.bin";
+    write_book(oversized, {{state.polyglot_key(), polyglot_move("e2", "e4"), 1, 0}});
+
+    constexpr std::uintmax_t oversized_size = 16U * 1024U * 1024U + 16U;
+    std::error_code error;
+    std::filesystem::resize_file(oversized, oversized_size, error);
+    require(!error, "the oversized test book must be resizable");
+
+    OpeningBook book(files.path());
+    book.set_file(oversized);
+    bool threw = false;
+    std::optional<koi::BookChoice> choice;
+    try {
+        choice = book.choose(state, 0, true, 16, 1);
+    } catch (...) {
+        threw = true;
+    }
+    require(!threw, "an oversized book must fall back without throwing");
+    require(!choice.has_value(), "an oversized book must be rejected before selection");
+}
+
 void test_book_safety_rejects_an_immediate_hanging_piece() {
     TestDirectory files;
     const GameState state = require_state("k3r3/8/8/8/4Q3/8/8/K7 w - - 0 1");
@@ -280,6 +304,7 @@ int main() {
         {"weighted legal selection", test_book_filters_illegal_and_zero_weight_entries_and_is_seeded},
         {"deterministic highest-weight selection", test_book_defaults_to_highest_weight_and_coordinate_tie_breaking},
         {"book fallback behavior", test_book_falls_back_for_unavailable_or_unusable_inputs},
+        {"oversized book fallback", test_book_rejects_oversized_record_aligned_input_without_throwing},
         {"book safety", test_book_safety_rejects_an_immediate_hanging_piece},
     };
 

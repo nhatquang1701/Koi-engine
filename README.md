@@ -310,6 +310,8 @@ from the starting position (for example, `bestmove e2e4`).
   `BookSafetyDepth` from `0` through `3` to control the probe horizon; `0`
   disables the probe while retaining legal-move filtering. Safety never
   overrides analysis, MultiPV, ponder, infinite, or `searchmoves` book bypass.
+- Book files larger than 16 MiB, malformed files, missing files, and load or
+  allocation failures are treated as unusable so normal search can continue.
 - `go` accepts `depth`, `nodes`, `movetime`, `wtime`, `btime`, `winc`, `binc`,
   `movestogo`, and `infinite`. Malformed limit values are ignored. A bare `go`
   uses a 250 ms move-time fallback, scaled by `Speed`. If a clock is supplied
@@ -507,10 +509,14 @@ transcript but cannot automate a locally installed Lucas Chess GUI.
 ## Configuration and release packaging
 
 Koi has no required configuration file. En Croissant or another UCI GUI sends
-the options at session start; the portable release defaults are `Hash=16`,
-`Threads=1`, `Speed=100`, `OwnBook=true`, `BookFile=book.bin`, `BookDepth=16`,
-`BookRandom=false`, `UCI_ShowWDL=false`, `Move Overhead=10`, `Slow Mover=100`,
-`UCI_LimitStrength=false`, `UCI_Elo=1320`, and `Syzygy50MoveRule=true`.
+the options at session start; the portable release defaults are `RandomSeed=0`,
+`Hash=16`, `Threads=1`, `Speed=100`, `UCI_AnalyseMode=false`, `MultiPV=1`,
+`Ponder=false`, `OwnBook=true`, `BookFile=book.bin`, `BookDepth=16`,
+`BookRandom=false`, `BookSafety=true`, `BookSafetyDepth=2`,
+`UCI_ShowWDL=false`, `Move Overhead=10`, `Slow Mover=100`,
+`UCI_LimitStrength=false`, `UCI_Elo=1320`, `StrengthMode=false`,
+`SyzygyPath=""`, `SyzygyProbeDepth=1`, `SyzygyProbeLimit=5`, and
+`Syzygy50MoveRule=true`.
 For the recommended En Croissant smoke scenario, use `Hash=512`, `Threads=4`, and
 `Speed=100`, then keep the book and Syzygy paths explicitly configured if those
 assets are available.

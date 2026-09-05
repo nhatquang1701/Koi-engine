@@ -132,6 +132,10 @@ std::uint32_t book_move_tie_break_key(Move move) noexcept {
 
 constexpr int kBookSafetyLossThreshold = 250;
 constexpr std::size_t kBookSafetyNodeBudget = 512;
+// Each 16-byte record can expand into an unordered_map node and vector capacity.
+// Keep the external input cap conservative so a valid-looking book cannot amplify
+// into an unbounded memory allocation while loading.
+constexpr std::uintmax_t kMaximumBookFileSize = 16U * 1024U * 1024U;
 
 int piece_value(PieceType type) noexcept {
     switch (type) {
@@ -232,54 +236,65 @@ public:
 
     [[nodiscard]] std::shared_ptr<const Cache> load() const {
         std::scoped_lock lock(mutex);
-        std::filesystem::path resolved = file;
-        if (resolved.is_relative() && !executable_directory.empty()) {
-            resolved = executable_directory / resolved;
-        }
-        const std::optional<FileSignature> signature = signature_for(resolved);
-        if (!signature) {
-            return {};
-        }
-        if (cache && cache->signature == *signature) {
-            return cache;
-        }
+        std::shared_ptr<Cache> replacement;
+        try {
+            std::filesystem::path resolved = file;
+            if (resolved.is_relative() && !executable_directory.empty()) {
+                resolved = executable_directory / resolved;
+            }
+            const std::optional<FileSignature> signature = signature_for(resolved);
+            if (!signature) {
+                return {};
+            }
+            if (cache && cache->signature == *signature) {
+                return cache;
+            }
 
-        auto replacement = std::make_shared<Cache>();
-        replacement->signature = *signature;
-        if (!signature->exists) {
-            cache = replacement;
-            return cache;
-        }
+            if (!signature->exists) {
+                replacement = std::make_shared<Cache>();
+                replacement->signature = *signature;
+                cache = replacement;
+                return cache;
+            }
 
-        std::error_code error;
-        const std::uintmax_t size = std::filesystem::file_size(signature->path, error);
-        if (error || size == 0 || size % 16 != 0) {
-            cache = replacement;
-            return cache;
-        }
+            std::error_code error;
+            const std::uintmax_t size = std::filesystem::file_size(signature->path, error);
+            if (error || size == 0 || size % 16 != 0 || size > kMaximumBookFileSize) {
+                return {};
+            }
 
-        std::ifstream stream(signature->path, std::ios::binary);
-        if (!stream) {
-            cache = replacement;
-            return cache;
-        }
-        for (std::uintmax_t offset = 0; offset < size; offset += 16) {
-            std::array<unsigned char, 16> bytes{};
-            stream.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+            replacement = std::make_shared<Cache>();
+            replacement->signature = *signature;
+            std::ifstream stream(signature->path, std::ios::binary);
             if (!stream) {
                 cache = replacement;
                 return cache;
             }
-            const std::uint64_t key = read_big_endian<std::uint64_t>(bytes, 0);
-            replacement->records[key].push_back(Record{
-                read_big_endian<std::uint16_t>(bytes, 8),
-                read_big_endian<std::uint16_t>(bytes, 10),
-                read_big_endian<std::uint32_t>(bytes, 12),
-            });
+            for (std::uintmax_t offset = 0; offset < size; offset += 16) {
+                std::array<unsigned char, 16> bytes{};
+                stream.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+                if (!stream) {
+                    cache = replacement;
+                    return cache;
+                }
+                const std::uint64_t key = read_big_endian<std::uint64_t>(bytes, 0);
+                replacement->records[key].push_back(Record{
+                    read_big_endian<std::uint16_t>(bytes, 8),
+                    read_big_endian<std::uint16_t>(bytes, 10),
+                    read_big_endian<std::uint32_t>(bytes, 12),
+                });
+            }
+            replacement->usable = !replacement->records.empty();
+            cache = replacement;
+            return cache;
+        } catch (...) {
+            if (replacement) {
+                replacement->usable = false;
+                cache = replacement;
+                return cache;
+            }
+            return {};
         }
-        replacement->usable = !replacement->records.empty();
-        cache = replacement;
-        return cache;
     }
 
     void set_file(std::filesystem::path path) {
