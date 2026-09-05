@@ -352,6 +352,8 @@ void test_uci_handshake_has_identity_and_supported_options_in_order() {
         "option name BookFile type string default book.bin\n"
         "option name BookDepth type spin default 16 min 0 max 40\n"
         "option name BookRandom type check default false\n"
+        "option name BookSafety type check default true\n"
+        "option name BookSafetyDepth type spin default 2 min 0 max 8\n"
         "option name Clear Hash type button\n"
         "option name UCI_ShowWDL type check default false\n"
         "option name Move Overhead type spin default 10 min 0 max 5000\n"
@@ -642,6 +644,40 @@ void test_book_random_option_accepts_valid_values_and_ignores_invalid_values() {
             "BookRandom false and an invalid replacement must retain deterministic selection");
     require(bestmoves.size() == 1 && bestmoves[0] == "bestmove d2d4",
             "deterministic book selection must emit the selected legal move");
+}
+
+void test_book_safety_options_reject_poisoned_moves_and_fallback_to_search() {
+    TestDirectory files;
+    const auto unsafe_position = koi::GameState::from_fen(
+        "k3r3/8/8/8/4Q3/8/8/K7 w - - 0 1");
+    require(unsafe_position.has_value(), "the book-safety fixture FEN must be valid");
+    const koi::GameState unsafe = *unsafe_position;
+    const std::filesystem::path book = files.path() / "unsafe-controller-book.bin";
+    write_book(book, {{unsafe.polyglot_key(), polyglot_move("e4", "e3"), 100, 0}});
+
+    const ControllerResult safe = run_controller(
+        "setoption name BookFile value " + book.string() + "\n"
+        "setoption name BookSafety value true\n"
+        "setoption name BookSafetyDepth value 2\n"
+        "position fen k3r3/8/8/8/4Q3/8/8/K7 w - - 0 1\n"
+        "go depth 1\n"
+        "stop\n"
+        "quit\n");
+    const ControllerResult disabled = run_controller(
+        "setoption name BookFile value " + book.string() + "\n"
+        "setoption name BookSafety value false\n"
+        "setoption name BookSafetyDepth value 9\n"
+        "position fen k3r3/8/8/8/4Q3/8/8/K7 w - - 0 1\n"
+        "go depth 1\n"
+        "quit\n");
+
+    require(safe.exit_code == 0 && safe.diagnostics.empty() &&
+                lines_starting_with(output_lines(safe.output), "info string book move ").empty(),
+            "BookSafety must reject a poisoned move and fall back silently to search");
+    require(disabled.exit_code == 0 && disabled.diagnostics.empty() &&
+                disabled.output.find("info string book move e4e3") != std::string::npos &&
+                disabled.output.find("bestmove e4e3") != std::string::npos,
+            "BookSafety=false must preserve the legal configured book move");
 }
 
 void test_book_fallback_and_analysis_style_commands_search_without_markers() {
@@ -1515,6 +1551,7 @@ int main() {
         {"Task 1 option replacement", test_task1_option_change_emits_exactly_one_bestmove},
         {"opening-book normal play", test_book_options_emit_one_seeded_marker_and_bestmove_for_normal_play},
         {"opening-book random option", test_book_random_option_accepts_valid_values_and_ignores_invalid_values},
+        {"opening-book safety option", test_book_safety_options_reject_poisoned_moves_and_fallback_to_search},
         {"opening-book fallback and bypass", test_book_fallback_and_analysis_style_commands_search_without_markers},
         {"opening-book MultiPV bypass", test_multipv_search_bypasses_a_matching_book_without_analysis_mode},
         {"ponderhit book bypass", test_ponderhit_keeps_the_entire_ponder_workflow_out_of_the_book},

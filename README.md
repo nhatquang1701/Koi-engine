@@ -302,6 +302,12 @@ from the starting position (for example, `bestmove e2e4`).
   weights. `BookRandom true` enables weighted random selection; `RandomSeed 0`
   is runtime-random only in that opt-in mode, while nonzero seeds remain
   repeatable.
+- `setoption name BookSafety value true` (the default) runs a shallow forcing
+  material probe before accepting a book move. A move that immediately hangs a
+  valuable piece is rejected and normal search chooses the move. Set
+  `BookSafetyDepth` from `0` through `8` to control the probe horizon; `0`
+  disables the probe while retaining legal-move filtering. Safety never
+  overrides analysis, MultiPV, ponder, infinite, or `searchmoves` book bypass.
 - `go` accepts `depth`, `nodes`, `movetime`, `wtime`, `btime`, `winc`, `binc`,
   `movestogo`, and `infinite`. Malformed limit values are ignored. A bare `go`
   uses a 250 ms move-time fallback, scaled by `Speed`. If a clock is supplied
@@ -383,6 +389,8 @@ setoption name OwnBook value true
 setoption name BookFile value book.bin
 setoption name BookDepth value 16
 setoption name BookRandom value false
+setoption name BookSafety value true
+setoption name BookSafetyDepth value 2
 ```
 
 For normal play, let En Croissant provide the position and clock limits. For

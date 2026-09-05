@@ -246,6 +246,23 @@ void test_book_falls_back_for_unavailable_or_unusable_inputs() {
     require(!book.choose(state, 0, true, 16, 1), "a book with no usable moves must fall back");
 }
 
+void test_book_safety_rejects_an_immediate_hanging_piece() {
+    TestDirectory files;
+    const GameState state = require_state("k3r3/8/8/8/4Q3/8/8/K7 w - - 0 1");
+    const auto book_path = files.path() / "unsafe.bin";
+    write_book(book_path, {{state.polyglot_key(), polyglot_move("e4", "e3"), 100, 0}});
+
+    OpeningBook book(files.path());
+    book.set_file(book_path);
+    const auto unsafe = book.choose(state, 0, true, 16, 1, false, true, 2);
+    require(!unsafe.has_value(),
+            "book safety must reject a move that immediately hangs a queen to a legal rook capture");
+
+    const auto allowed = book.choose(state, 0, true, 16, 1, false, false, 2);
+    require(allowed && allowed->move == require_move("e4e3"),
+            "disabling book safety must preserve the legal book move");
+}
+
 struct TestCase {
     std::string_view name;
     void (*run)();
@@ -260,6 +277,7 @@ int main() {
         {"weighted legal selection", test_book_filters_illegal_and_zero_weight_entries_and_is_seeded},
         {"deterministic highest-weight selection", test_book_defaults_to_highest_weight_and_coordinate_tie_breaking},
         {"book fallback behavior", test_book_falls_back_for_unavailable_or_unusable_inputs},
+        {"book safety", test_book_safety_rejects_an_immediate_hanging_piece},
     };
 
     for (const TestCase& test : tests) {

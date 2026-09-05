@@ -25,7 +25,8 @@ public:
     [[nodiscard]] std::optional<BookChoice> choose(
         const GameState& state, std::uint32_t root_ply, bool enabled,
         std::uint8_t maximum_depth, std::uint64_t random_seed,
-        bool random_selection = false) const;
+        bool random_selection = false, bool safety_enabled = false,
+        std::uint8_t safety_depth = 2) const;
 
 private:
     class Impl;

@@ -32,6 +32,7 @@ constexpr std::uint64_t kMaximumElo = 3'190;
 constexpr std::uint64_t kMinimumMultiPv = 1;
 constexpr std::uint64_t kMaximumMultiPv = 16;
 constexpr std::uint64_t kMaximumBookDepth = 40;
+constexpr std::uint64_t kMaximumBookSafetyDepth = 8;
 constexpr std::uint64_t kMinimumSyzygyProbeDepth = 1;
 constexpr std::uint64_t kMaximumSyzygyProbeDepth = 100;
 constexpr std::uint64_t kMaximumSyzygyProbeLimit = 5;
@@ -471,6 +472,24 @@ void UciController::handle_setoption(std::istream& command) {
         return;
     }
 
+    if (equals_ignore_case(name, "BookSafety")) {
+        bool book_safety = false;
+        if (parse_boolean(value, book_safety)) {
+            stop_and_suppress_active_search();
+            book_safety_ = book_safety;
+        }
+        return;
+    }
+
+    if (equals_ignore_case(name, "BookSafetyDepth")) {
+        std::uint64_t book_safety_depth = 0;
+        if (parse_uint64(value, book_safety_depth) && book_safety_depth <= kMaximumBookSafetyDepth) {
+            stop_and_suppress_active_search();
+            book_safety_depth_ = static_cast<std::uint8_t>(book_safety_depth);
+        }
+        return;
+    }
+
     if (equals_ignore_case(name, "BookFile")) {
         if (!value.empty()) {
             stop_and_suppress_active_search();
@@ -664,7 +683,8 @@ void UciController::start_search(GameState root, SearchLimits limits, bool skip_
     if (book_eligible) {
         const std::uint32_t ply = root_ply(root);
         const std::optional<BookChoice> choice =
-            opening_book_.choose(root, ply, own_book_, book_depth_, random_seed_, book_random_);
+            opening_book_.choose(root, ply, own_book_, book_depth_, random_seed_, book_random_,
+                                 book_safety_, book_safety_depth_);
         if (choice.has_value()) {
             write_book_completion(generation, *choice, ply);
             return;
@@ -779,6 +799,8 @@ void UciController::write_handshake() {
                "option name BookFile type string default book.bin\n"
                "option name BookDepth type spin default 16 min 0 max 40\n"
                "option name BookRandom type check default false\n"
+               "option name BookSafety type check default true\n"
+               "option name BookSafetyDepth type spin default 2 min 0 max 8\n"
                "option name Clear Hash type button\n"
                "option name UCI_ShowWDL type check default false\n"
                "option name Move Overhead type spin default 10 min 0 max 5000\n"

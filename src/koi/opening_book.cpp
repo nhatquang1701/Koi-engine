@@ -130,6 +130,83 @@ std::uint32_t book_move_tie_break_key(Move move) noexcept {
     return (square_key(move.from()) * 64U + square_key(move.to())) * 5U + promotion_key;
 }
 
+constexpr int kBookSafetyLossThreshold = 250;
+
+int piece_value(PieceType type) noexcept {
+    switch (type) {
+    case PieceType::pawn: return 100;
+    case PieceType::knight: return 320;
+    case PieceType::bishop: return 330;
+    case PieceType::rook: return 500;
+    case PieceType::queen: return 900;
+    case PieceType::king: return 20'000;
+    case PieceType::none: break;
+    }
+    return 0;
+}
+
+int material_score(const GameState& state, Color perspective) noexcept {
+    int score = 0;
+    for (const Piece& piece : state.position_features().board) {
+        if (piece.type == PieceType::none) {
+            continue;
+        }
+        const int signed_value = piece_value(piece.type) *
+            (piece.color == perspective ? 1 : -1);
+        score += signed_value;
+    }
+    return score;
+}
+
+int forcing_material_probe(GameState& state, Color perspective, int depth,
+                           bool maximizing) noexcept {
+    if (depth <= 0) {
+        return material_score(state, perspective);
+    }
+
+    MoveMetadataList moves;
+    const bool has_legal_move = state.legal_tactical_moves_with_metadata(moves, true);
+    if (!has_legal_move || moves.empty()) {
+        return material_score(state, perspective);
+    }
+
+    int best = maximizing ? std::numeric_limits<int>::min() : std::numeric_limits<int>::max();
+    for (const MoveMetadata& metadata : moves) {
+        GameState child = state;
+        if (!child.make_legal_move(metadata)) {
+            continue;
+        }
+        const int score = forcing_material_probe(child, perspective, depth - 1, !maximizing);
+        best = maximizing ? std::max(best, score) : std::min(best, score);
+    }
+    return best == std::numeric_limits<int>::min() || best == std::numeric_limits<int>::max() ?
+        material_score(state, perspective) : best;
+}
+
+bool safe_book_move(const GameState& state, const Move& move, std::uint8_t safety_depth) noexcept {
+    if (safety_depth == 0) {
+        return true;
+    }
+    const auto metadata = state.describe_move(move);
+    if (!metadata.has_value()) {
+        return false;
+    }
+    GameState after = state;
+    if (!after.make_legal_move(*metadata)) {
+        return false;
+    }
+    if (after.is_terminal()) {
+        return true;
+    }
+
+    const Color perspective = state.side_to_move();
+    const int before = material_score(state, perspective);
+    const int probe_depth = std::min<int>(safety_depth, 3);
+    const int worst_forcing_line = forcing_material_probe(
+        after, perspective, probe_depth, false);
+    return worst_forcing_line >= before - kBookSafetyLossThreshold;
+}
+
 } // namespace
 
 class OpeningBook::Impl {
@@ -228,7 +305,8 @@ void OpeningBook::clear_cache() noexcept {
 
 std::optional<BookChoice> OpeningBook::choose(
     const GameState& state, std::uint32_t root_ply, bool enabled,
-    std::uint8_t maximum_depth, std::uint64_t random_seed, bool random_selection) const {
+    std::uint8_t maximum_depth, std::uint64_t random_seed, bool random_selection,
+    bool safety_enabled, std::uint8_t safety_depth) const {
     if (!enabled || (maximum_depth != 0 && root_ply >= maximum_depth)) {
         return std::nullopt;
     }
@@ -251,6 +329,9 @@ std::optional<BookChoice> OpeningBook::choose(
         }
         const std::optional<Move> move = decode_move(entry.move, state);
         if (!move || total_weight > std::numeric_limits<std::uint64_t>::max() - entry.weight) {
+            continue;
+        }
+        if (safety_enabled && !safe_book_move(state, *move, safety_depth)) {
             continue;
         }
         choices.push_back(BookChoice{*move, entry.weight, entry.learn});

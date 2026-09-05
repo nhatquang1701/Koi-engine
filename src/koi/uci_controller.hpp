@@ -93,6 +93,8 @@ private:
     bool ponder_enabled_ = false;
     bool own_book_ = true;
     bool book_random_ = false;
+    bool book_safety_ = true;
+    std::uint8_t book_safety_depth_ = 2;
     std::uint8_t book_depth_ = 16;
     std::uint32_t random_seed_ = 0;
     std::filesystem::path syzygy_path_;
