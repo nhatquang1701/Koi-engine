@@ -435,6 +435,8 @@ setoption name OwnBook value true
 setoption name BookFile value book.bin
 setoption name BookDepth value 16
 setoption name BookRandom value false
+setoption name BookSafety value true
+setoption name BookSafetyDepth value 2
 ```
 
 `BookDepth 0` leaves the book unlimited; values from `1` through `40` limit

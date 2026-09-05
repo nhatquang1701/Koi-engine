@@ -136,6 +136,8 @@ $expectedHandshake = @(
     'option name BookFile type string default book.bin',
     'option name BookDepth type spin default 16 min 0 max 40',
     'option name BookRandom type check default false',
+    'option name BookSafety type check default true',
+    'option name BookSafetyDepth type spin default 2 min 0 max 3',
     'option name Clear Hash type button',
     'option name UCI_ShowWDL type check default false',
     'option name Move Overhead type spin default 10 min 0 max 5000',
