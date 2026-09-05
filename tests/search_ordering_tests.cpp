@@ -139,6 +139,26 @@ void test_quiet_checks_are_ordered_before_ordinary_quiet_moves() {
             "a quiet checking move must be searched before ordinary quiet moves");
 }
 
+void test_history_malus_and_continuation_history_shape_quiet_ordering() {
+    const koi::GameState state = koi::GameState::startpos();
+    const koi::Move prior = require_move("e2e4");
+    const koi::Move preferred = require_move("b1c3");
+    const koi::Move penalized = require_move("g1f3");
+    koi::detail::SearchMoveOrdering ordering;
+
+    ordering.record_quiet_cutoff(state.side_to_move(), preferred, 0, 6, prior);
+    for (int count = 0; count < 8; ++count) {
+        ordering.record_quiet_fail(state.side_to_move(), penalized, 0, 6, prior);
+    }
+
+    std::vector<koi::Move> moves = quiet_moves(state, state.legal_moves());
+    ordering.order(state, moves, std::nullopt, 1, prior);
+    const auto preferred_position = std::find(moves.begin(), moves.end(), preferred);
+    const auto penalized_position = std::find(moves.begin(), moves.end(), penalized);
+    require(preferred_position < penalized_position,
+            "continuation history bonus and quiet history malus must shape quiet ordering");
+}
+
 struct TestCase {
     std::string_view name;
     void (*run)();
@@ -153,6 +173,7 @@ int main() {
         {"killer history stable ordering", test_killer_history_and_tie_breaking_are_deterministic},
         {"killer tier outranks saturated history", test_killer_tier_outranks_saturated_history},
         {"quiet checks before quiet moves", test_quiet_checks_are_ordered_before_ordinary_quiet_moves},
+        {"history malus and continuation ordering", test_history_malus_and_continuation_history_shape_quiet_ordering},
     };
 
     for (const TestCase& test : tests) {

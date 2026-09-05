@@ -43,8 +43,13 @@ struct SearchStats {
     std::uint64_t see_prunes = 0;
     std::uint64_t delta_prunes = 0;
     std::uint64_t null_cutoffs = 0;
+    std::uint64_t null_verifications = 0;
     std::uint64_t lmr_reductions = 0;
     std::uint64_t lmr_verifications = 0;
+    std::uint64_t quiet_futility_prunes = 0;
+    std::uint64_t razoring_prunes = 0;
+    std::uint64_t quiet_history_updates = 0;
+    std::uint64_t continuation_history_updates = 0;
     int seldepth = 0;
     std::chrono::milliseconds elapsed{0};
 };

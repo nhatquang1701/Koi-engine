@@ -117,8 +117,13 @@ void accumulate_stats(SearchStats& total, const SearchStats& partial) noexcept {
     total.see_prunes += partial.see_prunes;
     total.delta_prunes += partial.delta_prunes;
     total.null_cutoffs += partial.null_cutoffs;
+    total.null_verifications += partial.null_verifications;
     total.lmr_reductions += partial.lmr_reductions;
     total.lmr_verifications += partial.lmr_verifications;
+    total.quiet_futility_prunes += partial.quiet_futility_prunes;
+    total.razoring_prunes += partial.razoring_prunes;
+    total.quiet_history_updates += partial.quiet_history_updates;
+    total.continuation_history_updates += partial.continuation_history_updates;
     total.seldepth = std::max(total.seldepth, partial.seldepth);
 }
 
@@ -324,7 +329,8 @@ struct SearchContext {
     }
 
     int negamax(GameState& state, int depth, int alpha, int beta, int ply,
-                PrincipalVariation& pv) {
+                PrincipalVariation& pv, std::optional<Move> previous_move = std::nullopt,
+                bool allow_null_pruning = true) {
         if (!count_node(false)) {
             return 0;
         }
@@ -355,6 +361,24 @@ struct SearchContext {
             ++depth;
         }
 
+        const bool tactical_position = checked || std::any_of(moves.begin(), moves.end(),
+            [](const MoveMetadata& metadata) {
+                return metadata.is_capture() || metadata.gives_check ||
+                    metadata.move.promotion() != Promotion::none;
+            });
+        int static_eval = 0;
+        if (!checked && depth == 1 && !tactical_position &&
+            state.position_features().game_phase >= 8) {
+            static_eval = evaluate(state, state.side_to_move());
+            if (depth == 1 && alpha > -kInfinity && static_eval + 120 <= alpha) {
+                const int razor_score = quiescence(state, alpha, beta, ply);
+                if (!aborted && razor_score <= alpha) {
+                    ++stats.razoring_prunes;
+                    return razor_score;
+                }
+            }
+        }
+
         const int original_alpha = alpha;
         const int original_beta = beta;
         std::optional<Move> tt_move;
@@ -378,7 +402,7 @@ struct SearchContext {
             }
         }
 
-        if (!checked && depth >= 3 && beta < kInfinity && beta > -kInfinity &&
+        if (allow_null_pruning && !checked && depth >= 3 && beta < kInfinity && beta > -kInfinity &&
             beta - alpha <= 1 && state.position_features().game_phase >= 8 &&
             state.has_non_pawn_material(state.side_to_move())) {
             if (state.make_null_move()) {
@@ -391,17 +415,29 @@ struct SearchContext {
                     return 0;
                 }
                 if (null_score >= beta) {
-                    ++stats.null_cutoffs;
-                    if (use_transposition_table) {
-                        table.store(state.position_key(), depth, null_score,
-                                    TranspositionBound::lower, Move::no_move(), ply);
+                    int verified_score = null_score;
+                    if (depth >= 6) {
+                        ++stats.null_verifications;
+                        PrincipalVariation verification_pv;
+                        verified_score = negamax(state, depth - 1, alpha, beta, ply,
+                                                 verification_pv, previous_move, false);
+                        if (aborted) {
+                            return 0;
+                        }
                     }
-                    return null_score;
+                    if (verified_score >= beta) {
+                        ++stats.null_cutoffs;
+                        if (use_transposition_table) {
+                            table.store(state.position_key(), depth, verified_score,
+                                        TranspositionBound::lower, Move::no_move(), ply);
+                        }
+                        return verified_score;
+                    }
                 }
             }
         }
 
-        ordering.order(state, moves, tt_move, ply);
+        ordering.order(state, moves, tt_move, ply, previous_move);
         int best_score = -kInfinity;
         Move best_move = Move::no_move();
         int move_number = 0;
@@ -410,35 +446,56 @@ struct SearchContext {
                 return 0;
             }
             const Move move = metadata.move;
+            const Color moving_side = state.side_to_move();
             if (!state.make_legal_move(metadata)) {
                 continue;
             }
 
             const bool is_tt_move = tt_move.has_value() && move == *tt_move;
-            const bool reduced = move_number >= 4 && depth >= 4 && !checked && !state.in_check() &&
+            const int history_score = ordering.quiet_history_score(moving_side, move, previous_move);
+            const bool reducible_quiet = move_number >= 4 && depth >= 4 && !checked && !state.in_check() &&
                 !metadata.gives_check && !metadata.is_capture() && move.promotion() == Promotion::none &&
                 !is_tt_move && !ordering.is_killer(move, ply);
             const int full_child_depth = depth - 1;
-            const int child_depth = reduced ? std::max(0, full_child_depth - 1) : full_child_depth;
+            const int base_reduction = 1 + (depth >= 8 && move_number >= 12 ? 1 : 0) +
+                (depth >= 12 && move_number >= 20 ? 1 : 0);
+            const int history_adjustment = history_score > 256 ? -1 : history_score < -256 ? 1 : 0;
+            const int reduction = std::clamp(base_reduction + history_adjustment, 0, full_child_depth);
+            const bool reduced = reducible_quiet && reduction > 0;
+            const int child_depth = reduced ? full_child_depth - reduction : full_child_depth;
             if (reduced) {
                 ++stats.lmr_reductions;
+            }
+
+            if (!checked && !tactical_position && depth == 1 &&
+                state.position_features().game_phase >= 8 && !metadata.is_capture() &&
+                !metadata.gives_check && move.promotion() == Promotion::none && move_number > 0 &&
+                static_eval + 80 + depth * 60 <= alpha) {
+                ++stats.quiet_futility_prunes;
+                state.unmake_move();
+                ++move_number;
+                continue;
             }
 
             PrincipalVariation child_pv;
             int score = 0;
             if (move_number == 0) {
-                score = -negamax(state, child_depth, -beta, -alpha, ply + 1, child_pv);
+                score = -negamax(state, child_depth, -beta, -alpha, ply + 1, child_pv,
+                                 move, allow_null_pruning);
             } else {
                 ++stats.pvs_searches;
-                score = -negamax(state, child_depth, -alpha - 1, -alpha, ply + 1, child_pv);
+                score = -negamax(state, child_depth, -alpha - 1, -alpha, ply + 1, child_pv,
+                                 move, allow_null_pruning);
                 if (!aborted && reduced && score > alpha) {
                     ++stats.lmr_verifications;
                     child_pv = {};
-                    score = -negamax(state, full_child_depth, -beta, -alpha, ply + 1, child_pv);
+                    score = -negamax(state, full_child_depth, -beta, -alpha, ply + 1, child_pv,
+                                     move, allow_null_pruning);
                 } else if (!aborted && !reduced && score > alpha && score < beta) {
                     ++stats.pvs_researches;
                     child_pv = {};
-                    score = -negamax(state, full_child_depth, -beta, -alpha, ply + 1, child_pv);
+                    score = -negamax(state, full_child_depth, -beta, -alpha, ply + 1, child_pv,
+                                     move, allow_null_pruning);
                 }
             }
             state.unmake_move();
@@ -453,10 +510,21 @@ struct SearchContext {
             }
             alpha = std::max(alpha, score);
             if (alpha >= beta) {
-                if (!metadata.is_capture() && move.promotion() == Promotion::none) {
-                    ordering.record_quiet_cutoff(state.side_to_move(), move, ply, depth);
+                if (ply > 0 && !metadata.is_capture() && move.promotion() == Promotion::none) {
+                    ordering.record_quiet_cutoff(state.side_to_move(), move, ply, depth, previous_move);
+                    ++stats.quiet_history_updates;
+                    if (previous_move.has_value()) {
+                        ++stats.continuation_history_updates;
+                    }
                 }
                 break;
+            }
+            if (ply > 0 && !metadata.is_capture() && move.promotion() == Promotion::none) {
+                ordering.record_quiet_fail(state.side_to_move(), move, ply, depth, previous_move);
+                ++stats.quiet_history_updates;
+                if (previous_move.has_value()) {
+                    ++stats.continuation_history_updates;
+                }
             }
             ++move_number;
         }
@@ -595,7 +663,8 @@ private:
 
                     PrincipalVariation child_pv;
                     const int score = -context.negamax(child, job->depth - 1,
-                                                       -job->beta, -job->alpha, 1, child_pv);
+                                                       -job->beta, -job->alpha, 1, child_pv,
+                                                       root_move.move);
                     if (context.aborted) {
                         job->aborted.store(true, std::memory_order_relaxed);
                         return;

@@ -1146,6 +1146,43 @@ void test_low_phase_search_skips_null_pruning() {
             "null-move pruning must stay disabled below the safe game-phase threshold");
 }
 
+void test_shallow_futility_pruning_is_safe_in_tactical_positions() {
+    koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>());
+    koi::SearchLimits limits;
+    limits.depth = 2;
+
+    const koi::GameState checked = require_state(
+        "4k3/8/8/8/8/8/4q3/4K2R w - - 0 1");
+    const koi::SearchResult checked_result = search(service, checked, limits);
+    require(checked_result.best_move.has_value() && checked.is_legal(*checked_result.best_move),
+            "shallow futility must preserve legal checked evasions");
+    require(checked_result.stats.quiet_futility_prunes == 0,
+            "shallow futility must stay disabled while in check");
+    require(checked_result.stats.razoring_prunes == 0,
+            "razoring must stay disabled while in check");
+
+    const koi::GameState tactical = require_state(
+        "4k3/8/8/8/8/8/P6r/4K2R w - - 0 1");
+    const koi::SearchResult tactical_result = search(service, tactical, limits);
+    require(tactical_result.best_move.has_value() && tactical.is_legal(*tactical_result.best_move),
+            "shallow futility must preserve legal tactical moves");
+    require(tactical_result.stats.quiet_futility_prunes == 0,
+            "shallow futility must stay disabled in tactical positions");
+    require(tactical_result.stats.razoring_prunes == 0,
+            "razoring must stay disabled in tactical positions");
+}
+
+void test_shallow_futility_accounts_for_safe_quiet_prunes() {
+    koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>());
+    koi::SearchLimits limits;
+    limits.depth = 3;
+    const koi::SearchResult result = search(service, koi::GameState::startpos(), limits);
+    require(result.best_move.has_value() && koi::GameState::startpos().is_legal(*result.best_move),
+            "shallow futility must preserve a legal root move");
+    require(result.stats.quiet_futility_prunes > 0 || result.stats.razoring_prunes > 0,
+            "a quiet middlegame search must exercise conservative shallow pruning");
+}
+
 void test_search_reduces_late_quiet_moves_without_losing_root_legality() {
     koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>());
     koi::SearchLimits limits;
@@ -1552,6 +1589,8 @@ int main() {
         {"shorter mate preference", test_search_prefers_the_shorter_forced_mate},
         {"pawn-only zugzwang null safety", test_pawn_only_zugzwang_search_skips_null_pruning},
         {"low-phase null safety", test_low_phase_search_skips_null_pruning},
+        {"shallow futility tactical safety", test_shallow_futility_pruning_is_safe_in_tactical_positions},
+        {"shallow futility accounting", test_shallow_futility_accounts_for_safe_quiet_prunes},
         {"late quiet move reductions", test_search_reduces_late_quiet_moves_without_losing_root_legality},
         {"late move full-depth verification", test_reduced_late_move_is_verified_at_full_child_depth},
         {"checked quiescence cap", test_quiescence_keeps_searching_checked_evasions_past_normal_cap},
