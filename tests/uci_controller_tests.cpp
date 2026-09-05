@@ -353,7 +353,7 @@ void test_uci_handshake_has_identity_and_supported_options_in_order() {
         "option name BookDepth type spin default 16 min 0 max 40\n"
         "option name BookRandom type check default false\n"
         "option name BookSafety type check default true\n"
-        "option name BookSafetyDepth type spin default 2 min 0 max 8\n"
+        "option name BookSafetyDepth type spin default 2 min 0 max 3\n"
         "option name Clear Hash type button\n"
         "option name UCI_ShowWDL type check default false\n"
         "option name Move Overhead type spin default 10 min 0 max 5000\n"

@@ -131,6 +131,7 @@ std::uint32_t book_move_tie_break_key(Move move) noexcept {
 }
 
 constexpr int kBookSafetyLossThreshold = 250;
+constexpr std::size_t kBookSafetyNodeBudget = 512;
 
 int piece_value(PieceType type) noexcept {
     switch (type) {
@@ -159,10 +160,12 @@ int material_score(const GameState& state, Color perspective) noexcept {
 }
 
 int forcing_material_probe(GameState& state, Color perspective, int depth,
-                           bool maximizing) noexcept {
-    if (depth <= 0) {
+                           bool maximizing, std::size_t& budget, bool& complete) noexcept {
+    if (depth <= 0 || budget == 0) {
+        complete = complete && budget != 0;
         return material_score(state, perspective);
     }
+    --budget;
 
     MoveMetadataList moves;
     const bool has_legal_move = state.legal_tactical_moves_with_metadata(moves, true);
@@ -176,8 +179,13 @@ int forcing_material_probe(GameState& state, Color perspective, int depth,
         if (!child.make_legal_move(metadata)) {
             continue;
         }
-        const int score = forcing_material_probe(child, perspective, depth - 1, !maximizing);
+        const int score = forcing_material_probe(child, perspective, depth - 1, !maximizing,
+                                                 budget, complete);
         best = maximizing ? std::max(best, score) : std::min(best, score);
+        if (budget == 0) {
+            complete = false;
+            break;
+        }
     }
     return best == std::numeric_limits<int>::min() || best == std::numeric_limits<int>::max() ?
         material_score(state, perspective) : best;
@@ -202,9 +210,11 @@ bool safe_book_move(const GameState& state, const Move& move, std::uint8_t safet
     const Color perspective = state.side_to_move();
     const int before = material_score(state, perspective);
     const int probe_depth = std::min<int>(safety_depth, 3);
+    std::size_t budget = kBookSafetyNodeBudget;
+    bool complete = true;
     const int worst_forcing_line = forcing_material_probe(
-        after, perspective, probe_depth, false);
-    return worst_forcing_line >= before - kBookSafetyLossThreshold;
+        after, perspective, probe_depth, false, budget, complete);
+    return complete && worst_forcing_line >= before - kBookSafetyLossThreshold;
 }
 
 } // namespace
@@ -331,9 +341,6 @@ std::optional<BookChoice> OpeningBook::choose(
         if (!move || total_weight > std::numeric_limits<std::uint64_t>::max() - entry.weight) {
             continue;
         }
-        if (safety_enabled && !safe_book_move(state, *move, safety_depth)) {
-            continue;
-        }
         choices.push_back(BookChoice{*move, entry.weight, entry.learn});
         total_weight += entry.weight;
     }
@@ -341,6 +348,7 @@ std::optional<BookChoice> OpeningBook::choose(
         return std::nullopt;
     }
 
+    std::optional<BookChoice> selected;
     if (!random_selection) {
         const auto best = std::max_element(
             choices.begin(), choices.end(), [](const BookChoice& left, const BookChoice& right) {
@@ -349,25 +357,35 @@ std::optional<BookChoice> OpeningBook::choose(
                 }
                 return book_move_tie_break_key(left.move) > book_move_tie_break_key(right.move);
             });
-        return best == choices.end() ? std::nullopt : std::optional<BookChoice>{*best};
+        if (best != choices.end()) {
+            selected = *best;
+        }
+    } else {
+        std::uint64_t seed = random_seed ^ key;
+        if (random_seed == 0) {
+            std::random_device entropy;
+            seed = (static_cast<std::uint64_t>(entropy()) << 32) ^ entropy() ^
+                static_cast<std::uint64_t>(std::chrono::high_resolution_clock::now().time_since_epoch().count());
+        }
+        std::mt19937_64 generator(seed);
+        std::uniform_int_distribution<std::uint64_t> distribution(0, total_weight - 1);
+        std::uint64_t random_choice = distribution(generator);
+        for (const BookChoice& choice : choices) {
+            if (random_choice < choice.weight) {
+                selected = choice;
+                break;
+            }
+            random_choice -= choice.weight;
+        }
     }
 
-    std::uint64_t seed = random_seed ^ key;
-    if (random_seed == 0) {
-        std::random_device entropy;
-        seed = (static_cast<std::uint64_t>(entropy()) << 32) ^ entropy() ^
-            static_cast<std::uint64_t>(std::chrono::high_resolution_clock::now().time_since_epoch().count());
+    if (!selected.has_value()) {
+        return std::nullopt;
     }
-    std::mt19937_64 generator(seed);
-    std::uniform_int_distribution<std::uint64_t> distribution(0, total_weight - 1);
-    std::uint64_t selected = distribution(generator);
-    for (const BookChoice& choice : choices) {
-        if (selected < choice.weight) {
-            return choice;
-        }
-        selected -= choice.weight;
+    if (safety_enabled && !safe_book_move(state, selected->move, safety_depth)) {
+        return std::nullopt;
     }
-    return std::nullopt;
+    return selected;
 }
 
 } // namespace koi

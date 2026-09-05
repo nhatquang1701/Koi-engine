@@ -32,7 +32,7 @@ constexpr std::uint64_t kMaximumElo = 3'190;
 constexpr std::uint64_t kMinimumMultiPv = 1;
 constexpr std::uint64_t kMaximumMultiPv = 16;
 constexpr std::uint64_t kMaximumBookDepth = 40;
-constexpr std::uint64_t kMaximumBookSafetyDepth = 8;
+constexpr std::uint64_t kMaximumBookSafetyDepth = 3;
 constexpr std::uint64_t kMinimumSyzygyProbeDepth = 1;
 constexpr std::uint64_t kMaximumSyzygyProbeDepth = 100;
 constexpr std::uint64_t kMaximumSyzygyProbeLimit = 5;
@@ -800,7 +800,7 @@ void UciController::write_handshake() {
                "option name BookDepth type spin default 16 min 0 max 40\n"
                "option name BookRandom type check default false\n"
                "option name BookSafety type check default true\n"
-               "option name BookSafetyDepth type spin default 2 min 0 max 8\n"
+               "option name BookSafetyDepth type spin default 2 min 0 max 3\n"
                "option name Clear Hash type button\n"
                "option name UCI_ShowWDL type check default false\n"
                "option name Move Overhead type spin default 10 min 0 max 5000\n"

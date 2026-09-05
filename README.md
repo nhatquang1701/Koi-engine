@@ -305,7 +305,7 @@ from the starting position (for example, `bestmove e2e4`).
 - `setoption name BookSafety value true` (the default) runs a shallow forcing
   material probe before accepting a book move. A move that immediately hangs a
   valuable piece is rejected and normal search chooses the move. Set
-  `BookSafetyDepth` from `0` through `8` to control the probe horizon; `0`
+  `BookSafetyDepth` from `0` through `3` to control the probe horizon; `0`
   disables the probe while retaining legal-move filtering. Safety never
   overrides analysis, MultiPV, ponder, infinite, or `searchmoves` book bypass.
 - `go` accepts `depth`, `nodes`, `movetime`, `wtime`, `btime`, `winc`, `binc`,
