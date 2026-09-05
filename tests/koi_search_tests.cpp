@@ -114,6 +114,23 @@ private:
     mutable std::atomic_int maximum_active_ = 0;
 };
 
+class CountingEvaluator final : public koi::Evaluator {
+public:
+    [[nodiscard]] int evaluate(const koi::GameState&, koi::Color) const override {
+        evaluations_.fetch_add(1, std::memory_order_relaxed);
+        return 0;
+    }
+
+    [[nodiscard]] bool supports_concurrent_evaluation() const noexcept override { return true; }
+
+    [[nodiscard]] std::uint64_t evaluations() const noexcept {
+        return evaluations_.load(std::memory_order_relaxed);
+    }
+
+private:
+    mutable std::atomic<std::uint64_t> evaluations_ = 0;
+};
+
 class CheckedPositionEvaluator final : public koi::Evaluator {
 public:
     [[nodiscard]] int evaluate(const koi::GameState& state, koi::Color) const override {
@@ -665,7 +682,7 @@ void test_classical_threaded_search_matches_reference_result() {
     const koi::SearchResult reference = search(reference_service, root, limits);
 
     koi::SearchOptions options;
-    options.threads = std::min<std::size_t>(2, koi::maximum_search_threads());
+    options.threads = std::min<std::size_t>(4, koi::maximum_search_threads());
     koi::SearchService threaded_service(std::make_shared<koi::ClassicalEvaluator>());
     const koi::SearchResult threaded = search(threaded_service, root, limits, options);
 
@@ -674,6 +691,24 @@ void test_classical_threaded_search_matches_reference_result() {
             "classical reference and threaded searches must return legal moves");
     require(*reference.best_move == *threaded.best_move && reference.score_cp == threaded.score_cp,
             "classical threaded search must match the single-thread reference result");
+}
+
+void test_threaded_single_pv_does_not_repeat_root_search() {
+    auto evaluator = std::make_shared<CountingEvaluator>();
+    koi::SearchService service(evaluator);
+    koi::SearchLimits limits;
+    limits.depth = 1;
+    koi::SearchOptions options;
+    options.threads = 2;
+    const koi::GameState root = koi::GameState::startpos();
+    const std::size_t legal_root_moves = root.legal_moves().size();
+
+    const koi::SearchResult result = search(service, root, limits, options);
+
+    require(result.best_move.has_value() && root.is_legal(*result.best_move),
+            "an authoritative threaded root search must retain a legal move");
+    require(evaluator->evaluations() == legal_root_moves + 1,
+            "a threaded single-PV search must not repeat the root search serially");
 }
 
 void test_threaded_evasion_06_matches_the_serial_allowlist() {
@@ -937,7 +972,7 @@ void test_threaded_infinite_search_cancels_and_completes_once() {
             "a cancelled threaded search must return a legal best move");
 }
 
-void test_threaded_timed_search_cancels_after_serial_confirmation() {
+void test_threaded_timed_search_cancels_without_serial_confirmation() {
     auto evaluator = std::make_shared<ConcurrencyEvaluator>();
     koi::SearchService service(evaluator);
     koi::SearchLimits limits;
@@ -962,7 +997,7 @@ void test_threaded_timed_search_cancels_after_serial_confirmation() {
     {
         std::unique_lock lock(info_mutex);
         require(info_condition.wait_for(lock, 2s, [&info_depths] { return !info_depths.empty(); }),
-                "Threads=2 timed search must reach serial confirmation before cancellation");
+                "Threads=2 timed search must publish a completed threaded root iteration before cancellation");
     }
     const auto stop_started = std::chrono::steady_clock::now();
     handle.stop();
@@ -974,7 +1009,7 @@ void test_threaded_timed_search_cancels_after_serial_confirmation() {
     {
         std::lock_guard lock(info_mutex);
         require(!info_depths.empty() && info_depths.front() == 1,
-                "Threads=2 timed cancellation must observe the serial confirmation callback");
+                "Threads=2 timed cancellation must observe the threaded root callback");
         require(std::adjacent_find(info_depths.begin(), info_depths.end()) == info_depths.end(),
                 "Threads=2 timed cancellation must not duplicate info output");
     }
@@ -1644,6 +1679,7 @@ int main() {
         {"deterministic multipv", test_deterministic_multipv_reports_sorted_distinct_legal_lines},
         {"threaded root search", test_threaded_search_uses_multiple_root_workers_and_matches_reference_result},
         {"classical threaded parity", test_classical_threaded_search_matches_reference_result},
+        {"threaded single-PV root is authoritative", test_threaded_single_pv_does_not_repeat_root_search},
         {"threaded evasion_06 parity", test_threaded_evasion_06_matches_the_serial_allowlist},
         {"stable root ties", test_equal_root_scores_keep_the_earliest_ordered_move},
         {"threaded multipv ordered root ties", test_threaded_multipv_equal_scores_use_stable_ordered_root_tie_breaking},
@@ -1653,7 +1689,7 @@ int main() {
         {"threaded node parity", test_threaded_and_reference_node_limits_have_matching_accounting},
         {"search info accounting", test_search_info_nodes_reports_all_visited_nodes},
         {"threaded cancellation", test_threaded_infinite_search_cancels_and_completes_once},
-        {"threaded timed cancellation", test_threaded_timed_search_cancels_after_serial_confirmation},
+        {"threaded timed cancellation", test_threaded_timed_search_cancels_without_serial_confirmation},
         {"evaluator cross-handle safety", test_non_concurrent_evaluators_are_serialized_across_simultaneous_handles},
         {"terminal search", test_terminal_roots_return_mate_or_stalemate_scores},
         {"deterministic legal search", test_fixed_depth_search_is_deterministic_and_legal},
