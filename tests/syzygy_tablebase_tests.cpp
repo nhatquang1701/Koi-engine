@@ -1,7 +1,9 @@
 #include <atomic>
+#include <chrono>
 #include <cstdint>
 #include <cstdlib>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <optional>
 #include <stdexcept>
@@ -11,6 +13,8 @@
 
 #include "koi/game_state.hpp"
 #include "koi/syzygy_tablebase.hpp"
+
+extern "C" unsigned TB_LARGEST;
 
 namespace {
 
@@ -60,6 +64,70 @@ void test_absent_and_malformed_paths_disable_probing_safely() {
     require(!malformed.probe_root(state_from_fen(
         "4k3/8/8/8/8/8/8/4K3 w - - 0 1")).has_value(),
             "disabled root probing must be empty");
+}
+
+void test_empty_and_valid_paths_preserve_optional_fallback() {
+    const std::filesystem::path root = std::filesystem::temp_directory_path() /
+        ("koi-task-2-syzygy-" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    const std::filesystem::path empty = root / "empty";
+    const std::filesystem::path valid = root / "valid";
+    std::filesystem::create_directories(empty);
+    std::filesystem::create_directories(valid);
+    {
+        std::ofstream tablebase(valid / "KQvK.rtbw", std::ios::binary);
+        tablebase.write(std::string(80, '\0').data(), 80);
+    }
+
+    const koi::GameState state = state_from_fen(
+        "4k3/8/8/8/8/8/8/3QK3 w - - 0 1");
+    const koi::SyzygyTablebase empty_tablebase(empty, 5, 1, true);
+    require(!empty_tablebase.enabled(), "an empty readable directory must fall back to search");
+    require(!empty_tablebase.probe_wdl(state.tablebase_snapshot()).has_value(),
+            "an empty readable directory must not probe as a tablebase");
+
+    const koi::SyzygyTablebase valid_tablebase(valid, 5, 1, true);
+    require(valid_tablebase.enabled(), "a readable tablebase path must acquire Fathom ownership");
+    require(TB_LARGEST > 0, "Fathom must report the registered valid-path table");
+
+    std::filesystem::remove_all(root);
+}
+
+void test_tablebase_instances_share_fathom_lifetime_in_both_clear_orders() {
+    const std::filesystem::path root = std::filesystem::temp_directory_path() /
+        ("koi-task-2-syzygy-lifetime-" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    std::filesystem::create_directories(root);
+    {
+        std::ofstream tablebase(root / "KQvK.rtbw", std::ios::binary);
+        tablebase.write(std::string(80, '\0').data(), 80);
+    }
+
+    {
+        auto first = std::make_unique<koi::SyzygyTablebase>(root, 5, 1, true);
+        auto second = std::make_unique<koi::SyzygyTablebase>(root, 5, 1, true);
+        require(first->enabled() && second->enabled(),
+                "two users of one valid tablebase path must both be enabled");
+        second.reset();
+        require(first->enabled() && TB_LARGEST > 0,
+                "clearing the second user must not invalidate the first user");
+        first.reset();
+        require(TB_LARGEST == 0, "clearing the final tablebase user must free Fathom");
+    }
+
+    {
+        auto first = std::make_unique<koi::SyzygyTablebase>(root, 5, 1, true);
+        auto second = std::make_unique<koi::SyzygyTablebase>(root, 5, 1, true);
+        require(first->enabled() && second->enabled(),
+                "Fathom must be reacquirable after the final user is cleared");
+        first.reset();
+        require(second->enabled() && TB_LARGEST > 0,
+                "clearing the first user must not invalidate the second user");
+        second.reset();
+        require(TB_LARGEST == 0, "the second clear order must release Fathom at the end");
+    }
+
+    std::filesystem::remove_all(root);
 }
 
 void test_piece_count_and_castling_gate_probing() {
@@ -132,6 +200,8 @@ int main() {
     try {
         test_snapshot_converts_rule_metadata_and_piece_bitboards();
         test_absent_and_malformed_paths_disable_probing_safely();
+        test_empty_and_valid_paths_preserve_optional_fallback();
+        test_tablebase_instances_share_fathom_lifetime_in_both_clear_orders();
         test_piece_count_and_castling_gate_probing();
         test_wdl_conversion_and_concurrent_disabled_probes();
         test_50_move_rule_selects_clock_aware_root_probe();

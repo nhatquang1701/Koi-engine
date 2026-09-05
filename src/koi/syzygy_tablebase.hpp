@@ -36,6 +36,8 @@ struct SyzygyRootResult {
 
 class SyzygyTablebase {
 public:
+    // Fathom is process-global; instances share one acquired path and release it
+    // only after the final enabled instance is destroyed.
     SyzygyTablebase(std::filesystem::path path = {}, std::uint8_t probe_limit = 5,
                     std::uint8_t probe_depth = 1, bool fifty_move_rule = true);
     ~SyzygyTablebase();

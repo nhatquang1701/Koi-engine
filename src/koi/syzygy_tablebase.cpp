@@ -15,6 +15,59 @@ std::mutex& fathom_mutex() {
     return mutex;
 }
 
+struct FathomOwnership {
+    std::filesystem::path path;
+    std::size_t users = 0;
+};
+
+FathomOwnership& fathom_ownership() {
+    static FathomOwnership ownership;
+    return ownership;
+}
+
+std::filesystem::path normalized_path(const std::filesystem::path& path) {
+    std::error_code error;
+    const auto normalized = std::filesystem::weakly_canonical(path, error);
+    return error ? path.lexically_normal() : normalized;
+}
+
+bool acquire_fathom(const std::filesystem::path& path) {
+    std::lock_guard lock(fathom_mutex());
+    FathomOwnership& ownership = fathom_ownership();
+    const std::filesystem::path normalized = normalized_path(path);
+    if (ownership.users != 0) {
+        if (ownership.path != normalized) {
+            return false;
+        }
+        ++ownership.users;
+        return true;
+    }
+
+    const bool initialized = tb_init(normalized.string().c_str());
+    if (!initialized || TB_LARGEST == 0) {
+        if (initialized) {
+            tb_free();
+        }
+        return false;
+    }
+    ownership.path = normalized;
+    ownership.users = 1;
+    return true;
+}
+
+void release_fathom() noexcept {
+    std::lock_guard lock(fathom_mutex());
+    FathomOwnership& ownership = fathom_ownership();
+    if (ownership.users == 0) {
+        return;
+    }
+    --ownership.users;
+    if (ownership.users == 0) {
+        tb_free();
+        ownership.path.clear();
+    }
+}
+
 std::optional<Move> move_from_fathom(const TbMove move) noexcept {
     const Square from = Square::from_index(static_cast<std::uint8_t>(TB_MOVE_FROM(move)));
     const Square to = Square::from_index(static_cast<std::uint8_t>(TB_MOVE_TO(move)));
@@ -103,14 +156,12 @@ SyzygyTablebase::SyzygyTablebase(std::filesystem::path path, const std::uint8_t 
     if (impl_->path.empty() || impl_->probe_limit == 0 || path_error || !readable_directory) {
         return;
     }
-    std::lock_guard lock(fathom_mutex());
-    impl_->enabled = tb_init(impl_->path.string().c_str()) && TB_LARGEST > 0;
+    impl_->enabled = acquire_fathom(impl_->path);
 }
 
 SyzygyTablebase::~SyzygyTablebase() {
     if (impl_->enabled) {
-        std::lock_guard lock(fathom_mutex());
-        tb_free();
+        release_fathom();
     }
 }
 

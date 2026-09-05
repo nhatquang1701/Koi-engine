@@ -513,7 +513,7 @@ struct SearchContext {
             alpha = std::max(alpha, score);
             if (alpha >= beta) {
                 if (ply > 0 && !metadata.is_capture() && move.promotion() == Promotion::none) {
-                    ordering.record_quiet_cutoff(state.side_to_move(), move, ply, depth, previous_move);
+                    ordering.record_quiet_cutoff(moving_side, move, ply, depth, previous_move);
                     ++stats.quiet_history_updates;
                     if (previous_move.has_value()) {
                         ++stats.continuation_history_updates;
@@ -522,7 +522,7 @@ struct SearchContext {
                 break;
             }
             if (ply > 0 && !metadata.is_capture() && move.promotion() == Promotion::none) {
-                ordering.record_quiet_fail(state.side_to_move(), move, ply, depth, previous_move);
+                ordering.record_quiet_fail(moving_side, move, ply, depth, previous_move);
                 ++stats.quiet_history_updates;
                 if (previous_move.has_value()) {
                     ++stats.continuation_history_updates;
