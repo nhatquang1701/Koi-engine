@@ -140,6 +140,8 @@ class EloEstimateTests(unittest.TestCase):
                 (lambda value: value["games"][0].update({"termination": "max plies"}), "incomplete"),
                 (lambda value: value["games"][0].update({"termination": "process exit"}), "incomplete"),
                 (lambda value: value["games"][0].pop("moves"), "malformed"),
+                (lambda value: value.pop("positions"), "positions"),
+                (lambda value: value["games"][0].update({"termination": "unknown terminal"}), "termination"),
             ):
                 broken = json.loads(json.dumps(report))
                 mutation(broken)
@@ -175,9 +177,17 @@ class EloEstimateTests(unittest.TestCase):
         self.assertEqual((with_book["OwnBook"], with_book["BookRandom"], with_book["BookDepth"]), (True, False, 16))
 
     def test_reproducibility_hash_excludes_timestamp_fields(self):
-        before = {"timestamp": "old", "nested": {"generated_utc": "old"}, "value": 3}
-        after = {"timestamp": "new", "nested": {"generated_utc": "new"}, "value": 3}
+        before = {
+            "timestamp": "old", "configuration": {"hashes": {"koi": "stable-executable-hash"}},
+            "artifacts": [{"kind": "json", "path": "C:/results/koi-uci-match-20260906-100000.json", "sha256": "old-artifact-hash", "content_metadata": {"generated_utc": "old"}}],
+        }
+        after = {
+            "timestamp": "new", "configuration": {"hashes": {"koi": "stable-executable-hash"}},
+            "artifacts": [{"kind": "json", "path": "C:/results/koi-uci-match-20260906-110000.json", "sha256": "new-artifact-hash", "content_metadata": {"generated_utc": "new"}}],
+        }
         self.assertEqual(elo_estimate.reproducibility_hash(before), elo_estimate.reproducibility_hash(after))
+        after["configuration"]["hashes"]["koi"] = "changed-executable-hash"
+        self.assertNotEqual(elo_estimate.reproducibility_hash(before), elo_estimate.reproducibility_hash(after))
 
     def test_dry_run_validates_and_writes_full_schedule_without_launching(self):
         with tempfile.TemporaryDirectory() as temporary_directory:

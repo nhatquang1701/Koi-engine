@@ -29,6 +29,8 @@ BOOTSTRAP_SEED = 20260906
 STOCKFISH_MIN_ELO = 1320
 STOCKFISH_MAX_ELO = 3190
 TIMESTAMP_KEYS = frozenset({"timestamp", "created_at", "generated_utc", "started_at", "completed_at"})
+ARTIFACT_VOLATILE_KEYS = frozenset({"path", "sha256", "content_sha256", "content_metadata", "metadata", "size", "mtime", "modified_at"})
+TERMINAL_TERMINATIONS = frozenset({"checkmate", "stalemate", "rule draw"})
 OPENING_LINE_RE = re.compile(r"^(?P<name>[^|#\s]+)\s*\|\s*(?P<moves>[a-h][1-8][a-h][1-8][nbrq]?(?:\s+[a-h][1-8][a-h][1-8][nbrq]?)*?)\s*$")
 
 
@@ -329,11 +331,17 @@ def bootstrap_ci(samples: Sequence[int]) -> tuple[int, int]:
 
 
 def reproducibility_hash(value: Any) -> str:
-    def stable(item: Any) -> Any:
+    def stable(item: Any, context: Optional[str] = None) -> Any:
         if isinstance(item, Mapping):
-            return {str(key): stable(nested) for key, nested in item.items() if key not in TIMESTAMP_KEYS and key != "reproducibility_hash"}
+            return {
+                str(key): stable(nested, "artifact" if context == "artifact" else str(key))
+                for key, nested in item.items()
+                if key not in TIMESTAMP_KEYS
+                and key != "reproducibility_hash"
+                and not (context == "artifact" and key in ARTIFACT_VOLATILE_KEYS)
+            }
         if isinstance(item, (list, tuple)):
-            return [stable(nested) for nested in item]
+            return [stable(nested, "artifact" if context == "artifacts" else context) for nested in item]
         if isinstance(item, Path):
             return str(item)
         return item
@@ -375,6 +383,9 @@ def validate_match_manifest(report: Mapping[str, Any], expected_openings: Sequen
 
     if not isinstance(report, Mapping) or report.get("schema") != MATCH_SCHEMA:
         raise EloEstimateError("malformed match report schema")
+    expected = set(expected_openings)
+    if len(expected) != OPENING_COUNT:
+        raise EloEstimateError("expected openings are malformed")
     configuration = report.get("configuration")
     if not isinstance(configuration, Mapping):
         raise EloEstimateError("malformed match configuration")
@@ -387,6 +398,17 @@ def validate_match_manifest(report: Mapping[str, Any], expected_openings: Sequen
             raise EloEstimateError("match configuration does not match requested time control")
     elif configuration.get("movetime_ms") != movetime_ms:
         raise EloEstimateError("match configuration does not match requested movetime")
+    positions = report.get("positions")
+    if not isinstance(positions, list) or len(positions) != OPENING_COUNT:
+        raise EloEstimateError("malformed positions evidence")
+    position_names: list[str] = []
+    for position in positions:
+        name = position.get("Name") if isinstance(position, Mapping) else None
+        if not isinstance(name, str) or not name or "Name" not in position:
+            raise EloEstimateError("malformed positions evidence")
+        position_names.append(name)
+    if len(set(position_names)) != OPENING_COUNT or set(position_names) != expected:
+        raise EloEstimateError("positions evidence must contain each expected opening exactly once")
     koi_engine, opponent = _engine_by_label(report, "Koi"), _engine_by_label(report, "Opponent")
     if not _same_path(Path(str(koi_engine.get("path", ""))), koi_path) or not _same_path(Path(str(opponent.get("path", ""))), anchor.path):
         raise EloEstimateError("engine provenance path does not match requested executable")
@@ -400,9 +422,6 @@ def validate_match_manifest(report: Mapping[str, Any], expected_openings: Sequen
     games = report.get("games")
     if not isinstance(games, list) or len(games) != OPENING_COUNT:
         raise EloEstimateError("paired color report must contain exactly 32 games")
-    expected = set(expected_openings)
-    if len(expected) != OPENING_COUNT:
-        raise EloEstimateError("expected openings are malformed")
     normalized: list[MatchGame] = []
     seen: set[str] = set()
     for index, game in enumerate(games, start=1):
@@ -426,6 +445,8 @@ def validate_match_manifest(report: Mapping[str, Any], expected_openings: Sequen
             if termination != "adjudicated draw":
                 raise EloEstimateError(f"incomplete game {index}")
             result = "1/2-1/2"
+        elif termination not in TERMINAL_TERMINATIONS:
+            raise EloEstimateError(f"unrecognized termination in game {index}: {termination}")
         normalized.append(MatchGame(str(game["position"]), koi_color, normalize_result(result, koi_color), result))
     if seen != expected:
         raise EloEstimateError("paired color report is missing an expected opening")
