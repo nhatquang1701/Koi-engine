@@ -28,10 +28,33 @@ BOOTSTRAP_SAMPLES = 2000
 BOOTSTRAP_SEED = 20260906
 STOCKFISH_MIN_ELO = 1320
 STOCKFISH_MAX_ELO = 3190
+LOCAL_ELO_MEASUREMENT_LABEL = "Local Stockfish-equivalent Elo at the recorded hardware, engine versions, options, and time control."
 TIMESTAMP_KEYS = frozenset({"timestamp", "created_at", "generated_utc", "started_at", "completed_at"})
 ARTIFACT_VOLATILE_KEYS = frozenset({"path", "sha256", "content_sha256", "content_metadata", "metadata", "size", "mtime", "modified_at"})
 TERMINAL_TERMINATIONS = frozenset({"checkmate", "stalemate", "rule draw"})
 OPENING_LINE_RE = re.compile(r"^(?P<name>[^|#\s]+)\s*\|\s*(?P<moves>[a-h][1-8][a-h][1-8][nbrq]?(?:\s+[a-h][1-8][a-h][1-8][nbrq]?)*?)\s*$")
+UCI_MOVE_RE = re.compile(r"^[a-h][1-8][a-h][1-8][nbrq]?$")
+SETOPTION_RE = re.compile(r"^setoption\s+name\s+(?P<name>.+?)\s+value\s*(?P<value>.*)$", re.IGNORECASE)
+RELEVANT_OPTION_NAMES = {
+    name.casefold(): name
+    for name in ("Hash", "Threads", "Speed", "RandomSeed", "OwnBook", "BookFile", "BookDepth", "BookRandom", "UCI_LimitStrength", "UCI_Elo")
+}
+BOOLEAN_OPTION_NAMES = frozenset({"OwnBook", "BookRandom", "UCI_LimitStrength"})
+INTEGER_OPTION_NAMES = frozenset({"Hash", "Threads", "Speed", "RandomSeed", "BookDepth", "UCI_Elo"})
+STRENGTH_OPTION_NAMES = frozenset({"UCI_LimitStrength", "UCI_Elo"})
+OPPONENT_FORBIDDEN_OPTION_NAMES = frozenset({"RandomSeed", "OwnBook", "BookFile", "BookDepth", "BookRandom"})
+CONFIGURATION_OPTION_FIELDS = {
+    "Hash": "hash_mb",
+    "Threads": "threads",
+    "Speed": "speed",
+    "RandomSeed": "koi_random_seed",
+    "OwnBook": "koi_own_book",
+    "BookFile": "koi_book_file",
+    "BookDepth": "koi_book_depth",
+    "BookRandom": "koi_book_random",
+    "UCI_LimitStrength": "opponent_limit_strength",
+    "UCI_Elo": "opponent_elo",
+}
 
 
 class EloEstimateError(RuntimeError):
@@ -349,11 +372,6 @@ def reproducibility_hash(value: Any) -> str:
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
-def _option(name: str, value: Any) -> str:
-    rendered = str(value).lower() if isinstance(value, bool) else str(value)
-    return f"setoption name {name} value {rendered}"
-
-
 def _engine_by_label(report: Mapping[str, Any], label: str) -> Mapping[str, Any]:
     engines = report.get("engines")
     if not isinstance(engines, list):
@@ -369,23 +387,92 @@ def _engine_by_label(report: Mapping[str, Any], label: str) -> Mapping[str, Any]
     return engine
 
 
-def _require_options(engine: Mapping[str, Any], expected: Sequence[str], label: str) -> None:
+def _canonical_option_value(name: str, value: Any) -> Any:
+    if name in BOOLEAN_OPTION_NAMES:
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            normalized = value.strip().casefold()
+            if normalized in {"true", "1"}:
+                return True
+            if normalized in {"false", "0"}:
+                return False
+        raise EloEstimateError(f"malformed {name} option value")
+    if name in INTEGER_OPTION_NAMES:
+        if name == "UCI_Elo" and value is None:
+            return None
+        if type(value) is int:
+            return value
+        if isinstance(value, str) and re.fullmatch(r"-?[0-9]+", value.strip()):
+            return int(value.strip())
+        raise EloEstimateError(f"malformed {name} option value")
+    if name == "BookFile":
+        if isinstance(value, Path):
+            value = str(value)
+        if not isinstance(value, str) or not value.strip():
+            raise EloEstimateError("malformed BookFile option value")
+        return os.path.normcase(os.path.normpath(value.strip()))
+    raise EloEstimateError(f"unsupported option provenance field: {name}")
+
+
+def _parse_relevant_options(engine: Mapping[str, Any], label: str) -> dict[str, Any]:
     actual = engine.get("options")
     if not isinstance(actual, list) or any(not isinstance(option, str) for option in actual):
         raise EloEstimateError(f"malformed {label} options")
-    missing = [option for option in expected if option not in actual]
-    if missing:
-        raise EloEstimateError(f"{label} option provenance is missing: {missing[0]}")
+    parsed: dict[str, Any] = {}
+    for option in actual:
+        match = SETOPTION_RE.fullmatch(option.strip())
+        if match is None:
+            continue
+        name = RELEVANT_OPTION_NAMES.get(" ".join(match.group("name").split()).casefold())
+        if name is None:
+            continue
+        value = _canonical_option_value(name, match.group("value"))
+        if name in parsed and parsed[name] != value:
+            raise EloEstimateError(f"conflicting {label} option provenance for {name}")
+        parsed[name] = value
+    return parsed
 
 
-def validate_match_manifest(report: Mapping[str, Any], expected_openings: Sequence[str], koi_color: str, anchor: Anchor, koi_options: Mapping[str, Any], time_control: Optional[str], movetime_ms: Optional[int], koi_path: Path) -> tuple[MatchGame, ...]:
+def _require_option_values(actual: Mapping[str, Any], expected: Mapping[str, Any], label: str) -> None:
+    for name, value in expected.items():
+        expected_value = _canonical_option_value(name, value)
+        if name not in actual:
+            raise EloEstimateError(f"{label} option provenance is missing: {name}")
+        if actual[name] != expected_value:
+            raise EloEstimateError(f"{label} option provenance does not match {name}")
+
+
+def _require_configuration_options(configuration: Mapping[str, Any], expected: Mapping[str, Any], label: str) -> None:
+    for name, value in expected.items():
+        field = CONFIGURATION_OPTION_FIELDS[name]
+        if field not in configuration:
+            raise EloEstimateError(f"match configuration is missing {field}")
+        if _canonical_option_value(name, configuration[field]) != _canonical_option_value(name, value):
+            raise EloEstimateError(f"match configuration does not match {label} {name}")
+
+
+def _opening_sequences(expected_openings: Mapping[str, Sequence[str]]) -> dict[str, tuple[str, ...]]:
+    if not isinstance(expected_openings, Mapping) or len(expected_openings) != OPENING_COUNT:
+        raise EloEstimateError("expected openings are malformed")
+    normalized: dict[str, tuple[str, ...]] = {}
+    for name, moves in expected_openings.items():
+        if not isinstance(name, str) or not name or isinstance(moves, (str, bytes)):
+            raise EloEstimateError("expected openings are malformed")
+        sequence = tuple(moves)
+        if not sequence or any(not isinstance(move, str) or UCI_MOVE_RE.fullmatch(move) is None for move in sequence):
+            raise EloEstimateError("expected openings are malformed")
+        normalized[name] = sequence
+    return normalized
+
+
+def validate_match_manifest(report: Mapping[str, Any], expected_openings: Mapping[str, Sequence[str]], koi_color: str, anchor: Anchor, koi_options: Mapping[str, Any], time_control: Optional[str], movetime_ms: Optional[int], koi_path: Path) -> tuple[MatchGame, ...]:
     """Validate a real v2 report before its games affect an Elo estimate."""
 
     if not isinstance(report, Mapping) or report.get("schema") != MATCH_SCHEMA:
         raise EloEstimateError("malformed match report schema")
-    expected = set(expected_openings)
-    if len(expected) != OPENING_COUNT:
-        raise EloEstimateError("expected openings are malformed")
+    expected_sequences = _opening_sequences(expected_openings)
+    expected = set(expected_sequences)
     configuration = report.get("configuration")
     if not isinstance(configuration, Mapping):
         raise EloEstimateError("malformed match configuration")
@@ -406,19 +493,38 @@ def validate_match_manifest(report: Mapping[str, Any], expected_openings: Sequen
         name = position.get("Name") if isinstance(position, Mapping) else None
         if not isinstance(name, str) or not name or "Name" not in position:
             raise EloEstimateError("malformed positions evidence")
+        if name not in expected_sequences or position.get("Fen") != "startpos":
+            raise EloEstimateError(f"opening position evidence does not match {name}")
+        moves = position.get("Moves")
+        if not isinstance(moves, list) or tuple(moves) != expected_sequences[name]:
+            raise EloEstimateError(f"opening position evidence does not match {name}")
         position_names.append(name)
     if len(set(position_names)) != OPENING_COUNT or set(position_names) != expected:
         raise EloEstimateError("positions evidence must contain each expected opening exactly once")
     koi_engine, opponent = _engine_by_label(report, "Koi"), _engine_by_label(report, "Opponent")
     if not _same_path(Path(str(koi_engine.get("path", ""))), koi_path) or not _same_path(Path(str(opponent.get("path", ""))), anchor.path):
         raise EloEstimateError("engine provenance path does not match requested executable")
-    koi_expected = [_option(name, value) for name, value in koi_options.items()]
-    koi_expected.append(_option("BookRandom", False))
-    _require_options(koi_engine, koi_expected, "Koi")
-    opponent_expected = [_option("Hash", 512), _option("Threads", 4), _option("Speed", 100)]
+    koi_actual = _parse_relevant_options(koi_engine, "Koi")
+    if STRENGTH_OPTION_NAMES & koi_actual.keys():
+        raise EloEstimateError("Koi option provenance must not contain opponent strength settings")
+    koi_expected = dict(koi_options)
+    koi_expected.update({"RandomSeed": 1, "BookRandom": False})
+    _require_option_values(koi_actual, koi_expected, "Koi")
+    _require_configuration_options(configuration, koi_expected, "Koi")
+    opponent_actual = _parse_relevant_options(opponent, "Opponent")
+    forbidden_opponent_options = OPPONENT_FORBIDDEN_OPTION_NAMES & opponent_actual.keys()
+    if forbidden_opponent_options:
+        raise EloEstimateError(f"Opponent option provenance contains Koi-only setting: {sorted(forbidden_opponent_options)[0]}")
+    opponent_expected: dict[str, Any] = {"Hash": 512, "Threads": 4, "Speed": 100}
     if anchor.stockfish_elo is not None:
-        opponent_expected.extend([_option("UCI_LimitStrength", True), _option("UCI_Elo", anchor.rating)])
-    _require_options(opponent, opponent_expected, "Opponent")
+        opponent_expected.update({"UCI_LimitStrength": True, "UCI_Elo": anchor.rating})
+    elif STRENGTH_OPTION_NAMES & opponent_actual.keys():
+        raise EloEstimateError("Opponent strength settings are only valid for a Stockfish UCI_Elo anchor")
+    _require_option_values(opponent_actual, opponent_expected, "Opponent")
+    _require_configuration_options(configuration, {
+        "UCI_LimitStrength": anchor.stockfish_elo is not None,
+        "UCI_Elo": anchor.rating if anchor.stockfish_elo is not None else None,
+    }, "Opponent")
     games = report.get("games")
     if not isinstance(games, list) or len(games) != OPENING_COUNT:
         raise EloEstimateError("paired color report must contain exactly 32 games")
@@ -427,7 +533,8 @@ def validate_match_manifest(report: Mapping[str, Any], expected_openings: Sequen
     for index, game in enumerate(games, start=1):
         if not isinstance(game, Mapping) or game.get("position") not in expected or game.get("position") in seen or game.get("koi_color") != koi_color:
             raise EloEstimateError(f"malformed game {index}")
-        seen.add(str(game["position"]))
+        opening_name = str(game["position"])
+        seen.add(opening_name)
         process_status = game.get("process_status")
         if not isinstance(process_status, Mapping) or any(process_status.get(side) != "clean shutdown" for side in ("koi", "opponent")):
             raise EloEstimateError(f"process failure in game {index}")
@@ -436,6 +543,12 @@ def validate_match_manifest(report: Mapping[str, Any], expected_openings: Sequen
             raise EloEstimateError(f"malformed game {index}")
         if any(not isinstance(move, Mapping) or move.get("replay_legal") is not True for move in moves):
             raise EloEstimateError(f"illegal game {index}: legal replay evidence is required")
+        opening_moves = expected_sequences[opening_name]
+        if game.get("initial_fen") != "startpos" or len(moves) < len(opening_moves):
+            raise EloEstimateError(f"opening prefix evidence does not match {opening_name}")
+        for expected_move, move in zip(opening_moves, moves):
+            if move.get("engine_label") != "opening" or move.get("move") != expected_move:
+                raise EloEstimateError(f"opening prefix evidence does not match {opening_name}")
         result, termination = game.get("result"), game.get("termination")
         if not isinstance(result, str) or not isinstance(termination, str):
             raise EloEstimateError(f"malformed game {index}")
@@ -488,7 +601,7 @@ def _harness_command(powershell: str, koi: Path, replay: Path, anchor: Anchor, o
     return command
 
 
-def _run_color_batch(powershell: str, koi: Path, replay: Path, anchor: Anchor, openings_path: Path, expected_openings: Sequence[str], output_directory: Path, color: str, time_control: Optional[str], movetime_ms: Optional[int], koi_options: Mapping[str, Any]) -> tuple[tuple[MatchGame, ...], list[dict[str, str]], Mapping[str, Any]]:
+def _run_color_batch(powershell: str, koi: Path, replay: Path, anchor: Anchor, openings_path: Path, expected_openings: Mapping[str, Sequence[str]], output_directory: Path, color: str, time_control: Optional[str], movetime_ms: Optional[int], koi_options: Mapping[str, Any]) -> tuple[tuple[MatchGame, ...], list[dict[str, str]], Mapping[str, Any]]:
     command = _harness_command(powershell, koi, replay, anchor, openings_path, output_directory, color, time_control, movetime_ms, koi_options)
     try:
         completed = subprocess.run(command, capture_output=True, text=True, check=False)
@@ -601,6 +714,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     try:
         koi, replay, stockfish, openings_path, openings, manifest, time_control, movetime_ms, options, output, hashes = _validate_arguments(args)
         dry_schedule = plan_schedule(manifest.anchors, args.prior_elo, args.max_games)
+        opening_sequences = {opening.name: opening.moves for opening in openings}
         artifacts: list[dict[str, str]] = []
         all_games: list[MatchGame] = []
         pairs: dict[int, list[tuple[float, float]]] = {}
@@ -613,8 +727,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             while schedule:
                 batch = schedule.pop(0)
                 batch_directory = artifact_root / f"batch-{batch.ordinal:02d}-{batch.anchor.id}"
-                white, white_artifacts, white_report = _run_color_batch(powershell, koi, replay, batch.anchor, openings_path, [opening.name for opening in openings], batch_directory / "white", "white", time_control, movetime_ms, options)
-                black, black_artifacts, black_report = _run_color_batch(powershell, koi, replay, batch.anchor, openings_path, [opening.name for opening in openings], batch_directory / "black", "black", time_control, movetime_ms, options)
+                white, white_artifacts, white_report = _run_color_batch(powershell, koi, replay, batch.anchor, openings_path, opening_sequences, batch_directory / "white", "white", time_control, movetime_ms, options)
+                black, black_artifacts, black_report = _run_color_batch(powershell, koi, replay, batch.anchor, openings_path, opening_sequences, batch_directory / "black", "black", time_control, movetime_ms, options)
                 pairs.setdefault(batch.anchor.rating, []).extend(_pairs_for_batch(white, black, [opening.name for opening in openings]))
                 all_games.extend(white)
                 all_games.extend(black)
@@ -644,7 +758,31 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             "results": summary["results"],
             "anchors": [{"id": anchor.id, "path": str(anchor.path), "rating": anchor.rating, "rating_source": anchor.rating_source, "stockfish_uci_elo": anchor.stockfish_elo} for anchor in manifest.anchors],
             "batches": [{"ordinal": batch.ordinal, "phase": batch.phase, "anchor_id": batch.anchor.id, "anchor_rating": batch.anchor.rating, "games": batch.games} for batch in (dry_schedule if args.dry_run else executed)],
-            "configuration": {"mode": args.mode, "time_control": time_control, "movetime_ms": movetime_ms, "no_book_options": koi_option_set("no-book", None), "book_options": koi_option_set("book", args.book) if args.book is not None else None, "active_koi_options": options, "engine_requirements": {"koi": {"path": str(koi), "options": options}, "stockfish": {"path": str(stockfish), "options": {"UCI_LimitStrength": True}}}, "hashes": hashes, "bootstrap": {"samples": BOOTSTRAP_SAMPLES, "seed": BOOTSTRAP_SEED, "unit": "paired opening (Koi White plus Koi Black)"}},
+            "configuration": {
+                "measurement": {
+                    "label": LOCAL_ELO_MEASUREMENT_LABEL,
+                    "perspective": "Koi",
+                    "prior_elo": args.prior_elo,
+                    "min_games": args.min_games,
+                    "max_games": args.max_games,
+                },
+                "mode": args.mode,
+                "time_control": time_control,
+                "movetime_ms": movetime_ms,
+                "no_book_options": koi_option_set("no-book", None),
+                "book_options": koi_option_set("book", args.book) if args.book is not None else None,
+                "active_koi_options": options,
+                "engine_requirements": {
+                    "koi": {"path": str(koi), "options": options},
+                    "stockfish": {"path": str(stockfish), "options": {"UCI_LimitStrength": True}},
+                },
+                "hashes": hashes,
+                "bootstrap": {
+                    "samples": BOOTSTRAP_SAMPLES,
+                    "seed": BOOTSTRAP_SEED,
+                    "unit": "paired opening (Koi White plus Koi Black)",
+                },
+            },
             "artifacts": artifacts,
             "engine_provenance": reports,
         }

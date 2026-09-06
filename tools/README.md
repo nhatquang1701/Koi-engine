@@ -96,6 +96,16 @@ python .\tools\stockfish_match.py `
   --own-book false --threads 4 --output-directory C:\Koi-results\match-1p0-white
 ```
 
+For a reproducible Stockfish strength anchor, use Python's `--opponent-elo`
+alias `--stockfish-elo`, or invoke the PowerShell harness directly with
+`-OpponentElo` alias `-StockfishElo`. An explicit value is clamped to
+1320..3190, enables `UCI_LimitStrength`, and sends `UCI_Elo` only to the
+opponent. Omit the strength option to leave strength limiting disabled.
+
+`--timeout-ms` / `-TimeoutMilliseconds` is a protocol read, readiness, and
+shutdown bound. In a clocked match, the `--time-control` / `-TimeControl`
+chess clock remains the deadline for `bestmove`.
+
 Use `--depth`, `--movetime-ms`, or `--nodes` for fixed limits, and use
 `--fen-file name | six-field FEN` through the existing harness for named FEN
 positions. Run balanced conditions with Koi White and Koi Black, and record the

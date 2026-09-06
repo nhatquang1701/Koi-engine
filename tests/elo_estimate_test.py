@@ -12,6 +12,10 @@ def opening_text():
     return "\n".join(f"opening-{index:02d} | e2e4 e7e5" for index in range(1, 33))
 
 
+def opening_map():
+    return {f"opening-{index:02d}": ("e2e4", "e7e5") for index in range(1, 33)}
+
+
 def make_paths(directory):
     paths = {}
     for name in ("koi.exe", "replay.exe", "stockfish.exe", "lower.exe", "book.bin"):
@@ -50,6 +54,7 @@ def option_line(name, value):
 
 
 def make_match_report(paths, anchor, color, *, result="1-0", own_book=False):
+    openings = opening_map()
     koi_options = [
         option_line("Hash", 512), option_line("Threads", 4), option_line("Speed", 100),
         option_line("RandomSeed", 1), option_line("OwnBook", own_book),
@@ -63,9 +68,12 @@ def make_match_report(paths, anchor, color, *, result="1-0", own_book=False):
         "schema": "koi-uci-match-v2",
         "configuration": {"time_control": "1+0", "movetime_ms": 0, "threads": 4, "speed": 100,
                           "hash_mb": 512, "games_per_position": 1, "koi_color": color,
+                          "koi_random_seed": 1,
                           "koi_own_book": own_book,
                           "koi_book_file": str(paths["book.bin"] if own_book else "book.bin"),
-                          "koi_book_depth": 16},
+                          "koi_book_depth": 16, "koi_book_random": False,
+                          "opponent_limit_strength": anchor.stockfish_elo is not None,
+                          "opponent_elo": anchor.rating if anchor.stockfish_elo is not None else None},
         "engines": [
             {"label": "Koi", "path": str(paths["koi.exe"]), "name": "Koi 1.2.3",
              "identity": ["id name Koi 1.2.3"], "options": koi_options,
@@ -74,12 +82,14 @@ def make_match_report(paths, anchor, color, *, result="1-0", own_book=False):
              "identity": ["id name Stockfish 19"], "options": opponent_options,
              "process_status": "clean shutdown", "exit_code": 0},
         ],
-        "positions": [{"Name": f"opening-{index:02d}"} for index in range(1, 33)],
+        "positions": [{"Name": name, "Fen": "startpos", "Moves": list(moves)}
+                      for name, moves in openings.items()],
         "games": [
-            {"position": f"opening-{index:02d}", "koi_color": color, "result": result,
+            {"position": name, "initial_fen": "startpos", "koi_color": color, "result": result,
              "termination": "checkmate", "process_status": {"koi": "clean shutdown", "opponent": "clean shutdown"},
-             "moves": [{"replay_legal": True}]}
-            for index in range(1, 33)
+             "moves": ([{"move": move, "engine_label": "opening", "replay_legal": True}
+                        for move in moves] + [{"move": "g1f3", "engine_label": "Koi", "replay_legal": True}])}
+            for name, moves in openings.items()
         ],
     }
 
@@ -129,7 +139,7 @@ class EloEstimateTests(unittest.TestCase):
             manifest = elo_estimate.load_anchor_manifest(write_anchor_manifest(directory, paths), paths["stockfish.exe"], 1500)
             anchor, options = manifest.anchors[1], elo_estimate.koi_option_set("no-book", None)
             report = make_match_report(paths, anchor, "white")
-            games = elo_estimate.validate_match_manifest(report, tuple(f"opening-{index:02d}" for index in range(1, 33)), "white", anchor, options, "1+0", None, paths["koi.exe"])
+            games = elo_estimate.validate_match_manifest(report, opening_map(), "white", anchor, options, "1+0", None, paths["koi.exe"])
             self.assertEqual(len(games), 32)
             self.assertTrue(all(game.score == 1.0 for game in games))
             for mutation, expected in (
@@ -146,11 +156,53 @@ class EloEstimateTests(unittest.TestCase):
                 broken = json.loads(json.dumps(report))
                 mutation(broken)
                 with self.subTest(expected=expected), self.assertRaisesRegex(elo_estimate.EloEstimateError, expected):
-                    elo_estimate.validate_match_manifest(broken, tuple(f"opening-{index:02d}" for index in range(1, 33)), "white", anchor, options, "1+0", None, paths["koi.exe"])
+                    elo_estimate.validate_match_manifest(broken, opening_map(), "white", anchor, options, "1+0", None, paths["koi.exe"])
             adjudicated = make_match_report(paths, anchor, "white", result="*")
             for game in adjudicated["games"]:
                 game["termination"] = "adjudicated draw"
-            self.assertEqual(elo_estimate.validate_match_manifest(adjudicated, tuple(f"opening-{index:02d}" for index in range(1, 33)), "white", anchor, options, "1+0", None, paths["koi.exe"])[0].score, 0.5)
+            self.assertEqual(elo_estimate.validate_match_manifest(adjudicated, opening_map(), "white", anchor, options, "1+0", None, paths["koi.exe"])[0].score, 0.5)
+
+    def test_report_validation_rejects_conflicting_options_and_configuration_drift(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            directory = Path(temporary_directory)
+            paths = make_paths(directory)
+            manifest = elo_estimate.load_anchor_manifest(write_anchor_manifest(directory, paths), paths["stockfish.exe"], 1500)
+            anchor, options = manifest.anchors[1], elo_estimate.koi_option_set("no-book", None)
+            report = make_match_report(paths, anchor, "white")
+            for mutation, expected in (
+                (lambda value: value["engines"][0]["options"].append(option_line("OwnBook", True)), "conflicting"),
+                (lambda value: value["configuration"].update({"koi_own_book": True}), "configuration"),
+                (lambda value: value["configuration"].update({"opponent_elo": anchor.rating + 1}), "configuration"),
+                (lambda value: value["configuration"].update({"opponent_limit_strength": False}), "configuration"),
+                (lambda value: value["engines"][0]["options"].append(option_line("UCI_LimitStrength", True)), "strength"),
+            ):
+                broken = json.loads(json.dumps(report))
+                mutation(broken)
+                with self.subTest(expected=expected), self.assertRaisesRegex(elo_estimate.EloEstimateError, expected):
+                    elo_estimate.validate_match_manifest(broken, opening_map(), "white", anchor, options, "1+0", None, paths["koi.exe"])
+
+            book_options = elo_estimate.koi_option_set("book", paths["book.bin"])
+            book_report = make_match_report(paths, anchor, "white", own_book=True)
+            book_report["configuration"]["koi_book_file"] = str(directory / "other-book.bin")
+            with self.assertRaisesRegex(elo_estimate.EloEstimateError, "configuration"):
+                elo_estimate.validate_match_manifest(book_report, opening_map(), "white", anchor, book_options, "1+0", None, paths["koi.exe"])
+
+    def test_report_validation_binds_opening_positions_to_the_requested_sequences(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            directory = Path(temporary_directory)
+            paths = make_paths(directory)
+            manifest = elo_estimate.load_anchor_manifest(write_anchor_manifest(directory, paths), paths["stockfish.exe"], 1500)
+            anchor, options = manifest.anchors[1], elo_estimate.koi_option_set("no-book", None)
+            report = make_match_report(paths, anchor, "white")
+            for mutation in (
+                lambda value: value["positions"][0].update({"Fen": "8/8/8/8/8/8/8/8 w - - 0 1"}),
+                lambda value: value["positions"][0].update({"Moves": ["d2d4", "d7d5"]}),
+                lambda value: value["games"][0]["moves"][0].update({"move": "d2d4"}),
+            ):
+                broken = json.loads(json.dumps(report))
+                mutation(broken)
+                with self.subTest(), self.assertRaisesRegex(elo_estimate.EloEstimateError, "opening"):
+                    elo_estimate.validate_match_manifest(broken, opening_map(), "white", anchor, options, "1+0", None, paths["koi.exe"])
 
     def test_logistic_helpers_have_known_50_75_and_25_percent_values(self):
         self.assertEqual(elo_estimate.expected_score(1800, 1800), 0.5)
@@ -204,6 +256,18 @@ class EloEstimateTests(unittest.TestCase):
             self.assertEqual(len(report["batches"]), 5)
             self.assertEqual(report["results"], {"games": 0, "wins": 0, "draws": 0, "losses": 0, "score": 0.0})
             self.assertIn("manifest", report["configuration"]["hashes"])
+            self.assertEqual(report["configuration"]["measurement"], {
+                "label": "Local Stockfish-equivalent Elo at the recorded hardware, engine versions, options, and time control.",
+                "perspective": "Koi",
+                "prior_elo": 1500,
+                "min_games": 128,
+                "max_games": 320,
+            })
+            for field, changed_value in (("prior_elo", 1501), ("min_games", 192), ("max_games", 192)):
+                changed_schedule = json.loads(json.dumps(report))
+                changed_schedule["configuration"]["measurement"][field] = changed_value
+                with self.subTest(field=field):
+                    self.assertNotEqual(elo_estimate.reproducibility_hash(report), elo_estimate.reproducibility_hash(changed_schedule))
 
     def test_mocked_non_dry_run_invokes_powershell_harness_and_preserves_artifacts(self):
         with tempfile.TemporaryDirectory() as temporary_directory:

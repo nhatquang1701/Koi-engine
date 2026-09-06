@@ -1,6 +1,7 @@
 import contextlib
 import io
 import unittest
+from pathlib import Path
 
 from tools import stockfish_match
 
@@ -32,6 +33,15 @@ class StockfishMatchOptionsTests(unittest.TestCase):
             self.parser.parse_args(self.base + ["--book-random", "maybe"])
         with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
             self.parser.parse_args(self.base + ["--opponent-elo", "not-an-elo"])
+
+    def test_operator_documentation_covers_strength_aliases_clamping_and_omission(self):
+        documentation = (Path(__file__).resolve().parents[1] / "tools" / "README.md").read_text(encoding="utf-8")
+        self.assertIn("`--opponent-elo`", documentation)
+        self.assertIn("`--stockfish-elo`", documentation)
+        self.assertIn("`-OpponentElo`", documentation)
+        self.assertIn("`-StockfishElo`", documentation)
+        self.assertIn("1320..3190", documentation)
+        self.assertRegex(documentation, r"(?is)omit.*strength limiting.*disabled")
 
 
 if __name__ == "__main__":

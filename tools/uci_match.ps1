@@ -237,9 +237,12 @@ function Stop-UciEngine($Engine, [bool]$KillImmediately = $false) {
     return [pscustomobject]@{ status = $status; exit_code = $exitCode; stderr = $stderr }
 }
 
-function Read-UciLine($Engine, [string]$Description) {
+function Read-UciLine($Engine, [string]$Description, [int]$WaitMilliseconds = $TimeoutMilliseconds) {
+    if ($WaitMilliseconds -le 0) {
+        throw [System.TimeoutException]::new("Timed out waiting for ${Engine.Label} ${Description}.")
+    }
     $readTask = $Engine.Process.StandardOutput.ReadLineAsync()
-    if (-not $readTask.Wait($TimeoutMilliseconds)) {
+    if (-not $readTask.Wait($WaitMilliseconds)) {
         throw [System.TimeoutException]::new("Timed out waiting for ${Engine.Label} ${Description}.")
     }
 
@@ -331,13 +334,24 @@ function Get-GoCommand($Clock) {
     return "go depth $Depth"
 }
 
+function Get-ClockRemainingMilliseconds($Clock, [string]$Side) {
+    if ($null -eq $Clock) {
+        return $null
+    }
+    $property = if ($Side -ceq 'w') { 'white_ms' } else { 'black_ms' }
+    return [int64]$Clock.$property
+}
+
 function Update-Clock($Clock, [string]$Side, [int64]$ElapsedMilliseconds) {
     if ($null -eq $Clock) {
         return
     }
     $property = if ($Side -ceq 'w') { 'white_ms' } else { 'black_ms' }
-    $remaining = [Math]::Max([int64]0, [int64]$Clock.$property - $ElapsedMilliseconds)
-    $Clock.$property = $remaining + $Clock.increment_ms
+    $remaining = [int64]$Clock.$property
+    if ($ElapsedMilliseconds -gt $remaining) {
+        throw [System.TimeoutException]::new("${Side} exceeded its chess clock by $($ElapsedMilliseconds - $remaining) ms.")
+    }
+    $Clock.$property = ($remaining - $ElapsedMilliseconds) + $Clock.increment_ms
 }
 
 function Parse-InfoLine([string]$Line) {
@@ -366,10 +380,11 @@ function Parse-InfoLine([string]$Line) {
     }
 }
 
-function Search-UciEngine($Engine, $Position, $Moves, $Clock) {
+function Search-UciEngine($Engine, $Position, $Moves, $Clock, [string]$Side) {
     $positionCommand = Format-PositionCommand $Position $Moves
     Send-UciLine $Engine $positionCommand
     $goCommand = Get-GoCommand $Clock
+    $clockDeadlineMilliseconds = Get-ClockRemainingMilliseconds $Clock $Side
     $started = [System.Diagnostics.Stopwatch]::StartNew()
     Send-UciLine $Engine $goCommand
 
@@ -380,7 +395,18 @@ function Search-UciEngine($Engine, $Position, $Moves, $Clock) {
     $bookUsed = $false
     $bookMove = $null
     while ($null -eq $bestMove) {
-        $line = Read-UciLine $Engine 'bestmove'
+        # Handshakes/readiness remain bounded by the protocol timeout. A clocked
+        # search instead waits through its actual chess-clock deadline, which
+        # prevents a short protocol timeout from becoming a false move deadline.
+        $waitMilliseconds = $TimeoutMilliseconds
+        if ($null -ne $clockDeadlineMilliseconds) {
+            $remainingMilliseconds = $clockDeadlineMilliseconds - [int64]$started.ElapsedMilliseconds
+            if ($remainingMilliseconds -le 0) {
+                throw [System.TimeoutException]::new("${Engine.Label} exceeded its chess clock before bestmove.")
+            }
+            $waitMilliseconds = [int][Math]::Min([int64][int]::MaxValue, $remainingMilliseconds)
+        }
+        $line = Read-UciLine $Engine 'bestmove' $waitMilliseconds
         $bookMatch = [regex]::Match($line, '^info string book move\s+([a-h][1-8][a-h][1-8][nbrq]?)\s+depth\s+(\d+)\s*$')
         if ($bookMatch.Success) {
             if ($bookUsed) {
@@ -400,6 +426,9 @@ function Search-UciEngine($Engine, $Position, $Moves, $Clock) {
         $bestMatch = [regex]::Match($line, '^bestmove\s+(\S+)')
         if ($bestMatch.Success) {
             $bestMove = $bestMatch.Groups[1].Value.ToLowerInvariant()
+            if ($null -ne $clockDeadlineMilliseconds -and [int64]$started.ElapsedMilliseconds -gt $clockDeadlineMilliseconds) {
+                throw [System.TimeoutException]::new("${Engine.Label} exceeded its chess clock before bestmove.")
+            }
             if ($bookUsed -and $bestMove -ne $bookMove) {
                 throw "Book marker '$bookMove' does not match bestmove '$bestMove'."
             }
@@ -649,7 +678,8 @@ try {
                 $engine = if ($koiTurn) { $koiEngine } else { $opponentEngine }
                 $positionCommand = Format-PositionCommand $position $moves
                 try {
-                    $search = Search-UciEngine $engine $position $moves $clock
+                    $search = Search-UciEngine $engine $position $moves $clock $side
+                    Update-Clock $clock $side $search.elapsed_ms
                 } catch {
                     $termination = if ($_.Exception -is [System.TimeoutException]) { 'timeout' } else { 'process exit' }
                     $result = '*'
@@ -704,7 +734,6 @@ try {
 
                 $moves.Add($search.move)
                 $rootFen = $moveReplay.fen
-                Update-Clock $clock $side $search.elapsed_ms
                 $result = $moveReplay.result
                 if ($result -ne '*') {
                     $termination = $moveReplay.termination
@@ -798,6 +827,7 @@ $report = [ordered]@{
         hash_mb = $Hash
         max_plies = $MaxPlies
         timeout_ms = $TimeoutMilliseconds
+        protocol_timeout_ms = $TimeoutMilliseconds
         games_per_position = $Games
         koi_color = $KoiColor
         time_control = $pgnTimeControl
@@ -806,6 +836,8 @@ $report = [ordered]@{
         koi_book_file = $KoiBookFile
         koi_book_depth = $KoiBookDepth
         koi_book_random = $KoiBookRandom
+        opponent_limit_strength = ($null -ne $OpponentEloAnchor)
+        opponent_elo = $OpponentEloAnchor
     }
     engines = $engineSummary
     positions = @($positions)

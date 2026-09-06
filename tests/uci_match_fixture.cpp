@@ -36,6 +36,9 @@ std::vector<std::string> moves_for(std::string_view name) {
     if (name.contains("slow-koi")) {
         return {"e2e4"};
     }
+    if (name.contains("clock-before-deadline-koi") || name.contains("clock-after-deadline-koi")) {
+        return {"e2e4"};
+    }
     return {"e7e5"};
 }
 
@@ -62,6 +65,12 @@ int main(int argument_count, char* arguments[]) {
         } else if (line.starts_with("go ")) {
             if (name.contains("slow-koi") && go_count == 0) {
                 std::this_thread::sleep_for(std::chrono::seconds(5));
+            }
+            if (name.contains("clock-before-deadline") && go_count == 0) {
+                std::this_thread::sleep_for(std::chrono::seconds(6));
+            }
+            if (name.contains("clock-after-deadline") && go_count == 0) {
+                std::this_thread::sleep_for(std::chrono::seconds(61));
             }
             if (name.contains("clock-")) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(25));

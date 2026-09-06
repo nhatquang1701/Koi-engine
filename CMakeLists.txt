@@ -231,6 +231,15 @@ add_test(
 set_tests_properties(koi_uci_match_process PROPERTIES TIMEOUT 120)
 
 add_test(
+    NAME koi_uci_match_clock
+    COMMAND ${POWERSHELL_EXECUTABLE} -NoProfile -ExecutionPolicy Bypass -File
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/uci_match_clock_test.ps1"
+            -EnginePath "$<TARGET_FILE:koi_engine>"
+)
+
+set_tests_properties(koi_uci_match_clock PROPERTIES TIMEOUT 120)
+
+add_test(
     NAME windows_ci_configuration
     COMMAND ${POWERSHELL_EXECUTABLE} -NoProfile -ExecutionPolicy Bypass -File
             "${CMAKE_CURRENT_SOURCE_DIR}/tests/ci_configuration_test.ps1"

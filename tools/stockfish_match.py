@@ -103,7 +103,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "--timeout-ms",
         type=_positive_int,
         default=5000,
-        help="per-engine read timeout",
+        help="protocol read/ready timeout; clocked searches use --time-control as their deadline",
     )
     parser.add_argument("--koi-color", choices=("white", "black"), default="white")
     parser.add_argument(
