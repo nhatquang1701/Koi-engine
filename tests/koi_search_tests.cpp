@@ -1300,6 +1300,25 @@ void test_low_phase_search_skips_null_pruning() {
             "null-move pruning must stay disabled below the safe game-phase threshold");
 }
 
+void test_sparse_phase_rich_position_skips_null_pruning() {
+    koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>());
+    koi::SearchLimits limits;
+    limits.depth = 6;
+    limits.nodes = 50'000;
+    const koi::GameState root = require_state("r2qk3/8/8/8/8/8/1Q5P/4K2R w - - 0 1");
+    const koi::TablebaseSnapshot snapshot = root.tablebase_snapshot();
+    require(root.position_features().game_phase >= 8 && snapshot.piece_count() <= 8 &&
+                root.has_non_pawn_material(root.side_to_move()) &&
+                root.has_non_pawn_material(koi::opposite(root.side_to_move())),
+            "the sparse null fixture must retain phase-rich non-pawn material on both sides");
+
+    const koi::SearchResult result = search(service, root, limits);
+    require(result.best_move.has_value() && root.is_legal(*result.best_move),
+            "a sparse phase-rich search must return a legal move");
+    require(result.stats.null_cutoffs == 0,
+            "null-move pruning must stay disabled in sparse phase-rich positions");
+}
+
 void test_eligible_null_move_receives_verification() {
     koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>());
     koi::SearchLimits limits;
@@ -1808,6 +1827,7 @@ int main() {
         {"shorter mate preference", test_search_prefers_the_shorter_forced_mate},
         {"pawn-only zugzwang null safety", test_pawn_only_zugzwang_search_skips_null_pruning},
         {"low-phase null safety", test_low_phase_search_skips_null_pruning},
+        {"sparse phase-rich null safety", test_sparse_phase_rich_position_skips_null_pruning},
         {"eligible null verification", test_eligible_null_move_receives_verification},
         {"shallow futility tactical safety", test_shallow_futility_pruning_is_safe_in_tactical_positions},
         {"shallow futility accounting", test_shallow_futility_accounts_for_safe_quiet_prunes},

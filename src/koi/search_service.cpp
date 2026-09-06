@@ -31,6 +31,9 @@ constexpr int kMaximumQuiescenceSafetyDepth = 64;
 constexpr int kMaximumQuiescenceCheckDepth = 2;
 constexpr int kAspirationWindow = 50;
 constexpr std::size_t kMaximumMultiPv = 16;
+constexpr int kHighHistoryMoveThreshold = 256;
+constexpr std::size_t kNullMoveSparsePieceLimit = 8;
+constexpr std::uint16_t kNullMoveRuleSafetyHalfmoves = 90;
 
 std::optional<int> mate_from_score(int score) noexcept {
     if (score >= kMateThreshold) {
@@ -150,6 +153,11 @@ bool quiet_move_is_forcing(const PositionFeatures& before, const GameState& afte
     const PositionFeatures features = after.position_features();
     const std::size_t own = before.side_to_move == Color::white ? 0U : 1U;
     const std::size_t enemy = 1U - own;
+    if (features.king_zone_attacks[enemy] > before.king_zone_attacks[enemy]) {
+        // A quiet move which opens lines or adds pressure around the enemy
+        // king is a forcing continuation even if it is not an immediate check.
+        return true;
+    }
     const std::uint8_t destination = metadata.move.to().index();
     if (destination >= 64) {
         return false;
@@ -215,6 +223,20 @@ bool quiet_move_is_forcing(const PositionFeatures& before, const GameState& afte
         }
     }
     return false;
+}
+
+bool null_move_is_safe(const GameState& state, const PositionFeatures& features) noexcept {
+    if (features.game_phase < 8 ||
+        !state.has_non_pawn_material(state.side_to_move()) ||
+        !state.has_non_pawn_material(opposite(state.side_to_move())) ||
+        state.halfmove_clock() >= kNullMoveRuleSafetyHalfmoves) {
+        return false;
+    }
+
+    // Sparse positions contain too little tactical reserve for the null-move
+    // assumption to be dependable, even when their phase value remains high
+    // because the few remaining pieces are major pieces.
+    return state.tablebase_snapshot().piece_count() > kNullMoveSparsePieceLimit;
 }
 
 constexpr std::size_t kMaximumPvLength = static_cast<std::size_t>(kMaximumSearchDepth);
@@ -552,8 +574,7 @@ struct SearchContext {
         }
 
         if (allow_null_pruning && !checked && depth >= 3 && beta < kInfinity && beta > -kInfinity &&
-            beta - alpha <= 1 && features.game_phase >= 8 &&
-            state.has_non_pawn_material(state.side_to_move())) {
+            beta - alpha <= 1 && null_move_is_safe(state, features)) {
             if (state.make_null_move()) {
                 PrincipalVariation null_pv;
                 const int reduction = depth >= 6 ? 3 : 2;
@@ -596,18 +617,18 @@ struct SearchContext {
             }
             const Move move = metadata.move;
             const Color moving_side = history_side(state.side_to_move(), false);
+            const int history_score = ordering.quiet_history_score(moving_side, move, previous_move);
             const bool is_tt_move = tt_move.has_value() && move == *tt_move;
             const bool lmr_candidate = move_number >= 4 && depth >= 4 && !checked &&
                 !metadata.gives_check && !metadata.is_capture() &&
                 move.promotion() == Promotion::none && !is_tt_move &&
-                !ordering.is_killer(move, ply);
+                !ordering.is_killer(move, ply) && history_score < kHighHistoryMoveThreshold;
             const std::optional<PositionFeatures> before_quiet_features = lmr_candidate ?
                 std::optional<PositionFeatures>{state.position_features()} : std::nullopt;
             if (!state.make_legal_move(metadata)) {
                 continue;
             }
 
-            const int history_score = ordering.quiet_history_score(moving_side, move, previous_move);
             const bool reducible_quiet = lmr_candidate && !state.in_check() &&
                 (before_quiet_features.has_value() &&
                  !quiet_move_is_forcing(*before_quiet_features, state, metadata));
