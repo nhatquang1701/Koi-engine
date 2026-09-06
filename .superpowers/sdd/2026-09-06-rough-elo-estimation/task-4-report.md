@@ -184,3 +184,62 @@ CMake Error at CMakeLists.txt:1 (cmake_minimum_required):
 Therefore a fresh Release configure/build and CTest run could not be executed in
 this environment. No real engine match was run because user-supplied Stockfish,
 anchor paths, and an external results location were not provided.
+
+## Review fix round 1 — fresh CMake and CTest verification
+
+The earlier CMake 3.27.1 failure was specific to the default `cmake` on `PATH`.
+It is superseded by fresh verification using the Visual Studio Build Tools CMake
+3.31.6 executable at:
+
+```text
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe
+```
+
+The commands were run from a proper x64 `VsDevCmd` environment.
+
+### CMake version
+
+Command:
+
+```text
+"C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" --version
+```
+
+Exit code: `0`
+
+Output:
+
+```text
+cmake version 3.31.6
+```
+
+### Release build
+
+Command:
+
+```text
+cmake --build out\roadmap-release2 --config Release --parallel 4
+```
+
+Exit code: `0`
+
+Output summary: `98/98` build steps completed successfully.
+
+### CTest
+
+Command:
+
+```text
+ctest --test-dir out\roadmap-release2 -C Release --output-on-failure
+```
+
+Exit code: `0`
+
+Output summary:
+
+```text
+100% tests passed, 22/22 tests passed, total time 116.57s
+```
+
+The required Release build and CTest verification is now complete; the previous
+default-CMake limitation is no longer a blocker.
