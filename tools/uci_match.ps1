@@ -47,6 +47,9 @@ param(
     [ValidateRange(1, 4096)]
     [int]$Hash = 16,
 
+    [Alias('StockfishElo')]
+    [Nullable[int]]$OpponentElo,
+
     [ValidateRange(1, 512)]
     [int]$MaxPlies = 512,
 
@@ -59,6 +62,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $KoiOwnBook = $KoiOwnBook -in @('true', '1')
+$OpponentEloAnchor = $null
+if ($null -ne $OpponentElo) {
+    $OpponentEloAnchor = [Math]::Max(1320, [Math]::Min(3190, $OpponentElo))
+}
 
 if ($MovetimeMs -gt 0 -and $Nodes -gt 0) {
     throw 'Choose at most one of -MovetimeMs and -Nodes.'
@@ -264,6 +271,15 @@ function Initialize-UciEngine($Engine) {
             "setoption name OwnBook value $($KoiOwnBook.ToString().ToLowerInvariant())",
             "setoption name BookFile value $KoiBookFile",
             "setoption name BookDepth value $KoiBookDepth"
+        )) {
+            Send-UciLine $Engine $option
+            $Engine.SentOptions.Add($option)
+        }
+    }
+    if ($Engine.Label -ceq 'Opponent' -and $null -ne $OpponentEloAnchor) {
+        foreach ($option in @(
+            'setoption name UCI_LimitStrength value true',
+            "setoption name UCI_Elo value $OpponentEloAnchor"
         )) {
             Send-UciLine $Engine $option
             $Engine.SentOptions.Add($option)

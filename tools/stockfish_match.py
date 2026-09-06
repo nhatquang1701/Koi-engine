@@ -21,6 +21,10 @@ class MatchToolError(RuntimeError):
     """An actionable match-tool configuration or process error."""
 
 
+STOCKFISH_MIN_ELO = 1320
+STOCKFISH_MAX_ELO = 3190
+
+
 def _positive_int(value: str) -> int:
     try:
         parsed = int(value)
@@ -39,6 +43,14 @@ def _nonnegative_int(value: str) -> int:
     if parsed < 0:
         raise argparse.ArgumentTypeError("must not be negative")
     return parsed
+
+
+def _stockfish_elo(value: str) -> int:
+    try:
+        parsed = int(value)
+    except ValueError as error:
+        raise argparse.ArgumentTypeError("must be an integer") from error
+    return max(STOCKFISH_MIN_ELO, min(STOCKFISH_MAX_ELO, parsed))
 
 
 def _time_control(value: str) -> str:
@@ -78,6 +90,13 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--threads", type=_positive_int, default=1, help="Koi and opponent Threads")
     parser.add_argument("--speed", type=_positive_int, default=100, help="Koi Speed")
     parser.add_argument("--hash", type=_positive_int, default=16, dest="hash_mb", help="Koi Hash in MiB")
+    parser.add_argument(
+        "--opponent-elo",
+        "--stockfish-elo",
+        dest="opponent_elo",
+        type=_stockfish_elo,
+        help="Stockfish UCI_Elo anchor; enables UCI_LimitStrength",
+    )
     parser.add_argument("--max-plies", type=_positive_int, default=512, help="maximum plies per game")
     parser.add_argument(
         "--timeout-ms",
@@ -147,6 +166,8 @@ def build_command(args: argparse.Namespace, powershell: Optional[str] = None) ->
     _append(command, "-Threads", args.threads)
     _append(command, "-Speed", args.speed)
     _append(command, "-Hash", args.hash_mb)
+    if getattr(args, "opponent_elo", None) is not None:
+        _append(command, "-OpponentElo", args.opponent_elo)
     _append(command, "-MaxPlies", args.max_plies)
     _append(command, "-TimeoutMilliseconds", args.timeout_ms)
     _append(command, "-KoiColor", args.koi_color)
