@@ -1,0 +1,54 @@
+{
+  "schema": "koi-measurement-forensics-v1",
+  "positions": [
+    {
+      "id": "opening-drift-001",
+      "category": "opening_drift",
+      "fen": "r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3",
+      "side": "white",
+      "purpose": "Open-game position for measuring an early move away from development and central control."
+    },
+    {
+      "id": "missed-development-001",
+      "category": "missed_development",
+      "fen": "rnbqk2r/ppp2ppp/4pn2/3p4/1bPP4/2N2N2/PP2PPPP/R1BQKB1R w KQkq - 2 5",
+      "side": "white",
+      "purpose": "Position with both sides committed to development choices for detecting a neglected minor piece."
+    },
+    {
+      "id": "pawn-break-001",
+      "category": "pawn_break",
+      "fen": "r1b1kbnr/pp3ppp/1qn1p3/2ppP3/3P4/2P2N2/PP3PPP/RNBQKB1R w KQkq - 3 6",
+      "side": "white",
+      "purpose": "Closed-center position where a timely pawn break is the measured decision."
+    },
+    {
+      "id": "queen-rook-shuffling-001",
+      "category": "queen_rook_shuffling",
+      "fen": "r2qr1k1/1bp1bppp/p1np1n2/1p2p3/3PP3/1BP2N2/PP3PPP/R1BQRNK1 b - - 4 11",
+      "side": "black",
+      "purpose": "Ruy Lopez structure with developed rooks and queens where repeated heavy-piece moves can be measured."
+    },
+    {
+      "id": "poisoned-capture-001",
+      "category": "poisoned_capture",
+      "fen": "r1bqkb1r/pp3ppp/2p2n2/n2Pp1N1/8/3B4/PPPP1PPP/RNBQK2R b KQkq - 1 7",
+      "side": "black",
+      "purpose": "Tactical opening position for checking whether an apparently free capture is safe."
+    },
+    {
+      "id": "fork-001",
+      "category": "fork",
+      "fen": "r1bq1rk1/2p1bppp/p1np1n2/1p2p3/3PP3/1BP2N2/PP3PPP/R1BQR1K1 b - - 0 9",
+      "side": "black",
+      "purpose": "Developed middlegame position for detecting a legal knight or pawn fork opportunity."
+    },
+    {
+      "id": "king-attack-001",
+      "category": "king_attack",
+      "fen": "rnbq1rk1/1p2bppp/p2p1n2/4p3/4P3/1NN5/PPP1BPPP/R1BQ1RK1 w - - 4 9",
+      "side": "white",
+      "purpose": "King-safety position for measuring forcing attacking moves against a castled king."
+    }
+  ]
+}

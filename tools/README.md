@@ -34,7 +34,8 @@ python -m unittest .\tests\elo_oracle_test.py -v
 `elo_oracle.py` reads standard SAN PGN mainlines. Comments, NAGs, and recursive
 variations are ignored by the mainline walk; castling, promotion, FEN setup
 headers, side-to-move, move number, sequential ply, pre-move FEN, SAN, and UCI
-move are retained in each position record.
+move are retained in each position record. Mainline comments, NAGs, and
+recognized `%eval`/`%clk` tokens are retained under `annotations` when present.
 
 Extract positions without starting either engine:
 
@@ -61,6 +62,40 @@ actual SAN/UCI move, Koi suggestion, Stockfish scores, timings, and separate CPL
 for the actual and suggested move. Scores are normalized to White's perspective;
 mate is represented as +/-100000 cp. Do not turn a CPL report into an Elo claim
 without a comparable baseline and color-balanced match evidence.
+
+Forensic extraction of every PGN below the checked-in user-test directory uses
+the deterministic corpus walker. It preserves the same per-position records,
+adds one SHA-256 for each input file, and writes a timestamp-independent
+`content_sha256` for reproducibility:
+
+```powershell
+python .\tools\pgn_forensics.py `
+  --pgn-dir ".\third_party\User tests"
+```
+
+The default `koi-pgn-forensics-v1` report is written below the system temporary
+directory. Use `--output C:\Koi-results\pgn-forensics.json` for a stable
+external path; repository-local report paths are rejected.
+
+## Read-only GigaBase sampling
+
+`gigabase_extract.py` accepts a SQLite-backed GigaBase export, opens it with
+`mode=ro`, enables and verifies `PRAGMA query_only`, and never copies or writes
+the source database. It uses seed `240906` by default, caps the sample at
+200,000 games and 2,000,000 positions, and emits separate train, validation,
+and holdout manifests plus a summary under the external temporary directory:
+
+```powershell
+python .\tools\gigabase_extract.py `
+  --database C:\Koi-inputs\gigabase.sqlite `
+  --output-dir C:\Koi-results\gigabase
+```
+
+The adapter discovers a game/position table and records only source IDs,
+position counts, and content hashes in the `koi-gigabase-manifest-v1` outputs.
+Use `--table`, `--id-column`, `--pgn-column`, or
+`--position-count-column` when a GigaBase export uses nonstandard names.
+Generated output directories must be outside the repository.
 
 ## Licensed-book audit
 
