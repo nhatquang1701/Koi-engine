@@ -26,7 +26,7 @@ struct TranspositionEntry {
 
 class TranspositionTable {
 public:
-    explicit TranspositionTable(std::size_t megabytes = 16);
+    explicit TranspositionTable(std::size_t megabytes = 512);
 
     void set_size_mb(std::size_t megabytes);
     [[nodiscard]] std::size_t size_mb() const noexcept;

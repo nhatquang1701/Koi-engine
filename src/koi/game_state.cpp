@@ -8,6 +8,8 @@
 #include <cstdlib>
 #include <limits>
 #include <memory>
+#include <mutex>
+#include <shared_mutex>
 #include <utility>
 
 #include <chess.hpp>
@@ -1132,6 +1134,29 @@ constexpr int promotion_exchange_gain(Promotion promotion) noexcept {
     return exchange_piece_value(promotion_piece_type(promotion)) - exchange_piece_value(PieceType::pawn);
 }
 
+constexpr std::uint64_t kCoreCenterMask =
+    (std::uint64_t{1} << 27) | (std::uint64_t{1} << 28) |
+    (std::uint64_t{1} << 35) | (std::uint64_t{1} << 36);
+
+std::uint64_t king_zone_mask(std::uint8_t square) noexcept {
+    if (square >= Square::kInvalid) {
+        return 0;
+    }
+    const int file = square % 8;
+    const int rank = square / 8;
+    std::uint64_t mask = 0;
+    for (int rank_delta = -1; rank_delta <= 1; ++rank_delta) {
+        for (int file_delta = -1; file_delta <= 1; ++file_delta) {
+            const int target_file = file + file_delta;
+            const int target_rank = rank + rank_delta;
+            if (target_file >= 0 && target_file < 8 && target_rank >= 0 && target_rank < 8) {
+                mask |= std::uint64_t{1} << (target_rank * 8 + target_file);
+            }
+        }
+    }
+    return mask;
+}
+
 bool exchange_piece_attacks_square(const std::array<Piece, 64>& board, int source, int target) noexcept {
     const Piece piece = board[static_cast<std::size_t>(source)];
     if (piece.empty() || source == target) {
@@ -1220,16 +1245,20 @@ public:
     chess::Board board{};
     std::vector<HistoryRecord> history;
     struct FeatureCache {
-        std::uint64_t position_key;
-        PositionFeatures features;
+        std::uint64_t position_key = 0;
+        PositionFeatures features{};
     };
-    mutable std::shared_ptr<const FeatureCache> feature_cache;
+    mutable std::shared_mutex feature_cache_mutex;
+    mutable FeatureCache feature_cache;
+    mutable bool feature_cache_valid = false;
 
     Impl() = default;
 
-    Impl(const Impl& other)
-        : board(other.board), history(other.history),
-          feature_cache(std::atomic_load_explicit(&other.feature_cache, std::memory_order_acquire)) {}
+    Impl(const Impl& other) : board(other.board), history(other.history) {
+        std::shared_lock lock(other.feature_cache_mutex);
+        feature_cache = other.feature_cache;
+        feature_cache_valid = other.feature_cache_valid;
+    }
 };
 
 GameState::GameState() : impl_(std::make_unique<Impl>()) {}
@@ -1435,8 +1464,9 @@ std::vector<MoveMetadata> GameState::legal_moves_with_metadata() const {
 }
 
 void GameState::legal_moves_with_metadata(MoveMetadataList& moves,
-                                          bool include_check_flags) const noexcept {
+                                           bool include_check_flags) const noexcept {
     moves.clear();
+    const std::uint64_t key = position_key();
     chess::Movelist native_moves;
     chess::movegen::legalmoves(native_moves, impl_->board);
 
@@ -1455,11 +1485,13 @@ void GameState::legal_moves_with_metadata(MoveMetadataList& moves,
             break;
         }
     }
+    finalize_metadata(moves, key);
 }
 
 bool GameState::legal_tactical_moves_with_metadata(MoveMetadataList& moves,
                                                    bool include_quiet_checks) const noexcept {
     moves.clear();
+    const std::uint64_t key = position_key();
 
     const chess::Color side_to_move = impl_->board.sideToMove();
     const bool sanitize_opponent_check =
@@ -1497,6 +1529,7 @@ bool GameState::legal_tactical_moves_with_metadata(MoveMetadataList& moves,
         for (chess::Move native_move : evasions) {
             append_if_legal(native_move, false);
         }
+        finalize_metadata(moves, key);
         return has_legal_move;
     }
 
@@ -1539,6 +1572,7 @@ bool GameState::legal_tactical_moves_with_metadata(MoveMetadataList& moves,
         }
     }
 
+    finalize_metadata(moves, key);
     return has_legal_move;
 }
 
@@ -1552,15 +1586,41 @@ std::optional<MoveMetadata> GameState::describe_move(const Move& move) const noe
         return std::nullopt;
     }
     const bool gives_check = impl_->board.givesCheck(native_move) != chess::CheckType::NO_CHECK;
-    return metadata_for_native_move(impl_->board, native_move, move, gives_check);
+    MoveMetadata metadata = metadata_for_native_move(impl_->board, native_move, move, gives_check);
+    metadata.position_key = position_key();
+    if (metadata.is_capture() || move.promotion() != Promotion::none) {
+        metadata.see_score = static_cast<std::int16_t>(std::clamp(
+            direct_static_exchange_gain(metadata),
+            static_cast<int>(std::numeric_limits<std::int16_t>::min()),
+            static_cast<int>(std::numeric_limits<std::int16_t>::max())));
+    }
+    return metadata;
+}
+
+void GameState::finalize_metadata(MoveMetadataList& moves, const std::uint64_t key) const noexcept {
+    for (MoveMetadata& metadata : moves) {
+        metadata.position_key = key;
+        if (metadata.is_capture() || metadata.move.promotion() != Promotion::none) {
+            metadata.see_score = static_cast<std::int16_t>(std::clamp(
+                direct_static_exchange_gain(metadata),
+                static_cast<int>(std::numeric_limits<std::int16_t>::min()),
+                static_cast<int>(std::numeric_limits<std::int16_t>::max())));
+        }
+    }
 }
 
 PositionFeatures GameState::position_features() const noexcept {
     const std::uint64_t key = position_key();
-    const std::shared_ptr<const Impl::FeatureCache> cached =
-        std::atomic_load_explicit(&impl_->feature_cache, std::memory_order_acquire);
-    if (cached != nullptr && cached->position_key == key) {
-        return cached->features;
+    {
+        std::shared_lock lock(impl_->feature_cache_mutex);
+        if (impl_->feature_cache_valid && impl_->feature_cache.position_key == key) {
+            return impl_->feature_cache.features;
+        }
+    }
+
+    std::unique_lock lock(impl_->feature_cache_mutex);
+    if (impl_->feature_cache_valid && impl_->feature_cache.position_key == key) {
+        return impl_->feature_cache.features;
     }
 
     PositionFeatures features;
@@ -1593,6 +1653,18 @@ PositionFeatures GameState::position_features() const noexcept {
             break;
         default:
             break;
+        }
+
+        if (piece.type() == chess::PieceType::KNIGHT || piece.type() == chess::PieceType::BISHOP) {
+            const bool white_home = piece.color() == chess::Color::WHITE &&
+                ((piece.type() == chess::PieceType::KNIGHT && (index == 1 || index == 6)) ||
+                 (piece.type() == chess::PieceType::BISHOP && (index == 2 || index == 5)));
+            const bool black_home = piece.color() == chess::Color::BLACK &&
+                ((piece.type() == chess::PieceType::KNIGHT && (index == 57 || index == 62)) ||
+                 (piece.type() == chess::PieceType::BISHOP && (index == 58 || index == 61)));
+            if (!white_home && !black_home) {
+                ++features.development[color_index];
+            }
         }
 
         chess::Bitboard piece_attacks;
@@ -1632,13 +1704,15 @@ PositionFeatures GameState::position_features() const noexcept {
             std::popcount(attacks[color_index] & ~own));
         features.king_squares[color_index] = Square::from_index(
             static_cast<std::uint8_t>(impl_->board.kingSq(color).index()));
+        features.center_control[color_index] = static_cast<std::uint8_t>(
+            std::popcount(attacks[color_index] & kCoreCenterMask));
     }
-    try {
-        auto replacement = std::make_shared<const Impl::FeatureCache>(Impl::FeatureCache{key, features});
-        std::atomic_store_explicit(&impl_->feature_cache, std::move(replacement), std::memory_order_release);
-    } catch (const std::bad_alloc&) {
-        // The cache is optional; feature extraction remains valid if allocating it fails.
+    for (std::size_t color = 0; color < 2; ++color) {
+        features.king_zone_attacks[color] = static_cast<std::uint8_t>(std::popcount(
+            attacks[1 - color] & king_zone_mask(features.king_squares[color].index())));
     }
+    impl_->feature_cache = Impl::FeatureCache{key, features};
+    impl_->feature_cache_valid = true;
     return features;
 }
 
@@ -1711,6 +1785,7 @@ bool GameState::make_move(const Move& move) noexcept {
             impl_->history.pop_back();
             return false;
         }
+        invalidate_feature_cache();
         return true;
     } catch (...) {
         return false;
@@ -1718,6 +1793,9 @@ bool GameState::make_move(const Move& move) noexcept {
 }
 
 bool GameState::make_legal_move(const MoveMetadata& metadata) noexcept {
+    if (metadata.position_key != position_key()) {
+        return false;
+    }
     const chess::Move native_move = native_move_for_metadata(metadata);
     if (native_move.move() == chess::Move::NO_MOVE) {
         return false;
@@ -1730,6 +1808,7 @@ bool GameState::make_legal_move(const MoveMetadata& metadata) noexcept {
             impl_->history.pop_back();
             return false;
         }
+        invalidate_feature_cache();
         return true;
     } catch (...) {
         return false;
@@ -1746,6 +1825,7 @@ bool GameState::unmake_move() noexcept {
     }
     impl_->board.unmakeMove(record.move);
     impl_->history.pop_back();
+    invalidate_feature_cache();
     return true;
 }
 
@@ -1759,6 +1839,7 @@ bool GameState::make_null_move() noexcept {
             impl_->history.pop_back();
             return false;
         }
+        invalidate_feature_cache();
         return true;
     } catch (...) {
         return false;
@@ -1771,7 +1852,13 @@ bool GameState::unmake_null_move() noexcept {
     }
     impl_->board.unmakeNullMove();
     impl_->history.pop_back();
+    invalidate_feature_cache();
     return true;
+}
+
+void GameState::invalidate_feature_cache() noexcept {
+    std::unique_lock lock(impl_->feature_cache_mutex);
+    impl_->feature_cache_valid = false;
 }
 
 bool GameState::is_capture(const Move& move) const noexcept {

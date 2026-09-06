@@ -1,0 +1,11 @@
+[Event "Engine Match"]
+[Site "En Croissant"]
+[Date "2026.09.05"]
+[Round "?"]
+[White "Koi Engine"]
+[Black "Koi Engine"]
+[Result "1/2-1/2"]
+[Orientation "white"]
+
+{[%eval +0.31] } 1. Nc3 {[%eval 0.00] } Nc6 {[%eval +0.25] } 2. d4 {[%eval +0.16] } d5 {[%eval +0.17] } 3. Nf3 {[%eval +0.05] } Nf6 {[%eval +0.18] } 4. Qd3 {[%eval -0.15] } a6 {[%eval -0.09] } 5. a3 {[%eval -0.07] } Qd6?! {[%eval +0.60] }  (5... g6  6. Bf4 Bg7 7. O-O-O O-O 8. Ne5 Nh5 9. Bg5 Bxe5 10. dxe5) 6. Be3?! {[%eval +0.01] }  (6. g3  Bg4 7. Bf4 Qe6 8. Bg2 Bf5 9. Qd2 h6 10. h4 O-O-O) Be6 {[%eval +0.16] } 7. h3 {[%eval -0.03] } h6 {[%eval +0.49] } 8. g4 {[%eval 0.00] } g5 {[%eval +0.16] } 9. Bg2 {[%eval +0.25] } Bg7 {[%eval +0.23] } 10. Kf1?! {[%eval -0.37] }  (10. O-O-O  O-O-O 11. Kb1 Nd7 12. Bc1 Nb6 13. b3 Kb8 14. e4 Bc8) Kf8 {[%eval 0.00] } 11. Rh2?! {[%eval -0.72] }  (11. Rd1  Rd8 12. Bc1 Ke8 13. b3 Kd7 14. b4 Ke8 15. Ke1 b5) Rb8?! {[%eval 0.00] }  (11... Ne4  12. Kg1 f5 13. gxf5 Bxf5 14. Nxd5 Qxd5 15. Nd2 Nxd2 16. Bxd5) 12. Rb1?! {[%eval -0.84] }  (12. Rh1  Rd8 13. Rd1 Bc8 14. Ke1 b6 15. Kd2 b5 16. Ke1 Kg8) Rh7?! {[%eval 0.00] }  (12... Ne4  13. Rh1 f5 14. Ne1 f4 15. Bc1 Nxd4 16. Nxe4 dxe4 17. Bxe4) 13. Ra1 {[%eval 0.00] } Rh8 {[%eval 0.00] } 14. Rb1?! {[%eval -0.86] }  (14. Rh1  Rd8 15. Rd1 Bc8 16. Ke1 b5 17. b4 Kg8 18. Kf1 Kf8) Rh7?! {[%eval 0.00] }  (14... Ne4  15. Rh1 f5 16. Nh2 Nxc3 17. bxc3 f4 18. Bc1 Bf7 19. Nf3) 15. Ra1 {[%eval 0.00] } Na5 {[%eval +0.01] } 16. Bc1 {[%eval -0.49] } Nc6 {[%eval 0.00] } 17. Be3 {[%eval 0.00] } 1/2-1/2
+

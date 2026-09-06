@@ -64,6 +64,22 @@ without a comparable baseline and color-balanced match evidence.
 
 ## Licensed-book audit
 
+Install the pinned CC0 opening book beside a specific engine executable with
+the one-time installer:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\install_book.ps1 `
+  -EnginePath C:\Koi\koi-engine.exe
+```
+
+`-EnginePath` is mandatory and must identify an existing local `.exe` file.
+The installer downloads the pinned `lichess_1900_rapid_2026-05.bin` asset from
+the `books-2026-05-v1` release, verifies SHA-256
+`56abc70e5291b4338356009d380e565fd85eab8067f6bf34927b5807ff231370`, and
+installs it as `book.bin` in the executable's directory. It refuses to replace
+a different existing book unless `-Force` is supplied. Temporary downloads are
+cleaned up, and Koi has no runtime network dependency.
+
 `book_audit.py` is the named entrypoint for the existing separate book-audit mode.
 It keeps book hits and book-move CPL out of ordinary search metrics and uses
 `OwnBook=true`, `BookDepth=16`, and `BookRandom=false`:

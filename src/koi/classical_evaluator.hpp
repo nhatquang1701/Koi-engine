@@ -11,6 +11,9 @@ struct EvaluationBreakdown {
     int mobility = 0;
     int pawn_structure = 0;
     int activity = 0;
+    int development = 0;
+    int center_control = 0;
+    int initiative = 0;
     int king_safety = 0;
     int king_activity = 0;
     int passed_pawn = 0;

@@ -76,7 +76,7 @@ $fenFile = Join-Path $outputDirectory 'terminal.fen'
 try {
     $output = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $matchScript `
         -KoiPath $EnginePath -OpponentPath $EnginePath -Depth 1 -Games 1 `
-        -MaxPlies 2 -OutputDirectory $outputDirectory
+        -MaxPlies 2 -KoiOwnBook false -OutputDirectory $outputDirectory
     if ($LASTEXITCODE -ne 0) {
         throw "UCI match script exited with ${LASTEXITCODE}: $($output -join ' | ')"
     }
@@ -117,9 +117,18 @@ try {
             [string]::IsNullOrWhiteSpace($ply.engine) -or
             [string]::IsNullOrWhiteSpace($ply.engine_label) -or
             [string]::IsNullOrWhiteSpace($ply.bestmove_line) -or
-            $ply.infos.Count -lt 1 -or $ply.final_info.pv.Count -lt 1 -or
-            $ply.all_info_lines.Count -lt 1) {
+            @($ply.all_info_lines).Count -lt 1) {
             throw 'UCI match JSON must preserve reproducible v2 per-ply command and engine fields.'
+        }
+        if ($ply.book_used) {
+            if ([string]::IsNullOrWhiteSpace($ply.book_move) -or
+                @($ply.infos).Count -ne 0 -or $null -ne $ply.final_info -or
+                $ply.bestmove_line -notmatch ('^bestmove ' + [regex]::Escape($ply.book_move) + '$')) {
+                throw 'UCI match JSON must keep book-backed plies separate from search PV fields.'
+            }
+        } elseif (@($ply.infos).Count -lt 1 -or $null -eq $ply.final_info -or
+                  @($ply.final_info.pv).Count -lt 1) {
+            throw 'UCI match JSON must preserve search info and a final PV for non-book plies.'
         }
     }
     if ($firstPly.evaluation -eq $null) {

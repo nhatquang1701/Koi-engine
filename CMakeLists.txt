@@ -14,6 +14,12 @@ if(NOT CMAKE_CXX_COMPILER_ARCHITECTURE_ID STREQUAL "x64")
     message(FATAL_ERROR "Koi Engine v1 requires an x86-64 compiler target")
 endif()
 
+if(NOT CMAKE_CXX_COMPILER_ID MATCHES "^(MSVC|Clang|GNU)$")
+    message(FATAL_ERROR
+        "Koi Engine Release builds require an MSVC, clang-cl, or GNU compiler "
+        "with an explicit AVX2 target; unsupported compiler ID: ${CMAKE_CXX_COMPILER_ID}")
+endif()
+
 set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -23,7 +29,7 @@ if(MSVC AND NOT DEFINED CMAKE_CXX26_STANDARD_COMPILE_OPTION)
 endif()
 
 if(MSVC)
-    add_compile_options(/permissive-)
+    add_compile_options(/permissive- "$<$<CONFIG:Release>:/arch:AVX2>")
     include(CheckIPOSupported)
     check_ipo_supported(RESULT KOI_IPO_SUPPORTED OUTPUT KOI_IPO_ERROR LANGUAGES CXX)
     if(KOI_IPO_SUPPORTED)
@@ -31,6 +37,8 @@ if(MSVC)
     else()
         message(WARNING "Koi Engine Release IPO/LTO is unavailable: ${KOI_IPO_ERROR}")
     endif()
+else()
+    add_compile_options("$<$<CONFIG:Release>:-mavx2>")
 endif()
 
 include(CTest)
@@ -244,6 +252,14 @@ add_test(
     COMMAND ${POWERSHELL_EXECUTABLE} -NoProfile -ExecutionPolicy Bypass -File
             "${CMAKE_CURRENT_SOURCE_DIR}/tests/ci_configuration_test.ps1"
 )
+
+add_test(
+    NAME install_book_script
+    COMMAND ${POWERSHELL_EXECUTABLE} -NoProfile -ExecutionPolicy Bypass -File
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/install_book_test.ps1"
+)
+
+set_tests_properties(install_book_script PROPERTIES TIMEOUT 30)
 
 find_package(Python3 COMPONENTS Interpreter QUIET)
 if(Python3_Interpreter_FOUND)

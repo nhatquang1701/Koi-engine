@@ -51,7 +51,9 @@ std::uint16_t polyglot_move(std::string_view from, std::string_view to,
     const auto source = koi::Square::parse(from);
     const auto target = koi::Square::parse(to);
     require(source.has_value() && target.has_value(), "Polyglot coordinate fixture must be valid");
-    return static_cast<std::uint16_t>(source->index() | (target->index() << 6) | (promotion << 12));
+    // Polyglot stores the destination in bits 0..5 and the origin in
+    // bits 6..11.  Keep the test writer aligned with real .bin books.
+    return static_cast<std::uint16_t>(target->index() | (source->index() << 6) | (promotion << 12));
 }
 
 template <class UInt>

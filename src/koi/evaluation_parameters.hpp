@@ -5,7 +5,7 @@
 namespace koi {
 
 struct ClassicalEvaluationParameters {
-    std::string_view version = "classical-eval-v2";
+    std::string_view version = "classical-eval-v3-development-center-threats";
     int pawn_value = 100;
     int knight_value = 320;
     int bishop_value = 330;
@@ -30,6 +30,10 @@ struct ClassicalEvaluationParameters {
     int rook_open_file_bonus = 20;
     int rook_seventh_rank_bonus = 15;
     int queen_mobility_weight = 1;
+    int development_bonus = 10;
+    int center_control_weight = 7;
+    int center_control_phase_offset = 8;
+    int attacked_piece_pressure_weight = 2;
     int bishop_pair_bonus = 30;
     int king_shield_bonus = 14;
     int king_open_file_penalty = 10;

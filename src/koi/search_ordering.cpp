@@ -144,9 +144,11 @@ void SearchMoveOrdering::order(const GameState& state, MoveMetadataList& moves,
                                std::optional<Move> previous_move) const {
     scored_move_count_ = 0;
     for (const MoveMetadata& metadata : moves) {
+        const int score = priority(state, metadata, tt_move, ply, previous_move);
+        MoveMetadata scored_metadata = metadata;
+        scored_metadata.ordering_score = score;
         scored_moves_[scored_move_count_++] = ScoredMove{
-            metadata, priority(state, metadata, tt_move, ply, previous_move),
-            move_tie_break_key(metadata.move)};
+            scored_metadata, score, move_tie_break_key(metadata.move)};
     }
 
     std::sort(scored_moves_.begin(), scored_moves_.begin() + moves.size(), [](const ScoredMove& lhs, const ScoredMove& rhs) {
@@ -169,8 +171,8 @@ int SearchMoveOrdering::priority(const GameState& state, const MoveMetadata& met
     if (metadata.is_capture()) {
         const int victim_value = piece_value(metadata.captured_piece);
         const int attacker_value = piece_value(metadata.moving_piece);
-        const int see = std::clamp(static_exchange_gain(state, metadata), -piece_value(PieceType::queen),
-                                   piece_value(PieceType::queen));
+        const int see = std::clamp(static_cast<int>(metadata.see_score),
+                                   -piece_value(PieceType::queen), piece_value(PieceType::queen));
         return kCapturePriority + (victim_value * 16) - attacker_value +
             promotion_value(move.promotion()) + see * kSeeOrderingWeight;
     }
@@ -195,9 +197,11 @@ void SearchMoveOrdering::order(const GameState& state, std::vector<MoveMetadata>
                                int ply, std::optional<Move> previous_move) const {
     scored_move_count_ = 0;
     for (const MoveMetadata& metadata : moves) {
+        const int score = priority(state, metadata, tt_move, ply, previous_move);
+        MoveMetadata scored_metadata = metadata;
+        scored_metadata.ordering_score = score;
         scored_moves_[scored_move_count_++] = ScoredMove{
-            metadata, priority(state, metadata, tt_move, ply, previous_move),
-            move_tie_break_key(metadata.move)};
+            scored_metadata, score, move_tie_break_key(metadata.move)};
     }
 
     std::sort(scored_moves_.begin(), scored_moves_.begin() + moves.size(), [](const ScoredMove& lhs, const ScoredMove& rhs) {

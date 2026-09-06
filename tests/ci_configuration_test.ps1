@@ -34,3 +34,5 @@ Require-WorkflowPattern '(?m)^\s*cmake\s+--build\s+out\\ci-\$\{\{ matrix\.config
 Require-WorkflowPattern '(?m)^\s*ctest\s+--test-dir\s+out\\ci-\$\{\{ matrix\.configuration \}\}\s+-C\s+\$\{\{ matrix\.configuration \}\}\s+--output-on-failure\s*$' 'the CTest command'
 Require-CMakePattern '(?i)check_ipo_supported' 'an IPO/LTO capability check'
 Require-CMakePattern '(?i)CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE\s+ON' 'portable Release IPO/LTO'
+Require-CMakePattern '(?i)AVX2' 'the required AVX2 Release optimization flag'
+Require-CMakePattern '(?i)CONFIG:Release' 'a Release-only AVX2 configuration guard'

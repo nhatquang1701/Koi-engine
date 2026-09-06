@@ -162,7 +162,7 @@ void write_profile_json(const std::string& path, const BenchmarkConfig& config,
            << "  \"warm_hash\": " << (config.warm_hash ? "true" : "false") << ",\n"
            << "  \"hash_state\": \"" << (config.warm_hash ? "warm" : "cold") << "\",\n"
            << "  \"timed\": " << (config.timed ? "true" : "false") << ",\n"
-           << "  \"hash_mb\": 16,\n"
+           << "  \"hash_mb\": 512,\n"
            << "  \"threads\": " << config.threads << ",\n"
            << "  \"speed\": " << static_cast<unsigned>(config.speed_percent) << ",\n"
            << "  \"positions\": [\n";
@@ -178,7 +178,7 @@ void write_profile_json(const std::string& path, const BenchmarkConfig& config,
         output << ", \"fen\": ";
         write_json_string(output, benchmark.fen);
         output << ", \"limits\": {\"depth\": " << static_cast<unsigned>(benchmark.depth)
-               << "}, \"hash_mb\": 16, \"hash_state\": \""
+               << "}, \"hash_mb\": 512, \"hash_state\": \""
                << (config.warm_hash ? "warm" : "cold") << "\", \"threads\": " << config.threads
                << ", \"speed\": " << static_cast<unsigned>(config.speed_percent)
                << ", \"score_cp\": " << result.score_cp << ", \"pv\": [";
@@ -241,13 +241,13 @@ int main(int argc, char** argv) {
         if (config->profile_json_path.has_value()) {
             profile_runs.reserve(benchmarks.size());
         }
-        std::optional<koi::SearchService> warm_service;
-        if (config->warm_hash) {
-            warm_service.emplace(std::make_shared<koi::ClassicalEvaluator>());
-        }
+        koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>());
         for (const koi::StrengthPosition& benchmark : benchmarks) {
-            koi::SearchService cold_service(std::make_shared<koi::ClassicalEvaluator>());
-            koi::SearchService& service = warm_service.has_value() ? *warm_service : cold_service;
+            if (!config->warm_hash) {
+                // Reuse the 512 MB allocation while keeping every cold position
+                // independent of entries produced by its predecessor.
+                service.clear_hash();
+            }
             const BenchmarkRun run = run_position(benchmark, *config, service);
             const koi::SearchResult& result = run.result;
             const bool matched = result.best_move.has_value() && accepts_move(benchmark, *result.best_move);

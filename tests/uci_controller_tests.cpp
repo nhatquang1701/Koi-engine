@@ -3,6 +3,7 @@
 #include <chrono>
 #include <condition_variable>
 #include <cstdint>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -94,7 +95,9 @@ std::uint16_t polyglot_move(std::string_view from, std::string_view to) {
     const auto source = koi::Square::parse(from);
     const auto target = koi::Square::parse(to);
     require(source.has_value() && target.has_value(), "Polyglot coordinates must be valid");
-    return static_cast<std::uint16_t>(source->index() | (target->index() << 6));
+    // Polyglot stores the destination in bits 0..5 and the origin in
+    // bits 6..11.
+    return static_cast<std::uint16_t>(target->index() | (source->index() << 6));
 }
 
 koi::GameState position_after(const std::vector<std::string_view>& moves) {
@@ -342,7 +345,7 @@ void test_uci_handshake_has_identity_and_supported_options_in_order() {
         "id name Koi Engine\n"
         "id author Koi Engine contributors\n"
         "option name RandomSeed type spin default 0 min 0 max 2147483647\n"
-        "option name Hash type spin default 16 min 1 max 4096\n"
+        "option name Hash type spin default 512 min 1 max 4096\n"
         "option name Threads type spin default 1 min 1 max " + std::to_string(maximum_threads()) + "\n"
         "option name Speed type spin default 100 min 1 max 100\n"
         "option name UCI_AnalyseMode type check default false\n"
@@ -928,7 +931,7 @@ void test_hash_options_preserve_the_contract_and_never_advertise_threads() {
         "quit\n");
 
     require(result.exit_code == 0, "Hash and Clear Hash commands must leave the controller usable");
-    require(result.output.find("option name Hash type spin default 16 min 1 max 4096\n") != std::string::npos,
+    require(result.output.find("option name Hash type spin default 512 min 1 max 4096\n") != std::string::npos,
             "the Hash option must retain its documented default and bounds");
     require(result.output.find("option name Clear Hash type button\n") != std::string::npos,
             "Clear Hash must remain a UCI button option");
@@ -1378,6 +1381,7 @@ void test_go_limit_parser_uses_fallback_for_missing_malformed_and_overflow_value
 void test_ponder_option_emits_a_legal_second_pv_move() {
     GatedInputBuffer input(
         "setoption name Ponder value true\n"
+        "setoption name OwnBook value false\n"
         "position startpos\n"
         "go depth 2\n",
         "stop\n"
@@ -1623,8 +1627,12 @@ int main() {
         {"promptly flushed responses", test_protocol_responses_flush_promptly},
     };
 
+    const char* filter = std::getenv("KOI_TEST_FILTER");
     int failures = 0;
     for (const TestCase& test : tests) {
+        if (filter != nullptr && std::string_view(test.name).find(filter) == std::string_view::npos) {
+            continue;
+        }
         try {
             test.run();
             std::cout << "PASS " << test.name << '\n';

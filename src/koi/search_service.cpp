@@ -15,7 +15,6 @@
 #include <vector>
 
 #include "koi/detail/search_ordering.hpp"
-#include "koi/detail/static_exchange.hpp"
 #include "koi/syzygy_tablebase.hpp"
 #include "koi/time_manager.hpp"
 #include "koi/transposition_table.hpp"
@@ -85,6 +84,137 @@ constexpr int piece_value(PieceType type) noexcept {
         return 0;
     }
     return 0;
+}
+
+bool piece_attacks_square(const PositionFeatures& features, std::uint8_t source,
+                          std::uint8_t target) noexcept {
+    if (source >= 64 || target >= 64 || source == target) {
+        return false;
+    }
+    const Piece piece = features.board[source];
+    if (piece.empty()) {
+        return false;
+    }
+
+    const int source_file = source % 8;
+    const int source_rank = source / 8;
+    const int target_file = target % 8;
+    const int target_rank = target / 8;
+    const int file_delta = target_file - source_file;
+    const int rank_delta = target_rank - source_rank;
+    const int abs_file_delta = std::abs(file_delta);
+    const int abs_rank_delta = std::abs(rank_delta);
+
+    switch (piece.type) {
+    case PieceType::pawn:
+        return rank_delta == (piece.color == Color::white ? 1 : -1) && abs_file_delta == 1;
+    case PieceType::knight:
+        return (abs_file_delta == 1 && abs_rank_delta == 2) ||
+               (abs_file_delta == 2 && abs_rank_delta == 1);
+    case PieceType::king:
+        return abs_file_delta <= 1 && abs_rank_delta <= 1;
+    case PieceType::bishop:
+    case PieceType::rook:
+    case PieceType::queen:
+        break;
+    case PieceType::none:
+        return false;
+    }
+
+    const bool diagonal = abs_file_delta == abs_rank_delta && abs_file_delta != 0;
+    const bool orthogonal = (file_delta == 0) != (rank_delta == 0);
+    if ((piece.type == PieceType::bishop && !diagonal) ||
+        (piece.type == PieceType::rook && !orthogonal) ||
+        (piece.type == PieceType::queen && !diagonal && !orthogonal)) {
+        return false;
+    }
+
+    const int file_step = file_delta == 0 ? 0 : (file_delta > 0 ? 1 : -1);
+    const int rank_step = rank_delta == 0 ? 0 : (rank_delta > 0 ? 1 : -1);
+    for (int file = source_file + file_step, rank = source_rank + rank_step;
+         file != target_file || rank != target_rank; file += file_step, rank += rank_step) {
+        if (!features.board[static_cast<std::size_t>(rank * 8 + file)].empty()) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool quiet_move_is_forcing(const PositionFeatures& before, const GameState& after,
+                           const MoveMetadata& metadata) {
+    if (metadata.is_capture() || metadata.gives_check ||
+        metadata.move.promotion() != Promotion::none) {
+        return false;
+    }
+
+    const PositionFeatures features = after.position_features();
+    const std::size_t own = before.side_to_move == Color::white ? 0U : 1U;
+    const std::size_t enemy = 1U - own;
+    const std::uint8_t destination = metadata.move.to().index();
+    if (destination >= 64) {
+        return false;
+    }
+
+    int attacked_valuable_pieces = 0;
+    for (std::uint8_t square = 0; square < 64; ++square) {
+        const Piece target = features.board[square];
+        if (target.empty() || target.type == PieceType::king ||
+            (target.color == Color::white ? 0U : 1U) != enemy ||
+            !piece_attacks_square(features, destination, square)) {
+            continue;
+        }
+        if (target.type == PieceType::queen || target.type == PieceType::rook) {
+            return true;
+        }
+        if (++attacked_valuable_pieces >= 2) {
+            return true;
+        }
+    }
+
+    const std::uint64_t newly_attacked = features.attacked_squares[own] &
+        ~before.attacked_squares[own];
+    for (std::uint8_t square = 0; square < 64; ++square) {
+        if ((newly_attacked & (std::uint64_t{1} << square)) == 0) {
+            continue;
+        }
+        const Piece target = features.board[square];
+        if (!target.empty() && (target.color == Color::white ? 0U : 1U) == enemy &&
+            (target.type == PieceType::queen || target.type == PieceType::rook ||
+             target.type == PieceType::bishop || target.type == PieceType::knight)) {
+            return true;
+        }
+    }
+
+    const Piece moved = features.board[destination];
+    if (moved.type == PieceType::pawn && (moved.color == Color::white ? 0U : 1U) == own) {
+        const int rank = destination / 8;
+        const int file = destination % 8;
+        const int direction = moved.color == Color::white ? 1 : -1;
+        bool passed = true;
+        for (int candidate_file = std::max(0, file - 1);
+             candidate_file <= std::min(7, file + 1); ++candidate_file) {
+            for (int candidate_rank = rank + direction;
+                 candidate_rank >= 0 && candidate_rank < 8;
+                 candidate_rank += direction) {
+                const Piece candidate = features.board[
+                    static_cast<std::size_t>(candidate_rank * 8 + candidate_file)];
+                if (candidate.type == PieceType::pawn &&
+                    (candidate.color == Color::white ? 0U : 1U) == enemy) {
+                    passed = false;
+                }
+            }
+        }
+        const bool advanced = moved.color == Color::white ? rank >= 4 : rank <= 3;
+        const bool central_break = (file == 3 || file == 4) &&
+            (rank == 3 || rank == 4);
+        if (passed && advanced) {
+            return true;
+        }
+        if (central_break) {
+            return true;
+        }
+    }
+    return false;
 }
 
 constexpr std::size_t kMaximumPvLength = static_cast<std::size_t>(kMaximumSearchDepth);
@@ -315,7 +445,7 @@ struct SearchContext {
             const Move move = metadata.move;
             if (!checked && metadata.is_capture() &&
                 move.promotion() == Promotion::none && !metadata.gives_check) {
-                if (detail::static_exchange_gain(state, metadata) < 0) {
+                if (metadata.see_score < 0) {
                     ++stats.see_prunes;
                     continue;
                 }
@@ -379,6 +509,7 @@ struct SearchContext {
             ++depth;
         }
 
+        const PositionFeatures features = state.position_features();
         const bool tactical_position = checked || std::any_of(moves.begin(), moves.end(),
             [](const MoveMetadata& metadata) {
                 return metadata.is_capture() || metadata.gives_check ||
@@ -386,7 +517,7 @@ struct SearchContext {
             });
         int static_eval = 0;
         if (!checked && depth == 1 && !tactical_position &&
-            state.position_features().game_phase >= 8) {
+            features.game_phase >= 8) {
             static_eval = evaluate(state, state.side_to_move());
             if (depth == 1 && alpha > -kInfinity && static_eval + 120 <= alpha) {
                 const int razor_score = quiescence(state, alpha, beta, ply);
@@ -421,7 +552,7 @@ struct SearchContext {
         }
 
         if (allow_null_pruning && !checked && depth >= 3 && beta < kInfinity && beta > -kInfinity &&
-            beta - alpha <= 1 && state.position_features().game_phase >= 8 &&
+            beta - alpha <= 1 && features.game_phase >= 8 &&
             state.has_non_pawn_material(state.side_to_move())) {
             if (state.make_null_move()) {
                 PrincipalVariation null_pv;
@@ -434,7 +565,7 @@ struct SearchContext {
                 }
                 if (null_score >= beta) {
                     int verified_score = null_score;
-                    if (depth >= 6) {
+                    if (depth >= 5) {
                         ++stats.null_verifications;
                         PrincipalVariation verification_pv;
                         verified_score = negamax(state, depth - 1, alpha, beta, ply,
@@ -465,15 +596,21 @@ struct SearchContext {
             }
             const Move move = metadata.move;
             const Color moving_side = history_side(state.side_to_move(), false);
+            const bool is_tt_move = tt_move.has_value() && move == *tt_move;
+            const bool lmr_candidate = move_number >= 4 && depth >= 4 && !checked &&
+                !metadata.gives_check && !metadata.is_capture() &&
+                move.promotion() == Promotion::none && !is_tt_move &&
+                !ordering.is_killer(move, ply);
+            const std::optional<PositionFeatures> before_quiet_features = lmr_candidate ?
+                std::optional<PositionFeatures>{state.position_features()} : std::nullopt;
             if (!state.make_legal_move(metadata)) {
                 continue;
             }
 
-            const bool is_tt_move = tt_move.has_value() && move == *tt_move;
             const int history_score = ordering.quiet_history_score(moving_side, move, previous_move);
-            const bool reducible_quiet = move_number >= 4 && depth >= 4 && !checked && !state.in_check() &&
-                !metadata.gives_check && !metadata.is_capture() && move.promotion() == Promotion::none &&
-                !is_tt_move && !ordering.is_killer(move, ply);
+            const bool reducible_quiet = lmr_candidate && !state.in_check() &&
+                (before_quiet_features.has_value() &&
+                 !quiet_move_is_forcing(*before_quiet_features, state, metadata));
             const int full_child_depth = depth - 1;
             const int base_reduction = 1 + (depth >= 8 && move_number >= 12 ? 1 : 0) +
                 (depth >= 12 && move_number >= 20 ? 1 : 0);
@@ -486,7 +623,7 @@ struct SearchContext {
             }
 
             if (!checked && !tactical_position && depth == 1 &&
-                state.position_features().game_phase >= 8 && !metadata.is_capture() &&
+                features.game_phase >= 8 && !metadata.is_capture() &&
                 !metadata.gives_check && move.promotion() == Promotion::none && move_number > 0 &&
                 static_eval + 80 + depth * 60 <= alpha) {
                 ++stats.quiet_futility_prunes;

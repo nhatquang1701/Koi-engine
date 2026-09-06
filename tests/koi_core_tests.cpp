@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <atomic>
 #include <iostream>
 #include <stdexcept>
@@ -37,6 +38,8 @@ bool contains_uci_move(const Position& position, std::string_view expected) {
 bool same_features(const koi::PositionFeatures& first, const koi::PositionFeatures& second) {
     if (first.attacked_squares != second.attacked_squares || first.mobility != second.mobility ||
         first.king_squares != second.king_squares || first.pawn_file_masks != second.pawn_file_masks ||
+        first.development != second.development || first.center_control != second.center_control ||
+        first.king_zone_attacks != second.king_zone_attacks ||
         first.game_phase != second.game_phase || first.side_to_move != second.side_to_move) {
         return false;
     }
@@ -397,6 +400,31 @@ void test_tactical_generation_omits_quiet_checks_after_the_checking_horizon() {
     }
 }
 
+void test_move_metadata_caches_see_and_rejects_stale_positions() {
+    const auto state_result = koi::GameState::from_fen(
+        "4k3/8/8/3q4/4Q3/8/8/4K3 w - - 0 1");
+    require(state_result.has_value(), "metadata cache fixture must be valid");
+    koi::GameState state = *state_result;
+    const std::uint64_t original_key = state.position_key();
+    koi::MoveMetadataList moves;
+    state.legal_moves_with_metadata(moves);
+
+    const auto selected = std::find_if(moves.begin(), moves.end(), [](const koi::MoveMetadata& metadata) {
+        return metadata.move.uci() == "e4d5";
+    });
+    require(selected != moves.end(), "metadata cache fixture must include the queen capture");
+    require(selected->position_key == original_key,
+            "generated metadata must carry the position identity it describes");
+    require(selected->see_score >= 500,
+            "generated captures must cache a materially useful SEE score");
+
+    const koi::MoveMetadata capture = *selected;
+    require(state.make_legal_move(capture), "fresh generated metadata must be fast-applicable");
+    require(!state.make_legal_move(capture),
+            "metadata from a previous position must be rejected as stale");
+    require(state.unmake_move(), "stale metadata fixture must unmake cleanly");
+}
+
 struct TestCase {
     std::string_view name;
     void (*run)();
@@ -425,6 +453,7 @@ int main() {
         {"position feature concurrent reads", test_position_features_are_safe_for_concurrent_const_reads},
         {"position feature concurrent copy", test_copying_a_const_state_is_safe_while_its_feature_cache_is_populated},
         {"tactical checking horizon", test_tactical_generation_omits_quiet_checks_after_the_checking_horizon},
+        {"metadata SEE cache", test_move_metadata_caches_see_and_rejects_stale_positions},
     };
 
     for (const TestCase& test : tests) {

@@ -94,7 +94,10 @@ struct SearchOptions {
     // and exceptions are ignored by the search implementation.
     using QuietHistorySideHook = std::function<Color(Color candidate, bool after_unmake)>;
 
-    std::size_t hash_mb = 16;
+    // The portable engine default is intentionally sized for the supported
+    // 32 GiB development/match machine.  UCI can still reduce this for small
+    // GUI hosts, and the TT keeps its 1..4096 MiB safety bounds.
+    std::size_t hash_mb = 512;
     std::size_t threads = 1;
     std::uint8_t speed_percent = 100;
     std::size_t multi_pv = 1;

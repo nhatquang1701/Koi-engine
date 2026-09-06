@@ -202,22 +202,6 @@ constexpr bool inside(int file, int rank) noexcept {
     return file >= 0 && file < 8 && rank >= 0 && rank < 8;
 }
 
-std::uint64_t king_zone(std::uint8_t square) noexcept {
-    const int file = square % 8;
-    const int rank = square / 8;
-    std::uint64_t zone = 0;
-    for (int rank_delta = -1; rank_delta <= 1; ++rank_delta) {
-        for (int file_delta = -1; file_delta <= 1; ++file_delta) {
-            const int target_file = file + file_delta;
-            const int target_rank = rank + rank_delta;
-            if (inside(target_file, target_rank)) {
-                zone |= std::uint64_t{1} << (target_rank * 8 + target_file);
-            }
-        }
-    }
-    return zone;
-}
-
 bool insufficient_material(const PositionFeatures& features) noexcept {
     int minor_count = 0;
     bool only_bishops = true;
@@ -296,6 +280,41 @@ int tapered_piece_square(PieceType type, std::uint8_t square, int phase) noexcep
     const int end = end_game_table(type)[square];
     return (middle * phase + end * (kEvaluation.maximum_phase - phase)) /
         kEvaluation.maximum_phase;
+}
+
+int development_for(const PositionFeatures& features, Color color) noexcept {
+    const int phase = features.game_phase;
+    return static_cast<int>(features.development[color_index(color)]) *
+        kEvaluation.development_bonus * phase / kEvaluation.maximum_phase;
+}
+
+int center_control_for(const PositionFeatures& features, Color color) noexcept {
+    const int phase = features.game_phase;
+    return static_cast<int>(features.center_control[color_index(color)]) *
+        kEvaluation.center_control_weight * (phase + kEvaluation.center_control_phase_offset) /
+        (kEvaluation.maximum_phase + kEvaluation.center_control_phase_offset);
+}
+
+int initiative_for(const PositionFeatures& features, Color color) noexcept {
+    const int own = color_index(color);
+    const int enemy = 1 - own;
+    int score = 0;
+    for (std::uint8_t square = 0; square < 64; ++square) {
+        const Piece piece = features.board[square];
+        if (piece.empty() || color_index(piece.color) != enemy || piece.type == PieceType::king) {
+            continue;
+        }
+        const std::uint64_t square_bit = std::uint64_t{1} << square;
+        // An attack on a defended piece is not, by itself, a useful threat:
+        // rewarding it inflated quiet positions where the opponent can
+        // simply recapture the attacker.  Keep this term conservative and
+        // reserve it for genuinely loose valuable pieces.
+        if ((features.attacked_squares[own] & square_bit) != 0 &&
+            (features.attacked_squares[enemy] & square_bit) == 0) {
+            score += piece_value(piece.type) * kEvaluation.attacked_piece_pressure_weight / 100;
+        }
+    }
+    return score;
 }
 
 int king_activity_for(const PositionFeatures& features, Color color) noexcept {
@@ -531,7 +550,6 @@ int activity_for(const PositionFeatures& features, Color color) noexcept {
 
 int king_safety_for(const PositionFeatures& features, Color color) noexcept {
     const int own = color_index(color);
-    const int enemy = 1 - own;
     const std::uint8_t king = features.king_squares[own].index();
     if (king >= 64) {
         return 0;
@@ -553,8 +571,7 @@ int king_safety_for(const PositionFeatures& features, Color color) noexcept {
     if (!has_pawn_on_file(features, own, file)) {
         score -= kEvaluation.king_open_file_penalty;
     }
-    const std::uint64_t zone = king_zone(king);
-    score -= std::popcount(features.attacked_squares[enemy] & zone) * kEvaluation.king_zone_attack_penalty;
+    score -= static_cast<int>(features.king_zone_attacks[own]) * kEvaluation.king_zone_attack_penalty;
     return score;
 }
 
@@ -584,6 +601,12 @@ EvaluationBreakdown ClassicalEvaluator::breakdown(const GameState& state, Color 
     score.pawn_structure = pawn_structure_for(features, Color::white) -
                            pawn_structure_for(features, Color::black);
     score.activity = activity_for(features, Color::white) - activity_for(features, Color::black);
+    score.development = development_for(features, Color::white) -
+                        development_for(features, Color::black);
+    score.center_control = center_control_for(features, Color::white) -
+                           center_control_for(features, Color::black);
+    score.initiative = initiative_for(features, Color::white) -
+                       initiative_for(features, Color::black);
     score.king_safety = king_safety_for(features, Color::white) -
                         king_safety_for(features, Color::black);
     score.king_safety = score.king_safety * (phase + kEvaluation.king_safety_phase_offset) /
@@ -596,8 +619,8 @@ EvaluationBreakdown ClassicalEvaluator::breakdown(const GameState& state, Color 
         (features.side_to_move == Color::white ? kEvaluation.tempo_bonus :
          -kEvaluation.tempo_bonus) : 0;
     score.total = score.material + score.piece_square + score.mobility + score.pawn_structure +
-                  score.activity + score.king_safety + score.king_activity + score.passed_pawn +
-                  score.tempo;
+                  score.activity + score.development + score.center_control + score.initiative +
+                  score.king_safety + score.king_activity + score.passed_pawn + score.tempo;
     if (dead_material) {
         score.total = 0;
     }
@@ -608,6 +631,9 @@ EvaluationBreakdown ClassicalEvaluator::breakdown(const GameState& state, Color 
         score.mobility = -score.mobility;
         score.pawn_structure = -score.pawn_structure;
         score.activity = -score.activity;
+        score.development = -score.development;
+        score.center_control = -score.center_control;
+        score.initiative = -score.initiative;
         score.king_safety = -score.king_safety;
         score.king_activity = -score.king_activity;
         score.passed_pawn = -score.passed_pawn;

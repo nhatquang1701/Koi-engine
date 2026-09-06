@@ -174,6 +174,23 @@ void test_history_saturation_does_not_overflow_signed_intermediates() {
             "saturated quiet and continuation history must remain within signed bounds");
 }
 
+void test_metadata_ordering_score_is_cached_with_see() {
+    const koi::GameState state = require_state("4k3/8/8/3q4/4Q3/8/8/4K3 w - - 0 1");
+    koi::MoveMetadataList moves;
+    state.legal_moves_with_metadata(moves);
+    koi::detail::SearchMoveOrdering ordering;
+    ordering.order(state, moves, std::nullopt, 0);
+
+    const auto selected = std::find_if(moves.begin(), moves.end(), [](const koi::MoveMetadata& metadata) {
+        return metadata.move == *koi::Move::parse_uci("e4d5");
+    });
+    require(selected != moves.end(), "ordering cache fixture must include the queen capture");
+    require(selected->see_score >= 500,
+            "ordering must preserve the cached SEE score from move generation");
+    require(selected->ordering_score > 0,
+            "ordering must publish its computed score into move metadata");
+}
+
 struct TestCase {
     std::string_view name;
     void (*run)();
@@ -190,6 +207,7 @@ int main() {
         {"quiet checks before quiet moves", test_quiet_checks_are_ordered_before_ordinary_quiet_moves},
         {"history malus and continuation ordering", test_history_malus_and_continuation_history_shape_quiet_ordering},
         {"history saturation overflow safety", test_history_saturation_does_not_overflow_signed_intermediates},
+        {"cached move scores", test_metadata_ordering_score_is_cached_with_see},
     };
 
     for (const TestCase& test : tests) {

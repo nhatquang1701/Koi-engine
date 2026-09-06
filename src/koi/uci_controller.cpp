@@ -799,7 +799,7 @@ void UciController::write_handshake() {
     output_ << "id name Koi Engine\n"
                "id author Koi Engine contributors\n"
                "option name RandomSeed type spin default 0 min 0 max 2147483647\n"
-               "option name Hash type spin default 16 min 1 max 4096\n"
+               "option name Hash type spin default 512 min 1 max 4096\n"
                "option name Threads type spin default 1 min 1 max " << maximum_search_threads() << "\n"
                "option name Speed type spin default 100 min 1 max 100\n"
                "option name UCI_AnalyseMode type check default false\n"

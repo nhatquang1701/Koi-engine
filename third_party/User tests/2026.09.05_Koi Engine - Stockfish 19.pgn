@@ -1,0 +1,11 @@
+[Event "Engine Match"]
+[Site "En Croissant"]
+[Date "2026.09.05"]
+[Round "?"]
+[White "Koi Engine"]
+[Black "Stockfish 19"]
+[Result "0-1"]
+[Orientation "white"]
+
+{[%eval +0.35] } 1. Nc3 {[%eval -0.02] } d5 {[%eval 0.00] } 2. d4 {[%eval -0.07] } Nf6 {[%eval -0.05] } 3. Nf3 {[%eval -0.20] } e6 {[%eval -0.13] } 4. Ne5 {[%eval -0.37] } c5 {[%eval -0.38] } 5. e3 {[%eval -0.67] } a6 {[%eval -0.66] } 6. Qf3 {[%eval -1.09] } Bd6 {[%eval -1.00] } 7. Qf4 {[%eval -1.54] } Qc7 {[%eval -1.44] } 8. Qg5?! {[%eval -2.06] }  (8. Qg3  O-O 9. f4 cxd4 10. exd4 Nc6 11. Qf2 Bb4 12. Qe3 Bxc3+) O-O {[%eval -1.89] } 9. Bd3 {[%eval -2.28] } c4 {[%eval -2.38] } 10. Be2 {[%eval -2.30] } b5 {[%eval -2.39] } 11. a3 {[%eval -2.60] } Ne4 {[%eval -2.36] } 12. Nxe4?! {[%eval -3.62] }  (12. Qh4  f6 13. Nf3 Nxc3 14. bxc3 Nc6 15. e4 dxe4 16. Qxe4 Ne7) dxe4! {[%eval -3.30] } 13. Qh4 {[%eval -3.69] } f6!! {[%eval -3.09] } 14. Nxc4? {[%eval -6.02] }  (14. Ng4  c3 15. b3 Bb7 16. f3 f5 17. Nf2 Rf6 18. fxe4 Rh6) bxc4! {[%eval -6.03] } 15. Qxe4 {[%eval -6.04] } f5!? {[%eval -6.59] } 16. Qxa8 {[%eval -6.46] } Bb7 {[%eval -6.28] } 17. Qa7 {[%eval -6.39] } Nc6 {[%eval -6.36] } 18. Qxb7 {[%eval -6.43] } Qxb7 {[%eval -6.43] } 19. Bxc4 {[%eval -6.66] } Nxd4!? {[%eval -6.39] } 20. exd4 {[%eval -6.69] } Qxg2 {[%eval -6.60] } 21. Rf1 {[%eval -6.31] } Qe4+ {[%eval -6.58] } 22. Be3 {[%eval -6.43] } Qxc2 {[%eval -6.45] } 23. Bxe6+ {[%eval -7.44] } Kh8 {[%eval -7.05] } 24. Rc1 {[%eval -7.16] } Qxb2 {[%eval -7.00] } 25. Rc4 {[%eval -9.59] } f4 {[%eval -8.82] } 26. Bc1 {[%eval -9.29] } Qa2 {[%eval -9.21] } 27. Kd1 {[%eval -10.44] } Qb3+ {[%eval -9.89] } 28. Kd2 {[%eval -10.49] } f3 {[%eval -9.99] } 29. Rc3 {[%eval -11.51] } Qxe6 {[%eval -10.62] } 30. Re1 {[%eval -11.53] } Qa2+ {[%eval -10.39] } 31. Rc2 {[%eval -12.37] } Qd5 {[%eval -11.15] } 32. Re3 {[%eval -15.23] } Qxd4+ {[%eval -14.79] } 33. Ke1 {[%eval -14.36] } Bf4!? {[%eval -11.96] } 34. Bb2 {[%eval -14.33] } Qa4 {[%eval -13.31] } 35. Rd2 {[%eval #-9] } Bxe3 {[%eval #-8] } 36. fxe3 {[%eval #-8] } Qa5 {[%eval #-7] } 37. Kd1 {[%eval #-7] } f2 {[%eval #-6] } 38. Rxf2 {[%eval #-3] } Rxf2 {[%eval #-2] } 39. Bc3 {[%eval #-2] } Qxc3 {[%eval #-1] } 40. h4 {[%eval #-1] } Qd2# 0-1
+

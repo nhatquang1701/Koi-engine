@@ -1,0 +1,11 @@
+[Event "Engine Match"]
+[Site "En Croissant"]
+[Date "2026.09.06"]
+[Round "?"]
+[White "Koi Engine"]
+[Black "Leela Chess Zero"]
+[Result "0-1"]
+[Orientation "white"]
+
+{[%eval +0.19] } 1. Nc3 {[%eval -0.07] } d5 {[%eval -0.09] } 2. d4 {[%eval -0.14] } Nf6 {[%eval -0.11] } 3. Nf3 {[%eval -0.28] } c5 {[%eval -0.29] } 4. dxc5 {[%eval -0.25] } Nc6 {[%eval -0.24] } 5. Nd4?! {[%eval -1.13] }  (5. e3  e6 6. Bd3 e5 7. e4 dxe4 8. Nxe4 Nxe4 9. Bxe4 Qxd1+) e5 {[%eval -1.08] } 6. Nxc6 {[%eval -1.07] } bxc6 {[%eval -1.13] } 7. Qd2?,N $146 {[%eval -2.51] }  (7. Na4  Ne4 8. c3 Qf6 9. Be3 Be7 10. g3 O-O 11. Bg2 Qg6) Bxc5 {[%eval -2.25] } 8. Qg5? {[%eval -5.01] }  (8. e3  O-O 9. Bd3 Qe7 10. e4 dxe4 11. Bxe4 Nxe4 12. Nxe4 Ba6) O-O! {[%eval -4.65] } 9. e3 {[%eval -5.77] } d4?! {[%eval -4.30] } 10. exd4?! {[%eval -6.74] }  (10. Nb1  Qa5+ 11. c3 h6 12. Qh4 Be7 13. Bc4 Ba6 14. Bxa6 Qxa6) h6! {[%eval -6.73] } 11. Qg3 {[%eval -7.02] } exd4 {[%eval -6.98] } 12. Bxh6 {[%eval -8.24] } Nh5 {[%eval -8.20] } 13. Qg5 {[%eval -8.06] } dxc3!? {[%eval -7.68] } 14. Qxc5 {[%eval -8.24] } gxh6 {[%eval -7.89] } 15. Bd3 {[%eval -8.19] } Re8+ {[%eval -8.11] } 16. Kf1 {[%eval -9.23] } cxb2 {[%eval -9.30] } 17. Rb1 {[%eval -9.85] } Nf4 {[%eval -9.43] } 18. Qxc6 {[%eval -10.78] } Nxd3!? {[%eval -9.90] } 19. Qf3 {[%eval -14.04] } Ba6 {[%eval -11.45] } 20. Kg1 {[%eval #-12] } Re1+ {[%eval #-11] } 21. Rxe1 {[%eval #-11] } Nxe1 {[%eval #-10] } 22. Qg4+ {[%eval #-10] } Qg5 {[%eval #-10] } 23. Qxg5+ {[%eval #-9] } hxg5 {[%eval #-8] } 24. h4 {[%eval #-8] } b1=Q {[%eval #-7] } 25. Kh2 {[%eval #-7] } Qb4 {[%eval -17.47] } 26. hxg5 {[%eval #-5] } Qh4+ {[%eval #-4] } 27. Kg1 {[%eval #-4] } Qg4 {[%eval #-5] } 28. Rh2 {[%eval #-5] } Nf3+ {[%eval #-4] } 29. Kh1 {[%eval #-4] } Re8!? {[%eval #-3] } 30. Rh8+ {[%eval #-3] } Kxh8 {[%eval #-2] } 31. gxf3 {[%eval #-2] } Qh3+ {[%eval #-1] } 32. Kg1 {[%eval #-1] } Re1# 0-1
+

@@ -265,6 +265,36 @@ void test_evaluator_breakdown_scores_structure_activity_and_king_safety() {
             "breakdown total must match the evaluator result");
 }
 
+void test_evaluator_rewards_development_center_control_and_immediate_pressure() {
+    koi::ClassicalEvaluator evaluator;
+    const auto undeveloped = evaluator.breakdown(
+        require_state("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"),
+        koi::Color::white);
+    const auto developed = evaluator.breakdown(
+        require_state("rnbqkbnr/pppppppp/8/8/8/2N5/PPPPPPPP/R1BQKBNR w KQkq - 0 1"),
+        koi::Color::white);
+    const auto edge = evaluator.breakdown(
+        require_state("4k3/8/8/8/8/8/8/N3K3 w - - 0 1"), koi::Color::white);
+    const auto center = evaluator.breakdown(
+        require_state("4k3/8/8/8/8/2N5/8/4K3 w - - 0 1"), koi::Color::white);
+    const auto quiet_pressure = evaluator.breakdown(
+        require_state("7r/6k1/8/8/Q7/8/8/4K3 w - - 0 1"), koi::Color::white);
+    const auto immediate_pressure = evaluator.breakdown(
+        require_state("4r1k1/8/8/8/Q7/8/8/4K3 w - - 0 1"), koi::Color::white);
+    const auto defended_pressure = evaluator.breakdown(
+        require_state("2k5/2q5/8/8/8/8/2R3B1/4K3 w - - 0 1"), koi::Color::white);
+
+    require(developed.development > undeveloped.development,
+            "developing a minor piece must improve the development term");
+    require(center.center_control > edge.center_control,
+            "a centralized knight must improve the core-center term");
+    require(immediate_pressure.initiative > quiet_pressure.initiative,
+            "attacking an exposed valuable piece must improve initiative pressure");
+    require(defended_pressure.initiative < 0,
+            "initiative pressure must not reward an attacked piece defended by the king: " +
+                std::to_string(defended_pressure.initiative));
+}
+
 void test_evaluator_rewards_a_bishop_pair() {
     koi::ClassicalEvaluator evaluator;
     const auto bishop_pair = evaluator.breakdown(
@@ -284,7 +314,9 @@ void test_evaluator_breakdown_is_perspective_symmetric() {
 
     require(white.material == -black.material && white.piece_square == -black.piece_square &&
                 white.mobility == -black.mobility && white.pawn_structure == -black.pawn_structure &&
-                white.activity == -black.activity && white.king_safety == -black.king_safety &&
+                white.activity == -black.activity && white.development == -black.development &&
+                white.center_control == -black.center_control && white.initiative == -black.initiative &&
+                white.king_safety == -black.king_safety &&
                 white.king_activity == -black.king_activity && white.passed_pawn == -black.passed_pawn &&
                 white.tempo == -black.tempo &&
                 white.total == -black.total,
@@ -456,7 +488,8 @@ void test_evaluator_breakdown_accounts_for_every_component() {
         require_state("4k3/8/8/3P4/3K4/8/8/8 w - - 0 1"), koi::Color::white);
 
     require(score.total == score.material + score.piece_square + score.mobility +
-                score.pawn_structure + score.activity + score.king_safety +
+                score.pawn_structure + score.activity + score.development + score.center_control +
+                score.initiative + score.king_safety +
                 score.king_activity + score.passed_pawn + score.tempo,
             "breakdown total must account for every evaluation component");
 }
@@ -1155,8 +1188,8 @@ void test_fixed_depth_tactical_reference_output_is_preserved() {
     const koi::SearchResult result = search(service, root, limits);
     const auto expected = koi::Move::parse_uci("e4d5");
     require(expected.has_value(), "fixed-depth tactical reference move must parse");
-    require(result.completed_depth == 2 && result.best_move == expected && result.score_cp == 1026,
-            "single-thread fixed-depth tactical output must retain its reviewed move and score");
+    require(result.completed_depth == 2 && result.best_move == expected && result.score_cp == 1033,
+            "single-thread fixed-depth tactical output must retain its reviewed move and updated score");
 }
 
 void test_search_reports_tactical_search_statistics() {
@@ -1558,7 +1591,7 @@ void test_hash_configuration_clamps_to_uci_bounds_and_clear_discards_warmed_entr
     koi::SearchLimits limits;
     limits.depth = 3;
 
-    require(service.hash_size_mb() == 16, "SearchService must retain the 16 MB default hash size");
+    require(service.hash_size_mb() == 512, "SearchService must retain the 512 MB default hash size");
     const koi::SearchResult warmed = search(service, koi::GameState::startpos(), limits);
     require(warmed.stats.tt_hits > 0, "a completed iterative search must warm the transposition table");
 
@@ -1574,7 +1607,7 @@ void test_hash_configuration_clamps_to_uci_bounds_and_clear_discards_warmed_entr
 
 void test_transposition_table_stores_probes_and_clears_entries() {
     koi::TranspositionTable table;
-    require(table.size_mb() == 16, "transposition table default must be 16 MB");
+    require(table.size_mb() == 512, "transposition table default must be 512 MB");
     const auto move = koi::Move::parse_uci("e2e4");
     require(move.has_value(), "test move must parse");
 
@@ -1730,6 +1763,7 @@ int main() {
     const std::vector<TestCase> tests{
         {"classical evaluator", test_evaluator_returns_material_and_pst_from_requested_perspective},
         {"classical evaluator breakdown", test_evaluator_breakdown_scores_structure_activity_and_king_safety},
+        {"development center pressure", test_evaluator_rewards_development_center_control_and_immediate_pressure},
         {"evaluator perspective symmetry", test_evaluator_breakdown_is_perspective_symmetric},
         {"evaluator endgame and mobility", test_evaluator_scores_backward_pawns_piece_mobility_and_dead_material},
         {"evaluator passed pawn endgame scaling", test_evaluator_increases_advanced_passed_pawn_value_in_the_endgame},

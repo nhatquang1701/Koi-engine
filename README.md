@@ -352,7 +352,7 @@ from the starting position (for example, `bestmove e2e4`).
 ## Supported UCI behavior
 
 - `uci` reports the engine identity, the compatibility `RandomSeed` option,
-  `Hash` (default 16 MB, range 1–4096 MB), `Threads` (default 1, capped at
+  `Hash` (default 512 MB, range 1–4096 MB), `Threads` (default 1, capped at
   `min(64, hardware_concurrency)`), `Speed` (1–100, default 100), the opening
   book options, and the `Clear Hash` button.
 - `isready` responds immediately with `readyok`, including while searching.
@@ -581,7 +581,7 @@ transcript but cannot automate a locally installed Lucas Chess GUI.
 
 Koi has no required configuration file. En Croissant or another UCI GUI sends
 the options at session start; the portable release defaults are `RandomSeed=0`,
-`Hash=16`, `Threads=1`, `Speed=100`, `UCI_AnalyseMode=false`, `MultiPV=1`,
+`Hash=512`, `Threads=1`, `Speed=100`, `UCI_AnalyseMode=false`, `MultiPV=1`,
 `Ponder=false`, `OwnBook=true`, `BookFile=book.bin`, `BookDepth=16`,
 `BookRandom=false`, `BookSafety=true`, `BookSafetyDepth=2`,
 `UCI_ShowWDL=false`, `Move Overhead=10`, `Slow Mover=100`,

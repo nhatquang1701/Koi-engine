@@ -30,6 +30,12 @@ struct MoveMetadata {
     PieceType captured_piece = PieceType::none;
     MoveKind kind = MoveKind::quiet;
     bool gives_check = false;
+    std::int16_t see_score = 0;
+    std::int32_t ordering_score = 0;
+    // A generated metadata record is valid only for this exact position.
+    // Keeping the key here lets the fast make path reject stale records
+    // without rebuilding a native legal-move list.
+    std::uint64_t position_key = 0;
 
     [[nodiscard]] constexpr bool is_capture() const noexcept {
         return kind == MoveKind::capture || kind == MoveKind::en_passant;
@@ -89,6 +95,9 @@ struct PositionFeatures {
     std::array<std::uint16_t, 2> mobility{};
     std::array<Square, 2> king_squares{};
     std::array<std::uint8_t, 2> pawn_file_masks{};
+    std::array<std::uint8_t, 2> development{};
+    std::array<std::uint8_t, 2> center_control{};
+    std::array<std::uint8_t, 2> king_zone_attacks{};
     std::uint8_t game_phase = 0;
     Color side_to_move = Color::white;
 };
@@ -161,6 +170,8 @@ public:
 
 private:
     [[nodiscard]] int direct_static_exchange_gain(const MoveMetadata&) const noexcept;
+    void finalize_metadata(MoveMetadataList&, std::uint64_t position_key) const noexcept;
+    void invalidate_feature_cache() noexcept;
 
     friend int detail::static_exchange_gain(const GameState&, const MoveMetadata&) noexcept;
 

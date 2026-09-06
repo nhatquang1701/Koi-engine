@@ -115,7 +115,7 @@ function Test-SearchInfo([string]$Line) {
 function Write-StartPositionBook([string]$Path) {
     [byte[]]$bytes = @(
         0x46, 0x3b, 0x96, 0x18, 0x16, 0x91, 0xfc, 0x9c,
-        0x07, 0x0c, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00
+        0x03, 0x1c, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00
     )
     [System.IO.File]::WriteAllBytes($Path, $bytes)
 }
@@ -126,7 +126,7 @@ $expectedHandshake = @(
     'id name Koi Engine',
     'id author Koi Engine contributors',
     'option name RandomSeed type spin default 0 min 0 max 2147483647',
-    'option name Hash type spin default 16 min 1 max 4096',
+    'option name Hash type spin default 512 min 1 max 4096',
     "option name Threads type spin default 1 min 1 max $MaximumThreads",
     'option name Speed type spin default 100 min 1 max 100',
     'option name UCI_AnalyseMode type check default false',
@@ -440,6 +440,7 @@ if ($replacementBestmoves.Count -ne 1 -or $replacementBestmoves[0] -cne 'bestmov
 
 $limitLines = @(Invoke-UciTranscript @'
 position startpos
+setoption name OwnBook value false
 go depth 1
 stop
 go nodes 0
@@ -559,6 +560,7 @@ foreach ($expected in $expectedHandshake) {
 }
 Send-UciCommand $gameSession "setoption name Threads value $MaximumThreads"
 Send-UciCommand $gameSession 'setoption name Speed value 50'
+Send-UciCommand $gameSession 'setoption name OwnBook value false'
 $gameMoves = [System.Collections.Generic.List[string]]::new()
 for ($ply = 0; $ply -lt 6; $ply++) {
     $positionCommand = 'position startpos'

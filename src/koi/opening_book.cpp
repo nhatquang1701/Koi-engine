@@ -65,8 +65,11 @@ std::optional<FileSignature> signature_for(const std::filesystem::path& path) {
 }
 
 std::optional<Move> decode_move(std::uint16_t encoded, const GameState& state) {
-    const std::uint8_t source = static_cast<std::uint8_t>(encoded & 0x3f);
-    std::uint8_t target = static_cast<std::uint8_t>((encoded >> 6) & 0x3f);
+    // Polyglot encodes destination in bits 0..5 and origin in bits 6..11.
+    // This ordering is easy to invert accidentally because Koi's coordinate
+    // move representation is written from -> to.
+    const std::uint8_t source = static_cast<std::uint8_t>((encoded >> 6) & 0x3f);
+    std::uint8_t target = static_cast<std::uint8_t>(encoded & 0x3f);
     const std::uint8_t promotion_code = static_cast<std::uint8_t>((encoded >> 12) & 0x7);
     Promotion promotion = Promotion::none;
     switch (promotion_code) {
