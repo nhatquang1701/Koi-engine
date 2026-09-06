@@ -43,6 +43,8 @@ SCORE_RE = re.compile(
     r"(?:^|\s)score\s+(?P<type>cp|mate)\s+(?P<value>-?\d+)"
     r"(?:\s+(?P<bound>lowerbound|upperbound))?(?=\s|$)"
 )
+ANNOTATION_EVAL_RE = re.compile(r"\[%eval\s+(?P<value>[^\]\s]+)\]")
+ANNOTATION_CLOCK_RE = re.compile(r"\[%clk\s+(?P<value>[^\]\s]+)\]")
 
 
 class OracleError(RuntimeError):
@@ -109,6 +111,23 @@ def calculate_cpl(root_score_white_cp: int, resulting_score_white_cp: int, movin
         else resulting_score_white_cp - root_score_white_cp
     )
     return max(0, int(loss))
+
+
+def classify_cpl(cpl: Optional[int]) -> Optional[str]:
+    """Return the stable forensic band for a derived centipawn loss."""
+
+    if cpl is None:
+        return None
+    loss = max(0, int(cpl))
+    if loss == 0:
+        return "best"
+    if loss < 50:
+        return "good"
+    if loss < 100:
+        return "inaccuracy"
+    if loss < 300:
+        return "mistake"
+    return "blunder"
 
 
 def parse_info_line(line: str, root_side: str) -> Optional[ParsedInfo]:
@@ -214,6 +233,35 @@ def _read_pgn(path: Path) -> Tuple[str, bytes]:
         raise OracleError(f"PGN file is not valid UTF-8: '{path}'") from error
 
 
+def sha256_file(path: Path) -> str:
+    """Return a file hash for reproducibility metadata."""
+
+    digest = hashlib.sha256()
+    try:
+        with path.open("rb") as stream:
+            for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                digest.update(chunk)
+    except OSError as error:
+        raise OracleError(f"Unable to hash file '{path}': {error}") from error
+    return digest.hexdigest()
+
+
+def _node_annotations(node: Any) -> Dict[str, Any]:
+    comment = str(getattr(node, "comment", "") or "").strip()
+    annotations: Dict[str, Any] = {
+        "comment": comment or None,
+        "nags": sorted(int(nag) for nag in getattr(node, "nags", set())),
+    }
+    if comment:
+        eval_match = ANNOTATION_EVAL_RE.search(comment)
+        clock_match = ANNOTATION_CLOCK_RE.search(comment)
+        if eval_match:
+            annotations["eval"] = eval_match.group("value")
+        if clock_match:
+            annotations["clock"] = clock_match.group("value")
+    return annotations
+
+
 def extract_games(pgn_text: str) -> List[Dict[str, Any]]:
     """Return every PGN game's mainline positions in source order."""
 
@@ -249,6 +297,7 @@ def extract_games(pgn_text: str) -> List[Dict[str, Any]]:
                     "fen": board.fen(),
                     "actual_move_uci": move.uci(),
                     "actual_move_san": san,
+                    "annotations": _node_annotations(node),
                 }
             )
             board.push(move)
@@ -498,11 +547,15 @@ class UciEngine:
     def metadata(self, options: Dict[str, Any]) -> Dict[str, Any]:
         return {
             "path": str(self.path),
+            "engine_id": self.id_name or "unknown",
             "identity": {
                 "name": self.id_name or "unknown",
                 "author": self.id_author,
             },
             "version": self._version_from_identity(self.id_name),
+            "hashes": {
+                "executable_sha256": sha256_file(self.path),
+            },
             "options": _json_options(options),
             "uci_handshake": list(self.handshake_lines),
             "advertised_options": list(self.option_lines),
@@ -770,6 +823,7 @@ def run_search_analysis(
                         "resulting_fen": actual_child_fen,
                         "stockfish_resulting_position": _result_dict(actual_result),
                         "cpl": actual_cpl,
+                        "classification": classify_cpl(actual_cpl),
                     },
                     "koi_suggested_move": {
                         "uci": koi_result.bestmove,
@@ -777,6 +831,7 @@ def run_search_analysis(
                         "resulting_fen": koi_child_fen,
                         "stockfish_resulting_position": _result_dict(koi_child_result),
                         "cpl": koi_cpl,
+                        "classification": classify_cpl(koi_cpl),
                     },
                     "timings_ms": {
                         "koi_search": koi_result.elapsed_ms,
@@ -923,6 +978,7 @@ def run_book_audit(
                     "book_move_san": book_san,
                     "stockfish_cpl": book_cpl,
                     "actual_game_move_stockfish_cpl": actual_cpl,
+                    "actual_game_move_classification": classify_cpl(actual_cpl),
                     "koi_book_search": _result_dict(koi_result, include_book=True),
                     "stockfish_root": _result_dict(root_result),
                     "timings_ms": {

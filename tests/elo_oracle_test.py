@@ -183,6 +183,7 @@ class EloOracleExtractionTests(unittest.TestCase):
             self.assertEqual(completed.returncode, 0, completed.stderr)
             report = json.loads(report_path.read_text(encoding="utf-8"))
             koi_commands = koi_log_path.read_text(encoding="utf-8")
+            expected_koi_sha256 = hashlib.sha256(koi_path.read_bytes()).hexdigest()
 
         position = report["games"][0]["positions"][0]
         self.assertEqual(report["mode"], "analysis")
@@ -194,6 +195,10 @@ class EloOracleExtractionTests(unittest.TestCase):
         self.assertEqual(position["search"]["timings_ms"]["koi_search"] >= 0, True)
         self.assertEqual(report["engines"]["koi"]["identity"]["name"], "Fake Koi 1.0")
         self.assertEqual(report["engines"]["koi"]["version"], "1.0")
+        self.assertEqual(
+            report["engines"]["koi"]["hashes"]["executable_sha256"],
+            expected_koi_sha256,
+        )
         self.assertEqual(report["engines"]["koi"]["options"]["OwnBook"], False)
         self.assertEqual(report["engines"]["koi"]["options"]["Threads"], 4)
         self.assertEqual(report["engines"]["koi"]["options"]["Speed"], 100)
@@ -201,6 +206,29 @@ class EloOracleExtractionTests(unittest.TestCase):
         self.assertIn("setoption name Threads value 4", koi_commands)
         self.assertIn("setoption name Speed value 100", koi_commands)
         self.assertIn("go movetime 1", koi_commands)
+        self.assertEqual(position["search"]["actual_game_move"]["classification"], "best")
+        self.assertEqual(position["search"]["koi_suggested_move"]["classification"], "best")
+
+    def test_extract_preserves_annotations_on_mainline_positions(self):
+        pgn = '[Result "*"]\n\n1. e4 $1 {[%eval +0.25] [%clk 0:05:00] coach note} e5 *\n'
+
+        games = elo_oracle.extract_games(pgn)
+
+        annotations = games[0]["positions"][0]["annotations"]
+        self.assertEqual(annotations["comment"], "[%eval +0.25] [%clk 0:05:00] coach note")
+        self.assertEqual(annotations["nags"], [1])
+        self.assertEqual(annotations["eval"], "+0.25")
+        self.assertEqual(annotations["clock"], "0:05:00")
+
+    def test_classify_cpl_uses_stable_forensic_bands(self):
+        self.assertEqual(elo_oracle.classify_cpl(0), "best")
+        self.assertEqual(elo_oracle.classify_cpl(49), "good")
+        self.assertEqual(elo_oracle.classify_cpl(50), "inaccuracy")
+        self.assertEqual(elo_oracle.classify_cpl(99), "inaccuracy")
+        self.assertEqual(elo_oracle.classify_cpl(100), "mistake")
+        self.assertEqual(elo_oracle.classify_cpl(299), "mistake")
+        self.assertEqual(elo_oracle.classify_cpl(300), "blunder")
+        self.assertIsNone(elo_oracle.classify_cpl(None))
 
     def test_book_audit_keeps_book_hits_and_cpl_outside_search_metrics(self):
         with tempfile.TemporaryDirectory(prefix="koi oracle ") as temporary_directory:
