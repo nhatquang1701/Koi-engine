@@ -200,6 +200,77 @@ separately from normal search PV data. The harness sends Koi's book options with
 requiring a book reader or any Jack dependency; Koi versions predating book support
 ignore those UCI options safely.
 
+## Rough local Elo measurement
+
+`tools/elo_estimate.py` is a standard-library-only, measurement-only harness. Its
+primary configuration is no-book, 1+0, Koi `Hash=512`, `Threads=4`, and
+`Speed=100`, with 32 named opening lines played once with Koi White and once with
+Koi Black at each Stockfish anchor. The initial schedule is two 64-game anchor
+batches (128 games); adaptive batches may extend the run to 192, 256, or 320 games.
+The estimator uses 2,000 paired-opening bootstrap samples and rejects incomplete,
+illegal, timed-out, or malformed match evidence.
+
+Create an external `koi-elo-anchor-manifest-v1` JSON manifest. Its `stockfish`
+object must contain the existing executable `path`, at least two unique
+`elos` in the Stockfish `UCI_Elo` range 1320..3190, and a `rating_source` such as
+`Stockfish 19 UCI_LimitStrength`. Each optional `lower_anchors` entry must contain
+an `id`, existing executable `path`, positive `rating`, and `rating_source`; a
+lower anchor is required when `--prior-elo` is below the lowest Stockfish anchor.
+The manifest must bracket `--prior-elo`, and `--stockfish` must match its
+`stockfish.path`.
+
+Run the primary no-book dry-run from the repository root with every executable,
+manifest, corpus, and report path resolved explicitly:
+
+```powershell
+python .\tools\elo_estimate.py `
+  --koi C:\Koi\out\release\koi-engine.exe `
+  --replay C:\Koi\out\release\koi-replay.exe `
+  --stockfish C:\Engines\stockfish.exe `
+  --anchors C:\Koi-inputs\anchors.json `
+  --openings .\tests\data\elo-openings-32.txt `
+  --time-control 1+0 `
+  --threads 4 --hash 512 --speed 100 `
+  --min-games 128 --max-games 320 `
+  --prior-elo 1600 --mode no-book `
+  --output C:\Koi-results\rough-elo-no-book.json `
+  --dry-run
+```
+
+`--dry-run` validates the executable paths, anchor manifest, 32-opening corpus,
+required fixed options, and output location, writes the complete deterministic
+schedule to the external JSON report, and launches no engines. Remove only
+`--dry-run` for a real run after supplying valid local Koi, replay, Stockfish,
+anchor, corpus, and external output paths. The real run writes raw `koi-uci-match-v2`
+JSON and matching PGN artifacts below a sibling `<report-stem>-artifacts` directory;
+keep those artifacts, executables, and manifests outside the checkout.
+
+Book mode is a separate measurement and must not be combined with the primary
+no-book result. Use a separate output path and licensed external book:
+
+```powershell
+python .\tools\elo_estimate.py `
+  --koi C:\Koi\out\release\koi-engine.exe `
+  --replay C:\Koi\out\release\koi-replay.exe `
+  --stockfish C:\Engines\stockfish.exe `
+  --anchors C:\Koi-inputs\anchors.json `
+  --openings .\tests\data\elo-openings-32.txt `
+  --time-control 1+0 `
+  --threads 4 --hash 512 --speed 100 `
+  --min-games 128 --max-games 320 `
+  --prior-elo 1600 --mode book --book C:\LicensedBooks\book.bin `
+  --output C:\Koi-results\rough-elo-book.json
+```
+
+CTest registers the standard-library-only estimator, match-option, and opening
+corpus tests when Python 3 is available; the corpus test receives the built
+`koi-replay` path through `KOI_REPLAY_PATH`. These tests validate tooling and
+corpus integration only. Real engine matches are intentionally unsuitable for a
+fixed CI schedule because they depend on supplied external executables, hardware,
+and time control; CTest is not an Elo threshold. Label any resulting figure as
+“local Stockfish-equivalent Elo at recorded hardware/options/time control”; it is
+not a universal Elo claim.
+
 ## Strength regression suite
 
 The deterministic `Threads=1`, `Speed=100` reference path includes a fixed-depth

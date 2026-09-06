@@ -262,6 +262,30 @@ if(Python3_Interpreter_FOUND)
         )
     endif()
     add_test(
+        NAME elo_estimate_python
+        COMMAND "${Python3_EXECUTABLE}" -m unittest tests/elo_estimate_test.py -v
+    )
+    add_test(
+        NAME stockfish_match_python
+        COMMAND "${Python3_EXECUTABLE}" -m unittest tests/stockfish_match_test.py -v
+    )
+    add_test(
+        NAME elo_openings_python
+        COMMAND "${Python3_EXECUTABLE}" -m unittest tests/elo_openings_test.py -v
+    )
+    set_tests_properties(
+        elo_estimate_python stockfish_match_python
+        PROPERTIES
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+            ENVIRONMENT "PYTHONDONTWRITEBYTECODE=1"
+    )
+    set_tests_properties(
+        elo_openings_python
+        PROPERTIES
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+            ENVIRONMENT "PYTHONDONTWRITEBYTECODE=1;KOI_REPLAY_PATH=$<TARGET_FILE:koi_replay>"
+    )
+    add_test(
         NAME tune_eval_python
         COMMAND "${Python3_EXECUTABLE}" -m unittest tests/tune_eval_test.py -v
     )

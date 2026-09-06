@@ -105,3 +105,83 @@ and PGN together in the external results directory.
 All three tools fail with an actionable stderr message and nonzero exit code for
 missing inputs or engine/configuration errors. The C++ engine remains independent
 of Python and `python-chess`.
+
+## Rough local Elo estimation
+
+`elo_estimate.py` is standard-library-only and consumes the existing
+`koi-uci-match-v2` JSON/PGN reports. The primary measurement is no-book at 1+0
+with Koi `Hash=512`, `Threads=4`, and `Speed=100`, using
+`tests/data/elo-openings-32.txt` once in each Koi color for every anchor. Two
+anchors produce 128 initial games (32 openings x 2 colors x 2 anchors); adaptive
+64-game batches can extend the schedule through 320 games. The fit is Koi's
+perspective with 2,000 paired-opening bootstrap samples and a documented anchor
+bracket, not a universal rating claim.
+
+The required external anchor manifest has this shape:
+
+```json
+{
+  "schema": "koi-elo-anchor-manifest-v1",
+  "stockfish": {
+    "path": "C:\\Engines\\stockfish.exe",
+    "elos": [1400, 1600, 1800],
+    "rating_source": "Stockfish 19 UCI_LimitStrength"
+  },
+  "lower_anchors": []
+}
+```
+
+`stockfish.path` must be an existing file matching `--stockfish`; `elos` must
+contain at least two unique Stockfish `UCI_Elo` values in 1320..3190; and
+`rating_source` is required. A lower anchor entry requires `id`, an existing
+`path`, positive `rating`, and `rating_source`, and is required to bracket a
+`--prior-elo` below the Stockfish floor. All anchors must bracket the prior.
+
+Use this exact no-book dry-run CLI from the repository root:
+
+```powershell
+python .\tools\elo_estimate.py `
+  --koi C:\Koi\out\release\koi-engine.exe `
+  --replay C:\Koi\out\release\koi-replay.exe `
+  --stockfish C:\Engines\stockfish.exe `
+  --anchors C:\Koi-inputs\anchors.json `
+  --openings .\tests\data\elo-openings-32.txt `
+  --time-control 1+0 `
+  --threads 4 --hash 512 --speed 100 `
+  --min-games 128 --max-games 320 `
+  --prior-elo 1600 --mode no-book `
+  --output C:\Koi-results\rough-elo-no-book.json `
+  --dry-run
+```
+
+Dry-run validates all inputs and writes the full deterministic schedule without
+starting Koi, replay, Stockfish, or PowerShell. Remove `--dry-run` only when the
+user-supplied executable, anchor, corpus, and external output paths are ready.
+Raw JSON and matching PGN files are preserved below the external report's
+`<stem>-artifacts` directory; do not commit them or place them under the
+checkout.
+
+Book mode is a separate run, with a separate report and external licensed book:
+
+```powershell
+python .\tools\elo_estimate.py `
+  --koi C:\Koi\out\release\koi-engine.exe `
+  --replay C:\Koi\out\release\koi-replay.exe `
+  --stockfish C:\Engines\stockfish.exe `
+  --anchors C:\Koi-inputs\anchors.json `
+  --openings .\tests\data\elo-openings-32.txt `
+  --time-control 1+0 `
+  --threads 4 --hash 512 --speed 100 `
+  --min-games 128 --max-games 320 `
+  --prior-elo 1600 --mode book --book C:\LicensedBooks\book.bin `
+  --output C:\Koi-results\rough-elo-book.json
+```
+
+Book mode records `OwnBook=true`, `BookFile`, `BookDepth=16`, and
+`BookRandom=false`; it must not be merged with the no-book result. CTest covers
+the estimator CLI logic, match-option forwarding, and all 32 corpus lines, but
+real matches are not a CI job or a fixed Elo gate because runtime depends on the
+recorded hardware, engine options, external executables, and time control. Any
+reported value must be labeled “local Stockfish-equivalent Elo at recorded
+hardware/options/time control” and must not be presented as a universal Elo
+claim.
