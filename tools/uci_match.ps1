@@ -38,6 +38,9 @@ param(
     [ValidateRange(0, 40)]
     [int]$KoiBookDepth = 16,
 
+    [ValidateSet('true', 'false', '1', '0')]
+    [string]$KoiBookRandom = 'false',
+
     [ValidateRange(1, 64)]
     [int]$Threads = 1,
 
@@ -62,6 +65,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $KoiOwnBook = $KoiOwnBook -in @('true', '1')
+$KoiBookRandom = $KoiBookRandom -in @('true', '1')
 $OpponentEloAnchor = $null
 if ($null -ne $OpponentElo) {
     $OpponentEloAnchor = [Math]::Max(1320, [Math]::Min(3190, $OpponentElo))
@@ -270,7 +274,8 @@ function Initialize-UciEngine($Engine) {
             "setoption name RandomSeed value $KoiRandomSeed",
             "setoption name OwnBook value $($KoiOwnBook.ToString().ToLowerInvariant())",
             "setoption name BookFile value $KoiBookFile",
-            "setoption name BookDepth value $KoiBookDepth"
+            "setoption name BookDepth value $KoiBookDepth",
+            "setoption name BookRandom value $($KoiBookRandom.ToString().ToLowerInvariant())"
         )) {
             Send-UciLine $Engine $option
             $Engine.SentOptions.Add($option)
@@ -285,7 +290,6 @@ function Initialize-UciEngine($Engine) {
             $Engine.SentOptions.Add($option)
         }
     }
-
     Send-UciLine $Engine 'isready'
     while ((Read-UciLine $Engine 'readyok') -cne 'readyok') {
     }
@@ -801,6 +805,7 @@ $report = [ordered]@{
         koi_own_book = $KoiOwnBook
         koi_book_file = $KoiBookFile
         koi_book_depth = $KoiBookDepth
+        koi_book_random = $KoiBookRandom
     }
     engines = $engineSummary
     positions = @($positions)
