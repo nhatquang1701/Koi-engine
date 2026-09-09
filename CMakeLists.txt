@@ -102,7 +102,7 @@ option(KOI_BUILD_SHADOW_DIFF
 
 if(KOI_BUILD_SHADOW_DIFF)
     add_executable(koi_shadow_diff_tests
-        tests/native_shadow_diff_tests.cpp
+        tests/integration/rules/native_shadow_diff_tests.cpp
     )
     target_link_libraries(koi_shadow_diff_tests PRIVATE koi_core)
     target_include_directories(koi_shadow_diff_tests PRIVATE
@@ -112,7 +112,7 @@ if(KOI_BUILD_SHADOW_DIFF)
 endif()
 
 add_executable(koi_core_tests
-    tests/koi_core_tests.cpp
+    tests/unit/core/koi_core_tests.cpp
 )
 
 target_link_libraries(koi_core_tests PRIVATE koi_core)
@@ -120,7 +120,7 @@ target_link_libraries(koi_core_tests PRIVATE koi_core)
 add_test(NAME koi_core_tests COMMAND koi_core_tests)
 
 add_executable(evaluation_boundary_tests
-    tests/evaluation_boundary_tests.cpp
+    tests/unit/evaluation/evaluation_boundary_tests.cpp
 )
 
 target_link_libraries(evaluation_boundary_tests PRIVATE koi_core)
@@ -128,7 +128,7 @@ target_link_libraries(evaluation_boundary_tests PRIVATE koi_core)
 add_test(NAME evaluation_boundary_tests COMMAND evaluation_boundary_tests)
 
 add_executable(nnue_boundary_tests
-    tests/nnue_boundary_tests.cpp
+    tests/unit/evaluation/nnue_boundary_tests.cpp
 )
 
 target_link_libraries(nnue_boundary_tests PRIVATE koi_core)
@@ -136,7 +136,7 @@ target_link_libraries(nnue_boundary_tests PRIVATE koi_core)
 add_test(NAME nnue_boundary_tests COMMAND nnue_boundary_tests)
 
 add_executable(koi_cpu_features_tests
-    tests/cpu_features_tests.cpp
+    tests/unit/runtime/cpu_features_tests.cpp
 )
 
 target_link_libraries(koi_cpu_features_tests PRIVATE koi_core)
@@ -144,7 +144,7 @@ target_link_libraries(koi_cpu_features_tests PRIVATE koi_core)
 add_test(NAME koi_cpu_features_tests COMMAND koi_cpu_features_tests)
 
 add_executable(koi_module_tests
-    tests/koi_module_tests.cpp
+    tests/unit/core/koi_module_tests.cpp
 )
 
 target_link_libraries(koi_module_tests PRIVATE koi_core)
@@ -152,7 +152,7 @@ target_link_libraries(koi_module_tests PRIVATE koi_core)
 add_test(NAME koi_module_tests COMMAND koi_module_tests)
 
 add_executable(syzygy_tablebase_tests
-    tests/syzygy_tablebase_tests.cpp
+    tests/unit/runtime/syzygy_tablebase_tests.cpp
 )
 
 target_link_libraries(syzygy_tablebase_tests PRIVATE koi_core)
@@ -160,7 +160,7 @@ target_link_libraries(syzygy_tablebase_tests PRIVATE koi_core)
 add_test(NAME syzygy_tablebase_tests COMMAND syzygy_tablebase_tests)
 
 add_executable(koi_rules_tests
-    tests/koi_rules_tests.cpp
+    tests/unit/rules/koi_rules_tests.cpp
 )
 
 target_link_libraries(koi_rules_tests PRIVATE koi_core)
@@ -168,7 +168,7 @@ target_link_libraries(koi_rules_tests PRIVATE koi_core)
 add_test(NAME koi_rules_tests COMMAND koi_rules_tests)
 
 add_executable(native_rule_state_tests
-    tests/native_rule_state_tests.cpp
+    tests/unit/rules/native_rule_state_tests.cpp
 )
 
 target_link_libraries(native_rule_state_tests PRIVATE koi_core)
@@ -176,7 +176,7 @@ target_link_libraries(native_rule_state_tests PRIVATE koi_core)
 add_test(NAME native_rule_state_tests COMMAND native_rule_state_tests)
 
 add_executable(opening_book_tests
-    tests/opening_book_tests.cpp
+    tests/unit/runtime/opening_book_tests.cpp
 )
 
 target_link_libraries(opening_book_tests PRIVATE koi_core)
@@ -184,7 +184,7 @@ target_link_libraries(opening_book_tests PRIVATE koi_core)
 add_test(NAME opening_book_tests COMMAND opening_book_tests)
 
 add_executable(uci_controller_tests
-    tests/uci_controller_tests.cpp
+    tests/unit/runtime/uci_controller_tests.cpp
 )
 
 target_link_libraries(uci_controller_tests PRIVATE koi_core)
@@ -192,7 +192,7 @@ target_link_libraries(uci_controller_tests PRIVATE koi_core)
 add_test(NAME uci_controller_tests COMMAND uci_controller_tests)
 
 add_executable(completion_gate_tests
-    tests/completion_gate_tests.cpp
+    tests/unit/runtime/completion_gate_tests.cpp
 )
 
 target_link_libraries(completion_gate_tests PRIVATE koi_core)
@@ -200,7 +200,7 @@ target_link_libraries(completion_gate_tests PRIVATE koi_core)
 add_test(NAME completion_gate_tests COMMAND completion_gate_tests)
 
 add_executable(koi_search_tests
-    tests/koi_search_tests.cpp
+    tests/unit/search/koi_search_tests.cpp
 )
 
 target_link_libraries(koi_search_tests PRIVATE koi_core)
@@ -208,7 +208,7 @@ target_link_libraries(koi_search_tests PRIVATE koi_core)
 add_test(NAME koi_search_tests COMMAND koi_search_tests)
 
 add_executable(search_ordering_tests
-    tests/search_ordering_tests.cpp
+    tests/unit/search/search_ordering_tests.cpp
 )
 
 target_link_libraries(search_ordering_tests PRIVATE koi_core)
@@ -216,7 +216,7 @@ target_link_libraries(search_ordering_tests PRIVATE koi_core)
 add_test(NAME search_ordering_tests COMMAND search_ordering_tests)
 
 add_executable(static_exchange_tests
-    tests/static_exchange_tests.cpp
+    tests/unit/search/static_exchange_tests.cpp
 )
 
 target_link_libraries(static_exchange_tests PRIVATE koi_core)
@@ -224,7 +224,7 @@ target_link_libraries(static_exchange_tests PRIVATE koi_core)
 add_test(NAME static_exchange_tests COMMAND static_exchange_tests)
 
 add_executable(koi_strength_tests
-    tests/koi_strength_tests.cpp
+    tests/unit/search/koi_strength_tests.cpp
 )
 
 target_link_libraries(koi_strength_tests PRIVATE koi_core)
@@ -232,7 +232,7 @@ target_link_libraries(koi_strength_tests PRIVATE koi_core)
 add_test(NAME koi_strength_tests COMMAND koi_strength_tests)
 
 add_executable(perft_tests
-    tests/perft_tests.cpp
+    tests/unit/rules/perft_tests.cpp
 )
 
 target_link_libraries(perft_tests PRIVATE koi_core)
@@ -240,7 +240,7 @@ target_link_libraries(perft_tests PRIVATE koi_core)
 add_test(NAME perft_tests COMMAND perft_tests)
 
 add_executable(koi_replay_tests
-    tests/koi_replay_tests.cpp
+    tests/integration/tools/koi_replay_tests.cpp
 )
 
 add_dependencies(koi_replay_tests koi_replay)
@@ -251,25 +251,25 @@ add_test(
 )
 
 add_executable(uci_match_fixture
-    tests/uci_match_fixture.cpp
+    tests/integration/tools/uci_match_fixture.cpp
 )
 
 add_executable(koi_perft
-    tools/perft.cpp
+    tools/engine/perft.cpp
 )
 
 target_link_libraries(koi_perft PRIVATE koi_core)
 set_target_properties(koi_perft PROPERTIES OUTPUT_NAME "koi-perft")
 
 add_executable(koi_bench
-    tools/koi_bench.cpp
+    tools/engine/koi_bench.cpp
 )
 
 target_link_libraries(koi_bench PRIVATE koi_core)
 set_target_properties(koi_bench PROPERTIES OUTPUT_NAME "koi-bench")
 
 add_executable(koi_replay
-    tools/koi_replay.cpp
+    tools/engine/koi_replay.cpp
 )
 
 target_link_libraries(koi_replay PRIVATE koi_core)
@@ -287,7 +287,7 @@ find_program(POWERSHELL_EXECUTABLE NAMES pwsh powershell REQUIRED)
 add_test(
     NAME koi_engine_process
     COMMAND ${POWERSHELL_EXECUTABLE} -NoProfile -ExecutionPolicy Bypass -File
-            "${CMAKE_CURRENT_SOURCE_DIR}/tests/uci_process_test.ps1"
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/uci/uci_process_test.ps1"
             -EnginePath "$<TARGET_FILE:koi_engine>"
 )
 
@@ -296,7 +296,7 @@ set_tests_properties(koi_engine_process PROPERTIES TIMEOUT 30)
 add_test(
     NAME koi_engine_en_croissant_process
     COMMAND ${POWERSHELL_EXECUTABLE} -NoProfile -ExecutionPolicy Bypass -File
-            "${CMAKE_CURRENT_SOURCE_DIR}/tests/en_croissant_uci_test.ps1"
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/uci/en_croissant_uci_test.ps1"
             -EnginePath "$<TARGET_FILE:koi_engine>"
 )
 
@@ -305,7 +305,7 @@ set_tests_properties(koi_engine_en_croissant_process PROPERTIES TIMEOUT 30)
 add_test(
     NAME koi_benchmark_process
     COMMAND ${POWERSHELL_EXECUTABLE} -NoProfile -ExecutionPolicy Bypass -File
-            "${CMAKE_CURRENT_SOURCE_DIR}/tests/koi_bench_process_test.ps1"
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/tools/koi_bench_process_test.ps1"
             -BenchPath "$<TARGET_FILE_DIR:koi_engine>/koi-bench.exe"
 )
 
@@ -314,7 +314,7 @@ set_tests_properties(koi_benchmark_process PROPERTIES TIMEOUT 300)
 add_test(
     NAME koi_uci_match_process
     COMMAND ${POWERSHELL_EXECUTABLE} -NoProfile -ExecutionPolicy Bypass -File
-            "${CMAKE_CURRENT_SOURCE_DIR}/tests/uci_match_process_test.ps1"
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/matches/uci_match_process_test.ps1"
             -EnginePath "$<TARGET_FILE:koi_engine>"
 )
 
@@ -323,7 +323,7 @@ set_tests_properties(koi_uci_match_process PROPERTIES TIMEOUT 120)
 add_test(
     NAME koi_uci_match_clock
     COMMAND ${POWERSHELL_EXECUTABLE} -NoProfile -ExecutionPolicy Bypass -File
-            "${CMAKE_CURRENT_SOURCE_DIR}/tests/uci_match_clock_test.ps1"
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/matches/uci_match_clock_test.ps1"
             -EnginePath "$<TARGET_FILE:koi_engine>"
 )
 
@@ -332,7 +332,7 @@ set_tests_properties(koi_uci_match_clock PROPERTIES TIMEOUT 120)
 add_test(
     NAME cutechess_stability_smoke
     COMMAND ${POWERSHELL_EXECUTABLE} -NoProfile -ExecutionPolicy Bypass -File
-            "${CMAKE_CURRENT_SOURCE_DIR}/tests/cutechess_stability_test.ps1"
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/matches/cutechess_stability_test.ps1"
             -EnginePath "$<TARGET_FILE:koi_engine>"
 )
 
@@ -341,13 +341,13 @@ set_tests_properties(cutechess_stability_smoke PROPERTIES TIMEOUT 180)
 add_test(
     NAME windows_ci_configuration
     COMMAND ${POWERSHELL_EXECUTABLE} -NoProfile -ExecutionPolicy Bypass -File
-            "${CMAKE_CURRENT_SOURCE_DIR}/tests/ci_configuration_test.ps1"
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/packaging/ci_configuration_test.ps1"
 )
 
 add_test(
     NAME install_book_script
     COMMAND ${POWERSHELL_EXECUTABLE} -NoProfile -ExecutionPolicy Bypass -File
-            "${CMAKE_CURRENT_SOURCE_DIR}/tools/install_book_test.ps1"
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/packaging/install_book_test.ps1"
 )
 
 set_tests_properties(install_book_script PROPERTIES TIMEOUT 30)
@@ -355,9 +355,9 @@ set_tests_properties(install_book_script PROPERTIES TIMEOUT 30)
 add_test(
     NAME package_release_layout
     COMMAND ${POWERSHELL_EXECUTABLE} -NoProfile -ExecutionPolicy Bypass -File
-            "${CMAKE_CURRENT_SOURCE_DIR}/tests/package_release_test.ps1"
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/packaging/package_release_test.ps1"
             -BuildDirectory "${CMAKE_BINARY_DIR}"
-            -PackageScript "${CMAKE_CURRENT_SOURCE_DIR}/tools/package_release.ps1"
+            -PackageScript "${CMAKE_CURRENT_SOURCE_DIR}/tools/build/package_release.ps1"
 )
 
 set_tests_properties(package_release_layout PROPERTIES TIMEOUT 60)
@@ -373,7 +373,7 @@ if(Python3_Interpreter_FOUND)
     if(ELO_ORACLE_PYTHON_CHESS_RESULT EQUAL 0)
         add_test(
             NAME elo_oracle_python
-            COMMAND "${Python3_EXECUTABLE}" -m unittest tests/elo_oracle_test.py -v
+            COMMAND "${Python3_EXECUTABLE}" -m unittest tests/python/measurement/elo_oracle_test.py -v
         )
         set_tests_properties(
             elo_oracle_python
@@ -384,20 +384,20 @@ if(Python3_Interpreter_FOUND)
     else()
         message(STATUS
             "Skipping elo_oracle_python: python-chess is unavailable. "
-            "Install tools/requirements-elo-oracle.txt to register the test."
+            "Install tools/measurement/requirements-elo-oracle.txt to register the test."
         )
     endif()
     add_test(
         NAME elo_estimate_python
-        COMMAND "${Python3_EXECUTABLE}" -m unittest tests/elo_estimate_test.py -v
+        COMMAND "${Python3_EXECUTABLE}" -m unittest tests/python/measurement/elo_estimate_test.py -v
     )
     add_test(
         NAME stockfish_match_python
-        COMMAND "${Python3_EXECUTABLE}" -m unittest tests/stockfish_match_test.py -v
+        COMMAND "${Python3_EXECUTABLE}" -m unittest tests/python/measurement/stockfish_match_test.py -v
     )
     add_test(
         NAME elo_openings_python
-        COMMAND "${Python3_EXECUTABLE}" -m unittest tests/elo_openings_test.py -v
+        COMMAND "${Python3_EXECUTABLE}" -m unittest tests/python/measurement/elo_openings_test.py -v
     )
     set_tests_properties(
         elo_estimate_python stockfish_match_python
@@ -413,23 +413,23 @@ if(Python3_Interpreter_FOUND)
     )
     add_test(
         NAME tune_eval_python
-        COMMAND "${Python3_EXECUTABLE}" -m unittest tests/tune_eval_test.py -v
+        COMMAND "${Python3_EXECUTABLE}" -m unittest tests/python/evaluation/tune_eval_test.py -v
     )
     add_test(
         NAME nnue_training_python
-        COMMAND "${Python3_EXECUTABLE}" -m unittest tests/nnue_training_test.py -v
+        COMMAND "${Python3_EXECUTABLE}" -m unittest tests/python/evaluation/nnue_training_test.py -v
     )
     add_test(
         NAME nnue_wrapper_python
-        COMMAND "${Python3_EXECUTABLE}" -m unittest tests/nnue_wrapper_test.py -v
+        COMMAND "${Python3_EXECUTABLE}" -m unittest tests/python/evaluation/nnue_wrapper_test.py -v
     )
     add_test(
         NAME measurement_phase_python
-        COMMAND "${Python3_EXECUTABLE}" -m unittest tests/measurement_phase_test.py -v
+        COMMAND "${Python3_EXECUTABLE}" -m unittest tests/python/measurement/measurement_phase_test.py -v
     )
     add_test(
         NAME measurement_forensics_python
-        COMMAND "${Python3_EXECUTABLE}" -m unittest tests/measurement_forensics_test.py -v
+        COMMAND "${Python3_EXECUTABLE}" -m unittest tests/python/measurement/measurement_forensics_test.py -v
     )
     set_tests_properties(
         tune_eval_python

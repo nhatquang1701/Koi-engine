@@ -1,0 +1,2209 @@
+#include <algorithm>
+#include <array>
+#include <atomic>
+#include <chrono>
+#include <condition_variable>
+#include <cstdint>
+#include <cstdlib>
+#include <filesystem>
+#include <fstream>
+#include <iostream>
+#include <memory>
+#include <mutex>
+#include <optional>
+#include <stdexcept>
+#include <string>
+#include <string_view>
+#include <thread>
+#include <utility>
+#include <vector>
+
+#include "koi/classical_evaluator.hpp"
+#include "koi/detail/search_ordering.hpp"
+#include "koi/search_service.hpp"
+#include "koi/time_manager.hpp"
+#include "koi/transposition_table.hpp"
+
+namespace {
+
+using namespace std::chrono_literals;
+
+void require(bool condition, std::string_view message) {
+    if (!condition) {
+        throw std::runtime_error(std::string(message));
+    }
+}
+
+koi::GameState require_state(std::string_view fen) {
+    const auto state = koi::GameState::from_fen(fen);
+    require(state.has_value(), "test FEN must construct a game state");
+    return *state;
+}
+
+koi::GameState require_evaluation_fixture(std::string_view name) {
+    const std::filesystem::path repository_root = std::filesystem::path(__FILE__).parent_path()
+        .parent_path().parent_path().parent_path();
+    const std::filesystem::path path = repository_root / "tests" / "data" / "positions" /
+        "evaluation-positions.txt";
+    std::ifstream input(path);
+    require(input.good(), "evaluation fixture data must be readable");
+
+    std::string line;
+    while (std::getline(input, line)) {
+        if (line.empty() || line.front() == '#') {
+            continue;
+        }
+        const std::size_t separator = line.find('|');
+        require(separator != std::string::npos, "evaluation fixture must contain a name and FEN");
+        if (std::string_view(line).substr(0, separator) == name) {
+            return require_state(std::string_view(line).substr(separator + 1));
+        }
+    }
+    throw std::runtime_error("missing evaluation fixture: " + std::string(name));
+}
+
+struct CompletedSearch {
+    mutable std::mutex mutex;
+    std::optional<koi::SearchResult> result;
+    std::uint32_t completions = 0;
+
+    koi::SearchEventSink sink() {
+        return {.on_complete = [this](const koi::SearchResult& completed) {
+                    std::lock_guard lock(mutex);
+                    result = completed;
+                    ++completions;
+                }};
+    }
+
+    koi::SearchResult take_result() {
+        std::lock_guard lock(mutex);
+        require(result.has_value(), "search must report a result");
+        require(completions == 1, "search must report exactly one final result");
+        return *result;
+    }
+
+    std::uint32_t completion_count() const {
+        std::lock_guard lock(mutex);
+        return completions;
+    }
+};
+
+struct FirstInfoBarrier {
+    mutable std::mutex mutex;
+    std::condition_variable condition;
+    std::optional<int> first_depth;
+    std::uint64_t evaluations_at_first_info = 0;
+    std::uint32_t info_count = 0;
+    bool released = false;
+
+    void observe(const koi::SearchInfo& info, std::uint64_t evaluations) {
+        std::unique_lock lock(mutex);
+        ++info_count;
+        if (first_depth.has_value()) {
+            return;
+        }
+        first_depth = info.depth;
+        evaluations_at_first_info = evaluations;
+        condition.notify_one();
+        condition.wait(lock, [this] { return released; });
+    }
+
+    void wait_for_first_info() {
+        std::unique_lock lock(mutex);
+        require(condition.wait_for(lock, 2s, [this] { return first_depth.has_value(); }),
+                "threaded cancellation must publish a completed root iteration before cancellation");
+    }
+
+    void release() {
+        {
+            std::lock_guard lock(mutex);
+            released = true;
+        }
+        condition.notify_one();
+    }
+
+    [[nodiscard]] int first_info_depth() const {
+        std::lock_guard lock(mutex);
+        require(first_depth.has_value(), "threaded cancellation must observe a first root callback");
+        return *first_depth;
+    }
+
+    [[nodiscard]] std::uint64_t first_info_evaluations() const {
+        std::lock_guard lock(mutex);
+        require(first_depth.has_value(), "threaded cancellation must record its first root callback");
+        return evaluations_at_first_info;
+    }
+
+    [[nodiscard]] std::uint32_t info_callback_count() const {
+        std::lock_guard lock(mutex);
+        return info_count;
+    }
+};
+
+class ConcurrencyEvaluator final : public koi::Evaluator {
+public:
+    explicit ConcurrencyEvaluator(bool supports_concurrency = true)
+        : supports_concurrency_(supports_concurrency) {}
+
+    [[nodiscard]] bool supports_concurrent_evaluation() const noexcept override {
+        return supports_concurrency_;
+    }
+
+    [[nodiscard]] int evaluate(const koi::GameState&, koi::Color) const override {
+        const int current = active_.fetch_add(1, std::memory_order_relaxed) + 1;
+        int observed = maximum_active_.load(std::memory_order_relaxed);
+        while (current > observed &&
+               !maximum_active_.compare_exchange_weak(observed, current, std::memory_order_relaxed)) {
+        }
+        std::this_thread::sleep_for(2ms);
+        active_.fetch_sub(1, std::memory_order_relaxed);
+        return 0;
+    }
+
+    [[nodiscard]] int maximum_active() const noexcept {
+        return maximum_active_.load(std::memory_order_relaxed);
+    }
+
+private:
+    bool supports_concurrency_;
+    mutable std::atomic_int active_ = 0;
+    mutable std::atomic_int maximum_active_ = 0;
+};
+
+class FirstRootEvaluationGateEvaluator final : public koi::Evaluator {
+public:
+    [[nodiscard]] bool supports_concurrent_evaluation() const noexcept override { return true; }
+
+    [[nodiscard]] int evaluate(const koi::GameState&, koi::Color) const override {
+        const std::uint64_t evaluation_number =
+            evaluations_.fetch_add(1, std::memory_order_relaxed) + 1;
+        if (evaluation_number == 2) {
+            std::unique_lock lock(mutex_);
+            first_root_evaluation_blocked_ = true;
+            condition_.notify_all();
+            condition_.wait(lock, [this] { return release_first_root_evaluation_; });
+        } else if (evaluation_number >= 3) {
+            std::unique_lock lock(mutex_);
+            condition_.wait(lock, [this] { return first_root_evaluation_blocked_; });
+            overlap_observed_ = true;
+            condition_.notify_all();
+        }
+        return 0;
+    }
+
+    [[nodiscard]] bool wait_for_first_root_evaluation() const {
+        std::unique_lock lock(mutex_);
+        return condition_.wait_for(lock, 2s, [this] { return first_root_evaluation_blocked_; });
+    }
+
+    [[nodiscard]] bool wait_for_overlap() const {
+        std::unique_lock lock(mutex_);
+        return condition_.wait_for(lock, 2s, [this] { return overlap_observed_; });
+    }
+
+    void release_first_root_evaluation() const {
+        {
+            std::lock_guard lock(mutex_);
+            release_first_root_evaluation_ = true;
+        }
+        condition_.notify_all();
+    }
+
+private:
+    mutable std::atomic<std::uint64_t> evaluations_ = 0;
+    mutable std::mutex mutex_;
+    mutable std::condition_variable condition_;
+    mutable bool first_root_evaluation_blocked_ = false;
+    mutable bool overlap_observed_ = false;
+    mutable bool release_first_root_evaluation_ = false;
+};
+
+class CountingEvaluator final : public koi::Evaluator {
+public:
+    [[nodiscard]] int evaluate(const koi::GameState&, koi::Color) const override {
+        evaluations_.fetch_add(1, std::memory_order_relaxed);
+        return 0;
+    }
+
+    [[nodiscard]] bool supports_concurrent_evaluation() const noexcept override { return true; }
+
+    [[nodiscard]] std::uint64_t evaluations() const noexcept {
+        return evaluations_.load(std::memory_order_relaxed);
+    }
+
+private:
+    mutable std::atomic<std::uint64_t> evaluations_ = 0;
+};
+
+class CheckedPositionEvaluator final : public koi::Evaluator {
+public:
+    [[nodiscard]] int evaluate(const koi::GameState& state, koi::Color) const override {
+        if (state.in_check()) {
+            checked_evaluations_.fetch_add(1, std::memory_order_relaxed);
+        }
+        return 0;
+    }
+
+    [[nodiscard]] bool supports_concurrent_evaluation() const noexcept override { return true; }
+
+    [[nodiscard]] int checked_evaluations() const noexcept {
+        return checked_evaluations_.load(std::memory_order_relaxed);
+    }
+
+private:
+    mutable std::atomic_int checked_evaluations_ = 0;
+};
+
+class LateMoveVerificationEvaluator final : public koi::Evaluator {
+public:
+    [[nodiscard]] int evaluate(const koi::GameState& state, koi::Color perspective) const override {
+        const koi::Piece h3 = state.piece_at(*koi::Square::parse("h3"));
+        const bool target_line = h3.type == koi::PieceType::pawn && h3.color == koi::Color::white;
+        const bool reduced_leaf = state.fullmove_number() == 2 &&
+            state.side_to_move() == koi::Color::black;
+        const bool full_leaf = state.fullmove_number() >= 3 &&
+            state.side_to_move() == koi::Color::white;
+        const int white_score = target_line ? (reduced_leaf ? 2'000 : full_leaf ? -1'000 : 0) : 0;
+        return perspective == koi::Color::white ? white_score : -white_score;
+    }
+
+    [[nodiscard]] bool supports_concurrent_evaluation() const noexcept override { return true; }
+};
+
+class ThrowingEvaluator final : public koi::Evaluator {
+public:
+    [[nodiscard]] int evaluate(const koi::GameState&, koi::Color) const override {
+        throw std::runtime_error("synthetic evaluator failure");
+    }
+};
+
+koi::SearchResult search(koi::SearchService& service, koi::GameState root, koi::SearchLimits limits,
+                         koi::SearchOptions options = {}) {
+    CompletedSearch completed;
+    koi::SearchHandle handle = service.start(std::move(root), limits, completed.sink(), options);
+    handle.wait();
+    return completed.take_result();
+}
+
+void test_evaluator_returns_material_and_pst_from_requested_perspective() {
+    koi::ClassicalEvaluator evaluator;
+    const koi::GameState queen_up = require_state("4k3/8/8/8/8/8/8/3QK3 w - - 0 1");
+    const koi::GameState pawn_home = require_state("4k3/8/8/8/8/8/P7/4K3 w - - 0 1");
+    const koi::GameState pawn_advanced = require_state("4k3/8/8/8/4P3/8/8/4K3 w - - 0 1");
+
+    const int queen_score = evaluator.evaluate(queen_up, koi::Color::white);
+    require(queen_score >= 850, "a white queen advantage must evaluate as strongly positive");
+    require(evaluator.evaluate(queen_up, koi::Color::black) == -queen_score,
+            "black perspective must negate the white perspective score");
+    require(evaluator.evaluate(pawn_advanced, koi::Color::white) > evaluator.evaluate(pawn_home, koi::Color::white),
+            "a centrally advanced white pawn must receive a positive PST improvement");
+}
+
+void test_evaluator_breakdown_scores_structure_activity_and_king_safety() {
+    koi::ClassicalEvaluator evaluator;
+    const koi::GameState mobile_knight = require_state("4k3/8/8/3N4/8/8/8/4K3 w - - 0 1");
+    const koi::GameState corner_knight = require_state("4k3/8/8/8/8/8/8/N3K3 w - - 0 1");
+    const koi::GameState passed_pawns = require_state("4k3/8/8/3P4/4P3/8/8/4K3 w - - 0 1");
+    const koi::GameState doubled_pawns = require_state("4k3/8/8/3P4/3P4/8/8/4K3 w - - 0 1");
+    const koi::GameState shielded_king = require_state("4k3/8/8/8/8/8/5PPP/4K3 w - - 0 1");
+    const koi::GameState exposed_king = require_state("4k3/8/8/8/8/8/8/4K3 w - - 0 1");
+
+    const auto mobile = evaluator.breakdown(mobile_knight, koi::Color::white);
+    const auto corner = evaluator.breakdown(corner_knight, koi::Color::white);
+    const auto passed = evaluator.breakdown(passed_pawns, koi::Color::white);
+    const auto doubled = evaluator.breakdown(doubled_pawns, koi::Color::white);
+    const auto shielded = evaluator.breakdown(shielded_king, koi::Color::white);
+    const auto exposed = evaluator.breakdown(exposed_king, koi::Color::white);
+
+    require(mobile.mobility > corner.mobility, "centralized pieces must receive a mobility bonus");
+    require(passed.pawn_structure > doubled.pawn_structure,
+            "passed and connected pawns must score better than doubled pawns");
+    require(shielded.king_safety > exposed.king_safety,
+            "a king pawn shield must improve king-safety scoring");
+    require(mobile.total == evaluator.evaluate(mobile_knight, koi::Color::white),
+            "breakdown total must match the evaluator result");
+}
+
+void test_evaluator_rewards_development_center_control_and_immediate_pressure() {
+    koi::ClassicalEvaluator evaluator;
+    const auto undeveloped = evaluator.breakdown(
+        require_state("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"),
+        koi::Color::white);
+    const auto developed = evaluator.breakdown(
+        require_state("rnbqkbnr/pppppppp/8/8/8/2N5/PPPPPPPP/R1BQKBNR w KQkq - 0 1"),
+        koi::Color::white);
+    const auto edge = evaluator.breakdown(
+        require_state("4k3/8/8/8/8/8/8/N3K3 w - - 0 1"), koi::Color::white);
+    const auto center = evaluator.breakdown(
+        require_state("4k3/8/8/8/8/2N5/8/4K3 w - - 0 1"), koi::Color::white);
+    const auto quiet_pressure = evaluator.breakdown(
+        require_state("7r/6k1/8/8/Q7/8/8/4K3 w - - 0 1"), koi::Color::white);
+    const auto immediate_pressure = evaluator.breakdown(
+        require_state("4r1k1/8/8/8/Q7/8/8/4K3 w - - 0 1"), koi::Color::white);
+    const auto defended_pressure = evaluator.breakdown(
+        require_state("2k5/2q5/8/8/8/8/2R3B1/4K3 w - - 0 1"), koi::Color::white);
+
+    require(developed.development > undeveloped.development,
+            "developing a minor piece must improve the development term");
+    require(center.center_control > edge.center_control,
+            "a centralized knight must improve the core-center term");
+    require(immediate_pressure.initiative > quiet_pressure.initiative,
+            "attacking an exposed valuable piece must improve initiative pressure");
+    require(defended_pressure.initiative < 0,
+            "initiative pressure must not reward an attacked piece defended by the king: " +
+                std::to_string(defended_pressure.initiative));
+}
+
+void test_evaluator_rewards_a_bishop_pair() {
+    koi::ClassicalEvaluator evaluator;
+    const auto bishop_pair = evaluator.breakdown(
+        require_state("4k3/8/8/8/8/8/8/2B1KB2 w - - 0 1"), koi::Color::white);
+    const auto single_bishop = evaluator.breakdown(
+        require_state("4k3/8/8/8/8/8/8/2B1K3 w - - 0 1"), koi::Color::white);
+
+    require(bishop_pair.activity > single_bishop.activity,
+            "a same-side bishop pair must receive an activity bonus over one bishop");
+}
+
+void test_evaluator_breakdown_is_perspective_symmetric() {
+    koi::ClassicalEvaluator evaluator;
+    const koi::GameState state = require_state("r3k2r/pp2bppp/2p1pn2/8/2B5/2N1PN2/PPPQ1PPP/R3K2R w KQkq - 0 1");
+    const auto white = evaluator.breakdown(state, koi::Color::white);
+    const auto black = evaluator.breakdown(state, koi::Color::black);
+
+    require(white.material == -black.material && white.piece_square == -black.piece_square &&
+                white.mobility == -black.mobility && white.pawn_structure == -black.pawn_structure &&
+                white.activity == -black.activity && white.development == -black.development &&
+                white.center_control == -black.center_control && white.initiative == -black.initiative &&
+                white.king_safety == -black.king_safety &&
+                white.king_activity == -black.king_activity && white.passed_pawn == -black.passed_pawn &&
+                white.tempo == -black.tempo &&
+                white.total == -black.total,
+            "every evaluation component must negate under a perspective flip");
+}
+
+void test_evaluator_scores_backward_pawns_piece_mobility_and_dead_material() {
+    koi::ClassicalEvaluator evaluator;
+    const koi::GameState backward = require_state("k7/1b6/8/8/3P4/4P3/8/K7 w - - 0 1");
+    const koi::GameState healthy = require_state("k7/2b5/8/8/3P4/4P3/8/K7 w - - 0 1");
+    const koi::GameState central_queen = require_state("4k3/8/8/8/3Q4/8/8/4K3 w - - 0 1");
+    const koi::GameState corner_queen = require_state("4k3/8/8/8/8/8/8/4K2Q w - - 0 1");
+    const koi::GameState central_bishop = require_state("4k2r/8/8/8/2B5/8/8/4K3 w - - 0 1");
+    const koi::GameState corner_bishop = require_state("4k2r/8/8/8/8/8/8/B3K3 w - - 0 1");
+    const koi::GameState lone_bishop = require_state("4k3/8/8/8/8/8/2B5/4K3 w - - 0 1");
+
+    const auto backward_score = evaluator.breakdown(backward, koi::Color::white);
+    const auto healthy_score = evaluator.breakdown(healthy, koi::Color::white);
+    const auto central_score = evaluator.breakdown(central_queen, koi::Color::white);
+    const auto corner_score = evaluator.breakdown(corner_queen, koi::Color::white);
+    const auto central_bishop_score = evaluator.breakdown(central_bishop, koi::Color::white);
+    const auto corner_bishop_score = evaluator.breakdown(corner_bishop, koi::Color::white);
+
+    require(backward_score.pawn_structure < healthy_score.pawn_structure,
+            "a backward pawn must score below an otherwise healthy pawn structure");
+    require(central_score.activity > corner_score.activity,
+            "central bishops and queens must receive piece-specific mobility credit");
+    require(central_bishop_score.activity > corner_bishop_score.activity,
+            "bishop mobility must contribute to activity scoring");
+    require(evaluator.evaluate(lone_bishop, koi::Color::white) == 0,
+            "insufficient material must evaluate as a forced draw");
+}
+
+void test_evaluator_increases_advanced_passed_pawn_value_in_the_endgame() {
+    koi::ClassicalEvaluator evaluator;
+    const koi::GameState endgame = require_state("4k3/8/8/3P4/8/8/8/4K3 w - - 0 1");
+    const koi::GameState middlegame = require_state("4q2k/8/8/3P4/8/8/8/4Q2K w - - 0 1");
+
+    const auto endgame_score = evaluator.breakdown(endgame, koi::Color::white);
+    const auto middlegame_score = evaluator.breakdown(middlegame, koi::Color::white);
+    require(endgame_score.pawn_structure > middlegame_score.pawn_structure,
+            "an advanced passed pawn must receive additional weight as material leaves the board");
+}
+
+void test_evaluator_penalizes_a_directly_blockaded_passed_pawn() {
+    koi::ClassicalEvaluator evaluator;
+    const auto advanced = evaluator.breakdown(require_evaluation_fixture("advanced_passed"), koi::Color::white);
+    const auto blockaded = evaluator.breakdown(require_evaluation_fixture("blockaded_passed"), koi::Color::white);
+
+    require(advanced.pawn_structure >= blockaded.pawn_structure + 10,
+            "a directly blockaded passed pawn must lose meaningful structure credit against an unobstructed passer");
+}
+
+void test_evaluator_mirrors_terms_and_black_passed_pawn_blockades() {
+    koi::ClassicalEvaluator evaluator;
+    const auto white_terms = evaluator.breakdown(require_evaluation_fixture("term_mirror_white"), koi::Color::white);
+    const auto black_terms = evaluator.breakdown(require_evaluation_fixture("term_mirror_black"), koi::Color::black);
+
+    require(white_terms.material == black_terms.material &&
+                white_terms.piece_square == black_terms.piece_square &&
+                white_terms.mobility == black_terms.mobility &&
+                white_terms.pawn_structure == black_terms.pawn_structure &&
+                white_terms.activity == black_terms.activity &&
+                white_terms.king_safety == black_terms.king_safety &&
+                white_terms.total == black_terms.total,
+            "a color-and-rank mirrored position must preserve every evaluator term");
+    require(white_terms.mobility != 0 && white_terms.pawn_structure != 0 &&
+                white_terms.activity != 0 && white_terms.king_safety != 0,
+            "the mirrored evaluator fixture must exercise mobility, pawn, activity, and king-safety terms");
+
+    const auto black_advanced =
+        evaluator.breakdown(require_evaluation_fixture("black_advanced_passed"), koi::Color::black);
+    const auto black_blockaded =
+        evaluator.breakdown(require_evaluation_fixture("black_blockaded_passed"), koi::Color::black);
+    require(black_advanced.pawn_structure >= black_blockaded.pawn_structure + 10,
+            "a directly blockaded black passed pawn must lose meaningful structure credit");
+}
+
+void test_evaluator_endgame_passer_scaling_is_color_symmetric() {
+    koi::ClassicalEvaluator evaluator;
+    const auto white_endgame =
+        evaluator.breakdown(require_evaluation_fixture("endgame_passer_white"), koi::Color::white);
+    const auto white_middlegame =
+        evaluator.breakdown(require_evaluation_fixture("middlegame_passer_white"), koi::Color::white);
+    const auto black_endgame =
+        evaluator.breakdown(require_evaluation_fixture("endgame_passer_black"), koi::Color::black);
+    const auto black_middlegame =
+        evaluator.breakdown(require_evaluation_fixture("middlegame_passer_black"), koi::Color::black);
+
+    require(white_endgame.pawn_structure > white_middlegame.pawn_structure &&
+                black_endgame.pawn_structure > black_middlegame.pawn_structure,
+            "advanced passed pawns must gain endgame structure weight for both colors");
+    require(white_endgame.pawn_structure == black_endgame.pawn_structure &&
+                white_middlegame.pawn_structure == black_middlegame.pawn_structure,
+            "endgame passed-pawn scaling must remain color symmetric");
+}
+
+void test_evaluator_exposes_versioned_classical_parameters() {
+    koi::ClassicalEvaluator evaluator;
+    const auto& parameters = evaluator.parameters();
+
+    require(!parameters.version.empty(), "classical evaluator parameters must expose a version");
+    require(parameters.maximum_phase > 0, "classical evaluator parameters must expose the phase scale");
+    require(parameters.tempo_bonus > 0, "classical evaluator parameters must expose the tempo bonus");
+}
+
+void test_evaluator_scores_endgame_king_activity() {
+    koi::ClassicalEvaluator evaluator;
+    const auto active = evaluator.breakdown(
+        require_state("4k3/8/8/3P4/3K4/8/8/8 w - - 0 1"), koi::Color::white);
+    const auto idle = evaluator.breakdown(
+        require_state("4k3/8/8/3P4/8/8/8/K7 w - - 0 1"), koi::Color::white);
+
+    require(active.king_activity > idle.king_activity,
+            "a centralized king must receive more tapered endgame activity credit");
+}
+
+void test_evaluator_scores_passed_pawn_support_and_promotion_race() {
+    koi::ClassicalEvaluator evaluator;
+    const auto supported = evaluator.breakdown(
+        require_state("4k3/8/8/3P4/3K4/8/8/8 w - - 0 1"), koi::Color::white);
+    const auto unsupported = evaluator.breakdown(
+        require_state("4k3/8/8/3P4/8/8/8/K7 w - - 0 1"), koi::Color::white);
+    const auto advanced = evaluator.breakdown(
+        require_state("k7/6P1/8/8/8/8/8/K7 w - - 0 1"), koi::Color::white);
+    const auto unadvanced = evaluator.breakdown(
+        require_state("k7/8/8/3P4/8/8/8/K7 w - - 0 1"), koi::Color::white);
+
+    require(supported.passed_pawn > unsupported.passed_pawn,
+            "a king supporting a passed pawn must improve passed-pawn scoring");
+    require(advanced.passed_pawn > unadvanced.passed_pawn,
+            "a passed pawn closer to promotion must receive race value");
+}
+
+void test_evaluator_applies_tempo_once_for_side_to_move() {
+    koi::ClassicalEvaluator evaluator;
+    const auto white_to_move = evaluator.breakdown(
+        require_state("4k3/8/8/8/8/8/P7/4K3 w - - 0 1"), koi::Color::white);
+    const auto black_to_move = evaluator.breakdown(
+        require_state("4k3/8/8/8/8/8/P7/4K3 b - - 0 1"), koi::Color::white);
+
+    require(white_to_move.tempo == evaluator.parameters().tempo_bonus,
+            "white to move must receive exactly one tempo bonus");
+    require(black_to_move.tempo == -evaluator.parameters().tempo_bonus,
+            "black to move must remove exactly one tempo bonus");
+}
+
+void test_evaluator_keeps_endgame_terms_for_pawnless_rook_endgames() {
+    koi::ClassicalEvaluator evaluator;
+    const auto active = evaluator.breakdown(
+        require_state("4k3/8/8/3R4/3K4/8/8/8 w - - 0 1"), koi::Color::white);
+    const auto idle = evaluator.breakdown(
+        require_state("4k3/8/8/3R4/8/8/8/K7 w - - 0 1"), koi::Color::white);
+    const auto white_to_move = evaluator.breakdown(
+        require_state("4k3/8/8/8/8/8/8/R3K3 w - - 0 1"), koi::Color::white);
+    const auto black_to_move = evaluator.breakdown(
+        require_state("4k3/8/8/8/8/8/8/R3K3 b - - 0 1"), koi::Color::white);
+
+    require(active.king_activity > idle.king_activity,
+            "pawnless rook endgames must receive tapered king activity credit");
+    require(white_to_move.tempo == evaluator.parameters().tempo_bonus &&
+                black_to_move.tempo == -evaluator.parameters().tempo_bonus,
+            "pawnless rook endgames must receive exactly one side-to-move tempo");
+}
+
+void test_evaluator_breakdown_accounts_for_every_component() {
+    koi::ClassicalEvaluator evaluator;
+    const auto score = evaluator.breakdown(
+        require_state("4k3/8/8/3P4/3K4/8/8/8 w - - 0 1"), koi::Color::white);
+
+    require(score.total == score.material + score.piece_square + score.mobility +
+                score.pawn_structure + score.activity + score.development + score.center_control +
+                score.initiative + score.king_safety +
+                score.king_activity + score.passed_pawn + score.tempo,
+            "breakdown total must account for every evaluation component");
+}
+
+void test_time_manager_applies_move_time_and_clock_limits() {
+    koi::SearchLimits move_time;
+    move_time.movetime = 100ms;
+    move_time.white_clock = koi::ClockLimit{10s, 1s};
+    koi::TimeManager fixed(move_time, koi::Color::white);
+    require(fixed.time_budget().has_value(), "movetime must create a time budget");
+    require(*fixed.time_budget() <= 100ms, "movetime must take precedence over clock allocation");
+
+    koi::SearchLimits clock;
+    clock.white_clock = koi::ClockLimit{10s, 1s};
+    clock.moves_to_go = 20;
+    koi::TimeManager allocated(clock, koi::Color::white);
+    require(allocated.time_budget().has_value(), "side-to-move clock must create a time budget");
+    require(*allocated.time_budget() > 0ms && *allocated.time_budget() < 10s,
+            "clock allocation must retain a safety margin");
+
+    koi::SearchLimits nodes;
+    nodes.nodes = 5;
+    koi::TimeManager node_limited(nodes, koi::Color::white);
+    require(!node_limited.should_stop(4), "node limit must allow work below its boundary");
+    require(node_limited.should_stop(5), "node limit must stop at its boundary");
+
+    koi::SearchLimits infinite;
+    infinite.infinite = true;
+    infinite.movetime = 1ms;
+    koi::TimeManager unbounded(infinite, koi::Color::white);
+    require(!unbounded.time_budget().has_value(), "infinite search must ignore a time budget");
+
+    koi::SearchLimits infinite_nodes;
+    infinite_nodes.infinite = true;
+    infinite_nodes.nodes = 1;
+    koi::TimeManager infinite_node_limited(infinite_nodes, koi::Color::white);
+    require(infinite_node_limited.node_limit() == 1,
+            "infinite search must retain an explicit node limit");
+    require(infinite_node_limited.should_stop(1),
+            "infinite search must stop when its explicit node limit is reached");
+}
+
+void test_speed_scales_only_time_based_search_budgets() {
+    koi::SearchLimits move_time;
+    move_time.movetime = 1s;
+    const koi::TimeManager normal(move_time, koi::Color::white, 100);
+    const koi::TimeManager faster(move_time, koi::Color::white, 50);
+    require(normal.time_budget().has_value() && faster.time_budget().has_value(),
+            "speed-controlled movetime searches must have budgets");
+    require(*faster.time_budget() < *normal.time_budget(),
+            "Speed below 100 must reduce a movetime budget");
+
+    koi::SearchLimits clock;
+    clock.white_clock = koi::ClockLimit{10s, 1s};
+    clock.moves_to_go = 20;
+    const koi::TimeManager normal_clock(clock, koi::Color::white, 100);
+    const koi::TimeManager faster_clock(clock, koi::Color::white, 50);
+    require(*faster_clock.time_budget() < *normal_clock.time_budget(),
+            "Speed below 100 must reduce a clock allocation");
+
+    koi::SearchLimits very_large;
+    very_large.movetime = std::chrono::milliseconds::max();
+    const koi::TimeManager scaled_large(very_large, koi::Color::white, 50);
+    require(scaled_large.time_budget().has_value() &&
+                *scaled_large.time_budget() < std::chrono::milliseconds::max() / 2,
+            "Speed must scale very large time values without overflow");
+
+    koi::SearchLimits very_large_clock;
+    very_large_clock.white_clock = koi::ClockLimit{std::chrono::milliseconds::max(),
+                                                    std::chrono::milliseconds::max()};
+    very_large_clock.moves_to_go = 2;
+    const koi::TimeManager scaled_large_clock(very_large_clock, koi::Color::white, 50);
+    require(scaled_large_clock.time_budget().has_value() &&
+                *scaled_large_clock.time_budget() > std::chrono::milliseconds::max() / 2 - 100ms,
+            "Clock allocation must saturate before scaling very large increments");
+
+    koi::SearchLimits depth;
+    depth.depth = 4;
+    koi::SearchLimits nodes;
+    nodes.nodes = 100;
+    koi::SearchLimits infinite;
+    infinite.infinite = true;
+    require(!koi::TimeManager(depth, koi::Color::white, 1).time_budget().has_value(),
+            "Speed must not add a time budget to depth searches");
+    require(!koi::TimeManager(nodes, koi::Color::white, 1).time_budget().has_value(),
+            "Speed must not add a time budget to node searches");
+    require(!koi::TimeManager(infinite, koi::Color::white, 1).time_budget().has_value(),
+            "Speed must not add a time budget to infinite searches");
+}
+
+void test_move_overhead_and_slow_mover_scale_time_in_order() {
+    koi::SearchLimits move_time;
+    move_time.movetime = 1s;
+    const koi::TimeManager configured(move_time, koi::Color::white, 50, 10, 50);
+    require(configured.time_budget().has_value() && *configured.time_budget() == 228ms,
+            "time budgets must apply Slow Mover, then Speed, then Move Overhead and safety margin");
+
+    koi::SearchLimits clock;
+    clock.white_clock = koi::ClockLimit{10s, 1s};
+    clock.moves_to_go = 20;
+    const koi::TimeManager configured_clock(clock, koi::Color::white, 50, 10, 50);
+    require(configured_clock.time_budget().has_value() && *configured_clock.time_budget() == 287ms,
+            "clock allocations must use both new compatibility timing controls");
+}
+
+void test_explicit_depth_and_nodes_remain_untimed_with_clock_fields() {
+    koi::SearchLimits depth_with_clock;
+    depth_with_clock.depth = 3;
+    depth_with_clock.movetime = 1ms;
+    depth_with_clock.white_clock = koi::ClockLimit{1s, 1s};
+    const koi::TimeManager depth_manager(depth_with_clock, koi::Color::white);
+    require(!depth_manager.time_budget().has_value(),
+            "explicit depth must remain untimed even when time fields are also present");
+
+    koi::SearchLimits nodes_with_clock;
+    nodes_with_clock.nodes = 100;
+    nodes_with_clock.black_clock = koi::ClockLimit{1s, 1s};
+    const koi::TimeManager nodes_manager(nodes_with_clock, koi::Color::black);
+    require(!nodes_manager.time_budget().has_value(),
+            "explicit nodes must remain untimed even when clock fields are also present");
+}
+
+void test_search_options_include_thread_and_speed_controls() {
+    const koi::SearchOptions defaults;
+    require(defaults.threads == 1, "SearchOptions must default to one search thread");
+    require(defaults.speed_percent == 100, "SearchOptions must default to Speed 100");
+    require(!defaults.show_wdl && defaults.move_overhead_ms == 10 &&
+                defaults.slow_mover_percent == 100 && !defaults.limit_strength && defaults.elo == 1320 &&
+                !defaults.strength_mode,
+            "SearchOptions must default to the Task 1 compatibility values");
+
+    koi::SearchOptions configured;
+    configured.threads = 2;
+    configured.speed_percent = 50;
+    configured.show_wdl = true;
+    configured.move_overhead_ms = 5000;
+    configured.slow_mover_percent = 200;
+    configured.limit_strength = true;
+    configured.elo = 1500;
+    configured.strength_mode = true;
+    require(configured.threads == 2 && configured.speed_percent == 50 && configured.show_wdl &&
+                configured.move_overhead_ms == 5000 && configured.slow_mover_percent == 200 &&
+                configured.limit_strength && configured.elo == 1500 && configured.strength_mode,
+            "SearchOptions must retain explicit compatibility and strength-mode values");
+}
+
+void test_root_filtering_keeps_only_requested_legal_move() {
+    const auto expected = koi::Move::parse_uci("e2e4");
+    require(expected.has_value(), "the requested root move must parse");
+
+    koi::SearchLimits limits;
+    limits.depth = 2;
+    limits.search_moves_specified = true;
+    limits.search_moves = {*expected};
+
+    koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>());
+    const koi::SearchResult result = search(service, koi::GameState::startpos(), limits);
+
+    require(result.completed_depth == 2, "a filtered root search must complete the requested depth");
+    require(result.best_move == expected, "root filtering must retain the requested legal move only");
+}
+
+void test_root_filtering_ignores_syntactically_valid_illegal_move() {
+    const auto illegal = koi::Move::parse_uci("a1a1");
+    require(illegal.has_value(), "the syntactically valid illegal root move must parse");
+
+    koi::SearchLimits limits;
+    limits.depth = 2;
+    limits.search_moves_specified = true;
+    limits.search_moves = {*illegal};
+
+    koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>());
+    const koi::SearchResult result = search(service, koi::GameState::startpos(), limits);
+
+    require(!result.best_move.has_value(), "an empty filtered root must not return a best move");
+}
+
+void test_deterministic_multipv_reports_sorted_distinct_legal_lines() {
+    const auto run = [] {
+        std::vector<koi::SearchInfo> infos;
+        std::optional<koi::SearchResult> result;
+        koi::SearchLimits limits;
+        limits.depth = 2;
+        const koi::SearchOptions options{.multi_pv = 3};
+        koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>());
+        koi::SearchHandle handle = service.start(
+            koi::GameState::startpos(), limits,
+            {.on_info = [&infos](const koi::SearchInfo& info) { infos.push_back(info); },
+             .on_complete = [&result](const koi::SearchResult& completed) { result = completed; }},
+            options);
+        handle.wait();
+
+        require(result.has_value(), "MultiPV search must report a completion result");
+        std::vector<koi::SearchInfo> final_depth;
+        for (const koi::SearchInfo& info : infos) {
+            if (info.depth == 2) {
+                final_depth.push_back(info);
+            }
+        }
+        require(final_depth.size() == 3,
+                "MultiPV must report three final-depth lines when three legal roots exist");
+        const koi::GameState root = koi::GameState::startpos();
+        std::vector<koi::Move> first_moves;
+        for (std::size_t index = 0; index < final_depth.size(); ++index) {
+            const koi::SearchInfo& info = final_depth[index];
+            require(info.multipv == static_cast<int>(index + 1),
+                    "MultiPV ranks must be consecutive starting at one");
+            if (index > 0) {
+                require(final_depth[index - 1].score_cp >= info.score_cp,
+                        "MultiPV lines must be sorted by descending score");
+            }
+            require(!info.pv.empty(), "each MultiPV line must contain a principal variation");
+            koi::GameState line_state = root;
+            for (const koi::Move& move : info.pv) {
+                require(line_state.is_legal(move), "MultiPV PV moves must remain legal");
+                require(line_state.make_move(move), "MultiPV PV moves must be applicable in sequence");
+            }
+            require(std::find(first_moves.begin(), first_moves.end(), info.pv.front()) == first_moves.end(),
+                    "MultiPV root moves must be distinct");
+            first_moves.push_back(info.pv.front());
+        }
+        require(result->best_move == final_depth.front().pv.front() &&
+                    result->score_cp == final_depth.front().score_cp &&
+                    result->mate == final_depth.front().mate,
+                "completion result must match the rank-one MultiPV line");
+        return std::pair{std::move(final_depth), *result};
+    };
+
+    const auto first = run();
+    const auto second = run();
+    require(first.first.size() == second.first.size(),
+            "repeated MultiPV searches must report the same number of lines");
+    for (std::size_t index = 0; index < first.first.size(); ++index) {
+        require(first.first[index].multipv == second.first[index].multipv &&
+                    first.first[index].score_cp == second.first[index].score_cp &&
+                    first.first[index].pv == second.first[index].pv,
+                "repeated MultiPV searches must report identical rank, score, and PV data");
+    }
+}
+
+void test_threaded_search_uses_multiple_root_workers_and_matches_reference_result() {
+    auto threaded_evaluator = std::make_shared<ConcurrencyEvaluator>();
+    koi::SearchService threaded_service(threaded_evaluator);
+    koi::SearchOptions threaded_options;
+    threaded_options.threads = 2;
+    koi::SearchLimits limits;
+    limits.depth = 2;
+    const koi::SearchResult threaded =
+        search(threaded_service, koi::GameState::startpos(), limits, threaded_options);
+
+    auto reference_evaluator = std::make_shared<ConcurrencyEvaluator>();
+    koi::SearchService reference_service(reference_evaluator);
+    const koi::SearchResult reference = search(reference_service, koi::GameState::startpos(), limits);
+
+    if (koi::maximum_search_threads() > 1) {
+        require(threaded_evaluator->maximum_active() >= 2,
+                "Threads greater than one must evaluate independent root jobs concurrently");
+    } else {
+        require(threaded_evaluator->maximum_active() >= 1,
+                "a single-thread host must still evaluate the root search");
+    }
+    require(threaded.best_move.has_value() && reference.best_move.has_value(),
+            "threaded and reference searches must both return a root move");
+    require(*threaded.best_move == *reference.best_move && threaded.score_cp == reference.score_cp,
+            "threaded fixed-depth search must match the single-thread reference result");
+}
+
+void test_threaded_root_worker_starts_while_first_root_evaluation_is_blocked() {
+    if (koi::maximum_search_threads() < 2) {
+        return;
+    }
+
+    auto evaluator = std::make_shared<FirstRootEvaluationGateEvaluator>();
+    koi::SearchService service(evaluator);
+    koi::SearchLimits limits;
+    limits.depth = 1;
+    koi::SearchOptions options;
+    options.threads = 2;
+    CompletedSearch completed;
+    koi::SearchHandle handle = service.start(
+        koi::GameState::startpos(), limits, completed.sink(), options);
+
+    const bool first_root_evaluation_blocked = evaluator->wait_for_first_root_evaluation();
+    const bool overlap_observed = first_root_evaluation_blocked && evaluator->wait_for_overlap();
+    evaluator->release_first_root_evaluation();
+    handle.wait();
+
+    require(first_root_evaluation_blocked,
+            "the first threaded root evaluation must reach the gate");
+    require(overlap_observed,
+            "another root worker must evaluate while the first root evaluation is blocked");
+    (void)completed.take_result();
+}
+
+void test_classical_threaded_search_matches_reference_result() {
+    const koi::GameState root = require_state(
+        "r1bqk2r/pppp1ppp/2n2n2/8/2B5/2N5/PPPP1PPP/R1BQK2R w KQkq - 0 1");
+    koi::SearchLimits limits;
+    limits.depth = 3;
+
+    koi::SearchService reference_service(std::make_shared<koi::ClassicalEvaluator>());
+    const koi::SearchResult reference = search(reference_service, root, limits);
+
+    koi::SearchOptions options;
+    options.threads = std::min<std::size_t>(4, koi::maximum_search_threads());
+    koi::SearchService threaded_service(std::make_shared<koi::ClassicalEvaluator>());
+    const koi::SearchResult threaded = search(threaded_service, root, limits, options);
+
+    require(reference.best_move.has_value() && threaded.best_move.has_value() &&
+                root.is_legal(*reference.best_move) && root.is_legal(*threaded.best_move),
+            "classical reference and threaded searches must return legal moves");
+    require(*reference.best_move == *threaded.best_move && reference.score_cp == threaded.score_cp,
+            "classical threaded search must match the single-thread reference result");
+}
+
+void test_threaded_single_pv_does_not_repeat_root_search() {
+    auto evaluator = std::make_shared<CountingEvaluator>();
+    koi::SearchService service(evaluator);
+    koi::SearchLimits limits;
+    limits.depth = 1;
+    koi::SearchOptions options;
+    options.threads = 2;
+    const koi::GameState root = koi::GameState::startpos();
+    const std::size_t legal_root_moves = root.legal_moves().size();
+
+    const koi::SearchResult result = search(service, root, limits, options);
+
+    require(result.best_move.has_value() && root.is_legal(*result.best_move),
+            "an authoritative threaded root search must retain a legal move");
+    require(evaluator->evaluations() == legal_root_moves + 1,
+            "a threaded single-PV search must not repeat the root search serially");
+}
+
+void test_threaded_root_in_check_matches_serial_fixed_depth() {
+    const koi::GameState root = require_state("7k/7b/8/8/4K3/8/8/6N1 w - - 0 1");
+    require(root.in_check(), "the threaded root-in-check fixture must begin with the king in check");
+    const std::array<std::string_view, 3> accepted{"e4f3", "e4d4", "e4f4"};
+    koi::SearchLimits limits;
+    limits.depth = 2;
+
+    koi::SearchService serial_service(std::make_shared<koi::ClassicalEvaluator>());
+    const koi::SearchResult serial = search(serial_service, root, limits);
+    require(serial.best_move.has_value() &&
+                std::find(accepted.begin(), accepted.end(), serial.best_move->uci()) != accepted.end(),
+            "the root-in-check fixture must retain a serial accepted evasion");
+
+    const std::size_t legal_root_moves = root.legal_moves().size();
+    for (const std::size_t threads : {std::size_t{2}, std::size_t{4}}) {
+        koi::SearchOptions threaded_options;
+        threaded_options.threads = threads;
+
+        auto concurrency_evaluator = std::make_shared<ConcurrencyEvaluator>();
+        koi::SearchService concurrency_service(concurrency_evaluator);
+        (void)search(concurrency_service, root, limits, threaded_options);
+        const std::size_t effective_threads = std::min({threads, koi::maximum_search_threads(), legal_root_moves});
+        if (effective_threads > 1) {
+            require(concurrency_evaluator->maximum_active() >= 2,
+                    "root-in-check search must use effective concurrent root workers when available");
+        } else {
+            require(concurrency_evaluator->maximum_active() >= 1,
+                    "root-in-check search must still evaluate on a single-thread host");
+        }
+
+        koi::SearchService threaded_service(std::make_shared<koi::ClassicalEvaluator>());
+        const koi::SearchResult threaded = search(threaded_service, root, limits, threaded_options);
+        require(threaded.completed_depth == serial.completed_depth && threaded.best_move == serial.best_move &&
+                    threaded.score_cp == serial.score_cp,
+                "root-in-check threaded search must retain the serial fixed-depth move and score at Threads=2 and Threads=4");
+    }
+}
+
+void test_equal_root_scores_keep_the_earliest_ordered_move() {
+    const koi::GameState root = require_state("4k3/8/8/8/8/8/P6r/4K2R w - - 0 1");
+    const auto expected = koi::Move::parse_uci("h1h2");
+    require(expected.has_value(), "the ordered capture fixture must parse");
+
+    koi::SearchLimits limits;
+    limits.depth = 1;
+
+    auto reference_evaluator = std::make_shared<ConcurrencyEvaluator>();
+    koi::SearchService reference_service(reference_evaluator);
+    const koi::SearchResult reference = search(reference_service, root, limits);
+    require(reference.best_move == expected,
+            "single-thread equal scores must retain the earliest move from root ordering");
+
+    auto threaded_evaluator = std::make_shared<ConcurrencyEvaluator>();
+    koi::SearchService threaded_service(threaded_evaluator);
+    koi::SearchOptions options;
+    options.threads = 2;
+    const koi::SearchResult threaded = search(threaded_service, root, limits, options);
+    require(threaded.best_move == expected,
+            "threaded equal scores must retain the earliest move from root ordering");
+}
+
+void test_threaded_multipv_equal_scores_use_stable_ordered_root_tie_breaking() {
+    const koi::GameState root = require_state("4k3/8/8/8/8/8/P6r/4K2R w - - 0 1");
+    const std::vector<koi::Move> generated_moves = root.legal_moves();
+    require(!generated_moves.empty(), "the equal-score fixture must have legal root moves");
+    const auto ordered_capture = koi::Move::parse_uci("h1h2");
+    require(ordered_capture.has_value() && generated_moves.front() != *ordered_capture,
+            "the fixture must distinguish generated legal order from root move ordering");
+
+    koi::SearchLimits limits;
+    limits.depth = 2;
+    koi::SearchOptions options;
+    options.threads = 2;
+    options.multi_pv = 3;
+
+    std::vector<koi::SearchInfo> infos;
+    std::optional<koi::SearchResult> result;
+    koi::SearchService service(std::make_shared<ConcurrencyEvaluator>());
+    koi::SearchHandle handle = service.start(
+        root, limits,
+        {.on_info = [&infos](const koi::SearchInfo& info) { infos.push_back(info); },
+         .on_complete = [&result](const koi::SearchResult& completed) { result = completed; }},
+        options);
+    handle.wait();
+
+    std::vector<koi::SearchInfo> final_depth;
+    for (const koi::SearchInfo& info : infos) {
+        if (info.depth == limits.depth) {
+            final_depth.push_back(info);
+        }
+    }
+    require(final_depth.size() == 3,
+            "threaded MultiPV must report three final-depth lines for three legal roots");
+    std::vector<koi::Move> first_moves;
+    for (std::size_t index = 0; index < final_depth.size(); ++index) {
+        const koi::SearchInfo& info = final_depth[index];
+        require(info.multipv == static_cast<int>(index + 1),
+                "threaded MultiPV ranks must be consecutive starting at one");
+        require(!info.pv.empty() && root.is_legal(info.pv.front()),
+                "threaded MultiPV must report legal root moves");
+        require(std::find(first_moves.begin(), first_moves.end(), info.pv.front()) == first_moves.end(),
+                "threaded MultiPV root moves must be distinct");
+        first_moves.push_back(info.pv.front());
+    }
+    require(final_depth.front().pv.front() == *ordered_capture,
+            "equal-score threaded MultiPV must retain the earliest stable ordered root move");
+    require(result.has_value() && result->best_move == final_depth.front().pv.front() &&
+                result->score_cp == final_depth.front().score_cp,
+            "threaded MultiPV completion must match its rank-one line");
+}
+
+void test_threaded_multipv_matches_single_thread_at_final_depth() {
+    const koi::GameState root = require_state("4k3/8/8/8/8/8/P6r/4K2R w - - 0 1");
+    koi::SearchLimits limits;
+    limits.depth = 2;
+
+    const auto run = [&](std::size_t threads) {
+        koi::SearchOptions options;
+        options.threads = threads;
+        options.multi_pv = 3;
+        std::vector<koi::SearchInfo> final_depth;
+        std::optional<koi::SearchResult> result;
+        koi::SearchService service(std::make_shared<ConcurrencyEvaluator>());
+        koi::SearchHandle handle = service.start(
+            root, limits,
+            {.on_info = [&final_depth, &limits](const koi::SearchInfo& info) {
+                 if (info.depth == limits.depth) {
+                     final_depth.push_back(info);
+                 }
+             },
+             .on_complete = [&result](const koi::SearchResult& completed) { result = completed; }},
+            options);
+        handle.wait();
+        require(result.has_value() && final_depth.size() == 3,
+                "each final-depth MultiPV search must report three ranked lines");
+        return std::pair{std::move(final_depth), *result};
+    };
+
+    const auto single_thread = run(1);
+    const auto threaded = run(2);
+    for (std::size_t index = 0; index < single_thread.first.size(); ++index) {
+        const koi::SearchInfo& reference = single_thread.first[index];
+        const koi::SearchInfo& candidate = threaded.first[index];
+        require(reference.multipv == candidate.multipv && reference.score_cp == candidate.score_cp &&
+                    reference.mate == candidate.mate && !reference.pv.empty() && !candidate.pv.empty() &&
+                    reference.pv.front() == candidate.pv.front() && reference.pv == candidate.pv,
+                "Threads=1 and Threads=2 must retain rank, score, root move, and PV at final depth");
+    }
+    require(single_thread.second.best_move == single_thread.first.front().pv.front() &&
+                threaded.second.best_move == threaded.first.front().pv.front(),
+            "MultiPV completion must retain the final-depth rank-one root move for both thread counts");
+}
+
+void test_threaded_multipv_is_stable_after_warming_the_shared_hash() {
+    const koi::GameState root = require_state("4k3/8/8/8/8/8/P6r/4K2R w - - 0 1");
+    const auto ordered_capture = koi::Move::parse_uci("h1h2");
+    require(ordered_capture.has_value(), "the stable-order fixture must parse");
+
+    koi::SearchLimits limits;
+    limits.depth = 2;
+    koi::SearchOptions options;
+    options.threads = 2;
+    options.multi_pv = 3;
+    koi::SearchService service(std::make_shared<ConcurrencyEvaluator>());
+
+    const auto run = [&] {
+        std::vector<koi::SearchInfo> final_depth;
+        std::optional<koi::SearchResult> result;
+        koi::SearchHandle handle = service.start(
+            root, limits,
+            {.on_info = [&final_depth](const koi::SearchInfo& info) {
+                 if (info.depth == 2) {
+                     final_depth.push_back(info);
+                 }
+             },
+             .on_complete = [&result](const koi::SearchResult& completed) { result = completed; }},
+            options);
+        handle.wait();
+        require(result.has_value() && final_depth.size() == 3,
+                "repeated threaded MultiPV searches must finish three final-depth lines");
+        require(final_depth.front().pv.front() == *ordered_capture,
+                "warmed threaded MultiPV must retain the stable ordered root prefix");
+        return std::pair{std::move(final_depth), *result};
+    };
+
+    (void)run();
+    const auto first = run();
+    const auto second = run();
+    require(first.second.stats.tt_hits > 0 && second.second.stats.tt_hits > 0,
+            "repeated threaded MultiPV searches must probe entries warmed through the shared hash");
+    for (std::size_t index = 0; index < first.first.size(); ++index) {
+        require(first.first[index].score_cp == second.first[index].score_cp &&
+                    first.first[index].pv == second.first[index].pv &&
+                    first.first[index].multipv == second.first[index].multipv,
+                "warmed threaded MultiPV must remain deterministic across repeated searches");
+    }
+}
+
+void test_threaded_node_limit_is_global_and_never_exceeded() {
+    auto evaluator = std::make_shared<koi::ClassicalEvaluator>();
+    koi::SearchService service(evaluator);
+    koi::SearchLimits limits;
+    limits.nodes = 37;
+    koi::SearchOptions options;
+    options.threads = 2;
+
+    const koi::SearchResult result = search(service, koi::GameState::startpos(), limits, options);
+    require(result.stats.nodes + result.stats.qnodes <= 37,
+            "a threaded search must enforce one global node limit across all workers");
+    require(result.best_move.has_value() && koi::GameState::startpos().is_legal(*result.best_move),
+            "a globally node-limited search must retain a legal fallback move");
+}
+
+void test_threaded_and_reference_node_limits_have_matching_accounting() {
+    auto evaluator = std::make_shared<koi::ClassicalEvaluator>();
+    koi::SearchLimits limits;
+    limits.depth = 1;
+    limits.nodes = 3;
+
+    koi::SearchService reference_service(evaluator);
+    const koi::SearchResult reference = search(reference_service, koi::GameState::startpos(), limits);
+
+    koi::SearchService threaded_service(std::make_shared<koi::ClassicalEvaluator>());
+    koi::SearchOptions options;
+    options.threads = 2;
+    const koi::SearchResult threaded = search(threaded_service, koi::GameState::startpos(), limits, options);
+
+    require(reference.stats.nodes + reference.stats.qnodes == 3 &&
+                threaded.stats.nodes + threaded.stats.qnodes == 3,
+            "node-limited searches must account for the root and stop at the exact global boundary");
+    require(reference.completed_depth == threaded.completed_depth &&
+                reference.best_move == threaded.best_move && reference.score_cp == threaded.score_cp,
+            "threaded and reference searches must have matching partial-search results");
+}
+
+void test_depth_zero_leaves_are_counted_as_quiescence_only() {
+    koi::SearchLimits limits;
+    limits.depth = 1;
+    limits.nodes = 3;
+
+    koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>());
+    const koi::SearchResult result = search(service, koi::GameState::startpos(), limits);
+
+    require(result.stats.nodes == 1 && result.stats.qnodes == 2,
+            "depth-zero leaves must enter quiescence without also consuming a full-search node");
+}
+
+void test_search_info_nodes_reports_all_visited_nodes() {
+    auto evaluator = std::make_shared<koi::ClassicalEvaluator>();
+    koi::SearchService service(evaluator);
+    koi::SearchLimits limits;
+    limits.depth = 2;
+    std::optional<koi::SearchInfo> last_info;
+    std::optional<koi::SearchResult> result;
+    koi::SearchHandle handle = service.start(koi::GameState::startpos(), limits,
+        {.on_info = [&last_info](const koi::SearchInfo& info) { last_info = info; },
+         .on_complete = [&result](const koi::SearchResult& completed) { result = completed; }});
+    handle.wait();
+
+    require(last_info.has_value() && result.has_value(), "a completed search must report info and a result");
+    require(last_info->nodes == result->stats.nodes + result->stats.qnodes,
+            "search info node count must include all work used for nps");
+}
+
+void test_threaded_infinite_search_cancels_and_completes_once() {
+    auto evaluator = std::make_shared<CountingEvaluator>();
+    koi::SearchService service(evaluator);
+    koi::SearchLimits limits;
+    limits.infinite = true;
+    limits.depth = 1;
+    koi::SearchOptions options;
+    options.threads = 2;
+    CompletedSearch completed;
+    FirstInfoBarrier first_info;
+    const std::uint64_t expected_evaluations = koi::GameState::startpos().legal_moves().size() + 1;
+
+    koi::SearchHandle handle = service.start(koi::GameState::startpos(), limits,
+        {.on_info = [&first_info, &evaluator](const koi::SearchInfo& info) {
+             first_info.observe(info, evaluator->evaluations());
+         },
+         .on_complete = completed.sink().on_complete}, options);
+    first_info.wait_for_first_info();
+    const auto stop_started = std::chrono::steady_clock::now();
+    handle.stop();
+    first_info.release();
+    handle.wait();
+    const auto stop_elapsed = std::chrono::steady_clock::now() - stop_started;
+
+    require(!handle.running(), "a stopped threaded search must join all internal workers");
+    require(stop_elapsed < 2s, "threaded cancellation must return promptly");
+    const koi::SearchResult result = completed.take_result();
+    require(first_info.first_info_depth() == 1 && result.completed_depth == 1,
+            "infinite cancellation must complete from the first authoritative threaded root iteration");
+    require(first_info.first_info_evaluations() == expected_evaluations &&
+                evaluator->evaluations() == expected_evaluations,
+            "infinite cancellation must not perform a serial confirmation search");
+    require(first_info.info_callback_count() == 1,
+            "infinite cancellation must publish only the completed iteration held by the stop barrier");
+    require(result.best_move.has_value() && koi::GameState::startpos().is_legal(*result.best_move),
+            "a cancelled threaded search must return a legal best move");
+}
+
+void test_threaded_timed_search_cancels_without_serial_confirmation() {
+    auto evaluator = std::make_shared<CountingEvaluator>();
+    koi::SearchService service(evaluator);
+    koi::SearchLimits limits;
+    limits.movetime = 5s;
+    koi::SearchOptions options;
+    options.threads = 2;
+    CompletedSearch completed;
+    FirstInfoBarrier first_info;
+    const std::uint64_t expected_evaluations = koi::GameState::startpos().legal_moves().size() + 1;
+
+    koi::SearchHandle handle = service.start(koi::GameState::startpos(), limits,
+        {.on_info = [&first_info, &evaluator](const koi::SearchInfo& info) {
+             first_info.observe(info, evaluator->evaluations());
+         },
+         .on_complete = completed.sink().on_complete}, options);
+
+    first_info.wait_for_first_info();
+    const auto stop_started = std::chrono::steady_clock::now();
+    handle.stop();
+    first_info.release();
+    handle.wait();
+    const auto stop_elapsed = std::chrono::steady_clock::now() - stop_started;
+
+    require(!handle.running(), "Threads=2 timed cancellation must join the authoritative threaded workers");
+    require(stop_elapsed < 2s, "Threads=2 timed cancellation must return promptly");
+    const koi::SearchResult result = completed.take_result();
+    require(first_info.first_info_depth() == 1 && result.completed_depth == 1,
+            "Threads=2 timed cancellation must complete from the first authoritative threaded root iteration");
+    require(first_info.first_info_evaluations() == expected_evaluations &&
+                evaluator->evaluations() == expected_evaluations,
+            "Threads=2 timed cancellation must not perform a serial confirmation search");
+    require(first_info.info_callback_count() == 1,
+            "Threads=2 timed cancellation must publish only the completed iteration held by the stop barrier");
+    require(result.best_move.has_value() && koi::GameState::startpos().is_legal(*result.best_move),
+            "Threads=2 timed cancellation must return a legal fallback move");
+}
+
+void test_non_concurrent_evaluators_are_serialized_across_simultaneous_handles() {
+    auto evaluator = std::make_shared<ConcurrencyEvaluator>(false);
+    koi::SearchService service(evaluator);
+    koi::SearchLimits limits;
+    limits.depth = 1;
+    koi::SearchOptions options;
+    options.threads = 2;
+
+    koi::SearchHandle first = service.start(koi::GameState::startpos(), limits, {}, options);
+    koi::SearchHandle second = service.start(koi::GameState::startpos(), limits, {}, options);
+    first.wait();
+    second.wait();
+
+    require(evaluator->maximum_active() == 1,
+            "a non-concurrent evaluator must be serialized across handles sharing one service");
+}
+
+void test_terminal_roots_return_mate_or_stalemate_scores() {
+    auto evaluator = std::make_shared<koi::ClassicalEvaluator>();
+    koi::SearchService service(evaluator);
+    koi::SearchLimits limits;
+    limits.depth = 3;
+
+    const koi::SearchResult mate = search(
+        service, require_state("7k/6Q1/5K2/8/8/8/8/8 b - - 0 1"), limits);
+    require(!mate.best_move.has_value(), "a checkmated root must not return a move");
+    require(mate.score_cp < -90000, "a checkmated side must receive a terminal losing score");
+    require(mate.mate.has_value() && *mate.mate <= 0, "a checkmated side must report mate");
+
+    const koi::SearchResult stalemate = search(
+        service, require_state("7k/5Q2/6K1/8/8/8/8/8 b - - 0 1"), limits);
+    require(!stalemate.best_move.has_value(), "a stalemated root must not return a move");
+    require(stalemate.score_cp == 0 && !stalemate.mate.has_value(),
+            "a stalemate must receive a draw score without mate");
+}
+
+void test_claimable_draw_root_retains_a_legal_best_move() {
+    koi::GameState root = koi::GameState::startpos();
+    for (int cycle = 0; cycle < 2; ++cycle) {
+        for (const std::string_view uci : {"g1f3", "g8f6", "f3g1", "f6g8"}) {
+            const auto move = koi::Move::parse_uci(uci);
+            require(move.has_value() && root.make_move(*move),
+                    "the claimable-draw fixture must build through legal moves");
+        }
+    }
+    require(root.is_draw_by_rule() && !root.legal_moves().empty(),
+            "the claimable-draw fixture must retain legal moves after threefold history");
+
+    koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>());
+    koi::SearchLimits limits;
+    limits.depth = 1;
+    const koi::SearchResult result = search(service, root, limits);
+
+    require(result.completed_depth == 1 && result.best_move.has_value() &&
+                root.is_legal(*result.best_move),
+            "a claimable draw root must preserve a legal best move instead of clearing it");
+}
+
+void test_fixed_depth_search_is_deterministic_and_legal() {
+    auto evaluator = std::make_shared<koi::ClassicalEvaluator>();
+    koi::SearchService service(evaluator);
+    koi::SearchLimits limits;
+    limits.depth = 3;
+    const koi::GameState root = koi::GameState::startpos();
+
+    const koi::SearchResult first = search(service, root, limits);
+    const koi::SearchResult second = search(service, root, limits);
+
+    require(first.completed_depth == 3 && second.completed_depth == 3,
+            "fixed-depth searches must complete the requested depth");
+    require(first.best_move.has_value() && second.best_move.has_value(),
+            "non-terminal roots must return a best move");
+    require(*first.best_move == *second.best_move && first.score_cp == second.score_cp,
+            "identical roots and limits must produce identical results");
+    require(root.is_legal(*first.best_move), "search must only return legal root moves");
+}
+
+void test_search_result_carries_root_identity_and_completion_state() {
+    koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>());
+    koi::SearchLimits limits;
+    limits.depth = 2;
+    const koi::GameState root = require_state(
+        "r1bqk2r/pppp1ppp/2n2n2/4p3/2B1P3/2N2N2/PPPP1PPP/R1BQK2R w KQkq - 4 4");
+
+    const koi::SearchResult result = search(service, root, limits);
+
+    require(result.completed && !result.cancelled && !result.failed,
+            "a normal search must report a completed non-failed result");
+    require(result.identity.generation == 0,
+            "direct SearchService callers must retain the default generation");
+    require(result.identity.root_key == root.position_key() &&
+                result.identity.root_fen == root.fen(),
+            "search completion must identify the exact immutable root snapshot");
+}
+
+void test_search_result_carries_a_legal_pv_for_completion_validation() {
+    koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>());
+    koi::SearchLimits limits;
+    limits.depth = 2;
+    const koi::GameState root = require_state(
+        "r1bqk2r/pppp1ppp/2n2n2/4p3/2B1P3/2N2N2/PPPP1PPP/R1BQK2R w KQkq - 4 4");
+
+    const koi::SearchResult result = search(service, root, limits);
+
+    require(result.best_move.has_value() && !result.pv.empty(),
+            "a completed search must retain its principal variation for boundary validation");
+    require(result.pv.front() == *result.best_move,
+            "the completion PV must begin with the emitted root move");
+    koi::GameState replay = root;
+    for (const koi::Move& move : result.pv) {
+        require(replay.is_legal(move) && replay.make_move(move),
+                "every move in a completion PV must be legal from its preceding position");
+    }
+}
+
+void test_fixed_depth_tactical_reference_output_is_preserved() {
+    koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>());
+    koi::SearchLimits limits;
+    limits.depth = 2;
+    const koi::GameState root = require_state("4k3/8/8/3q4/4Q3/8/8/4K3 w - - 0 1");
+
+    const koi::SearchResult result = search(service, root, limits);
+    const auto expected = koi::Move::parse_uci("e4d5");
+    require(expected.has_value(), "fixed-depth tactical reference move must parse");
+    require(result.completed_depth == 2 && result.best_move == expected && result.score_cp == 1033,
+            "single-thread fixed-depth tactical output must retain its reviewed move and updated score");
+}
+
+void test_search_reports_tactical_search_statistics() {
+    auto evaluator = std::make_shared<koi::ClassicalEvaluator>();
+    koi::SearchService service(evaluator);
+    koi::SearchLimits limits;
+    limits.depth = 3;
+
+    const koi::SearchResult result = search(service, koi::GameState::startpos(), limits);
+    require(result.stats.seldepth >= 3, "search must report the deepest visited ply");
+    require(result.stats.pvs_searches > 0, "search must use principal-variation search after the first move");
+}
+
+void test_search_extends_checked_positions() {
+    auto evaluator = std::make_shared<koi::ClassicalEvaluator>();
+    koi::SearchService service(evaluator);
+    koi::SearchLimits limits;
+    limits.depth = 2;
+
+    const koi::SearchResult result = search(
+        service, require_state("7k/5Q2/6K1/8/8/8/8/8 w - - 0 1"), limits);
+    require(result.stats.check_extensions > 0,
+            "a checking tactical line must use at least one check extension");
+}
+
+void test_search_keeps_a_forced_quiet_evasion() {
+    koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>());
+    koi::SearchLimits limits;
+    limits.depth = 3;
+    const koi::GameState root = require_state("k3r3/8/8/8/8/8/3N1N2/2NNKN2 w - - 0 1");
+    const auto quiet_block = koi::Move::parse_uci("c1e2");
+    require(quiet_block.has_value() && root.in_check(),
+            "the quiet-defense fixture must begin with a checked king and a parsable interposition");
+    const std::vector<koi::Move> evasions = root.legal_moves();
+    require(std::find(evasions.begin(), evasions.end(), *quiet_block) != evasions.end() &&
+                std::all_of(evasions.begin(), evasions.end(), [&root](const koi::Move& move) {
+                    return !root.is_capture(move) && move.promotion() == koi::Promotion::none;
+                }),
+            "the quiet-defense fixture must allow only non-capturing interpositions");
+
+    const koi::SearchResult result = search(service, root, limits);
+    require(result.completed_depth == 3 && result.best_move.has_value() &&
+                std::find(evasions.begin(), evasions.end(), *result.best_move) != evasions.end(),
+            "search must retain a quiet interposition while resolving check");
+}
+
+void test_search_reports_mate_in_one_distance() {
+    koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>());
+    koi::SearchLimits limits;
+    limits.depth = 3;
+    const koi::SearchResult result = search(
+        service, require_state("7k/5Q2/6K1/8/8/8/8/8 w - - 0 1"), limits);
+
+    require(result.best_move.has_value() && result.mate == std::optional<int>{1},
+            "a forced mate in one must report a one-move mate distance");
+}
+
+void test_search_prefers_the_shorter_forced_mate() {
+    koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>());
+    koi::SearchLimits limits;
+    limits.depth = 5;
+    const koi::GameState root = require_state("k7/8/K7/8/8/8/8/Q7 w - - 0 1");
+    const auto mate_in_one = koi::Move::parse_uci("a1h8");
+    const auto mate_in_two = koi::Move::parse_uci("a6b6");
+    require(mate_in_one.has_value() && mate_in_two.has_value() && root.is_legal(*mate_in_one) &&
+                root.is_legal(*mate_in_two),
+            "the mate-distance fixture must contain both candidate moves");
+
+    koi::GameState after_mate = root;
+    require(after_mate.make_move(*mate_in_one) && after_mate.in_check() && after_mate.legal_moves().empty(),
+            "the fast candidate must be an immediate checkmate");
+    koi::GameState after_slow = root;
+    require(after_slow.make_move(*mate_in_two) && !after_slow.legal_moves().empty(),
+            "the slow candidate must leave a legal reply instead of mating immediately");
+
+    const koi::SearchResult result = search(service, root, limits);
+    require(result.best_move == mate_in_one && result.mate == std::optional<int>{1},
+            "search must prefer the shorter forced mate when a longer mate is also available");
+}
+
+void test_pawn_only_zugzwang_search_skips_null_pruning() {
+    koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>());
+    koi::SearchLimits limits;
+    limits.depth = 5;
+    const koi::GameState root = require_state("8/8/8/3k4/3P4/3K4/8/8 w - - 0 1");
+    const koi::SearchResult result = search(service, root, limits);
+
+    require(result.best_move.has_value() && root.is_legal(*result.best_move),
+            "a pawn-only zugzwang search must return a legal move");
+    require(result.stats.null_cutoffs == 0,
+            "null-move pruning must stay disabled in the pawn-only zugzwang endgame");
+}
+
+void test_low_phase_search_skips_null_pruning() {
+    koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>());
+    koi::SearchLimits limits;
+    limits.depth = 5;
+    const koi::GameState root = require_state("4kn2/pppp4/8/8/8/8/PPPP4/4K1N1 w - - 0 1");
+    require(root.position_features().game_phase < 8 &&
+                root.has_non_pawn_material(root.side_to_move()) &&
+                root.has_non_pawn_material(koi::opposite(root.side_to_move())),
+            "the low-phase null fixture must contain non-pawn material for both sides");
+
+    const koi::SearchResult result = search(service, root, limits);
+    require(result.best_move.has_value() && root.is_legal(*result.best_move),
+            "a low-phase search must return a legal move");
+    require(result.stats.null_cutoffs == 0,
+            "null-move pruning must stay disabled below the safe game-phase threshold");
+}
+
+void test_sparse_phase_rich_position_skips_null_pruning() {
+    koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>());
+    koi::SearchLimits limits;
+    limits.depth = 3;
+    limits.nodes = 50'000;
+    const koi::GameState root = require_state("r2qk3/8/8/8/8/8/1Q5P/4K2R w - - 0 1");
+    const koi::TablebaseSnapshot snapshot = root.tablebase_snapshot();
+    require(root.position_features().game_phase >= 8 && snapshot.piece_count() <= 8 &&
+                root.has_non_pawn_material(root.side_to_move()) &&
+                root.has_non_pawn_material(koi::opposite(root.side_to_move())),
+            "the sparse null fixture must retain phase-rich non-pawn material on both sides");
+
+    const koi::SearchResult result = search(service, root, limits);
+    const auto expected = koi::Move::parse_uci("b2h8");
+    require(expected.has_value() && result.completed_depth == 3 &&
+                result.best_move == expected && result.score_cp == 131 &&
+                root.is_legal(*result.best_move),
+            "a sparse phase-rich search must retain its legal tactical result and score");
+    require(result.stats.null_cutoffs == 0,
+            "null-move pruning must stay disabled in sparse phase-rich positions");
+}
+
+void test_repetition_sensitive_history_disables_null_move_pruning() {
+    koi::GameState root = koi::GameState::startpos();
+    for (const std::string_view uci : {"g1f3", "g8f6", "f3g1", "f6g8"}) {
+        const auto move = koi::Move::parse_uci(uci);
+        require(move.has_value() && root.make_move(*move),
+                "the repetition-sensitive fixture must build through legal moves");
+    }
+    require(!root.is_draw_by_rule() && root.is_repetition_sensitive(),
+            "the repetition-sensitive fixture must be a twofold, not yet drawn, position");
+
+    koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>());
+    koi::SearchLimits limits;
+    limits.depth = 5;
+    limits.nodes = 50'000;
+    const koi::SearchResult result = search(service, root, limits);
+    require(result.best_move.has_value() && root.is_legal(*result.best_move),
+            "a repeated-position search must retain a legal move");
+    require(result.stats.null_repetition_skips > 0,
+            "null-move pruning must report and skip repetition-sensitive nodes");
+}
+
+void test_lmr_excludes_quiet_moves_that_increase_enemy_king_zone_pressure() {
+    const koi::GameState root = require_state(
+        "3qk2r/8/8/8/8/1P6/B7/3QK2R w - - 0 1");
+    const auto target = koi::Move::parse_uci("b3b4");
+    require(target.has_value() && root.is_legal(*target),
+            "the king-zone pressure fixture must contain the quiet target move");
+    const auto metadata = root.describe_move(*target);
+    require(metadata.has_value() && !metadata->gives_check,
+            "the king-zone pressure target must be a quiet non-checking move");
+    const auto before = root.position_features();
+    koi::GameState after = root;
+    require(after.make_move(*target), "the king-zone pressure target must be applicable");
+    require(after.position_features().king_zone_attacks[1] > before.king_zone_attacks[1],
+            "the quiet target must increase pressure in the black king zone");
+
+    koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>());
+    koi::SearchLimits limits;
+    limits.depth = 4;
+    limits.nodes = 50'000;
+    const koi::SearchResult result = search(service, root, limits);
+    require(result.best_move.has_value() && root.is_legal(*result.best_move),
+            "king-zone pressure search must retain a legal root move");
+    require(result.stats.lmr_king_zone_exclusions > 0,
+            "quiet king-zone pressure moves must be excluded from LMR");
+}
+
+void test_lmr_excludes_high_history_quiet_moves() {
+    const koi::GameState state = koi::GameState::startpos();
+    const auto move = koi::Move::parse_uci("b1c3");
+    require(move.has_value() && state.is_legal(*move),
+            "the high-history fixture must contain a legal quiet move");
+    koi::detail::SearchMoveOrdering ordering;
+    for (int count = 0; count < 100; ++count) {
+        ordering.record_quiet_cutoff(state.side_to_move(), *move, 1, 8);
+    }
+
+    const int history_score = ordering.quiet_history_score(state.side_to_move(), *move);
+    require(history_score >= 128,
+            "the high-history fixture must seed a score above the LMR exclusion boundary");
+    require(koi::detail::high_history_move_excluded_from_lmr(history_score) &&
+                !koi::detail::high_history_move_excluded_from_lmr(0),
+            "LMR must exclude only quiet moves with genuinely high history");
+}
+
+void test_committed_pgn_loss_fixtures_retain_reviewed_move_and_score() {
+    struct Fixture {
+        std::string_view source;
+        std::string_view fen;
+        std::string_view expected_move;
+        int expected_score;
+    };
+    constexpr std::array<Fixture, 4> fixtures{{
+        {"2026-09-05-koi-vs-stockfish-19-2.pgn",
+         "r1bqkb1r/p4ppp/2p2n2/2Ppp3/5P2/2N5/PPP1P1PP/R1BQKB1R b KQkq - 0 7",
+         "e5f4", 31},
+        {"2026-09-05-koi-vs-koi.pgn",
+         "r1b1kb1r/1pp1pppp/p1nq1n2/3p4/3P4/P1NQ1N2/1PP1PPPP/R1B1KB1R w KQkq - 1 6",
+         "h2h3", 29},
+        {"2026-09-05-koi-vs-stockfish-19.pgn",
+         "rnb1k2r/1pq2ppp/p2bpn2/2ppN1Q1/3P4/2N1P3/PPP2PPP/R1B1KB1R b KQkq - 5 8",
+         "c5d4", -77},
+        {"2026-09-06-koi-vs-lc0.pgn",
+         "r1bqkb1r/p4ppp/2p2n2/2Ppp3/8/2N5/PPPQPPPP/R1B1KB1R b KQkq - 1 7",
+         "d5d4", 49},
+    }};
+
+    koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>());
+    for (const Fixture& fixture : fixtures) {
+        const koi::GameState root = require_state(fixture.fen);
+        const auto expected = koi::Move::parse_uci(fixture.expected_move);
+        require(expected.has_value() && root.is_legal(*expected),
+                std::string("PGN fixture expected move must be legal: ") + std::string(fixture.source));
+        service.clear_hash();
+        koi::SearchLimits limits;
+        limits.depth = 3;
+        const koi::SearchResult result = search(service, root, limits);
+        require(result.completed_depth == 3 && result.best_move == expected &&
+                    result.score_cp == fixture.expected_score,
+                std::string("PGN fixture output changed: ") + std::string(fixture.source));
+    }
+}
+
+void test_eligible_null_move_receives_verification() {
+    koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>());
+    koi::SearchLimits limits;
+    limits.depth = 7;
+    limits.nodes = 50'000;
+    const koi::GameState root = koi::GameState::startpos();
+    const koi::SearchResult result = search(service, root, limits);
+
+    require(result.best_move.has_value() && root.is_legal(*result.best_move),
+            "a null-verification search must preserve a legal root move");
+    require(result.stats.null_verifications > 0,
+            "an eligible null-move fail-high must receive verification");
+}
+
+void test_shallow_futility_pruning_is_safe_in_tactical_positions() {
+    koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>());
+    koi::SearchLimits limits;
+    limits.depth = 2;
+
+    const koi::GameState checked = require_state(
+        "4k3/8/8/8/8/8/4q3/4K2R w - - 0 1");
+    const koi::SearchResult checked_result = search(service, checked, limits);
+    require(checked_result.best_move.has_value() && checked.is_legal(*checked_result.best_move),
+            "shallow futility must preserve legal checked evasions");
+    require(checked_result.stats.quiet_futility_prunes == 0,
+            "shallow futility must stay disabled while in check");
+    require(checked_result.stats.razoring_prunes == 0,
+            "razoring must stay disabled while in check");
+
+    const koi::GameState tactical = require_state(
+        "4k3/8/8/8/8/8/P6r/4K2R w - - 0 1");
+    const koi::SearchResult tactical_result = search(service, tactical, limits);
+    require(tactical_result.best_move.has_value() && tactical.is_legal(*tactical_result.best_move),
+            "shallow futility must preserve legal tactical moves");
+    require(tactical_result.stats.quiet_futility_prunes == 0,
+            "shallow futility must stay disabled in tactical positions");
+    require(tactical_result.stats.razoring_prunes == 0,
+            "razoring must stay disabled in tactical positions");
+}
+
+void test_shallow_futility_accounts_for_safe_quiet_prunes() {
+    koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>());
+    koi::SearchLimits limits;
+    limits.depth = 3;
+    const koi::SearchResult result = search(service, koi::GameState::startpos(), limits);
+    require(result.best_move.has_value() && koi::GameState::startpos().is_legal(*result.best_move),
+            "shallow futility must preserve a legal root move");
+    require(result.stats.quiet_futility_prunes > 0 || result.stats.razoring_prunes > 0,
+            "a quiet middlegame search must exercise conservative shallow pruning");
+}
+
+void test_quiet_history_updates_use_saved_moving_side_after_unmake() {
+    const auto quiet_move = koi::Move::parse_uci("e8d7");
+    require(quiet_move.has_value(), "the quiet-history regression move must parse");
+    const koi::GameState state = require_state("4k3/8/8/8/8/8/8/4K2R b - - 0 1");
+    require(state.is_legal(*quiet_move), "the quiet-history regression move must be legal");
+
+    koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>());
+    koi::SearchLimits limits;
+    limits.depth = 3;
+    std::atomic_int before_move = 0;
+    std::atomic_int after_unmake = 0;
+    std::atomic_bool wrong_side = false;
+    koi::SearchOptions options;
+    options.quiet_history_side_hook = [&](koi::Color candidate, bool after_move) {
+        if (!after_move) {
+            before_move.fetch_add(1, std::memory_order_relaxed);
+            return koi::Color::black;
+        }
+        after_unmake.fetch_add(1, std::memory_order_relaxed);
+        if (candidate != koi::Color::black) {
+            wrong_side.store(true, std::memory_order_relaxed);
+        }
+        return candidate;
+    };
+
+    const koi::SearchResult result = search(service, state, limits, options);
+    require(result.stats.quiet_history_updates > 0 && before_move.load(std::memory_order_relaxed) > 0,
+            "the regression position must exercise quiet-history updates after unmake_move");
+    require(after_unmake.load(std::memory_order_relaxed) > 0,
+            "quiet-history updates must report their post-unmake attribution side");
+    require(!wrong_side.load(std::memory_order_relaxed),
+            "quiet-history updates after unmake_move must use the saved moving side");
+}
+
+void test_throwing_history_diagnostic_hook_cannot_abort_search() {
+    koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>());
+    koi::SearchLimits limits;
+    limits.depth = 2;
+    koi::SearchOptions options;
+    options.quiet_history_side_hook = [](koi::Color, bool) -> koi::Color {
+        throw std::runtime_error("diagnostic hook failure");
+    };
+
+    const koi::GameState root = koi::GameState::startpos();
+    const koi::SearchResult result = search(service, root, limits, options);
+    require(result.best_move.has_value() && root.is_legal(*result.best_move),
+            "a throwing history diagnostic hook must not abort a legal search");
+}
+
+void test_search_reduces_late_quiet_moves_without_losing_root_legality() {
+    koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>());
+    koi::SearchLimits limits;
+    limits.depth = 4;
+    const koi::GameState root = koi::GameState::startpos();
+    const koi::SearchResult result = search(service, root, limits);
+
+    require(result.best_move.has_value() && root.is_legal(*result.best_move),
+            "late-move reduction search must preserve a legal root move");
+    require(result.stats.lmr_reductions > 0,
+            "a multi-move quiet root must exercise late-move reductions");
+}
+
+void test_reduced_late_move_is_verified_at_full_child_depth() {
+    koi::SearchService service(std::make_shared<LateMoveVerificationEvaluator>());
+    koi::SearchLimits limits;
+    limits.depth = 4;
+    limits.search_moves_specified = true;
+    for (const std::string_view uci : {"b1c3", "a2a3", "a2a4", "b2b3", "b2b4", "h2h3"}) {
+        const auto move = koi::Move::parse_uci(uci);
+        require(move.has_value(), "the late-move verification fixture must parse every root move");
+        limits.search_moves.push_back(*move);
+    }
+    const koi::GameState root = require_state(
+        "4k3/pppp4/8/8/8/8/PPPP3P/RN2K2R w K - 0 1");
+    const auto expected = koi::Move::parse_uci("a2a3");
+    const auto target = koi::Move::parse_uci("h2h3");
+    require(expected.has_value() && target.has_value() && root.position_features().game_phase < 8,
+            "the late-move verification fixture must remain a low-phase legal position");
+
+    const koi::SearchResult result = search(service, root, limits);
+    require(result.stats.lmr_reductions > 0,
+            "the late-move verification fixture must exercise a reduced root move");
+    require(result.stats.lmr_verifications > 0,
+            "a reduced move that exceeds alpha must receive a full-depth verification search");
+    require(result.best_move == expected && result.best_move != target && result.score_cp == 0,
+            "full-depth verification must replace a reduced fail-high line before selecting it");
+}
+
+void test_quiescence_keeps_searching_checked_evasions_past_normal_cap() {
+    auto evaluator = std::make_shared<CheckedPositionEvaluator>();
+    koi::SearchService service(evaluator);
+    koi::SearchLimits limits;
+    limits.depth = 4;
+
+    const koi::GameState root = require_state(
+        "7k/2q2q2/1r1r1r2/8/8/1R1R1R2/2Q2Q2/K7 w - - 0 1");
+    const koi::SearchResult result = search(service, root, limits);
+    require(result.best_move.has_value() && root.is_legal(*result.best_move),
+            "the long checking line must still produce a legal root move");
+    require(evaluator->checked_evaluations() == 0,
+            "quiescence must search legal evasions instead of statically evaluating checked nodes");
+}
+
+void test_quiescence_keeps_bounded_checking_continuations() {
+    koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>());
+    koi::SearchLimits limits;
+    limits.depth = 2;
+    const koi::SearchResult result = search(
+        service, require_state("4k3/8/8/3p4/4Q3/8/8/4K3 w - - 0 1"), limits);
+    require(result.stats.qchecks > 0,
+            "quiescence must retain checking continuations before its checking horizon");
+}
+
+void test_iterative_deepening_uses_aspiration_windows() {
+    auto evaluator = std::make_shared<koi::ClassicalEvaluator>();
+    koi::SearchService service(evaluator);
+    koi::SearchLimits limits;
+    limits.depth = 3;
+
+    const koi::SearchResult result = search(service, koi::GameState::startpos(), limits);
+    require(result.stats.aspiration_researches > 0,
+            "a changed iterative score must trigger an aspiration-window re-search");
+}
+
+void test_infinite_search_runs_until_stopped_and_completes_once() {
+    auto evaluator = std::make_shared<koi::ClassicalEvaluator>();
+    koi::SearchService service(evaluator);
+    koi::SearchLimits limits;
+    limits.infinite = true;
+    limits.depth = 1;
+    CompletedSearch completed;
+
+    koi::SearchHandle handle = service.start(koi::GameState::startpos(), limits, completed.sink());
+    std::this_thread::sleep_for(50ms);
+    require(handle.running(), "infinite search must remain running instead of completing its depth limit");
+    require(completed.completion_count() == 0, "infinite search must not complete before cancellation");
+
+    handle.stop();
+    handle.wait();
+    require(!handle.running(), "stopped infinite search must join its worker");
+    const koi::SearchResult result = completed.take_result();
+    require(result.best_move.has_value(), "stopped non-terminal infinite search must retain a legal fallback move");
+}
+
+void test_search_worker_converts_exceptions_to_failed_completion() {
+    koi::SearchService service(std::make_shared<ThrowingEvaluator>());
+    koi::SearchLimits limits;
+    limits.depth = 2;
+    const koi::GameState root = koi::GameState::startpos();
+    CompletedSearch completed;
+
+    koi::SearchHandle handle = service.start(root, limits, completed.sink());
+    handle.wait();
+    const koi::SearchResult result = completed.take_result();
+
+    require(result.completed && result.failed && !result.cancelled,
+            "an evaluator exception must become one controlled failed completion");
+    require(result.best_move.has_value() && root.is_legal(*result.best_move),
+            "a failed search must retain a legal root fallback");
+}
+
+void test_ponder_search_runs_until_stopped_and_completes_once() {
+    auto evaluator = std::make_shared<koi::ClassicalEvaluator>();
+    koi::SearchService service(evaluator);
+    koi::SearchLimits limits;
+    limits.depth = 1;
+    limits.ponder = true;
+    limits.movetime = 1ms;
+    limits.white_clock = koi::ClockLimit{1ms, 0ms};
+    CompletedSearch completed;
+
+    koi::SearchHandle handle = service.start(koi::GameState::startpos(), limits, completed.sink());
+    std::this_thread::sleep_for(50ms);
+    require(handle.running(), "ponder search must remain running instead of completing its depth limit");
+    require(completed.completion_count() == 0, "ponder search must not complete before cancellation");
+
+    handle.stop();
+    handle.wait();
+    require(!handle.running(), "stopped ponder search must join its worker");
+    const koi::SearchResult result = completed.take_result();
+    require(result.best_move.has_value(), "stopped ponder search must retain a legal fallback move");
+}
+
+void test_ponder_terminal_and_empty_roots_wait_for_stop() {
+    auto evaluator = std::make_shared<koi::ClassicalEvaluator>();
+    koi::SearchService service(evaluator);
+
+    const auto require_parked = [&service](koi::GameState root, koi::SearchLimits limits,
+                                           std::string_view description, bool expect_legal_fallback) {
+        const koi::GameState original_root = root;
+        CompletedSearch completed;
+        koi::SearchHandle handle = service.start(std::move(root), std::move(limits), completed.sink());
+        std::this_thread::sleep_for(20ms);
+        require(handle.running(), std::string("ponder ") + std::string(description) +
+                                      " must remain running until stop");
+        require(completed.completion_count() == 0, std::string("ponder ") + std::string(description) +
+                                                   " must not complete before stop");
+
+        handle.stop();
+        handle.wait();
+        const koi::SearchResult result = completed.take_result();
+        if (expect_legal_fallback) {
+            require(result.best_move.has_value() && original_root.is_legal(*result.best_move),
+                    std::string("stopped ponder ") + std::string(description) +
+                        " must retain a legal fallback move");
+        } else {
+            require(!result.best_move.has_value(), std::string("stopped ponder ") + std::string(description) +
+                                                     " must report no legal best move");
+        }
+    };
+
+    koi::SearchLimits terminal_limits;
+    terminal_limits.ponder = true;
+    require_parked(require_state("7k/6Q1/5K2/8/8/8/8/8 b - - 0 1"), terminal_limits,
+                   "checkmate root", false);
+
+    koi::SearchLimits draw_limits;
+    draw_limits.ponder = true;
+    require_parked(require_state("4k3/8/8/8/8/8/8/R3K3 w - - 100 1"), draw_limits,
+                   "rule-draw root", true);
+
+    koi::SearchLimits empty_filter_limits;
+    empty_filter_limits.ponder = true;
+    empty_filter_limits.search_moves_specified = true;
+    require_parked(koi::GameState::startpos(), empty_filter_limits, "empty searchmoves root", false);
+}
+
+void test_ponder_ignores_time_but_honors_node_limits() {
+    koi::SearchLimits limits;
+    limits.ponder = true;
+    limits.movetime = 1ms;
+    limits.nodes = 1;
+    limits.white_clock = koi::ClockLimit{1ms, 0ms};
+
+    const koi::TimeManager manager(limits, koi::Color::white);
+    require(!manager.time_budget().has_value(), "ponder must ignore movetime and clock budgets");
+    require(manager.node_limit() == 1, "ponder must retain an explicit node limit");
+    require(manager.should_stop(1), "ponder must stop at its explicit node limit");
+}
+
+void test_service_hash_configuration_survives_default_start_and_non_default_override() {
+    auto evaluator = std::make_shared<koi::ClassicalEvaluator>();
+    koi::SearchService service(evaluator);
+    koi::SearchLimits limits;
+    limits.depth = 1;
+
+    service.set_hash_size_mb(1);
+    require(service.hash_size_mb() == 1, "service hash configuration must accept 1 MB");
+    search(service, koi::GameState::startpos(), limits);
+    require(service.hash_size_mb() == 1, "default SearchOptions must preserve the configured service hash size");
+
+    CompletedSearch completed;
+    koi::SearchOptions override;
+    override.hash_mb = 2;
+    koi::SearchHandle handle = service.start(koi::GameState::startpos(), limits, completed.sink(), override);
+    handle.wait();
+    completed.take_result();
+    require(service.hash_size_mb() == 2, "a non-default per-start hash option must explicitly reconfigure the service hash");
+}
+
+void test_hash_configuration_clamps_to_uci_bounds_and_clear_discards_warmed_entries() {
+    auto evaluator = std::make_shared<koi::ClassicalEvaluator>();
+    koi::SearchService service(evaluator);
+    koi::SearchLimits limits;
+    limits.depth = 3;
+
+    require(service.hash_size_mb() == 512, "SearchService must retain the 512 MB default hash size");
+    const koi::SearchResult warmed = search(service, koi::GameState::startpos(), limits);
+    require(warmed.stats.tt_hits > 0, "a completed iterative search must warm the transposition table");
+
+    service.clear_hash();
+    koi::SearchLimits one_ply;
+    one_ply.depth = 1;
+    const koi::SearchResult cleared = search(service, koi::GameState::startpos(), one_ply);
+    require(cleared.stats.tt_hits == 0, "Clear Hash must remove entries used by a subsequent root search");
+
+    service.set_hash_size_mb(0);
+    require(service.hash_size_mb() == 1, "hash size must clamp to the UCI lower bound of 1 MB");
+}
+
+void test_transposition_table_stores_probes_and_clears_entries() {
+    koi::TranspositionTable table;
+    require(table.size_mb() == 512, "transposition table default must be 512 MB");
+    const auto move = koi::Move::parse_uci("e2e4");
+    require(move.has_value(), "test move must parse");
+
+    require(!table.probe(0).has_value(), "a fresh table must not report a zero-key entry");
+    table.store(0, 6, 17, koi::TranspositionBound::exact, *move);
+    const auto zero_key_entry = table.probe(0);
+    require(zero_key_entry.has_value() && zero_key_entry->score == 17,
+            "a stored zero key must probe successfully");
+    table.clear();
+    require(!table.probe(0).has_value(), "a cleared table must not report a zero-key entry");
+
+    table.new_generation();
+    table.store(0x0123456789abcdefULL, 7, 42, koi::TranspositionBound::exact, *move);
+    const auto entry = table.probe(0x0123456789abcdefULL);
+    require(entry.has_value(), "stored key must probe successfully");
+    require(entry->depth == 7 && entry->score == 42 && entry->bound == koi::TranspositionBound::exact,
+            "probe must retain depth, score, and bound");
+    require(entry->best_move == *move, "probe must retain the best move");
+
+    table.clear();
+    require(!table.probe(0x0123456789abcdefULL).has_value(), "clear must remove a stored entry");
+    table.set_size_mb(1);
+    require(table.size_mb() == 1, "hash configuration must accept the lower 1 MB bound");
+}
+
+void test_transposition_table_preserves_deeper_exact_entry_against_shallow_bound() {
+    koi::TranspositionTable table(1);
+    const auto exact_move = koi::Move::parse_uci("e2e4");
+    const auto shallow_move = koi::Move::parse_uci("d2d4");
+    require(exact_move.has_value() && shallow_move.has_value(), "TT replacement moves must parse");
+
+    constexpr std::uint64_t key = 0x4f534331ULL;
+    table.store(key, 8, 73, koi::TranspositionBound::exact, *exact_move);
+    table.store(key, 2, -41, koi::TranspositionBound::lower, *shallow_move);
+
+    const auto entry = table.probe(key);
+    require(entry.has_value() && entry->depth == 8 && entry->score == 73 &&
+                entry->bound == koi::TranspositionBound::exact && entry->best_move == *exact_move,
+            "a shallow same-key bound must not discard a deeper exact TT entry");
+}
+
+void test_transposition_table_refreshes_generation_without_downgrading_same_key_entry() {
+    koi::TranspositionTable table(1);
+    const auto exact_move = koi::Move::parse_uci("e2e4");
+    const auto shallow_move = koi::Move::parse_uci("d2d4");
+    require(exact_move.has_value() && shallow_move.has_value(), "TT aging moves must parse");
+
+    constexpr std::uint64_t key = 0x41474531ULL;
+    table.store(key, 7, 61, koi::TranspositionBound::exact, *exact_move);
+    const auto before = table.probe(key);
+    require(before.has_value(), "the aged TT fixture must retain its initial entry");
+
+    table.new_generation();
+    table.store(key, 2, -19, koi::TranspositionBound::lower, *shallow_move);
+
+    const auto refreshed = table.probe(key);
+    require(refreshed.has_value() && refreshed->generation != before->generation &&
+                refreshed->depth == 7 && refreshed->score == 61 &&
+                refreshed->bound == koi::TranspositionBound::exact &&
+                refreshed->best_move == *exact_move,
+            "a preserved deep same-key TT entry must refresh its age without losing exact data");
+}
+
+void test_transposition_table_preserves_mate_distance_across_plies() {
+    koi::TranspositionTable table;
+    const auto move = koi::Move::parse_uci("e2e4");
+    require(move.has_value(), "test move must parse");
+
+    table.store(0x1111ULL, 6, 99'993, koi::TranspositionBound::exact, *move, 7);
+    const auto winning_mate = table.probe(0x1111ULL, 3);
+    require(winning_mate.has_value() && winning_mate->score == 99'997,
+            "a winning mate score must be adjusted to the probing ply");
+
+    table.store(0x2222ULL, 6, -99'993, koi::TranspositionBound::exact, *move, 7);
+    const auto losing_mate = table.probe(0x2222ULL, 3);
+    require(losing_mate.has_value() && losing_mate->score == -99'997,
+            "a losing mate score must be adjusted to the probing ply");
+}
+
+void test_transposition_table_survives_concurrent_probe_store_and_maintenance() {
+    koi::TranspositionTable table(1);
+    const auto move = koi::Move::parse_uci("e2e4");
+    require(move.has_value(), "test move must parse");
+    std::atomic_bool invalid_entry = false;
+    std::vector<std::thread> workers;
+    for (std::uint64_t worker = 0; worker < 6; ++worker) {
+        workers.emplace_back([&table, &invalid_entry, move, worker] {
+            for (std::uint64_t iteration = 0; iteration < 2'000; ++iteration) {
+                const std::uint64_t key = (worker + 1) * 0x100000001b3ULL + iteration;
+                table.store(key, static_cast<int>(iteration % 8), static_cast<int>(worker),
+                            koi::TranspositionBound::exact, *move);
+                if (const auto entry = table.probe(key); entry.has_value() && entry->key != key) {
+                    invalid_entry.store(true, std::memory_order_relaxed);
+                }
+            }
+        });
+    }
+    std::thread maintenance([&table] {
+        for (int iteration = 0; iteration < 100; ++iteration) {
+            table.new_generation();
+            table.clear();
+        }
+    });
+
+    for (std::thread& worker : workers) {
+        worker.join();
+    }
+    maintenance.join();
+    require(!invalid_entry.load(std::memory_order_relaxed),
+            "concurrent TT access must never return an entry for a different key");
+}
+
+void test_transposition_table_survives_concurrent_probe_store_and_resize() {
+    koi::TranspositionTable table(1);
+    const auto move = koi::Move::parse_uci("e2e4");
+    require(move.has_value(), "test move must parse");
+    std::atomic_bool invalid_entry = false;
+    std::vector<std::thread> workers;
+    for (std::uint64_t worker = 0; worker < 4; ++worker) {
+        workers.emplace_back([&table, &invalid_entry, move, worker] {
+            for (std::uint64_t iteration = 0; iteration < 2'000; ++iteration) {
+                const std::uint64_t key = (worker + 7) * 0x100000001b3ULL + iteration;
+                table.store(key, static_cast<int>(iteration % 8), static_cast<int>(worker),
+                            koi::TranspositionBound::lower, *move);
+                if (const auto entry = table.probe(key); entry.has_value() && entry->key != key) {
+                    invalid_entry.store(true, std::memory_order_relaxed);
+                }
+            }
+        });
+    }
+    for (int iteration = 0; iteration < 40; ++iteration) {
+        const std::size_t megabytes = iteration % 2 == 0 ? 1 : 2;
+        table.set_size_mb(megabytes);
+        require(table.size_mb() == megabytes, "serialized resize must publish the requested table size");
+    }
+    for (std::thread& worker : workers) {
+        worker.join();
+    }
+    require(!invalid_entry.load(std::memory_order_relaxed),
+            "concurrent resize must not expose a transposition entry for another key");
+}
+
+void test_transposition_table_survives_mixed_concurrent_maintenance() {
+    koi::TranspositionTable table(1);
+    const auto move = koi::Move::parse_uci("e2e4");
+    require(move.has_value(), "test move must parse");
+    std::atomic_bool invalid_entry = false;
+    std::atomic_bool invalid_size = false;
+    std::vector<std::thread> workers;
+    for (std::uint64_t worker = 0; worker < 6; ++worker) {
+        workers.emplace_back([&table, &invalid_entry, move, worker] {
+            for (std::uint64_t iteration = 0; iteration < 2'000; ++iteration) {
+                const std::uint64_t key = (worker + 13) * 0x100000001b3ULL + iteration;
+                table.store(key, static_cast<int>(iteration % 8), static_cast<int>(worker),
+                            koi::TranspositionBound::exact, *move);
+                if (const auto entry = table.probe(key); entry.has_value() && entry->key != key) {
+                    invalid_entry.store(true, std::memory_order_relaxed);
+                }
+            }
+        });
+    }
+    std::thread maintenance([&] {
+        for (int iteration = 0; iteration < 80; ++iteration) {
+            table.new_generation();
+            table.clear();
+            const std::size_t megabytes = iteration % 2 == 0 ? 1 : 2;
+            table.set_size_mb(megabytes);
+            if (table.size_mb() != megabytes) {
+                invalid_size.store(true, std::memory_order_relaxed);
+            }
+        }
+    });
+    for (std::thread& worker : workers) {
+        worker.join();
+    }
+    maintenance.join();
+    require(!invalid_entry.load(std::memory_order_relaxed),
+            "mixed TT maintenance must never expose an entry for another key");
+    require(!invalid_size.load(std::memory_order_relaxed),
+            "mixed TT maintenance must publish every requested resize");
+}
+
+struct TestCase {
+    std::string_view name;
+    void (*run)();
+};
+
+} // namespace
+
+int main() {
+    const std::vector<TestCase> tests{
+        {"classical evaluator", test_evaluator_returns_material_and_pst_from_requested_perspective},
+        {"classical evaluator breakdown", test_evaluator_breakdown_scores_structure_activity_and_king_safety},
+        {"development center pressure", test_evaluator_rewards_development_center_control_and_immediate_pressure},
+        {"evaluator perspective symmetry", test_evaluator_breakdown_is_perspective_symmetric},
+        {"evaluator endgame and mobility", test_evaluator_scores_backward_pawns_piece_mobility_and_dead_material},
+        {"evaluator passed pawn endgame scaling", test_evaluator_increases_advanced_passed_pawn_value_in_the_endgame},
+        {"evaluator passed pawn blockade", test_evaluator_penalizes_a_directly_blockaded_passed_pawn},
+        {"evaluator mirrored terms and black blockade", test_evaluator_mirrors_terms_and_black_passed_pawn_blockades},
+        {"evaluator color symmetric endgame passer", test_evaluator_endgame_passer_scaling_is_color_symmetric},
+        {"evaluator versioned parameters", test_evaluator_exposes_versioned_classical_parameters},
+        {"evaluator endgame king activity", test_evaluator_scores_endgame_king_activity},
+        {"evaluator passer support and race", test_evaluator_scores_passed_pawn_support_and_promotion_race},
+        {"evaluator tempo", test_evaluator_applies_tempo_once_for_side_to_move},
+        {"evaluator pawnless endgame terms", test_evaluator_keeps_endgame_terms_for_pawnless_rook_endgames},
+        {"evaluator complete breakdown", test_evaluator_breakdown_accounts_for_every_component},
+        {"time manager", test_time_manager_applies_move_time_and_clock_limits},
+        {"speed budgets", test_speed_scales_only_time_based_search_budgets},
+        {"compatibility timing controls", test_move_overhead_and_slow_mover_scale_time_in_order},
+        {"explicit limits remain untimed", test_explicit_depth_and_nodes_remain_untimed_with_clock_fields},
+        {"search options", test_search_options_include_thread_and_speed_controls},
+        {"root filtering legal move", test_root_filtering_keeps_only_requested_legal_move},
+        {"root filtering illegal move", test_root_filtering_ignores_syntactically_valid_illegal_move},
+        {"deterministic multipv", test_deterministic_multipv_reports_sorted_distinct_legal_lines},
+        {"threaded root search", test_threaded_search_uses_multiple_root_workers_and_matches_reference_result},
+        {"threaded root overlap", test_threaded_root_worker_starts_while_first_root_evaluation_is_blocked},
+        {"classical threaded parity", test_classical_threaded_search_matches_reference_result},
+        {"threaded single-PV root is authoritative", test_threaded_single_pv_does_not_repeat_root_search},
+        {"threaded root-in-check parity", test_threaded_root_in_check_matches_serial_fixed_depth},
+        {"stable root ties", test_equal_root_scores_keep_the_earliest_ordered_move},
+        {"threaded multipv ordered root ties", test_threaded_multipv_equal_scores_use_stable_ordered_root_tie_breaking},
+        {"threaded multipv final-depth parity", test_threaded_multipv_matches_single_thread_at_final_depth},
+        {"threaded multipv warmed hash", test_threaded_multipv_is_stable_after_warming_the_shared_hash},
+        {"threaded global nodes", test_threaded_node_limit_is_global_and_never_exceeded},
+        {"threaded node parity", test_threaded_and_reference_node_limits_have_matching_accounting},
+        {"depth-zero node accounting", test_depth_zero_leaves_are_counted_as_quiescence_only},
+        {"search info accounting", test_search_info_nodes_reports_all_visited_nodes},
+        {"threaded cancellation", test_threaded_infinite_search_cancels_and_completes_once},
+        {"threaded timed cancellation", test_threaded_timed_search_cancels_without_serial_confirmation},
+        {"evaluator cross-handle safety", test_non_concurrent_evaluators_are_serialized_across_simultaneous_handles},
+        {"terminal search", test_terminal_roots_return_mate_or_stalemate_scores},
+        {"claimable draw root fallback", test_claimable_draw_root_retains_a_legal_best_move},
+        {"deterministic legal search", test_fixed_depth_search_is_deterministic_and_legal},
+        {"search result identity", test_search_result_carries_root_identity_and_completion_state},
+        {"search result legal PV", test_search_result_carries_a_legal_pv_for_completion_validation},
+        {"fixed-depth tactical reference", test_fixed_depth_tactical_reference_output_is_preserved},
+        {"tactical search statistics", test_search_reports_tactical_search_statistics},
+        {"check extensions", test_search_extends_checked_positions},
+        {"forced quiet evasion", test_search_keeps_a_forced_quiet_evasion},
+        {"mate in one distance", test_search_reports_mate_in_one_distance},
+        {"shorter mate preference", test_search_prefers_the_shorter_forced_mate},
+        {"pawn-only zugzwang null safety", test_pawn_only_zugzwang_search_skips_null_pruning},
+        {"low-phase null safety", test_low_phase_search_skips_null_pruning},
+        {"sparse phase-rich null safety", test_sparse_phase_rich_position_skips_null_pruning},
+        {"repetition-sensitive null safety", test_repetition_sensitive_history_disables_null_move_pruning},
+        {"king-zone LMR exclusion", test_lmr_excludes_quiet_moves_that_increase_enemy_king_zone_pressure},
+        {"high-history LMR exclusion", test_lmr_excludes_high_history_quiet_moves},
+        {"eligible null verification", test_eligible_null_move_receives_verification},
+        {"shallow futility tactical safety", test_shallow_futility_pruning_is_safe_in_tactical_positions},
+        {"shallow futility accounting", test_shallow_futility_accounts_for_safe_quiet_prunes},
+        {"quiet history moving side", test_quiet_history_updates_use_saved_moving_side_after_unmake},
+        {"quiet history hook exceptions", test_throwing_history_diagnostic_hook_cannot_abort_search},
+        {"late quiet move reductions", test_search_reduces_late_quiet_moves_without_losing_root_legality},
+        {"late move full-depth verification", test_reduced_late_move_is_verified_at_full_child_depth},
+        {"committed PGN tactical fixtures", test_committed_pgn_loss_fixtures_retain_reviewed_move_and_score},
+        {"checked quiescence cap", test_quiescence_keeps_searching_checked_evasions_past_normal_cap},
+        {"bounded quiescence checks", test_quiescence_keeps_bounded_checking_continuations},
+        {"aspiration windows", test_iterative_deepening_uses_aspiration_windows},
+        {"infinite search lifecycle", test_infinite_search_runs_until_stopped_and_completes_once},
+        {"search exception lifecycle", test_search_worker_converts_exceptions_to_failed_completion},
+        {"ponder search lifecycle", test_ponder_search_runs_until_stopped_and_completes_once},
+        {"ponder terminal lifecycle", test_ponder_terminal_and_empty_roots_wait_for_stop},
+        {"ponder time and node limits", test_ponder_ignores_time_but_honors_node_limits},
+        {"service hash persistence", test_service_hash_configuration_survives_default_start_and_non_default_override},
+        {"hash bounds and clear", test_hash_configuration_clamps_to_uci_bounds_and_clear_discards_warmed_entries},
+        {"transposition table", test_transposition_table_stores_probes_and_clears_entries},
+        {"transposition table depth preservation", test_transposition_table_preserves_deeper_exact_entry_against_shallow_bound},
+        {"transposition table age refresh", test_transposition_table_refreshes_generation_without_downgrading_same_key_entry},
+        {"transposition table mate normalization", test_transposition_table_preserves_mate_distance_across_plies},
+        {"transposition table concurrency", test_transposition_table_survives_concurrent_probe_store_and_maintenance},
+        {"transposition table resize concurrency", test_transposition_table_survives_concurrent_probe_store_and_resize},
+        {"transposition table mixed maintenance", test_transposition_table_survives_mixed_concurrent_maintenance},
+    };
+
+    const char* filter = std::getenv("KOI_TEST_FILTER");
+    for (const TestCase& test : tests) {
+        if (filter != nullptr && std::string_view(test.name).find(filter) == std::string_view::npos) {
+            continue;
+        }
+        try {
+            test.run();
+            std::cout << "PASS " << test.name << '\n';
+        } catch (const std::exception& error) {
+            std::cerr << "FAIL " << test.name << ": " << error.what() << '\n';
+            return 1;
+        }
+    }
+
+    return 0;
+}

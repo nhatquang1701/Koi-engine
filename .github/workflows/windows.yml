@@ -10,9 +10,11 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        configuration:
-          - Debug
-          - Release
+        include:
+          - configuration: Debug
+            build_dir: build/ci-debug
+          - configuration: Release
+            build_dir: build/ci-release
     steps:
       - uses: actions/checkout@v4
       - name: Configure x64 MSVC environment and build
@@ -28,8 +30,8 @@ jobs:
           where cl
           cl 2>&1 | findstr /C:"x64" >nul
           if errorlevel 1 exit /b 1
-          cmake -S . -B out\ci-${{ matrix.configuration }} -G Ninja -DCMAKE_BUILD_TYPE=${{ matrix.configuration }} -DCMAKE_CXX_COMPILER=cl
+          cmake -S . -B ${{ matrix.build_dir }} -G Ninja -DCMAKE_BUILD_TYPE=${{ matrix.configuration }} -DCMAKE_CXX_COMPILER=cl
           if errorlevel 1 exit /b 1
-          cmake --build out\ci-${{ matrix.configuration }} --config ${{ matrix.configuration }}
+          cmake --build ${{ matrix.build_dir }} --config ${{ matrix.configuration }}
           if errorlevel 1 exit /b 1
-          ctest --test-dir out\ci-${{ matrix.configuration }} -C ${{ matrix.configuration }} --output-on-failure
+          ctest --test-dir ${{ matrix.build_dir }} -C ${{ matrix.configuration }} --output-on-failure

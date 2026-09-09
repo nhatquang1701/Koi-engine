@@ -1,0 +1,42 @@
+{
+  "schema": "koi-game-fixture-manifest-v1",
+  "source": "legacy user-supplied PGN corpus",
+  "files": [
+    {
+      "original_name": "2026.09.05_Koi Engine - Koi Engine.pgn",
+      "path": "2026-09-05-koi-vs-koi.pgn",
+      "size": 1533,
+      "sha256": "bc6f50ea9b95c9afe1855d9ec4373e4a17e52d5ea379cea344ad31fda709003b"
+    },
+    {
+      "original_name": "2026.09.05 2_Koi Engine - Stockfish 19.pgn",
+      "path": "2026-09-05-koi-vs-stockfish-19-2.pgn",
+      "size": 1672,
+      "sha256": "30893cfc2a6367ee8ec07a966932a08e08ade52533b99704eaa44edc7761cbcf"
+    },
+    {
+      "original_name": "2026.09.05_Koi Engine - Stockfish 19.pgn",
+      "path": "2026-09-05-koi-vs-stockfish-19.pgn",
+      "size": 2206,
+      "sha256": "1a9f6783bf66e93b6f6bd8965a01384b9598402a3e12375063084735b48d4903"
+    },
+    {
+      "original_name": "2026.09.06  2_Koi Engine - Leela Chess Zero.pgn",
+      "path": "2026-09-06-koi-vs-lc0-2.pgn",
+      "size": 1798,
+      "sha256": "e37f19c9951db338990753b7f269182d06911d785afb837c15fefc9a6d48d897"
+    },
+    {
+      "original_name": "2026.09.06_Koi Engine - Leela Chess Zero.pgn",
+      "path": "2026-09-06-koi-vs-lc0.pgn",
+      "size": 1887,
+      "sha256": "ee52dca1133e9de9626eb65c42bce0272c2c446fdd819e60b78771e0848517c0"
+    },
+    {
+      "original_name": "2026.09.08_Koi Engine - Stockfish 19.pgn",
+      "path": "2026-09-08-koi-vs-stockfish-19.pgn",
+      "size": 1980,
+      "sha256": "41306c1d125401dab516474046b0d25d2e4fa1e45fdacbadd89d7c58e3409ef2"
+    }
+  ]
+}

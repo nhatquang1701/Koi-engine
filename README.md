@@ -47,30 +47,30 @@ deterministic. There is no public rule API for these policies; `Threads` and
 From an x64 Visual Studio developer shell in the repository root:
 
 ```powershell
-cmake -S . -B out\release-vs -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=cl
-cmake --build out\release-vs --config Release
-ctest --test-dir out\release-vs -C Release --output-on-failure
+cmake -S . -B build\release -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=cl
+cmake --build build\release --config Release
+ctest --test-dir build\release -C Release --output-on-failure
 ```
 
-For a Debug build, substitute `debug-vs` and `Debug` in those commands. The
-resulting engine executable is `out\release-vs\koi-engine.exe`.
+For a Debug build, substitute `build\debug` and `Debug` in those commands. The
+resulting engine executable is `build\release\koi-engine.exe`.
 
 For an independently reproducible release gate, run the checked-in harness from
-an x64 Visual Studio developer shell. It configures and builds fresh external
+an x64 Visual Studio developer shell. It configures and builds fresh canonical
 Debug and Release trees, runs all CTest/process tests, checks tactical
 Threads 1/2/4 when the host supports them (with an explicit maximum-thread
-fallback), and writes benchmark, UCI, replay, and En Croissant-style artifacts outside
-the checkout:
+fallback), and writes benchmark, UCI, replay, and En Croissant-style artifacts
+under `artifacts/verification`:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\task5_release_verify.ps1 `
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\build\release_verify.ps1 `
   -CMakePath "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" `
-  -OutputDirectory C:\Koi-results\task5-run
+  -OutputDirectory .\artifacts\verification\release-verify
 ```
 
-The harness rejects an output directory inside the repository and records the
-exact Debug/Release configure, build, CTest, benchmark, transcript, replay, and
-match command outputs under the supplied external directory. It makes no
+The harness records the exact Debug/Release configure, build, CTest, benchmark,
+transcript, replay, and match command outputs under the supplied artifact
+directory. It makes no
 Stockfish/CPL or En Croissant GUI availability assumption.
 
 ## Developer tools
@@ -78,11 +78,11 @@ Stockfish/CPL or En Croissant GUI availability assumption.
 From the configured build directory:
 
 ```powershell
-.\out\release-vs\koi-perft.exe 4
-.\out\release-vs\koi-bench.exe
-.\out\release-vs\koi-bench.exe --threads 4 --speed 100 --timed
-.\out\release-vs\koi-bench.exe --optional --profile-json C:\Koi-results\optional-strength.json
-.\out\release-vs\koi-replay.exe startpos moves e2e4 e7e5 g1f3
+.\build\release\koi-perft.exe 4
+.\build\release\koi-bench.exe
+.\build\release\koi-bench.exe --threads 4 --speed 100 --timed
+.\build\release\koi-bench.exe --optional --profile-json .\artifacts\verification\optional-strength.json
+.\build\release\koi-replay.exe startpos moves e2e4 e7e5 g1f3
 ```
 
 `koi-perft` counts legal nodes from the standard starting position at the given
@@ -112,8 +112,8 @@ dependency to the C++ engine. Install its pinned dependency and run its test dir
 from the repository root:
 
 ```powershell
-python -m pip install -r .\tools\requirements-elo-oracle.txt
-python -m unittest .\tests\elo_oracle_test.py -v
+python -m pip install -r .\tools\measurement\requirements-elo-oracle.txt
+python -m unittest .\tests\python\measurement\elo_oracle_test.py -v
 ```
 
 See [`tools/README.md`](tools/README.md) for the extract-only schema, the named
@@ -124,15 +124,15 @@ is registered as `elo_oracle_python` in CTest; otherwise the C++ test suite is u
 and CMake reports that the optional test was skipped.
 
 To analyze a supplied standard-SAN PGN with Stockfish as the position oracle, keep the
-JSON output outside this checkout and provide the exact executable/version and PGN
-provenance alongside the report:
+JSON output under this checkout's artifacts directory and provide the exact
+executable/version and PGN provenance alongside the report:
 
 ```powershell
-python .\tools\elo_oracle.py `
-  --pgn C:\Koi-inputs\game.pgn `
-  --koi .\out\release-vs\koi-engine.exe `
-  --stockfish C:\Engines\stockfish.exe `
-  --output C:\Koi-results\elo-oracle.json `
+python .\tools\measurement\elo_oracle.py `
+  --pgn .\tests\data\games\2026-09-08-koi-vs-stockfish-19.pgn `
+  --koi .\build\release\koi-engine.exe `
+  --stockfish .\third_party\stockfish-19\stockfish-windows-x86-64-universal\stockfish\stockfish-windows-x86-64-universal.exe `
+  --output .\artifacts\verification\elo-oracle.json `
   --movetime-ms 250 --threads 4
 ```
 
@@ -141,12 +141,12 @@ opening book as a separate audit so its `book_used`, `book_move`, and Stockfish 
 kept outside the normal search metrics:
 
 ```powershell
-python .\tools\elo_oracle.py `
-  --pgn C:\Koi-inputs\game.pgn `
-  --koi .\out\release-vs\koi-engine.exe `
-  --stockfish C:\Engines\stockfish.exe `
+python .\tools\measurement\elo_oracle.py `
+  --pgn .\tests\data\games\2026-09-08-koi-vs-stockfish-19.pgn `
+  --koi .\build\release\koi-engine.exe `
+  --stockfish .\third_party\stockfish-19\stockfish-windows-x86-64-universal\stockfish\stockfish-windows-x86-64-universal.exe `
   --book C:\LicensedBooks\book.bin --book-audit `
-  --output C:\Koi-results\book-audit.json `
+  --output .\artifacts\verification\book-audit.json `
   --movetime-ms 250 --threads 4
 ```
 
@@ -160,8 +160,8 @@ same versioned implementation and emit the `piece-square-king-pawn-v2` container
 they do not add a Python runtime dependency to the engine:
 
 ```powershell
-python .\tools\train_nnue.py --help
-python .\tools\export_nnue.py --help
+python .\tools\measurement\train_nnue.py --help
+python .\tools\measurement\export_nnue.py --help
 ```
 
 `--backend synthetic` is deterministic and suitable for boundary tests. The optional
@@ -172,11 +172,11 @@ For a reproducible local match against Stockfish or another UCI engine, use the
 optional PowerShell harness:
 
 ```powershell
-.\tools\uci_match.ps1 `
-  -KoiPath .\out\release-vs\koi-engine.exe `
-  -OpponentPath C:\Engines\stockfish.exe `
+.\tools\stability\uci_match.ps1 `
+  -KoiPath .\build\release\koi-engine.exe `
+  -OpponentPath .\third_party\stockfish-19\stockfish-windows-x86-64-universal\stockfish\stockfish-windows-x86-64-universal.exe `
   -Depth 6 -Threads 4 -Speed 100 -Hash 512 `
-  -OutputDirectory C:\Koi-results\match-results
+  -OutputDirectory .\artifacts\matches\match-results
 ```
 
 The harness writes a `koi-uci-match-v2` JSON report plus matching `.pgn`. It records
@@ -199,20 +199,20 @@ Koi White and 20 as Koi Black for 40 games per opening and condition. Run both
 book-disabled and licensed-book conditions at both clocks:
 
 ```powershell
-.\tools\uci_match.ps1 `
-  -KoiPath .\out\release-vs\koi-engine.exe `
-  -OpponentPath C:\Engines\stockfish.exe `
-  -OpeningFile .\tests\data\elo-openings.txt `
+.\tools\stability\uci_match.ps1 `
+  -KoiPath .\build\release\koi-engine.exe `
+  -OpponentPath .\third_party\stockfish-19\stockfish-windows-x86-64-universal\stockfish\stockfish-windows-x86-64-universal.exe `
+  -OpeningFile .\tests\data\openings\openings-basic.txt `
   -TimeControl 1+0 -Games 20 -KoiColor white `
   -KoiRandomSeed 1 -KoiOwnBook false `
-  -OutputDirectory C:\Koi-results\no-book-1p0-white
-.\tools\uci_match.ps1 -KoiPath .\out\release-vs\koi-engine.exe -OpponentPath C:\Engines\stockfish.exe -OpeningFile .\tests\data\elo-openings.txt -TimeControl 1+0 -Games 20 -KoiColor black -KoiRandomSeed 1 -KoiOwnBook false -OutputDirectory C:\Koi-results\no-book-1p0-black
-.\tools\uci_match.ps1 -KoiPath .\out\release-vs\koi-engine.exe -OpponentPath C:\Engines\stockfish.exe -OpeningFile .\tests\data\elo-openings.txt -TimeControl 1+0 -Games 20 -KoiColor white -KoiRandomSeed 1 -KoiOwnBook true -KoiBookFile C:\LicensedBooks\book.bin -KoiBookDepth 16 -OutputDirectory C:\Koi-results\book-1p0-white
-.\tools\uci_match.ps1 -KoiPath .\out\release-vs\koi-engine.exe -OpponentPath C:\Engines\stockfish.exe -OpeningFile .\tests\data\elo-openings.txt -TimeControl 1+0 -Games 20 -KoiColor black -KoiRandomSeed 1 -KoiOwnBook true -KoiBookFile C:\LicensedBooks\book.bin -KoiBookDepth 16 -OutputDirectory C:\Koi-results\book-1p0-black
-.\tools\uci_match.ps1 -KoiPath .\out\release-vs\koi-engine.exe -OpponentPath C:\Engines\stockfish.exe -OpeningFile .\tests\data\elo-openings.txt -TimeControl 5+3 -Games 20 -KoiColor white -KoiRandomSeed 1 -KoiOwnBook false -OutputDirectory C:\Koi-results\no-book-5p3-white
-.\tools\uci_match.ps1 -KoiPath .\out\release-vs\koi-engine.exe -OpponentPath C:\Engines\stockfish.exe -OpeningFile .\tests\data\elo-openings.txt -TimeControl 5+3 -Games 20 -KoiColor black -KoiRandomSeed 1 -KoiOwnBook false -OutputDirectory C:\Koi-results\no-book-5p3-black
-.\tools\uci_match.ps1 -KoiPath .\out\release-vs\koi-engine.exe -OpponentPath C:\Engines\stockfish.exe -OpeningFile .\tests\data\elo-openings.txt -TimeControl 5+3 -Games 20 -KoiColor white -KoiRandomSeed 1 -KoiOwnBook true -KoiBookFile C:\LicensedBooks\book.bin -KoiBookDepth 16 -OutputDirectory C:\Koi-results\book-5p3-white
-.\tools\uci_match.ps1 -KoiPath .\out\release-vs\koi-engine.exe -OpponentPath C:\Engines\stockfish.exe -OpeningFile .\tests\data\elo-openings.txt -TimeControl 5+3 -Games 20 -KoiColor black -KoiRandomSeed 1 -KoiOwnBook true -KoiBookFile C:\LicensedBooks\book.bin -KoiBookDepth 16 -OutputDirectory C:\Koi-results\book-5p3-black
+  -OutputDirectory .\artifacts\matches\no-book-1p0-white
+.\tools\stability\uci_match.ps1 -KoiPath .\build\release\koi-engine.exe -OpponentPath .\third_party\stockfish-19\stockfish-windows-x86-64-universal\stockfish\stockfish-windows-x86-64-universal.exe -OpeningFile .\tests\data\openings\openings-basic.txt -TimeControl 1+0 -Games 20 -KoiColor black -KoiRandomSeed 1 -KoiOwnBook false -OutputDirectory .\artifacts\matches\no-book-1p0-black
+.\tools\stability\uci_match.ps1 -KoiPath .\build\release\koi-engine.exe -OpponentPath .\third_party\stockfish-19\stockfish-windows-x86-64-universal\stockfish\stockfish-windows-x86-64-universal.exe -OpeningFile .\tests\data\openings\openings-basic.txt -TimeControl 1+0 -Games 20 -KoiColor white -KoiRandomSeed 1 -KoiOwnBook true -KoiBookFile C:\LicensedBooks\book.bin -KoiBookDepth 16 -OutputDirectory .\artifacts\matches\book-1p0-white
+.\tools\stability\uci_match.ps1 -KoiPath .\build\release\koi-engine.exe -OpponentPath .\third_party\stockfish-19\stockfish-windows-x86-64-universal\stockfish\stockfish-windows-x86-64-universal.exe -OpeningFile .\tests\data\openings\openings-basic.txt -TimeControl 1+0 -Games 20 -KoiColor black -KoiRandomSeed 1 -KoiOwnBook true -KoiBookFile C:\LicensedBooks\book.bin -KoiBookDepth 16 -OutputDirectory .\artifacts\matches\book-1p0-black
+.\tools\stability\uci_match.ps1 -KoiPath .\build\release\koi-engine.exe -OpponentPath .\third_party\stockfish-19\stockfish-windows-x86-64-universal\stockfish\stockfish-windows-x86-64-universal.exe -OpeningFile .\tests\data\openings\openings-basic.txt -TimeControl 5+3 -Games 20 -KoiColor white -KoiRandomSeed 1 -KoiOwnBook false -OutputDirectory .\artifacts\matches\no-book-5p3-white
+.\tools\stability\uci_match.ps1 -KoiPath .\build\release\koi-engine.exe -OpponentPath .\third_party\stockfish-19\stockfish-windows-x86-64-universal\stockfish\stockfish-windows-x86-64-universal.exe -OpeningFile .\tests\data\openings\openings-basic.txt -TimeControl 5+3 -Games 20 -KoiColor black -KoiRandomSeed 1 -KoiOwnBook false -OutputDirectory .\artifacts\matches\no-book-5p3-black
+.\tools\stability\uci_match.ps1 -KoiPath .\build\release\koi-engine.exe -OpponentPath .\third_party\stockfish-19\stockfish-windows-x86-64-universal\stockfish\stockfish-windows-x86-64-universal.exe -OpeningFile .\tests\data\openings\openings-basic.txt -TimeControl 5+3 -Games 20 -KoiColor white -KoiRandomSeed 1 -KoiOwnBook true -KoiBookFile C:\LicensedBooks\book.bin -KoiBookDepth 16 -OutputDirectory .\artifacts\matches\book-5p3-white
+.\tools\stability\uci_match.ps1 -KoiPath .\build\release\koi-engine.exe -OpponentPath .\third_party\stockfish-19\stockfish-windows-x86-64-universal\stockfish\stockfish-windows-x86-64-universal.exe -OpeningFile .\tests\data\openings\openings-basic.txt -TimeControl 5+3 -Games 20 -KoiColor black -KoiRandomSeed 1 -KoiOwnBook true -KoiBookFile C:\LicensedBooks\book.bin -KoiBookDepth 16 -OutputDirectory .\artifacts\matches\book-5p3-black
 ```
 
 `-TimeControl` accepts only `<minutes>+<increment>` (for example `1+0` or `5+3`)
@@ -227,7 +227,7 @@ ignore those UCI options safely.
 
 ## Rough local Elo measurement
 
-`tools/elo_estimate.py` is a standard-library-only, measurement-only harness. Its
+`tools/measurement/elo_estimate.py` is a standard-library-only, measurement-only harness. Its
 primary configuration is no-book, 1+0, Koi `Hash=512`, `Threads=4`, and
 `Speed=100`, with 32 named opening lines played once with Koi White and once with
 Koi Black at each Stockfish anchor. The initial schedule is two 64-game anchor
@@ -248,43 +248,43 @@ Run the primary no-book dry-run from the repository root with every executable,
 manifest, corpus, and report path resolved explicitly:
 
 ```powershell
-python .\tools\elo_estimate.py `
-  --koi C:\Koi\out\release\koi-engine.exe `
-  --replay C:\Koi\out\release\koi-replay.exe `
-  --stockfish C:\Engines\stockfish.exe `
-  --anchors C:\Koi-inputs\anchors.json `
-  --openings .\tests\data\elo-openings-32.txt `
+python .\tools\measurement\elo_estimate.py `
+  --koi .\build\release\koi-engine.exe `
+  --replay .\build\release\koi-replay.exe `
+  --stockfish .\third_party\stockfish-19\stockfish-windows-x86-64-universal\stockfish\stockfish-windows-x86-64-universal.exe `
+  --anchors .\artifacts\manifests\elo-anchors.json `
+  --openings .\tests\data\openings\openings-curated-32.txt `
   --time-control 1+0 `
   --threads 4 --hash 512 --speed 100 `
   --min-games 128 --max-games 320 `
   --prior-elo 1600 --mode no-book `
-  --output C:\Koi-results\rough-elo-no-book.json `
+  --output .\artifacts\matches\rough-elo-no-book.json `
   --dry-run
 ```
 
 `--dry-run` validates the executable paths, anchor manifest, 32-opening corpus,
 required fixed options, and output location, writes the complete deterministic
-schedule to the external JSON report, and launches no engines. Remove only
+schedule to the repository-local JSON report, and launches no engines. Remove only
 `--dry-run` for a real run after supplying valid local Koi, replay, Stockfish,
-anchor, corpus, and external output paths. The real run writes raw `koi-uci-match-v2`
-JSON and matching PGN artifacts below a sibling `<report-stem>-artifacts` directory;
-keep those artifacts, executables, and manifests outside the checkout.
+anchor, corpus, and artifact paths. The real run writes raw `koi-uci-match-v2`
+JSON and matching PGN artifacts below a sibling `<report-stem>-artifacts` directory
+under `artifacts/matches`.
 
 Book mode is a separate measurement and must not be combined with the primary
 no-book result. Use a separate output path and licensed external book:
 
 ```powershell
-python .\tools\elo_estimate.py `
-  --koi C:\Koi\out\release\koi-engine.exe `
-  --replay C:\Koi\out\release\koi-replay.exe `
-  --stockfish C:\Engines\stockfish.exe `
-  --anchors C:\Koi-inputs\anchors.json `
-  --openings .\tests\data\elo-openings-32.txt `
+python .\tools\measurement\elo_estimate.py `
+  --koi .\build\release\koi-engine.exe `
+  --replay .\build\release\koi-replay.exe `
+  --stockfish .\third_party\stockfish-19\stockfish-windows-x86-64-universal\stockfish\stockfish-windows-x86-64-universal.exe `
+  --anchors .\artifacts\manifests\elo-anchors.json `
+  --openings .\tests\data\openings\openings-curated-32.txt `
   --time-control 1+0 `
   --threads 4 --hash 512 --speed 100 `
   --min-games 128 --max-games 320 `
   --prior-elo 1600 --mode book --book C:\LicensedBooks\book.bin `
-  --output C:\Koi-results\rough-elo-book.json
+  --output .\artifacts\matches\rough-elo-book.json
 ```
 
 CTest registers the standard-library-only estimator, match-option, and opening
@@ -310,8 +310,8 @@ Run the hard gate and the complete Release suite from an x64 Visual Studio devel
 shell:
 
 ```powershell
-.\out\release-vs\koi_strength_tests.exe
-ctest --test-dir out\release-vs -C Release --output-on-failure
+.\build\release\koi_strength_tests.exe
+ctest --test-dir build\release -C Release --output-on-failure
 ```
 
 The optional corpus is retained for local tuning and is deliberately not an Elo or NPS
@@ -365,7 +365,7 @@ external Stockfish/Lc0 strength campaign.
 Run this PowerShell transcript after building:
 
 ```powershell
-$engine = (Resolve-Path .\out\release-vs\koi-engine.exe).Path
+$engine = (Resolve-Path .\build\release\koi-engine.exe).Path
 @(
     'uci'
     'isready'
@@ -479,7 +479,7 @@ protocol clean. Leave this option disabled for normal release use.
 ## Register in En Croissant (primary)
 
 1. Build the Windows x64 Release target and resolve the absolute path to
-   `out\release-vs\koi-engine.exe` (or the executable in your chosen build
+   `build\release\koi-engine.exe` (or the executable in your chosen build
    directory).
 2. In En Croissant, add a UCI engine and select that `koi-engine.exe` path.
    Keep the engine's working directory beside the executable when configuring
@@ -637,8 +637,9 @@ licenses with the package:
 
 The release archive should also retain the README and the exact build identity.
 Do not include generated benchmark profiles, match JSON/PGN, debug logs, or
-tablebase data in the repository release commit; write those artifacts under an
-external results directory such as `C:\Koi-results`. An Elo, CPL, or strength
+tablebase data in the repository release commit; write those artifacts under the
+repository-local artifacts directory such as `artifacts\verification` or
+`artifacts\matches`. An Elo, CPL, or strength
 claim requires fresh comparable Stockfish CPL or match data with the executable,
 options, time control, and input provenance recorded alongside the report.
 
