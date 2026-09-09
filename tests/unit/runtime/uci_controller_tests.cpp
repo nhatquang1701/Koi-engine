@@ -15,6 +15,7 @@
 #include <string>
 #include <string_view>
 #include <thread>
+#include <utility>
 #include <vector>
 
 #include "koi/position.hpp"
@@ -1202,6 +1203,33 @@ void test_ponderhit_restarts_the_ponder_search_once() {
             "ponderhit must search from the position after the expected reply");
 }
 
+void test_large_hash_option_is_capped_without_crashing_the_controller() {
+    koi::HashMemoryPolicy policy;
+    policy.memory_provider = [] {
+        return koi::HashMemorySnapshot{
+            128ULL * 1024ULL * 1024ULL,
+            96ULL * 1024ULL * 1024ULL,
+            16ULL * 1024ULL * 1024ULL};
+    };
+
+    std::istringstream input(
+        "setoption name Hash value 4096\n"
+        "isready\n"
+        "position startpos\n"
+        "go depth 1\n"
+        "quit\n");
+    std::ostringstream output;
+    std::ostringstream diagnostics;
+    UciController controller(input, output, diagnostics,
+                              koi::SearchService{std::make_shared<koi::ClassicalEvaluator>(),
+                                                 std::move(policy)});
+    require(controller.run() == 0, "a capped large hash request must not crash the controller");
+    require(output.str().find("info string hash requested 4096 MB effective ") != std::string::npos,
+            "a reduced large hash request must be reported as valid UCI info");
+    require(output.str().find("readyok\n") != std::string::npos,
+            "a capped large hash request must leave isready usable");
+}
+
 void test_immediate_ponderhit_without_observed_reply_suppresses_restart() {
     GatedInputBuffer input(
         "position startpos\n"
@@ -1712,6 +1740,7 @@ int main() {
         {"opening-book depth boundaries", test_book_depth_boundaries_and_invalid_values_preserve_the_previous_limit},
         {"opening-book option generation replacement", test_book_option_changes_suppress_active_search_generations},
         {"Hash and Clear Hash contract", test_hash_options_preserve_the_contract_and_never_advertise_threads},
+        {"large Hash safety", test_large_hash_option_is_capped_without_crashing_the_controller},
         {"Threads and Speed validation", test_threads_and_speed_options_accept_valid_values_and_ignore_invalid_values},
         {"Threads and Speed generation replacement", test_threads_and_speed_changes_suppress_the_active_generation},
         {"Lucas analysis options and multipv output",

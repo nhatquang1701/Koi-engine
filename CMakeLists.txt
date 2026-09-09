@@ -30,7 +30,7 @@ endif()
 
 if(MSVC)
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-    add_compile_options(/permissive- "$<$<CONFIG:Release>:/arch:AVX2>")
+    add_compile_options(/EHsc /permissive- "$<$<CONFIG:Release>:/arch:AVX2>")
     include(CheckIPOSupported)
     check_ipo_supported(RESULT KOI_IPO_SUPPORTED OUTPUT KOI_IPO_ERROR LANGUAGES CXX)
     if(KOI_IPO_SUPPORTED)
@@ -337,6 +337,15 @@ add_test(
 )
 
 set_tests_properties(cutechess_stability_smoke PROPERTIES TIMEOUT 180)
+
+add_test(
+    NAME hash_memory_stability
+    COMMAND ${POWERSHELL_EXECUTABLE} -NoProfile -ExecutionPolicy Bypass -File
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/runtime/hash_memory_stability_test.ps1"
+            -EnginePath "$<TARGET_FILE:koi_engine>"
+)
+
+set_tests_properties(hash_memory_stability PROPERTIES TIMEOUT 60)
 
 add_test(
     NAME windows_ci_configuration

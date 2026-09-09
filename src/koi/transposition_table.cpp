@@ -5,13 +5,26 @@
 #include <atomic>
 #include <limits>
 #include <mutex>
+#include <new>
 #include <shared_mutex>
+#include <stdexcept>
 #include <utility>
+
+#if defined(_WIN32)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
 
 namespace koi {
 namespace {
 
 constexpr int kMateThreshold = 99'000;
+constexpr std::size_t kBytesPerMegabyte = 1024ULL * 1024ULL;
+constexpr std::size_t kSegmentBytes = 32ULL * kBytesPerMegabyte;
+constexpr std::size_t kMinimumMegabytes = 1;
+constexpr std::size_t kMaximumMegabytes = 4096;
 
 int score_for_storage(int score, int ply) noexcept {
     if (score >= kMateThreshold) {
@@ -33,36 +46,206 @@ int score_for_probe(int score, int ply) noexcept {
     return score;
 }
 
+HashMemorySnapshot default_memory_snapshot() noexcept {
+#if defined(_WIN32)
+    MEMORYSTATUSEX status{};
+    status.dwLength = sizeof(status);
+    if (GlobalMemoryStatusEx(&status) != 0) {
+        return HashMemorySnapshot{status.ullTotalPhys, status.ullAvailPhys, status.ullAvailPageFile};
+    }
+#endif
+    return {};
+}
+
+std::size_t megabytes_to_bytes(std::size_t megabytes) noexcept {
+    constexpr std::size_t maximum = std::numeric_limits<std::size_t>::max();
+    if (megabytes > maximum / kBytesPerMegabyte) {
+        return maximum;
+    }
+    return megabytes * kBytesPerMegabyte;
+}
+
+std::size_t bytes_to_megabytes(std::size_t bytes) noexcept {
+    return bytes / kBytesPerMegabyte;
+}
+
+std::size_t u64_to_size(std::uint64_t value) noexcept {
+    const std::uint64_t maximum = std::numeric_limits<std::size_t>::max();
+    return static_cast<std::size_t>(std::min(value, maximum));
+}
+
 } // namespace
 
 struct TranspositionTable::Storage {
-    explicit Storage(std::size_t megabytes)
-        : entries(std::max<std::size_t>(1, (megabytes * 1024ULL * 1024ULL) /
-                                             sizeof(TranspositionEntry))),
-          size_mb(megabytes) {}
+    struct Segment {
+        explicit Segment(std::size_t count, const HashAllocationFailureProvider& failure) {
+            const std::size_t bytes = count * sizeof(TranspositionEntry);
+            if (failure && failure(bytes)) {
+                throw std::bad_alloc();
+            }
+            entries.resize(count);
+        }
 
-    std::vector<TranspositionEntry> entries;
+        std::vector<TranspositionEntry> entries;
+    };
+
+    explicit Storage(std::size_t megabytes, const HashAllocationFailureProvider& failure)
+        : entries_per_segment(std::max<std::size_t>(1, kSegmentBytes / sizeof(TranspositionEntry))) {
+        const std::size_t requested_bytes = megabytes_to_bytes(megabytes);
+        const std::size_t total_entries = std::max<std::size_t>(
+            1, requested_bytes / sizeof(TranspositionEntry));
+        const std::size_t segment_count =
+            (total_entries + entries_per_segment - 1) / entries_per_segment;
+        segments.reserve(segment_count);
+        std::size_t remaining = total_entries;
+        for (std::size_t index = 0; index < segment_count; ++index) {
+            const std::size_t count = std::min(remaining, entries_per_segment);
+            segments.push_back(std::make_unique<Segment>(count, failure));
+            remaining -= count;
+        }
+        total_slot_count = total_entries;
+        allocated_bytes = total_entries * sizeof(TranspositionEntry);
+        size_mb = std::max<std::size_t>(1, bytes_to_megabytes(allocated_bytes));
+    }
+
+    [[nodiscard]] TranspositionEntry& at(std::size_t slot) noexcept {
+        const std::size_t segment = slot / entries_per_segment;
+        const std::size_t offset = slot % entries_per_segment;
+        return segments[segment]->entries[offset];
+    }
+
+    [[nodiscard]] const TranspositionEntry& at(std::size_t slot) const noexcept {
+        const std::size_t segment = slot / entries_per_segment;
+        const std::size_t offset = slot % entries_per_segment;
+        return segments[segment]->entries[offset];
+    }
+
+    std::vector<std::unique_ptr<Segment>> segments;
     std::array<std::shared_mutex, kStripeCount> stripes;
-    const std::size_t size_mb;
+    const std::size_t entries_per_segment;
+    std::size_t allocated_bytes = 0;
+    std::size_t total_slot_count = 0;
+    std::size_t size_mb = 0;
     std::uint16_t generation = 1;
 };
 
-TranspositionTable::TranspositionTable(std::size_t megabytes)
-    : storage_(std::make_shared<Storage>(normalized_size_mb(megabytes))) {}
+TranspositionTable::TranspositionTable(std::size_t megabytes, HashMemoryPolicy policy)
+    : memory_policy_(std::move(policy)) {
+    std::lock_guard lock(maintenance_mutex_);
+    (void)resize_locked(megabytes);
+}
 
 std::shared_ptr<TranspositionTable::Storage> TranspositionTable::snapshot() const noexcept {
     return std::atomic_load_explicit(&storage_, std::memory_order_acquire);
 }
 
 std::size_t TranspositionTable::normalized_size_mb(std::size_t megabytes) noexcept {
-    return std::clamp(megabytes, std::size_t{1}, std::size_t{4096});
+    return std::clamp(megabytes, kMinimumMegabytes, kMaximumMegabytes);
 }
 
-void TranspositionTable::set_size_mb(std::size_t megabytes) {
-    const std::size_t normalized = normalized_size_mb(megabytes);
-    auto replacement = std::make_shared<Storage>(normalized);
+HashResizeResult TranspositionTable::set_size_mb(std::size_t megabytes) noexcept {
     std::lock_guard lock(maintenance_mutex_);
-    std::atomic_store_explicit(&storage_, std::move(replacement), std::memory_order_release);
+    return resize_locked(megabytes);
+}
+
+HashResizeResult TranspositionTable::resize_locked(std::size_t megabytes) noexcept {
+    HashResizeResult result;
+    result.requested_mb = megabytes;
+    const std::size_t normalized = normalized_size_mb(megabytes);
+    const bool request_was_clamped = normalized != megabytes;
+    const auto current = snapshot();
+    const std::size_t current_bytes = current == nullptr ? 0 : current->allocated_bytes;
+    const std::size_t requested_bytes = megabytes_to_bytes(normalized);
+    std::size_t allowed_bytes = requested_bytes;
+
+    HashMemorySnapshot memory;
+    try {
+        memory = memory_policy_.memory_provider ? memory_policy_.memory_provider() :
+            default_memory_snapshot();
+    } catch (...) {
+        memory = {};
+    }
+    result.total_physical_bytes = memory.total_physical_bytes;
+    result.available_physical_bytes = memory.available_physical_bytes;
+    result.available_commit_bytes = memory.available_commit_bytes;
+
+    if (memory.total_physical_bytes != 0) {
+        const std::size_t physical_cap = u64_to_size(memory.total_physical_bytes / 4ULL);
+        if (physical_cap < allowed_bytes) {
+            allowed_bytes = physical_cap;
+            result.reason = HashResizeReason::physical_memory_cap;
+        }
+    }
+    if (memory.available_commit_bytes != 0) {
+        const std::size_t available_commit = u64_to_size(memory.available_commit_bytes);
+        const std::size_t available_after_old = available_commit > current_bytes ?
+            available_commit - current_bytes : 0;
+        const std::size_t commit_cap = available_after_old / 2;
+        if (commit_cap < allowed_bytes) {
+            allowed_bytes = commit_cap;
+            result.reason = HashResizeReason::commit_cap;
+        }
+    }
+
+    if (allowed_bytes < kBytesPerMegabyte) {
+        result.effective_mb = current == nullptr ? 0 : current->size_mb;
+        result.allocated_bytes = current == nullptr ? 0 : current->allocated_bytes;
+        result.segment_count = current == nullptr ? 0 : current->segments.size();
+        result.status = current == nullptr ? HashResizeStatus::disabled : HashResizeStatus::unchanged;
+        if (result.reason == HashResizeReason::none) {
+            result.reason = current == nullptr ? HashResizeReason::startup_unavailable :
+                HashResizeReason::commit_cap;
+        }
+        return result;
+    }
+
+    const std::size_t candidate_mb = std::max<std::size_t>(1, bytes_to_megabytes(allowed_bytes));
+    if (current != nullptr && current->size_mb == candidate_mb) {
+        result.effective_mb = current->size_mb;
+        result.allocated_bytes = current->allocated_bytes;
+        result.segment_count = current->segments.size();
+        result.status = candidate_mb < normalized || request_was_clamped ?
+            HashResizeStatus::reduced : HashResizeStatus::unchanged;
+        if (result.reason == HashResizeReason::none && request_was_clamped) {
+            result.reason = HashResizeReason::request_clamped;
+        }
+        return result;
+    }
+
+    try {
+        auto replacement = std::make_shared<Storage>(candidate_mb, memory_policy_.allocation_failure);
+        result.effective_mb = replacement->size_mb;
+        result.allocated_bytes = replacement->allocated_bytes;
+        result.segment_count = replacement->segments.size();
+        result.status = candidate_mb < normalized || request_was_clamped ?
+            HashResizeStatus::reduced : HashResizeStatus::applied;
+        if (result.reason == HashResizeReason::none && request_was_clamped) {
+            result.reason = HashResizeReason::request_clamped;
+        }
+        std::atomic_store_explicit(&storage_, std::move(replacement), std::memory_order_release);
+        return result;
+    } catch (const std::bad_alloc&) {
+        result.effective_mb = current == nullptr ? 0 : current->size_mb;
+        result.allocated_bytes = current == nullptr ? 0 : current->allocated_bytes;
+        result.segment_count = current == nullptr ? 0 : current->segments.size();
+        result.status = current == nullptr ? HashResizeStatus::disabled : HashResizeStatus::unchanged;
+        result.reason = HashResizeReason::allocation_failed;
+        return result;
+    } catch (const std::length_error&) {
+        result.effective_mb = current == nullptr ? 0 : current->size_mb;
+        result.allocated_bytes = current == nullptr ? 0 : current->allocated_bytes;
+        result.segment_count = current == nullptr ? 0 : current->segments.size();
+        result.status = current == nullptr ? HashResizeStatus::disabled : HashResizeStatus::unchanged;
+        result.reason = HashResizeReason::allocation_failed;
+        return result;
+    } catch (...) {
+        result.effective_mb = current == nullptr ? 0 : current->size_mb;
+        result.allocated_bytes = current == nullptr ? 0 : current->allocated_bytes;
+        result.segment_count = current == nullptr ? 0 : current->segments.size();
+        result.status = current == nullptr ? HashResizeStatus::disabled : HashResizeStatus::unchanged;
+        result.reason = HashResizeReason::allocation_failed;
+        return result;
+    }
 }
 
 std::size_t TranspositionTable::size_mb() const noexcept {
@@ -73,7 +256,7 @@ std::size_t TranspositionTable::size_mb() const noexcept {
 void TranspositionTable::clear() noexcept {
     std::lock_guard maintenance_lock(maintenance_mutex_);
     const auto storage = snapshot();
-    if (storage == nullptr) {
+    if (storage == nullptr || storage->total_slot_count == 0) {
         return;
     }
 
@@ -81,13 +264,15 @@ void TranspositionTable::clear() noexcept {
     for (std::size_t index = 0; index < kStripeCount; ++index) {
         stripe_locks[index] = std::unique_lock<std::shared_mutex>(storage->stripes[index]);
     }
-    std::fill(storage->entries.begin(), storage->entries.end(), TranspositionEntry{});
+    for (const auto& segment : storage->segments) {
+        std::fill(segment->entries.begin(), segment->entries.end(), TranspositionEntry{});
+    }
 }
 
 void TranspositionTable::new_generation() noexcept {
     std::lock_guard maintenance_lock(maintenance_mutex_);
     const auto storage = snapshot();
-    if (storage == nullptr) {
+    if (storage == nullptr || storage->total_slot_count == 0) {
         return;
     }
 
@@ -98,20 +283,22 @@ void TranspositionTable::new_generation() noexcept {
     ++storage->generation;
     if (storage->generation == 0) {
         storage->generation = 1;
-        std::fill(storage->entries.begin(), storage->entries.end(), TranspositionEntry{});
+        for (const auto& segment : storage->segments) {
+            std::fill(segment->entries.begin(), segment->entries.end(), TranspositionEntry{});
+        }
     }
 }
 
-void TranspositionTable::store(std::uint64_t key, int depth, int score, TranspositionBound bound, Move best_move,
-                               int ply) noexcept {
+void TranspositionTable::store(std::uint64_t key, int depth, int score, TranspositionBound bound,
+                               Move best_move, int ply) noexcept {
     const auto storage = snapshot();
-    if (storage == nullptr || storage->entries.empty()) {
+    if (storage == nullptr || storage->total_slot_count == 0) {
         return;
     }
 
-    const std::size_t index = key % storage->entries.size();
+    const std::size_t index = key % storage->total_slot_count;
     std::unique_lock stripe_lock(storage->stripes[index % kStripeCount]);
-    TranspositionEntry& existing = storage->entries[index];
+    TranspositionEntry& existing = storage->at(index);
     const bool empty = !existing.occupied;
     const bool same_key = existing.key == key;
     if (!empty && same_key) {
@@ -120,6 +307,7 @@ void TranspositionTable::store(std::uint64_t key, int depth, int score, Transpos
             existing.bound == TranspositionBound::exact && bound != TranspositionBound::exact;
         if (keeps_deeper_entry || keeps_equal_exact_entry) {
             existing.generation = storage->generation;
+            existing.generation_age = 0;
             return;
         }
     }
@@ -131,23 +319,24 @@ void TranspositionTable::store(std::uint64_t key, int depth, int score, Transpos
     }
 
     existing = TranspositionEntry{key, depth, score_for_storage(score, ply), bound, best_move,
-                                  storage->generation, true};
+                                  storage->generation, true, 0};
 }
 
 std::optional<TranspositionEntry> TranspositionTable::probe(std::uint64_t key, int ply) const noexcept {
     const auto storage = snapshot();
-    if (storage == nullptr || storage->entries.empty()) {
+    if (storage == nullptr || storage->total_slot_count == 0) {
         return std::nullopt;
     }
 
-    const std::size_t index = key % storage->entries.size();
+    const std::size_t index = key % storage->total_slot_count;
     std::shared_lock stripe_lock(storage->stripes[index % kStripeCount]);
-    const TranspositionEntry& entry = storage->entries[index];
+    const TranspositionEntry& entry = storage->at(index);
     if (!entry.occupied || entry.key != key) {
         return std::nullopt;
     }
     TranspositionEntry result = entry;
     result.score = score_for_probe(result.score, ply);
+    result.generation_age = static_cast<std::uint16_t>(storage->generation - entry.generation);
     return result;
 }
 

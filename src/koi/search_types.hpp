@@ -35,6 +35,39 @@ struct SearchLimits {
     std::vector<Move> search_moves;
 };
 
+struct RootTimingContext {
+    bool table_available = false;
+    bool tt_hit = false;
+    bool tt_exact = false;
+    bool tt_has_best_move = false;
+    int tt_depth = 0;
+    std::uint16_t tt_generation_age = 0;
+    std::uint32_t legal_move_count = 0;
+    std::uint32_t forcing_move_count = 0;
+    bool in_check = false;
+};
+
+struct SearchIterationObservation {
+    int depth = 0;
+    int score_cp = 0;
+    bool best_move_changed = false;
+    bool pv_changed = false;
+    bool aspiration_researched = false;
+    std::uint64_t nodes = 0;
+};
+
+struct TimeManagementStats {
+    std::chrono::milliseconds reserve{0};
+    std::chrono::milliseconds usable{0};
+    std::chrono::milliseconds soft_budget{0};
+    std::chrono::milliseconds hard_budget{0};
+    std::uint32_t horizon = 20;
+    int initial_hardness = 0;
+    int observed_hardness = 0;
+    bool extended_for_hard_position = false;
+    bool hard_deadline_reached = false;
+};
+
 struct SearchStats {
     std::uint64_t nodes = 0;
     std::uint64_t qnodes = 0;
@@ -90,6 +123,7 @@ struct SearchResult {
     std::optional<int> mate;
     int completed_depth = 0;
     SearchStats stats;
+    TimeManagementStats timing;
     std::optional<Move> ponder_move;
     SearchRequestIdentity identity;
     bool completed = false;

@@ -622,8 +622,9 @@ void test_speed_scales_only_time_based_search_budgets() {
     very_large_clock.moves_to_go = 2;
     const koi::TimeManager scaled_large_clock(very_large_clock, koi::Color::white, 50);
     require(scaled_large_clock.time_budget().has_value() &&
-                *scaled_large_clock.time_budget() > std::chrono::milliseconds::max() / 2 - 100ms,
-            "Clock allocation must saturate before scaling very large increments");
+                *scaled_large_clock.time_budget() > 0ms &&
+                *scaled_large_clock.time_budget() <= scaled_large_clock.diagnostics().usable,
+            "Clock allocation must remain bounded by the usable time before scaling large increments");
 
     koi::SearchLimits depth;
     depth.depth = 4;
@@ -650,8 +651,10 @@ void test_move_overhead_and_slow_mover_scale_time_in_order() {
     clock.white_clock = koi::ClockLimit{10s, 1s};
     clock.moves_to_go = 20;
     const koi::TimeManager configured_clock(clock, koi::Color::white, 50, 10, 50);
-    require(configured_clock.time_budget().has_value() && *configured_clock.time_budget() == 287ms,
-            "clock allocations must use both new compatibility timing controls");
+    const koi::TimeManagementStats timing = configured_clock.diagnostics();
+    require(configured_clock.time_budget().has_value() && *configured_clock.time_budget() == 645ms &&
+                timing.reserve == 300ms && timing.usable == 9700ms && timing.soft_budget == 308ms,
+            "clock allocations must use reserve, Slow Mover, Speed, and the adaptive hard budget");
 }
 
 void test_explicit_depth_and_nodes_remain_untimed_with_clock_fields() {
@@ -814,6 +817,52 @@ void test_threaded_search_uses_multiple_root_workers_and_matches_reference_resul
             "threaded and reference searches must both return a root move");
     require(*threaded.best_move == *reference.best_move && threaded.score_cp == reference.score_cp,
             "threaded fixed-depth search must match the single-thread reference result");
+}
+
+void test_adaptive_time_manager_uses_tt_stability_and_hardness() {
+    const auto origin = std::chrono::steady_clock::time_point{};
+    auto now = std::make_shared<std::chrono::steady_clock::time_point>(origin);
+    const koi::TimePointProvider clock = [now] { return *now; };
+
+    koi::SearchLimits limits;
+    limits.white_clock = koi::ClockLimit{10s, 1s};
+
+    const koi::RootTimingContext easy{
+        true, true, true, true, 8, 0, 20, 0, false};
+    koi::TimeManager manager(limits, koi::Color::white, 100, 10, 100, easy, clock);
+    const koi::TimeManagementStats initial = manager.diagnostics();
+    require(initial.reserve == 300ms, "clock timing must reserve three percent at ten seconds");
+    require(initial.usable == 9700ms, "clock timing must spend only time outside the reserve");
+    require(initial.soft_budget == 1235ms && initial.hard_budget == 2580ms,
+            "clock timing must calculate the approved soft and hard budgets");
+    require(initial.initial_hardness == 0,
+            "a recent deep exact root entry must classify as easy before iteration evidence");
+
+    manager.observe_iteration({1, 12, false, false, false, 100});
+    manager.observe_iteration({2, 13, false, false, false, 200});
+    *now = origin + 1235ms;
+    require(manager.should_stop_after_iteration(),
+            "two stable completed iterations must permit stopping at the soft budget");
+    require(!manager.diagnostics().extended_for_hard_position,
+            "a stable TT-supported position must not extend to the hard budget");
+
+    *now = origin;
+    const koi::RootTimingContext hard{
+        false, false, false, false, 0, 4, 38, 20, true};
+    koi::TimeManager hard_manager(limits, koi::Color::white, 100, 10, 100, hard, clock);
+    require(hard_manager.diagnostics().initial_hardness >= 35,
+            "a TT miss with check and forcing moves must classify as hard");
+    hard_manager.observe_iteration({1, 10, true, true, true, 100});
+    *now = origin + hard_manager.diagnostics().soft_budget + 1ms;
+    require(!hard_manager.should_stop_after_iteration(),
+            "an unstable hard position must continue beyond the soft budget");
+    *now = origin + hard_manager.diagnostics().hard_budget + 1ms;
+    require(hard_manager.should_stop_after_iteration(),
+            "a hard position must stop at its hard deadline; hard=" +
+                std::to_string(hard_manager.diagnostics().hard_budget.count()) +
+                " reserve=" + std::to_string(hard_manager.diagnostics().reserve.count()));
+    require(hard_manager.diagnostics().extended_for_hard_position,
+            "hardness evidence must be recorded when a position extends");
 }
 
 void test_threaded_root_worker_starts_while_first_root_evaluation_is_blocked() {
@@ -1942,6 +1991,92 @@ void test_transposition_table_stores_probes_and_clears_entries() {
     require(table.size_mb() == 1, "hash configuration must accept the lower 1 MB bound");
 }
 
+void test_search_result_reports_root_tt_timing_context() {
+    auto evaluator = std::make_shared<koi::ClassicalEvaluator>();
+    koi::SearchService service(evaluator);
+    koi::SearchLimits warm_limits;
+    warm_limits.depth = 3;
+    (void)search(service, koi::GameState::startpos(), warm_limits);
+
+    koi::SearchLimits timed_limits;
+    timed_limits.movetime = 20ms;
+    const koi::SearchResult result = search(service, koi::GameState::startpos(), timed_limits);
+    require(result.timing.soft_budget > 0ms && result.timing.hard_budget >= result.timing.soft_budget,
+            "timed search results must expose adaptive timing budgets");
+    require(result.timing.initial_hardness < 35,
+            "a warmed root must expose its deep exact TT context to time management");
+}
+
+void test_transposition_table_caps_large_requests_without_throwing() {
+    koi::HashMemoryPolicy policy;
+    policy.memory_provider = [] {
+        return koi::HashMemorySnapshot{
+            128ULL * 1024ULL * 1024ULL,
+            96ULL * 1024ULL * 1024ULL,
+            16ULL * 1024ULL * 1024ULL};
+    };
+
+    koi::TranspositionTable table(1, policy);
+    const koi::HashResizeResult result = table.set_size_mb(4096);
+    require(result.status == koi::HashResizeStatus::reduced,
+            "large hash requests must be reduced under the memory cap");
+    require(result.effective_mb > 0 && result.effective_mb < 4096,
+            "a reduced hash request must retain a usable bounded table");
+    require(result.segment_count >= 1 && table.size_mb() == result.effective_mb,
+            "the effective hash size must describe the allocated segments");
+}
+
+void test_transposition_table_does_not_reallocate_an_unchanged_effective_size() {
+    auto fail = std::make_shared<std::atomic_bool>(false);
+    koi::HashMemoryPolicy policy;
+    policy.memory_provider = [] {
+        return koi::HashMemorySnapshot{
+            4ULL * 1024ULL * 1024ULL,
+            3ULL * 1024ULL * 1024ULL,
+            64ULL * 1024ULL * 1024ULL};
+    };
+    policy.allocation_failure = [fail](std::size_t) {
+        return fail->load(std::memory_order_relaxed);
+    };
+
+    koi::TranspositionTable table(1, policy);
+    require(table.size_mb() == 1, "the capped fixture must start with a one-megabyte table");
+    fail->store(true, std::memory_order_relaxed);
+
+    const koi::HashResizeResult result = table.set_size_mb(4096);
+    require(result.status == koi::HashResizeStatus::reduced &&
+                result.reason == koi::HashResizeReason::physical_memory_cap &&
+                result.effective_mb == 1 && table.size_mb() == 1,
+            "a capped request at the existing effective size must not reallocate the table");
+}
+
+void test_transposition_table_allocation_failure_preserves_previous_storage() {
+    auto fail = std::make_shared<std::atomic_bool>(false);
+    koi::HashMemoryPolicy policy;
+    policy.memory_provider = [] {
+        return koi::HashMemorySnapshot{
+            128ULL * 1024ULL * 1024ULL,
+            96ULL * 1024ULL * 1024ULL,
+            128ULL * 1024ULL * 1024ULL};
+    };
+    policy.allocation_failure = [fail](std::size_t) {
+        return fail->load(std::memory_order_relaxed);
+    };
+
+    koi::TranspositionTable table(1, policy);
+    const auto move = koi::Move::parse_uci("e2e4");
+    require(move.has_value(), "allocation failure fixture move must parse");
+    constexpr std::uint64_t key = 0x12345678ULL;
+    table.store(key, 4, 17, koi::TranspositionBound::exact, *move);
+    fail->store(true, std::memory_order_relaxed);
+
+    const koi::HashResizeResult result = table.set_size_mb(2);
+    require(result.reason == koi::HashResizeReason::allocation_failed,
+            "allocation failure must be reported without escaping the TT boundary");
+    require(table.size_mb() == 1 && table.probe(key).has_value(),
+            "failed resize must preserve the previous table and its entries");
+}
+
 void test_transposition_table_preserves_deeper_exact_entry_against_shallow_bound() {
     koi::TranspositionTable table(1);
     const auto exact_move = koi::Move::parse_uci("e2e4");
@@ -2124,6 +2259,7 @@ int main() {
         {"evaluator pawnless endgame terms", test_evaluator_keeps_endgame_terms_for_pawnless_rook_endgames},
         {"evaluator complete breakdown", test_evaluator_breakdown_accounts_for_every_component},
         {"time manager", test_time_manager_applies_move_time_and_clock_limits},
+        {"adaptive time manager", test_adaptive_time_manager_uses_tt_stability_and_hardness},
         {"speed budgets", test_speed_scales_only_time_based_search_budgets},
         {"compatibility timing controls", test_move_overhead_and_slow_mover_scale_time_in_order},
         {"explicit limits remain untimed", test_explicit_depth_and_nodes_remain_untimed_with_clock_fields},
@@ -2181,8 +2317,12 @@ int main() {
         {"ponder terminal lifecycle", test_ponder_terminal_and_empty_roots_wait_for_stop},
         {"ponder time and node limits", test_ponder_ignores_time_but_honors_node_limits},
         {"service hash persistence", test_service_hash_configuration_survives_default_start_and_non_default_override},
+        {"search timing context", test_search_result_reports_root_tt_timing_context},
         {"hash bounds and clear", test_hash_configuration_clamps_to_uci_bounds_and_clear_discards_warmed_entries},
         {"transposition table", test_transposition_table_stores_probes_and_clears_entries},
+        {"transposition table memory cap", test_transposition_table_caps_large_requests_without_throwing},
+        {"transposition table unchanged cap", test_transposition_table_does_not_reallocate_an_unchanged_effective_size},
+        {"transposition table allocation failure", test_transposition_table_allocation_failure_preserves_previous_storage},
         {"transposition table depth preservation", test_transposition_table_preserves_deeper_exact_entry_against_shallow_bound},
         {"transposition table age refresh", test_transposition_table_refreshes_generation_without_downgrading_same_key_entry},
         {"transposition table mate normalization", test_transposition_table_preserves_mate_distance_across_plies},

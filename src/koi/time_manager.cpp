@@ -1,6 +1,7 @@
 #include "koi/time_manager.hpp"
 
 #include <algorithm>
+#include <cstdlib>
 #include <limits>
 
 namespace koi {
@@ -11,7 +12,8 @@ std::chrono::milliseconds with_safety_margin(std::chrono::milliseconds duration)
         return std::chrono::milliseconds::zero();
     }
 
-    const auto margin = std::min(std::chrono::milliseconds{50}, std::max(std::chrono::milliseconds{1}, duration / 20));
+    const auto margin = std::min(std::chrono::milliseconds{50},
+                                 std::max(std::chrono::milliseconds{1}, duration / 20));
     return duration > margin ? duration - margin : std::chrono::milliseconds{1};
 }
 
@@ -37,6 +39,21 @@ std::chrono::milliseconds scale_duration(std::chrono::milliseconds duration,
     return std::chrono::milliseconds{static_cast<Rep>(scaled)};
 }
 
+std::chrono::milliseconds scale_fraction(std::chrono::milliseconds duration,
+                                         std::uint64_t numerator,
+                                         std::uint64_t denominator) noexcept {
+    if (duration <= std::chrono::milliseconds::zero() || numerator == 0) {
+        return std::chrono::milliseconds::zero();
+    }
+    using Rep = std::chrono::milliseconds::rep;
+    const std::uint64_t count = static_cast<std::uint64_t>(duration.count());
+    const std::uint64_t maximum = static_cast<std::uint64_t>(std::numeric_limits<Rep>::max());
+    if (count > maximum / numerator) {
+        return std::chrono::milliseconds{std::numeric_limits<Rep>::max()};
+    }
+    return std::chrono::milliseconds{static_cast<Rep>((count * numerator) / denominator)};
+}
+
 std::chrono::milliseconds subtract_overhead(std::chrono::milliseconds duration,
                                              std::uint32_t overhead_ms) noexcept {
     using Rep = std::chrono::milliseconds::rep;
@@ -49,16 +66,7 @@ std::chrono::milliseconds subtract_overhead(std::chrono::milliseconds duration,
 }
 
 std::chrono::milliseconds three_quarters(std::chrono::milliseconds duration) noexcept {
-    if (duration <= std::chrono::milliseconds::zero()) {
-        return std::chrono::milliseconds::zero();
-    }
-
-    using Rep = std::chrono::milliseconds::rep;
-    const Rep count = duration.count();
-    // Compute floor(3 * count / 4) without multiplying count itself.
-    const Rep quotient = count / Rep{4};
-    const Rep remainder = count % Rep{4};
-    return std::chrono::milliseconds{quotient * Rep{3} + (remainder * Rep{3}) / Rep{4}};
+    return scale_fraction(duration, 3, 4);
 }
 
 std::chrono::milliseconds saturating_add(std::chrono::milliseconds left,
@@ -78,11 +86,29 @@ std::chrono::milliseconds saturating_add(std::chrono::milliseconds left,
     return std::chrono::milliseconds{left_count + right_count};
 }
 
+std::chrono::milliseconds nonnegative_difference(std::chrono::milliseconds left,
+                                                 std::chrono::milliseconds right) noexcept {
+    return left > right ? left - right : std::chrono::milliseconds::zero();
+}
+
 } // namespace
 
 TimeManager::TimeManager(SearchLimits limits, Color side_to_move, std::uint8_t speed_percent,
                          std::uint32_t move_overhead_ms, std::uint32_t slow_mover_percent)
-    : limits_(std::move(limits)), started_(std::chrono::steady_clock::now()) {
+    : TimeManager(std::move(limits), side_to_move, speed_percent, move_overhead_ms,
+                  slow_mover_percent, {}, {}) {}
+
+TimeManager::TimeManager(SearchLimits limits, Color side_to_move, std::uint8_t speed_percent,
+                         std::uint32_t move_overhead_ms, std::uint32_t slow_mover_percent,
+                         RootTimingContext root_context,
+                         TimePointProvider now)
+    : limits_(std::move(limits)), root_context_(root_context), now_(std::move(now)), started_(this->now()) {
+    timing_.initial_hardness = initial_hardness(root_context_);
+    timing_.observed_hardness = timing_.initial_hardness;
+    hard_position_ = timing_.initial_hardness >= 35;
+    timing_.extended_for_hard_position = hard_position_;
+    timing_.horizon = std::max<std::uint32_t>(1, limits_.moves_to_go.value_or(20));
+
     if (limits_.infinite || limits_.ponder || limits_.depth.has_value() || limits_.nodes.has_value()) {
         return;
     }
@@ -91,20 +117,90 @@ TimeManager::TimeManager(SearchLimits limits, Color side_to_move, std::uint8_t s
         const auto slow = scale_duration(*limits_.movetime, slow_mover_percent);
         const auto scaled = scale_duration(slow, speed_percent);
         budget_ = with_safety_margin(subtract_overhead(scaled, move_overhead_ms));
+        timing_.usable = *budget_;
+        timing_.soft_budget = *budget_;
+        timing_.hard_budget = *budget_;
         return;
     }
 
-    const std::optional<ClockLimit>& clock = side_to_move == Color::white ? limits_.white_clock : limits_.black_clock;
+    const std::optional<ClockLimit>& clock = side_to_move == Color::white ?
+        limits_.white_clock : limits_.black_clock;
     if (!clock.has_value()) {
         return;
     }
 
-    const std::uint32_t moves = std::max<std::uint32_t>(1, limits_.moves_to_go.value_or(30));
-    const auto base = clock->remaining / moves;
-    const auto allocation = std::min(clock->remaining, saturating_add(base, three_quarters(clock->increment)));
-    const auto slow = scale_duration(allocation, slow_mover_percent);
-    const auto scaled = scale_duration(slow, speed_percent);
-    budget_ = with_safety_margin(subtract_overhead(scaled, move_overhead_ms));
+    clock_mode_ = true;
+    const auto remaining = std::max(clock->remaining, std::chrono::milliseconds::zero());
+    const auto overhead = std::chrono::milliseconds{
+        static_cast<std::chrono::milliseconds::rep>(std::min<std::uint64_t>(
+            move_overhead_ms, static_cast<std::uint64_t>(
+                std::numeric_limits<std::chrono::milliseconds::rep>::max())))};
+    const auto reserve_floor = std::max(
+        std::chrono::milliseconds{50},
+        std::max(scale_duration(remaining, 3), saturating_add(overhead, overhead)));
+    timing_.reserve = std::min(std::chrono::milliseconds{750}, reserve_floor);
+    timing_.reserve = std::min(timing_.reserve, remaining);
+    timing_.usable = nonnegative_difference(remaining, timing_.reserve);
+
+    const auto base_allocation = timing_.usable / timing_.horizon;
+    const auto increment_credit = three_quarters(clock->increment);
+    const auto raw_soft = saturating_add(base_allocation, increment_credit);
+    const auto raw_hard = saturating_add(scale_fraction(base_allocation, 3, 1),
+                                         scale_fraction(increment_credit, 3, 2));
+    const auto scale_budget = [slow_mover_percent, speed_percent, this](
+                                  std::chrono::milliseconds duration) {
+        const auto slow = scale_duration(duration, slow_mover_percent);
+        return std::min(timing_.usable, scale_duration(slow, speed_percent));
+    };
+    timing_.soft_budget = scale_budget(std::min(raw_soft, timing_.usable));
+    timing_.hard_budget = scale_budget(std::min(raw_hard, timing_.usable));
+    timing_.soft_budget = std::min(timing_.soft_budget, timing_.hard_budget);
+    budget_ = timing_.hard_budget;
+}
+
+std::chrono::steady_clock::time_point TimeManager::now() const noexcept {
+    if (!now_) {
+        return std::chrono::steady_clock::now();
+    }
+    try {
+        return now_();
+    } catch (...) {
+        return std::chrono::steady_clock::now();
+    }
+}
+
+int TimeManager::initial_hardness(const RootTimingContext& context) noexcept {
+    int hardness = 0;
+    if (!context.table_available || !context.tt_hit) {
+        hardness += 30;
+    }
+    if (!context.tt_exact) {
+        hardness += 15;
+    }
+    if (context.tt_depth < 6) {
+        hardness += 15;
+    }
+    if (context.tt_generation_age > 2) {
+        hardness += 10;
+    }
+    if (!context.tt_has_best_move) {
+        hardness += 10;
+    }
+    if (context.in_check) {
+        hardness += 15;
+    }
+    if (context.forcing_move_count > 0 &&
+        context.forcing_move_count * 2 >= context.legal_move_count) {
+        hardness += 10;
+    }
+    if (context.legal_move_count >= 30) {
+        hardness += 5;
+    }
+    if (context.tt_hit && context.tt_exact && context.tt_depth >= 8 &&
+        context.tt_generation_age <= 1) {
+        hardness -= 25;
+    }
+    return std::clamp(hardness, 0, 100);
 }
 
 std::optional<std::chrono::milliseconds> TimeManager::time_budget() const noexcept {
@@ -123,7 +219,68 @@ bool TimeManager::should_stop(std::uint64_t nodes) const noexcept {
     if (limits_.infinite || limits_.ponder || !budget_.has_value()) {
         return false;
     }
-    return std::chrono::steady_clock::now() - started_ >= *budget_;
+    if (now() - started_ >= *budget_) {
+        hard_deadline_reached_.store(true, std::memory_order_relaxed);
+        return true;
+    }
+    return false;
+}
+
+void TimeManager::observe_iteration(const SearchIterationObservation& observation) noexcept {
+    bool score_swing = false;
+    if (previous_score_.has_value()) {
+        const long long delta = static_cast<long long>(observation.score_cp) -
+            static_cast<long long>(*previous_score_);
+        score_swing = std::llabs(delta) >= 75;
+    }
+    const bool hard_evidence = observation.best_move_changed || observation.pv_changed ||
+        score_swing || observation.aspiration_researched;
+    if (hard_evidence) {
+        hard_position_ = true;
+        stable_observations_ = 0;
+        timing_.extended_for_hard_position = true;
+        timing_.observed_hardness = std::max(timing_.observed_hardness, 100);
+    } else if (previous_score_.has_value()) {
+        const long long delta = static_cast<long long>(observation.score_cp) -
+            static_cast<long long>(*previous_score_);
+        if (!observation.best_move_changed && !observation.pv_changed &&
+            std::llabs(delta) <= 25 && !observation.aspiration_researched) {
+            ++stable_observations_;
+        } else {
+            stable_observations_ = 0;
+        }
+    } else {
+        stable_observations_ = 1;
+    }
+    previous_score_ = observation.score_cp;
+}
+
+bool TimeManager::should_stop_after_iteration() const noexcept {
+    if (limits_.infinite || limits_.ponder || !budget_.has_value()) {
+        return false;
+    }
+    const auto elapsed = now() - started_;
+    if (elapsed >= *budget_) {
+        hard_deadline_reached_.store(true, std::memory_order_relaxed);
+        return true;
+    }
+    return clock_mode_ && !hard_position_ && stable_observations_ >= 2 &&
+        elapsed >= timing_.soft_budget;
+}
+
+bool TimeManager::should_start_next_iteration(std::chrono::milliseconds estimated_next_iteration) const noexcept {
+    if (limits_.infinite || limits_.ponder || !budget_.has_value()) {
+        return true;
+    }
+    const auto elapsed = now() - started_;
+    return elapsed < *budget_ && elapsed +
+        std::max(estimated_next_iteration, std::chrono::milliseconds{1}) < *budget_;
+}
+
+TimeManagementStats TimeManager::diagnostics() const noexcept {
+    TimeManagementStats result = timing_;
+    result.hard_deadline_reached = hard_deadline_reached_.load(std::memory_order_relaxed);
+    return result;
 }
 
 } // namespace koi

@@ -979,8 +979,9 @@ struct SearchHandle::State {
 };
 
 struct SearchService::Impl {
-    explicit Impl(std::shared_ptr<const Evaluator> evaluator)
-        : evaluator(std::move(evaluator)), table(std::make_shared<TranspositionTable>()),
+    explicit Impl(std::shared_ptr<const Evaluator> evaluator, HashMemoryPolicy hash_memory_policy)
+        : evaluator(std::move(evaluator)),
+          table(std::make_shared<TranspositionTable>(512, std::move(hash_memory_policy))),
           evaluator_mutex(std::make_shared<std::mutex>()) {}
 
     std::shared_ptr<const Evaluator> evaluator;
@@ -1023,11 +1024,12 @@ bool SearchHandle::running() const noexcept {
     return state_ && state_->running.load(std::memory_order_relaxed);
 }
 
-SearchService::SearchService(std::shared_ptr<const Evaluator> evaluator) {
+SearchService::SearchService(std::shared_ptr<const Evaluator> evaluator,
+                             HashMemoryPolicy hash_memory_policy) {
     if (!evaluator) {
         throw std::invalid_argument("SearchService requires an evaluator");
     }
-    impl_ = std::make_shared<Impl>(std::move(evaluator));
+    impl_ = std::make_shared<Impl>(std::move(evaluator), std::move(hash_memory_policy));
 }
 
 SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEventSink sink,
@@ -1035,7 +1037,7 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
     // The default SearchOptions hash value means "use the service configuration".
     // A non-default value explicitly reconfigures the shared service table.
     if (options.hash_mb != SearchOptions{}.hash_mb) {
-        impl_->table->set_size_mb(options.hash_mb);
+        (void)impl_->table->set_size_mb(options.hash_mb);
     }
 
     options.threads = normalized_threads(options.threads);
@@ -1058,15 +1060,30 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
         SearchResult result;
         result.identity = SearchRequestIdentity{options.generation, root.position_key(), root.fen()};
         try {
-            table->new_generation();
-            TimeManager time_manager(limits, root.side_to_move(), options.speed_percent,
-                                     options.move_overhead_ms, options.slow_mover_percent);
+            RootTimingContext timing_context;
+            timing_context.table_available = table->size_mb() != 0;
+            if (const auto entry = table->probe(root.position_key(), 0); entry.has_value()) {
+                timing_context.tt_hit = true;
+                timing_context.tt_exact = entry->bound == TranspositionBound::exact;
+                timing_context.tt_has_best_move = !entry->best_move.is_no_move();
+                timing_context.tt_depth = entry->depth;
+                timing_context.tt_generation_age = entry->generation_age;
+            }
 
             std::mutex* evaluator_mutex_ptr = evaluator->supports_concurrent_evaluation() ?
                 nullptr : evaluator_mutex.get();
 
-            MoveMetadataList legal_moves;
-            root.legal_moves_with_metadata(legal_moves);
+            MoveMetadataList all_legal_moves;
+            root.legal_moves_with_metadata(all_legal_moves);
+            timing_context.legal_move_count = static_cast<std::uint32_t>(all_legal_moves.size());
+            timing_context.forcing_move_count = static_cast<std::uint32_t>(std::count_if(
+                all_legal_moves.begin(), all_legal_moves.end(), [](const MoveMetadata& metadata) {
+                    return metadata.is_capture() || metadata.gives_check ||
+                        metadata.move.promotion() != Promotion::none;
+                }));
+            timing_context.in_check = root.in_check();
+
+            MoveMetadataList legal_moves = all_legal_moves;
             if (limits.search_moves_specified) {
                 MoveMetadataList filtered_moves;
                 for (const MoveMetadata& metadata : legal_moves) {
@@ -1077,6 +1094,11 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                 }
                 legal_moves = filtered_moves;
             }
+            table->new_generation();
+            TimeManager time_manager(limits, root.side_to_move(), options.speed_percent,
+                                     options.move_overhead_ms, options.slow_mover_percent,
+                                     timing_context);
+            result.timing = time_manager.diagnostics();
             result.best_move = legal_moves.empty() ? std::nullopt :
                 std::optional<Move>{legal_moves.front().move};
             if (result.best_move.has_value()) {
@@ -1129,16 +1151,25 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                     std::min(kMaximumSearchDepth, std::max(1, limits.depth.value_or(kMaximumSearchDepth)));
                 const bool unbounded = limits.infinite || limits.ponder;
                 std::optional<int> previous_score;
+                std::chrono::milliseconds previous_iteration_elapsed{1};
+                std::chrono::milliseconds previous_report_elapsed{0};
                 for (int depth = 1;; depth = depth < maximum_depth ? depth + 1 : maximum_depth) {
                     if (!unbounded && depth > maximum_depth) {
+                        break;
+                    }
+                    if (!unbounded && !time_manager.should_start_next_iteration(previous_iteration_elapsed)) {
                         break;
                     }
                     if (context.interrupted()) {
                         break;
                     }
+                    const std::optional<Move> previous_best_move = result.best_move;
+                    const std::vector<Move> previous_pv = result.pv;
+                    const bool had_completed_iteration = result.completed_depth > 0;
                     PrincipalVariation pv;
                     int alpha = -kInfinity;
                     int beta = kInfinity;
+                    bool aspiration_researched = false;
                     if (previous_score.has_value()) {
                         alpha = std::max(-kInfinity, *previous_score - kAspirationWindow);
                         beta = std::min(kInfinity, *previous_score + kAspirationWindow);
@@ -1148,6 +1179,7 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                     if (!context.aborted && previous_score.has_value() &&
                         (score <= alpha || score >= beta)) {
                         ++context.stats.aspiration_researches;
+                        aspiration_researched = true;
                         pv = {};
                         score = context.negamax(root, depth, -kInfinity, kInfinity, 0, pv);
                     }
@@ -1174,9 +1206,20 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                     info.qnodes = context.stats.qnodes;
                     info.tt_hits = context.stats.tt_hits;
                     safely_report_info(sink, info);
+                    time_manager.observe_iteration(SearchIterationObservation{
+                        depth,
+                        score,
+                        had_completed_iteration && previous_best_move != result.best_move,
+                        had_completed_iteration && previous_pv != result.pv,
+                        aspiration_researched,
+                        visited});
+                    result.timing = time_manager.diagnostics();
                     previous_score = score;
+                    previous_iteration_elapsed = elapsed - previous_report_elapsed;
+                    previous_report_elapsed = elapsed;
 
-                    if ((!unbounded && depth == maximum_depth) || root_is_claimable_draw) {
+                    if ((!unbounded && depth == maximum_depth) || root_is_claimable_draw ||
+                        time_manager.should_stop_after_iteration()) {
                         break;
                     }
                 }
@@ -1201,8 +1244,13 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                 const int maximum_depth =
                     std::min(kMaximumSearchDepth, std::max(1, limits.depth.value_or(kMaximumSearchDepth)));
                 const bool unbounded = limits.infinite || limits.ponder;
+                std::chrono::milliseconds previous_iteration_elapsed{1};
+                std::chrono::milliseconds previous_report_elapsed{0};
                 for (int depth = 1;; depth = depth < maximum_depth ? depth + 1 : maximum_depth) {
                     if (!unbounded && depth > maximum_depth) {
+                        break;
+                    }
+                    if (!unbounded && !time_manager.should_start_next_iteration(previous_iteration_elapsed)) {
                         break;
                     }
                     if (state->stop_requested.load(std::memory_order_relaxed) ||
@@ -1265,6 +1313,9 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                         break;
                     }
 
+                    const std::optional<Move> previous_best_move = result.best_move;
+                    const std::vector<Move> previous_pv = result.pv;
+                    const bool had_completed_iteration = result.completed_depth > 0;
                     const std::size_t best_index = ranked_indices.front();
                     const RootLine& best_line = lines[best_index];
 
@@ -1296,7 +1347,19 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                         info.multipv = static_cast<int>(rank + 1);
                         safely_report_info(sink, info);
                     }
-                    if ((!unbounded && depth == maximum_depth) || root_is_claimable_draw) {
+                    const auto iteration_elapsed = elapsed - previous_report_elapsed;
+                    time_manager.observe_iteration(SearchIterationObservation{
+                        depth,
+                        best_line.score,
+                        had_completed_iteration && previous_best_move != result.best_move,
+                        had_completed_iteration && previous_pv != result.pv,
+                        false,
+                        visited});
+                    result.timing = time_manager.diagnostics();
+                    previous_iteration_elapsed = iteration_elapsed;
+                    previous_report_elapsed = elapsed;
+                    if ((!unbounded && depth == maximum_depth) || root_is_claimable_draw ||
+                        time_manager.should_stop_after_iteration()) {
                         break;
                     }
                 }
@@ -1309,6 +1372,7 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                     return state->stop_requested.load(std::memory_order_relaxed);
                 });
             }
+            result.timing = time_manager.diagnostics();
         } catch (...) {
             result.failed = true;
             try {
@@ -1339,8 +1403,8 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
     return SearchHandle(std::move(state));
 }
 
-void SearchService::set_hash_size_mb(std::size_t megabytes) {
-    impl_->table->set_size_mb(megabytes);
+HashResizeResult SearchService::set_hash_size_mb(std::size_t megabytes) {
+    return impl_->table->set_size_mb(megabytes);
 }
 
 std::size_t SearchService::hash_size_mb() const noexcept {

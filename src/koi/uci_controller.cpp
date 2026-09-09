@@ -40,6 +40,38 @@ constexpr std::uint64_t kMaximumSyzygyProbeLimit = 7;
 constexpr std::uintmax_t kDebugRotationBytes = 8U * 1024U * 1024U;
 constexpr int kWdlScoreLimit = 1'000;
 
+const char* hash_status_name(HashResizeStatus status) noexcept {
+    switch (status) {
+    case HashResizeStatus::applied:
+        return "applied";
+    case HashResizeStatus::reduced:
+        return "reduced";
+    case HashResizeStatus::unchanged:
+        return "unchanged";
+    case HashResizeStatus::disabled:
+        return "disabled";
+    }
+    return "unknown";
+}
+
+const char* hash_reason_name(HashResizeReason reason) noexcept {
+    switch (reason) {
+    case HashResizeReason::none:
+        return "none";
+    case HashResizeReason::request_clamped:
+        return "request_clamped";
+    case HashResizeReason::physical_memory_cap:
+        return "physical_memory_cap";
+    case HashResizeReason::commit_cap:
+        return "commit_cap";
+    case HashResizeReason::allocation_failed:
+        return "allocation_failed";
+    case HashResizeReason::startup_unavailable:
+        return "startup_unavailable";
+    }
+    return "unknown";
+}
+
 std::vector<std::string> remaining_tokens(std::istream& command) {
     std::vector<std::string> tokens;
     for (std::string token; command >> token;) {
@@ -583,7 +615,37 @@ void UciController::handle_setoption(std::istream& command) {
         if (parse_uint64(value, megabytes) && megabytes >= kMinimumHashMegabytes &&
             megabytes <= kMaximumHashMegabytes) {
             stop_and_suppress_active_search();
-            search_service_.set_hash_size_mb(static_cast<std::size_t>(megabytes));
+            try {
+                const HashResizeResult result =
+                    search_service_.set_hash_size_mb(static_cast<std::size_t>(megabytes));
+                debug_json_event(
+                    "hash_resize",
+                    "\"requested_mb\":" + std::to_string(result.requested_mb) +
+                        ",\"effective_mb\":" + std::to_string(result.effective_mb) +
+                        ",\"allocated_bytes\":" + std::to_string(result.allocated_bytes) +
+                        ",\"segment_count\":" + std::to_string(result.segment_count) +
+                        ",\"total_physical_bytes\":" +
+                            std::to_string(result.total_physical_bytes) +
+                        ",\"available_physical_bytes\":" +
+                            std::to_string(result.available_physical_bytes) +
+                        ",\"available_commit_bytes\":" +
+                            std::to_string(result.available_commit_bytes) +
+                        ",\"status\":" + debug_quoted(hash_status_name(result.status)) +
+                        ",\"reason\":" + debug_quoted(hash_reason_name(result.reason)));
+                if (result.status == HashResizeStatus::reduced ||
+                    result.status == HashResizeStatus::disabled ||
+                    result.reason != HashResizeReason::none) {
+                    std::lock_guard lock(output_mutex_);
+                    output_ << "info string hash requested " << result.requested_mb
+                            << " MB effective " << result.effective_mb << " MB status "
+                            << hash_status_name(result.status) << " reason "
+                            << hash_reason_name(result.reason) << '\n' << std::flush;
+                }
+            } catch (...) {
+                debug_event("hash resize failed outside the guarded allocation boundary");
+                std::lock_guard lock(output_mutex_);
+                output_ << "info string hash resize failed; previous table preserved\n" << std::flush;
+            }
         }
         return;
     }
@@ -1007,8 +1069,25 @@ void UciController::start_search(GameState root, SearchLimits limits, bool skip_
                 ",\"reason\":" + debug_quoted(validation.reason) +
                 ",\"completed\":" + (result.completed ? "true" : "false") +
                 ",\"cancelled\":" + (result.cancelled ? "true" : "false") +
-                ",\"failed\":" + (result.failed ? "true" : "false") +
-                ",\"last_command\":" + debug_quoted(last_command));
+                 ",\"failed\":" + (result.failed ? "true" : "false") +
+                 ",\"timing_reserve_ms\":" +
+                     std::to_string(result.timing.reserve.count()) +
+                 ",\"timing_usable_ms\":" +
+                     std::to_string(result.timing.usable.count()) +
+                 ",\"timing_soft_ms\":" +
+                     std::to_string(result.timing.soft_budget.count()) +
+                 ",\"timing_hard_ms\":" +
+                     std::to_string(result.timing.hard_budget.count()) +
+                 ",\"timing_horizon\":" + std::to_string(result.timing.horizon) +
+                 ",\"timing_initial_hardness\":" +
+                     std::to_string(result.timing.initial_hardness) +
+                 ",\"timing_observed_hardness\":" +
+                     std::to_string(result.timing.observed_hardness) +
+                 ",\"timing_extended\":" +
+                     (result.timing.extended_for_hard_position ? "true" : "false") +
+                 ",\"timing_hard_deadline\":" +
+                     (result.timing.hard_deadline_reached ? "true" : "false") +
+                 ",\"last_command\":" + debug_quoted(last_command));
         if (validation.disposition == CompletionDisposition::suppress_stale) {
             debug_event("stale search completion suppressed generation " +
                         std::to_string(generation) + " result_generation " +

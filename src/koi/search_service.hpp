@@ -4,6 +4,7 @@
 
 #include "koi/evaluator.hpp"
 #include "koi/search_types.hpp"
+#include "koi/transposition_table.hpp"
 
 namespace koi {
 
@@ -39,11 +40,12 @@ private:
 
 class SearchService {
 public:
-    explicit SearchService(std::shared_ptr<const Evaluator> evaluator);
+    explicit SearchService(std::shared_ptr<const Evaluator> evaluator,
+                           HashMemoryPolicy hash_memory_policy = {});
 
     [[nodiscard]] SearchHandle start(GameState root, SearchLimits limits,
                                      SearchEventSink sink = {}, SearchOptions options = {});
-    void set_hash_size_mb(std::size_t megabytes);
+    [[nodiscard]] HashResizeResult set_hash_size_mb(std::size_t megabytes);
     [[nodiscard]] std::size_t hash_size_mb() const noexcept;
     void clear_hash() noexcept;
 
