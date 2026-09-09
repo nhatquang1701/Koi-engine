@@ -163,6 +163,36 @@ positions. Run balanced conditions with Koi White and Koi Black, and record the
 exact engine paths, options, time control, opening/FEN input, and generated JSON
 and PGN together in the external results directory.
 
+## Cutechess stability campaign
+
+`cutechess_stability.ps1` captures a single reproducible Cutechess run without
+using Cutechess's global `-debug` switch. It records executable hashes, the
+exact argument array, streamed manager output, Koi JSONL diagnostics, per-ply
+records, and partial failure artifacts. `-KoiColor white|black` fixes the Koi
+side for a one-game run; the default `auto` preserves Cutechess's normal
+round-based color assignment.
+
+`cutechess_stability_campaign.ps1` schedules independent one-game runs so each
+game starts fresh engine processes. Its default 500-game plan contains 400
+Koi-Stockfish games, 50 Koi-Koi games, and 50 book-audit games. It rotates
+Threads 1/2/4, balances Koi colors, samples start positions plus curated
+opening and FEN inputs, writes `schedule.json` before execution, and appends
+`games.jsonl` after every game. A missing book is recorded as
+`book_unavailable` and those games safely run no-book.
+
+Generate and inspect the deterministic schedule without launching engines:
+
+```powershell
+& .\tools\cutechess_stability_campaign.ps1 `
+  -KoiPath C:\Koi-results\koi-engine.exe `
+  -StockfishPath 'C:\Engines\stockfish-19.exe' `
+  -OutputDirectory C:\Koi-results\stability\campaign-plan `
+  -PlanOnly
+```
+
+Run the campaign only after the focused and full stability tests are green.
+The campaign produces no Elo or rating report; it is a reliability gate.
+
 All three tools fail with an actionable stderr message and nonzero exit code for
 missing inputs or engine/configuration errors. The C++ engine remains independent
 of Python and `python-chess`.

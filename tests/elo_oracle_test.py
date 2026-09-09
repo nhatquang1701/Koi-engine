@@ -34,7 +34,7 @@ FAKE_ENGINE_SOURCE = textwrap.dedent(
         with open(log_path, "a", encoding="utf-8") as log:
             log.write(line + "\\n")
         if line == "uci":
-            emit("id name Fake Koi 1.0" if role == "koi" else "id name Fake Stockfish 17.1")
+            emit("id name Fake Koi 1.1.0" if role == "koi" else "id name Fake Stockfish 17.1")
             emit("id author Task 1 test")
             emit("option name Threads type spin default 1 min 1 max 64")
             if role == "koi":
@@ -193,8 +193,8 @@ class EloOracleExtractionTests(unittest.TestCase):
         self.assertEqual(position["search"]["koi_suggested_move"]["cpl"], 0)
         self.assertEqual(position["search"]["koi_suggested_move"]["uci"], "e2e4")
         self.assertEqual(position["search"]["timings_ms"]["koi_search"] >= 0, True)
-        self.assertEqual(report["engines"]["koi"]["identity"]["name"], "Fake Koi 1.0")
-        self.assertEqual(report["engines"]["koi"]["version"], "1.0")
+        self.assertEqual(report["engines"]["koi"]["identity"]["name"], "Fake Koi 1.1.0")
+        self.assertEqual(report["engines"]["koi"]["version"], "1.1.0")
         self.assertEqual(
             report["engines"]["koi"]["hashes"]["executable_sha256"],
             expected_koi_sha256,
@@ -208,6 +208,11 @@ class EloOracleExtractionTests(unittest.TestCase):
         self.assertIn("go movetime 1", koi_commands)
         self.assertEqual(position["search"]["actual_game_move"]["classification"], "best")
         self.assertEqual(position["search"]["koi_suggested_move"]["classification"], "best")
+        self.assertEqual(report["measurement"]["network"]["state"], "disabled")
+        self.assertEqual(report["measurement"]["book"]["state"], "disabled")
+        self.assertEqual(report["measurement"]["tablebase"]["state"], "disabled")
+        self.assertGreaterEqual(report["hardware"]["cpu_count"], 1)
+        self.assertIn("executable_sha256", report["engines"]["stockfish"]["hashes"])
 
     def test_extract_preserves_annotations_on_mainline_positions(self):
         pgn = '[Result "*"]\n\n1. e4 $1 {[%eval +0.25] [%clk 0:05:00] coach note} e5 *\n'

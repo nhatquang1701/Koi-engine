@@ -5,12 +5,14 @@
 #include <filesystem>
 #include <fstream>
 #include <iosfwd>
+#include <memory>
 #include <mutex>
 #include <optional>
 #include <string>
 #include <string_view>
 
 #include "koi/game_state.hpp"
+#include "koi/completion_gate.hpp"
 #include "koi/move_chooser.hpp"
 #include "koi/opening_book.hpp"
 #include "koi/search_service.hpp"
@@ -39,7 +41,15 @@ public:
     int run();
 
 private:
-    void handle_position(std::istream& command);
+    enum class ControllerState : std::uint8_t {
+        Idle,
+        Searching,
+        Pondering,
+        Stopping,
+        ShuttingDown,
+    };
+
+    void handle_position(std::istream& command, std::string_view command_text);
     void handle_setoption(std::istream& command);
     void handle_go(std::istream& command);
     void handle_ponderhit();
@@ -52,10 +62,13 @@ private:
     void write_readyok();
     void write_search_info(std::uint64_t generation, const SearchInfo& info);
     void write_search_completion(std::uint64_t generation, const SearchResult& result);
-    void write_book_completion(std::uint64_t generation, const BookChoice& choice,
-                               std::uint32_t root_ply);
+    void write_book_completion(std::uint64_t generation, const GameState& root,
+                               const SearchLimits& limits, const BookChoice& choice,
+                               std::uint32_t root_ply,
+                               const std::shared_ptr<CompletionOnce>& completion_once);
     void write_position_error(const char* message);
     void debug_event(std::string message) noexcept;
+    void debug_json_event(std::string event, std::string fields) noexcept;
     void configure_debug_file();
     void rebuild_syzygy();
     [[nodiscard]] std::filesystem::path debug_path() const;
@@ -74,10 +87,12 @@ private:
     OpeningBook opening_book_;
     SearchService search_service_;
     std::optional<SearchHandle> active_search_;
+    std::optional<GameState> ponder_origin_;
     std::optional<GameState> ponder_root_;
     std::optional<SearchLimits> ponder_limits_;
     std::optional<Move> principal_variation_best_move_;
     std::optional<Move> principal_variation_ponder_move_;
+    std::optional<Move> ponder_predicted_move_;
     std::optional<Move> ponder_expected_move_;
     bool active_ponder_ = false;
     std::size_t threads_ = 1;
@@ -104,7 +119,10 @@ private:
     bool syzygy_50_move_rule_ = true;
     std::shared_ptr<const SyzygyTablebase> syzygy_ =
         std::make_shared<SyzygyTablebase>();
+    CompletionGate completion_gate_;
     std::uint64_t generation_ = 0;
+    std::string last_command_;
+    ControllerState state_ = ControllerState::Idle;
 };
 
 } // namespace koi

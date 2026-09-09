@@ -114,6 +114,123 @@ void test_killer_tier_outranks_saturated_history() {
             "a killer must outrank even a repeatedly reinforced history move");
 }
 
+void test_countermove_tier_outranks_history_but_not_a_killer() {
+    koi::GameState state = koi::GameState::startpos();
+    const koi::Move previous = require_move("e2e4");
+    const koi::Move counter = require_move("g8f6");
+    const koi::Move history = require_move("b8c6");
+    const koi::Move killer = require_move("e7e5");
+    require(state.make_move(previous), "the counter-move fixture must apply the previous move");
+    require(state.is_legal(counter) && state.is_legal(history) && state.is_legal(killer),
+            "the counter-move fixture must retain three legal quiet replies");
+
+    koi::detail::SearchMoveOrdering ordering;
+    for (int count = 0; count < 100; ++count) {
+        ordering.record_quiet_cutoff(state.side_to_move(), history, 4, 64);
+    }
+    ordering.record_quiet_cutoff(state.side_to_move(), counter, 4, 8, previous);
+    ordering.record_quiet_cutoff(state.side_to_move(), killer, 3, 4);
+
+    std::vector<koi::Move> moves = quiet_moves(state, state.legal_moves());
+    ordering.order(state, moves, std::nullopt, 3, previous);
+    const auto killer_position = std::find(moves.begin(), moves.end(), killer);
+    const auto counter_position = std::find(moves.begin(), moves.end(), counter);
+    const auto history_position = std::find(moves.begin(), moves.end(), history);
+    require(killer_position != moves.end() && counter_position != moves.end() &&
+                history_position != moves.end(),
+            "the ordered fixture must retain the killer, counter move, and history move");
+    require(killer_position < counter_position && counter_position < history_position,
+            "a counter move must outrank saturated quiet history while remaining below a killer");
+}
+
+void test_unproven_countermove_does_not_outrank_saturated_history() {
+    koi::GameState state = koi::GameState::startpos();
+    const koi::Move previous = require_move("e2e4");
+    const koi::Move counter = require_move("g8f6");
+    const koi::Move history = require_move("b8c6");
+    require(state.make_move(previous), "the unproven counter fixture must apply the previous move");
+    require(state.is_legal(counter) && state.is_legal(history),
+            "the unproven counter fixture must retain two legal quiet replies");
+
+    koi::detail::SearchMoveOrdering ordering;
+    for (int count = 0; count < 100; ++count) {
+        ordering.record_quiet_cutoff(state.side_to_move(), history, 4, 64);
+    }
+    ordering.record_quiet_cutoff(state.side_to_move(), counter, 4, 6, previous);
+
+    std::vector<koi::Move> moves = quiet_moves(state, state.legal_moves());
+    ordering.order(state, moves, std::nullopt, 3, previous);
+    const auto counter_position = std::find(moves.begin(), moves.end(), counter);
+    const auto history_position = std::find(moves.begin(), moves.end(), history);
+    require(counter_position != moves.end() && history_position != moves.end(),
+            "the ordered fixture must retain the unproven counter and history move");
+    require(history_position < counter_position,
+            "one shallow counter cutoff must not outrank saturated quiet history");
+}
+
+void test_countermove_confidence_ignores_colliding_continuation_history() {
+    koi::GameState state = koi::GameState::startpos();
+    const koi::Move previous = require_move("e2e4");
+    const koi::Move counter = require_move("g8f6");
+    const koi::Move history = require_move("b8c6");
+    // These geometrically legal coordinate pairs share the target continuation-history slot.
+    const koi::Move colliding_previous = require_move("a1f1");
+    const koi::Move colliding_reply = require_move("e7c5");
+    require(state.make_move(previous), "the collision fixture must apply the previous move");
+    require(state.is_legal(counter) && state.is_legal(history),
+            "the collision fixture must retain two legal quiet replies");
+
+    koi::detail::SearchMoveOrdering ordering;
+    for (int count = 0; count < 500; ++count) {
+        ordering.record_quiet_cutoff(state.side_to_move(), history, 4, 64);
+    }
+    for (int count = 0; count < 100; ++count) {
+        ordering.record_quiet_cutoff(state.side_to_move(), colliding_reply, 4, 64,
+                                     colliding_previous);
+    }
+    ordering.record_quiet_cutoff(state.side_to_move(), counter, 4, 6, previous);
+    require(ordering.quiet_history_score(state.side_to_move(), counter, previous) >= 128,
+            "the collision fixture must raise the target combined history above the counter gate");
+
+    std::vector<koi::Move> moves = quiet_moves(state, state.legal_moves());
+    ordering.order(state, moves, std::nullopt, 3, previous);
+    const auto counter_position = std::find(moves.begin(), moves.end(), counter);
+    const auto history_position = std::find(moves.begin(), moves.end(), history);
+    require(counter_position != moves.end() && history_position != moves.end(),
+            "the collision fixture must retain the counter and history move");
+    require(history_position < counter_position,
+            "a shallow counter must not claim counter priority from colliding continuation history");
+}
+
+void test_countermove_failure_clears_exact_confidence() {
+    koi::GameState state = koi::GameState::startpos();
+    const koi::Move previous = require_move("e2e4");
+    const koi::Move counter = require_move("g8f6");
+    const koi::Move history = require_move("b8c6");
+    require(state.make_move(previous), "the counter-failure fixture must apply the previous move");
+    require(state.is_legal(counter) && state.is_legal(history),
+            "the counter-failure fixture must retain two legal quiet replies");
+
+    koi::detail::SearchMoveOrdering ordering;
+    for (int count = 0; count < 100; ++count) {
+        ordering.record_quiet_cutoff(state.side_to_move(), history, 4, 64);
+    }
+    ordering.record_quiet_cutoff(state.side_to_move(), counter, 4, 8, previous);
+
+    std::vector<koi::Move> moves = quiet_moves(state, state.legal_moves());
+    ordering.order(state, moves, std::nullopt, 3, previous);
+    require(std::find(moves.begin(), moves.end(), counter) <
+                std::find(moves.begin(), moves.end(), history),
+            "a proven counter must receive the special counter tier before it fails");
+
+    ordering.record_quiet_fail(state.side_to_move(), counter, 4, 8, previous);
+    moves = quiet_moves(state, state.legal_moves());
+    ordering.order(state, moves, std::nullopt, 3, previous);
+    require(std::find(moves.begin(), moves.end(), history) <
+                std::find(moves.begin(), moves.end(), counter),
+            "a failed exact counter must lose special counter priority");
+}
+
 void test_quiet_checks_are_ordered_before_ordinary_quiet_moves() {
     const koi::GameState state = require_state("k7/8/8/8/8/8/1q2Q3/4K3 w - - 0 1");
     koi::detail::SearchMoveOrdering ordering;
@@ -204,6 +321,10 @@ int main() {
         {"SEE capture ordering", test_static_exchange_orders_safe_captures_ahead_of_poisoned_captures},
         {"killer history stable ordering", test_killer_history_and_tie_breaking_are_deterministic},
         {"killer tier outranks saturated history", test_killer_tier_outranks_saturated_history},
+        {"counter move tier", test_countermove_tier_outranks_history_but_not_a_killer},
+        {"counter move confidence", test_unproven_countermove_does_not_outrank_saturated_history},
+        {"counter move collision confidence", test_countermove_confidence_ignores_colliding_continuation_history},
+        {"counter move failure confidence", test_countermove_failure_clears_exact_confidence},
         {"quiet checks before quiet moves", test_quiet_checks_are_ordered_before_ordinary_quiet_moves},
         {"history malus and continuation ordering", test_history_malus_and_continuation_history_shape_quiet_ordering},
         {"history saturation overflow safety", test_history_saturation_does_not_overflow_signed_intermediates},

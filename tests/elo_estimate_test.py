@@ -323,6 +323,73 @@ class EloEstimateTests(unittest.TestCase):
             self.assertEqual(report["results"]["games"], 192)
             self.assertEqual(report["batches"][-1]["phase"], "adaptive")
 
+    def test_schedule_cli_options_are_available_for_reproducible_before_after_runs(self):
+        parser = elo_estimate._build_parser()
+        arguments = parser.parse_args([
+            "--koi", "C:/Koi/koi.exe", "--replay", "C:/Koi/replay.exe",
+            "--stockfish", "C:/Engines/stockfish.exe", "--anchors", "C:/inputs/anchors.json",
+            "--openings", "C:/inputs/openings.txt", "--prior-elo", "1500",
+            "--output", "C:/results/report.json", "--schedule-export", "C:/results/schedule.json",
+            "--schedule-import", "C:/inputs/schedule.json", "--run-label", "after", "--dry-run",
+        ])
+        self.assertEqual(arguments.run_label, "after")
+        self.assertEqual(arguments.schedule_export, Path("C:/results/schedule.json"))
+        self.assertEqual(arguments.schedule_import, Path("C:/inputs/schedule.json"))
+
+    def test_schedule_import_rejects_inconsistent_target_and_missing_opening_contract(self):
+        anchors = tuple(
+            elo_estimate.Anchor(
+                f"stockfish-{rating}", Path(f"C:/{rating}.exe"), rating, "test", rating
+            )
+            for rating in (1400, 1600, 1800)
+        )
+        openings = tuple(f"opening-{index:02d}" for index in range(1, 33))
+        schedule = elo_estimate.plan_schedule(
+            anchors, prior_elo=1500, target_games=128, opening_names=openings
+        )
+        with self.assertRaisesRegex(elo_estimate.EloEstimateError, "opening"):
+            elo_estimate.build_schedule_manifest(
+                elo_estimate.plan_schedule(anchors, prior_elo=1500, target_games=128),
+                prior_elo=1500,
+            )
+
+        with tempfile.TemporaryDirectory(prefix="koi invalid schedule ") as temporary_directory:
+            schedule_path = Path(temporary_directory) / "schedule.json"
+            elo_estimate.export_schedule(
+                schedule_path,
+                schedule,
+                prior_elo=1500,
+                opening_names=openings,
+            )
+            payload = json.loads(schedule_path.read_text(encoding="utf-8"))
+            payload["measurement"]["target_games"] = 320
+            payload["schedule_sha256"] = elo_estimate.reproducibility_hash(
+                {key: value for key, value in payload.items() if key != "schedule_sha256"}
+            )
+            schedule_path.write_text(json.dumps(payload), encoding="utf-8")
+
+            with self.assertRaisesRegex(elo_estimate.EloEstimateError, "target_games"):
+                elo_estimate.import_schedule(
+                    schedule_path,
+                    anchors,
+                    expected_openings=openings,
+                    prior_elo=1500,
+                )
+
+            payload["measurement"]["target_games"] = 128
+            payload["batches"][0]["anchor"]["path"] = "C:/different-stockfish.exe"
+            payload["schedule_sha256"] = elo_estimate.reproducibility_hash(
+                {key: value for key, value in payload.items() if key != "schedule_sha256"}
+            )
+            schedule_path.write_text(json.dumps(payload), encoding="utf-8")
+            with self.assertRaisesRegex(elo_estimate.EloEstimateError, "anchor"):
+                elo_estimate.import_schedule(
+                    schedule_path,
+                    anchors,
+                    expected_openings=openings,
+                    prior_elo=1500,
+                )
+
 
 if __name__ == "__main__":
     unittest.main()

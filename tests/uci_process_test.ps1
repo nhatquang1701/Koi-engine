@@ -147,7 +147,7 @@ $expectedHandshake = @(
     'option name StrengthMode type check default false',
     'option name SyzygyPath type string default ',
     'option name SyzygyProbeDepth type spin default 1 min 1 max 100',
-    'option name SyzygyProbeLimit type spin default 5 min 0 max 5',
+    'option name SyzygyProbeLimit type spin default 5 min 0 max 7',
     'option name Syzygy50MoveRule type check default true',
     'uciok'
 )
@@ -365,19 +365,8 @@ $immediatePonder = Start-UciSession
 Send-UciCommand $immediatePonder 'position startpos'
 $immediatePonder.Process.StandardInput.Write("go ponder depth 2`nponderhit`n")
 $immediatePonder.Process.StandardInput.Flush()
-$immediatePonderBestmoves = [System.Collections.Generic.List[string]]::new()
-while ($immediatePonderBestmoves.Count -eq 0) {
-    $line = Read-UciLine $immediatePonder 'bestmove after immediate ponderhit'
-    if ($line -like 'bestmove *') {
-        if ($line -notmatch '^bestmove ([a-h][1-8][a-h][1-8][nbrq]?)$' -or
-            $initialMoves -notcontains $Matches[1]) {
-            throw "Immediate ponderhit emitted an invalid bestmove: $line"
-        }
-        $immediatePonderBestmoves.Add($line)
-    } elseif (-not (Test-SearchInfo $line)) {
-        throw "Invalid output after immediate ponderhit: $line"
-    }
-}
+$immediatePonderLines = [System.Collections.Generic.List[string]]::new()
+Send-UciCommand $immediatePonder 'stop'
 Send-UciCommand $immediatePonder 'isready'
 while ($true) {
     $line = Read-UciLine $immediatePonder 'readyok after immediate ponderhit'
@@ -385,25 +374,19 @@ while ($true) {
         break
     }
     if ($line -like 'bestmove *') {
-        $immediatePonderBestmoves.Add($line)
+        throw "Immediate invalid ponderhit emitted a completion: $line"
     } elseif (-not (Test-SearchInfo $line)) {
         throw "Invalid output after immediate ponderhit: $line"
     }
+    $immediatePonderLines.Add($line)
 }
-$immediatePonderLines = @(Complete-UciSession $immediatePonder $true)
-foreach ($line in $immediatePonderLines) {
+$immediatePonderLines += @(Complete-UciSession $immediatePonder $true)
+foreach ($line in @($immediatePonderLines)) {
     if ($line -like 'bestmove *') {
-        if ($line -notmatch '^bestmove ([a-h][1-8][a-h][1-8][nbrq]?)$' -or
-            $initialMoves -notcontains $Matches[1]) {
-            throw "Immediate ponderhit emitted an invalid bestmove: $line"
-        }
+        throw "Immediate invalid ponderhit emitted a late completion: $line"
     } elseif ($line -cne 'readyok' -and -not (Test-SearchInfo $line)) {
         throw "Invalid shutdown output after immediate ponderhit: $line"
     }
-}
-$allImmediatePonderBestmoves = @($immediatePonderLines | Where-Object { $_ -like 'bestmove *' })
-if ($allImmediatePonderBestmoves.Count -ne 1) {
-    throw "Immediate ponderhit emitted duplicate or missing bestmoves: $($allImmediatePonderBestmoves -join ' | ')"
 }
 
 $replacement = Start-UciSession

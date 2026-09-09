@@ -2,10 +2,12 @@
 
 #include <string_view>
 
+#include "koi/evaluation_parameters_generated.hpp"
+
 namespace koi {
 
 struct ClassicalEvaluationParameters {
-    std::string_view version = "classical-eval-v3-development-center-threats";
+    std::string_view version = "classical-eval-v4-development-center-threats";
     int pawn_value = 100;
     int knight_value = 320;
     int bishop_value = 330;
@@ -31,9 +33,13 @@ struct ClassicalEvaluationParameters {
     int rook_seventh_rank_bonus = 15;
     int queen_mobility_weight = 1;
     int development_bonus = 10;
+    int castling_readiness_bonus = 8;
     int center_control_weight = 7;
     int center_control_phase_offset = 8;
+    int pawn_break_bonus = 12;
     int attacked_piece_pressure_weight = 2;
+    int hanging_piece_penalty = 5;
+    int trapped_piece_penalty = 12;
     int bishop_pair_bonus = 30;
     int king_shield_bonus = 14;
     int king_open_file_penalty = 10;

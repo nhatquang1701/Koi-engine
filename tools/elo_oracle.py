@@ -4,11 +4,14 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import copy
 import hashlib
+import io
 import json
 import math
 import os
+import platform
 import queue
 import re
 import subprocess
@@ -262,6 +265,51 @@ def _node_annotations(node: Any) -> Dict[str, Any]:
     return annotations
 
 
+def classify_position(chess: Any, board: Any, ply: int) -> Dict[str, Any]:
+    """Return stable, engine-independent labels for a root position."""
+
+    piece_values = {
+        chess.PAWN: 100,
+        chess.KNIGHT: 320,
+        chess.BISHOP: 330,
+        chess.ROOK: 500,
+        chess.QUEEN: 900,
+        chess.KING: 0,
+    }
+    pieces = list(board.piece_map().values())
+    non_pawn_non_king = sum(
+        piece.piece_type not in {chess.PAWN, chess.KING} for piece in pieces
+    )
+    if ply <= 20:
+        phase = "opening"
+    elif len(pieces) <= 10 or non_pawn_non_king <= 4:
+        phase = "endgame"
+    else:
+        phase = "middlegame"
+    material = {
+        "white_cp": sum(
+            piece_values[piece.piece_type]
+            for piece in pieces
+            if piece.color == chess.WHITE
+        ),
+        "black_cp": sum(
+            piece_values[piece.piece_type]
+            for piece in pieces
+            if piece.color == chess.BLACK
+        ),
+    }
+    return {
+        "phase": phase,
+        "side_to_move": "white" if board.turn == chess.WHITE else "black",
+        "piece_count": len(pieces),
+        "non_pawn_non_king_count": non_pawn_non_king,
+        "material": material,
+        "in_check": bool(board.is_check()),
+        "castling_rights": board.castling_xfen() or "-",
+        "en_passant": chess.square_name(board.ep_square) if board.ep_square is not None else None,
+    }
+
+
 def extract_games(pgn_text: str) -> List[Dict[str, Any]]:
     """Return every PGN game's mainline positions in source order."""
 
@@ -271,7 +319,8 @@ def extract_games(pgn_text: str) -> List[Dict[str, Any]]:
     games: List[Dict[str, Any]] = []
     stream = StringIO(pgn_text)
     while True:
-        game = pgn_module.read_game(stream)
+        with contextlib.redirect_stderr(io.StringIO()):
+            game = pgn_module.read_game(stream)
         if game is None:
             break
         if game.errors:
@@ -298,6 +347,7 @@ def extract_games(pgn_text: str) -> List[Dict[str, Any]]:
                     "actual_move_uci": move.uci(),
                     "actual_move_san": san,
                     "annotations": _node_annotations(node),
+                    "position_classification": classify_position(chess, board, ply),
                 }
             )
             board.push(move)
@@ -338,6 +388,10 @@ def build_extraction_report(
             "mate_score_cp": MATE_SCORE_CP,
             "cpl_definition": "max(0, mover_perspective(root_score - resulting_position_score))",
         },
+        "hardware": _hardware_metadata(),
+        "measurement": _measurement_metadata(
+            "extract-only", movetime_ms, threads, book_path=None
+        ),
         "requested_limits": {
             "movetime_ms": movetime_ms,
             "threads": threads,
@@ -350,6 +404,47 @@ def build_extraction_report(
 
 def _json_options(options: Dict[str, Any]) -> Dict[str, Any]:
     return {key: value for key, value in options.items()}
+
+
+def _hardware_metadata() -> Dict[str, Any]:
+    return {
+        "os": platform.system() or "unknown",
+        "os_release": platform.release() or "unknown",
+        "machine": platform.machine() or "unknown",
+        "processor": platform.processor() or "unknown",
+        "cpu_count": max(1, int(os.cpu_count() or 1)),
+        "python_version": platform.python_version(),
+    }
+
+
+def _measurement_metadata(
+    mode: str, movetime_ms: int, threads: int, book_path: Optional[Path]
+) -> Dict[str, Any]:
+    book_active = book_path is not None or mode == "book-audit"
+    return {
+        "network": {
+            "enabled": False,
+            "state": "disabled",
+            "reason": "measurement tools launch only local subprocesses",
+        },
+        "book": {
+            "enabled": book_active,
+            "state": "active" if book_active else "disabled",
+            "path": str(book_path) if book_path is not None else None,
+            "random": BOOK_RANDOM,
+        },
+        "tablebase": {
+            "enabled": False,
+            "state": "disabled",
+            "path": None,
+        },
+        "time_control": {
+            "kind": "movetime",
+            "movetime_ms": int(movetime_ms),
+            "threads": int(threads),
+            "speed": 100,
+        },
+    }
 
 
 class UciEngine:
@@ -639,6 +734,9 @@ def _score_dict(score: Optional[UciScore]) -> Optional[Dict[str, Any]]:
         "normalized_cp": score.normalized_cp,
         "perspective": "white",
         "root_side": score.root_side,
+        "mate_score_cp": MATE_SCORE_CP,
+        "mate_distance": score.value if score.score_type == "mate" else None,
+        "normalization": "mate scores are mapped to +/-100000 cp before white-perspective conversion",
     }
 
 
@@ -704,6 +802,7 @@ def _report_header(
     movetime_ms: int,
     threads: int,
     engines: Dict[str, Any],
+    book_path: Optional[Path] = None,
 ) -> Dict[str, Any]:
     return {
         "schema": SCHEMA,
@@ -721,6 +820,8 @@ def _report_header(
             "mate_score_cp": MATE_SCORE_CP,
             "cpl_definition": "max(0, mover_perspective(root_score - resulting_position_score))",
         },
+        "hardware": _hardware_metadata(),
+        "measurement": _measurement_metadata(mode, movetime_ms, threads, book_path),
         "requested_limits": {
             "movetime_ms": movetime_ms,
             "threads": threads,
@@ -1015,6 +1116,7 @@ def run_book_audit(
         movetime_ms,
         threads,
         engines,
+        book_path=book_path,
     )
     report["search_metrics"] = None
     report["book_audit"] = {

@@ -7,6 +7,7 @@
 #include <functional>
 #include <memory>
 #include <optional>
+#include <string>
 #include <thread>
 #include <vector>
 
@@ -47,8 +48,11 @@ struct SearchStats {
     std::uint64_t delta_prunes = 0;
     std::uint64_t null_cutoffs = 0;
     std::uint64_t null_verifications = 0;
+    std::uint64_t null_repetition_skips = 0;
     std::uint64_t lmr_reductions = 0;
     std::uint64_t lmr_verifications = 0;
+    std::uint64_t lmr_king_zone_exclusions = 0;
+    std::uint64_t lmr_high_history_exclusions = 0;
     std::uint64_t quiet_futility_prunes = 0;
     std::uint64_t razoring_prunes = 0;
     std::uint64_t quiet_history_updates = 0;
@@ -73,13 +77,24 @@ struct SearchInfo {
     std::uint64_t tbhits = 0;
 };
 
+struct SearchRequestIdentity {
+    std::uint64_t generation = 0;
+    std::uint64_t root_key = 0;
+    std::string root_fen;
+};
+
 struct SearchResult {
     std::optional<Move> best_move;
+    std::vector<Move> pv;
     int score_cp = 0;
     std::optional<int> mate;
     int completed_depth = 0;
     SearchStats stats;
     std::optional<Move> ponder_move;
+    SearchRequestIdentity identity;
+    bool completed = false;
+    bool cancelled = false;
+    bool failed = false;
 };
 
 struct SearchEventSink {
@@ -107,6 +122,7 @@ struct SearchOptions {
     std::uint32_t slow_mover_percent = 100;
     bool limit_strength = false;
     std::uint32_t elo = 1320;
+    std::uint64_t generation = 0;
     // Stable UCI snapshot for the future calibrated strength profile; currently neutral.
     bool strength_mode = false;
     std::shared_ptr<const SyzygyTablebase> syzygy;

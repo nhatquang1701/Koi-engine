@@ -339,6 +339,46 @@ private:
     int depth_;
 };
 
+class PonderGateEvaluator final : public koi::Evaluator {
+public:
+    explicit PonderGateEvaluator(GatedInputBuffer& input) : input_(input) {}
+
+    [[nodiscard]] bool supports_concurrent_evaluation() const noexcept override { return true; }
+
+    [[nodiscard]] int evaluate(const koi::GameState&, koi::Color) const override {
+        {
+            std::lock_guard lock(mutex_);
+            started_ = true;
+        }
+        started_condition_.notify_one();
+        input_.release();
+        std::unique_lock lock(mutex_);
+        release_condition_.wait(lock, [this] { return released_; });
+        return 0;
+    }
+
+    [[nodiscard]] bool wait_for_started(std::chrono::milliseconds timeout) const {
+        std::unique_lock lock(mutex_);
+        return started_condition_.wait_for(lock, timeout, [this] { return started_; });
+    }
+
+    void release() const {
+        {
+            std::lock_guard lock(mutex_);
+            released_ = true;
+        }
+        release_condition_.notify_all();
+    }
+
+private:
+    GatedInputBuffer& input_;
+    mutable std::mutex mutex_;
+    mutable std::condition_variable started_condition_;
+    mutable std::condition_variable release_condition_;
+    mutable bool started_ = false;
+    mutable bool released_ = false;
+};
+
 void test_uci_handshake_has_identity_and_supported_options_in_order() {
     const ControllerResult result = run_controller("uci\nquit\n");
     const std::string expected =
@@ -366,7 +406,7 @@ void test_uci_handshake_has_identity_and_supported_options_in_order() {
         "option name StrengthMode type check default false\n"
         "option name SyzygyPath type string default \n"
         "option name SyzygyProbeDepth type spin default 1 min 1 max 100\n"
-        "option name SyzygyProbeLimit type spin default 5 min 0 max 5\n"
+        "option name SyzygyProbeLimit type spin default 5 min 0 max 7\n"
         "option name Syzygy50MoveRule type check default true\n"
         "uciok\n";
 
@@ -551,8 +591,13 @@ void test_task1_hidden_debug_file_is_relative_rotated_and_off_stdio() {
     std::ifstream relative_log(files.path() / "relative-debug.log", std::ios::binary);
     const std::string relative_contents((std::istreambuf_iterator<char>(relative_log)), {});
     require(relative_contents.find("command position startpos") != std::string::npos &&
-                relative_contents.find("search start generation") != std::string::npos,
-            "debug files must include command and search lifecycle events");
+                relative_contents.find("search start generation") != std::string::npos &&
+                relative_contents.find("search root generation") != std::string::npos &&
+                relative_contents.find("position_record ") != std::string::npos &&
+                relative_contents.find("legal_digest=") != std::string::npos &&
+                relative_contents.find("go_record ") != std::string::npos &&
+                relative_contents.find("completion_record ") != std::string::npos,
+            "debug files must include structured position, search, and completion records");
 
     const ControllerResult defaulted = run_controller_in_directory(
         "setoption name Debug value true\nquit\n", files.path());
@@ -830,22 +875,66 @@ void test_ponderhit_keeps_the_entire_ponder_workflow_out_of_the_book() {
     const koi::GameState start = koi::GameState::startpos();
     write_book(book, {{start.polyglot_key(), polyglot_move("e2", "e4"), 1, 0}});
 
-    const ControllerResult result = run_controller(
+    GatedInputBuffer input(
         "setoption name BookFile value " + book.string() + "\n"
         "position startpos\n"
-        "go ponder depth 1\n"
+        "go ponder depth 2\n",
         "ponderhit\n"
         "stop\n"
         "quit\n");
-    const std::vector<std::string> lines = output_lines(result.output);
+    std::istream input_stream(&input);
+    ReleaseOnDepthBuffer output_buffer(input, 2);
+    std::ostream output(&output_buffer);
+    std::ostringstream diagnostics;
+    int exit_code = -1;
+    std::thread controller_thread([&] {
+        UciController controller(input_stream, output, diagnostics);
+        exit_code = controller.run();
+    });
+    const bool marker_seen = input.wait_for_marker(std::chrono::seconds(5));
+    if (!marker_seen) {
+        input.release();
+    }
+    controller_thread.join();
+
+    const std::vector<std::string> lines = output_lines(output_buffer.str());
     const std::vector<std::string> bestmoves = lines_starting_with(lines, "bestmove ");
 
-    require(result.exit_code == 0 && result.diagnostics.empty(),
+    require(marker_seen, "ponderhit book bypass must observe a completed ponder PV");
+    require(exit_code == 0 && diagnostics.str().empty(),
             "a ponderhit transcript must shut down cleanly");
     require(lines_starting_with(lines, "info string book move ").empty(),
             "ponderhit must not turn a ponder workflow into a book search");
-    require(bestmoves.size() == 1 && is_legal_move(Position{}, bestmoves[0].substr(9)),
-            "ponderhit must retain one legal search completion");
+    std::vector<koi::Move> expected_pv;
+    for (const std::string& line : lines) {
+        if (!line.starts_with("info depth ") || line.find(" multipv 1 ") == std::string::npos) {
+            continue;
+        }
+        const std::size_t pv_start = line.find(" pv ");
+        if (pv_start == std::string::npos) {
+            continue;
+        }
+        std::istringstream pv_stream(line.substr(pv_start + 4));
+        for (std::string move; pv_stream >> move;) {
+            const auto parsed = koi::Move::parse_uci(move);
+            require(parsed.has_value(), "ponder book bypass PV must contain coordinate moves");
+            expected_pv.push_back(*parsed);
+        }
+        if (expected_pv.size() >= 2) {
+            break;
+        }
+        expected_pv.clear();
+    }
+    require(expected_pv.size() >= 2, "ponderhit book bypass must retain an expected reply");
+    koi::GameState after_expected_reply = koi::GameState::startpos();
+    require(after_expected_reply.make_move(expected_pv[0]) &&
+                after_expected_reply.make_move(expected_pv[1]),
+            "ponder book bypass expected reply must remain legal");
+    const auto restarted_bestmove = bestmoves.size() == 1 ?
+        koi::Move::parse_uci(bestmoves[0].substr(9)) : std::nullopt;
+    require(bestmoves.size() == 1 && restarted_bestmove.has_value() &&
+                after_expected_reply.is_legal(*restarted_bestmove),
+            "ponderhit must retain one legal search completion outside the book");
 }
 
 void test_book_depth_boundaries_and_invalid_values_preserve_the_previous_limit() {
@@ -1111,6 +1200,35 @@ void test_ponderhit_restarts_the_ponder_search_once() {
     const auto restarted_bestmove = koi::Move::parse_uci(bestmoves[0].substr(9));
     require(restarted_bestmove.has_value() && after_expected_reply.is_legal(*restarted_bestmove),
             "ponderhit must search from the position after the expected reply");
+}
+
+void test_immediate_ponderhit_without_observed_reply_suppresses_restart() {
+    GatedInputBuffer input(
+        "position startpos\n"
+        "go ponder depth 2\n",
+        "ponderhit\n"
+        "stop\n"
+        "quit\n");
+    auto evaluator = std::make_shared<PonderGateEvaluator>(input);
+    std::istream input_stream(&input);
+    std::ostringstream output;
+    std::ostringstream diagnostics;
+    int exit_code = -1;
+    std::thread controller_thread([&] {
+        UciController controller(input_stream, output, diagnostics,
+                                 koi::SearchService{evaluator});
+        exit_code = controller.run();
+    });
+
+    require(evaluator->wait_for_started(std::chrono::seconds(5)),
+            "the ponder test must reach evaluation before releasing ponderhit");
+    evaluator->release();
+    controller_thread.join();
+
+    require(exit_code == 0 && diagnostics.str().empty(),
+            "an immediate ponderhit must shut down cleanly");
+    require(lines_starting_with(output_lines(output.str()), "bestmove ").empty(),
+            "ponderhit without an observed expected reply must not restart on an unverified root");
 }
 
 void test_quit_and_eof_suppress_a_ponderhit_replacement_search() {
@@ -1601,6 +1719,7 @@ int main() {
         {"Lucas analysis option generation replacement",
          test_lucas_analysis_option_changes_suppress_the_active_generation},
         {"ponderhit restart lifecycle", test_ponderhit_restarts_the_ponder_search_once},
+        {"immediate ponderhit suppression", test_immediate_ponderhit_without_observed_reply_suppresses_restart},
         {"ponderhit shutdown suppression", test_quit_and_eof_suppress_a_ponderhit_replacement_search},
         {"idle ponderhit", test_idle_ponderhit_is_quiet},
         {"ponder stop lifecycle", test_stopping_ponder_search_emits_one_legal_bestmove},

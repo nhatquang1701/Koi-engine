@@ -13,7 +13,9 @@ constexpr int kCapturePriority = 500'000;
 constexpr int kPromotionPriority = 400'000;
 constexpr int kCheckingMovePriority = 350'000;
 constexpr int kKillerPriority = 300'000;
-constexpr int kMaximumHistoryScore = kKillerPriority - 1;
+constexpr int kCounterMovePriority = kKillerPriority - 1;
+constexpr int kMaximumHistoryScore = kCounterMovePriority - 1;
+constexpr int kCounterMoveMinimumConfidence = 7 * 7;
 constexpr int kMaximumPly = 64;
 constexpr int kSeeOrderingWeight = 12;
 
@@ -70,7 +72,7 @@ std::size_t continuation_index(Move previous_move, Move move) noexcept {
 }
 
 void update_history(int& score, int delta) noexcept {
-    constexpr int maximum = 299'998;
+    constexpr int maximum = kMaximumHistoryScore;
     const std::int64_t wide_score = score;
     const std::int64_t wide_delta = delta;
     const std::int64_t wide_abs_delta = wide_delta < 0 ? -wide_delta : wide_delta;
@@ -113,6 +115,8 @@ std::uint32_t move_tie_break_key(Move move) noexcept {
 void SearchMoveOrdering::clear() noexcept {
     killers_ = {};
     history_ = {};
+    counter_moves_ = {};
+    counter_confidence_ = {};
     continuation_history_ = {};
     scored_move_count_ = 0;
 }
@@ -189,6 +193,13 @@ int SearchMoveOrdering::priority(const GameState& state, const MoveMetadata& met
     if (killers_[static_cast<std::size_t>(checked_ply)][1] == move) {
         return kKillerPriority;
     }
+    if (previous_move.has_value() && !previous_move->is_no_move() &&
+        counter_moves_[static_cast<std::size_t>(color_index(state.side_to_move()))]
+                      [move_index(*previous_move)] == move &&
+        counter_confidence_[static_cast<std::size_t>(color_index(state.side_to_move()))]
+                           [move_index(*previous_move)] >= kCounterMoveMinimumConfidence) {
+        return kCounterMovePriority;
+    }
     return quiet_history_score(state.side_to_move(), move, previous_move);
 }
 
@@ -243,6 +254,15 @@ void SearchMoveOrdering::record_quiet_cutoff(Color side, Move move, int ply, int
     const int bonus = depth_bonus * depth_bonus;
     update_history(history, bonus);
     if (previous_move.has_value() && !previous_move->is_no_move()) {
+        const std::size_t side_index = static_cast<std::size_t>(color_index(side));
+        const std::size_t previous_index = move_index(*previous_move);
+        Move& counter_move = counter_moves_[side_index][previous_index];
+        int& counter_confidence = counter_confidence_[side_index][previous_index];
+        if (counter_move != move) {
+            counter_move = move;
+            counter_confidence = 0;
+        }
+        update_history(counter_confidence, bonus);
         update_history(continuation_history_[continuation_index(*previous_move, move)], bonus * 2);
     }
 }
@@ -256,6 +276,11 @@ void SearchMoveOrdering::record_quiet_fail(Color side, Move move, int ply, int d
     const int malus = -(depth_bonus * depth_bonus);
     update_history(history_[static_cast<std::size_t>(color_index(side))][move_index(move)], malus);
     if (previous_move.has_value() && !previous_move->is_no_move()) {
+        const std::size_t side_index = static_cast<std::size_t>(color_index(side));
+        const std::size_t previous_index = move_index(*previous_move);
+        if (counter_moves_[side_index][previous_index] == move) {
+            counter_confidence_[side_index][previous_index] = 0;
+        }
         update_history(continuation_history_[continuation_index(*previous_move, move)], malus);
     }
 }

@@ -108,6 +108,71 @@ unsigned native_ep(const TablebaseSnapshot& snapshot) noexcept {
         static_cast<unsigned>(snapshot.en_passant_square.index()) : 0;
 }
 
+bool valid_snapshot(const TablebaseSnapshot& snapshot) noexcept {
+    if (snapshot.side_to_move != Color::white && snapshot.side_to_move != Color::black) {
+        return false;
+    }
+
+    std::uint64_t occupied = 0;
+    for (const auto& colors : snapshot.piece_bitboards) {
+        for (const std::uint64_t pieces : colors) {
+            if ((occupied & pieces) != 0) {
+                return false;
+            }
+            occupied |= pieces;
+        }
+    }
+
+    const std::uint64_t white_kings =
+        snapshot.piece_bitboards[0][static_cast<std::size_t>(PieceType::king) - 1];
+    const std::uint64_t black_kings =
+        snapshot.piece_bitboards[1][static_cast<std::size_t>(PieceType::king) - 1];
+    if (std::popcount(white_kings) != 1 || std::popcount(black_kings) != 1) {
+        return false;
+    }
+    const int white_king = std::countr_zero(white_kings);
+    const int black_king = std::countr_zero(black_kings);
+    const int file_delta = (white_king & 7) - (black_king & 7);
+    const int rank_delta = (white_king >> 3) - (black_king >> 3);
+    if (file_delta >= -1 && file_delta <= 1 && rank_delta >= -1 && rank_delta <= 1) {
+        return false;
+    }
+
+    constexpr std::uint64_t kBackRanks = 0xFF000000000000FFULL;
+    const std::uint64_t pawns = snapshot.piece_bitboards[0][0] | snapshot.piece_bitboards[1][0];
+    if ((pawns & kBackRanks) != 0) {
+        return false;
+    }
+
+    if (snapshot.en_passant_square.index() >= Square::kInvalid) {
+        return true;
+    }
+    if (snapshot.halfmove_clock != 0) {
+        return false;
+    }
+
+    const int target = snapshot.en_passant_square.index();
+    const bool white_to_move = snapshot.side_to_move == Color::white;
+    if ((white_to_move && (target >> 3) != 5) || (!white_to_move && (target >> 3) != 2)) {
+        return false;
+    }
+    const std::uint64_t target_bit = std::uint64_t{1} << target;
+    if ((occupied & target_bit) != 0) {
+        return false;
+    }
+
+    const int pawn_square = target + (white_to_move ? -8 : 8);
+    const int origin_square = target + (white_to_move ? 8 : -8);
+    if (pawn_square < 0 || pawn_square >= 64 || origin_square < 0 || origin_square >= 64) {
+        return false;
+    }
+    const std::size_t pawn_color = white_to_move ? 1 : 0;
+    const std::uint64_t pawn_bit = std::uint64_t{1} << pawn_square;
+    const std::uint64_t origin_bit = std::uint64_t{1} << origin_square;
+    return (snapshot.piece_bitboards[pawn_color][0] & pawn_bit) != 0 &&
+        (occupied & origin_bit) == 0;
+}
+
 } // namespace
 
 class SyzygyTablebase::Impl {
@@ -148,7 +213,10 @@ SyzygyTablebase::SyzygyTablebase(std::filesystem::path path, const std::uint8_t 
                                  const std::uint8_t probe_depth, const bool fifty_move_rule)
     : impl_(std::make_unique<Impl>()) {
     impl_->path = std::move(path);
-    impl_->probe_limit = std::clamp<std::uint8_t>(probe_limit, 0, 5);
+    // The vendored Fathom snapshot supports seven-man tables.  Keep the
+    // default at five for predictable I/O, while allowing an explicit user
+    // opt-in to six- and seven-piece probing.
+    impl_->probe_limit = std::clamp<std::uint8_t>(probe_limit, 0, 7);
     impl_->probe_depth = std::clamp<std::uint8_t>(probe_depth, 1, 100);
     impl_->fifty_move_rule = fifty_move_rule;
     std::error_code path_error;
@@ -168,8 +236,9 @@ SyzygyTablebase::~SyzygyTablebase() {
 bool SyzygyTablebase::enabled() const noexcept { return impl_->enabled; }
 
 bool SyzygyTablebase::supports(const TablebaseSnapshot& snapshot) const noexcept {
-    return snapshot.castling_rights == 0 && snapshot.piece_count() <= impl_->probe_limit &&
-        snapshot.piece_count() <= 5;
+    return valid_snapshot(snapshot) && snapshot.castling_rights == 0 &&
+        snapshot.piece_count() <= impl_->probe_limit &&
+        snapshot.piece_count() <= 7;
 }
 
 bool SyzygyTablebase::allows_depth(const int depth) const noexcept {
@@ -217,39 +286,59 @@ std::optional<SyzygyRootResult> SyzygyTablebase::probe_root(
     std::uint64_t white, black, kings, queens, rooks, bishops, knights, pawns;
     native_bitboards(snapshot, white, black, kings, queens, rooks, bishops, knights, pawns);
     TbRootMoves root_moves{};
-    std::lock_guard lock(fathom_mutex());
-    const int probe_succeeded = impl_->fifty_move_rule ?
-        tb_probe_root_dtz(white, black, kings, queens, rooks, bishops, knights, pawns,
-                          snapshot.halfmove_clock, snapshot.castling_rights,
-                          native_ep(snapshot), snapshot.side_to_move == Color::white,
-                          false, true, &root_moves) :
-        tb_probe_root_wdl(white, black, kings, queens, rooks, bishops, knights, pawns,
-                          snapshot.halfmove_clock, snapshot.castling_rights,
-                          native_ep(snapshot), snapshot.side_to_move == Color::white,
-                          false, &root_moves);
-    if (probe_succeeded == 0 || root_moves.size == 0) {
+    int probe_succeeded = 0;
+    {
+        std::lock_guard lock(fathom_mutex());
+        if (impl_->fifty_move_rule) {
+            probe_succeeded = tb_probe_root_dtz(
+                white, black, kings, queens, rooks, bishops, knights, pawns,
+                snapshot.halfmove_clock, snapshot.castling_rights,
+                native_ep(snapshot), snapshot.side_to_move == Color::white,
+                state.is_repetition_sensitive(), true, &root_moves);
+            if (probe_succeeded == 0) {
+                root_moves = {};
+                probe_succeeded = tb_probe_root_wdl(
+                    white, black, kings, queens, rooks, bishops, knights, pawns,
+                    snapshot.halfmove_clock, snapshot.castling_rights,
+                    native_ep(snapshot), snapshot.side_to_move == Color::white,
+                    true, &root_moves);
+            }
+        } else {
+            probe_succeeded = tb_probe_root_wdl(
+                white, black, kings, queens, rooks, bishops, knights, pawns,
+                snapshot.halfmove_clock, snapshot.castling_rights,
+                native_ep(snapshot), snapshot.side_to_move == Color::white,
+                false, &root_moves);
+        }
+    }
+    if (probe_succeeded == 0 || root_moves.size == 0 || root_moves.size > TB_MAX_MOVES) {
         return std::nullopt;
     }
-    int best_rank = std::numeric_limits<int>::min();
-    for (unsigned index = 0; index < root_moves.size; ++index) {
-        best_rank = std::max(best_rank, root_moves.moves[index].tbRank);
-    }
-    const SyzygyWdl wdl = syzygy_wdl_from_rank(best_rank);
-    SyzygyRootResult result{wdl, syzygy_score(wdl), {}};
     const auto permitted = [&allowed_moves](const Move& move) {
         return allowed_moves.empty() || std::find(allowed_moves.begin(), allowed_moves.end(), move) !=
             allowed_moves.end();
     };
+    int best_rank = std::numeric_limits<int>::min();
+    std::vector<Move> best_moves;
     for (unsigned index = 0; index < root_moves.size; ++index) {
-        if (root_moves.moves[index].tbRank != best_rank) continue;
         const auto move = move_from_fathom(root_moves.moves[index].move);
-        if (move.has_value() && permitted(*move) && state.is_legal(*move)) {
-            result.moves.push_back(*move);
+        if (!move.has_value() || !permitted(*move) || !state.is_legal(*move)) {
+            continue;
+        }
+        const int rank = root_moves.moves[index].tbRank;
+        if (rank > best_rank) {
+            best_rank = rank;
+            best_moves.clear();
+        }
+        if (rank == best_rank) {
+            best_moves.push_back(*move);
         }
     }
-    if (result.moves.empty()) {
+    if (best_moves.empty()) {
         return std::nullopt;
     }
+    const SyzygyWdl wdl = syzygy_wdl_from_rank(best_rank);
+    SyzygyRootResult result{wdl, syzygy_score(wdl), std::move(best_moves)};
     impl_->hits.fetch_add(1, std::memory_order_relaxed);
     return result;
 }

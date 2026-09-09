@@ -52,6 +52,21 @@ void test_snapshot_converts_rule_metadata_and_piece_bitboards() {
             "snapshot must retain the en-passant square");
 }
 
+void test_snapshot_uses_native_rule_state_after_a_pinned_double_push() {
+    koi::GameState state = state_from_fen("7k/5p2/8/r5PK/8/8/8/8 b - - 0 1");
+    const auto double_push = koi::Move::parse_uci("f7f5");
+    require(double_push.has_value() && state.make_move(*double_push),
+            "the pinned en-passant fixture must apply the pawn double push");
+    require(state.en_passant_square().index() == koi::Square::kInvalid,
+            "the native position must discard an unusable en-passant target");
+
+    const koi::TablebaseSnapshot snapshot = state.tablebase_snapshot();
+    require(snapshot.en_passant_square == state.en_passant_square() &&
+                snapshot.castling_rights == state.castling_rights() &&
+                snapshot.halfmove_clock == state.halfmove_clock(),
+            "the tablebase snapshot must be sourced from native rule state rather than the shadow board");
+}
+
 void test_absent_and_malformed_paths_disable_probing_safely() {
     const koi::TablebaseSnapshot snapshot = state_from_fen(
         "4k3/8/8/8/8/8/8/4K3 w - - 0 1").tablebase_snapshot();
@@ -165,6 +180,28 @@ void test_piece_count_and_castling_gate_probing() {
             "positions above five pieces must be gated");
 }
 
+void test_malformed_snapshots_are_rejected_before_probing() {
+    const koi::SyzygyTablebase tablebase({}, 7, 1, true);
+    koi::TablebaseSnapshot missing_black_king;
+    missing_black_king.piece_bitboards[0][static_cast<std::size_t>(koi::PieceType::king) - 1] =
+        std::uint64_t{1} << koi::Square::parse("e1")->index();
+    require(!tablebase.supports(missing_black_king),
+            "a malformed snapshot without both kings must never be passed to Fathom");
+
+    koi::TablebaseSnapshot overlapping = state_from_fen(
+        "4k3/8/8/8/8/8/8/4K3 w - - 0 1").tablebase_snapshot();
+    overlapping.piece_bitboards[1][static_cast<std::size_t>(koi::PieceType::queen) - 1] |=
+        std::uint64_t{1} << koi::Square::parse("e1")->index();
+    require(!tablebase.supports(overlapping),
+            "a snapshot with overlapping pieces must never be passed to Fathom");
+
+    koi::TablebaseSnapshot impossible_en_passant = state_from_fen(
+        "4k3/8/8/8/8/8/8/4K3 w - - 0 1").tablebase_snapshot();
+    impossible_en_passant.en_passant_square = *koi::Square::parse("e4");
+    require(!tablebase.supports(impossible_en_passant),
+            "a snapshot with an impossible en-passant square must never be passed to Fathom");
+}
+
 void test_wdl_conversion_and_concurrent_disabled_probes() {
     require(koi::syzygy_score(koi::SyzygyWdl::win).score_cp > 0,
             "winning WDL must convert to a positive score");
@@ -216,18 +253,27 @@ void test_50_move_rule_selects_clock_aware_root_probe() {
             "disabling the 50-move rule must select the WDL root path");
 }
 
+void test_seven_piece_probe_limit_is_preserved() {
+    const koi::SyzygyTablebase tablebase({}, 7, 1, true);
+    require(tablebase.probe_limit() == 7,
+            "the tablebase adapter must retain the configured seven-piece ceiling");
+}
+
 } // namespace
 
 int main() {
     try {
         test_snapshot_converts_rule_metadata_and_piece_bitboards();
+        test_snapshot_uses_native_rule_state_after_a_pinned_double_push();
         test_absent_and_malformed_paths_disable_probing_safely();
         test_empty_and_valid_paths_preserve_optional_fallback();
         test_wrong_sized_fixture_disables_probing_safely();
         test_tablebase_instances_share_fathom_lifetime_in_both_clear_orders();
         test_piece_count_and_castling_gate_probing();
+        test_malformed_snapshots_are_rejected_before_probing();
         test_wdl_conversion_and_concurrent_disabled_probes();
         test_50_move_rule_selects_clock_aware_root_probe();
+        test_seven_piece_probe_limit_is_preserved();
         std::cout << "PASS syzygy tablebase tests\n";
         return 0;
     } catch (const std::exception& error) {

@@ -29,6 +29,21 @@ if (-not (Test-Path -LiteralPath $fixturePath -PathType Leaf)) {
     throw "UCI match fixture executable is missing: $fixturePath"
 }
 
+function Get-PowerShellExecutable {
+    if ($PSVersionTable.PSEdition -eq 'Core') {
+        return (Get-Process -Id $PID -ErrorAction Stop).Path
+    }
+
+    $pwsh = Get-Command pwsh -ErrorAction SilentlyContinue
+    if ($null -ne $pwsh) {
+        return $pwsh.Source
+    }
+
+    return (Get-Command powershell.exe -ErrorAction Stop).Source
+}
+
+$PowerShellExecutable = Get-PowerShellExecutable
+
 function New-ScriptedUciEngine([string]$Directory, [string]$Name) {
     $enginePath = Join-Path $Directory "$Name.exe"
     Copy-Item -LiteralPath $fixturePath -Destination $enginePath
@@ -51,7 +66,7 @@ function Invoke-ScriptedMatch([string]$KoiPath, [string]$OpponentPath, [string]$
     if (-not [string]::IsNullOrWhiteSpace($TimeControl)) {
         $optionalArguments += @('-TimeControl', $TimeControl)
     }
-    $output = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $matchScript `
+    $output = & $PowerShellExecutable -NoProfile -ExecutionPolicy Bypass -File $matchScript `
         -KoiPath $KoiPath -OpponentPath $OpponentPath -ReplayPath $replayPath `
         -KoiColor $KoiColor -Depth 1 -Games $Games -MaxPlies $MaxPlies `
         -TimeoutMilliseconds $TimeoutMilliseconds -OutputDirectory $OutputDirectory `
@@ -74,7 +89,7 @@ function Invoke-ScriptedMatch([string]$KoiPath, [string]$OpponentPath, [string]$
 $outputDirectory = Join-Path ([System.IO.Path]::GetTempPath()) ("koi-match-test-" + [guid]::NewGuid().ToString('N'))
 $fenFile = Join-Path $outputDirectory 'terminal.fen'
 try {
-    $output = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $matchScript `
+    $output = & $PowerShellExecutable -NoProfile -ExecutionPolicy Bypass -File $matchScript `
         -KoiPath $EnginePath -OpponentPath $EnginePath -Depth 1 -Games 1 `
         -MaxPlies 2 -KoiOwnBook false -OutputDirectory $outputDirectory
     if ($LASTEXITCODE -ne 0) {
@@ -103,6 +118,19 @@ try {
         $game.process_status.opponent -ne 'clean shutdown') {
         throw 'UCI match JSON must record clean process shutdown for both engines.'
     }
+    if ($report.measurement.network.state -ne 'disabled' -or
+        $report.measurement.book.state -ne 'disabled' -or
+        $report.measurement.tablebase.state -ne 'disabled' -or
+        $report.hardware.cpu_count -lt 1 -or
+        $report.configuration.run_label -ne 'measurement') {
+        throw 'UCI match JSON must record disabled network/book/tablebase state and hardware/run metadata.'
+    }
+    foreach ($engine in @($report.engines)) {
+        if ([string]::IsNullOrWhiteSpace($engine.version) -or
+            [string]::IsNullOrWhiteSpace($engine.hashes.executable_sha256)) {
+            throw 'UCI match JSON must record engine version and executable hash metadata.'
+        }
+    }
     $firstPly = $game.moves[0]
     $secondPly = $game.moves[1]
     if ($firstPly.root_fen -eq $secondPly.root_fen -or
@@ -119,6 +147,11 @@ try {
             [string]::IsNullOrWhiteSpace($ply.bestmove_line) -or
             @($ply.all_info_lines).Count -lt 1) {
             throw 'UCI match JSON must preserve reproducible v2 per-ply command and engine fields.'
+        }
+        if ($null -eq $ply.position_classification -or
+            [string]::IsNullOrWhiteSpace($ply.position_classification.phase) -or
+            $ply.position_classification.side_to_move -notin @('white', 'black')) {
+            throw 'UCI match JSON must classify every recorded root position.'
         }
         if ($ply.book_used) {
             if ([string]::IsNullOrWhiteSpace($ply.book_move) -or
@@ -144,7 +177,7 @@ try {
     New-Item -ItemType Directory -Path $outputDirectory -Force | Out-Null
     Set-Content -LiteralPath $fenFile -Value 'forced-mate | 7k/6Q1/5K2/8/8/8/8/8 b - - 0 1' -Encoding UTF8
     $terminalOutputDirectory = Join-Path $outputDirectory 'terminal'
-    $terminalOutput = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $matchScript `
+    $terminalOutput = & $PowerShellExecutable -NoProfile -ExecutionPolicy Bypass -File $matchScript `
         -KoiPath $EnginePath -OpponentPath $EnginePath -Depth 1 -Games 1 `
         -FenFile $fenFile -OutputDirectory $terminalOutputDirectory
     if ($LASTEXITCODE -ne 0) {
@@ -283,7 +316,7 @@ try {
     Set-Content -LiteralPath $invalidOpeningFile -Value 'illegal | e2e5' -Encoding UTF8
     $preflightKoi = New-ScriptedUciEngine $invalidOpeningDirectory 'preflight-koi'
     $preflightOpponent = New-ScriptedUciEngine $invalidOpeningDirectory 'preflight-opponent'
-    $invalidOutput = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $matchScript `
+    $invalidOutput = & $PowerShellExecutable -NoProfile -ExecutionPolicy Bypass -File $matchScript `
         -KoiPath $preflightKoi.path -OpponentPath $preflightOpponent.path -ReplayPath $replayPath `
         -OpeningFile $invalidOpeningFile -OutputDirectory $invalidOpeningDirectory
     if ($LASTEXITCODE -eq 0 -or (Test-Path -LiteralPath $preflightKoi.log) -or

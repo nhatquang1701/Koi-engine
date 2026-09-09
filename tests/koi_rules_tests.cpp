@@ -1,8 +1,5 @@
 #include <algorithm>
-#include <atomic>
-#include <cstdlib>
 #include <iostream>
-#include <new>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -15,8 +12,6 @@
 #endif
 
 namespace {
-
-std::atomic_bool fail_next_allocation = false;
 
 using koi::GameState;
 using koi::Move;
@@ -55,6 +50,28 @@ void test_fen_constructs_a_game_state() {
     const auto state = GameState::from_fen("4k3/8/8/8/8/8/8/4K3 w - - 0 1");
     require(state.has_value(), "valid FEN must construct a GameState");
     require(state->fen() == "4k3/8/8/8/8/8/8/4K3 w - - 0 1", "GameState must preserve valid FEN");
+}
+
+void test_strict_fen_rejects_impossible_material_and_check_state() {
+    const auto too_many_pawns = GameState::from_fen(
+        "4k3/8/8/8/P7/PPPPPPPP/8/4K3 w - - 0 1");
+    require(!too_many_pawns.has_value(),
+            "production FEN parsing must reject more than eight pawns for one side");
+
+    const auto too_many_pieces = GameState::from_fen(
+        "4k3/8/8/8/8/N7/PPPPPPPP/RNBQKBNR w - - 0 1");
+    require(!too_many_pieces.has_value(),
+            "production FEN parsing must reject more than sixteen pieces for one side");
+
+    const auto both_kings_in_check = GameState::from_fen(
+        "k7/8/7r/8/8/8/R7/7K w - - 0 1");
+    require(!both_kings_in_check.has_value(),
+            "production FEN parsing must reject simultaneous check on both kings");
+
+    const auto promoted_material = GameState::from_fen(
+        "4k3/8/8/8/8/8/PPPPPPPP/RNBQKBNQ w - - 0 1");
+    require(promoted_material.has_value(),
+            "legal promoted-material positions within per-side limits must remain valid");
 }
 
 void test_game_state_exposes_legal_special_moves() {
@@ -314,20 +331,19 @@ void test_null_move_round_trips_side_fen_and_key() {
     require(!state.unmake_null_move(), "an empty null-move history must be rejected");
 }
 
-void test_failed_history_recording_leaves_state_unchanged() {
-    GameState state = GameState::startpos();
+void test_rejected_king_move_leaves_state_unchanged() {
+    const auto parsed = GameState::from_fen("4r2k/8/8/8/8/8/8/4K3 w - - 0 1");
+    require(parsed.has_value(), "rejected-move fixture must construct");
+    GameState state = *parsed;
     const std::string original_fen = state.fen();
     const std::uint64_t original_key = state.position_key();
-    const Move move = require_move("e2e4");
 
-    fail_next_allocation = true;
-    const bool made_move = state.make_move(move);
-    fail_next_allocation = false;
-
-    require(!made_move, "history-allocation failure must make the move fail");
-    require(state.fen() == original_fen, "failed move must preserve FEN");
-    require(state.position_key() == original_key, "failed move must preserve the position key");
-    require(!state.unmake_move(), "failed move must not add an undo entry");
+    require(!state.make_move(require_move("e1e2")),
+            "a king move that remains on the checking rook file must be rejected");
+    require(state.fen() == original_fen, "a rejected move must preserve FEN");
+    require(state.position_key() == original_key,
+            "a rejected move must preserve the position key");
+    require(!state.unmake_move(), "a rejected move must not add an undo entry");
 }
 
 void test_start_position_has_twenty_legal_moves() {
@@ -343,29 +359,11 @@ struct TestCase {
 
 } // namespace
 
-void* operator new(std::size_t size) {
-    if (fail_next_allocation.exchange(false)) {
-        throw std::bad_alloc();
-    }
-
-    if (void* memory = std::malloc(size == 0 ? 1 : size)) {
-        return memory;
-    }
-    throw std::bad_alloc();
-}
-
-void operator delete(void* memory) noexcept {
-    std::free(memory);
-}
-
-void operator delete(void* memory, std::size_t) noexcept {
-    std::free(memory);
-}
-
 int main() {
     const std::vector<TestCase> tests{
         {"Koi-owned move coordinates", test_move_uses_koi_coordinates_and_formats_uci},
         {"FEN construction", test_fen_constructs_a_game_state},
+        {"strict FEN legality", test_strict_fen_rejects_impossible_material_and_check_state},
         {"legal special moves", test_game_state_exposes_legal_special_moves},
         {"special move conversion round trips", test_special_move_conversion_round_trips_without_uci_translation},
         {"move metadata", test_move_metadata_identifies_special_moves_and_checks},
@@ -379,7 +377,7 @@ int main() {
         {"position features", test_position_features_expose_symmetric_board_attacks_and_mobility},
         {"make/unmake restoration", test_make_and_unmake_restore_fen_and_key},
         {"null move restoration", test_null_move_round_trips_side_fen_and_key},
-        {"transactional history failure", test_failed_history_recording_leaves_state_unchanged},
+        {"transactional rejected move", test_rejected_king_move_leaves_state_unchanged},
         {"start-position move count", test_start_position_has_twenty_legal_moves},
     };
 

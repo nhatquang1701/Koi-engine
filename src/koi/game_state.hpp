@@ -22,6 +22,17 @@ struct PositionError {
     std::string message;
 };
 
+// Claimable outcomes are reported separately from automatic terminal draws.
+// The UCI layer still returns a legal move when a claim is available.
+enum class DrawStatus : std::uint8_t {
+    none,
+    claimable_threefold,
+    claimable_fifty_move,
+    automatic_fivefold,
+    automatic_seventy_five_move,
+    dead_position,
+};
+
 enum class MoveKind : std::uint8_t { quiet, capture, en_passant, castling, promotion };
 
 struct MoveMetadata {
@@ -36,6 +47,9 @@ struct MoveMetadata {
     // Keeping the key here lets the fast make path reject stale records
     // without rebuilding a native legal-move list.
     std::uint64_t position_key = 0;
+    // Internal provenance token.  It is deliberately not part of the public
+    // UCI surface; zero means the record was not produced by Koi's generator.
+    std::uint64_t validation_token = 0;
 
     [[nodiscard]] constexpr bool is_capture() const noexcept {
         return kind == MoveKind::capture || kind == MoveKind::en_passant;
@@ -102,6 +116,55 @@ struct PositionFeatures {
     Color side_to_move = Color::white;
 };
 
+// Diagnostic-only state comparison data.  The native position remains the
+// production authority; this snapshot exists to prove that the compatibility
+// mirror has not drifted while it is still used by legacy consumers.
+struct PositionConsistencySnapshot {
+    std::string native_fen;
+    std::string shadow_fen;
+    std::vector<std::string> native_legal_moves;
+    std::vector<std::string> shadow_legal_moves;
+    std::uint64_t native_position_key = 0;
+    std::uint64_t shadow_position_key = 0;
+    std::uint8_t native_castling_rights = 0;
+    std::uint8_t shadow_castling_rights = 0;
+    Square native_en_passant_square{};
+    Square shadow_en_passant_square{};
+    std::uint16_t native_halfmove_clock = 0;
+    std::uint16_t shadow_halfmove_clock = 0;
+    std::uint16_t native_fullmove_number = 0;
+    std::uint16_t shadow_fullmove_number = 0;
+    std::size_t native_repetition_count = 0;
+    std::size_t shadow_repetition_count = 0;
+    bool native_repetition_sensitive = false;
+    bool shadow_repetition_sensitive = false;
+    bool native_can_claim_threefold_repetition = false;
+    bool shadow_can_claim_threefold_repetition = false;
+    bool native_is_automatic_fivefold_repetition = false;
+    bool shadow_is_automatic_fivefold_repetition = false;
+    bool native_in_check = false;
+    bool shadow_in_check = false;
+    Color native_side_to_move = Color::white;
+    Color shadow_side_to_move = Color::white;
+
+    [[nodiscard]] bool operator==(const PositionConsistencySnapshot&) const = default;
+
+    [[nodiscard]] bool consistent() const noexcept {
+        return native_fen == shadow_fen &&
+            native_legal_moves == shadow_legal_moves &&
+            native_castling_rights == shadow_castling_rights &&
+            native_en_passant_square == shadow_en_passant_square &&
+            native_halfmove_clock == shadow_halfmove_clock &&
+            native_fullmove_number == shadow_fullmove_number &&
+            native_repetition_count == shadow_repetition_count &&
+            native_repetition_sensitive == shadow_repetition_sensitive &&
+            native_can_claim_threefold_repetition == shadow_can_claim_threefold_repetition &&
+            native_is_automatic_fivefold_repetition == shadow_is_automatic_fivefold_repetition &&
+            native_in_check == shadow_in_check &&
+            native_side_to_move == shadow_side_to_move;
+    }
+};
+
 inline constexpr std::uint8_t kWhiteKingSideCastling = 0x1;
 inline constexpr std::uint8_t kWhiteQueenSideCastling = 0x2;
 inline constexpr std::uint8_t kBlackKingSideCastling = 0x4;
@@ -135,6 +198,7 @@ public:
     [[nodiscard]] Color side_to_move() const noexcept;
     [[nodiscard]] Piece piece_at(Square square) const noexcept;
     [[nodiscard]] std::vector<Move> legal_moves() const;
+    [[nodiscard]] PositionConsistencySnapshot consistency_snapshot() const;
     [[nodiscard]] std::vector<MoveMetadata> legal_moves_with_metadata() const;
     void legal_moves_with_metadata(MoveMetadataList& moves,
                                    bool include_check_flags = true) const noexcept;
@@ -159,17 +223,32 @@ public:
     [[nodiscard]] bool in_check() const noexcept;
     [[nodiscard]] bool in_check(Color color) const noexcept;
     [[nodiscard]] bool has_non_pawn_material(Color color) const noexcept;
+    // True when the current position has already occurred once in the
+    // reversible move history. Null-move pruning must treat this twofold
+    // state conservatively because a null move can create a false cutoff.
+    [[nodiscard]] bool is_repetition_sensitive() const noexcept;
     // Draw conditions that can be checked after legal move generation. A
     // caller that needs checkmate/stalemate must still inspect legal_moves().
     [[nodiscard]] bool is_draw_by_rule() const noexcept;
     [[nodiscard]] bool is_terminal() const noexcept;
     [[nodiscard]] std::uint64_t position_key() const noexcept;
     [[nodiscard]] std::uint64_t polyglot_key() const noexcept;
+    [[nodiscard]] std::uint8_t castling_rights() const noexcept;
+    [[nodiscard]] Square en_passant_square() const noexcept;
     [[nodiscard]] std::uint16_t halfmove_clock() const noexcept;
     [[nodiscard]] std::uint16_t fullmove_number() const noexcept;
+    [[nodiscard]] std::size_t repetition_count() const noexcept;
+    [[nodiscard]] bool can_claim_threefold_repetition() const noexcept;
+    [[nodiscard]] bool can_claim_fifty_move_draw() const noexcept;
+    [[nodiscard]] bool is_automatic_fivefold_repetition() const noexcept;
+    [[nodiscard]] bool is_automatic_seventy_five_move_draw() const noexcept;
+    [[nodiscard]] bool is_dead_position() const noexcept;
+    [[nodiscard]] DrawStatus draw_status() const noexcept;
 
 private:
     [[nodiscard]] int direct_static_exchange_gain(const MoveMetadata&) const noexcept;
+    [[nodiscard]] std::optional<MoveMetadata> metadata_for_native_move(
+        const Move&, bool include_check_flags) const noexcept;
     void finalize_metadata(MoveMetadataList&, std::uint64_t position_key) const noexcept;
     void invalidate_feature_cache() noexcept;
 

@@ -7,6 +7,14 @@
 
 namespace koi {
 
+namespace detail {
+
+[[nodiscard]] constexpr bool high_history_move_excluded_from_lmr(int history_score) noexcept {
+    return history_score >= 128;
+}
+
+} // namespace detail
+
 class SearchHandle {
 public:
     SearchHandle(SearchHandle&&) noexcept;

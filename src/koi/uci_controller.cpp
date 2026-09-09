@@ -6,6 +6,7 @@
 #include <chrono>
 #include <cstdint>
 #include <cstdlib>
+#include <iomanip>
 #include <limits>
 #include <memory>
 #include <sstream>
@@ -35,7 +36,7 @@ constexpr std::uint64_t kMaximumBookDepth = 40;
 constexpr std::uint64_t kMaximumBookSafetyDepth = 3;
 constexpr std::uint64_t kMinimumSyzygyProbeDepth = 1;
 constexpr std::uint64_t kMaximumSyzygyProbeDepth = 100;
-constexpr std::uint64_t kMaximumSyzygyProbeLimit = 5;
+constexpr std::uint64_t kMaximumSyzygyProbeLimit = 7;
 constexpr std::uintmax_t kDebugRotationBytes = 8U * 1024U * 1024U;
 constexpr int kWdlScoreLimit = 1'000;
 
@@ -145,6 +146,124 @@ struct Wdl {
     int loss = 0;
 };
 
+std::string debug_quoted(std::string_view value) {
+    std::string result;
+    result.reserve(value.size() + 2);
+    result.push_back('"');
+    for (const char character : value) {
+        switch (character) {
+        case '\\':
+        case '"':
+            result.push_back('\\');
+            result.push_back(character);
+            break;
+        case '\b':
+            result += "\\b";
+            break;
+        case '\f':
+            result += "\\f";
+            break;
+        case '\n':
+            result += "\\n";
+            break;
+        case '\r':
+            result += "\\r";
+            break;
+        case '\t':
+            result += "\\t";
+            break;
+        default:
+            if (static_cast<unsigned char>(character) < 0x20U) {
+                std::ostringstream escaped;
+                escaped << "\\u" << std::hex << std::setw(4) << std::setfill('0')
+                        << static_cast<unsigned int>(static_cast<unsigned char>(character));
+                result += escaped.str();
+            } else {
+                result.push_back(character);
+            }
+            break;
+        }
+    }
+    result.push_back('"');
+    return result;
+}
+
+std::string debug_color(Color color) {
+    return color == Color::white ? "w" : "b";
+}
+
+std::string debug_square(Square square) {
+    return square.index() < Square::kInvalid ? square.uci() : "-";
+}
+
+std::string debug_castling(std::uint8_t rights) {
+    std::string result;
+    if ((rights & kWhiteKingSideCastling) != 0) result += 'K';
+    if ((rights & kWhiteQueenSideCastling) != 0) result += 'Q';
+    if ((rights & kBlackKingSideCastling) != 0) result += 'k';
+    if ((rights & kBlackQueenSideCastling) != 0) result += 'q';
+    return result.empty() ? "-" : result;
+}
+
+std::string debug_hex(std::uint64_t value) {
+    std::ostringstream stream;
+    stream << std::hex << std::setw(16) << std::setfill('0') << value;
+    return stream.str();
+}
+
+std::uint64_t legal_move_digest(const std::vector<Move>& legal_moves) {
+    std::vector<std::string> coordinates;
+    coordinates.reserve(legal_moves.size());
+    for (const Move& move : legal_moves) {
+        coordinates.push_back(move.uci());
+    }
+    std::sort(coordinates.begin(), coordinates.end());
+
+    std::uint64_t digest = 1469598103934665603ULL;
+    for (const std::string& coordinate : coordinates) {
+        for (const unsigned char character : coordinate) {
+            digest ^= character;
+            digest *= 1099511628211ULL;
+        }
+        digest ^= static_cast<unsigned char>('\n');
+        digest *= 1099511628211ULL;
+    }
+    return digest;
+}
+
+template <typename T>
+std::string debug_optional(const std::optional<T>& value) {
+    return value.has_value() ? std::to_string(*value) : "-";
+}
+
+std::string debug_limits(const SearchLimits& limits) {
+    std::ostringstream stream;
+    stream << "depth=" << debug_optional(limits.depth)
+           << ",nodes=" << debug_optional(limits.nodes)
+           << ",movetime_ms=" <<
+        (limits.movetime.has_value() ? std::to_string(limits.movetime->count()) : "-")
+           << ",wtime_ms=" <<
+        (limits.white_clock.has_value() ? std::to_string(limits.white_clock->remaining.count()) : "-")
+           << ",btime_ms=" <<
+        (limits.black_clock.has_value() ? std::to_string(limits.black_clock->remaining.count()) : "-")
+           << ",winc_ms=" <<
+        (limits.white_clock.has_value() ? std::to_string(limits.white_clock->increment.count()) : "-")
+           << ",binc_ms=" <<
+        (limits.black_clock.has_value() ? std::to_string(limits.black_clock->increment.count()) : "-")
+           << ",movestogo=" << debug_optional(limits.moves_to_go)
+           << ",infinite=" << (limits.infinite ? "true" : "false")
+           << ",ponder=" << (limits.ponder ? "true" : "false")
+           << ",searchmoves=" << (limits.search_moves_specified ? "true" : "false");
+    if (limits.search_moves_specified) {
+        stream << ",searchmove_list=";
+        for (std::size_t index = 0; index < limits.search_moves.size(); ++index) {
+            if (index != 0) stream << ',';
+            stream << limits.search_moves[index].uci();
+        }
+    }
+    return stream.str();
+}
+
 Wdl score_to_wdl(const SearchInfo& info) noexcept {
     if (info.mate.has_value()) {
         return *info.mate > 0 ? Wdl{1'000, 0, 0} : Wdl{0, 0, 1'000};
@@ -154,6 +273,19 @@ Wdl score_to_wdl(const SearchInfo& info) noexcept {
     const int decisive = 1'000 - draw;
     const int win = decisive * (score + kWdlScoreLimit) / (2 * kWdlScoreLimit);
     return Wdl{win, draw, decisive - win};
+}
+
+std::vector<Move> legal_pv_prefix(const GameState& root, const std::vector<Move>& pv) {
+    GameState position = root;
+    std::vector<Move> prefix;
+    prefix.reserve(pv.size());
+    for (const Move& move : pv) {
+        if (!position.is_legal(move) || !position.make_move(move)) {
+            break;
+        }
+        prefix.push_back(move);
+    }
+    return prefix;
 }
 
 } // namespace
@@ -286,11 +418,19 @@ UciController::UciController(std::istream& input, std::ostream& output,
       search_service_(std::move(search_service)) {}
 
 UciController::~UciController() {
+    {
+        std::lock_guard lock(output_mutex_);
+        state_ = ControllerState::ShuttingDown;
+    }
     stop_and_suppress_active_search();
 }
 
 int UciController::run() {
     for (std::string line; std::getline(input_, line);) {
+        {
+            std::lock_guard lock(output_mutex_);
+            last_command_ = line;
+        }
         debug_event("command " + line);
         std::istringstream command(line);
         std::string name;
@@ -306,7 +446,7 @@ int UciController::run() {
             stop_and_suppress_active_search();
             position_ = GameState::startpos();
         } else if (name == "position") {
-            handle_position(command);
+            handle_position(command, line);
         } else if (name == "setoption") {
             handle_setoption(command);
         } else if (name == "go") {
@@ -316,6 +456,10 @@ int UciController::run() {
         } else if (name == "stop") {
             stop_active_search();
         } else if (name == "quit") {
+            {
+                std::lock_guard lock(output_mutex_);
+                state_ = ControllerState::ShuttingDown;
+            }
             stop_and_suppress_active_search();
             return 0;
         }
@@ -325,7 +469,15 @@ int UciController::run() {
     return 0;
 }
 
-void UciController::handle_position(std::istream& command) {
+void UciController::handle_position(std::istream& command, std::string_view command_text) {
+    // Suppress the old generation before doing any parsing work. A worker may
+    // finish while a replacement position is being validated; it must not be
+    // allowed to emit a completion for the old root during that window.
+    {
+        std::lock_guard lock(output_mutex_);
+        state_ = ControllerState::ShuttingDown;
+    }
+    stop_and_suppress_active_search();
     const std::vector<std::string> tokens = remaining_tokens(command);
     if (tokens.empty()) {
         write_position_error("missing position");
@@ -374,8 +526,37 @@ void UciController::handle_position(std::istream& command) {
         }
     }
 
-    stop_and_suppress_active_search();
     position_ = std::move(candidate);
+    const std::vector<Move> legal = position_.legal_moves();
+    debug_event("position accepted generation " + std::to_string(generation_) +
+                " key " + std::to_string(position_.position_key()) +
+                " fen " + position_.fen() +
+                " legal_moves " + std::to_string(legal.size()));
+    if (debug_enabled_) {
+        const PositionConsistencySnapshot snapshot = position_.consistency_snapshot();
+        debug_json_event(
+            "position",
+            "\"message\":" + debug_quoted(
+                "position_record command=" + std::string(command_text) +
+                " legal_digest=" + debug_hex(legal_move_digest(legal))) +
+                ",\"command\":" + debug_quoted(command_text) +
+                ",\"generation\":" + std::to_string(generation_) +
+                ",\"root_fen\":" + debug_quoted(snapshot.native_fen) +
+                ",\"position_key\":" + debug_quoted(debug_hex(snapshot.native_position_key)) +
+                ",\"side_to_move\":" + debug_quoted(
+                    snapshot.native_side_to_move == Color::white ? "white" : "black") +
+                ",\"castling_rights\":" + debug_quoted(
+                    debug_castling(snapshot.native_castling_rights)) +
+                ",\"en_passant\":" + debug_quoted(debug_square(position_.en_passant_square())) +
+                ",\"halfmove_clock\":" + std::to_string(snapshot.native_halfmove_clock) +
+                ",\"fullmove_number\":" + std::to_string(snapshot.native_fullmove_number) +
+                ",\"legal_move_count\":" + std::to_string(snapshot.native_legal_moves.size()) +
+                ",\"native_legal_count\":" + std::to_string(snapshot.native_legal_moves.size()) +
+                ",\"shadow_legal_count\":" + std::to_string(snapshot.shadow_legal_moves.size()) +
+                ",\"legal_move_digest\":" + debug_quoted(debug_hex(legal_move_digest(legal))) +
+                ",\"native_shadow_consistent\":" +
+                    (snapshot.consistent() ? "true" : "false"));
+    }
 }
 
 void UciController::handle_setoption(std::istream& command) {
@@ -642,8 +823,10 @@ void UciController::handle_go(std::istream& command) {
     stop_and_suppress_active_search();
 
     if (limits.ponder) {
+        ponder_origin_ = position_;
         ponder_root_ = position_;
         ponder_limits_ = limits;
+        ponder_predicted_move_.reset();
         active_ponder_ = true;
     }
     start_search(position_, std::move(limits));
@@ -651,24 +834,37 @@ void UciController::handle_go(std::istream& command) {
 
 void UciController::handle_ponderhit() {
     std::optional<GameState> root;
+    std::optional<GameState> origin;
     std::optional<SearchLimits> limits;
+    std::optional<Move> predicted_move;
     std::optional<Move> expected_move;
     {
         std::lock_guard lock(output_mutex_);
-        if (!active_ponder_ || !ponder_root_.has_value() || !ponder_limits_.has_value()) {
+        if (!active_ponder_ || !ponder_origin_.has_value() || !ponder_root_.has_value() ||
+            !ponder_limits_.has_value()) {
             return;
         }
+        origin = ponder_origin_;
         root = ponder_root_;
         limits = ponder_limits_;
+        predicted_move = ponder_predicted_move_;
         expected_move = ponder_expected_move_;
     }
 
     stop_and_suppress_active_search();
-    if (!root.has_value() || !limits.has_value()) {
+    if (!origin.has_value() || !root.has_value() || !limits.has_value() ||
+        !predicted_move.has_value() || !expected_move.has_value() ||
+        position_.position_key() != origin->position_key() || position_.fen() != origin->fen() ||
+        !origin->is_legal(*predicted_move)) {
+        debug_event("ponderhit suppressed without a matching origin, prediction, and reply");
         return;
     }
-    if (expected_move.has_value() && root->is_legal(*expected_move)) {
-        (void)root->make_move(*expected_move);
+    GameState expected_root = *origin;
+    if (!expected_root.make_move(*predicted_move) || expected_root.fen() != root->fen() ||
+        expected_root.position_key() != root->position_key() || !root->is_legal(*expected_move) ||
+        !root->make_move(*expected_move)) {
+        debug_event("ponderhit suppressed because the stored ponder root or reply no longer matches");
+        return;
     }
 
     limits->ponder = false;
@@ -686,18 +882,40 @@ void UciController::handle_ponderhit() {
 
 void UciController::start_search(GameState root, SearchLimits limits, bool skip_book) {
     const std::uint64_t generation = begin_generation();
+    {
+        std::lock_guard lock(output_mutex_);
+        state_ = limits.ponder ? ControllerState::Pondering : ControllerState::Searching;
+    }
+    const auto completion_once = std::make_shared<CompletionOnce>();
     debug_event("search start generation " + std::to_string(generation));
+    debug_event("search root generation " + std::to_string(generation) +
+                " key " + std::to_string(root.position_key()) +
+                " fen " + root.fen());
     const bool book_eligible = !skip_book && !analyse_mode_ && multi_pv_ == 1 && !limits.infinite &&
         !limits.ponder && !limits.search_moves_specified;
+    std::optional<BookChoice> book_choice;
+    std::uint32_t ply = 0;
     if (book_eligible) {
-        const std::uint32_t ply = root_ply(root);
-        const std::optional<BookChoice> choice =
-            opening_book_.choose(root, ply, own_book_, book_depth_, random_seed_, book_random_,
-                                 book_safety_, book_safety_depth_);
-        if (choice.has_value()) {
-            write_book_completion(generation, *choice, ply);
-            return;
-        }
+        ply = root_ply(root);
+        book_choice = opening_book_.choose(root, ply, own_book_, book_depth_, random_seed_,
+                                           book_random_, book_safety_, book_safety_depth_);
+    }
+    debug_json_event(
+        "go",
+        "\"message\":" + debug_quoted(
+            "go_record generation=" + std::to_string(generation) +
+            " root_fen=" + root.fen()) +
+            ",\"generation\":" + std::to_string(generation) +
+            ",\"root_fen\":" + debug_quoted(root.fen()) +
+            ",\"root_key\":" + debug_quoted(debug_hex(root.position_key())) +
+            ",\"limits\":" + debug_quoted(debug_limits(limits)) +
+            ",\"threads\":" + std::to_string(threads_) +
+            ",\"source\":" + debug_quoted(book_choice.has_value() ? "book" : "search"));
+    if (book_choice.has_value()) {
+        debug_event("book completion candidate generation " + std::to_string(generation) +
+                    " move " + book_choice->move.uci() + " root " + root.fen());
+        write_book_completion(generation, root, limits, *book_choice, ply, completion_once);
+        return;
     }
     const GameState search_root = root;
     const bool is_ponder_search = limits.ponder;
@@ -705,32 +923,134 @@ void UciController::start_search(GameState root, SearchLimits limits, bool skip_
 
     SearchEventSink sink;
     sink.on_info = [this, generation, search_root, is_ponder_search](const SearchInfo& info) {
-        if (info.multipv == 1 && info.pv.size() >= 2) {
+        SearchInfo safe_info = info;
+        safe_info.pv = legal_pv_prefix(search_root, info.pv);
+        if (safe_info.pv.size() != info.pv.size()) {
+            debug_event("invalid PV prefix suppressed generation " + std::to_string(generation));
+        }
+        if (safe_info.multipv == 1 && safe_info.pv.size() >= 2) {
             GameState after_best = search_root;
-            if (after_best.make_move(info.pv[0]) && after_best.is_legal(info.pv[1])) {
+            if (after_best.make_move(safe_info.pv[0]) && after_best.is_legal(safe_info.pv[1])) {
                 std::lock_guard lock(output_mutex_);
                 if (generation == generation_) {
-                    principal_variation_best_move_ = info.pv[0];
-                    principal_variation_ponder_move_ = info.pv[1];
+                    principal_variation_best_move_ = safe_info.pv[0];
+                    principal_variation_ponder_move_ = safe_info.pv[1];
                     if (is_ponder_search && !ponder_expected_move_.has_value()) {
                         ponder_root_ = std::move(after_best);
-                        ponder_expected_move_ = info.pv[1];
+                        ponder_predicted_move_ = safe_info.pv[0];
+                        ponder_expected_move_ = safe_info.pv[1];
                     }
                 }
             }
         }
-        write_search_info(generation, info);
+        write_search_info(generation, safe_info);
     };
-    sink.on_complete = [this, generation, allow_ponder_move](const SearchResult& result) {
+    sink.on_complete = [this, generation, allow_ponder_move, search_root, limits, completion_once](
+                           const SearchResult& result) {
         debug_event("search complete generation " + std::to_string(generation));
-        SearchResult completed = result;
+        CompletionCandidate candidate;
+        candidate.best_move = result.best_move;
+        candidate.pv = result.pv;
+        candidate.ponder_move = result.ponder_move;
+        candidate.identity = result.identity;
+        candidate.source = result.stats.tbhits != 0 ? CompletionSource::tablebase :
+            (limits.ponder ? CompletionSource::ponder : CompletionSource::search);
+        const SearchRequestIdentity expected{generation, search_root.position_key(), search_root.fen()};
+        std::string last_command;
         {
             std::lock_guard lock(output_mutex_);
-            if (generation == generation_ && allow_ponder_move &&
-                result.best_move == principal_variation_best_move_) {
-                completed.ponder_move = principal_variation_ponder_move_;
+            if (generation == generation_ && allow_ponder_move && candidate.best_move.has_value() &&
+                candidate.best_move == principal_variation_best_move_) {
+                candidate.ponder_move = principal_variation_ponder_move_;
+            }
+            last_command = last_command_;
+        }
+        const CompletionValidation validation = completion_gate_.validate(
+            search_root, limits, expected, candidate);
+        const auto disposition_name = [](CompletionDisposition disposition) {
+            switch (disposition) {
+            case CompletionDisposition::emit: return "emit";
+            case CompletionDisposition::suppress_stale: return "suppress_stale";
+            case CompletionDisposition::fallback: return "fallback";
+            case CompletionDisposition::quarantine: return "quarantine";
+            }
+            return "unknown";
+        };
+        const std::string source = result.stats.tbhits != 0 ? "tablebase" :
+            (limits.ponder ? "ponder" : "search");
+        debug_json_event(
+            "completion_validation",
+            "\"message\":" + debug_quoted(
+                "completion_record generation=" + std::to_string(generation)) +
+                ",\"generation\":" + std::to_string(generation) +
+                ",\"result_generation\":" + std::to_string(result.identity.generation) +
+                ",\"root_fen\":" + debug_quoted(search_root.fen()) +
+                ",\"root_key\":" + debug_quoted(debug_hex(search_root.position_key())) +
+                ",\"result_root_key\":" + debug_quoted(debug_hex(result.identity.root_key)) +
+                ",\"root_key_match\":" +
+                    (result.identity.root_key == search_root.position_key() ? "true" : "false") +
+                ",\"root_fen_match\":" +
+                    (result.identity.root_fen == search_root.fen() ? "true" : "false") +
+                ",\"identity_match\":" + (validation.identity_match ? "true" : "false") +
+                ",\"candidate\":" + debug_quoted(
+                    candidate.best_move.has_value() ? candidate.best_move->uci() : "0000") +
+                ",\"native_legal\":" + (validation.native_legal ? "true" : "false") +
+                ",\"shadow_legal\":" + (validation.shadow_legal ? "true" : "false") +
+                ",\"searchmoves_legal\":" + (validation.searchmoves_legal ? "true" : "false") +
+                ",\"pv_legal\":" + (validation.pv_legal ? "true" : "false") +
+                ",\"ponder_legal\":" + (validation.ponder_legal ? "true" : "false") +
+                ",\"fallback_used\":" + (validation.fallback_used ? "true" : "false") +
+                ",\"validated\":" + debug_quoted(
+                    validation.best_move.has_value() ? validation.best_move->uci() : "0000") +
+                ",\"source\":" + debug_quoted(source) +
+                ",\"disposition\":" + debug_quoted(disposition_name(validation.disposition)) +
+                ",\"reason\":" + debug_quoted(validation.reason) +
+                ",\"completed\":" + (result.completed ? "true" : "false") +
+                ",\"cancelled\":" + (result.cancelled ? "true" : "false") +
+                ",\"failed\":" + (result.failed ? "true" : "false") +
+                ",\"last_command\":" + debug_quoted(last_command));
+        if (validation.disposition == CompletionDisposition::suppress_stale) {
+            debug_event("stale search completion suppressed generation " +
+                        std::to_string(generation) + " result_generation " +
+                        std::to_string(result.identity.generation) + " result_key " +
+                        std::to_string(result.identity.root_key));
+            return;
+        }
+        if (validation.fallback_used) {
+            debug_event("illegal or shadow-rejected search move replaced generation " +
+                        std::to_string(generation) + " fallback " +
+                        (validation.best_move.has_value() ? validation.best_move->uci() : "0000"));
+        }
+        if (validation.disposition == CompletionDisposition::quarantine) {
+            debug_event("fatal no common legal move for nonterminal search root generation " +
+                        std::to_string(generation) + " fen " + search_root.fen());
+            std::quick_exit(74);
+        }
+        if (!completion_once->try_claim()) {
+            debug_event("duplicate search completion suppressed generation " +
+                        std::to_string(generation));
+            return;
+        }
+        SearchResult completed = result;
+        completed.best_move = validation.best_move;
+        completed.pv = validation.pv;
+        completed.ponder_move = validation.ponder_move;
+        std::string after_fen = search_root.fen();
+        if (validation.best_move.has_value()) {
+            GameState after_move = search_root;
+            if (after_move.make_move(*validation.best_move)) {
+                after_fen = after_move.fen();
             }
         }
+        debug_json_event(
+            "move",
+            "\"generation\":" + std::to_string(generation) +
+                ",\"root_fen\":" + debug_quoted(search_root.fen()) +
+                ",\"root_key\":" + debug_quoted(debug_hex(search_root.position_key())) +
+                ",\"move\":" + debug_quoted(
+                    validation.best_move.has_value() ? validation.best_move->uci() : "0000") +
+                ",\"after_fen\":" + debug_quoted(after_fen) +
+                ",\"source\":" + debug_quoted(source));
         write_search_completion(generation, completed);
     };
 
@@ -744,14 +1064,23 @@ void UciController::start_search(GameState root, SearchLimits limits, bool skip_
     options.slow_mover_percent = slow_mover_percent_;
     options.limit_strength = limit_strength_;
     options.elo = elo_;
+    options.generation = generation;
     options.strength_mode = strength_mode_;
     options.syzygy = syzygy_;
     active_search_.emplace(search_service_.start(std::move(root), std::move(limits), std::move(sink), options));
 }
 
 void UciController::stop_active_search() {
+    {
+        std::lock_guard lock(output_mutex_);
+        if (state_ != ControllerState::ShuttingDown) {
+            state_ = ControllerState::Stopping;
+        }
+    }
     if (!active_search_.has_value()) {
         clear_ponder_state();
+        std::lock_guard lock(output_mutex_);
+        if (state_ != ControllerState::ShuttingDown) state_ = ControllerState::Idle;
         return;
     }
 
@@ -760,28 +1089,36 @@ void UciController::stop_active_search() {
     active_search_->wait();
     active_search_.reset();
     clear_ponder_state();
+    std::lock_guard lock(output_mutex_);
+    if (state_ != ControllerState::ShuttingDown) state_ = ControllerState::Idle;
 }
 
 void UciController::stop_and_suppress_active_search() {
-    if (!active_search_.has_value()) {
-        clear_ponder_state();
-        return;
-    }
-
     {
         std::lock_guard lock(output_mutex_);
         ++generation_;
+        if (state_ != ControllerState::ShuttingDown) {
+            state_ = ControllerState::Stopping;
+        }
     }
     debug_event("search cancellation requested with generation suppression");
-    active_search_->stop();
-    active_search_->wait();
-    active_search_.reset();
+    if (active_search_.has_value()) {
+        active_search_->stop();
+        active_search_->wait();
+        active_search_.reset();
+    }
     clear_ponder_state();
+    {
+        std::lock_guard lock(output_mutex_);
+        if (state_ != ControllerState::ShuttingDown) state_ = ControllerState::Idle;
+    }
 }
 
 void UciController::clear_ponder_state() {
+    ponder_origin_.reset();
     ponder_root_.reset();
     ponder_limits_.reset();
+    ponder_predicted_move_.reset();
     ponder_expected_move_.reset();
     active_ponder_ = false;
 }
@@ -820,7 +1157,7 @@ void UciController::write_handshake() {
                "option name StrengthMode type check default false\n"
                "option name SyzygyPath type string default \n"
                "option name SyzygyProbeDepth type spin default 1 min 1 max 100\n"
-               "option name SyzygyProbeLimit type spin default 5 min 0 max 5\n"
+               "option name SyzygyProbeLimit type spin default 5 min 0 max 7\n"
                "option name Syzygy50MoveRule type check default true\n"
                "uciok\n"
             << std::flush;
@@ -880,15 +1217,85 @@ void UciController::write_search_completion(std::uint64_t generation,
     output_ << '\n' << std::flush;
 }
 
-void UciController::write_book_completion(std::uint64_t generation, const BookChoice& choice,
-                                           std::uint32_t ply) {
+void UciController::write_book_completion(std::uint64_t generation, const GameState& root,
+                                           const SearchLimits& limits, const BookChoice& choice,
+                                           std::uint32_t ply,
+                                           const std::shared_ptr<CompletionOnce>& completion_once) {
+    CompletionCandidate candidate;
+    candidate.best_move = choice.move;
+    candidate.pv = {choice.move};
+    candidate.identity = SearchRequestIdentity{generation, root.position_key(), root.fen()};
+    candidate.source = CompletionSource::book;
+    const CompletionValidation validation = completion_gate_.validate(
+        root, limits, candidate.identity, candidate);
+    std::string last_command;
+    {
+        std::lock_guard lock(output_mutex_);
+        last_command = last_command_;
+    }
+    const auto disposition_name = [](CompletionDisposition disposition) {
+        switch (disposition) {
+        case CompletionDisposition::emit: return "emit";
+        case CompletionDisposition::suppress_stale: return "suppress_stale";
+        case CompletionDisposition::fallback: return "fallback";
+        case CompletionDisposition::quarantine: return "quarantine";
+        }
+        return "unknown";
+    };
+    debug_json_event(
+        "completion_validation",
+        "\"message\":" + debug_quoted(
+            "book_completion_record generation=" + std::to_string(generation)) +
+            ",\"generation\":" + std::to_string(generation) +
+            ",\"result_generation\":" + std::to_string(candidate.identity.generation) +
+            ",\"root_fen\":" + debug_quoted(root.fen()) +
+            ",\"root_key\":" + debug_quoted(debug_hex(root.position_key())) +
+            ",\"result_root_key\":" + debug_quoted(debug_hex(candidate.identity.root_key)) +
+            ",\"root_key_match\":true" +
+            ",\"root_fen_match\":true" +
+            ",\"identity_match\":" + (validation.identity_match ? "true" : "false") +
+            ",\"candidate\":" + debug_quoted(choice.move.uci()) +
+            ",\"native_legal\":" + (validation.native_legal ? "true" : "false") +
+            ",\"shadow_legal\":" + (validation.shadow_legal ? "true" : "false") +
+            ",\"searchmoves_legal\":" + (validation.searchmoves_legal ? "true" : "false") +
+            ",\"pv_legal\":" + (validation.pv_legal ? "true" : "false") +
+            ",\"ponder_legal\":" + (validation.ponder_legal ? "true" : "false") +
+            ",\"fallback_used\":" + (validation.fallback_used ? "true" : "false") +
+            ",\"validated\":" + debug_quoted(
+                validation.best_move.has_value() ? validation.best_move->uci() : "0000") +
+            ",\"source\":\"book\"" +
+            ",\"disposition\":" + debug_quoted(disposition_name(validation.disposition)) +
+            ",\"reason\":" + debug_quoted(validation.reason) +
+            ",\"last_command\":" + debug_quoted(last_command));
+    if (validation.disposition == CompletionDisposition::suppress_stale) {
+        debug_event("book completion suppressed as stale generation " + std::to_string(generation));
+        return;
+    }
+    if (validation.disposition == CompletionDisposition::quarantine) {
+        debug_event("fatal no common legal move for nonterminal book root generation " +
+                    std::to_string(generation) + " fen " + root.fen());
+        std::quick_exit(74);
+    }
+    if (!completion_once->try_claim()) {
+        debug_event("duplicate book completion suppressed generation " + std::to_string(generation));
+        return;
+    }
+    debug_json_event(
+        "move",
+        "\"generation\":" + std::to_string(generation) +
+            ",\"root_fen\":" + debug_quoted(root.fen()) +
+            ",\"root_key\":" + debug_quoted(debug_hex(root.position_key())) +
+            ",\"move\":" + debug_quoted(
+                validation.best_move.has_value() ? validation.best_move->uci() : "0000") +
+            ",\"source\":\"book\"" +
+            ",\"book_depth\":" + std::to_string(ply));
     std::lock_guard lock(output_mutex_);
     if (generation != generation_) {
         return;
     }
 
-    output_ << "info string book move " << choice.move.uci() << " depth " << ply << '\n'
-             << "bestmove " << choice.move.uci() << '\n' << std::flush;
+    output_ << "info string book move " << validation.best_move->uci() << " depth " << ply << '\n'
+             << "bestmove " << validation.best_move->uci() << '\n' << std::flush;
 }
 
 std::filesystem::path UciController::debug_path() const {
@@ -945,6 +1352,10 @@ void UciController::configure_debug_file() {
 }
 
 void UciController::debug_event(std::string message) noexcept {
+    debug_json_event("log", "\"message\":" + debug_quoted(message));
+}
+
+void UciController::debug_json_event(std::string event, std::string fields) noexcept {
     try {
         std::lock_guard lock(debug_mutex_);
         if (!debug_enabled_) {
@@ -957,7 +1368,12 @@ void UciController::debug_event(std::string message) noexcept {
         if (!debug_file_.is_open()) {
             return;
         }
-        message.push_back('\n');
+        std::string message = "{\"event\":" + debug_quoted(event);
+        if (!fields.empty()) {
+            message += ',';
+            message += fields;
+        }
+        message += "}\n";
         rotate_debug_file_if_needed(message.size());
         if (!debug_file_.is_open()) {
             debug_file_.open(debug_path(), std::ios::binary | std::ios::app);

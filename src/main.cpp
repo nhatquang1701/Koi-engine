@@ -11,6 +11,7 @@
 #endif
 
 #include "koi/classical_evaluator.hpp"
+#include "koi/cpu_features.hpp"
 #include "koi/search_service.hpp"
 #include "koi/uci_controller.hpp"
 
@@ -39,6 +40,12 @@ std::filesystem::path executable_directory(int argc, char* argv[]) {
 } // namespace
 
 int main(int argc, char* argv[]) {
+#if defined(NDEBUG) && defined(_MSC_VER)
+    if (!koi::cpu_supports_avx2()) {
+        std::cerr << "Koi Engine Release requires an x64 CPU with AVX2 support.\n";
+        return 3;
+    }
+#endif
     koi::SearchService search_service(std::make_shared<koi::ClassicalEvaluator>());
     koi::UciController controller(std::cin, std::cout, std::cerr, std::move(search_service),
                                   executable_directory(argc, argv));

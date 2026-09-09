@@ -43,6 +43,14 @@ class StockfishMatchOptionsTests(unittest.TestCase):
         self.assertIn("1320..3190", documentation)
         self.assertRegex(documentation, r"(?is)omit.*strength limiting.*disabled")
 
+    def test_paired_run_metadata_is_forwarded_to_the_uci_harness(self):
+        args = self.parser.parse_args(
+            self.base + ["--batch-id", "batch-03", "--run-label", "before"]
+        )
+        command = stockfish_match.build_command(args, powershell="pwsh-test")
+        self.assertEqual(command[command.index("-BatchId") + 1], "batch-03")
+        self.assertEqual(command[command.index("-RunLabel") + 1], "before")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,143 @@
+#pragma once
+
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <expected>
+#include <filesystem>
+#include <memory>
+#include <optional>
+#include <span>
+#include <string>
+#include <string_view>
+#include <vector>
+
+#include "koi/evaluation_features.hpp"
+#include "koi/evaluator.hpp"
+
+namespace koi {
+
+inline constexpr std::string_view kKoiNnueMagic = "KOI-NNUE";
+inline constexpr std::uint32_t kKoiNnueFormatVersion = 2;
+inline constexpr std::uint32_t kKoiNnueFeatureCount =
+    static_cast<std::uint32_t>(kNnuePieceSquareV1FeatureCount);
+inline constexpr std::uint32_t kKoiNnuePieceSquareKingPawnV2FeatureCount =
+    static_cast<std::uint32_t>(kNnuePieceSquareKingPawnV2FeatureCount);
+using NnueLayerSizes = std::array<std::uint32_t, 4>;
+inline constexpr NnueLayerSizes kKoiNnueLayerSizes{768, 128, 32, 1};
+inline constexpr NnueLayerSizes kKoiNnuePieceSquareKingPawnV2LayerSizes{960, 256, 32, 1};
+inline constexpr std::uint32_t kKoiNnueV2FeatureCount =
+    kKoiNnuePieceSquareKingPawnV2FeatureCount;
+inline constexpr NnueLayerSizes kKoiNnueV2LayerSizes =
+    kKoiNnuePieceSquareKingPawnV2LayerSizes;
+inline constexpr std::string_view kKoiNnueFeatureSet = kNnuePieceSquareV1FeatureSet;
+inline constexpr std::string_view kKoiNnuePieceSquareKingPawnV2FeatureSet =
+    kNnuePieceSquareKingPawnV2FeatureSet;
+inline constexpr std::string_view kKoiNnueV2FeatureSet =
+    kKoiNnuePieceSquareKingPawnV2FeatureSet;
+inline constexpr std::string_view kKoiNnueQuantization = "int16/int8";
+inline constexpr std::int32_t kKoiNnueClippedReluMaximum = 127;
+
+enum class NnueErrorCode : std::uint8_t {
+    io_error,
+    empty_container,
+    bad_magic,
+    unsupported_version,
+    malformed_manifest,
+    invalid_dimensions,
+    unsupported_feature_set,
+    unsupported_quantization,
+    invalid_file_size,
+    checksum_mismatch,
+};
+
+struct NnueError {
+    NnueErrorCode code = NnueErrorCode::malformed_manifest;
+    std::string message;
+};
+
+struct NnueManifest {
+    std::string magic;
+    std::uint32_t version = kKoiNnueFormatVersion;
+    NnueLayerSizes layer_sizes = kKoiNnueLayerSizes;
+    std::string feature_set;
+    std::string quantization = std::string(kKoiNnueQuantization);
+    std::uint64_t payload_size = 0;
+    std::array<std::uint8_t, 32> network_sha256{};
+};
+
+struct NnueNetwork {
+    NnueManifest manifest;
+    std::vector<std::int16_t> feature_weights;
+    std::vector<std::int32_t> hidden_bias;
+    std::vector<std::int8_t> bottleneck_weights;
+    std::vector<std::int32_t> bottleneck_bias;
+    std::vector<std::int8_t> output_weights;
+    std::int32_t output_bias = 0;
+
+    [[nodiscard]] static NnueNetwork synthetic();
+    [[nodiscard]] static NnueNetwork synthetic_v2();
+};
+
+class NnueLoader final {
+public:
+    [[nodiscard]] static std::expected<NnueNetwork, NnueError> load(
+        std::span<const std::uint8_t> container);
+    [[nodiscard]] static std::expected<NnueNetwork, NnueError> load_file(
+        const std::filesystem::path& path);
+    [[nodiscard]] static std::expected<std::vector<std::uint8_t>, NnueError> serialize(
+        const NnueNetwork& network);
+};
+
+struct NnueAccumulator {
+    std::vector<std::int16_t> values;
+    std::vector<std::int16_t> bottleneck_values;
+};
+
+enum class NnueInferencePath : std::uint8_t {
+    automatic,
+    scalar,
+    avx2_compatible,
+};
+
+class NnueWorker final {
+public:
+    explicit NnueWorker(std::shared_ptr<const NnueNetwork> weights);
+
+    [[nodiscard]] int evaluate(const EvaluationFeatures&, Color perspective,
+                               NnueInferencePath path = NnueInferencePath::automatic);
+    [[nodiscard]] int evaluate(const GameState&, Color perspective,
+                               NnueInferencePath path = NnueInferencePath::automatic);
+    [[nodiscard]] const NnueAccumulator& accumulator() const noexcept { return accumulator_; }
+
+private:
+    std::shared_ptr<const NnueNetwork> weights_;
+    NnueAccumulator accumulator_;
+};
+
+class NnueEvaluator final : public Evaluator {
+public:
+    explicit NnueEvaluator(std::shared_ptr<const NnueNetwork> weights);
+    NnueEvaluator(std::shared_ptr<const NnueNetwork> weights,
+                  std::shared_ptr<const Evaluator> fallback);
+
+    [[nodiscard]] int evaluate(const GameState&, Color perspective) const override;
+    [[nodiscard]] bool supports_concurrent_evaluation() const noexcept override { return true; }
+    [[nodiscard]] NnueWorker make_worker() const;
+    [[nodiscard]] bool enabled() const noexcept { return static_cast<bool>(weights_); }
+
+private:
+    std::shared_ptr<const NnueNetwork> weights_;
+    std::shared_ptr<const Evaluator> fallback_;
+};
+
+struct EvaluatorSelection {
+    std::shared_ptr<const Evaluator> evaluator;
+    bool nnue_enabled = false;
+    std::optional<NnueError> nnue_error;
+};
+
+[[nodiscard]] EvaluatorSelection make_evaluator(
+    std::optional<std::filesystem::path> nnue_path = std::nullopt);
+
+} // namespace koi

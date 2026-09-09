@@ -1,21 +1,32 @@
-# Koi Engine v1
+# Koi Engine v1.1.0
 
-Koi Engine v1 is a Windows x64 UCI chess engine for standard chess. It is
+Koi Engine v1.1.0 is a Windows x64 UCI chess engine for standard chess. It is
 written in C++26 and is documented and process-tested against En Croissant as
 the primary GUI workflow. It uses deterministic iterative-deepening alpha-beta search
-with a classical evaluator and a persistent transposition table. Search runs on
-a cancellable outer worker; `Threads > 1` enables deterministic authoritative
-root-parallel work while the UCI command loop remains responsive.
+with a classical evaluator, an opt-in Koi-native NNUE boundary, and a persistent
+transposition table. Search runs on a cancellable outer worker; `Threads > 1`
+enables deterministic authoritative root-parallel work while the UCI command loop
+remains responsive.
 
 ## Architecture
 
 The engine is deliberately layered so the chess rules implementation remains a
 private dependency. Public Koi rules types (`Move`, `GameState`, `Position`)
-never expose `chess.hpp`; `GameState` converts to the vendored chess-library
-only in its implementation. `ClassicalEvaluator`, time management, the
-transposition table, and the `SearchService` build on those Koi
-types. The UCI controller owns the current position and worker lifecycle, and
-is the only layer that writes protocol output.
+never expose `chess.hpp`. The native `Position` core owns the legality, key,
+rule-state, and move-generation contract; `GameState` remains the compatibility
+facade used by the existing evaluator/search/UCI APIs. During the migration,
+`GameState` keeps a synchronized vendored chess-library mirror only for legacy
+feature, Polyglot-book, and tablebase adapters. The mirror is not part of the
+public API and is covered by the opt-in `KOI_BUILD_SHADOW_DIFF` differential
+target. `ClassicalEvaluator`, time management, the transposition table, and the
+`SearchService` build on Koi-owned types. The UCI controller owns the current
+position and worker lifecycle, and is the only layer that writes protocol output.
+
+The C++26 module boundary is represented by the aggregate `koi` module and the
+partitions `koi:types`, `koi:position`, `koi:eval`, `koi:tablebase`,
+`koi:search`, and `koi:runtime`. These partitions export stable value contracts;
+the implementation headers remain internal so future search and evaluation work
+does not create an ABI promise.
 
 Search ordering is also an internal search concern: TT best moves are tried
 first, followed by MVV-LVA captures/promotions, two killer moves, and quiet-move
@@ -85,7 +96,7 @@ configuration as the corresponding engine controls. Every text report includes
 and is useful for comparing warmed-table behavior. The default is cold.
 `--timed` is opt-in and adds wall-clock `elapsed_ms` and measured NPS to text and
 JSON; it is intentionally absent from the default CI-shaped output. Untimed JSON
-profiles use the stable `Koi Engine 1.0` build identity, set `timed` to `false`,
+profiles use the stable `Koi Engine 1.1.0` build identity, set `timed` to `false`,
 and record `nps` as unmeasured (`0`). Each profile carries `hash_state` (`cold` or
 `warm`) at the top level and on every position. It is a separate process and never
 writes to the UCI engine's stdout.
@@ -142,6 +153,20 @@ python .\tools\elo_oracle.py `
 The PGN, Stockfish executable/version, and licensed `book.bin` are external inputs;
 none are assumed to exist in this repository. Do not report an Elo or CPL improvement
 until both a comparable baseline and an after-change report have been generated.
+
+The offline Koi-native NNUE boundary is dependency-free in synthetic mode and has
+separate entry points for future training/export automation. Both wrappers use the
+same versioned implementation and emit the `piece-square-king-pawn-v2` container;
+they do not add a Python runtime dependency to the engine:
+
+```powershell
+python .\tools\train_nnue.py --help
+python .\tools\export_nnue.py --help
+```
+
+`--backend synthetic` is deterministic and suitable for boundary tests. The optional
+PyTorch backend is offline-only, records corpus and network provenance, and must pass
+the Koi loader and strength gates before any network is considered for runtime use.
 
 For a reproducible local match against Stockfish or another UCI engine, use the
 optional PowerShell harness:
@@ -290,9 +315,10 @@ ctest --test-dir out\release-vs -C Release --output-on-failure
 ```
 
 The optional corpus is retained for local tuning and is deliberately not an Elo or NPS
-CI threshold. NNUE, tablebases, and chess variants remain deferred; opening-book
+CI threshold. NNUE remains opt-in and classical evaluation remains the safe default;
+Syzygy tablebases are optional, and chess variants remain out of scope. Opening-book
 defaults, placement, fallback, and bypass behavior are documented below. This engine
-continues to evaluate standard chess with its classical evaluator.
+continues to evaluate standard FIDE chess.
 
 ### Task 5 release verification (2026-09-05)
 
@@ -316,15 +342,23 @@ The fresh UCI smoke transcript produced 26 lines, 21 option declarations, one
 legal coordinate `bestmove`, and empty stderr. CTest and the direct Release
 process checks covered the handshake, analysis/tutor `MultiPV`, ponder/`ponderhit`,
 book hit and missing-book fallback, `stop`, `quit`, input EOF, and clean stdout.
-The fresh Lucas-style process scenario completed 24 legal plies with `Hash=512`,
+The fresh En Croissant-style process scenario completed 24 legal plies with `Hash=512`,
 `Threads=4`, and `Speed=100`; both engine processes shut down cleanly. Direct
 replay output classified the repeated knight sequence as a legal rule draw.
 
 No Stockfish executable, fresh CPL corpus, or fresh color-balanced match data was
 available in this environment. Therefore this release verification makes no Elo,
-CPL, or playing-strength improvement claim. Lucas Chess itself was not installed
-for GUI automation; use the Release executable and the settings below for the
+CPL, or playing-strength improvement claim. En Croissant GUI automation was not
+available in that run; use the Release executable and the settings below for the
 remaining manual registration/play check.
+
+The architecture follow-up verification on 2026-09-06 rebuilt the existing
+MSVC x64 Release tree with no pending compilation work and ran all 26 registered
+CTest tests. The suite passed 26/26 in 197.30 seconds, including the native
+position/module tests, benchmark process gate, UCI process tests, En Croissant
+scenario, package layout, and Python measurement-tool tests. This confirms the
+current checkout is regression-clean; it does not replace the still-missing
+external Stockfish/Lc0 strength campaign.
 
 ## UCI smoke test
 
@@ -423,7 +457,7 @@ the strength hook is reserved for a later calibrated profile.
 
 Syzygy support is optional and never requires tablebase files for build, startup,
 or ordinary search. Set `SyzygyPath` to a directory containing licensed `.rtbw`
-and `.rtbz` files. `SyzygyProbeLimit` accepts 0..5 pieces (default 5),
+and `.rtbz` files. `SyzygyProbeLimit` accepts 0..7 pieces (default 5),
 `SyzygyProbeDepth` accepts 1..100 (default 1), and `Syzygy50MoveRule` defaults to
 true. An empty, missing, unreadable, malformed, over-limit, or unsupported
 position safely falls back to normal search. Root WDL/DTZ selection is used only
@@ -481,7 +515,7 @@ covers the handshake, options, positions with moves, stopped searches,
 MultiPV, infinite analysis, and clean quit with exactly one legal `bestmove`
 per search. Any other standard UCI GUI can use the same executable and options.
 
-## Register in Lucas Chess (generic UCI fallback)
+## Generic UCI fallback (including Lucas Chess)
 
 1. Build the engine and resolve the path to `koi-engine.exe`.
 2. In Lucas Chess, open the engine-management or configuration dialog and add

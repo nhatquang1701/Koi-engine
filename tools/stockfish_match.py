@@ -112,6 +112,17 @@ def _build_parser() -> argparse.ArgumentParser:
         default=default_results_directory() / "matches",
         help="directory for JSON and PGN reports",
     )
+    parser.add_argument(
+        "--batch-id",
+        default="batch-00",
+        help="paired schedule batch identity recorded in the match report",
+    )
+    parser.add_argument(
+        "--run-label",
+        choices=("measurement", "before", "after"),
+        default="measurement",
+        help="paired-run label recorded in the match report",
+    )
     return parser
 
 
@@ -173,6 +184,8 @@ def build_command(args: argparse.Namespace, powershell: Optional[str] = None) ->
     _append(command, "-MaxPlies", args.max_plies)
     _append(command, "-TimeoutMilliseconds", args.timeout_ms)
     _append(command, "-KoiColor", args.koi_color)
+    _append(command, "-BatchId", args.batch_id)
+    _append(command, "-RunLabel", args.run_label)
     return command
 
 

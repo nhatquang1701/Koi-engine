@@ -22,6 +22,7 @@ from typing import Any, Mapping, Optional, Sequence
 SCHEMA = "koi-rough-elo-estimate-v1"
 ANCHOR_SCHEMA = "koi-elo-anchor-manifest-v1"
 MATCH_SCHEMA = "koi-uci-match-v2"
+SCHEDULE_SCHEMA = "koi-elo-schedule-v1"
 BATCH_GAMES = 64
 OPENING_COUNT = 32
 BOOTSTRAP_SAMPLES = 2000
@@ -90,6 +91,8 @@ class BatchPlan:
     anchor: Anchor
     phase: str
     games: int = BATCH_GAMES
+    opening_names: tuple[str, ...] = ()
+    pair_id: str = ""
 
 
 @dataclass(frozen=True)
@@ -257,21 +260,229 @@ def normalize_result(result: str, koi_color: str) -> float:
     return white_scores[result] if koi_color == "white" else 1.0 - white_scores[result]
 
 
-def plan_schedule(anchors: Sequence[Anchor], prior_elo: int, target_games: int, observed_scores: Optional[Mapping[int, Sequence[float]]] = None) -> tuple[BatchPlan, ...]:
+def _normalize_opening_names(opening_names: Optional[Sequence[str]]) -> tuple[str, ...]:
+    if opening_names is None:
+        return ()
+    normalized = tuple(str(name).strip() for name in opening_names)
+    if len(normalized) != OPENING_COUNT or len(set(normalized)) != OPENING_COUNT or any(not name for name in normalized):
+        raise EloEstimateError("schedule opening names must contain exactly 32 unique non-empty names")
+    return normalized
+
+
+def plan_schedule(
+    anchors: Sequence[Anchor],
+    prior_elo: int,
+    target_games: int,
+    observed_scores: Optional[Mapping[int, Sequence[float]]] = None,
+    opening_names: Optional[Sequence[str]] = None,
+) -> tuple[BatchPlan, ...]:
     """Plan 64-game paired batches; unobserved dry runs are deterministic."""
 
     if target_games not in {128, 192, 256, 320}:
         raise EloEstimateError("target games must be exactly one of 128, 192, 256, or 320")
+    normalized_openings = _normalize_opening_names(opening_names)
     lower, upper = _initial_anchors(anchors, prior_elo)
-    schedule = [BatchPlan(1, lower, "initial"), BatchPlan(2, upper, "initial")]
+    schedule = [
+        BatchPlan(1, lower, "initial", BATCH_GAMES, normalized_openings, "batch-01"),
+        BatchPlan(2, upper, "initial", BATCH_GAMES, normalized_openings, "batch-02"),
+    ]
     target = float(prior_elo)
     if observed_scores:
         fit = fit_rating(observed_scores)
         target = float(fit.elo if fit.elo is not None else (fit.lower_bound + fit.upper_bound) / 2.0)
     ordered = tuple(sorted(anchors, key=lambda anchor: (abs(anchor.rating - target), anchor.rating, anchor.id)))
     while len(schedule) * BATCH_GAMES < target_games:
-        schedule.append(BatchPlan(len(schedule) + 1, ordered[0], "adaptive"))
+        ordinal = len(schedule) + 1
+        schedule.append(
+            BatchPlan(
+                ordinal,
+                ordered[0],
+                "adaptive",
+                BATCH_GAMES,
+                normalized_openings,
+                f"batch-{ordinal:02d}",
+            )
+        )
     return tuple(schedule)
+
+
+def _schedule_batch_dict(batch: BatchPlan) -> dict[str, Any]:
+    if batch.games != BATCH_GAMES:
+        raise EloEstimateError("every paired schedule batch must contain exactly 64 games")
+    pair_id = batch.pair_id or f"batch-{batch.ordinal:02d}"
+    return {
+        "ordinal": int(batch.ordinal),
+        "pair_id": pair_id,
+        "phase": batch.phase,
+        "games": int(batch.games),
+        "anchor": {
+            "id": batch.anchor.id,
+            "rating": int(batch.anchor.rating),
+            "stockfish_uci_elo": batch.anchor.stockfish_elo,
+            "rating_source": batch.anchor.rating_source,
+            "path": str(batch.anchor.path),
+        },
+    }
+
+
+def build_schedule_manifest(
+    schedule: Sequence[BatchPlan],
+    *,
+    prior_elo: int,
+    opening_names: Optional[Sequence[str]] = None,
+    run_labels: Sequence[str] = ("before", "after"),
+) -> dict[str, Any]:
+    """Build a portable paired schedule manifest for before/after runs."""
+
+    batches = tuple(schedule)
+    if len(batches) < 2 or sum(batch.games for batch in batches) not in {128, 192, 256, 320}:
+        raise EloEstimateError("schedule must contain 128, 192, 256, or 320 games")
+    expected_openings = _normalize_opening_names(
+        opening_names if opening_names is not None else (batches[0].opening_names or None)
+    )
+    if len(expected_openings) != OPENING_COUNT:
+        raise EloEstimateError("paired schedule export requires exactly 32 opening names")
+    if any(batch.opening_names not in {(), expected_openings} for batch in batches):
+        raise EloEstimateError("schedule batches do not share one deterministic opening order")
+    labels = tuple(str(label).strip() for label in run_labels)
+    if labels != ("before", "after") or len(set(labels)) != len(labels):
+        raise EloEstimateError("schedule run labels must be exactly before and after")
+    if [batch.ordinal for batch in batches] != list(range(1, len(batches) + 1)):
+        raise EloEstimateError("schedule batch ordinals must be contiguous")
+    if [batch.phase for batch in batches[:2]] != ["initial", "initial"] or any(
+        batch.phase != "adaptive" for batch in batches[2:]
+    ):
+        raise EloEstimateError("schedule must begin with two initial batches followed by adaptive batches")
+    payload: dict[str, Any] = {
+        "schema": SCHEDULE_SCHEMA,
+        "schema_version": 1,
+        "measurement": {
+            "prior_elo": int(prior_elo),
+            "target_games": sum(batch.games for batch in batches),
+            "initial_games": 128,
+            "adaptive_batch_games": BATCH_GAMES,
+            "max_games": 320,
+        },
+        "pairing": {
+            "unit": "one opening played once with Koi White and once with Koi Black",
+            "opening_count": OPENING_COUNT,
+            "opening_names": list(expected_openings),
+            "run_labels": list(labels),
+        },
+        "batches": [_schedule_batch_dict(batch) for batch in batches],
+    }
+    payload["schedule_sha256"] = reproducibility_hash(payload)
+    return payload
+
+
+def export_schedule(
+    path: Path,
+    schedule: Sequence[BatchPlan],
+    *,
+    prior_elo: int,
+    opening_names: Optional[Sequence[str]] = None,
+    run_labels: Sequence[str] = ("before", "after"),
+) -> dict[str, Any]:
+    """Write an external schedule artifact that can be reused for both runs."""
+
+    destination = _output_is_external(path)
+    payload = build_schedule_manifest(
+        schedule,
+        prior_elo=prior_elo,
+        opening_names=opening_names,
+        run_labels=run_labels,
+    )
+    try:
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    except OSError as error:
+        raise EloEstimateError(f"unable to write schedule artifact: {destination}") from error
+    return payload
+
+
+def import_schedule(
+    path: Path,
+    anchors: Sequence[Anchor],
+    *,
+    expected_openings: Optional[Sequence[str]] = None,
+    prior_elo: Optional[int] = None,
+) -> tuple[BatchPlan, ...]:
+    """Load and validate an exported schedule before launching any engines."""
+
+    schedule_path = _require_file(path, "schedule artifact")
+    try:
+        payload = json.loads(schedule_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise EloEstimateError(f"invalid schedule artifact: {schedule_path}") from error
+    if not isinstance(payload, Mapping) or payload.get("schema") != SCHEDULE_SCHEMA:
+        raise EloEstimateError(f"schedule schema must be {SCHEDULE_SCHEMA}")
+    supplied_hash = payload.get("schedule_sha256")
+    without_hash = dict(payload)
+    without_hash.pop("schedule_sha256", None)
+    if supplied_hash != reproducibility_hash(without_hash):
+        raise EloEstimateError("schedule reproducibility hash does not match its content")
+    measurement = payload.get("measurement")
+    pairing = payload.get("pairing")
+    raw_batches = payload.get("batches")
+    if not isinstance(measurement, Mapping) or not isinstance(pairing, Mapping) or not isinstance(raw_batches, list):
+        raise EloEstimateError("schedule artifact is missing measurement, pairing, or batches")
+    target_games = measurement.get("target_games")
+    if type(target_games) is not int or target_games not in {128, 192, 256, 320}:
+        raise EloEstimateError("schedule target_games must be 128, 192, 256, or 320")
+    if measurement.get("initial_games") != 128 or measurement.get("adaptive_batch_games") != BATCH_GAMES or measurement.get("max_games") != 320:
+        raise EloEstimateError("schedule measurement contract is invalid")
+    if len(raw_batches) not in {2, 3, 4, 5} or target_games != len(raw_batches) * BATCH_GAMES:
+        raise EloEstimateError("schedule target_games does not match its batches")
+    if pairing.get("opening_count") != OPENING_COUNT:
+        raise EloEstimateError("schedule opening_count must be 32")
+    stored_prior = measurement.get("prior_elo")
+    if type(stored_prior) is not int or (prior_elo is not None and stored_prior != prior_elo):
+        raise EloEstimateError("schedule prior Elo does not match the requested run")
+    stored_openings = pairing.get("opening_names")
+    normalized_openings = _normalize_opening_names(stored_openings)
+    if expected_openings is not None and normalized_openings != _normalize_opening_names(expected_openings):
+        raise EloEstimateError("schedule opening corpus does not match the requested corpus")
+    if pairing.get("run_labels") != ["before", "after"]:
+        raise EloEstimateError("schedule must declare before and after run labels")
+    anchor_by_id = {anchor.id: anchor for anchor in anchors}
+    batches: list[BatchPlan] = []
+    for index, raw_batch in enumerate(raw_batches, start=1):
+        if not isinstance(raw_batch, Mapping) or not isinstance(raw_batch.get("anchor"), Mapping):
+            raise EloEstimateError(f"malformed schedule batch {index}")
+        raw_anchor = raw_batch["anchor"]
+        anchor_id = raw_anchor.get("id")
+        anchor = anchor_by_id.get(anchor_id)
+        raw_path = raw_anchor.get("path")
+        if (
+            anchor is None
+            or anchor.rating != raw_anchor.get("rating")
+            or anchor.stockfish_elo != raw_anchor.get("stockfish_uci_elo")
+            or raw_anchor.get("rating_source") != anchor.rating_source
+            or not isinstance(raw_path, str)
+            or not _same_path(Path(raw_path), anchor.path)
+        ):
+            raise EloEstimateError(f"schedule anchor does not match the current manifest: {anchor_id}")
+        if raw_batch.get("ordinal") != index or raw_batch.get("pair_id") != f"batch-{index:02d}":
+            raise EloEstimateError(f"malformed schedule batch identity {index}")
+        if raw_batch.get("games") != BATCH_GAMES:
+            raise EloEstimateError("schedule batches must contain exactly 64 games")
+        expected_phase = "initial" if index <= 2 else "adaptive"
+        if raw_batch.get("phase") != expected_phase:
+            raise EloEstimateError(f"malformed schedule phase for batch {index}")
+        batches.append(
+            BatchPlan(
+                index,
+                anchor,
+                expected_phase,
+                BATCH_GAMES,
+                normalized_openings,
+                f"batch-{index:02d}",
+            )
+        )
+    return tuple(batches)
+
+
+load_schedule = import_schedule
 
 
 def koi_option_set(mode: str, book: Optional[Path]) -> dict[str, Any]:
@@ -585,11 +796,25 @@ def _parse_harness_paths(stdout: str) -> tuple[Path, Path]:
     return _require_file(json_paths[0], "match JSON artifact"), _require_file(pgn_paths[0], "match PGN artifact")
 
 
-def _harness_command(powershell: str, koi: Path, replay: Path, anchor: Anchor, openings: Path, output_directory: Path, color: str, time_control: Optional[str], movetime_ms: Optional[int], koi_options: Mapping[str, Any]) -> list[str]:
+def _harness_command(
+    powershell: str,
+    koi: Path,
+    replay: Path,
+    anchor: Anchor,
+    openings: Path,
+    output_directory: Path,
+    color: str,
+    time_control: Optional[str],
+    movetime_ms: Optional[int],
+    koi_options: Mapping[str, Any],
+    batch: Optional[BatchPlan] = None,
+    run_label: str = "measurement",
+) -> list[str]:
     script = Path(__file__).with_name("uci_match.ps1").resolve()
     if not script.is_file():
         raise EloEstimateError(f"match harness is missing: {script}")
-    command = [powershell, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(script), "-KoiPath", str(koi), "-OpponentPath", str(anchor.path), "-ReplayPath", str(replay), "-OpeningFile", str(openings), "-OutputDirectory", str(output_directory), "-Games", "1", "-KoiColor", color, "-KoiRandomSeed", "1", "-Hash", "512", "-Threads", "4", "-Speed", "100", "-KoiOwnBook", str(koi_options["OwnBook"]).lower(), "-KoiBookRandom", "false"]
+    batch_id = batch.pair_id if batch is not None else "batch-00"
+    command = [powershell, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(script), "-KoiPath", str(koi), "-OpponentPath", str(anchor.path), "-ReplayPath", str(replay), "-OpeningFile", str(openings), "-OutputDirectory", str(output_directory), "-Games", "1", "-KoiColor", color, "-KoiRandomSeed", "1", "-Hash", "512", "-Threads", "4", "-Speed", "100", "-KoiOwnBook", str(koi_options["OwnBook"]).lower(), "-KoiBookRandom", "false", "-BatchId", batch_id, "-RunLabel", run_label]
     if time_control is not None:
         command.extend(["-TimeControl", time_control])
     else:
@@ -601,8 +826,35 @@ def _harness_command(powershell: str, koi: Path, replay: Path, anchor: Anchor, o
     return command
 
 
-def _run_color_batch(powershell: str, koi: Path, replay: Path, anchor: Anchor, openings_path: Path, expected_openings: Mapping[str, Sequence[str]], output_directory: Path, color: str, time_control: Optional[str], movetime_ms: Optional[int], koi_options: Mapping[str, Any]) -> tuple[tuple[MatchGame, ...], list[dict[str, str]], Mapping[str, Any]]:
-    command = _harness_command(powershell, koi, replay, anchor, openings_path, output_directory, color, time_control, movetime_ms, koi_options)
+def _run_color_batch(
+    powershell: str,
+    koi: Path,
+    replay: Path,
+    anchor: Anchor,
+    openings_path: Path,
+    expected_openings: Mapping[str, Sequence[str]],
+    output_directory: Path,
+    color: str,
+    time_control: Optional[str],
+    movetime_ms: Optional[int],
+    koi_options: Mapping[str, Any],
+    batch: Optional[BatchPlan] = None,
+    run_label: str = "measurement",
+) -> tuple[tuple[MatchGame, ...], list[dict[str, str]], Mapping[str, Any]]:
+    command = _harness_command(
+        powershell,
+        koi,
+        replay,
+        anchor,
+        openings_path,
+        output_directory,
+        color,
+        time_control,
+        movetime_ms,
+        koi_options,
+        batch,
+        run_label,
+    )
     try:
         completed = subprocess.run(command, capture_output=True, text=True, check=False)
     except OSError as error:
@@ -686,6 +938,9 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--mode", choices=("no-book", "book"), default="no-book")
     parser.add_argument("--book", type=Path)
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("--schedule-export", type=Path, help="write the paired schedule artifact outside the repository")
+    parser.add_argument("--schedule-import", type=Path, help="reuse a previously exported paired schedule")
+    parser.add_argument("--run-label", choices=("measurement", "before", "after"), default="measurement")
     parser.add_argument("--dry-run", action="store_true")
     return parser
 
@@ -713,7 +968,42 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     args = _build_parser().parse_args(argv)
     try:
         koi, replay, stockfish, openings_path, openings, manifest, time_control, movetime_ms, options, output, hashes = _validate_arguments(args)
-        dry_schedule = plan_schedule(manifest.anchors, args.prior_elo, args.max_games)
+        opening_names = tuple(opening.name for opening in openings)
+        if args.schedule_import is not None:
+            _output_is_external(args.schedule_import)
+            planned_schedule = import_schedule(
+                args.schedule_import,
+                manifest.anchors,
+                expected_openings=opening_names,
+                prior_elo=args.prior_elo,
+            )
+            imported_schedule = True
+            if sum(batch.games for batch in planned_schedule) > args.max_games:
+                raise EloEstimateError("imported schedule exceeds --max-games")
+            if sum(batch.games for batch in planned_schedule) < args.min_games:
+                raise EloEstimateError("imported schedule does not reach --min-games")
+        else:
+            planned_schedule = plan_schedule(
+                manifest.anchors,
+                args.prior_elo,
+                args.max_games,
+                opening_names=opening_names,
+            )
+            imported_schedule = False
+        schedule_manifest = build_schedule_manifest(
+            planned_schedule,
+            prior_elo=args.prior_elo,
+            opening_names=opening_names,
+        )
+        exported_schedule_path: Optional[Path] = None
+        if args.schedule_export is not None:
+            exported_schedule_path = _output_is_external(args.schedule_export)
+            export_schedule(
+                exported_schedule_path,
+                planned_schedule,
+                prior_elo=args.prior_elo,
+                opening_names=opening_names,
+            )
         opening_sequences = {opening.name: opening.moves for opening in openings}
         artifacts: list[dict[str, str]] = []
         all_games: list[MatchGame] = []
@@ -723,32 +1013,30 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         if not args.dry_run:
             powershell = _powershell_executable()
             artifact_root = output.parent / f"{output.stem}-artifacts"
-            schedule = list(plan_schedule(manifest.anchors, args.prior_elo, 128))
+            schedule = list(planned_schedule)
             while schedule:
                 batch = schedule.pop(0)
                 batch_directory = artifact_root / f"batch-{batch.ordinal:02d}-{batch.anchor.id}"
-                white, white_artifacts, white_report = _run_color_batch(powershell, koi, replay, batch.anchor, openings_path, opening_sequences, batch_directory / "white", "white", time_control, movetime_ms, options)
-                black, black_artifacts, black_report = _run_color_batch(powershell, koi, replay, batch.anchor, openings_path, opening_sequences, batch_directory / "black", "black", time_control, movetime_ms, options)
-                pairs.setdefault(batch.anchor.rating, []).extend(_pairs_for_batch(white, black, [opening.name for opening in openings]))
+                white, white_artifacts, white_report = _run_color_batch(powershell, koi, replay, batch.anchor, openings_path, opening_sequences, batch_directory / "white", "white", time_control, movetime_ms, options, batch, args.run_label)
+                black, black_artifacts, black_report = _run_color_batch(powershell, koi, replay, batch.anchor, openings_path, opening_sequences, batch_directory / "black", "black", time_control, movetime_ms, options, batch, args.run_label)
+                pairs.setdefault(batch.anchor.rating, []).extend(_pairs_for_batch(white, black, list(opening_names)))
                 all_games.extend(white)
                 all_games.extend(black)
                 artifacts.extend(white_artifacts + black_artifacts)
                 reports.extend([{"anchor_id": batch.anchor.id, "color": "white", "engine_ids": white_report["engines"]}, {"anchor_id": batch.anchor.id, "color": "black", "engine_ids": black_report["engines"]}])
                 executed.append(batch)
-                if schedule:
-                    continue
                 if len(all_games) < args.min_games:
-                    need_next = True
-                else:
-                    interim = _estimate_summary(all_games, pairs, manifest.anchors[0].rating, manifest.anchors[-1].rating)
-                    stockfish_floor = min(anchor.rating for anchor in manifest.anchors if anchor.stockfish_elo is not None)
-                    if interim["estimate"]["raw_logistic_elo"] < stockfish_floor and not any(anchor.stockfish_elo is None for anchor in manifest.anchors):
-                        raise EloEstimateError("an external lower anchor is required because the fitted estimate is below the Stockfish floor")
-                    need_next = bool(interim["estimate"]["low_confidence"])
-                if need_next and len(all_games) < args.max_games:
-                    observed = {rating: [score for pair in anchor_pairs for score in pair] for rating, anchor_pairs in pairs.items()}
-                    next_schedule = plan_schedule(manifest.anchors, args.prior_elo, len(all_games) + BATCH_GAMES, observed)
-                    schedule.append(next_schedule[-1])
+                    continue
+                if len(all_games) >= args.max_games or imported_schedule:
+                    continue
+                interim = _estimate_summary(all_games, pairs, manifest.anchors[0].rating, manifest.anchors[-1].rating)
+                stockfish_floor = min(anchor.rating for anchor in manifest.anchors if anchor.stockfish_elo is not None)
+                if interim["estimate"]["raw_logistic_elo"] < stockfish_floor and not any(anchor.stockfish_elo is None for anchor in manifest.anchors):
+                    raise EloEstimateError("an external lower anchor is required because the fitted estimate is below the Stockfish floor")
+                if not interim["estimate"]["low_confidence"]:
+                    schedule.clear()
+            if exported_schedule_path is not None:
+                artifacts.append({"kind": "schedule", "path": str(exported_schedule_path), "sha256": sha256_file(exported_schedule_path, "schedule artifact")})
         summary = _estimate_summary(all_games, pairs, manifest.anchors[0].rating, manifest.anchors[-1].rating)
         report: dict[str, Any] = {
             "schema": SCHEMA,
@@ -757,7 +1045,13 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             "estimate": summary["estimate"],
             "results": summary["results"],
             "anchors": [{"id": anchor.id, "path": str(anchor.path), "rating": anchor.rating, "rating_source": anchor.rating_source, "stockfish_uci_elo": anchor.stockfish_elo} for anchor in manifest.anchors],
-            "batches": [{"ordinal": batch.ordinal, "phase": batch.phase, "anchor_id": batch.anchor.id, "anchor_rating": batch.anchor.rating, "games": batch.games} for batch in (dry_schedule if args.dry_run else executed)],
+            "batches": [{"ordinal": batch.ordinal, "pair_id": batch.pair_id, "phase": batch.phase, "anchor_id": batch.anchor.id, "anchor_rating": batch.anchor.rating, "games": batch.games, "opening_names": list(batch.opening_names)} for batch in (planned_schedule if args.dry_run else executed)],
+            "schedule": {
+                "schema": schedule_manifest["schema"],
+                "schedule_sha256": schedule_manifest["schedule_sha256"],
+                "source": "imported" if imported_schedule else "planned",
+                "path": str(args.schedule_import) if args.schedule_import is not None else (str(exported_schedule_path) if exported_schedule_path is not None else None),
+            },
             "configuration": {
                 "measurement": {
                     "label": LOCAL_ELO_MEASUREMENT_LABEL,
@@ -782,6 +1076,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                     "seed": BOOTSTRAP_SEED,
                     "unit": "paired opening (Koi White plus Koi Black)",
                 },
+                "run_label": args.run_label,
             },
             "artifacts": artifacts,
             "engine_provenance": reports,

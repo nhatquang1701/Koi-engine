@@ -60,12 +60,18 @@ param(
     [int]$TimeoutMilliseconds = 5000,
 
     [ValidateSet('white', 'black')]
-    [string]$KoiColor = 'white'
+    [string]$KoiColor = 'white',
+
+    [ValidatePattern('^[^\s]+$')]
+    [string]$BatchId = 'batch-00',
+
+    [ValidateSet('measurement', 'before', 'after')]
+    [string]$RunLabel = 'measurement'
 )
 
 $ErrorActionPreference = 'Stop'
-$KoiOwnBook = $KoiOwnBook -in @('true', '1')
-$KoiBookRandom = $KoiBookRandom -in @('true', '1')
+$KoiOwnBookEnabled = $KoiOwnBook -in @('true', '1')
+$KoiBookRandomEnabled = $KoiBookRandom -in @('true', '1')
 $OpponentEloAnchor = $null
 if ($null -ne $OpponentElo) {
     $OpponentEloAnchor = [Math]::Max(1320, [Math]::Min(3190, $OpponentElo))
@@ -275,10 +281,10 @@ function Initialize-UciEngine($Engine) {
     if ($Engine.Label -ceq 'Koi') {
         foreach ($option in @(
             "setoption name RandomSeed value $KoiRandomSeed",
-            "setoption name OwnBook value $($KoiOwnBook.ToString().ToLowerInvariant())",
+            "setoption name OwnBook value $($KoiOwnBookEnabled.ToString().ToLowerInvariant())",
             "setoption name BookFile value $KoiBookFile",
             "setoption name BookDepth value $KoiBookDepth",
-            "setoption name BookRandom value $($KoiBookRandom.ToString().ToLowerInvariant())"
+            "setoption name BookRandom value $($KoiBookRandomEnabled.ToString().ToLowerInvariant())"
         )) {
             Send-UciLine $Engine $option
             $Engine.SentOptions.Add($option)
@@ -531,6 +537,73 @@ function Get-PgnHeaderValue([string]$Value) {
     return $Value.Replace('"', '')
 }
 
+function Get-EngineVersion([string]$Name) {
+    $match = [regex]::Match($Name, '\b(?:v)?(\d+(?:\.\d+)+[-+._A-Za-z0-9]*)\b')
+    if ($match.Success) {
+        return $match.Groups[1].Value
+    }
+    return 'unknown'
+}
+
+function Get-EngineSha256([string]$Path) {
+    $hashAlgorithm = [System.Security.Cryptography.SHA256]::Create()
+    $stream = [System.IO.File]::OpenRead($Path)
+    try {
+        return (($hashAlgorithm.ComputeHash($stream) | ForEach-Object { $_.ToString('x2') }) -join '')
+    } finally {
+        $stream.Dispose()
+        $hashAlgorithm.Dispose()
+    }
+}
+
+function Get-HardwareMetadata {
+    return [ordered]@{
+        os = [Environment]::OSVersion.VersionString
+        machine = if ([string]::IsNullOrWhiteSpace($env:PROCESSOR_ARCHITECTURE)) { 'unknown' } else { $env:PROCESSOR_ARCHITECTURE }
+        processor = if ([string]::IsNullOrWhiteSpace($env:PROCESSOR_IDENTIFIER)) { 'unknown' } else { $env:PROCESSOR_IDENTIFIER }
+        cpu_count = [Environment]::ProcessorCount
+        powershell_version = $PSVersionTable.PSVersion.ToString()
+    }
+}
+
+function Get-PositionClassification([string]$Fen, [int]$Ply) {
+    $fields = if ($Fen -ceq 'startpos') { @('start', 'w', 'KQkq', '-') } else { $Fen -split '\s+' }
+    $placement = [string]$fields[0]
+    $pieceCount = 0
+    $nonPawnNonKingCount = 0
+    foreach ($character in $placement.ToCharArray()) {
+        if ($character -match '[prnbqkPRNBQK]') {
+            ++$pieceCount
+        }
+        if ($character -match '[rnbqRNBQ]') {
+            ++$nonPawnNonKingCount
+        }
+    }
+    $phase = if ($Ply -le 20) { 'opening' } elseif ($pieceCount -le 10 -or $nonPawnNonKingCount -le 4) { 'endgame' } else { 'middlegame' }
+    return [ordered]@{
+        phase = $phase
+        side_to_move = if ([string]$fields[1] -ceq 'w') { 'white' } else { 'black' }
+        piece_count = $pieceCount
+        non_pawn_non_king_count = $nonPawnNonKingCount
+        castling_rights = [string]$fields[2]
+        en_passant = [string]$fields[3]
+    }
+}
+
+function Get-TimeControlMetadata {
+    if (-not [string]::IsNullOrWhiteSpace($TimeControl)) {
+        $parts = $TimeControl -split '\+'
+        return [ordered]@{ kind = 'clock'; value = $TimeControl; initial_minutes = [int]$parts[0]; increment_seconds = [int]$parts[1] }
+    }
+    if ($MovetimeMs -gt 0) {
+        return [ordered]@{ kind = 'movetime'; value = "movetime $MovetimeMs"; movetime_ms = $MovetimeMs }
+    }
+    if ($Nodes -gt 0) {
+        return [ordered]@{ kind = 'nodes'; value = "nodes $Nodes"; nodes = [uint64]$Nodes }
+    }
+    return [ordered]@{ kind = 'depth'; value = "depth $Depth"; depth = $Depth }
+}
+
 function Format-Pgn($Position, $Game, [string]$WhiteName, [string]$BlackName, [string]$TimeControl) {
     $headers = [System.Collections.Generic.List[string]]::new()
     $headers.Add('[Event "Koi Engine UCI match"]')
@@ -659,6 +732,7 @@ try {
                     bestmove_line = $null
                     book_used = $false
                     book_move = $null
+                    position_classification = Get-PositionClassification $rootFen ($moveRecords.Count + 1)
                 })
                 $moves.Add($openingMove)
                 $rootFen = $openingMoveReplay.fen
@@ -707,6 +781,7 @@ try {
                     bestmove_line = $search.bestmove_line
                     book_used = $search.book_used
                     book_move = $search.book_move
+                    position_classification = Get-PositionClassification $rootFen ($moveRecords.Count + 1)
                 }
 
                 if ($search.move -ceq '0000') {
@@ -795,6 +870,8 @@ $engineSummary = @(
         label = 'Koi'
         path = $koiExecutable
         name = $koiEngine.Name
+        version = Get-EngineVersion $koiEngine.Name
+        hashes = [ordered]@{ executable_sha256 = Get-EngineSha256 $koiExecutable }
         identity = @($koiEngine.Handshake | Where-Object { $_ -match '^id ' })
         handshake = @($koiEngine.Handshake)
         options = @($koiEngine.SentOptions)
@@ -806,6 +883,8 @@ $engineSummary = @(
         label = 'Opponent'
         path = $opponentExecutable
         name = $opponentEngine.Name
+        version = Get-EngineVersion $opponentEngine.Name
+        hashes = [ordered]@{ executable_sha256 = Get-EngineSha256 $opponentExecutable }
         identity = @($opponentEngine.Handshake | Where-Object { $_ -match '^id ' })
         handshake = @($opponentEngine.Handshake)
         options = @($opponentEngine.SentOptions)
@@ -815,9 +894,32 @@ $engineSummary = @(
     }
 )
 
+$measurement = [ordered]@{
+    network = [ordered]@{
+        enabled = $false
+        state = 'disabled'
+        reason = 'the local UCI match harness performs no network access'
+    }
+    book = [ordered]@{
+        enabled = $KoiOwnBookEnabled
+        state = if ($KoiOwnBookEnabled) { 'active' } else { 'disabled' }
+        path = if ($KoiOwnBookEnabled) { $KoiBookFile } else { $null }
+        random = $KoiBookRandomEnabled
+    }
+    tablebase = [ordered]@{
+        enabled = $false
+        state = 'disabled'
+        path = $null
+    }
+    hardware = Get-HardwareMetadata
+    time_control = Get-TimeControlMetadata
+}
+
 $report = [ordered]@{
     schema = 'koi-uci-match-v2'
     generated_utc = (Get-Date).ToUniversalTime().ToString('o')
+    hardware = $measurement.hardware
+    measurement = $measurement
     configuration = [ordered]@{
         depth = $Depth
         movetime_ms = $MovetimeMs
@@ -832,12 +934,15 @@ $report = [ordered]@{
         koi_color = $KoiColor
         time_control = $pgnTimeControl
         koi_random_seed = $KoiRandomSeed
-        koi_own_book = $KoiOwnBook
+        koi_own_book = $KoiOwnBookEnabled
         koi_book_file = $KoiBookFile
         koi_book_depth = $KoiBookDepth
-        koi_book_random = $KoiBookRandom
+        koi_book_random = $KoiBookRandomEnabled
         opponent_limit_strength = ($null -ne $OpponentEloAnchor)
         opponent_elo = $OpponentEloAnchor
+        batch_id = $BatchId
+        run_label = $RunLabel
+        time_control_metadata = $measurement.time_control
     }
     engines = $engineSummary
     positions = @($positions)

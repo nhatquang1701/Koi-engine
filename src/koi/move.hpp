@@ -63,7 +63,7 @@ class Move {
 public:
     constexpr Move() noexcept = default;
     constexpr Move(Square from, Square to, Promotion promotion = Promotion::none) noexcept
-        : from_(from), to_(to), promotion_(promotion) {}
+        : packed_(encode(from, to, promotion)) {}
 
     [[nodiscard]] static Move no_move() noexcept;
     [[nodiscard]] static std::optional<Move> parse_uci(std::string_view uci) noexcept;
@@ -76,26 +76,38 @@ public:
     friend constexpr bool operator==(const Move&, const Move&) noexcept = default;
 
 private:
-    Square from_{};
-    Square to_{};
-    Promotion promotion_ = Promotion::none;
+    static constexpr std::uint32_t kNoMove = 0xFFFFFFFFU;
+
+    [[nodiscard]] static constexpr std::uint32_t encode(
+        Square from, Square to, Promotion promotion) noexcept {
+        if (from.index() >= Square::kInvalid || to.index() >= Square::kInvalid) {
+            return kNoMove;
+        }
+        return static_cast<std::uint32_t>(from.index()) |
+            (static_cast<std::uint32_t>(to.index()) << 6U) |
+            (static_cast<std::uint32_t>(promotion) << 12U);
+    }
+
+    std::uint32_t packed_ = kNoMove;
 };
 
 constexpr Square Move::from() const noexcept {
-    return from_;
+    return is_no_move() ? Square{} :
+        Square::from_index(static_cast<std::uint8_t>(packed_ & 0x3FU));
 }
 
 constexpr Square Move::to() const noexcept {
-    return to_;
+    return is_no_move() ? Square{} :
+        Square::from_index(static_cast<std::uint8_t>((packed_ >> 6U) & 0x3FU));
 }
 
 constexpr Promotion Move::promotion() const noexcept {
-    return promotion_;
+    return is_no_move() ? Promotion::none :
+        static_cast<Promotion>((packed_ >> 12U) & 0x7U);
 }
 
 constexpr bool Move::is_no_move() const noexcept {
-    return from_.index() == Square::kInvalid && to_.index() == Square::kInvalid &&
-           promotion_ == Promotion::none;
+    return packed_ == kNoMove;
 }
 
 } // namespace koi

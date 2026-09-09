@@ -114,6 +114,15 @@ void TranspositionTable::store(std::uint64_t key, int depth, int score, Transpos
     TranspositionEntry& existing = storage->entries[index];
     const bool empty = !existing.occupied;
     const bool same_key = existing.key == key;
+    if (!empty && same_key) {
+        const bool keeps_deeper_entry = existing.depth > depth;
+        const bool keeps_equal_exact_entry = existing.depth == depth &&
+            existing.bound == TranspositionBound::exact && bound != TranspositionBound::exact;
+        if (keeps_deeper_entry || keeps_equal_exact_entry) {
+            existing.generation = storage->generation;
+            return;
+        }
+    }
     const bool older_generation = existing.generation != storage->generation;
     const bool deeper = depth > existing.depth;
     const bool deterministic_tie_break = depth == existing.depth && key < existing.key;

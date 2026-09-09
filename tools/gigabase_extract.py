@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import hashlib
+import io
 import json
 import os
 import random
@@ -26,6 +28,8 @@ MAX_POSITIONS = 2_000_000
 RESULT_TOKENS = {"1-0", "0-1", "1/2-1/2", "*"}
 PGN_MOVE_NUMBER_RE = re.compile(r"^\d+\.{1,3}")
 PGN_NAG_RE = re.compile(r"^\$\d+$")
+SPLIT_RATIOS = {"train": 0.70, "validation": 0.15, "holdout": 0.15}
+SPLIT_ORDER = ("train", "validation", "holdout")
 
 
 class GigaBaseError(RuntimeError):
@@ -258,6 +262,104 @@ def _position_count(value: Any, pgn_value: Any, fen_value: Any) -> int:
     return 1
 
 
+def _optional_chess_modules() -> Tuple[Optional[Any], Optional[Any], Optional[str]]:
+    """Load python-chess lazily so raw extraction remains standard-library-safe."""
+
+    try:
+        import chess
+        import chess.pgn
+    except ImportError as error:
+        return None, None, str(error)
+    return chess, chess.pgn, None
+
+
+def _canonical_game_key(pgn_value: Any, fen_value: Any, result: str) -> str:
+    """Return a move/content identity that ignores source ids and PGN tags."""
+
+    if pgn_value is not None:
+        mainline = " ".join(_strip_pgn_noise(str(pgn_value)).split()).casefold()
+        payload = {"kind": "moves", "mainline": mainline, "result": result}
+    elif fen_value is not None:
+        payload = {"kind": "fen", "fen": " ".join(str(fen_value).split()), "result": result}
+    else:
+        payload = {"kind": "row", "result": result}
+    return _record_hash(payload)
+
+
+def _header_result(pgn_value: Any) -> Optional[str]:
+    if pgn_value is None:
+        return None
+    for line in str(pgn_value).splitlines():
+        match = re.match(r'^\s*\[Result\s+"(?P<result>[^"\s]+)"\]\s*$', line, re.IGNORECASE)
+        if match and match.group("result") in RESULT_TOKENS:
+            return match.group("result")
+    return None
+
+
+def _record_stratum(result_value: Any, pgn_value: Any) -> str:
+    result = str(result_value).strip() if result_value is not None else ""
+    if result not in RESULT_TOKENS:
+        result = _header_result(pgn_value) or "unknown"
+    return result
+
+
+def _side_name(chess: Any, board: Any) -> str:
+    return "white" if board.turn == chess.WHITE else "black"
+
+
+def _decode_pgn(pgn_value: Any, fen_value: Any) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    """Decode legal mainline positions, returning a non-fatal fallback on bad input."""
+
+    if pgn_value is None and fen_value is None:
+        return [], {"status": "fallback", "reason": "no move or FEN payload"}
+    chess, pgn_module, import_error = _optional_chess_modules()
+    if chess is None or pgn_module is None:
+        return [], {
+            "status": "fallback",
+            "reason": f"python-chess unavailable: {import_error or 'unknown import error'}",
+        }
+    try:
+        if pgn_value is None:
+            board = chess.Board(str(fen_value))
+            return [
+                {
+                    "ply": 0,
+                    "move_number": board.fullmove_number,
+                    "side": _side_name(chess, board),
+                    "fen": board.fen(),
+                    "actual_move_uci": None,
+                    "actual_move_san": None,
+                }
+            ], {"status": "decoded", "decoder": "python-chess"}
+
+        with contextlib.redirect_stderr(io.StringIO()):
+            game = pgn_module.read_game(io.StringIO(str(pgn_value)))
+        if game is None:
+            raise ValueError("PGN contains no game")
+        if game.errors:
+            raise ValueError("; ".join(str(error) for error in game.errors))
+        board = game.board()
+        positions: List[Dict[str, Any]] = []
+        for ply, node in enumerate(game.mainline(), start=1):
+            move = node.move
+            if move is None or not board.is_legal(move):
+                raise ValueError(f"illegal move at ply {ply}")
+            positions.append(
+                {
+                    "ply": ply,
+                    "move_number": board.fullmove_number,
+                    "side": _side_name(chess, board),
+                    "fen": board.fen(),
+                    "actual_move_uci": move.uci(),
+                    "actual_move_san": board.san(move),
+                }
+            )
+            board.push(move)
+        return positions, {"status": "decoded", "decoder": "python-chess"}
+    except Exception as error:
+        return [], {"status": "fallback", "reason": f"move decoding failed: {error}"}
+
+
 def _record_hash(record: Mapping[str, Any]) -> str:
     canonical = json.dumps(record, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
@@ -270,6 +372,7 @@ def _iter_records(
     requested_id: Optional[str] = None,
     requested_pgn: Optional[str] = None,
     requested_position_count: Optional[str] = None,
+    requested_result: Optional[str] = None,
 ) -> Iterable[Dict[str, Any]]:
     id_column = _find_column(columns, requested_id, ("id", "game_id", "gameid", "key"))
     pgn_column = _find_column(
@@ -282,6 +385,11 @@ def _iter_records(
         requested_position_count,
         ("position_count", "ply_count", "plies", "num_positions"),
     )
+    result_column = _find_column(
+        columns,
+        requested_result,
+        ("result", "outcome", "winner", "game_result"),
+    )
     if requested_id is not None and id_column is None:
         raise GigaBaseError(f"table '{table}' has no id column named '{requested_id}'")
     if requested_pgn is not None and pgn_column is None:
@@ -290,6 +398,8 @@ def _iter_records(
         raise GigaBaseError(
             f"table '{table}' has no position-count column named '{requested_position_count}'"
         )
+    if requested_result is not None and result_column is None:
+        raise GigaBaseError(f"table '{table}' has no result column named '{requested_result}'")
     fen_column = _find_column(columns, None, ("fen", "position", "board"))
     if id_column is None and pgn_column is None and position_column is None and fen_column is None:
         raise GigaBaseError(
@@ -305,6 +415,7 @@ def _iter_records(
         ("__pgn", pgn_column),
         ("__position_count", position_column),
         ("__fen", fen_column),
+        ("__result", result_column),
     ):
         if column is not None:
             selected.append(f"{_quote_identifier(column)} AS {alias}")
@@ -320,10 +431,19 @@ def _iter_records(
             pgn_value = row["__pgn"] if "__pgn" in row.keys() else None
             fen_value = row["__fen"] if "__fen" in row.keys() else None
             position_value = row["__position_count"] if "__position_count" in row.keys() else None
+            result_value = row["__result"] if "__result" in row.keys() else None
             position_count = _position_count(position_value, pgn_value, fen_value)
+            stratum = _record_stratum(result_value, pgn_value)
             record: Dict[str, Any] = {
                 "source_id": source_id,
                 "position_count": position_count,
+                "legal_position_count": 0,
+                "positions": [],
+                "stratum": stratum,
+                "deduplication_key": _canonical_game_key(pgn_value, fen_value, stratum),
+                "decode": {"status": "pending"},
+                "_pgn_value": pgn_value,
+                "_fen_value": fen_value,
             }
             if pgn_value is not None:
                 record["pgn_sha256"] = hashlib.sha256(
@@ -344,23 +464,50 @@ def _sample_records(
     seed: int,
     max_games: int,
     max_positions: int,
-) -> Tuple[List[Dict[str, Any]], int]:
-    rng = random.Random(seed)
-    reservoir: List[Dict[str, Any]] = []
+) -> Tuple[List[Dict[str, Any]], int, int]:
+    reservoirs: Dict[str, List[Dict[str, Any]]] = {}
+    stratum_counts: Dict[str, int] = {}
+    stratum_rngs: Dict[str, random.Random] = {}
+    seen_keys: set[str] = set()
     scanned = 0
+    unique = 0
     for record in records:
         scanned += 1
+        deduplication_key = str(record["deduplication_key"])
+        if deduplication_key in seen_keys:
+            continue
+        seen_keys.add(deduplication_key)
+        stratum = str(record["stratum"])
+        if stratum not in reservoirs:
+            reservoirs[stratum] = []
+            stratum_counts[stratum] = 0
+            stable_seed = int.from_bytes(
+                hashlib.sha256(stratum.encode("utf-8")).digest()[:8], "big"
+            )
+            stratum_rngs[stratum] = random.Random(seed ^ stable_seed)
+        stratum_counts[stratum] += 1
+        unique += 1
+        reservoir = reservoirs[stratum]
         if len(reservoir) < max_games:
             reservoir.append(record)
             continue
-        replacement = rng.randrange(scanned)
+        replacement = stratum_rngs[stratum].randrange(stratum_counts[stratum])
         if replacement < max_games:
             reservoir[replacement] = record
 
-    rng.shuffle(reservoir)
+    target = min(max_games, unique)
+    candidate_records: List[Dict[str, Any]] = []
+    if target > 0:
+        allocations = _largest_remainder_allocation(stratum_counts, target)
+        for stratum in sorted(reservoirs):
+            reservoir = reservoirs[stratum]
+            stratum_rngs[stratum].shuffle(reservoir)
+            candidate_records.extend(reservoir[: allocations.get(stratum, 0)])
+
+    random.Random(seed).shuffle(candidate_records)
     selected: List[Dict[str, Any]] = []
     positions = 0
-    for record in reservoir:
+    for record in candidate_records:
         record_positions = int(record["position_count"])
         if positions + record_positions > max_positions:
             continue
@@ -368,32 +515,90 @@ def _sample_records(
         positions += record_positions
         if len(selected) >= max_games:
             break
-    return selected, scanned
+    return selected, scanned, unique
+
+
+def _largest_remainder_allocation(counts: Mapping[str, int], target: int) -> Dict[str, int]:
+    if target <= 0 or not counts:
+        return {stratum: 0 for stratum in counts}
+    total = sum(counts.values())
+    if total <= 0:
+        return {stratum: 0 for stratum in counts}
+    raw = {stratum: target * count / total for stratum, count in counts.items()}
+    allocation = {stratum: int(value) for stratum, value in raw.items()}
+    remaining = target - sum(allocation.values())
+    order = sorted(
+        counts,
+        key=lambda stratum: (-(raw[stratum] - allocation[stratum]), str(stratum)),
+    )
+    for stratum in order[:remaining]:
+        allocation[stratum] += 1
+    return allocation
+
+
+def _split_counts(count: int) -> Dict[str, int]:
+    if count <= 0:
+        return {split: 0 for split in SPLIT_ORDER}
+    raw = {split: count * SPLIT_RATIOS[split] for split in SPLIT_ORDER}
+    counts = {split: int(raw[split]) for split in SPLIT_ORDER}
+    remaining = count - sum(counts.values())
+    order = sorted(
+        SPLIT_ORDER,
+        key=lambda split: (-(raw[split] - counts[split]), SPLIT_ORDER.index(split)),
+    )
+    for split in order[:remaining]:
+        counts[split] += 1
+    return counts
 
 
 def _split_records(records: Sequence[Dict[str, Any]]) -> Dict[str, List[Dict[str, Any]]]:
-    count = len(records)
-    if count == 0:
-        return {"train": [], "validation": [], "holdout": []}
-    if count == 1:
-        return {"train": list(records), "validation": [], "holdout": []}
-    if count == 2:
-        return {"train": [records[0]], "validation": [], "holdout": [records[1]]}
-    train_count = max(1, int(count * 0.8))
-    validation_count = max(1, int(count * 0.1))
-    if train_count + validation_count >= count:
-        train_count = count - 2
-        validation_count = 1
+    allocations = _split_counts(len(records))
+    by_stratum: Dict[str, List[Dict[str, Any]]] = {}
+    for record in records:
+        by_stratum.setdefault(str(record["stratum"]), []).append(record)
+
+    # Interleave strata before slicing exact global quotas. This keeps common
+    # result/outcome strata represented in every split when the sample permits.
+    interleaved: List[Dict[str, Any]] = []
+    offsets = {stratum: 0 for stratum in by_stratum}
+    while True:
+        progressed = False
+        for stratum in sorted(by_stratum):
+            offset = offsets[stratum]
+            if offset < len(by_stratum[stratum]):
+                interleaved.append(by_stratum[stratum][offset])
+                offsets[stratum] = offset + 1
+                progressed = True
+        if not progressed:
+            break
+
+    train_end = allocations["train"]
+    validation_end = train_end + allocations["validation"]
     return {
-        "train": list(records[:train_count]),
-        "validation": list(records[train_count : train_count + validation_count]),
-        "holdout": list(records[train_count + validation_count :]),
+        "train": interleaved[:train_end],
+        "validation": interleaved[train_end:validation_end],
+        "holdout": interleaved[validation_end:],
     }
 
 
 def _content_hash(value: Mapping[str, Any]) -> str:
     canonical = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _decode_selected_record(record: Dict[str, Any]) -> Dict[str, Any]:
+    positions, decode = _decode_pgn(record.get("_pgn_value"), record.get("_fen_value"))
+    record["positions"] = positions
+    record["legal_position_count"] = len(positions)
+    record["decode"] = decode
+    if decode.get("status") == "decoded":
+        record["position_count"] = len(positions)
+    record.pop("_pgn_value", None)
+    record.pop("_fen_value", None)
+    record["record_sha256"] = _record_hash(
+        {key: value for key, value in record.items() if key != "record_sha256"}
+    )
+    return record
 
 
 def sample_database(
@@ -405,6 +610,7 @@ def sample_database(
     id_column: Optional[str] = None,
     pgn_column: Optional[str] = None,
     position_count_column: Optional[str] = None,
+    result_column: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Return a bounded deterministic sample and its train/validation/holdout splits."""
 
@@ -418,7 +624,7 @@ def sample_database(
     try:
         schemas = _table_schema(connection)
         selected_table, columns = _choose_table(schemas, table)
-        selected_records, scanned_games = _sample_records(
+        selected_records, scanned_games, deduplicated_games = _sample_records(
             _iter_records(
                 connection,
                 selected_table,
@@ -426,6 +632,7 @@ def sample_database(
                 requested_id=id_column,
                 requested_pgn=pgn_column,
                 requested_position_count=position_count_column,
+                requested_result=result_column,
             ),
             seed,
             max_games,
@@ -441,22 +648,46 @@ def sample_database(
         "table": selected_table,
         "read_only": True,
         "query_only": query_only,
+        "decoder": "python-chess when available; bounded raw-record fallback otherwise",
     }
-    sampling = {
+    decoded_candidates = [_decode_selected_record(record) for record in selected_records]
+    legal_positions = 0
+    selected_records = []
+    for record in decoded_candidates:
+        record_legal_positions = int(record["legal_position_count"])
+        if legal_positions + record_legal_positions > max_positions:
+            continue
+        selected_records.append(record)
+        legal_positions += record_legal_positions
+    splits = _split_records(selected_records)
+    split_counts = {split: len(records) for split, records in splits.items()}
+    sampling_content = {
         "seed": int(seed),
         "max_games": max_games,
         "max_positions": max_positions,
         "scanned_games": scanned_games,
+        "deduplicated_games": deduplicated_games,
         "selected_games": len(selected_records),
         "selected_positions": sum(int(record["position_count"]) for record in selected_records),
+        "selected_legal_positions": sum(
+            int(record["legal_position_count"]) for record in selected_records
+        ),
+        "split_ratios": dict(SPLIT_RATIOS),
+        "split_counts": split_counts,
+        "stratification": {
+            "field": "result/outcome column, then PGN Result header, then unknown",
+            "strata": sorted({str(record["stratum"]) for record in selected_records}),
+        },
     }
-    splits = _split_records(selected_records)
+    sampling_content["content_sha256"] = _content_hash(
+        {"records": selected_records, "splits": splits, "sampling": sampling_content}
+    )
     return {
         "schema": SCHEMA,
         "schema_version": 1,
         "created_at": _utc_timestamp(),
         "source": source,
-        "sampling": sampling,
+        "sampling": sampling_content,
         "records": selected_records,
         "splits": splits,
     }
@@ -487,6 +718,9 @@ def _manifest_for_split(
         "source": source,
         "record_count": len(records),
         "position_count": sum(int(record["position_count"]) for record in records),
+        "legal_position_count": sum(
+            int(record["legal_position_count"]) for record in records
+        ),
     }
 
 
@@ -578,6 +812,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--id-column", help="game identifier column")
     parser.add_argument("--pgn-column", help="PGN/movetext column")
     parser.add_argument("--position-count-column", help="precomputed position-count column")
+    parser.add_argument("--result-column", help="result/outcome column used for stratification")
     return parser
 
 
@@ -593,6 +828,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         id_column=args.id_column,
         pgn_column=args.pgn_column,
         position_count_column=args.position_count_column,
+        result_column=args.result_column,
     )
     paths = write_manifests(sample, args.output_dir)
     for name in ("train", "validation", "holdout", "summary"):

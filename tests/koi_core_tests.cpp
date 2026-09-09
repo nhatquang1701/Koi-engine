@@ -17,6 +17,9 @@ using koi::Move;
 using koi::Position;
 using koi::RandomMoveChooser;
 
+static_assert(sizeof(Move) == sizeof(std::uint32_t),
+              "Koi moves must remain 32-bit packed values");
+
 constexpr std::string_view kInitialFen =
     "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
@@ -71,7 +74,7 @@ void test_default_position_has_initial_fen_and_twenty_moves() {
 void test_legal_uci_sequence_updates_position() {
     Position position;
 
-    position.apply_uci("e2e4");
+    require(position.apply_uci("e2e4"), "e2e4 must be accepted");
     require(position.fen() == "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1",
             "e2e4 must update the position");
 
@@ -82,6 +85,20 @@ void test_legal_uci_sequence_updates_position() {
     position.apply_uci("g1f3");
     require(position.fen() == "rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2",
             "g1f3 must update the position");
+}
+
+void test_native_position_undo_restores_state_and_key() {
+    Position position;
+    const std::string initial_fen = position.fen();
+    const std::uint64_t initial_key = position.position_key();
+
+    require(position.apply_uci("e2e4"), "native undo fixture move must be legal");
+    require(position.position_key() != initial_key,
+            "a legal native move must change the incremental position key");
+    require(position.unapply(), "native undo must restore the previous state");
+    require(position.fen() == initial_fen && position.position_key() == initial_key,
+            "native undo must restore FEN and incremental key exactly");
+    require(!position.unapply(), "native undo must reject an empty undo stack");
 }
 
 void test_malformed_fens_are_rejected_transactionally() {
@@ -165,6 +182,27 @@ void test_impossible_triple_check_is_rejected_transactionally() {
     require(position.fen() == original, "rejected triple-check FEN must leave the position unchanged");
 }
 
+void test_strict_material_and_double_check_limits_are_transactional() {
+    Position position;
+    const std::string original = position.fen();
+    for (std::string_view fen : {
+             "4k3/8/8/8/P7/PPPPPPPP/8/4K3 w - - 0 1",
+             "4k3/8/8/8/8/N7/PPPPPPPP/RNBQKBNR w - - 0 1",
+             "k7/8/7r/8/8/8/R7/7K w - - 0 1",
+         }) {
+        require(!position.set_fen(fen),
+                "native production parsing must reject impossible material or double-check FEN");
+        require(position.fen() == original,
+                "rejected strict FEN must leave the native position unchanged");
+    }
+    require(position.set_fen("4k3/8/8/8/8/8/PPPPPPPP/RNBQKBNQ w - - 0 1"),
+            "native parsing must retain legal promoted-material positions within limits");
+
+    Position synthetic;
+    require(synthetic.set_fen_unchecked("k7/8/7r/8/8/8/R7/7K w - - 0 1"),
+            "fixture-only unchecked parsing must remain available for synthetic positions");
+}
+
 void test_invalid_uci_is_rejected_transactionally() {
     Position position;
     const std::string original = position.fen();
@@ -188,6 +226,29 @@ void test_position_forwards_fen_and_move_application() {
 
     require(position.fen() == "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2",
             "compatibility position must forward FEN and move application");
+}
+
+void test_native_position_exposes_search_state_contract() {
+    Position position;
+    require(position.side_to_move() == koi::Color::white,
+            "native position must expose the side to move");
+    require(position.piece_at(*koi::Square::parse("e2")).type == koi::PieceType::pawn,
+            "native position must expose pieces by square");
+    const auto e2e4 = koi::Move::parse_uci("e2e4");
+    require(e2e4.has_value() && position.is_legal(*e2e4),
+            "native position must validate legal moves");
+    require(!position.is_capture(*e2e4),
+            "native position must classify quiet moves");
+    require(position.make_move(*e2e4),
+            "native position must make a legal move");
+    require(position.side_to_move() == koi::Color::black &&
+                position.halfmove_clock() == 0 && position.fullmove_number() == 1,
+            "native position counters must update after a move");
+    require(position.unmake_move(),
+            "native position must unmake a legal move");
+    require(position.side_to_move() == koi::Color::white &&
+                position.fen() == kInitialFen,
+            "native position unmake must restore the complete state");
 }
 
 void test_special_move_positions_accept_valid_uci_moves() {
@@ -425,6 +486,23 @@ void test_move_metadata_caches_see_and_rejects_stale_positions() {
     require(state.unmake_move(), "stale metadata fixture must unmake cleanly");
 }
 
+void test_fabricated_metadata_is_rejected_by_native_legality() {
+    koi::GameState state = koi::GameState::startpos();
+    const std::string original = state.fen();
+    const auto move = koi::Move::parse_uci("e2e5");
+    require(move.has_value(), "fabricated metadata move must parse");
+
+    koi::MoveMetadata fabricated;
+    fabricated.move = *move;
+    fabricated.moving_piece = koi::PieceType::pawn;
+    fabricated.kind = koi::MoveKind::quiet;
+    fabricated.position_key = state.position_key();
+    require(!state.make_legal_move(fabricated),
+            "metadata with a matching key must still pass native legality");
+    require(state.fen() == original,
+            "rejected fabricated metadata must leave the state unchanged");
+}
+
 struct TestCase {
     std::string_view name;
     void (*run)();
@@ -436,6 +514,7 @@ int main() {
     const std::vector<TestCase> tests{
         {"default position", test_default_position_has_initial_fen_and_twenty_moves},
         {"legal UCI sequence", test_legal_uci_sequence_updates_position},
+        {"native position undo and key", test_native_position_undo_restores_state_and_key},
         {"special moves", test_special_move_positions_accept_valid_uci_moves},
         {"malformed FEN rejection", test_malformed_fens_are_rejected_transactionally},
         {"back-rank pawn rejection", test_pawns_on_back_ranks_are_rejected_transactionally},
@@ -443,9 +522,11 @@ int main() {
         {"adjacent king rejection", test_adjacent_kings_are_rejected_transactionally},
         {"castling-rights validation", test_castling_rights_require_the_standard_pieces},
         {"triple-check rejection", test_impossible_triple_check_is_rejected_transactionally},
+        {"strict material and double-check rejection", test_strict_material_and_double_check_limits_are_transactional},
         {"invalid UCI rejection", test_invalid_uci_is_rejected_transactionally},
         {"malformed UCI rejection", test_malformed_uci_is_rejected_transactionally},
         {"compatibility position forwarding", test_position_forwards_fen_and_move_application},
+        {"native search state contract", test_native_position_exposes_search_state_contract},
         {"checkmate and stalemate", test_checkmate_and_stalemate_have_no_legal_moves},
         {"random chooser legality", test_random_chooser_returns_a_legal_move},
         {"seeded chooser repeatability", test_seeded_choosers_are_repeatable},
@@ -454,6 +535,7 @@ int main() {
         {"position feature concurrent copy", test_copying_a_const_state_is_safe_while_its_feature_cache_is_populated},
         {"tactical checking horizon", test_tactical_generation_omits_quiet_checks_after_the_checking_horizon},
         {"metadata SEE cache", test_move_metadata_caches_see_and_rejects_stale_positions},
+        {"fabricated metadata rejection", test_fabricated_metadata_is_rejected_by_native_legality},
     };
 
     for (const TestCase& test : tests) {

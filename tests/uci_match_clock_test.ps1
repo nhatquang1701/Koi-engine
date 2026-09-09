@@ -12,6 +12,21 @@ $fixturePath = Join-Path (Split-Path -Parent $enginePath) 'uci_match_fixture.exe
 $replayPath = Join-Path (Split-Path -Parent $enginePath) 'koi-replay.exe'
 $outputDirectory = Join-Path ([System.IO.Path]::GetTempPath()) ('koi-uci-match-clock-' + [guid]::NewGuid().ToString('N'))
 
+function Get-PowerShellExecutable {
+    if ($PSVersionTable.PSEdition -eq 'Core') {
+        return (Get-Process -Id $PID -ErrorAction Stop).Path
+    }
+
+    $pwsh = Get-Command pwsh -ErrorAction SilentlyContinue
+    if ($null -ne $pwsh) {
+        return $pwsh.Source
+    }
+
+    return (Get-Command powershell.exe -ErrorAction Stop).Source
+}
+
+$PowerShellExecutable = Get-PowerShellExecutable
+
 function New-ScriptedUciEngine([string]$Directory, [string]$Name) {
     $path = Join-Path $Directory "$Name.exe"
     Copy-Item -LiteralPath $fixturePath -Destination $path
@@ -22,7 +37,7 @@ function New-ScriptedUciEngine([string]$Directory, [string]$Name) {
 }
 
 function Invoke-ClockMatch([string]$KoiPath, [string]$OpponentPath, [string]$Directory, [int]$Games) {
-    $output = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $matchScript `
+    $output = & $PowerShellExecutable -NoProfile -ExecutionPolicy Bypass -File $matchScript `
         -KoiPath $KoiPath -OpponentPath $OpponentPath -ReplayPath $replayPath `
         -KoiColor white -TimeControl 1+0 -Games $Games -MaxPlies 1 `
         -KoiOwnBook false -TimeoutMilliseconds 1000 -OutputDirectory $Directory
