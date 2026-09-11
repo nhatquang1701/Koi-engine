@@ -14,6 +14,7 @@
 #include "koi/detail/search_constants.hpp"
 #include "koi/detail/search_context_support.hpp"
 #include "koi/detail/search_ordering.hpp"
+#include "koi/detail/search_policy.hpp"
 #include "koi/detail/search_stack.hpp"
 #include "koi/evaluator.hpp"
 #include "koi/search_types.hpp"
@@ -377,17 +378,17 @@ struct SearchContext {
                 continue;
             }
             const Move move = metadata.move;
-            if (!checked && metadata.is_capture() &&
-                move.promotion() == Promotion::none && !metadata.gives_check) {
-                if (metadata.see_score < 0) {
+            const auto capture_prune = SearchPolicy::quiescence_capture(
+                checked, metadata.is_capture(), metadata.gives_check,
+                move.promotion() != Promotion::none, metadata.see_score,
+                piece_value(metadata.captured_piece), best, alpha);
+            if (capture_prune == QuiescenceCapturePrune::static_exchange) {
                     ++stats.see_prunes;
                     continue;
-                }
-                const int delta = piece_value(metadata.captured_piece) + 100;
-                if (best + delta < alpha) {
-                    ++stats.delta_prunes;
-                    continue;
-                }
+            }
+            if (capture_prune == QuiescenceCapturePrune::delta) {
+                ++stats.delta_prunes;
+                continue;
             }
             if (metadata.gives_check &&
                 (checked || qdepth < quiescence_check_depth_limit)) {
@@ -452,8 +453,8 @@ struct SearchContext {
             time_manager.time_budget().has_value() &&
             *time_manager.time_budget() < kShortTimedFallbackMinimum;
         int child_check_extensions_remaining = check_extensions_remaining;
-        if (checked && depth < kMaximumSearchDepth && !short_timed_root &&
-            check_extensions_remaining > 0) {
+        if (SearchPolicy::check_extension(
+                checked, depth, short_timed_root, check_extensions_remaining)) {
             ++stats.check_extensions;
             ++depth;
             --child_check_extensions_remaining;
@@ -522,16 +523,16 @@ struct SearchContext {
             }
         }
 
-        const bool null_move_candidate = allow_null_pruning && !checked && depth >= 3 &&
-            beta < kInfinity && beta > -kInfinity && beta - alpha <= 1;
-        if (null_move_candidate && state.is_repetition_sensitive()) {
+        const NullMoveDecision null_move_decision = SearchPolicy::null_move(
+            depth, alpha, beta, checked, allow_null_pruning);
+        if (null_move_decision.eligible && state.is_repetition_sensitive()) {
             ++stats.null_repetition_skips;
         }
-        if (null_move_candidate && null_move_is_safe(state, ensure_features())) {
+        if (null_move_decision.eligible && null_move_is_safe(state, ensure_features())) {
             if (state.make_null_move()) {
                 PrincipalVariation null_pv;
-                const int reduction = depth >= 6 ? 3 : 2;
-                const int null_depth = std::max(0, depth - 1 - reduction);
+                const int null_depth = std::max(
+                    0, depth - 1 - null_move_decision.reduction);
                 const int null_score = -negamax(
                     state, null_depth, -beta, -beta + 1, ply + 1, null_pv,
                     std::nullopt, allow_null_pruning, child_check_extensions_remaining);
@@ -578,16 +579,16 @@ struct SearchContext {
             const int history_score = ordering.quiet_history_score(moving_side, move, previous_move);
             const bool is_tt_move = tt_move.has_value() && move == *tt_move;
             const bool root_pawn_move = ply == 0 && metadata.moving_piece == PieceType::pawn;
-            const bool lmr_base_candidate = !root_pawn_move && move_number >= 4 && depth >= 4 && !checked &&
-                !metadata.gives_check && !metadata.is_capture() &&
-                move.promotion() == Promotion::none && !is_tt_move &&
-                !ordering.is_killer(move, ply);
-            const bool high_history_exclusion = lmr_base_candidate &&
-                high_history_move_excluded_from_lmr(history_score);
-            if (high_history_exclusion) {
+            const int full_child_depth = depth - 1;
+            const LateMoveDecision lmr_gate = SearchPolicy::late_move(
+                depth, move_number, full_child_depth, history_score, root_pawn_move,
+                checked, metadata.gives_check, metadata.is_capture(),
+                move.promotion() != Promotion::none, is_tt_move,
+                ordering.is_killer(move, ply), false, false);
+            if (lmr_gate.high_history_exclusion) {
                 ++stats.lmr_high_history_exclusions;
             }
-            const bool lmr_candidate = lmr_base_candidate && !high_history_exclusion;
+            const bool lmr_candidate = lmr_gate.candidate && !lmr_gate.high_history_exclusion;
             if (lmr_candidate) {
                 if (!lmr_parent_features.has_value()) {
                     const std::uint64_t misses_before = state.position_feature_cache_misses();
@@ -642,12 +643,13 @@ struct SearchContext {
                     }
                 }
             }
-            const int full_child_depth = depth - 1;
-            const int base_reduction = 1 + (depth >= 8 && move_number >= 12 ? 1 : 0) +
-                (depth >= 12 && move_number >= 20 ? 1 : 0);
-            const int history_adjustment = history_score > 256 ? -1 : history_score < -256 ? 1 : 0;
-            const int reduction = std::clamp(base_reduction + history_adjustment, 0, full_child_depth);
-            const bool reduced = reducible_quiet && !quiet_forcing_extension && reduction > 0;
+            const LateMoveDecision lmr_decision = SearchPolicy::late_move(
+                depth, move_number, full_child_depth, history_score, root_pawn_move,
+                checked, metadata.gives_check, metadata.is_capture(),
+                move.promotion() != Promotion::none, is_tt_move,
+                ordering.is_killer(move, ply), reducible_quiet, quiet_forcing_extension);
+            const bool reduced = lmr_decision.reduced;
+            const int reduction = lmr_decision.reduction;
             frame.reduction = reduced ? reduction : 0;
             const int authoritative_child_depth = quiet_forcing_extension ?
                 full_child_depth + 1 : full_child_depth;
@@ -656,9 +658,9 @@ struct SearchContext {
                 ++stats.lmr_reductions;
             }
 
-            if (phase_rich_quiet_position && !metadata.is_capture() &&
-                !metadata.gives_check && move.promotion() == Promotion::none && move_number > 0 &&
-                static_eval + 80 + depth * 60 <= alpha) {
+            if (SearchPolicy::quiet_futility(
+                    phase_rich_quiet_position, metadata.is_capture(), metadata.gives_check,
+                    move.promotion() != Promotion::none, move_number, static_eval, depth, alpha)) {
                 ++stats.quiet_futility_prunes;
                 state.unmake_move();
                 ++move_number;

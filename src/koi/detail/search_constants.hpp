@@ -22,6 +22,8 @@ inline constexpr auto kShortTimedFallbackThreshold = std::chrono::milliseconds{3
 inline constexpr std::size_t kNullMoveSparsePieceLimit = 8;
 inline constexpr std::uint16_t kNullMoveRuleSafetyHalfmoves = 90;
 
+// Kept as a private compatibility predicate for existing diagnostic tests;
+// SearchPolicy owns the live LMR decision and uses the same threshold.
 [[nodiscard]] constexpr bool high_history_move_excluded_from_lmr(
     const int history_score) noexcept {
     return history_score >= 128;

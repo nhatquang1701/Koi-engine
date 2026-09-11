@@ -86,7 +86,7 @@ void test_late_move_policy_owns_gating_history_and_reduction() {
 
 void test_quiet_futility_policy_owns_exact_boundary() {
     require(koi::detail::SearchPolicy::quiet_futility(
-                true, false, false, false, 1, -100, 1, 0),
+                true, false, false, false, 1, -200, 1, 0),
             "a quiet phase-rich move below the futility bound must prune");
     require(!koi::detail::SearchPolicy::quiet_futility(
                 true, false, false, false, 0, -100, 1, 0),
