@@ -88,6 +88,20 @@ void test_compatibility_mirror_owns_only_shadow_state_and_history() {
     require(mirror.last_move_is_null(), "a null transition must be identifiable in shadow history");
     require(mirror.undo_null_move() && mirror.history_size() == 0,
             "the mirror null transition must be independently reversible");
+
+    constexpr std::string_view start_fen =
+        "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+    require(mirror.set_fen(start_fen),
+            "the mirror failure fixture must reset to a legal start position");
+    require(mirror.apply_move(require_move("e2e4")),
+            "the mirror failure fixture must establish a valid shadow history record");
+    const std::uint64_t failed_move_key = mirror.position_key();
+    const std::size_t failed_move_history = mirror.history_size();
+    require(!mirror.apply_move(require_move("e2e5")),
+            "an illegal mirror move must be rejected without a transition");
+    require(mirror.position_key() == failed_move_key &&
+                mirror.history_size() == failed_move_history,
+            "a rejected mirror move must preserve the prior shadow state and history");
 }
 
 koi::PositionFeatures ownership_feature_builder(const koi::Position& position) noexcept {

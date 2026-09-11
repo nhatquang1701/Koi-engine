@@ -40,6 +40,8 @@ std::vector<std::string> sorted_chess_moves(const chess::Board& board) {
 void require_consistent(const koi::GameState& state, std::string_view context) {
     const koi::PositionConsistencySnapshot snapshot = state.consistency_snapshot();
     require(snapshot.consistent(), context);
+    require(state.native_shadow_consistent(),
+            "the cheap explicit mirror boundary check must agree with the diagnostic snapshot");
     require(snapshot.native_fen == state.fen(),
             "consistency snapshot must expose the native FEN authority");
     require(snapshot.native_legal_moves == sorted_moves(state.legal_moves()),

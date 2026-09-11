@@ -51,6 +51,8 @@ enable_testing()
 
 add_library(koi_core
     src/koi/classical_evaluator.cpp
+    src/koi/detail/compatibility_mirror.cpp
+    src/koi/detail/feature_state.cpp
     src/koi/completion_gate.cpp
     src/koi/cpu_features.cpp
     src/koi/evaluation_features.cpp

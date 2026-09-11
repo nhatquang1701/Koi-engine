@@ -9,22 +9,18 @@
 #include <cstdlib>
 #include <limits>
 #include <memory>
-#include <mutex>
 #include <numeric>
 #include <optional>
-#include <shared_mutex>
 #include <span>
 #include <utility>
 
-#include <chess.hpp>
-
+#include "koi/detail/compatibility_mirror.hpp"
+#include "koi/detail/feature_state.hpp"
 #include "koi/position.hpp"
 
 namespace koi {
 
 namespace {
-
-constexpr std::size_t kMaximumGameStateHistory = 256;
 
 constexpr std::array<std::uint64_t, 781> kPolyglotRandom{
 +0x9D39247E33776D41ULL,
@@ -966,146 +962,6 @@ bool valid_fen_syntax(std::string_view fen) {
            valid_counter(fields[5], false, 32768);
 }
 
-bool valid_check_counts(const chess::Board& board) {
-    const bool white_in_check = chess::attacks::attackers(
-        board, chess::Color::BLACK, board.kingSq(chess::Color::WHITE)).count() != 0;
-    const bool black_in_check = chess::attacks::attackers(
-        board, chess::Color::WHITE, board.kingSq(chess::Color::BLACK)).count() != 0;
-    if (white_in_check && black_in_check) {
-        return false;
-    }
-    for (chess::Color color : {chess::Color::WHITE, chess::Color::BLACK}) {
-        if (chess::attacks::attackers(board, ~color, board.kingSq(color)).count() > 2) {
-            return false;
-        }
-    }
-    return true;
-}
-
-Color koi_color(chess::Color color) {
-    return color == chess::Color::WHITE ? Color::white : Color::black;
-}
-
-chess::Color native_color(Color color) {
-    return color == Color::white ? chess::Color::WHITE : chess::Color::BLACK;
-}
-
-PieceType koi_piece_type(chess::PieceType type) {
-    if (type == chess::PieceType::PAWN) return PieceType::pawn;
-    if (type == chess::PieceType::KNIGHT) return PieceType::knight;
-    if (type == chess::PieceType::BISHOP) return PieceType::bishop;
-    if (type == chess::PieceType::ROOK) return PieceType::rook;
-    if (type == chess::PieceType::QUEEN) return PieceType::queen;
-    if (type == chess::PieceType::KING) return PieceType::king;
-    return PieceType::none;
-}
-
-chess::PieceType native_promotion_type(Promotion promotion) noexcept {
-    switch (promotion) {
-    case Promotion::knight:
-        return chess::PieceType::KNIGHT;
-    case Promotion::bishop:
-        return chess::PieceType::BISHOP;
-    case Promotion::rook:
-        return chess::PieceType::ROOK;
-    case Promotion::queen:
-        return chess::PieceType::QUEEN;
-    case Promotion::none:
-        return chess::PieceType::NONE;
-    }
-    return chess::PieceType::NONE;
-}
-
-Promotion koi_promotion_type(chess::PieceType promotion) noexcept {
-    if (promotion == chess::PieceType::KNIGHT) return Promotion::knight;
-    if (promotion == chess::PieceType::BISHOP) return Promotion::bishop;
-    if (promotion == chess::PieceType::ROOK) return Promotion::rook;
-    if (promotion == chess::PieceType::QUEEN) return Promotion::queen;
-    return Promotion::none;
-}
-
-chess::Move native_move_for(const chess::Board& board, const Move& move) noexcept {
-    if (move.is_no_move() || move.from().index() == Square::kInvalid ||
-        move.to().index() == Square::kInvalid) {
-        return chess::Move{chess::Move::NO_MOVE};
-    }
-
-    const chess::Square source(move.from().index());
-    const chess::Square target(move.to().index());
-    const chess::Piece piece = board.at(source);
-    if (piece == chess::Piece::NONE) {
-        return chess::Move{chess::Move::NO_MOVE};
-    }
-
-    if (piece.type() == chess::PieceType::KING && source.rank() == target.rank() &&
-        std::abs(static_cast<int>(source.file()) - static_cast<int>(target.file())) == 2) {
-        const chess::File rook_file = target > source ? chess::File::FILE_H : chess::File::FILE_A;
-        return chess::Move::make<chess::Move::CASTLING>(source, chess::Square(rook_file, source.rank()));
-    }
-
-    if (piece.type() == chess::PieceType::PAWN && target == board.enpassantSq()) {
-        return chess::Move::make<chess::Move::ENPASSANT>(source, target);
-    }
-
-    if (move.promotion() != Promotion::none) {
-        if (piece.type() != chess::PieceType::PAWN ||
-            !chess::Square::back_rank(target, ~board.sideToMove())) {
-            return chess::Move{chess::Move::NO_MOVE};
-        }
-        return chess::Move::make<chess::Move::PROMOTION>(source, target,
-                                                         native_promotion_type(move.promotion()));
-    }
-
-    return chess::Move::make<chess::Move::NORMAL>(source, target);
-}
-
-chess::Move native_move_for_metadata(const MoveMetadata& metadata) noexcept {
-    const Move& move = metadata.move;
-    if (move.is_no_move() || move.from().index() == Square::kInvalid ||
-        move.to().index() == Square::kInvalid) {
-        return chess::Move{chess::Move::NO_MOVE};
-    }
-
-    const chess::Square source(move.from().index());
-    const chess::Square target(move.to().index());
-    switch (metadata.kind) {
-    case MoveKind::castling: {
-        const chess::File rook_file = target > source ? chess::File::FILE_H : chess::File::FILE_A;
-        return chess::Move::make<chess::Move::CASTLING>(source,
-                                                        chess::Square(rook_file, source.rank()));
-    }
-    case MoveKind::en_passant:
-        return chess::Move::make<chess::Move::ENPASSANT>(source, target);
-    case MoveKind::promotion:
-        if (metadata.moving_piece != PieceType::pawn) {
-            return chess::Move{chess::Move::NO_MOVE};
-        }
-        return chess::Move::make<chess::Move::PROMOTION>(source, target,
-                                                         native_promotion_type(move.promotion()));
-    case MoveKind::quiet:
-    case MoveKind::capture:
-        return chess::Move::make<chess::Move::NORMAL>(source, target);
-    }
-    return chess::Move{chess::Move::NO_MOVE};
-}
-
-Move koi_move_for(chess::Move move) noexcept {
-    if (move.move() == chess::Move::NO_MOVE) {
-        return Move::no_move();
-    }
-
-    const Square from = Square::from_index(move.from().index());
-    Square to = Square::from_index(move.to().index());
-    Promotion promotion = Promotion::none;
-    if (move.typeOf() == chess::Move::CASTLING) {
-        const std::uint8_t file = move.to() > move.from() ? 6 : 2;
-        to = Square::from_index(static_cast<std::uint8_t>(move.from().rank() * 8 + file));
-    } else if (move.typeOf() == chess::Move::PROMOTION) {
-        promotion = koi_promotion_type(move.promotionType());
-    }
-    return Move(from, to, promotion);
-}
-
 std::vector<std::string> sorted_native_move_strings(const Position& position) {
     std::vector<std::string> moves;
     for (const Move& move : position.legal_moves()) {
@@ -1113,138 +969,6 @@ std::vector<std::string> sorted_native_move_strings(const Position& position) {
     }
     std::sort(moves.begin(), moves.end());
     return moves;
-}
-
-std::uint8_t shadow_castling_rights(const chess::Board& board) noexcept {
-    const chess::Board::CastlingRights rights = board.castlingRights();
-    std::uint8_t result = 0;
-    if (rights.has(chess::Color::WHITE, chess::Board::CastlingRights::Side::KING_SIDE)) {
-        result |= kWhiteKingSideCastling;
-    }
-    if (rights.has(chess::Color::WHITE, chess::Board::CastlingRights::Side::QUEEN_SIDE)) {
-        result |= kWhiteQueenSideCastling;
-    }
-    if (rights.has(chess::Color::BLACK, chess::Board::CastlingRights::Side::KING_SIDE)) {
-        result |= kBlackKingSideCastling;
-    }
-    if (rights.has(chess::Color::BLACK, chess::Board::CastlingRights::Side::QUEEN_SIDE)) {
-        result |= kBlackQueenSideCastling;
-    }
-    return result;
-}
-
-Square shadow_en_passant_square(const chess::Board& board) noexcept {
-    const chess::Square square = board.enpassantSq();
-    if (square == chess::Square::NO_SQ) {
-        return {};
-    }
-    return Square::from_index(static_cast<std::uint8_t>(square.index()));
-}
-
-bool shadow_has_legal_en_passant_capture(const chess::Board& board) {
-    chess::Movelist legal_moves;
-    chess::movegen::legalmoves(legal_moves, board);
-    for (const chess::Move move : legal_moves) {
-        if (move.typeOf() == chess::Move::ENPASSANT && board.isLegal(move)) {
-            return true;
-        }
-    }
-    return false;
-}
-
-std::string shadow_fen_for_native_comparison(const Position& native_position,
-                                             const chess::Board& shadow_board) {
-    std::string fen = shadow_board.getFen();
-    if (native_position.en_passant_square().index() < Square::kInvalid ||
-        shadow_board.enpassantSq() == chess::Square::NO_SQ ||
-        shadow_has_legal_en_passant_capture(shadow_board)) {
-        return fen;
-    }
-
-    const std::size_t board_end = fen.find(' ');
-    if (board_end == std::string::npos) return fen;
-    const std::size_t side_end = fen.find(' ', board_end + 1);
-    if (side_end == std::string::npos) return fen;
-    const std::size_t castling_end = fen.find(' ', side_end + 1);
-    if (castling_end == std::string::npos) return fen;
-    const std::size_t en_passant_end = fen.find(' ', castling_end + 1);
-    if (en_passant_end == std::string::npos) return fen;
-    fen.replace(castling_end + 1, en_passant_end - castling_end - 1, "-");
-    return fen;
-}
-
-Square shadow_en_passant_square_for_native_comparison(const Position& native_position,
-                                                      const chess::Board& shadow_board) {
-    if (native_position.en_passant_square().index() < Square::kInvalid ||
-        shadow_board.enpassantSq() == chess::Square::NO_SQ ||
-        shadow_has_legal_en_passant_capture(shadow_board)) {
-        return shadow_en_passant_square(shadow_board);
-    }
-    return {};
-}
-
-std::vector<std::string> sorted_shadow_move_strings(const chess::Board& board) {
-    chess::Movelist legal_moves;
-    chess::movegen::legalmoves(legal_moves, board);
-    std::vector<std::string> moves;
-    moves.reserve(legal_moves.size());
-    for (const chess::Move move : legal_moves) {
-        if (board.isLegal(move)) {
-            moves.push_back(chess::uci::moveToUci(move));
-        }
-    }
-    std::sort(moves.begin(), moves.end());
-    return moves;
-}
-
-bool mirror_matches_native(const Position& native_position, const chess::Board& shadow_board) {
-    // This check runs on every generated move in the search tree. Comparing
-    // two freshly formatted FEN strings here used to allocate and scan both
-    // complete strings (and could generate shadow legal moves to normalize
-    // en-passant), making the compatibility mirror an avoidable fixed-depth
-    // cost. Compare the same state fields directly instead; the diagnostic
-    // consistency_snapshot() retains the exhaustive FEN and legal-move
-    // comparison for tests and incident reports.
-    if (native_position.side_to_move() !=
-            (shadow_board.sideToMove() == chess::Color::WHITE ? Color::white : Color::black) ||
-        native_position.castling_rights() != shadow_castling_rights(shadow_board) ||
-        native_position.halfmove_clock() != static_cast<std::uint16_t>(std::min<std::uint32_t>(
-            shadow_board.halfMoveClock(), std::numeric_limits<std::uint16_t>::max())) ||
-        native_position.fullmove_number() != static_cast<std::uint16_t>(std::min<std::uint32_t>(
-            shadow_board.fullMoveNumber(), std::numeric_limits<std::uint16_t>::max()))) {
-        return false;
-    }
-
-    constexpr std::array<std::pair<PieceType, chess::PieceType>, 6> piece_types{{
-        {PieceType::pawn, chess::PieceType::PAWN},
-        {PieceType::knight, chess::PieceType::KNIGHT},
-        {PieceType::bishop, chess::PieceType::BISHOP},
-        {PieceType::rook, chess::PieceType::ROOK},
-        {PieceType::queen, chess::PieceType::QUEEN},
-        {PieceType::king, chess::PieceType::KING},
-    }};
-    for (const Color color : {Color::white, Color::black}) {
-        const chess::Color shadow_color = color == Color::white ?
-            chess::Color::WHITE : chess::Color::BLACK;
-        for (const auto [native_type, shadow_type] : piece_types) {
-            if (native_position.piece_bitboard(native_type, color) !=
-                shadow_board.pieces(shadow_type, shadow_color).getBits()) {
-                return false;
-            }
-        }
-    }
-
-    if (native_position.piece_count() != shadow_board.occ().count()) {
-        return false;
-    }
-
-    const Square native_en_passant = native_position.en_passant_square();
-    const Square shadow_en_passant = shadow_en_passant_square(shadow_board);
-    if (native_en_passant.index() < Square::kInvalid) {
-        return shadow_en_passant == native_en_passant;
-    }
-    return shadow_en_passant.index() >= Square::kInvalid ||
-        !shadow_has_legal_en_passant_capture(shadow_board);
 }
 
 std::uint64_t metadata_validation_token(const std::uint64_t key,
@@ -1847,74 +1571,20 @@ int static_exchange_gain_from_features(const PositionFeatures& features,
 
 class GameState::Impl {
 public:
-    struct FeatureCache {
-        std::uint64_t position_key = 0;
-        PositionFeatures features{};
-    };
-
-    struct HistoryRecord {
-        chess::Move move;
-        bool null_move = false;
-        std::uint64_t shadow_position_key = 0;
-    };
-
-    chess::Board board{};
-    // NativePosition is the legality and incremental-key authority.  The
-    // vendored board remains a compatibility mirror for Polyglot/tablebase
-    // adapters until those consumers are migrated to native snapshots.
+    // NativePosition is the legality and incremental-key authority. The
+    // vendored board is owned by CompatibilityMirror and remains a private
+    // compatibility adapter for Polyglot and diagnostic consumers.
+    detail::CompatibilityMirror compatibility_mirror{};
     Position native_position{};
-    std::vector<HistoryRecord> history;
-    mutable std::shared_mutex feature_cache_mutex;
-    mutable std::array<std::unique_ptr<FeatureCache>, kMaximumGameStateHistory>
-        feature_cache_slots{};
-    mutable std::array<bool, kMaximumGameStateHistory> feature_cache_valid{};
-    mutable std::array<std::atomic<FeatureCache*>, kMaximumGameStateHistory>
-        feature_cache_published{};
-    mutable std::array<std::atomic_bool, kMaximumGameStateHistory>
-        feature_cache_published_valid{};
-    mutable std::array<std::atomic_uint64_t, kMaximumGameStateHistory>
-        feature_cache_keys{};
-    mutable std::uint64_t feature_cache_misses = 0;
-    mutable std::atomic_uint64_t feature_cache_copies = 0;
-    mutable std::atomic_uint64_t feature_cache_fast_hits = 0;
+    mutable detail::FeatureState feature_state{};
     mutable std::atomic_uint64_t check_flag_evaluations = 0;
 
-    Impl() {
-        for (std::size_t index = 0; index < kMaximumGameStateHistory; ++index) {
-            feature_cache_published[index].store(nullptr, std::memory_order_relaxed);
-            feature_cache_published_valid[index].store(false, std::memory_order_relaxed);
-            feature_cache_keys[index].store(0, std::memory_order_relaxed);
-        }
-    }
+    Impl() = default;
 
-    Impl(const Impl& other) : board(other.board), native_position(other.native_position),
-                              history(other.history) {
-        std::shared_lock lock(other.feature_cache_mutex);
-        const std::size_t cache_count = std::min(
-            other.history.size() + 1, kMaximumGameStateHistory);
-        for (std::size_t index = 0; index < cache_count; ++index) {
-            if (other.feature_cache_slots[index] != nullptr) {
-                feature_cache_slots[index] =
-                    std::make_unique<FeatureCache>(*other.feature_cache_slots[index]);
-            }
-            feature_cache_valid[index] = other.feature_cache_valid[index];
-            const std::uint64_t key = feature_cache_valid[index] ?
-                other.feature_cache_keys[index].load(std::memory_order_acquire) : 0;
-            if (feature_cache_valid[index] && feature_cache_slots[index] != nullptr) {
-                feature_cache_slots[index]->position_key = key;
-                feature_cache_published[index].store(feature_cache_slots[index].get(),
-                                                      std::memory_order_release);
-                feature_cache_keys[index].store(key, std::memory_order_release);
-                feature_cache_published_valid[index].store(true, std::memory_order_release);
-            }
-        }
-        feature_cache_misses = other.feature_cache_misses;
-        feature_cache_copies.store(
-            other.feature_cache_copies.load(std::memory_order_relaxed),
-            std::memory_order_relaxed);
-        feature_cache_fast_hits.store(
-            other.feature_cache_fast_hits.load(std::memory_order_relaxed),
-            std::memory_order_relaxed);
+    Impl(const Impl& other) : compatibility_mirror(other.compatibility_mirror),
+                              native_position(other.native_position),
+                              feature_state(other.feature_state,
+                                            other.compatibility_mirror.history_size()) {
         check_flag_evaluations.store(
             other.check_flag_evaluations.load(std::memory_order_relaxed),
             std::memory_order_relaxed);
@@ -1947,13 +1617,10 @@ std::expected<GameState, PositionError> GameState::from_fen(std::string_view fen
         return std::unexpected(PositionError{PositionErrorCode::malformed_fen, "invalid FEN"});
     }
 
-    chess::Board candidate;
-    if (!candidate.setFen(fen) || !valid_check_counts(candidate)) {
+    GameState state;
+    if (!state.impl_->compatibility_mirror.set_fen(fen)) {
         return std::unexpected(PositionError{PositionErrorCode::illegal_position, "illegal position"});
     }
-
-    GameState state;
-    state.impl_->board = std::move(candidate);
     if (!state.impl_->native_position.set_fen(fen)) {
         return std::unexpected(PositionError{PositionErrorCode::illegal_position,
                                               "native position rejected FEN"});
@@ -1985,38 +1652,30 @@ std::vector<Move> GameState::legal_moves() const {
 PositionConsistencySnapshot GameState::consistency_snapshot() const {
     PositionConsistencySnapshot snapshot;
     snapshot.native_fen = impl_->native_position.fen();
-    snapshot.shadow_fen = shadow_fen_for_native_comparison(impl_->native_position, impl_->board);
+    snapshot.shadow_fen = impl_->compatibility_mirror.fen_for_comparison(impl_->native_position);
     snapshot.native_legal_moves = sorted_native_move_strings(impl_->native_position);
-    snapshot.shadow_legal_moves = sorted_shadow_move_strings(impl_->board);
+    snapshot.shadow_legal_moves = impl_->compatibility_mirror.legal_move_strings();
     snapshot.native_position_key = position_key();
-    snapshot.shadow_position_key = impl_->board.hash();
+    snapshot.shadow_position_key = impl_->compatibility_mirror.position_key();
     snapshot.native_castling_rights = castling_rights();
-    snapshot.shadow_castling_rights = shadow_castling_rights(impl_->board);
+    snapshot.shadow_castling_rights = impl_->compatibility_mirror.castling_rights();
     snapshot.native_en_passant_square = en_passant_square();
-    snapshot.shadow_en_passant_square = shadow_en_passant_square_for_native_comparison(
-        impl_->native_position, impl_->board);
+    snapshot.shadow_en_passant_square =
+        impl_->compatibility_mirror.en_passant_square_for_comparison(impl_->native_position);
     snapshot.native_halfmove_clock = halfmove_clock();
-    snapshot.shadow_halfmove_clock = static_cast<std::uint16_t>(std::min<std::uint32_t>(
-        impl_->board.halfMoveClock(), std::numeric_limits<std::uint16_t>::max()));
+    snapshot.shadow_halfmove_clock = impl_->compatibility_mirror.halfmove_clock();
     snapshot.native_fullmove_number = fullmove_number();
-    snapshot.shadow_fullmove_number = static_cast<std::uint16_t>(std::min<std::uint32_t>(
-        impl_->board.fullMoveNumber(), std::numeric_limits<std::uint16_t>::max()));
+    snapshot.shadow_fullmove_number = impl_->compatibility_mirror.fullmove_number();
     snapshot.native_repetition_count = repetition_count();
-    snapshot.shadow_repetition_count = 1;
-    for (const Impl::HistoryRecord& record : impl_->history) {
-        if (!record.null_move && record.shadow_position_key == snapshot.shadow_position_key) {
-            ++snapshot.shadow_repetition_count;
-        }
-    }
+    snapshot.shadow_repetition_count = impl_->compatibility_mirror.repetition_count();
     snapshot.native_repetition_sensitive = is_repetition_sensitive();
     snapshot.shadow_repetition_sensitive = snapshot.shadow_repetition_count >= 2;
     snapshot.native_can_claim_threefold_repetition = can_claim_threefold_repetition();
     snapshot.native_is_automatic_fivefold_repetition = is_automatic_fivefold_repetition();
     snapshot.native_in_check = in_check();
-    snapshot.shadow_in_check = impl_->board.inCheck();
+    snapshot.shadow_in_check = impl_->compatibility_mirror.in_check();
     snapshot.native_side_to_move = side_to_move();
-    snapshot.shadow_side_to_move = impl_->board.sideToMove() == chess::Color::WHITE ?
-        Color::white : Color::black;
+    snapshot.shadow_side_to_move = impl_->compatibility_mirror.side_to_move();
     const bool shadow_checkmate = snapshot.shadow_in_check && snapshot.shadow_legal_moves.empty();
     snapshot.shadow_can_claim_threefold_repetition =
         snapshot.shadow_repetition_count >= 3 && !shadow_checkmate;
@@ -2026,7 +1685,7 @@ PositionConsistencySnapshot GameState::consistency_snapshot() const {
 }
 
 bool GameState::native_shadow_consistent() const noexcept {
-    return mirror_matches_native(impl_->native_position, impl_->board);
+    return impl_->compatibility_mirror.matches(impl_->native_position);
 }
 
 std::vector<MoveMetadata> GameState::legal_moves_with_metadata() const {
@@ -2161,11 +1820,7 @@ std::optional<MoveMetadata> GameState::metadata_for_native_move(
         if (check_flag_mode == CheckFlagMode::quiet_moves_only) {
             metadata.gives_check = native_move_gives_check(impl_->native_position, move);
         } else {
-            const chess::Move native_move = native_move_for(impl_->board, move);
-            if (native_move.move() != chess::Move::NO_MOVE) {
-                metadata.gives_check =
-                    impl_->board.givesCheck(native_move) != chess::CheckType::NO_CHECK;
-            }
+            metadata.gives_check = impl_->compatibility_mirror.gives_check(move);
         }
     }
     return metadata;
@@ -2199,73 +1854,28 @@ void GameState::finalize_metadata(MoveMetadataList& moves, const std::uint64_t k
 }
 
 PositionFeatures GameState::position_features() const noexcept {
-    const std::uint64_t key = position_key();
-    const std::size_t cache_index = impl_->history.size();
-    if (cache_index < kMaximumGameStateHistory) {
-        if (impl_->feature_cache_published_valid[cache_index].load(
-                std::memory_order_acquire)) {
-            const auto* cache = impl_->feature_cache_published[cache_index].load(
-                std::memory_order_acquire);
-            if (cache != nullptr && impl_->feature_cache_keys[cache_index].load(
-                    std::memory_order_acquire) == key) {
-                ++impl_->feature_cache_fast_hits;
-                return cache->features;
-            }
-        }
-    }
-
-    std::unique_lock lock(impl_->feature_cache_mutex);
-    if (cache_index < kMaximumGameStateHistory) {
-        const auto& cache = impl_->feature_cache_slots[cache_index];
-        if (impl_->feature_cache_valid[cache_index] && cache != nullptr &&
-            cache->position_key == key) {
-            return cache->features;
-        }
-    }
-
-    ++impl_->feature_cache_misses;
-
     // The native position already owns incremental piece bitboards.  Build
     // evaluation features from that authority instead of walking the shadow
     // chess.hpp board and asking it to recompute attacks for every piece.
     // The shadow remains synchronized for legality/tablebase compatibility;
     // it is intentionally no longer on the evaluator hot path.
-    const PositionFeatures features = native_position_features(impl_->native_position);
-    if (cache_index < kMaximumGameStateHistory) {
-        try {
-            if (impl_->feature_cache_slots[cache_index] == nullptr) {
-                impl_->feature_cache_slots[cache_index] =
-                    std::make_unique<Impl::FeatureCache>();
-            }
-            impl_->feature_cache_slots[cache_index]->position_key = key;
-            impl_->feature_cache_slots[cache_index]->features = features;
-            impl_->feature_cache_valid[cache_index] = true;
-            impl_->feature_cache_published[cache_index].store(
-                impl_->feature_cache_slots[cache_index].get(), std::memory_order_release);
-            impl_->feature_cache_keys[cache_index].store(key, std::memory_order_release);
-            impl_->feature_cache_published_valid[cache_index].store(
-                true, std::memory_order_release);
-        } catch (...) {
-            impl_->feature_cache_valid[cache_index] = false;
-            impl_->feature_cache_published_valid[cache_index].store(
-                false, std::memory_order_release);
-            impl_->feature_cache_keys[cache_index].store(0, std::memory_order_release);
-        }
-    }
-    return features;
+    return impl_->feature_state.get_or_compute(
+        impl_->compatibility_mirror.history_size(),
+        impl_->native_position.position_key(),
+        impl_->native_position,
+        native_position_features);
 }
 
 std::uint64_t GameState::position_feature_cache_misses() const noexcept {
-    std::shared_lock lock(impl_->feature_cache_mutex);
-    return impl_->feature_cache_misses;
+    return impl_->feature_state.cache_misses();
 }
 
 std::uint64_t GameState::position_feature_cache_fast_hits() const noexcept {
-    return impl_->feature_cache_fast_hits.load(std::memory_order_relaxed);
+    return impl_->feature_state.fast_hits();
 }
 
 std::uint64_t GameState::position_feature_cache_copies() const noexcept {
-    return impl_->feature_cache_copies.load(std::memory_order_relaxed);
+    return impl_->feature_state.snapshot_copies();
 }
 
 std::uint64_t GameState::check_flag_evaluations() const noexcept {
@@ -2308,42 +1918,18 @@ bool GameState::make_move(const Move& move) noexcept {
     if (!impl_->native_position.make_move(move)) {
         return false;
     }
-    const chess::Move native_move = native_move_for(impl_->board, move);
-    if (native_move.move() == chess::Move::NO_MOVE) {
-        (void)impl_->native_position.unmake_move();
-        return false;
-    }
-    if (!impl_->board.isLegal(native_move)) {
-        (void)impl_->native_position.unmake_move();
-        return false;
-    }
-    try {
-        impl_->history.push_back(Impl::HistoryRecord{
-            native_move, false, impl_->board.hash()});
-        bool shadow_applied = false;
-        try {
-            impl_->board.makeMove(native_move);
-            shadow_applied = true;
-            if (!mirror_matches_native(impl_->native_position, impl_->board)) {
-                impl_->board.unmakeMove(native_move);
-                impl_->history.pop_back();
-                (void)impl_->native_position.unmake_move();
-                return false;
-            }
-        } catch (...) {
-            if (shadow_applied) {
-                impl_->board.unmakeMove(native_move);
-            }
-            impl_->history.pop_back();
-            (void)impl_->native_position.unmake_move();
-            return false;
+    const std::size_t mirror_history_before =
+        impl_->compatibility_mirror.history_size();
+    const bool mirror_applied = impl_->compatibility_mirror.apply_move(move);
+    if (!mirror_applied || !impl_->compatibility_mirror.matches(impl_->native_position)) {
+        if (impl_->compatibility_mirror.history_size() > mirror_history_before) {
+            (void)impl_->compatibility_mirror.undo_move();
         }
-        invalidate_feature_cache();
-        return true;
-    } catch (...) {
         (void)impl_->native_position.unmake_move();
         return false;
     }
+    invalidate_feature_cache();
+    return true;
 }
 
 bool GameState::apply_generated_move(const MoveMetadata& metadata,
@@ -2356,41 +1942,27 @@ bool GameState::apply_generated_move(const MoveMetadata& metadata,
         metadata.validation_token != metadata_validation_token(position_key(), metadata)) {
         return false;
     }
-    const chess::Move native_move = native_move_for_metadata(metadata);
-    if (native_move.move() == chess::Move::NO_MOVE ||
-        (verify_shadow_legality && !impl_->board.isLegal(native_move))) {
-        return false;
-    }
     if (!impl_->native_position.make_generated_move(metadata.move)) {
         return false;
     }
-    try {
-        impl_->history.push_back(Impl::HistoryRecord{
-            native_move, false, impl_->board.hash()});
-        bool shadow_applied = false;
-        try {
-            impl_->board.makeMove(native_move);
-            shadow_applied = true;
-            if (verify_mirror && !mirror_matches_native(impl_->native_position, impl_->board)) {
-                impl_->board.unmakeMove(native_move);
-                impl_->history.pop_back();
-                (void)impl_->native_position.unmake_move();
-                return false;
-            }
-        } catch (...) {
-            if (shadow_applied) {
-                impl_->board.unmakeMove(native_move);
-            }
-            impl_->history.pop_back();
-            (void)impl_->native_position.unmake_move();
-            return false;
+    const std::size_t mirror_history_before =
+        impl_->compatibility_mirror.history_size();
+    if (!impl_->compatibility_mirror.apply_generated_move(metadata, verify_shadow_legality)) {
+        if (impl_->compatibility_mirror.history_size() > mirror_history_before) {
+            (void)impl_->compatibility_mirror.undo_move();
         }
-        invalidate_feature_cache();
-        return true;
-    } catch (...) {
         (void)impl_->native_position.unmake_move();
         return false;
     }
+    if (verify_mirror && !impl_->compatibility_mirror.matches(impl_->native_position)) {
+        if (impl_->compatibility_mirror.history_size() > mirror_history_before) {
+            (void)impl_->compatibility_mirror.undo_move();
+        }
+        (void)impl_->native_position.unmake_move();
+        return false;
+    }
+    invalidate_feature_cache();
+    return true;
 }
 
 bool GameState::make_legal_move(const MoveMetadata& metadata) noexcept {
@@ -2406,18 +1978,16 @@ bool GameState::make_search_move(const MoveMetadata& metadata) noexcept {
 }
 
 bool GameState::unmake_move() noexcept {
-    if (impl_->history.empty()) {
+    if (impl_->compatibility_mirror.history_size() == 0 ||
+        impl_->compatibility_mirror.last_move_is_null()) {
         return false;
     }
-    const Impl::HistoryRecord record = impl_->history.back();
-    if (record.null_move) {
+    if (!impl_->compatibility_mirror.undo_move()) {
         return false;
     }
-    impl_->board.unmakeMove(record.move);
     if (!impl_->native_position.unmake_move()) {
         return false;
     }
-    impl_->history.pop_back();
     return true;
 }
 
@@ -2425,45 +1995,30 @@ bool GameState::make_null_move() noexcept {
     if (!impl_->native_position.make_null_move()) {
         return false;
     }
-    try {
-        impl_->history.push_back(Impl::HistoryRecord{
-            chess::Move{chess::Move::NULL_MOVE}, true, impl_->board.hash()});
-        try {
-            impl_->board.makeNullMove();
-        } catch (...) {
-            impl_->history.pop_back();
-            (void)impl_->native_position.unmake_null_move();
-            return false;
-        }
-        invalidate_feature_cache();
-        return true;
-    } catch (...) {
+    if (!impl_->compatibility_mirror.apply_null_move()) {
         (void)impl_->native_position.unmake_null_move();
         return false;
     }
+    invalidate_feature_cache();
+    return true;
 }
 
 bool GameState::unmake_null_move() noexcept {
-    if (impl_->history.empty() || !impl_->history.back().null_move) {
+    if (impl_->compatibility_mirror.history_size() == 0 ||
+        !impl_->compatibility_mirror.last_move_is_null()) {
         return false;
     }
-    impl_->board.unmakeNullMove();
+    if (!impl_->compatibility_mirror.undo_null_move()) {
+        return false;
+    }
     if (!impl_->native_position.unmake_null_move()) {
         return false;
     }
-    impl_->history.pop_back();
     return true;
 }
 
 void GameState::invalidate_feature_cache() noexcept {
-    std::unique_lock lock(impl_->feature_cache_mutex);
-    const std::size_t cache_index = impl_->history.size();
-    if (cache_index < kMaximumGameStateHistory) {
-        impl_->feature_cache_valid[cache_index] = false;
-        impl_->feature_cache_published_valid[cache_index].store(
-            false, std::memory_order_release);
-        impl_->feature_cache_keys[cache_index].store(0, std::memory_order_release);
-    }
+    impl_->feature_state.invalidate(impl_->compatibility_mirror.history_size());
 }
 
 bool GameState::is_capture(const Move& move) const noexcept {
@@ -2510,44 +2065,44 @@ std::uint64_t GameState::polyglot_key() const noexcept {
         key ^= kPolyglotRandom[piece_index * 64 + index];
     }
 
-    const chess::Board::CastlingRights rights = impl_->board.castlingRights();
-    if (rights.has(chess::Color::WHITE, chess::Board::CastlingRights::Side::KING_SIDE)) {
+    const std::uint8_t rights = impl_->compatibility_mirror.castling_rights();
+    if ((rights & kWhiteKingSideCastling) != 0) {
         key ^= kPolyglotRandom[768];
     }
-    if (rights.has(chess::Color::WHITE, chess::Board::CastlingRights::Side::QUEEN_SIDE)) {
+    if ((rights & kWhiteQueenSideCastling) != 0) {
         key ^= kPolyglotRandom[769];
     }
-    if (rights.has(chess::Color::BLACK, chess::Board::CastlingRights::Side::KING_SIDE)) {
+    if ((rights & kBlackKingSideCastling) != 0) {
         key ^= kPolyglotRandom[770];
     }
-    if (rights.has(chess::Color::BLACK, chess::Board::CastlingRights::Side::QUEEN_SIDE)) {
+    if ((rights & kBlackQueenSideCastling) != 0) {
         key ^= kPolyglotRandom[771];
     }
 
-    const chess::Square en_passant = impl_->board.enpassantSq();
-    if (en_passant != chess::Square::NO_SQ) {
+    const Square en_passant = impl_->compatibility_mirror.en_passant_square();
+    if (en_passant.index() < Square::kInvalid) {
         const int target = en_passant.index();
-        const int source_rank_delta = impl_->board.sideToMove() == chess::Color::WHITE ? -8 : 8;
+        const int source_rank_delta = side_to_move() == Color::white ? -8 : 8;
         const int pawn_rank = target + source_rank_delta;
-        const chess::Color side = impl_->board.sideToMove();
+        const Color side = side_to_move();
         bool capturable = false;
         for (const int file_delta : {-1, 1}) {
             const int source = pawn_rank + file_delta;
             if (source < 0 || source >= 64 || source / 8 != pawn_rank / 8) {
                 continue;
             }
-            const chess::Piece piece = impl_->board.at(chess::Square(source));
-            if (piece.type() == chess::PieceType::PAWN && piece.color() == side) {
+            const Piece piece = piece_at(Square::from_index(static_cast<std::uint8_t>(source)));
+            if (piece.type == PieceType::pawn && piece.color == side) {
                 capturable = true;
                 break;
             }
         }
         if (capturable) {
-            key ^= kPolyglotRandom[772 + en_passant.file()];
+            key ^= kPolyglotRandom[772 + (en_passant.file() - 'a')];
         }
     }
 
-    if (impl_->board.sideToMove() == chess::Color::WHITE) {
+    if (side_to_move() == Color::white) {
         key ^= kPolyglotRandom[780];
     }
     return key;
