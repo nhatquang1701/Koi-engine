@@ -15,6 +15,9 @@
 #include <vector>
 
 #include "koi/detail/search_ordering.hpp"
+#include "koi/detail/root_coordinator.hpp"
+#include "koi/detail/search_stack.hpp"
+#include "koi/detail/search_session.hpp"
 #include "koi/syzygy_tablebase.hpp"
 #include "koi/time_manager.hpp"
 #include "koi/transposition_table.hpp"
@@ -448,24 +451,9 @@ bool narrow_deep_quiet_check_candidate(GameState& state, const MoveMetadata& met
     return narrow_evasion_set;
 }
 
-constexpr std::size_t kMaximumPvLength = static_cast<std::size_t>(kMaximumSearchDepth);
-
-struct PrincipalVariation {
-    std::array<Move, kMaximumPvLength> moves{};
-    std::uint8_t length = 0;
-
-    void prepend(Move move, const PrincipalVariation& child) noexcept {
-        const std::size_t child_length =
-            std::min<std::size_t>(child.length, kMaximumPvLength - 1);
-        moves[0] = move;
-        std::copy_n(child.moves.data(), child_length, moves.data() + 1);
-        length = static_cast<std::uint8_t>(child_length + 1);
-    }
-
-    [[nodiscard]] std::vector<Move> to_vector() const {
-        return {moves.begin(), moves.begin() + length};
-    }
-};
+using detail::PrincipalVariation;
+using detail::RootCoordinator;
+using detail::RootLine;
 
 void accumulate_stats(SearchStats& total, const SearchStats& partial) noexcept {
     total.nodes += partial.nodes;
@@ -1912,6 +1900,7 @@ struct SearchContext {
     bool aborted = false;
     bool allow_root_forcing_extension = false;
     int quiescence_check_depth_limit = kMaximumQuiescenceCheckDepth;
+    detail::SearchStack stack;
     std::unique_ptr<EvaluationCacheEntry[]> evaluation_cache;
     std::array<RootMoveScore, kMaximumLegalMoves> root_move_scores{};
     std::size_t root_move_score_count = 0;
@@ -1955,6 +1944,7 @@ struct SearchContext {
         aborted = false;
         iteration_aborted = shared_abort;
         root_move_score_count = 0;
+        stack.reset();
     }
 
     [[nodiscard]] std::optional<RootMoveScore> best_completed_root_move(
@@ -2277,6 +2267,12 @@ struct SearchContext {
         // generation. Do not build and annotate the full legal move list here
         // only to discard it immediately at the depth boundary.
         const bool checked = state.in_check();
+        detail::SearchFrame& frame = stack.frame(static_cast<std::size_t>(std::max(ply, 0)));
+        frame.previous_move = previous_move.value_or(Move::no_move());
+        frame.in_check = checked;
+        frame.move_count = 0;
+        frame.reduction = 0;
+        frame.extension = 0;
         MoveMetadataList moves;
         if (ply == 0 && root_moves != nullptr) {
             moves = *root_moves;
@@ -2299,6 +2295,7 @@ struct SearchContext {
             ++stats.check_extensions;
             ++depth;
             --child_check_extensions_remaining;
+            frame.extension = 1;
         }
 
         std::optional<PositionFeatures> features;
@@ -2330,6 +2327,7 @@ struct SearchContext {
         }
         if (phase_rich_quiet_position) {
             static_eval = evaluate(state, state.side_to_move());
+            frame.static_eval = static_eval;
             if (depth == 1 && alpha > -kInfinity && static_eval + 120 <= alpha) {
                 const int razor_score = quiescence(state, alpha, beta, ply);
                 if (!aborted && razor_score <= alpha) {
@@ -2413,6 +2411,7 @@ struct SearchContext {
                 return 0;
             }
             const Move move = metadata.move;
+            frame.current_move = move;
             const Color moving_side = history_side(state.side_to_move(), false);
             const int history_score = ordering.quiet_history_score(moving_side, move, previous_move);
             const bool is_tt_move = tt_move.has_value() && move == *tt_move;
@@ -2487,6 +2486,7 @@ struct SearchContext {
             const int history_adjustment = history_score > 256 ? -1 : history_score < -256 ? 1 : 0;
             const int reduction = std::clamp(base_reduction + history_adjustment, 0, full_child_depth);
             const bool reduced = reducible_quiet && !quiet_forcing_extension && reduction > 0;
+            frame.reduction = reduced ? reduction : 0;
             const int authoritative_child_depth = quiet_forcing_extension ?
                 full_child_depth + 1 : full_child_depth;
             const int child_depth = reduced ? full_child_depth - reduction : authoritative_child_depth;
@@ -2570,6 +2570,7 @@ struct SearchContext {
                 }
             }
             ++move_number;
+            frame.move_count = move_number;
         }
 
         const TranspositionBound bound = best_score <= original_alpha ? TranspositionBound::upper
@@ -2579,13 +2580,6 @@ struct SearchContext {
         }
         return best_score;
     }
-};
-
-struct RootLine {
-    bool completed = false;
-    int score = -kInfinity;
-    std::size_t stable_index = 0;
-    PrincipalVariation pv;
 };
 
 class RootWorkerPool {
@@ -2817,23 +2811,6 @@ private:
     bool stopping_ = false;
 };
 
-std::vector<std::size_t> rank_root_lines(const std::vector<RootLine>& lines) {
-    std::vector<std::size_t> ranked;
-    ranked.reserve(lines.size());
-    for (std::size_t index = 0; index < lines.size(); ++index) {
-        if (lines[index].completed) {
-            ranked.push_back(index);
-        }
-    }
-    std::sort(ranked.begin(), ranked.end(), [&lines](std::size_t left, std::size_t right) {
-        if (lines[left].score != lines[right].score) {
-            return lines[left].score > lines[right].score;
-        }
-        return lines[left].stable_index < lines[right].stable_index;
-    });
-    return ranked;
-}
-
 void safely_report_info(const SearchEventSink& sink, const SearchInfo& info) {
     if (!sink.on_info) {
         return;
@@ -2844,25 +2821,7 @@ void safely_report_info(const SearchEventSink& sink, const SearchInfo& info) {
     }
 }
 
-void safely_report_completion(const SearchEventSink& sink, const SearchResult& result) {
-    if (!sink.on_complete) {
-        return;
-    }
-    try {
-        sink.on_complete(result);
-    } catch (...) {
-    }
-}
-
 } // namespace
-
-struct SearchHandle::State {
-    std::atomic_bool stop_requested = false;
-    std::atomic_bool running = true;
-    std::mutex stop_mutex;
-    std::condition_variable stop_condition;
-    std::thread worker;
-};
 
 struct SearchService::Impl {
     explicit Impl(std::shared_ptr<const Evaluator> evaluator, HashMemoryPolicy hash_memory_policy,
@@ -2876,7 +2835,8 @@ struct SearchService::Impl {
     std::shared_ptr<std::mutex> evaluator_mutex;
 };
 
-SearchHandle::SearchHandle(std::shared_ptr<State> state) noexcept : state_(std::move(state)) {}
+SearchHandle::SearchHandle(std::shared_ptr<detail::SearchSession> state) noexcept
+    : state_(std::move(state)) {}
 
 SearchHandle::SearchHandle(SearchHandle&&) noexcept = default;
 
@@ -2896,19 +2856,18 @@ SearchHandle::~SearchHandle() {
 
 void SearchHandle::stop() noexcept {
     if (state_) {
-        state_->stop_requested.store(true, std::memory_order_relaxed);
-        state_->stop_condition.notify_all();
+        state_->stop();
     }
 }
 
 void SearchHandle::wait() {
-    if (state_ && state_->worker.joinable() && state_->worker.get_id() != std::this_thread::get_id()) {
-        state_->worker.join();
+    if (state_) {
+        state_->wait();
     }
 }
 
 bool SearchHandle::running() const noexcept {
-    return state_ && state_->running.load(std::memory_order_relaxed);
+    return state_ && state_->running();
 }
 
 SearchService::SearchService(std::shared_ptr<const Evaluator> evaluator,
@@ -2939,15 +2898,18 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
         options.strength_profile_hook(options);
     }
 
-    auto state = std::make_shared<SearchHandle::State>();
+    auto session = std::make_shared<detail::SearchSession>(
+        std::move(root), std::move(limits), options);
     const auto evaluator = impl_->evaluator;
     const auto table = impl_->table;
     const auto evaluator_mutex = impl_->evaluator_mutex;
-    state->worker = std::thread([state, evaluator, table, root = std::move(root), limits = std::move(limits),
-                                 sink = std::move(sink), options, evaluator_mutex]() mutable {
+    session->launch([session, evaluator, table, sink = std::move(sink), evaluator_mutex]() mutable {
         const auto started = std::chrono::steady_clock::now();
+        GameState root = session->root();
+        const SearchLimits& limits = session->limits();
+        const SearchOptions& options = session->options();
         SearchResult result;
-        result.identity = SearchRequestIdentity{options.generation, root.position_key(), root.fen()};
+        result.identity = session->identity();
         try {
             RootTimingContext timing_context;
             timing_context.table_available = table->size_mb() != 0;
@@ -2988,7 +2950,7 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
             TimeManager time_manager(limits, root.side_to_move(), options.speed_percent,
                                      options.move_overhead_ms, options.slow_mover_percent,
                                      timing_context);
-            const FallbackControl fallback_control{&time_manager, &state->stop_requested};
+            const FallbackControl fallback_control{&time_manager, &session->stop_requested()};
             result.timing = time_manager.diagnostics();
             result.best_move = legal_moves.empty() ? std::nullopt :
                 std::optional<Move>{legal_moves.front().move};
@@ -3085,7 +3047,7 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
             } else if ((options.threads == 1 && options.multi_pv == 1) || legal_moves.size() < 2 ||
                        (time_manager.node_limit().has_value() && options.multi_pv == 1) ||
                        (short_tactical_budget && !ultra_short_nonchecking_parallel)) {
-                SearchContext context(*evaluator, *table, time_manager, state->stop_requested,
+                SearchContext context(*evaluator, *table, time_manager, session->stop_requested(),
                                       nullptr, evaluator_mutex_ptr, &legal_moves, true,
                                       options.quiet_history_side_hook);
                 context.allow_root_forcing_extension = limits.depth.has_value() &&
@@ -3684,10 +3646,10 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                 const std::size_t worker_count = std::min(options.threads, legal_moves.size());
                 const bool multi_pv = options.multi_pv > 1;
                 RootWorkerPool pool(worker_count, *evaluator, *table, time_manager,
-                                    state->stop_requested, global_nodes_ptr, evaluator_mutex_ptr, true,
+                                    session->stop_requested(), global_nodes_ptr, evaluator_mutex_ptr, true,
                                     options.quiet_history_side_hook);
                 SearchStats total_stats;
-                SearchContext root_context(*evaluator, *table, time_manager, state->stop_requested,
+                SearchContext root_context(*evaluator, *table, time_manager, session->stop_requested(),
                                            global_nodes_ptr, evaluator_mutex_ptr, nullptr, true,
                                            options.quiet_history_side_hook);
 
@@ -3727,7 +3689,7 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                     if (!unbounded && !time_manager.should_start_next_iteration(previous_iteration_elapsed)) {
                         break;
                     }
-                    if (state->stop_requested.load(std::memory_order_relaxed) ||
+                    if (session->stop_requested().load(std::memory_order_relaxed) ||
                         time_manager.should_stop(root_context.visited_nodes())) {
                         break;
                     }
@@ -3777,7 +3739,8 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                         }
                         accumulate_stats(iteration_stats, root_context.stats);
                         accumulate_stats(total_stats, iteration_stats);
-                        const std::vector<std::size_t> partial_ranked_indices = rank_root_lines(lines);
+                        const std::vector<std::size_t> partial_ranked_indices =
+                            RootCoordinator::rank(lines);
                         const auto safe_partial = used_short_fallback ?
                             partial_ranked_indices.end() : std::find_if(
                             partial_ranked_indices.begin(), partial_ranked_indices.end(),
@@ -3800,7 +3763,7 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
 
                     std::vector<std::size_t> ranked_indices;
                     if (multi_pv) {
-                        ranked_indices = rank_root_lines(lines);
+                        ranked_indices = RootCoordinator::rank(lines);
                     } else {
                         ranked_indices.reserve(lines.size());
                         for (std::size_t index = 0; index < lines.size(); ++index) {
@@ -3899,7 +3862,7 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                                     lines[candidate_index].score = verification.score;
                                     lines[candidate_index].pv = verification.pv;
                                     lines[candidate_index].completed = true;
-                                    ranked_indices = rank_root_lines(lines);
+                                    ranked_indices = RootCoordinator::rank(lines);
                                     break;
                                 }
                             }
@@ -3959,7 +3922,7 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                                     lines[candidate_index].score = verification.score;
                                     lines[candidate_index].pv = verification.pv;
                                     lines[candidate_index].completed = true;
-                                    ranked_indices = rank_root_lines(lines);
+                                    ranked_indices = RootCoordinator::rank(lines);
                                     break;
                                 }
                             }
@@ -4074,10 +4037,7 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
             }
 
             if (limits.ponder && (legal_moves.empty() || root_is_claimable_draw)) {
-                std::unique_lock lock(state->stop_mutex);
-                state->stop_condition.wait(lock, [state] {
-                    return state->stop_requested.load(std::memory_order_relaxed);
-                });
+                session->wait_until_stopped();
             }
             result.timing = time_manager.diagnostics();
         } catch (...) {
@@ -4103,11 +4063,10 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
             std::chrono::steady_clock::now() - started);
         result.mate = mate_from_score(result.score_cp);
         result.completed = true;
-        result.cancelled = state->stop_requested.load(std::memory_order_relaxed);
-        state->running.store(false, std::memory_order_release);
-        safely_report_completion(sink, result);
+        result.cancelled = session->stop_requested().load(std::memory_order_relaxed);
+        (void)session->publish_completion(sink, result);
     });
-    return SearchHandle(std::move(state));
+    return SearchHandle(std::move(session));
 }
 
 HashResizeResult SearchService::set_hash_size_mb(std::size_t megabytes) {

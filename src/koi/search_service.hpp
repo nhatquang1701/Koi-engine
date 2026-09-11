@@ -10,6 +10,8 @@ namespace koi {
 
 namespace detail {
 
+class SearchSession;
+
 [[nodiscard]] constexpr bool high_history_move_excluded_from_lmr(int history_score) noexcept {
     return history_score >= 128;
 }
@@ -29,11 +31,9 @@ public:
     [[nodiscard]] bool running() const noexcept;
 
 private:
-    struct State;
+    explicit SearchHandle(std::shared_ptr<detail::SearchSession> state) noexcept;
 
-    explicit SearchHandle(std::shared_ptr<State> state) noexcept;
-
-    std::shared_ptr<State> state_;
+    std::shared_ptr<detail::SearchSession> state_;
 
     friend class SearchService;
 };

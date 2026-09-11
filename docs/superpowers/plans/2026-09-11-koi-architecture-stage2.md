@@ -134,7 +134,8 @@ Required interface:
 ```cpp
 namespace koi::detail {
 
-inline constexpr std::size_t kSearchStackCapacity = 64;
+inline constexpr std::size_t kSearchStackCapacity = 128;
+inline constexpr std::size_t kPrincipalVariationCapacity = 64;
 
 struct SearchFrame {
     Move current_move = Move::no_move();
@@ -147,7 +148,7 @@ struct SearchFrame {
 };
 
 struct PrincipalVariation {
-    std::array<Move, kSearchStackCapacity> moves{};
+    std::array<Move, kPrincipalVariationCapacity> moves{};
     std::uint8_t length = 0;
     void clear() noexcept;
     void prepend(Move move, const PrincipalVariation& child) noexcept;

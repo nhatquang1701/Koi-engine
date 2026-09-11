@@ -71,8 +71,8 @@ void test_session_snapshot_and_completion_are_single_owner_operations() {
     koi::SearchEventSink sink;
     sink.on_complete = [&completions](const koi::SearchResult&) { ++completions; };
     koi::SearchResult result;
-    session->publish_completion(sink, result);
-    session->publish_completion(sink, result);
+    (void)session->publish_completion(sink, result);
+    (void)session->publish_completion(sink, result);
     require(completions == 1,
             "session must publish completion exactly once");
 }
