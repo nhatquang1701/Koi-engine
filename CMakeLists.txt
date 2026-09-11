@@ -178,6 +178,9 @@ add_executable(native_rule_state_tests
 )
 
 target_link_libraries(native_rule_state_tests PRIVATE koi_core)
+target_include_directories(native_rule_state_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/chess-library
+)
 
 add_test(NAME native_rule_state_tests COMMAND native_rule_state_tests)
 

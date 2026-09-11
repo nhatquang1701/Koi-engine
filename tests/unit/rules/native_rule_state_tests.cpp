@@ -5,6 +5,8 @@
 #include <vector>
 
 #include "koi/game_state.hpp"
+#include "koi/detail/compatibility_mirror.hpp"
+#include "koi/detail/feature_state.hpp"
 #include "koi/position.hpp"
 
 namespace {
@@ -51,6 +53,68 @@ void test_fen_rule_state_and_position_facade() {
                 position.piece_bitboard(koi::PieceType::rook, koi::Color::black) ==
                     ((std::uint64_t{1} << 56) | (std::uint64_t{1} << 63)),
             "Position must expose incrementally maintained piece bitboards");
+}
+
+void test_compatibility_mirror_owns_only_shadow_state_and_history() {
+    constexpr std::string_view fen =
+        "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1";
+    const auto parsed = GameState::from_fen(fen);
+    require(parsed.has_value(), "ownership seam fixture must be valid");
+    const auto move = Move::parse_uci("e1g1");
+    require(move.has_value(), "ownership seam move must parse");
+    const auto metadata = parsed->describe_move(*move);
+    require(metadata.has_value(), "ownership seam move must have metadata");
+
+    koi::Position native(fen);
+    koi::detail::CompatibilityMirror mirror;
+    require(mirror.set_fen(fen), "compatibility mirror must accept a valid native FEN");
+    require(mirror.matches(native),
+            "a freshly initialized compatibility mirror must match the native authority");
+    require(mirror.apply_generated_move(*metadata, true),
+            "the mirror must apply generated special-move metadata transactionally");
+
+    koi::Position child(native);
+    require(child.make_generated_move(metadata->move),
+            "the native authority must apply the same generated special move");
+    require(mirror.matches(child),
+            "mirror state must match the independently advanced native state");
+    require(mirror.history_size() == 1 && !mirror.last_move_is_null(),
+            "normal mirror moves must add one non-null shadow history record");
+    require(mirror.undo_move(), "the mirror must undo its own normal history record");
+    require(mirror.matches(native) && mirror.history_size() == 0,
+            "undoing the mirror must restore its source state without native mutation");
+
+    require(mirror.apply_null_move(), "the mirror must own null-move shadow transitions");
+    require(mirror.last_move_is_null(), "a null transition must be identifiable in shadow history");
+    require(mirror.undo_null_move() && mirror.history_size() == 0,
+            "the mirror null transition must be independently reversible");
+}
+
+koi::PositionFeatures ownership_feature_builder(const koi::Position& position) noexcept {
+    koi::PositionFeatures features{};
+    features.side_to_move = position.side_to_move();
+    features.fullmove_number = position.fullmove_number();
+    return features;
+}
+
+void test_feature_state_owns_cache_publication_and_invalidation() {
+    const koi::Position native;
+    koi::detail::FeatureState cache;
+    const std::uint64_t key = native.position_key();
+
+    const koi::PositionFeatures first = cache.get_or_compute(
+        0, key, native, ownership_feature_builder);
+    const koi::PositionFeatures second = cache.get_or_compute(
+        0, key, native, ownership_feature_builder);
+    require(first.side_to_move == koi::Color::white && second.fullmove_number == 1,
+            "feature ownership seam must return the builder's published value");
+    require(cache.cache_misses() == 1 && cache.fast_hits() == 1,
+            "a repeated feature request must publish once and hit the lock-free path once");
+
+    cache.invalidate(0);
+    (void)cache.get_or_compute(0, key, native, ownership_feature_builder);
+    require(cache.cache_misses() == 2,
+            "invalidating one position slot must force exactly one subsequent rebuild");
 }
 
 void test_claimable_and_automatic_repetition_thresholds() {
@@ -208,6 +272,8 @@ struct TestCase { std::string_view name; void (*run)(); };
 
 int main() {
     const std::vector<TestCase> tests{
+        {"compatibility mirror ownership", test_compatibility_mirror_owns_only_shadow_state_and_history},
+        {"feature state ownership", test_feature_state_owns_cache_publication_and_invalidation},
         {"FEN rule state and Position facade", test_fen_rule_state_and_position_facade},
         {"repetition thresholds", test_claimable_and_automatic_repetition_thresholds},
         {"clock, checkmate, and dead positions", test_move_clock_checkmate_and_dead_position_rules},
