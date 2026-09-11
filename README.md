@@ -82,12 +82,15 @@ new scheduler, shared history, or Lazy-SMP behavior. These seams let future
 parallel search evolve shared-state policy without moving it through recursive
 search or changing the public `SearchService` contract.
 
-Stages 1 through 5 now cover native state ownership, search lifecycle and
-stack, ordering/policy, evaluation/NNUE worker state, and TT/budget runtime
-resources. Stage 6 remains for final module/tooling/documentation alignment,
-measurement review, strength validation, and the adversarial architecture
-self-review; `Goal.txt` is intentionally retained until that complete goal is
-finished.
+Stages 1 through 5 cover native state ownership, search lifecycle and stack,
+ordering/policy, evaluation/NNUE worker state, and TT/budget runtime resources.
+The final Stage 6 review records the module/tooling alignment, Release and
+Debug evidence, Stockfish-informed self-review, future-change test, and the
+known short-clock/Debug limitations:
+[final architecture review](docs/superpowers/verification/2026-09-12-koi-architecture-stage6-final-review.md).
+The architecture is accepted as the baseline for future strength work. Lazy
+SMP and shared histories remain deliberately future work, and `Goal.txt` is
+only a temporary task input rather than an engine artifact.
 
 ## Build prerequisites
 

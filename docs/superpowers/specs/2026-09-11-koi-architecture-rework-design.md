@@ -339,6 +339,18 @@ and match reports with the resulting implementation. Strength claims require
 appropriate comparative evidence; NPS and deterministic node signatures remain
 separate measurements.
 
+The final Stage 6 review is recorded in
+`docs/superpowers/verification/2026-09-12-koi-architecture-stage6-final-review.md`.
+It confirms that the module and tooling contracts describe the implementation,
+that the full Release and Debug registrations were exercised, and that the
+ten-point self-review and twelve-item future-change test identify no remaining
+major foundational ownership change. The review preserves the known
+short-clock oracle sensitivity and Debug benchmark timeout as explicit
+limitations; it makes no Elo or universal wall-clock determinism claim. Lazy
+SMP, shared histories, and a new root scheduler remain future consumers of the
+documented shared/local runtime seams rather than unfinished architecture
+requirements.
+
 ## Verification contract
 
 Every behavioral change follows RED -> GREEN -> refactor and records the
@@ -397,3 +409,8 @@ baseline, full Debug/Release verification where available, clean diff checks,
 and an updated repository architecture description. `Goal.txt` is a temporary
 task input and must not be deleted until the complete multi-stage objective is
 actually satisfied.
+
+The complete multi-stage objective is now reviewed against the final
+architecture record above. Removal of `Goal.txt` is a task-cleanup action only;
+it does not remove the staged specifications, verification records, or the
+documented future work.
