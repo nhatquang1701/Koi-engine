@@ -52,6 +52,7 @@ enable_testing()
 add_library(koi_core
     src/koi/classical_evaluator.cpp
     src/koi/detail/compatibility_mirror.cpp
+    src/koi/detail/evaluation_context.cpp
     src/koi/detail/feature_state.cpp
     src/koi/detail/root_coordinator.cpp
     src/koi/detail/search_context.cpp

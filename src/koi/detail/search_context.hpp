@@ -13,6 +13,7 @@
 
 #include "koi/detail/search_constants.hpp"
 #include "koi/detail/search_context_support.hpp"
+#include "koi/detail/evaluation_context.hpp"
 #include "koi/detail/search_ordering.hpp"
 #include "koi/detail/search_policy.hpp"
 #include "koi/detail/search_stack.hpp"
@@ -46,12 +47,15 @@ struct SearchContext {
         return SearchStack::kCapacity;
     }
 
-    const Evaluator& evaluator;
+    static constexpr bool has_evaluation_context() noexcept {
+        return true;
+    }
+
+    EvaluationContext evaluation;
     TranspositionTable& table;
     TimeManager& time_manager;
     std::atomic_bool& stop_requested;
     std::atomic<std::uint64_t>* global_nodes = nullptr;
-    std::mutex* evaluator_mutex = nullptr;
     const MoveMetadataList* root_moves = nullptr;
     bool use_transposition_table = true;
     std::atomic_bool* iteration_aborted = nullptr;
@@ -73,8 +77,8 @@ struct SearchContext {
                   const MoveMetadataList* root_moves = nullptr,
                   bool use_transposition_table = true,
                   SearchOptions::QuietHistorySideHook quiet_history_side_hook = {})
-        : evaluator(evaluator), table(table), time_manager(time_manager), stop_requested(stop_requested),
-          global_nodes(global_nodes), evaluator_mutex(evaluator_mutex), root_moves(root_moves),
+        : evaluation(evaluator, evaluator_mutex), table(table), time_manager(time_manager),
+          stop_requested(stop_requested), global_nodes(global_nodes), root_moves(root_moves),
           use_transposition_table(use_transposition_table),
           evaluation_cache(std::make_unique<EvaluationCacheEntry[]>(kEvaluationCacheSize)),
           quiet_history_side_hook(std::move(quiet_history_side_hook)) {
@@ -285,13 +289,7 @@ struct SearchContext {
             return entry.score;
         }
 
-        int score = 0;
-        if (evaluator_mutex != nullptr) {
-            std::lock_guard lock(*evaluator_mutex);
-            score = evaluator.evaluate(state, perspective);
-        } else {
-            score = evaluator.evaluate(state, perspective);
-        }
+        const int score = evaluation.evaluate(state, perspective);
         entry = EvaluationCacheEntry{key, score, true};
         return score;
     }
