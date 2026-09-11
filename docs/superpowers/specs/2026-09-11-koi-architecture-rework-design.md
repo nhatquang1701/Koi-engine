@@ -259,6 +259,21 @@ Extract `SearchSession`, `SearchStack`, `SearchContext`, and
 owner per piece of state, fixed-capacity PV/stack behavior, cancellation, and
 exactly one completion.
 
+The Stage 2 boundary is now represented by the private files
+`src/koi/detail/search_session.{hpp,cpp}`,
+`src/koi/detail/search_stack.hpp`,
+`src/koi/detail/search_context.{hpp,cpp}`,
+`src/koi/detail/search_context_support.{hpp,cpp}`,
+`src/koi/detail/search_constants.hpp`, and
+`src/koi/detail/root_coordinator.{hpp,cpp}`. `SearchService` constructs a
+`SearchSession`, whose worker creates a `SearchContext`; the context owns the
+fixed-capacity recursive stack and search-local state, while
+`RootCoordinator` owns root-line ranking and stable tie-breaking. The
+`RootWorkerPool` scheduling loop and some root policy remain in
+`search_service.cpp` as an explicit migration boundary for the next stages;
+this stage does not claim that search scheduling, ordering, or pruning policy
+is fully extracted.
+
 ### Stage 3 — Ordering and search-policy seams
 
 Move ordering tables and move ranking behind a focused internal interface, then

@@ -40,6 +40,17 @@ history. Stable UCI-coordinate tie-breaking keeps repeated searches
 deterministic. There is no public rule API for these policies; `Threads` and
 `Speed` are UCI controls over the search runtime.
 
+The search lifecycle is decomposed behind the public `SearchService` and
+`SearchHandle` contracts. `detail::SearchSession` owns one request's immutable
+root/limits/options snapshot, cancellation, worker lifetime, identity, and
+exactly-once completion claim. Each worker owns a fixed-capacity
+`detail::SearchStack` through `detail::SearchContext`; the context keeps
+recursive state and search-local statistics out of `GameState`. Root-line
+records and deterministic score/index ranking belong to
+`detail::RootCoordinator`. These types are private implementation headers in
+`src/koi/detail`; root-worker scheduling and the remaining ordering/policy
+migration are intentionally still staged behind the existing service.
+
 ## Build prerequisites
 
 - A C++26-capable x64 MSVC toolchain (the current CMake configuration selects
