@@ -282,6 +282,17 @@ heuristics and diagnostics intact while adding tests that isolate each policy
 decision. Only after this stage may new pruning, LMR, singular, or history
 experiments be introduced.
 
+The Stage 3 boundary is represented by the private
+`src/koi/detail/search_ordering_tables.{hpp,cpp}` and
+`src/koi/detail/search_policy.hpp` seams. `SearchMoveOrdering` remains the
+stable internal ranking façade but delegates adaptive killer/history/counter /
+continuation state to `SearchOrderingTables`. `SearchPolicy` returns scalar
+decision records for null moves, check extensions, LMR, quiet futility, and
+quiescence capture pruning; `SearchContext` applies those records and retains
+position-derived forcing checks, recursion, and statistics. No new heuristic is
+introduced in this stage, and the next architectural work remains evaluation,
+TT/time/parallel runtime, and final tooling/module/strength validation.
+
 ### Stage 4 — Evaluation state and NNUE evolution seam
 
 Separate feature extraction and per-worker evaluation state from rules and

@@ -51,6 +51,15 @@ records and deterministic score/index ranking belong to
 `src/koi/detail`; root-worker scheduling and the remaining ordering/policy
 migration are intentionally still staged behind the existing service.
 
+Adaptive ordering state is separately owned by
+`detail::SearchOrderingTables`, which stores killers, quiet history, counter
+moves/confidence, and continuation history for one worker. The
+`detail::SearchPolicy` seam contains the scalar null-move, check-extension,
+LMR, quiet-futility, and quiescence-capture decisions; `SearchContext` still
+applies the decisions and owns recursion and statistics. This keeps future
+heuristic experiments local while preserving the current formulas and avoids
+making search policy depend on the physical layout of ordering tables.
+
 ## Build prerequisites
 
 - A C++26-capable x64 MSVC toolchain (the current CMake configuration selects
