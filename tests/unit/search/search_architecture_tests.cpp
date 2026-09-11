@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "koi/detail/root_coordinator.hpp"
+#include "koi/detail/search_context.hpp"
 #include "koi/detail/search_session.hpp"
 #include "koi/detail/search_stack.hpp"
 
@@ -77,6 +78,12 @@ void test_session_snapshot_and_completion_are_single_owner_operations() {
             "session must publish completion exactly once");
 }
 
+void test_search_context_exposes_fixed_stack_boundary() {
+    require(koi::detail::SearchContext::stack_capacity() ==
+                koi::detail::SearchStack::kCapacity,
+            "search context must own the fixed-capacity search stack");
+}
+
 struct TestCase {
     const char* name;
     void (*run)();
@@ -89,6 +96,7 @@ int main() {
         {"fixed search stack", test_stack_is_fixed_capacity_and_restores_frames},
         {"deterministic root ranking", test_root_ranking_is_score_then_stable_index},
         {"session ownership", test_session_snapshot_and_completion_are_single_owner_operations},
+        {"context stack boundary", test_search_context_exposes_fixed_stack_boundary},
     };
     int failures = 0;
     for (const TestCase& test : tests) {
