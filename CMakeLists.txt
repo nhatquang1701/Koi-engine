@@ -56,6 +56,7 @@ add_library(koi_core
     src/koi/detail/root_coordinator.cpp
     src/koi/detail/search_context.cpp
     src/koi/detail/search_context_support.cpp
+    src/koi/detail/search_ordering_tables.cpp
     src/koi/detail/search_session.cpp
     src/koi/completion_gate.cpp
     src/koi/cpu_features.cpp

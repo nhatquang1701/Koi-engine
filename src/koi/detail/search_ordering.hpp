@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "koi/game_state.hpp"
+#include "koi/detail/search_ordering_tables.hpp"
 
 namespace koi::detail {
 
@@ -34,8 +35,6 @@ public:
                                           std::optional<Move> previous_move = std::nullopt) const noexcept;
 
 private:
-    static constexpr int kMaximumPly = 64;
-
     [[nodiscard]] int priority(const GameState& state, const MoveMetadata& metadata,
                                std::optional<Move> tt_move, int ply,
                                std::optional<Move> previous_move) const;
@@ -46,12 +45,7 @@ private:
         std::uint32_t tie_break = 0;
     };
 
-    static constexpr std::size_t kContinuationHistorySize = 16 * 1024;
-    std::array<std::array<Move, 2>, kMaximumPly> killers_{};
-    std::array<std::array<int, 64 * 64>, 2> history_{};
-    std::array<std::array<Move, 64 * 64>, 2> counter_moves_{};
-    std::array<std::array<int, 64 * 64>, 2> counter_confidence_{};
-    std::array<int, kContinuationHistorySize> continuation_history_{};
+    SearchOrderingTables tables_;
     mutable std::array<ScoredMove, kMaximumLegalMoves> scored_moves_{};
     mutable std::size_t scored_move_count_ = 0;
 };

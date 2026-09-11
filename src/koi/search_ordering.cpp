@@ -14,16 +14,9 @@ constexpr int kPromotionPriority = 400'000;
 constexpr int kCheckingMovePriority = 350'000;
 constexpr int kKillerPriority = 300'000;
 constexpr int kCounterMovePriority = kKillerPriority - 1;
-constexpr int kMaximumHistoryScore = kCounterMovePriority - 1;
-constexpr int kCounterMoveMinimumConfidence = 7 * 7;
-constexpr int kMaximumPly = 64;
 constexpr int kSeeOrderingWeight = 12;
 
-int color_index(Color color) noexcept {
-    return color == Color::white ? 0 : 1;
-}
-
-int piece_value(PieceType type) noexcept {
+int piece_value(const PieceType type) noexcept {
     switch (type) {
     case PieceType::pawn:
         return 100;
@@ -42,7 +35,7 @@ int piece_value(PieceType type) noexcept {
     return 0;
 }
 
-int promotion_value(Promotion promotion) noexcept {
+int promotion_value(const Promotion promotion) noexcept {
     switch (promotion) {
     case Promotion::queen:
         return 900;
@@ -58,33 +51,10 @@ int promotion_value(Promotion promotion) noexcept {
     return 0;
 }
 
-int normalized_ply(int ply) noexcept {
-    return std::clamp(ply, 0, kMaximumPly - 1);
-}
-
-std::size_t move_index(Move move) noexcept {
-    return static_cast<std::size_t>(move.from().index()) * 64U + move.to().index();
-}
-
-std::size_t continuation_index(Move previous_move, Move move) noexcept {
-    constexpr std::size_t mask = 16 * 1024 - 1;
-    return (move_index(previous_move) * 131U + move_index(move) * 17U) & mask;
-}
-
-void update_history(int& score, int delta) noexcept {
-    constexpr int maximum = kMaximumHistoryScore;
-    const std::int64_t wide_score = score;
-    const std::int64_t wide_delta = delta;
-    const std::int64_t wide_abs_delta = wide_delta < 0 ? -wide_delta : wide_delta;
-    const std::int64_t updated = wide_score + wide_delta -
-        (wide_score * wide_abs_delta) / maximum;
-    score = static_cast<int>(std::clamp<std::int64_t>(updated, -maximum, maximum));
-}
-
 } // namespace
 
-std::uint32_t move_tie_break_key(Move move) noexcept {
-    const auto square_key = [](Square square) noexcept -> std::uint32_t {
+std::uint32_t move_tie_break_key(const Move move) noexcept {
+    const auto square_key = [](const Square square) noexcept -> std::uint32_t {
         if (square.index() == Square::kInvalid) {
             return 64;
         }
@@ -113,23 +83,17 @@ std::uint32_t move_tie_break_key(Move move) noexcept {
 }
 
 void SearchMoveOrdering::clear() noexcept {
-    killers_ = {};
-    history_ = {};
-    counter_moves_ = {};
-    counter_confidence_ = {};
-    continuation_history_ = {};
+    tables_.clear();
     scored_move_count_ = 0;
 }
 
-bool SearchMoveOrdering::is_killer(Move move, int ply) const noexcept {
-    const int checked_ply = normalized_ply(ply);
-    const auto& killers = killers_[static_cast<std::size_t>(checked_ply)];
-    return killers[0] == move || killers[1] == move;
+bool SearchMoveOrdering::is_killer(const Move move, const int ply) const noexcept {
+    return tables_.is_killer(move, ply);
 }
 
 void SearchMoveOrdering::order(const GameState& state, std::vector<Move>& moves,
-                               std::optional<Move> tt_move, int ply,
-                               std::optional<Move> previous_move) const {
+                               const std::optional<Move> tt_move, const int ply,
+                               const std::optional<Move> previous_move) const {
     std::vector<MoveMetadata> metadata;
     metadata.reserve(moves.size());
     for (const Move move : moves) {
@@ -144,8 +108,8 @@ void SearchMoveOrdering::order(const GameState& state, std::vector<Move>& moves,
 }
 
 void SearchMoveOrdering::order(const GameState& state, MoveMetadataList& moves,
-                               std::optional<Move> tt_move, int ply,
-                               std::optional<Move> previous_move) const {
+                               const std::optional<Move> tt_move, const int ply,
+                               const std::optional<Move> previous_move) const {
     scored_move_count_ = 0;
     for (MoveMetadata& metadata : moves) {
         if (!metadata.see_computed && metadata.is_capture()) {
@@ -162,9 +126,11 @@ void SearchMoveOrdering::order(const GameState& state, MoveMetadataList& moves,
             scored_metadata, score, move_tie_break_key(metadata.move)};
     }
 
-    std::sort(scored_moves_.begin(), scored_moves_.begin() + moves.size(), [](const ScoredMove& lhs, const ScoredMove& rhs) {
-        return lhs.priority != rhs.priority ? lhs.priority > rhs.priority : lhs.tie_break < rhs.tie_break;
-    });
+    std::sort(scored_moves_.begin(), scored_moves_.begin() + moves.size(),
+              [](const ScoredMove& lhs, const ScoredMove& rhs) {
+                  return lhs.priority != rhs.priority ? lhs.priority > rhs.priority :
+                      lhs.tie_break < rhs.tie_break;
+              });
 
     for (std::size_t index = 0; index < moves.size(); ++index) {
         moves[index] = scored_moves_[index].metadata;
@@ -172,8 +138,8 @@ void SearchMoveOrdering::order(const GameState& state, MoveMetadataList& moves,
 }
 
 int SearchMoveOrdering::priority(const GameState& state, const MoveMetadata& metadata,
-                                 std::optional<Move> tt_move, int ply,
-                                 std::optional<Move> previous_move) const {
+                                 const std::optional<Move> tt_move, const int ply,
+                                 const std::optional<Move> previous_move) const {
     const Move move = metadata.move;
     if (tt_move.has_value() && move == *tt_move) {
         return kTtMovePriority;
@@ -193,26 +159,24 @@ int SearchMoveOrdering::priority(const GameState& state, const MoveMetadata& met
     if (metadata.gives_check) {
         return kCheckingMovePriority;
     }
-    const int checked_ply = normalized_ply(ply);
-    if (killers_[static_cast<std::size_t>(checked_ply)][0] == move) {
+
+    const int killer_rank = tables_.killer_rank(move, ply);
+    if (killer_rank == 2) {
         return kKillerPriority + 1;
     }
-    if (killers_[static_cast<std::size_t>(checked_ply)][1] == move) {
+    if (killer_rank == 1) {
         return kKillerPriority;
     }
-    if (previous_move.has_value() && !previous_move->is_no_move() &&
-        counter_moves_[static_cast<std::size_t>(color_index(state.side_to_move()))]
-                      [move_index(*previous_move)] == move &&
-        counter_confidence_[static_cast<std::size_t>(color_index(state.side_to_move()))]
-                           [move_index(*previous_move)] >= kCounterMoveMinimumConfidence) {
+    if (previous_move.has_value() &&
+        tables_.is_proven_counter_move(state.side_to_move(), *previous_move, move)) {
         return kCounterMovePriority;
     }
-    return quiet_history_score(state.side_to_move(), move, previous_move);
+    return tables_.quiet_history_score(state.side_to_move(), move, previous_move);
 }
 
 void SearchMoveOrdering::order(const GameState& state, std::vector<MoveMetadata>& moves,
-                               std::optional<Move> tt_move,
-                               int ply, std::optional<Move> previous_move) const {
+                               const std::optional<Move> tt_move, const int ply,
+                               const std::optional<Move> previous_move) const {
     scored_move_count_ = 0;
     for (const MoveMetadata& metadata : moves) {
         const int score = priority(state, metadata, tt_move, ply, previous_move);
@@ -222,74 +186,32 @@ void SearchMoveOrdering::order(const GameState& state, std::vector<MoveMetadata>
             scored_metadata, score, move_tie_break_key(metadata.move)};
     }
 
-    std::sort(scored_moves_.begin(), scored_moves_.begin() + moves.size(), [](const ScoredMove& lhs, const ScoredMove& rhs) {
-        return lhs.priority != rhs.priority ? lhs.priority > rhs.priority : lhs.tie_break < rhs.tie_break;
-    });
+    std::sort(scored_moves_.begin(), scored_moves_.begin() + moves.size(),
+              [](const ScoredMove& lhs, const ScoredMove& rhs) {
+                  return lhs.priority != rhs.priority ? lhs.priority > rhs.priority :
+                      lhs.tie_break < rhs.tie_break;
+              });
 
     for (std::size_t index = 0; index < moves.size(); ++index) {
         moves[index] = scored_moves_[index].metadata;
     }
 }
 
-int SearchMoveOrdering::quiet_history_score(Color side, Move move,
-                                             std::optional<Move> previous_move) const noexcept {
-    if (move.is_no_move()) {
-        return 0;
-    }
-    int score = history_[static_cast<std::size_t>(color_index(side))][move_index(move)];
-    if (previous_move.has_value() && !previous_move->is_no_move()) {
-        score += continuation_history_[continuation_index(*previous_move, move)];
-    }
-    return std::clamp(score, -kMaximumHistoryScore, kMaximumHistoryScore);
+int SearchMoveOrdering::quiet_history_score(
+    const Color side, const Move move, const std::optional<Move> previous_move) const noexcept {
+    return tables_.quiet_history_score(side, move, previous_move);
 }
 
-void SearchMoveOrdering::record_quiet_cutoff(Color side, Move move, int ply, int depth,
-                                             std::optional<Move> previous_move) noexcept {
-    if (move.is_no_move() || move.promotion() != Promotion::none) {
-        return;
-    }
-
-    const int checked_ply = normalized_ply(ply);
-    auto& killers = killers_[static_cast<std::size_t>(checked_ply)];
-    if (killers[0] != move) {
-        killers[1] = killers[0];
-        killers[0] = move;
-    }
-
-    int& history = history_[static_cast<std::size_t>(color_index(side))][move_index(move)];
-    const int depth_bonus = std::clamp(depth, 1, kMaximumPly);
-    const int bonus = depth_bonus * depth_bonus;
-    update_history(history, bonus);
-    if (previous_move.has_value() && !previous_move->is_no_move()) {
-        const std::size_t side_index = static_cast<std::size_t>(color_index(side));
-        const std::size_t previous_index = move_index(*previous_move);
-        Move& counter_move = counter_moves_[side_index][previous_index];
-        int& counter_confidence = counter_confidence_[side_index][previous_index];
-        if (counter_move != move) {
-            counter_move = move;
-            counter_confidence = 0;
-        }
-        update_history(counter_confidence, bonus);
-        update_history(continuation_history_[continuation_index(*previous_move, move)], bonus * 2);
-    }
+void SearchMoveOrdering::record_quiet_cutoff(
+    const Color side, const Move move, const int ply, const int depth,
+    const std::optional<Move> previous_move) noexcept {
+    tables_.record_quiet_cutoff(side, move, ply, depth, previous_move);
 }
 
-void SearchMoveOrdering::record_quiet_fail(Color side, Move move, int ply, int depth,
-                                           std::optional<Move> previous_move) noexcept {
-    if (move.is_no_move() || move.promotion() != Promotion::none) {
-        return;
-    }
-    const int depth_bonus = std::clamp(depth, 1, kMaximumPly);
-    const int malus = -(depth_bonus * depth_bonus);
-    update_history(history_[static_cast<std::size_t>(color_index(side))][move_index(move)], malus);
-    if (previous_move.has_value() && !previous_move->is_no_move()) {
-        const std::size_t side_index = static_cast<std::size_t>(color_index(side));
-        const std::size_t previous_index = move_index(*previous_move);
-        if (counter_moves_[side_index][previous_index] == move) {
-            counter_confidence_[side_index][previous_index] = 0;
-        }
-        update_history(continuation_history_[continuation_index(*previous_move, move)], malus);
-    }
+void SearchMoveOrdering::record_quiet_fail(
+    const Color side, const Move move, const int ply, const int depth,
+    const std::optional<Move> previous_move) noexcept {
+    tables_.record_quiet_fail(side, move, ply, depth, previous_move);
 }
 
 } // namespace koi::detail
