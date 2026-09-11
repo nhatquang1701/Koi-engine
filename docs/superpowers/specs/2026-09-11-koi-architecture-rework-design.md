@@ -227,6 +227,23 @@ mirror synchronization, make/unmake/key restoration, null moves, generated
 metadata provenance, and the fact that mirror checks are only performed at
 explicit validation or diagnostic boundaries.
 
+The concrete Stage 1 seam is now represented by
+`src/koi/detail/compatibility_mirror.{hpp,cpp}`,
+`src/koi/detail/feature_state.{hpp,cpp}`, and the private `GameState::Impl`
+composition. `Position` remains the authoritative rules state. The
+`CompatibilityMirror` owns the vendored board, shadow history, conversions,
+comparison normalization, and compatibility queries; `FeatureState` owns
+feature-cache storage, publication, invalidation, and diagnostics derived from
+`Position`. `make_search_move` continues to update the mirror transactionally
+but skips interior mirror comparison, while explicit validation and diagnostic
+boundaries compare the two states.
+
+The mirror is intentionally retained because Polyglot-key/book behavior,
+completion validation, and differential diagnostics still consume it. Mirror
+removal is gated on migrating or deliberately isolating each remaining
+consumer, preserving an independently runnable shadow-differential target, and
+passing the full rules, process, and benchmark evidence described below.
+
 Inventory and migrate consumers of the compatibility mirror one at a time:
 Polyglot key/book selection, completion validation, debug snapshots, and any
 remaining external adapter. Do not remove the mirror until the consumer list

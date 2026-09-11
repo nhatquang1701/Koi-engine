@@ -12,15 +12,21 @@ remains responsive.
 
 The engine is deliberately layered so the chess rules implementation remains a
 private dependency. Public Koi rules types (`Move`, `GameState`, `Position`)
-never expose `chess.hpp`. The native `Position` core owns the legality, key,
-rule-state, and move-generation contract; `GameState` remains the compatibility
-facade used by the existing evaluator/search/UCI APIs. During the migration,
-`GameState` keeps a synchronized vendored chess-library mirror only for legacy
-feature, Polyglot-book, and tablebase adapters. The mirror is not part of the
-public API and is covered by the opt-in `KOI_BUILD_SHADOW_DIFF` differential
-target. `ClassicalEvaluator`, time management, the transposition table, and the
-`SearchService` build on Koi-owned types. The UCI controller owns the current
-position and worker lifecycle, and is the only layer that writes protocol output.
+never expose `chess.hpp`. The native `Position` core is the sole production
+authority for legality, keys, rule state, reversible history, and move
+generation. `GameState` remains the compatibility facade used by the existing
+evaluator/search/UCI APIs and coordinates two private owners: `CompatibilityMirror`
+holds the vendored chess-library board and reversible shadow history for
+Polyglot/book compatibility, completion validation, explicit differential
+diagnostics, and other legacy adapters; `FeatureState` owns cached
+`PositionFeatures` derived from the native `Position`. The mirror is not part
+of the public API and is covered by the opt-in `KOI_BUILD_SHADOW_DIFF`
+differential target. Search moves still update the mirror transactionally, while
+interior search skips the expensive mirror comparison; explicit validation and
+diagnostic boundaries retain it. `ClassicalEvaluator`, time management, the
+transposition table, and the `SearchService` build on Koi-owned types. The UCI
+controller owns the current position and worker lifecycle, and is the only layer
+that writes protocol output.
 
 The C++26 module boundary is represented by the aggregate `koi` module and the
 partitions `koi:types`, `koi:position`, `koi:eval`, `koi:tablebase`,
