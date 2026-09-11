@@ -435,5 +435,3 @@ git commit -m "test: verify stage one architecture seam"
 - Spec coverage: Stage 1 native/mirror/feature ownership is covered by Tasks 2 and 3; transactional and diagnostic behavior by Tasks 1 and 2; benchmark/release gates by Tasks 1 and 5; documentation by Task 4; public-boundary protection by Task 5. Later search/evaluation/TT/time/parallel stages are intentionally outside this plan.
 - Placeholder scan: the implementation tasks contain no `TODO`, `TBD`, or deferred implementation instruction; Task 4 Step 3 requires every requested verification field to be filled with a value before commit.
 - Type consistency: `CompatibilityMirror` methods used by the tests and GameState integration are defined in Task 2; `FeatureState::get_or_compute` uses the `FeatureBuilder` type defined in Task 3; `history_size()` is the shared index source for mirror and feature-cache ownership.
-
-
