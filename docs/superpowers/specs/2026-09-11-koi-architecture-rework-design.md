@@ -300,6 +300,16 @@ search recursion. Keep classical evaluation behavior stable. Validate NNUE
 feature sets, accumulator updates, refresh paths, scalar/SIMD parity, network
 lifetime, and fallback behavior independently.
 
+The Stage 4 execution boundary is represented by the optional public
+`EvaluatorWorker` capability, `NnueEvaluator::create_worker()`, and the private
+`src/koi/detail/evaluation_context.{hpp,cpp}` owner. `SearchContext` delegates
+evaluation through `EvaluationContext`; stateful NNUE workers and their
+accumulators are local to that context, while immutable network data remains
+owned by the shared `NnueEvaluator`. Evaluators without a worker retain the
+existing mutex-guarded fallback. Feature extraction and network format remain
+value-oriented public evaluation contracts, and no NNUE representation leaks
+through search or rules modules.
+
 ### Stage 5 — TT, time, and parallel-runtime hardening
 
 Finalize TT score/age/replacement contracts, time-manager observability, and

@@ -60,6 +60,15 @@ applies the decisions and owns recursion and statistics. This keeps future
 heuristic experiments local while preserving the current formulas and avoids
 making search policy depend on the physical layout of ordering tables.
 
+Evaluation execution has a corresponding private boundary. The optional
+`EvaluatorWorker` capability lets stateful evaluators provide one worker per
+search context; `NnueEvaluator` uses it to keep an `NnueWorker` accumulator
+local while immutable network data remains shared. `detail::EvaluationContext`
+selects that worker path or the existing evaluator-plus-mutex fallback, so
+`SearchContext` no longer owns evaluator synchronization or a particular NNUE
+representation. The classical evaluator remains the default and malformed or
+absent NNUE input still falls back as before.
+
 ## Build prerequisites
 
 - A C++26-capable x64 MSVC toolchain (the current CMake configuration selects
