@@ -16,7 +16,9 @@
 #include "koi/detail/evaluation_context.hpp"
 #include "koi/detail/search_ordering.hpp"
 #include "koi/detail/search_policy.hpp"
+#include "koi/detail/search_budget.hpp"
 #include "koi/detail/search_stack.hpp"
+#include "koi/detail/search_table_access.hpp"
 #include "koi/evaluator.hpp"
 #include "koi/search_types.hpp"
 #include "koi/time_manager.hpp"
@@ -52,12 +54,11 @@ struct SearchContext {
     }
 
     EvaluationContext evaluation;
-    TranspositionTable& table;
+    SearchTableAccess table_access;
+    SearchBudget budget;
     TimeManager& time_manager;
     std::atomic_bool& stop_requested;
-    std::atomic<std::uint64_t>* global_nodes = nullptr;
     const MoveMetadataList* root_moves = nullptr;
-    bool use_transposition_table = true;
     std::atomic_bool* iteration_aborted = nullptr;
     SearchOptions::QuietHistorySideHook quiet_history_side_hook;
     SearchMoveOrdering ordering;
@@ -77,9 +78,9 @@ struct SearchContext {
                   const MoveMetadataList* root_moves = nullptr,
                   bool use_transposition_table = true,
                   SearchOptions::QuietHistorySideHook quiet_history_side_hook = {})
-        : evaluation(evaluator, evaluator_mutex), table(table), time_manager(time_manager),
-          stop_requested(stop_requested), global_nodes(global_nodes), root_moves(root_moves),
-          use_transposition_table(use_transposition_table),
+        : evaluation(evaluator, evaluator_mutex), table_access(table, use_transposition_table),
+          budget(time_manager, global_nodes), time_manager(time_manager),
+          stop_requested(stop_requested), root_moves(root_moves),
           evaluation_cache(std::make_unique<EvaluationCacheEntry[]>(kEvaluationCacheSize)),
           quiet_history_side_hook(std::move(quiet_history_side_hook)) {
         if (const auto budget = time_manager.time_budget(); budget.has_value() &&
@@ -176,24 +177,24 @@ struct SearchContext {
         MoveMetadataList single_move;
         (void)single_move.push_back(metadata);
         const MoveMetadataList* saved_root_moves = root_moves;
-        const bool saved_use_transposition_table = use_transposition_table;
+        const bool saved_use_transposition_table = table_access.enabled();
         root_moves = &single_move;
         // The first shallow root pass stores exact child entries at the same
         // depth that this verification is meant to extend.  Reusing those
         // entries would make the "deeper" comparison identical to the
         // shallow score and hide the tactical consequence being tested.
-        use_transposition_table = false;
+        table_access.set_enabled(false);
         RootVerification verification;
         try {
             verification.score = negamax(root, depth, -kInfinity, kInfinity, 0,
                                          verification.pv);
         } catch (...) {
             root_moves = saved_root_moves;
-            use_transposition_table = saved_use_transposition_table;
+            table_access.set_enabled(saved_use_transposition_table);
             throw;
         }
         root_moves = saved_root_moves;
-        use_transposition_table = saved_use_transposition_table;
+        table_access.set_enabled(saved_use_transposition_table);
         return verification;
     }
 
@@ -205,38 +206,7 @@ struct SearchContext {
     }
 
     [[nodiscard]] std::uint64_t visited_nodes() const noexcept {
-        if (global_nodes != nullptr) {
-            return global_nodes->load(std::memory_order_relaxed);
-        }
-        return stats.nodes + stats.qnodes;
-    }
-
-    [[nodiscard]] bool reserve_global_node() noexcept {
-        if (global_nodes == nullptr) {
-            if (const std::optional<std::uint64_t> limit = time_manager.node_limit(); limit.has_value() &&
-                stats.nodes + stats.qnodes >= *limit) {
-                return false;
-            }
-            return true;
-        }
-
-        const std::optional<std::uint64_t> limit = time_manager.node_limit();
-        if (!limit.has_value()) {
-            global_nodes->fetch_add(1, std::memory_order_relaxed);
-            return true;
-        }
-
-        std::uint64_t observed = global_nodes->load(std::memory_order_relaxed);
-        for (;;) {
-            if (observed >= *limit) {
-                return false;
-            }
-            if (global_nodes->compare_exchange_weak(observed, observed + 1,
-                                                    std::memory_order_relaxed,
-                                                    std::memory_order_relaxed)) {
-                return true;
-            }
-        }
+        return budget.visited(stats.nodes + stats.qnodes);
     }
 
     [[nodiscard]] bool interrupted() noexcept {
@@ -258,7 +228,7 @@ struct SearchContext {
             aborted = true;
             return false;
         }
-        if (!reserve_global_node()) {
+        if (!budget.reserve(stats.nodes + stats.qnodes)) {
             request_abort();
             return false;
         }
@@ -501,22 +471,20 @@ struct SearchContext {
         const int original_alpha = alpha;
         const int original_beta = beta;
         std::optional<Move> tt_move;
-        if (use_transposition_table) {
-            if (const auto entry = table.probe(state.position_key(), ply); entry.has_value()) {
-                ++stats.tt_hits;
-                tt_move = entry->best_move.is_no_move() ? std::nullopt : std::optional<Move>{entry->best_move};
-                if (ply > 0 && entry->depth >= depth) {
-                    if (entry->bound == TranspositionBound::exact) {
-                        return entry->score;
-                    }
-                    if (entry->bound == TranspositionBound::lower) {
-                        alpha = std::max(alpha, entry->score);
-                    } else {
-                        beta = std::min(beta, entry->score);
-                    }
-                    if (alpha >= beta) {
-                        return entry->score;
-                    }
+        if (const auto entry = table_access.probe(state.position_key(), ply); entry.has_value()) {
+            ++stats.tt_hits;
+            tt_move = entry->best_move.is_no_move() ? std::nullopt : std::optional<Move>{entry->best_move};
+            if (ply > 0 && entry->depth >= depth) {
+                if (entry->bound == TranspositionBound::exact) {
+                    return entry->score;
+                }
+                if (entry->bound == TranspositionBound::lower) {
+                    alpha = std::max(alpha, entry->score);
+                } else {
+                    beta = std::min(beta, entry->score);
+                }
+                if (alpha >= beta) {
+                    return entry->score;
                 }
             }
         }
@@ -552,10 +520,8 @@ struct SearchContext {
                     }
                     if (verified_score >= beta) {
                         ++stats.null_cutoffs;
-                        if (use_transposition_table) {
-                            table.store(state.position_key(), depth, verified_score,
-                                        TranspositionBound::lower, Move::no_move(), ply);
-                        }
+                        table_access.store(state.position_key(), depth, verified_score,
+                                           TranspositionBound::lower, Move::no_move(), ply);
                         return verified_score;
                     }
                 }
@@ -737,9 +703,7 @@ struct SearchContext {
 
         const TranspositionBound bound = best_score <= original_alpha ? TranspositionBound::upper
             : best_score >= original_beta ? TranspositionBound::lower : TranspositionBound::exact;
-        if (use_transposition_table) {
-            table.store(state.position_key(), depth, best_score, bound, best_move, ply);
-        }
+        table_access.store(state.position_key(), depth, best_score, bound, best_move, ply);
         return best_score;
     }
 };
