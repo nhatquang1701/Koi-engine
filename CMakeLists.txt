@@ -140,6 +140,14 @@ target_link_libraries(evaluation_boundary_tests PRIVATE koi_core)
 
 add_test(NAME evaluation_boundary_tests COMMAND evaluation_boundary_tests)
 
+add_executable(evaluation_architecture_tests
+    tests/unit/evaluation/evaluation_architecture_tests.cpp
+)
+
+target_link_libraries(evaluation_architecture_tests PRIVATE koi_core)
+
+add_test(NAME evaluation_architecture_tests COMMAND evaluation_architecture_tests)
+
 add_executable(nnue_boundary_tests
     tests/unit/evaluation/nnue_boundary_tests.cpp
 )
