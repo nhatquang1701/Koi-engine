@@ -147,7 +147,14 @@ void SearchMoveOrdering::order(const GameState& state, MoveMetadataList& moves,
                                std::optional<Move> tt_move, int ply,
                                std::optional<Move> previous_move) const {
     scored_move_count_ = 0;
-    for (const MoveMetadata& metadata : moves) {
+    for (MoveMetadata& metadata : moves) {
+        if (!metadata.see_computed && metadata.is_capture()) {
+            metadata.see_score = static_cast<std::int16_t>(std::clamp(
+                static_exchange_gain(state, metadata),
+                static_cast<int>(std::numeric_limits<std::int16_t>::min()),
+                static_cast<int>(std::numeric_limits<std::int16_t>::max())));
+            metadata.see_computed = true;
+        }
         const int score = priority(state, metadata, tt_move, ply, previous_move);
         MoveMetadata scored_metadata = metadata;
         scored_metadata.ordering_score = score;

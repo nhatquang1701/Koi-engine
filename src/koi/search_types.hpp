@@ -64,6 +64,7 @@ struct TimeManagementStats {
     std::uint32_t horizon = 20;
     int initial_hardness = 0;
     int observed_hardness = 0;
+    bool emergency_pacing = false;
     bool extended_for_hard_position = false;
     bool hard_deadline_reached = false;
 };
@@ -71,11 +72,29 @@ struct TimeManagementStats {
 struct SearchStats {
     std::uint64_t nodes = 0;
     std::uint64_t qnodes = 0;
+    // Number of full PositionFeatures snapshots requested by the search
+    // context. This is diagnostic-only and helps keep expensive feature
+    // extraction out of nodes that do not need it.
+    std::uint64_t position_feature_extractions = 0;
+    // Number of late-move feature checks served by a parent snapshot already
+    // acquired for the current search node.
+    std::uint64_t lmr_parent_feature_reuses = 0;
+    // Number of evaluator calls served by the search-local static-evaluation cache.
+    std::uint64_t evaluation_cache_hits = 0;
     std::uint64_t tt_hits = 0;
     std::uint64_t pvs_searches = 0;
     std::uint64_t pvs_researches = 0;
+    std::uint64_t root_pvs_searches = 0;
+    std::uint64_t root_pvs_researches = 0;
+    std::uint64_t root_selective_candidates = 0;
+    std::uint64_t root_selective_researches = 0;
+    std::uint64_t short_fallback_invocations = 0;
+    std::uint64_t short_fallback_candidates = 0;
+    std::uint64_t short_fallback_overdue_candidates = 0;
+    std::uint64_t quiet_forcing_extensions = 0;
     std::uint64_t aspiration_researches = 0;
     std::uint64_t check_extensions = 0;
+    std::uint64_t king_safety_extensions = 0;
     std::uint64_t qchecks = 0;
     std::uint64_t see_prunes = 0;
     std::uint64_t delta_prunes = 0;

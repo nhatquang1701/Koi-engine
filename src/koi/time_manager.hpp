@@ -36,6 +36,7 @@ private:
 
     SearchLimits limits_;
     std::optional<std::chrono::milliseconds> budget_;
+    std::chrono::milliseconds normal_hard_budget_{0};
     RootTimingContext root_context_;
     TimePointProvider now_;
     std::chrono::steady_clock::time_point started_;
@@ -44,6 +45,7 @@ private:
     std::uint32_t stable_observations_ = 0;
     bool hard_position_ = false;
     bool clock_mode_ = false;
+    bool emergency_pacing_ = false;
     mutable std::atomic_bool hard_deadline_reached_ = false;
 };
 

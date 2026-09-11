@@ -44,6 +44,13 @@ void test_fen_rule_state_and_position_facade() {
     require(position.castling_rights() == koi::kAllCastlingRights &&
                 position.halfmove_clock() == 17 && position.fullmove_number() == 42,
             "Position must expose the same native rule state");
+    require(position.piece_bitboard(koi::PieceType::king, koi::Color::white) == (std::uint64_t{1} << 4) &&
+                position.piece_bitboard(koi::PieceType::king, koi::Color::black) == (std::uint64_t{1} << 60) &&
+                position.piece_bitboard(koi::PieceType::rook, koi::Color::white) ==
+                    ((std::uint64_t{1} << 0) | (std::uint64_t{1} << 7)) &&
+                position.piece_bitboard(koi::PieceType::rook, koi::Color::black) ==
+                    ((std::uint64_t{1} << 56) | (std::uint64_t{1} << 63)),
+            "Position must expose incrementally maintained piece bitboards");
 }
 
 void test_claimable_and_automatic_repetition_thresholds() {
@@ -144,6 +151,57 @@ void test_en_passant_identity_requires_a_legal_capture() {
             "a legal en-passant capture must remain part of the native repetition identity");
 }
 
+void test_generated_move_transaction_preserves_shadow_consistency() {
+    const GameState root = GameState::startpos();
+    const std::string original_fen = root.fen();
+    const std::uint64_t original_key = root.position_key();
+    const std::vector<koi::MoveMetadata> moves = root.legal_moves_with_metadata();
+    require(moves.size() == 20, "generated move transaction fixture must contain all start moves");
+
+    for (const koi::MoveMetadata& metadata : moves) {
+        GameState child = root;
+        require(child.make_generated_move(metadata),
+                "metadata from the native legal generator must apply transactionally");
+        require(child.consistency_snapshot().consistent(),
+                "generated move transaction must keep native and shadow state synchronized");
+        require(child.unmake_move(), "generated move transaction must unmake");
+        require(child.fen() == original_fen && child.position_key() == original_key,
+                "generated move transaction must restore the exact root state");
+    }
+}
+
+void test_search_move_transaction_preserves_shadow_consistency() {
+    const GameState root = GameState::startpos();
+    const std::string original_fen = root.fen();
+    const std::uint64_t original_key = root.position_key();
+    const std::vector<koi::MoveMetadata> moves = root.legal_moves_with_metadata();
+    require(moves.size() == 20, "search move transaction fixture must contain all start moves");
+
+    for (const koi::MoveMetadata& metadata : moves) {
+        GameState child = root;
+        require(child.make_search_move(metadata),
+                "metadata from the native legal generator must apply through the search path");
+        require(child.consistency_snapshot().consistent(),
+                "search move transaction must keep native and shadow state synchronized");
+        require(child.unmake_move(), "search move transaction must unmake");
+        require(child.fen() == original_fen && child.position_key() == original_key,
+                "search move transaction must restore the exact root state");
+    }
+}
+
+void test_fixed_buffer_legal_generation_matches_vector_api() {
+    const koi::Position position;
+    std::array<Move, koi::kMaximumLegalMoves> buffer{};
+    const std::size_t count = position.legal_moves_into(buffer);
+    const std::vector<Move> vector_moves = position.legal_moves();
+    require(count == vector_moves.size(),
+            "fixed-buffer legal generation must return the vector move count");
+    for (std::size_t index = 0; index < count; ++index) {
+        require(buffer[index] == vector_moves[index],
+                "fixed-buffer legal generation must preserve move ordering");
+    }
+}
+
 struct TestCase { std::string_view name; void (*run)(); };
 
 } // namespace
@@ -155,6 +213,9 @@ int main() {
         {"clock, checkmate, and dead positions", test_move_clock_checkmate_and_dead_position_rules},
         {"make/unmake and special moves", test_make_unmake_and_special_move_rules},
         {"legal en-passant repetition identity", test_en_passant_identity_requires_a_legal_capture},
+        {"generated move transaction", test_generated_move_transaction_preserves_shadow_consistency},
+        {"search move transaction", test_search_move_transaction_preserves_shadow_consistency},
+        {"fixed-buffer legal generation", test_fixed_buffer_legal_generation_matches_vector_api},
     };
     for (const TestCase& test : tests) {
         try {

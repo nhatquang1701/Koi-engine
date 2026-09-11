@@ -46,7 +46,10 @@ int main(int argc, char* argv[]) {
         return 3;
     }
 #endif
-    koi::SearchService search_service(std::make_shared<koi::ClassicalEvaluator>());
+    // Bootstrap with a tiny table so a GUI/tournament can deliver its Hash
+    // option before a large default allocation is charged to the first clock.
+    // UciController materializes the configured 512 MB default at isready.
+    koi::SearchService search_service(std::make_shared<koi::ClassicalEvaluator>(), {}, 1);
     koi::UciController controller(std::cin, std::cout, std::cerr, std::move(search_service),
                                   executable_directory(argc, argv));
     return controller.run();

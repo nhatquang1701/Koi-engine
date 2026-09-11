@@ -35,12 +35,18 @@ enum class DrawStatus : std::uint8_t {
 
 enum class MoveKind : std::uint8_t { quiet, capture, en_passant, castling, promotion };
 
+enum class CheckFlagMode : std::uint8_t {
+    all_moves,
+    quiet_moves_only,
+};
+
 struct MoveMetadata {
     Move move;
     PieceType moving_piece = PieceType::none;
     PieceType captured_piece = PieceType::none;
     MoveKind kind = MoveKind::quiet;
     bool gives_check = false;
+    bool see_computed = false;
     std::int16_t see_score = 0;
     std::int32_t ordering_score = 0;
     // A generated metadata record is valid only for this exact position.
@@ -112,7 +118,9 @@ struct PositionFeatures {
     std::array<std::uint8_t, 2> development{};
     std::array<std::uint8_t, 2> center_control{};
     std::array<std::uint8_t, 2> king_zone_attacks{};
+    std::uint8_t castling_rights = 0;
     std::uint8_t game_phase = 0;
+    std::uint16_t fullmove_number = 1;
     Color side_to_move = Color::white;
 };
 
@@ -199,23 +207,50 @@ public:
     [[nodiscard]] Piece piece_at(Square square) const noexcept;
     [[nodiscard]] std::vector<Move> legal_moves() const;
     [[nodiscard]] PositionConsistencySnapshot consistency_snapshot() const;
+    // Cheap search-boundary mirror check. The exhaustive consistency snapshot
+    // remains available for tests and incident reports.
+    [[nodiscard]] bool native_shadow_consistent() const noexcept;
     [[nodiscard]] std::vector<MoveMetadata> legal_moves_with_metadata() const;
     void legal_moves_with_metadata(MoveMetadataList& moves,
-                                   bool include_check_flags = true) const noexcept;
+                                   bool include_check_flags = true,
+                                   bool include_see = true,
+                                   CheckFlagMode check_flag_mode = CheckFlagMode::all_moves) const noexcept;
     // Generates all legal evasions while checked, or only captures,
     // promotions, and checking moves otherwise. The return value reports
     // whether any legal move exists, even when a quiet non-checking move was
     // intentionally omitted from the output.
     [[nodiscard]] bool legal_tactical_moves_with_metadata(
-        MoveMetadataList& moves, bool include_quiet_checks = true) const noexcept;
+        MoveMetadataList& moves, bool include_quiet_checks = true,
+        bool include_see = true,
+        CheckFlagMode check_flag_mode = CheckFlagMode::all_moves) const noexcept;
     [[nodiscard]] std::optional<MoveMetadata> describe_move(const Move&) const noexcept;
     [[nodiscard]] PositionFeatures position_features() const noexcept;
+    // Diagnostic-only count of cache rebuilds. Search uses this to verify that
+    // make/unmake restores parent feature snapshots instead of rebuilding them.
+    [[nodiscard]] std::uint64_t position_feature_cache_misses() const noexcept;
+    // Diagnostic-only count of repeated feature requests served without
+    // acquiring the cache maintenance lock.
+    [[nodiscard]] std::uint64_t position_feature_cache_fast_hits() const noexcept;
+    // Diagnostic-only count of feature-cache snapshot copies on the search move path.
+    [[nodiscard]] std::uint64_t position_feature_cache_copies() const noexcept;
+    // Diagnostic-only count of compatibility-board check probes performed while
+    // annotating generated moves.
+    [[nodiscard]] std::uint64_t check_flag_evaluations() const noexcept;
     [[nodiscard]] TablebaseSnapshot tablebase_snapshot() const noexcept;
     [[nodiscard]] bool is_legal(const Move& move) const noexcept;
     bool make_move(const Move& move) noexcept;
-    // Fast path for metadata returned by legal_moves_with_metadata() for this
-    // unchanged position. The metadata must not be stale or fabricated.
+    // Validates metadata against both native and shadow legality authorities.
     bool make_legal_move(const MoveMetadata& metadata) noexcept;
+    // Fast transactional path for metadata returned by
+    // legal_moves_with_metadata() for this unchanged position. Native legal
+    // generation is authoritative; the shadow board is still updated and
+    // compared after the move so divergence rolls the transaction back.
+    bool make_generated_move(const MoveMetadata& metadata) noexcept;
+    // Search-only fast path. Native legality remains authoritative and the
+    // compatibility board is still updated transactionally; the mirror check
+    // is performed at search boundaries to avoid repeating the same 12-piece
+    // comparison at every interior node.
+    bool make_search_move(const MoveMetadata& metadata) noexcept;
     bool unmake_move() noexcept;
     bool make_null_move() noexcept;
     bool unmake_null_move() noexcept;
@@ -248,8 +283,12 @@ public:
 private:
     [[nodiscard]] int direct_static_exchange_gain(const MoveMetadata&) const noexcept;
     [[nodiscard]] std::optional<MoveMetadata> metadata_for_native_move(
-        const Move&, bool include_check_flags) const noexcept;
-    void finalize_metadata(MoveMetadataList&, std::uint64_t position_key) const noexcept;
+        const Move&, bool include_check_flags, CheckFlagMode check_flag_mode) const noexcept;
+    bool apply_generated_move(const MoveMetadata&, bool verify_shadow_legality,
+                              bool verify_mirror) noexcept;
+    void finalize_metadata(MoveMetadataList&, std::uint64_t position_key,
+                           bool include_see,
+                           const PositionFeatures* exchange_features = nullptr) const noexcept;
     void invalidate_feature_cache() noexcept;
 
     friend int detail::static_exchange_gain(const GameState&, const MoveMetadata&) noexcept;

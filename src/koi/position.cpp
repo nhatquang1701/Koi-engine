@@ -27,6 +27,25 @@ constexpr std::size_t kMaximumHistory = 256;
 
 using Board = std::array<Piece, 64>;
 
+class MoveBuffer {
+public:
+    template <typename... Arguments>
+    void emplace_back(Arguments&&... arguments) noexcept {
+        if (size_ >= storage_.size()) {
+            return;
+        }
+        storage_[size_++] = Move(std::forward<Arguments>(arguments)...);
+    }
+
+    [[nodiscard]] std::size_t size() const noexcept { return size_; }
+    [[nodiscard]] const Move* begin() const noexcept { return storage_.data(); }
+    [[nodiscard]] const Move* end() const noexcept { return storage_.data() + size_; }
+
+private:
+    std::array<Move, kMaximumLegalMoves> storage_{};
+    std::size_t size_ = 0;
+};
+
 struct ZobristKeys {
     std::array<std::array<std::array<std::uint64_t, 64>, 7>, 2> pieces{};
     std::array<std::uint64_t, 16> castling{};
@@ -128,6 +147,9 @@ struct Snapshot {
     std::uint16_t halfmove = 0;
     std::uint16_t fullmove = 1;
     std::uint64_t key = 0;
+    std::array<std::array<std::uint64_t, 7>, 2> piece_bitboards{};
+    std::array<std::uint64_t, 2> occupancy{};
+    std::uint64_t occupied = 0;
     bool null_move = false;
 };
 
@@ -182,6 +204,52 @@ void rebuild_derived(NativeState& state) noexcept {
     }
     state.occupied = state.occupancy[0] | state.occupancy[1];
     state.key = calculate_key(state);
+}
+
+void remove_derived_piece(NativeState& state, Piece piece, int square) noexcept {
+    if (piece.empty() || !valid_square(square)) {
+        return;
+    }
+    const std::uint64_t square_bit = bit(square);
+    const std::size_t color = piece.color == Color::white ? 0 : 1;
+    const std::size_t type = static_cast<std::size_t>(piece.type);
+    state.piece_bitboards[color][type] &= ~square_bit;
+    state.occupancy[color] &= ~square_bit;
+    state.key ^= zobrist().pieces[color][type][static_cast<std::size_t>(square)];
+}
+
+void add_derived_piece(NativeState& state, Piece piece, int square) noexcept {
+    if (piece.empty() || !valid_square(square)) {
+        return;
+    }
+    const std::uint64_t square_bit = bit(square);
+    const std::size_t color = piece.color == Color::white ? 0 : 1;
+    const std::size_t type = static_cast<std::size_t>(piece.type);
+    state.piece_bitboards[color][type] |= square_bit;
+    state.occupancy[color] |= square_bit;
+    state.key ^= zobrist().pieces[color][type][static_cast<std::size_t>(square)];
+}
+
+void remove_rule_keys(NativeState& state) noexcept {
+    const ZobristKeys& keys = zobrist();
+    state.key ^= keys.castling[state.castling & kAllCastling];
+    if (has_legal_en_passant_capture(state)) {
+        state.key ^= keys.en_passant[state.en_passant.index() & 7];
+    }
+    if (state.side == Color::black) {
+        state.key ^= keys.black_to_move;
+    }
+}
+
+void add_rule_keys(NativeState& state) noexcept {
+    const ZobristKeys& keys = zobrist();
+    state.key ^= keys.castling[state.castling & kAllCastling];
+    if (has_legal_en_passant_capture(state)) {
+        state.key ^= keys.en_passant[state.en_passant.index() & 7];
+    }
+    if (state.side == Color::black) {
+        state.key ^= keys.black_to_move;
+    }
 }
 
 int king_square(const NativeState& state, Color color) noexcept {
@@ -334,7 +402,8 @@ bool safe_king_step(NativeState& state, int from, int to, Color side) noexcept {
     return safe;
 }
 
-void add_promotion_moves(std::vector<Move>& moves, Square from, Square to) {
+template <typename MoveContainer>
+void add_promotion_moves(MoveContainer& moves, Square from, Square to) {
     moves.emplace_back(from, to, Promotion::queen);
     moves.emplace_back(from, to, Promotion::rook);
     moves.emplace_back(from, to, Promotion::bishop);
@@ -511,18 +580,36 @@ public:
 
     std::vector<Move> legal_moves() {
         const Color mover = state.side;
-        std::vector<Move> pseudo;
-        pseudo.reserve(64);
+        MoveBuffer pseudo;
         generate_pseudo(pseudo);
-        std::vector<Move> legal;
-        legal.reserve(pseudo.size());
+        std::vector<Move> result;
+        result.reserve(pseudo.size());
         for (const Move& move : pseudo) {
             const Snapshot saved = snapshot();
             apply_unchecked(move);
-            if (!is_checked(state, mover)) legal.push_back(move);
+            if (!is_checked(state, mover)) result.push_back(move);
             restore(saved);
         }
-        return legal;
+        return result;
+    }
+
+    std::size_t legal_moves_into(std::span<Move> output) {
+        if (output.empty()) {
+            return 0;
+        }
+        const Color mover = state.side;
+        MoveBuffer pseudo;
+        generate_pseudo(pseudo);
+        std::size_t count = 0;
+        for (const Move& move : pseudo) {
+            const Snapshot saved = snapshot();
+            apply_unchecked(move);
+            if (!is_checked(state, mover) && count < output.size()) {
+                output[count++] = move;
+            }
+            restore(saved);
+        }
+        return count;
     }
 
     [[nodiscard]] bool is_legal(const Move& move) const noexcept {
@@ -631,6 +718,14 @@ public:
             if (!piece.empty()) ++count;
         }
         return count;
+    }
+
+    [[nodiscard]] std::uint64_t piece_bitboard(PieceType type, Color color) const noexcept {
+        const std::size_t type_index = static_cast<std::size_t>(type);
+        if (type_index >= state.piece_bitboards[0].size()) {
+            return 0;
+        }
+        return state.piece_bitboards[color == Color::white ? 0 : 1][type_index];
     }
 
     [[nodiscard]] bool in_check() const noexcept { return is_checked(state, state.side); }
@@ -773,7 +868,8 @@ public:
 private:
     Snapshot snapshot() const noexcept {
         return Snapshot{state.board, state.side, state.castling, state.en_passant,
-                         state.halfmove, state.fullmove, state.key, false};
+                         state.halfmove, state.fullmove, state.key, state.piece_bitboards,
+                         state.occupancy, state.occupied, false};
     }
 
     void restore(const Snapshot& saved) noexcept {
@@ -784,10 +880,13 @@ private:
         state.halfmove = saved.halfmove;
         state.fullmove = saved.fullmove;
         state.key = saved.key;
-        rebuild_derived(state);
+        state.piece_bitboards = saved.piece_bitboards;
+        state.occupancy = saved.occupancy;
+        state.occupied = saved.occupied;
     }
 
-    void push(std::vector<Move>& moves, int from, int to) const {
+    template <typename MoveContainer>
+    void push(MoveContainer& moves, int from, int to) const {
         if (!valid_square(to)) return;
         const Piece target = state.board[static_cast<std::size_t>(to)];
         if (!target.empty() && target.color == state.side) return;
@@ -803,7 +902,8 @@ private:
         }
     }
 
-    void generate_pseudo(std::vector<Move>& moves) {
+    template <typename MoveContainer>
+    void generate_pseudo(MoveContainer& moves) {
         const Color side = state.side;
         for (int from = 0; from < 64; ++from) {
             const Piece piece = state.board[static_cast<std::size_t>(from)];
@@ -919,11 +1019,27 @@ private:
         const bool castling = moving.type == PieceType::king && std::abs(file_of(to) - file_of(from)) == 2;
         const bool en_passant = pawn_move && to == state.en_passant.index() && captured.empty();
         const bool capture = !captured.empty() || en_passant;
+
+        // Remove the old rule-state keys and every piece that is about to
+        // leave the board before mutating the board array. The remaining
+        // derived state is rebuilt only from the pieces that actually moved.
+        remove_rule_keys(state);
+        remove_derived_piece(state, moving, from);
+        if (!captured.empty()) {
+            remove_derived_piece(state, captured, to);
+        }
+        const int en_passant_captured_square =
+            en_passant ? to + (moving.color == Color::white ? -8 : 8) : -1;
+        if (en_passant) {
+            remove_derived_piece(
+                state, state.board[static_cast<std::size_t>(en_passant_captured_square)],
+                en_passant_captured_square);
+        }
+
         state.en_passant = {};
         state.board[static_cast<std::size_t>(from)] = {};
         if (en_passant) {
-            const int captured_square = to + (moving.color == Color::white ? -8 : 8);
-            state.board[static_cast<std::size_t>(captured_square)] = {};
+            state.board[static_cast<std::size_t>(en_passant_captured_square)] = {};
         }
         state.board[static_cast<std::size_t>(to)] = moving;
         if (move.promotion() != Promotion::none) {
@@ -933,11 +1049,15 @@ private:
             if (move.promotion() == Promotion::knight) promoted = PieceType::knight;
             state.board[static_cast<std::size_t>(to)].type = promoted;
         }
+        add_derived_piece(state, state.board[static_cast<std::size_t>(to)], to);
         if (castling) {
             const int rook_from = to > from ? from + 3 : from - 4;
             const int rook_to = to > from ? from + 1 : from - 1;
-            state.board[static_cast<std::size_t>(rook_to)] = state.board[static_cast<std::size_t>(rook_from)];
+            const Piece rook = state.board[static_cast<std::size_t>(rook_from)];
+            remove_derived_piece(state, rook, rook_from);
+            state.board[static_cast<std::size_t>(rook_to)] = rook;
             state.board[static_cast<std::size_t>(rook_from)] = {};
+            add_derived_piece(state, rook, rook_to);
         }
 
         if (moving.type == PieceType::king) {
@@ -966,7 +1086,8 @@ private:
             !has_legal_en_passant_capture(state)) {
             state.en_passant = {};
         }
-        rebuild_derived(state);
+        state.occupied = state.occupancy[0] | state.occupancy[1];
+        add_rule_keys(state);
     }
 };
 
@@ -1002,6 +1123,14 @@ Piece Position::piece_at(Square square) const noexcept { return impl_->position.
 
 std::vector<Move> Position::legal_moves() const {
     return const_cast<NativePosition&>(impl_->position).legal_moves();
+}
+
+std::size_t Position::legal_moves_into(std::span<Move> output) const noexcept {
+    try {
+        return const_cast<NativePosition&>(impl_->position).legal_moves_into(output);
+    } catch (...) {
+        return 0;
+    }
 }
 
 bool Position::is_legal(const Move& move) const noexcept { return impl_->position.is_legal(move); }
@@ -1044,6 +1173,10 @@ bool Position::set_fen_unchecked(std::string_view fen) {
 std::uint64_t Position::position_key() const noexcept { return impl_->position.position_key(); }
 
 std::size_t Position::piece_count() const noexcept { return impl_->position.piece_count(); }
+
+std::uint64_t Position::piece_bitboard(PieceType type, Color color) const noexcept {
+    return impl_->position.piece_bitboard(type, color);
+}
 
 bool Position::in_check() const noexcept { return impl_->position.in_check(); }
 

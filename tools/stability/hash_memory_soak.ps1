@@ -55,6 +55,22 @@ function Invoke-HashProbe {
     $stdoutTask = $process.StandardOutput.ReadToEndAsync()
     $stderrTask = $process.StandardError.ReadToEndAsync()
     $writer = $process.StandardInput
+    function Get-MemorySample {
+        param([System.Diagnostics.Process]$ObservedProcess)
+
+        try {
+            $ObservedProcess.Refresh()
+            return [pscustomobject]@{
+                working_set = $ObservedProcess.WorkingSet64
+                commit = $ObservedProcess.PrivateMemorySize64
+            }
+        } catch [System.InvalidOperationException] {
+            # The process may exit between Refresh and property access. The
+            # caller retains the peak counters collected before exit.
+            return [pscustomobject]@{ working_set = 0; commit = 0 }
+        }
+    }
+
     @(
         'uci'
         "setoption name DebugFile value $debugPath"
@@ -68,20 +84,35 @@ function Invoke-HashProbe {
         'position startpos'
         'go depth 1'
         'stop'
-        'quit'
     ) | ForEach-Object { $writer.WriteLine($_) }
-    $writer.Close()
+    $writer.Flush()
 
     [Int64]$peakWorkingSet = 0
     [Int64]$peakCommitBytes = 0
-    while (-not $process.WaitForExit(100)) {
-        $process.Refresh()
-        $peakWorkingSet = [Math]::Max($peakWorkingSet, $process.WorkingSet64)
-        $peakCommitBytes = [Math]::Max($peakCommitBytes, $process.PrivateMemorySize64)
+    for ($sampleIndex = 0; $sampleIndex -lt 4; ++$sampleIndex) {
+        $sample = Get-MemorySample -ObservedProcess $process
+        $peakWorkingSet = [Math]::Max($peakWorkingSet, $sample.working_set)
+        $peakCommitBytes = [Math]::Max($peakCommitBytes, $sample.commit)
+        Start-Sleep -Milliseconds 50
     }
-    $process.Refresh()
-    $peakWorkingSet = [Math]::Max($peakWorkingSet, $process.WorkingSet64)
-    $peakCommitBytes = [Math]::Max($peakCommitBytes, $process.PrivateMemorySize64)
+
+    $writer.WriteLine('quit')
+    $writer.Close()
+    while (-not $process.WaitForExit(100)) {
+        $sample = Get-MemorySample -ObservedProcess $process
+        $peakWorkingSet = [Math]::Max($peakWorkingSet, $sample.working_set)
+        $peakCommitBytes = [Math]::Max($peakCommitBytes, $sample.commit)
+    }
+    $sample = Get-MemorySample -ObservedProcess $process
+    $peakWorkingSet = [Math]::Max($peakWorkingSet, $sample.working_set)
+    $peakCommitBytes = [Math]::Max($peakCommitBytes, $sample.commit)
+    try {
+        $peakWorkingSet = [Math]::Max($peakWorkingSet, $process.PeakWorkingSet64)
+        $peakCommitBytes = [Math]::Max($peakCommitBytes, $process.PeakPagedMemorySize64)
+    } catch [System.InvalidOperationException] {
+        # The process handle may no longer expose peak counters. A zero value
+        # is still rejected by the integration test as incomplete telemetry.
+    }
     $process.WaitForExit()
 
     $stdout = $stdoutTask.GetAwaiter().GetResult()

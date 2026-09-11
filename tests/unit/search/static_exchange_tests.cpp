@@ -97,6 +97,15 @@ void test_unsafe_king_recapture_does_not_reduce_exchange_gain() {
             "a king may not recapture onto a square protected by the opposing rook");
 }
 
+void test_tactical_metadata_reuses_one_feature_snapshot_for_exchange_scoring() {
+    koi::GameState state = require_state("3rk3/8/8/3p4/4Q3/8/8/4K3 w - - 0 1");
+    const std::uint64_t misses_before = state.position_feature_cache_misses();
+    koi::MoveMetadataList moves;
+    (void)state.legal_tactical_moves_with_metadata(moves, true, true);
+    require(state.position_feature_cache_misses() == misses_before + 1,
+            "a tactical metadata batch must build one shared feature snapshot for SEE");
+}
+
 } // namespace
 
 int main() {
@@ -121,6 +130,8 @@ int main() {
         std::cout << "PASS pinned recapturer\n";
         test_unsafe_king_recapture_does_not_reduce_exchange_gain();
         std::cout << "PASS unsafe king recapture\n";
+        test_tactical_metadata_reuses_one_feature_snapshot_for_exchange_scoring();
+        std::cout << "PASS shared tactical feature snapshot\n";
     } catch (const std::exception& error) {
         std::cerr << "FAIL static exchange: " << error.what() << '\n';
         return 1;

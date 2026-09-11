@@ -36,6 +36,8 @@ Require-WorkflowPattern '(?m)^\s*ctest\s+--test-dir\s+\$\{\{ matrix\.build_dir \
 Require-CMakePattern '(?i)check_ipo_supported' 'an IPO/LTO capability check'
 Require-CMakePattern '(?i)CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE\s+ON' 'portable Release IPO/LTO'
 Require-CMakePattern '(?i)AVX2' 'the required AVX2 Release optimization flag'
+Require-CMakePattern '(?i)CONFIG:Release.*:/O2' 'the Release compiler optimization level'
+Require-CMakePattern '(?i)CONFIG:Release.*:/DNDEBUG' 'the Release assertion configuration'
 Require-CMakePattern '(?i)CONFIG:Release' 'a Release-only AVX2 configuration guard'
 Require-CMakePattern '(?i)project\s*\(\s*koi_engine\s+VERSION\s+1\.1\.0' 'the v1.1.0 project identity'
 Require-CMakePattern '(?i)CMAKE_MSVC_RUNTIME_LIBRARY' 'the static MSVC runtime policy'

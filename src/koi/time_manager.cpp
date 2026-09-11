@@ -141,6 +141,8 @@ TimeManager::TimeManager(SearchLimits limits, Color side_to_move, std::uint8_t s
     timing_.reserve = std::min(std::chrono::milliseconds{750}, reserve_floor);
     timing_.reserve = std::min(timing_.reserve, remaining);
     timing_.usable = nonnegative_difference(remaining, timing_.reserve);
+    emergency_pacing_ = remaining <= std::chrono::milliseconds{3000};
+    timing_.emergency_pacing = emergency_pacing_;
 
     const auto base_allocation = timing_.usable / timing_.horizon;
     const auto increment_credit = three_quarters(clock->increment);
@@ -155,6 +157,31 @@ TimeManager::TimeManager(SearchLimits limits, Color side_to_move, std::uint8_t s
     timing_.soft_budget = scale_budget(std::min(raw_soft, timing_.usable));
     timing_.hard_budget = scale_budget(std::min(raw_hard, timing_.usable));
     timing_.soft_budget = std::min(timing_.soft_budget, timing_.hard_budget);
+    normal_hard_budget_ = timing_.hard_budget;
+
+    // A three-move extension is useful with a normal clock, but it is unsafe
+    // when the entire remaining clock is only a few seconds. TT misses are
+    // common in that regime and would otherwise classify almost every move as
+    // hard, allowing repeated hard budgets to consume the whole clock. Pace
+    // low-clock searches over three times the normal horizon and retain only
+    // a small hard-position extension while preserving the reserve.
+    if (emergency_pacing_) {
+        const std::uint32_t emergency_horizon = timing_.horizon <=
+                std::numeric_limits<std::uint32_t>::max() / 3 ?
+            timing_.horizon * 3 : std::numeric_limits<std::uint32_t>::max();
+        const auto emergency_base = timing_.usable / std::max<std::uint32_t>(1, emergency_horizon);
+        const auto emergency_soft = std::min(
+            timing_.usable, saturating_add(emergency_base, increment_credit));
+        const auto emergency_extension = std::max(
+            std::chrono::milliseconds{5}, emergency_base / 2);
+        const auto emergency_hard = std::min(
+            timing_.usable, saturating_add(emergency_soft, emergency_extension));
+        timing_.soft_budget = std::min(timing_.soft_budget, emergency_soft);
+        if (!hard_position_) {
+            timing_.hard_budget = std::min(timing_.hard_budget, emergency_hard);
+        }
+        timing_.hard_budget = std::max(timing_.hard_budget, timing_.soft_budget);
+    }
     budget_ = timing_.hard_budget;
 }
 
@@ -237,6 +264,9 @@ void TimeManager::observe_iteration(const SearchIterationObservation& observatio
         score_swing || observation.aspiration_researched;
     if (hard_evidence) {
         hard_position_ = true;
+        if (emergency_pacing_) {
+            timing_.hard_budget = std::max(timing_.hard_budget, normal_hard_budget_);
+        }
         stable_observations_ = 0;
         timing_.extended_for_hard_position = true;
         timing_.observed_hardness = std::max(timing_.observed_hardness, 100);
@@ -264,6 +294,9 @@ bool TimeManager::should_stop_after_iteration() const noexcept {
         hard_deadline_reached_.store(true, std::memory_order_relaxed);
         return true;
     }
+    if (emergency_pacing_ && !hard_position_ && elapsed >= timing_.soft_budget) {
+        return true;
+    }
     return clock_mode_ && !hard_position_ && stable_observations_ >= 2 &&
         elapsed >= timing_.soft_budget;
 }
@@ -273,6 +306,9 @@ bool TimeManager::should_start_next_iteration(std::chrono::milliseconds estimate
         return true;
     }
     const auto elapsed = now() - started_;
+    if (emergency_pacing_ && !hard_position_ && elapsed >= timing_.soft_budget) {
+        return false;
+    }
     return elapsed < *budget_ && elapsed +
         std::max(estimated_next_iteration, std::chrono::milliseconds{1}) < *budget_;
 }

@@ -308,6 +308,66 @@ void test_metadata_ordering_score_is_cached_with_see() {
             "ordering must publish its computed score into move metadata");
 }
 
+void test_search_move_generation_can_defer_see() {
+    const koi::GameState state = require_state(
+        "4k3/8/8/3q4/4Q3/8/8/4K3 w - - 0 1");
+    koi::MoveMetadataList moves;
+    state.legal_moves_with_metadata(moves, true, false);
+    const auto selected = std::find_if(moves.begin(), moves.end(), [](const koi::MoveMetadata& metadata) {
+        return metadata.move == *koi::Move::parse_uci("e4d5");
+    });
+    require(selected != moves.end(), "deferred SEE fixture must include the queen capture");
+    require(!selected->see_computed,
+            "normal search move generation must be able to defer expensive SEE calculation");
+}
+
+void test_search_move_generation_can_skip_capture_check_analysis() {
+    const koi::GameState state = require_state(
+        "4k3/4p3/8/8/8/8/8/4R1K1 w - - 0 1");
+    const auto checking_capture = koi::Move::parse_uci("e1e7");
+    require(checking_capture.has_value(), "checking capture fixture move must parse");
+
+    koi::MoveMetadataList complete;
+    state.legal_moves_with_metadata(complete, true, false);
+    const auto complete_move = std::find_if(complete.begin(), complete.end(),
+        [&checking_capture](const koi::MoveMetadata& metadata) {
+            return metadata.move == *checking_capture;
+        });
+    require(complete_move != complete.end() && complete_move->gives_check,
+            "the complete metadata path must identify a checking capture");
+
+    koi::MoveMetadataList search_metadata;
+    state.legal_moves_with_metadata(search_metadata, true, false,
+                                    koi::CheckFlagMode::quiet_moves_only);
+    const auto search_move = std::find_if(search_metadata.begin(), search_metadata.end(),
+        [&checking_capture](const koi::MoveMetadata& metadata) {
+            return metadata.move == *checking_capture;
+        });
+    require(search_move != search_metadata.end() && !search_move->gives_check,
+            "the search metadata path must skip check analysis for captures");
+}
+
+void test_ordering_resolves_deferred_see_for_search_moves() {
+    const koi::GameState state = require_state(
+        "4k3/8/8/3q4/4Q3/8/8/4K3 w - - 0 1");
+    koi::MoveMetadataList moves;
+    state.legal_moves_with_metadata(moves, true, false);
+    const auto selected_before = std::find_if(moves.begin(), moves.end(), [](const koi::MoveMetadata& metadata) {
+        return metadata.move == *koi::Move::parse_uci("e4d5");
+    });
+    require(selected_before != moves.end() && !selected_before->see_computed,
+            "the normal search fixture must start with deferred SEE");
+
+    koi::detail::SearchMoveOrdering ordering;
+    ordering.order(state, moves, std::nullopt, 0);
+    const auto selected_after = std::find_if(moves.begin(), moves.end(), [](const koi::MoveMetadata& metadata) {
+        return metadata.move == *koi::Move::parse_uci("e4d5");
+    });
+    require(selected_after != moves.end() && selected_after->see_computed &&
+                selected_after->see_score >= 500,
+            "ordering must resolve deferred SEE before ranking a capture");
+}
+
 struct TestCase {
     std::string_view name;
     void (*run)();
@@ -329,6 +389,9 @@ int main() {
         {"history malus and continuation ordering", test_history_malus_and_continuation_history_shape_quiet_ordering},
         {"history saturation overflow safety", test_history_saturation_does_not_overflow_signed_intermediates},
         {"cached move scores", test_metadata_ordering_score_is_cached_with_see},
+        {"deferred SEE generation", test_search_move_generation_can_defer_see},
+        {"quiet-only check metadata", test_search_move_generation_can_skip_capture_check_analysis},
+        {"deferred SEE ordering", test_ordering_resolves_deferred_see_for_search_moves},
     };
 
     for (const TestCase& test : tests) {

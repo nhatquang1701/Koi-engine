@@ -1,6 +1,9 @@
 #include <algorithm>
+#include <array>
 #include <atomic>
+#include <bit>
 #include <iostream>
+#include <random>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -43,6 +46,7 @@ bool same_features(const koi::PositionFeatures& first, const koi::PositionFeatur
         first.king_squares != second.king_squares || first.pawn_file_masks != second.pawn_file_masks ||
         first.development != second.development || first.center_control != second.center_control ||
         first.king_zone_attacks != second.king_zone_attacks ||
+        first.castling_rights != second.castling_rights ||
         first.game_phase != second.game_phase || first.side_to_move != second.side_to_move) {
         return false;
     }
@@ -53,6 +57,177 @@ bool same_features(const koi::PositionFeatures& first, const koi::PositionFeatur
         }
     }
     return true;
+}
+
+std::uint64_t reference_feature_attacks(const koi::PositionFeatures& features,
+                                        koi::Color color) {
+    constexpr int knight_directions[8][2] = {
+        {1, 2}, {2, 1}, {2, -1}, {1, -2},
+        {-1, -2}, {-2, -1}, {-2, 1}, {-1, 2},
+    };
+    constexpr int king_directions[8][2] = {
+        {1, 1}, {1, 0}, {1, -1}, {0, 1},
+        {0, -1}, {-1, 1}, {-1, 0}, {-1, -1},
+    };
+    constexpr int bishop_directions[4][2] = {
+        {1, 1}, {1, -1}, {-1, 1}, {-1, -1},
+    };
+    constexpr int rook_directions[4][2] = {
+        {1, 0}, {-1, 0}, {0, 1}, {0, -1},
+    };
+    constexpr int queen_directions[8][2] = {
+        {1, 1}, {1, -1}, {-1, 1}, {-1, -1},
+        {1, 0}, {-1, 0}, {0, 1}, {0, -1},
+    };
+
+    std::uint64_t attacks = 0;
+    for (int source = 0; source < 64; ++source) {
+        const koi::Piece piece = features.board[static_cast<std::size_t>(source)];
+        if (piece.empty() || piece.color != color) {
+            continue;
+        }
+        const int file = source % 8;
+        const int rank = source / 8;
+        const auto add_step = [&attacks, file, rank](int file_delta, int rank_delta) {
+            const int target_file = file + file_delta;
+            const int target_rank = rank + rank_delta;
+            if (target_file >= 0 && target_file < 8 && target_rank >= 0 && target_rank < 8) {
+                attacks |= std::uint64_t{1} << (target_rank * 8 + target_file);
+            }
+        };
+        if (piece.type == koi::PieceType::pawn) {
+            const int direction = color == koi::Color::white ? 1 : -1;
+            add_step(-1, direction);
+            add_step(1, direction);
+            continue;
+        }
+        if (piece.type == koi::PieceType::knight || piece.type == koi::PieceType::king) {
+            const auto& directions = piece.type == koi::PieceType::knight ?
+                knight_directions : king_directions;
+            for (const auto& direction : directions) {
+                add_step(direction[0], direction[1]);
+            }
+            continue;
+        }
+
+        const auto& directions = piece.type == koi::PieceType::bishop ? bishop_directions :
+            (piece.type == koi::PieceType::rook ? rook_directions : queen_directions);
+        const int direction_count = piece.type == koi::PieceType::queen ? 8 : 4;
+        for (int direction = 0; direction < direction_count; ++direction) {
+            int target_file = file + directions[direction][0];
+            int target_rank = rank + directions[direction][1];
+            while (target_file >= 0 && target_file < 8 && target_rank >= 0 && target_rank < 8) {
+                const std::uint64_t target = std::uint64_t{1} << (target_rank * 8 + target_file);
+                attacks |= target;
+                if (!features.board[static_cast<std::size_t>(target_rank * 8 + target_file)].empty()) {
+                    break;
+                }
+                target_file += directions[direction][0];
+                target_rank += directions[direction][1];
+            }
+        }
+    }
+    return attacks;
+}
+
+std::uint64_t reference_king_zone(std::uint8_t square) {
+    if (square >= 64) {
+        return 0;
+    }
+    const int file = square % 8;
+    const int rank = square / 8;
+    std::uint64_t zone = 0;
+    for (int rank_delta = -1; rank_delta <= 1; ++rank_delta) {
+        for (int file_delta = -1; file_delta <= 1; ++file_delta) {
+            const int target_file = file + file_delta;
+            const int target_rank = rank + rank_delta;
+            if (target_file >= 0 && target_file < 8 && target_rank >= 0 && target_rank < 8) {
+                zone |= std::uint64_t{1} << (target_rank * 8 + target_file);
+            }
+        }
+    }
+    return zone;
+}
+
+void test_position_features_match_the_native_board_after_replay() {
+    constexpr std::array<std::string_view, 4> fens{
+        "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+        "r3k2r/ppp2ppp/2n5/3Pp3/8/2N5/PPP2PPP/R3K2R w KQkq e6 0 2",
+        "4k3/P6p/8/3b4/4B3/8/p6P/4K3 w - - 0 1",
+        "r1bq1rk1/pp1n1ppp/2p1pn2/3p4/3P4/2N1PN2/PP1N1PPP/R1BQ1RK1 w - - 0 8",
+    };
+    constexpr std::uint64_t core_center_mask =
+        (std::uint64_t{1} << 27) | (std::uint64_t{1} << 28) |
+        (std::uint64_t{1} << 35) | (std::uint64_t{1} << 36);
+
+    for (const std::string_view fen : fens) {
+        auto state_result = koi::GameState::from_fen(fen);
+        require(state_result.has_value(), "native feature replay FEN must be valid");
+        koi::GameState state = *state_result;
+        for (int ply = 0; ply < 10; ++ply) {
+            const koi::PositionFeatures features = state.position_features();
+            std::array<std::uint64_t, 2> expected_attacks{};
+            std::array<std::uint64_t, 2> own_occupancy{};
+            std::array<std::uint8_t, 2> expected_development{};
+            std::array<std::uint8_t, 2> expected_pawn_files{};
+            int expected_phase = 0;
+            for (std::uint8_t square = 0; square < 64; ++square) {
+                const koi::Piece expected = state.piece_at(koi::Square::from_index(square));
+                require(features.board[square].type == expected.type &&
+                            features.board[square].color == expected.color,
+                        "native feature board must match the native piece map");
+                if (expected.empty()) {
+                    continue;
+                }
+                const std::size_t color = expected.color == koi::Color::white ? 0U : 1U;
+                own_occupancy[color] |= std::uint64_t{1} << square;
+                expected_attacks[color] = reference_feature_attacks(features, expected.color);
+                if (expected.type == koi::PieceType::pawn) {
+                    expected_pawn_files[color] = static_cast<std::uint8_t>(
+                        expected_pawn_files[color] | (std::uint8_t{1} << (square % 8)));
+                }
+                if (expected.type == koi::PieceType::knight || expected.type == koi::PieceType::bishop) {
+                    const bool home = expected.color == koi::Color::white ?
+                        ((expected.type == koi::PieceType::knight && (square == 1 || square == 6)) ||
+                         (expected.type == koi::PieceType::bishop && (square == 2 || square == 5))) :
+                        ((expected.type == koi::PieceType::knight && (square == 57 || square == 62)) ||
+                         (expected.type == koi::PieceType::bishop && (square == 58 || square == 61)));
+                    if (!home) {
+                        ++expected_development[color];
+                    }
+                }
+                expected_phase += expected.type == koi::PieceType::knight ||
+                    expected.type == koi::PieceType::bishop ? 1 :
+                    expected.type == koi::PieceType::rook ? 2 :
+                    expected.type == koi::PieceType::queen ? 4 : 0;
+            }
+            expected_phase = std::min(expected_phase, 24);
+            for (const koi::Color color : {koi::Color::white, koi::Color::black}) {
+                const std::size_t index = color == koi::Color::white ? 0U : 1U;
+                require(features.attacked_squares[index] == expected_attacks[index],
+                        "native feature attacks must match the board reference");
+                require(features.mobility[index] ==
+                            std::popcount(expected_attacks[index] & ~own_occupancy[index]),
+                        "native feature mobility must match the board reference");
+                require(features.pawn_file_masks[index] == expected_pawn_files[index] &&
+                            features.development[index] == expected_development[index],
+                        "native pawn and development features must match the board reference");
+                require(features.center_control[index] ==
+                            std::popcount(expected_attacks[index] & core_center_mask),
+                        "native center-control features must match the board reference");
+                const std::uint8_t king = features.king_squares[index].index();
+                require(features.king_zone_attacks[index] == static_cast<std::uint8_t>(std::popcount(
+                            expected_attacks[1U - index] & reference_king_zone(king))),
+                        "native king-zone features must match the board reference");
+            }
+            require(features.game_phase == expected_phase,
+                    "native feature game phase must match the material map");
+            const auto legal = state.legal_moves();
+            if (legal.empty() || !state.make_move(legal.front())) {
+                break;
+            }
+        }
+    }
 }
 
 bool contains_metadata_move(const koi::MoveMetadataList& moves, std::string_view expected) {
@@ -503,6 +678,93 @@ void test_fabricated_metadata_is_rejected_by_native_legality() {
             "rejected fabricated metadata must leave the state unchanged");
 }
 
+void test_tactical_generation_skips_quiet_check_probes_when_disabled() {
+    koi::GameState state = koi::GameState::startpos();
+    koi::MoveMetadataList moves;
+    const std::uint64_t probes_before = state.check_flag_evaluations();
+
+    require(state.legal_tactical_moves_with_metadata(moves, false, true),
+            "the start position must have legal moves even without quiet checks");
+    require(moves.empty(),
+            "the start position must have no captures, promotions, or quiet checks");
+    require(state.check_flag_evaluations() == probes_before,
+            "tactical generation must not probe quiet checks after the quiet-check horizon");
+
+    const auto capture_result = koi::GameState::from_fen(
+        "4k3/8/8/4r3/4Q3/8/8/4K3 w - - 0 1");
+    require(capture_result.has_value(), "capture check fixture must be valid");
+    koi::GameState capture_state = *capture_result;
+    koi::MoveMetadataList capture_moves;
+    require(capture_state.legal_tactical_moves_with_metadata(capture_moves, false, true),
+            "capture check fixture must have legal moves");
+    const auto checking_capture = std::find_if(
+        capture_moves.begin(), capture_moves.end(), [](const koi::MoveMetadata& metadata) {
+            return metadata.move.uci() == "e4e5";
+        });
+    require(checking_capture != capture_moves.end() && checking_capture->gives_check,
+            "checking captures must retain their check annotation without quiet checks");
+    require(capture_state.check_flag_evaluations() > 0,
+            "tactical generation must still probe captures for check annotations");
+}
+
+void test_fast_quiet_check_flags_match_exhaustive_move_descriptions() {
+    const std::array<std::string_view, 6> fixtures{
+        kInitialFen,
+        "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1",
+        "4k3/8/8/3pP3/8/8/8/4K3 w - d6 0 2",
+        "4k3/8/8/8/8/8/P7/4K3 w - - 0 1",
+        "4k3/8/8/8/8/2N5/4N3/4R1K1 w - - 0 1",
+        "4k3/7N/8/8/8/8/8/4K3 w - - 0 1",
+    };
+
+    const auto compare_position = [](const koi::GameState& state) {
+        const std::vector<koi::MoveMetadata> exhaustive = state.legal_moves_with_metadata();
+        koi::MoveMetadataList fast;
+        state.legal_moves_with_metadata(fast, true, false, koi::CheckFlagMode::quiet_moves_only);
+
+        for (const koi::MoveMetadata& expected : exhaustive) {
+            if (expected.is_capture() || expected.move.promotion() != koi::Promotion::none) {
+                continue;
+            }
+            const auto actual = std::find_if(fast.begin(), fast.end(),
+                [&expected](const koi::MoveMetadata& metadata) {
+                    return metadata.move == expected.move;
+                });
+            require(actual != fast.end(),
+                    "fast quiet-check generation must retain every quiet legal move");
+            if (actual->gives_check != expected.gives_check) {
+                throw std::runtime_error(
+                    "native quiet-check mismatch at " + state.fen() + " move " +
+                    expected.move.uci() + " native=" +
+                    (actual->gives_check ? "true" : "false") + " exhaustive=" +
+                    (expected.gives_check ? "true" : "false"));
+            }
+        }
+    };
+
+    for (const std::string_view fen : fixtures) {
+        const auto state = koi::GameState::from_fen(fen);
+        require(state.has_value(), "quiet-check differential fixture must be valid");
+        compare_position(*state);
+    }
+
+    std::mt19937 random(0x4B4F4951U);
+    koi::GameState state = koi::GameState::startpos();
+    for (int ply = 0; ply < 240; ++ply) {
+        compare_position(state);
+        const std::vector<koi::Move> legal = state.legal_moves();
+        if (legal.empty()) {
+            state = koi::GameState::startpos();
+            continue;
+        }
+        const koi::Move move = legal[static_cast<std::size_t>(random() % legal.size())];
+        require(state.make_move(move), "random differential replay move must be legal");
+        if ((ply + 1) % 48 == 0) {
+            state = koi::GameState::startpos();
+        }
+    }
+}
+
 struct TestCase {
     std::string_view name;
     void (*run)();
@@ -533,9 +795,12 @@ int main() {
         {"position feature freshness", test_position_features_refresh_after_make_and_unmake},
         {"position feature concurrent reads", test_position_features_are_safe_for_concurrent_const_reads},
         {"position feature concurrent copy", test_copying_a_const_state_is_safe_while_its_feature_cache_is_populated},
+        {"native feature replay", test_position_features_match_the_native_board_after_replay},
         {"tactical checking horizon", test_tactical_generation_omits_quiet_checks_after_the_checking_horizon},
         {"metadata SEE cache", test_move_metadata_caches_see_and_rejects_stale_positions},
         {"fabricated metadata rejection", test_fabricated_metadata_is_rejected_by_native_legality},
+        {"tactical quiet-check probe budget", test_tactical_generation_skips_quiet_check_probes_when_disabled},
+        {"fast quiet-check differential", test_fast_quiet_check_flags_match_exhaustive_move_descriptions},
     };
 
     for (const TestCase& test : tests) {

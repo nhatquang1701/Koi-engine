@@ -581,6 +581,7 @@ $failurePatterns = @(
     '(?i)illegal move',
     '(?i)invalid move',
     '(?i)time forfeit',
+    '(?i)loses on time',
     '(?i)timed out',
     '(?i)timeout',
     '(?i)crash',

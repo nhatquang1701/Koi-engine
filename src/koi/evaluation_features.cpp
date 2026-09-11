@@ -109,7 +109,7 @@ struct PawnFileState {
 EvaluationFeatures EvaluationFeatureExtractor::extract(const GameState& state) noexcept {
     EvaluationFeatures features;
     features.position = state.position_features();
-    features.castling_rights = state.tablebase_snapshot().castling_rights;
+    features.castling_rights = features.position.castling_rights;
     return features;
 }
 

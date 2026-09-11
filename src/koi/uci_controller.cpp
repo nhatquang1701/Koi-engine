@@ -439,7 +439,7 @@ SearchLimits parse_go_limits(std::string_view arguments) {
 
 UciController::UciController(std::istream& input, std::ostream& output, std::ostream& diagnostics)
     : UciController(input, output, diagnostics,
-                    SearchService{std::make_shared<ClassicalEvaluator>()}) {}
+                    SearchService{std::make_shared<ClassicalEvaluator>(), {}, 1}) {}
 
 UciController::UciController(std::istream& input, std::ostream& output,
                              std::ostream& diagnostics, SearchService search_service,
@@ -615,6 +615,7 @@ void UciController::handle_setoption(std::istream& command) {
         if (parse_uint64(value, megabytes) && megabytes >= kMinimumHashMegabytes &&
             megabytes <= kMaximumHashMegabytes) {
             stop_and_suppress_active_search();
+            hash_mb_ = static_cast<std::size_t>(megabytes);
             try {
                 const HashResizeResult result =
                     search_service_.set_hash_size_mb(static_cast<std::size_t>(megabytes));
@@ -1243,6 +1244,17 @@ void UciController::write_handshake() {
 }
 
 void UciController::write_readyok() {
+    // The production UCI controller starts with a one-megabyte bootstrap table
+    // so a large default hash cannot consume a fast game's clock before the
+    // GUI has delivered its options. Materialize the requested table while the
+    // engine is idle; explicit Hash options have already resized it here.
+    if (!active_search_.has_value()) {
+        try {
+            (void)search_service_.set_hash_size_mb(hash_mb_);
+        } catch (...) {
+            debug_event("deferred hash materialization failed; existing table preserved");
+        }
+    }
     std::lock_guard lock(output_mutex_);
     output_ << "readyok\n" << std::flush;
 }

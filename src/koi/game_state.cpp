@@ -10,7 +10,10 @@
 #include <limits>
 #include <memory>
 #include <mutex>
+#include <numeric>
+#include <optional>
 #include <shared_mutex>
+#include <span>
 #include <utility>
 
 #include <chess.hpp>
@@ -20,6 +23,8 @@
 namespace koi {
 
 namespace {
+
+constexpr std::size_t kMaximumGameStateHistory = 256;
 
 constexpr std::array<std::uint64_t, 781> kPolyglotRandom{
 +0x9D39247E33776D41ULL,
@@ -1193,7 +1198,53 @@ std::vector<std::string> sorted_shadow_move_strings(const chess::Board& board) {
 }
 
 bool mirror_matches_native(const Position& native_position, const chess::Board& shadow_board) {
-    return native_position.fen() == shadow_fen_for_native_comparison(native_position, shadow_board);
+    // This check runs on every generated move in the search tree. Comparing
+    // two freshly formatted FEN strings here used to allocate and scan both
+    // complete strings (and could generate shadow legal moves to normalize
+    // en-passant), making the compatibility mirror an avoidable fixed-depth
+    // cost. Compare the same state fields directly instead; the diagnostic
+    // consistency_snapshot() retains the exhaustive FEN and legal-move
+    // comparison for tests and incident reports.
+    if (native_position.side_to_move() !=
+            (shadow_board.sideToMove() == chess::Color::WHITE ? Color::white : Color::black) ||
+        native_position.castling_rights() != shadow_castling_rights(shadow_board) ||
+        native_position.halfmove_clock() != static_cast<std::uint16_t>(std::min<std::uint32_t>(
+            shadow_board.halfMoveClock(), std::numeric_limits<std::uint16_t>::max())) ||
+        native_position.fullmove_number() != static_cast<std::uint16_t>(std::min<std::uint32_t>(
+            shadow_board.fullMoveNumber(), std::numeric_limits<std::uint16_t>::max()))) {
+        return false;
+    }
+
+    constexpr std::array<std::pair<PieceType, chess::PieceType>, 6> piece_types{{
+        {PieceType::pawn, chess::PieceType::PAWN},
+        {PieceType::knight, chess::PieceType::KNIGHT},
+        {PieceType::bishop, chess::PieceType::BISHOP},
+        {PieceType::rook, chess::PieceType::ROOK},
+        {PieceType::queen, chess::PieceType::QUEEN},
+        {PieceType::king, chess::PieceType::KING},
+    }};
+    for (const Color color : {Color::white, Color::black}) {
+        const chess::Color shadow_color = color == Color::white ?
+            chess::Color::WHITE : chess::Color::BLACK;
+        for (const auto [native_type, shadow_type] : piece_types) {
+            if (native_position.piece_bitboard(native_type, color) !=
+                shadow_board.pieces(shadow_type, shadow_color).getBits()) {
+                return false;
+            }
+        }
+    }
+
+    if (native_position.piece_count() != shadow_board.occ().count()) {
+        return false;
+    }
+
+    const Square native_en_passant = native_position.en_passant_square();
+    const Square shadow_en_passant = shadow_en_passant_square(shadow_board);
+    if (native_en_passant.index() < Square::kInvalid) {
+        return shadow_en_passant == native_en_passant;
+    }
+    return shadow_en_passant.index() >= Square::kInvalid ||
+        !shadow_has_legal_en_passant_capture(shadow_board);
 }
 
 std::uint64_t metadata_validation_token(const std::uint64_t key,
@@ -1276,61 +1327,395 @@ std::uint64_t king_zone_mask(std::uint8_t square) noexcept {
     return mask;
 }
 
-bool exchange_piece_attacks_square(const std::array<Piece, 64>& board, int source, int target) noexcept {
-    const Piece piece = board[static_cast<std::size_t>(source)];
-    if (piece.empty() || source == target) {
-        return false;
+using NativeFeatureBitboards = std::array<std::array<std::uint64_t, 7>, 2>;
+
+constexpr std::uint64_t feature_bit(int square) noexcept {
+    return square >= 0 && square < 64 ? std::uint64_t{1} << square : 0;
+}
+
+std::uint64_t native_feature_attacks(const NativeFeatureBitboards& pieces,
+                                     std::uint64_t occupied, int source,
+                                     PieceType type, Color color) noexcept {
+    const int file = source % 8;
+    const int rank = source / 8;
+    std::uint64_t attacks = 0;
+
+    if (type == PieceType::pawn) {
+        const int direction = color == Color::white ? 1 : -1;
+        for (const int file_delta : {-1, 1}) {
+            const int target_file = file + file_delta;
+            const int target_rank = rank + direction;
+            if (target_file >= 0 && target_file < 8 && target_rank >= 0 && target_rank < 8) {
+                attacks |= feature_bit(target_rank * 8 + target_file);
+            }
+        }
+        return attacks;
     }
 
-    const int source_file = source % 8;
-    const int source_rank = source / 8;
-    const int target_file = target % 8;
-    const int target_rank = target / 8;
-    const int file_delta = target_file - source_file;
-    const int rank_delta = target_rank - source_rank;
-    const int abs_file_delta = std::abs(file_delta);
-    const int abs_rank_delta = std::abs(rank_delta);
-
-    if (piece.type == PieceType::pawn) {
-        const int direction = piece.color == Color::white ? 1 : -1;
-        return rank_delta == direction && abs_file_delta == 1;
-    }
-    if (piece.type == PieceType::knight) {
-        return (abs_file_delta == 1 && abs_rank_delta == 2) ||
-               (abs_file_delta == 2 && abs_rank_delta == 1);
-    }
-    if (piece.type == PieceType::king) {
-        return abs_file_delta <= 1 && abs_rank_delta <= 1;
-    }
-
-    const bool diagonal = abs_file_delta == abs_rank_delta;
-    const bool orthogonal = file_delta == 0 || rank_delta == 0;
-    if ((piece.type == PieceType::bishop && !diagonal) ||
-        (piece.type == PieceType::rook && !orthogonal) ||
-        (piece.type == PieceType::queen && !diagonal && !orthogonal) ||
-        (piece.type != PieceType::bishop && piece.type != PieceType::rook && piece.type != PieceType::queen)) {
-        return false;
+    if (type == PieceType::knight || type == PieceType::king) {
+        constexpr int knight_directions[8][2] = {
+            {1, 2}, {2, 1}, {2, -1}, {1, -2},
+            {-1, -2}, {-2, -1}, {-2, 1}, {-1, 2},
+        };
+        constexpr int king_directions[8][2] = {
+            {1, 1}, {1, 0}, {1, -1}, {0, 1},
+            {0, -1}, {-1, 1}, {-1, 0}, {-1, -1},
+        };
+        const auto& directions = type == PieceType::knight ? knight_directions : king_directions;
+        for (const auto& direction : directions) {
+            const int target_file = file + direction[0];
+            const int target_rank = rank + direction[1];
+            if (target_file >= 0 && target_file < 8 && target_rank >= 0 && target_rank < 8) {
+                attacks |= feature_bit(target_rank * 8 + target_file);
+            }
+        }
+        return attacks;
     }
 
-    const int file_step = file_delta == 0 ? 0 : (file_delta > 0 ? 1 : -1);
-    const int rank_step = rank_delta == 0 ? 0 : (rank_delta > 0 ? 1 : -1);
-    for (int file = source_file + file_step, rank = source_rank + rank_step;
-         file != target_file || rank != target_rank; file += file_step, rank += rank_step) {
-        if (!board[static_cast<std::size_t>(rank * 8 + file)].empty()) {
-            return false;
+    constexpr int bishop_directions[4][2] = {
+        {1, 1}, {1, -1}, {-1, 1}, {-1, -1},
+    };
+    constexpr int rook_directions[4][2] = {
+        {1, 0}, {-1, 0}, {0, 1}, {0, -1},
+    };
+    constexpr int queen_directions[8][2] = {
+        {1, 1}, {1, -1}, {-1, 1}, {-1, -1},
+        {1, 0}, {-1, 0}, {0, 1}, {0, -1},
+    };
+    const auto& directions = type == PieceType::bishop ? bishop_directions :
+        (type == PieceType::rook ? rook_directions : queen_directions);
+    const int direction_count = type == PieceType::queen ? 8 : 4;
+    for (int direction = 0; direction < direction_count; ++direction) {
+        int target_file = file + directions[direction][0];
+        int target_rank = rank + directions[direction][1];
+        while (target_file >= 0 && target_file < 8 && target_rank >= 0 && target_rank < 8) {
+            const std::uint64_t target = feature_bit(target_rank * 8 + target_file);
+            attacks |= target;
+            if ((occupied & target) != 0) {
+                break;
+            }
+            target_file += directions[direction][0];
+            target_rank += directions[direction][1];
         }
     }
-    return true;
+    (void)pieces;
+    return attacks;
+}
+
+bool native_move_gives_check(const Position& position, const Move& move) noexcept {
+    const std::uint8_t source = move.from().index();
+    const std::uint8_t destination = move.to().index();
+    if (source >= Square::kInvalid || destination >= Square::kInvalid) {
+        return false;
+    }
+
+    const Color moving_color = position.side_to_move();
+    const Color enemy_color = opposite(moving_color);
+    const std::uint64_t enemy_king = position.piece_bitboard(PieceType::king, enemy_color);
+    if (enemy_king == 0) {
+        return false;
+    }
+
+    std::uint64_t occupied = 0;
+    for (const Color color : {Color::white, Color::black}) {
+        for (const PieceType type : {PieceType::pawn, PieceType::knight, PieceType::bishop,
+                                     PieceType::rook, PieceType::queen, PieceType::king}) {
+            occupied |= position.piece_bitboard(type, color);
+        }
+    }
+
+    const std::uint64_t source_bit = std::uint64_t{1} << source;
+    const std::uint64_t destination_bit = std::uint64_t{1} << destination;
+    occupied &= ~source_bit;
+    if (!position.piece_at(Square::from_index(destination)).empty()) {
+        occupied &= ~destination_bit;
+    }
+
+    const Piece moving_piece = position.piece_at(Square::from_index(source));
+    if (moving_piece.type == PieceType::pawn &&
+        position.en_passant_square().index() == destination &&
+        position.piece_at(Square::from_index(destination)).empty()) {
+        const int captured_square = static_cast<int>(destination) +
+            (moving_color == Color::white ? -8 : 8);
+        if (captured_square >= 0 && captured_square < 64) {
+            occupied &= ~(std::uint64_t{1} << captured_square);
+        }
+    }
+    occupied |= destination_bit;
+
+    const bool castling = moving_piece.type == PieceType::king &&
+        std::abs(static_cast<int>(destination % 8) - static_cast<int>(source % 8)) == 2;
+    std::uint8_t rook_source = Square::kInvalid;
+    std::uint8_t rook_destination = Square::kInvalid;
+    if (castling) {
+        const bool king_side = destination > source;
+        rook_source = static_cast<std::uint8_t>((source / 8) * 8 + (king_side ? 7 : 0));
+        rook_destination = static_cast<std::uint8_t>((source / 8) * 8 + (king_side ? 5 : 3));
+        occupied &= ~(std::uint64_t{1} << rook_source);
+        occupied |= std::uint64_t{1} << rook_destination;
+    }
+
+    NativeFeatureBitboards empty_pieces{};
+    const PieceType moved_type = move.promotion() == Promotion::none ? moving_piece.type :
+        promotion_piece_type(move.promotion());
+    if ((native_feature_attacks(empty_pieces, occupied, destination, moved_type, moving_color) &
+         enemy_king) != 0) {
+        return true;
+    }
+
+    for (const PieceType type : {PieceType::pawn, PieceType::knight, PieceType::bishop,
+                                 PieceType::rook, PieceType::queen, PieceType::king}) {
+        std::uint64_t remaining = position.piece_bitboard(type, moving_color);
+        while (remaining != 0) {
+            const int square = static_cast<int>(std::countr_zero(remaining));
+            remaining &= remaining - 1;
+            if (square == source || (castling && square == rook_source)) {
+                continue;
+            }
+            if ((native_feature_attacks(empty_pieces, occupied, square, type, moving_color) &
+                 enemy_king) != 0) {
+                return true;
+            }
+        }
+    }
+
+    if (castling && (native_feature_attacks(empty_pieces, occupied, rook_destination,
+                                            PieceType::rook, moving_color) & enemy_king) != 0) {
+        return true;
+    }
+    return false;
+}
+
+PositionFeatures native_position_features(const Position& position) noexcept {
+    NativeFeatureBitboards pieces{};
+    for (const Color color : {Color::white, Color::black}) {
+        const std::size_t color_index = color == Color::white ? 0U : 1U;
+        for (const PieceType type : {PieceType::pawn, PieceType::knight, PieceType::bishop,
+                                     PieceType::rook, PieceType::queen, PieceType::king}) {
+            pieces[color_index][static_cast<std::size_t>(type)] =
+                position.piece_bitboard(type, color);
+        }
+    }
+
+    PositionFeatures features;
+    features.side_to_move = position.side_to_move();
+    features.fullmove_number = position.fullmove_number();
+    const std::uint64_t occupied =
+        std::accumulate(pieces[0].begin(), pieces[0].end(), std::uint64_t{0},
+                        [](std::uint64_t value, std::uint64_t board) { return value | board; }) |
+        std::accumulate(pieces[1].begin(), pieces[1].end(), std::uint64_t{0},
+                        [](std::uint64_t value, std::uint64_t board) { return value | board; });
+    std::array<std::uint64_t, 2> attacks{};
+
+    for (const Color color : {Color::white, Color::black}) {
+        const std::size_t color_index = color == Color::white ? 0U : 1U;
+        const std::uint64_t own = std::accumulate(
+            pieces[color_index].begin(), pieces[color_index].end(), std::uint64_t{0},
+            [](std::uint64_t value, std::uint64_t board) { return value | board; });
+        for (const PieceType type : {PieceType::pawn, PieceType::knight, PieceType::bishop,
+                                     PieceType::rook, PieceType::queen, PieceType::king}) {
+            std::uint64_t remaining = pieces[color_index][static_cast<std::size_t>(type)];
+            while (remaining != 0) {
+                const int square = static_cast<int>(std::countr_zero(remaining));
+                remaining &= remaining - 1;
+                features.board[static_cast<std::size_t>(square)] = {type, color};
+                if (type == PieceType::pawn) {
+                    features.pawn_file_masks[color_index] = static_cast<std::uint8_t>(
+                        features.pawn_file_masks[color_index] |
+                        (std::uint8_t{1} << (square % 8)));
+                }
+                if (type == PieceType::knight || type == PieceType::bishop) {
+                    const bool white_home = color == Color::white &&
+                        ((type == PieceType::knight && (square == 1 || square == 6)) ||
+                         (type == PieceType::bishop && (square == 2 || square == 5)));
+                    const bool black_home = color == Color::black &&
+                        ((type == PieceType::knight && (square == 57 || square == 62)) ||
+                         (type == PieceType::bishop && (square == 58 || square == 61)));
+                    if (!white_home && !black_home) {
+                        ++features.development[color_index];
+                    }
+                }
+                switch (type) {
+                case PieceType::knight:
+                case PieceType::bishop:
+                    features.game_phase = static_cast<std::uint8_t>(features.game_phase + 1);
+                    break;
+                case PieceType::rook:
+                    features.game_phase = static_cast<std::uint8_t>(features.game_phase + 2);
+                    break;
+                case PieceType::queen:
+                    features.game_phase = static_cast<std::uint8_t>(features.game_phase + 4);
+                    break;
+                default:
+                    break;
+                }
+                attacks[color_index] |= native_feature_attacks(pieces, occupied, square, type, color);
+            }
+        }
+        features.attacked_squares[color_index] = attacks[color_index];
+        features.mobility[color_index] = static_cast<std::uint16_t>(
+            std::popcount(attacks[color_index] & ~own));
+        const std::uint64_t king = pieces[color_index][static_cast<std::size_t>(PieceType::king)];
+        const std::uint8_t king_square = king == 0 ? Square::kInvalid :
+            static_cast<std::uint8_t>(std::countr_zero(king));
+        features.king_squares[color_index] = Square::from_index(king_square);
+        features.center_control[color_index] = static_cast<std::uint8_t>(
+            std::popcount(attacks[color_index] & kCoreCenterMask));
+    }
+
+    features.game_phase = std::min<std::uint8_t>(features.game_phase, 24);
+    for (std::size_t color = 0; color < 2; ++color) {
+        features.king_zone_attacks[color] = static_cast<std::uint8_t>(std::popcount(
+            attacks[1 - color] & king_zone_mask(features.king_squares[color].index())));
+    }
+    features.castling_rights = position.castling_rights();
+    return features;
+}
+
+constexpr bool exchange_square_valid(int square) noexcept {
+    return square >= 0 && square < 64;
 }
 
 bool exchange_square_attacked_by(const std::array<Piece, 64>& board, int target, Color attacker) noexcept {
-    for (int source = 0; source < 64; ++source) {
-        if (board[static_cast<std::size_t>(source)].color == attacker &&
-            exchange_piece_attacks_square(board, source, target)) {
+    if (!exchange_square_valid(target)) {
+        return false;
+    }
+
+    const int target_file = target & 7;
+    const int target_rank = target >> 3;
+    const auto has_piece = [&board, attacker](int square, PieceType type) noexcept {
+        if (!exchange_square_valid(square)) {
+            return false;
+        }
+        const Piece piece = board[static_cast<std::size_t>(square)];
+        return piece.color == attacker && piece.type == type;
+    };
+
+    const int pawn_rank = target_rank - (attacker == Color::white ? 1 : -1);
+    if (pawn_rank >= 0 && pawn_rank < 8) {
+        if ((target_file > 0 && has_piece((pawn_rank << 3) + target_file - 1, PieceType::pawn)) ||
+            (target_file < 7 && has_piece((pawn_rank << 3) + target_file + 1, PieceType::pawn))) {
             return true;
         }
     }
+
+    constexpr int knight_directions[8][2] = {
+        {1, 2}, {2, 1}, {2, -1}, {1, -2},
+        {-1, -2}, {-2, -1}, {-2, 1}, {-1, 2},
+    };
+    for (const auto& direction : knight_directions) {
+        const int file = target_file + direction[0];
+        const int rank = target_rank + direction[1];
+        if (file >= 0 && file < 8 && rank >= 0 && rank < 8 &&
+            has_piece((rank << 3) + file, PieceType::knight)) {
+            return true;
+        }
+    }
+
+    for (int file = target_file - 1; file <= target_file + 1; ++file) {
+        for (int rank = target_rank - 1; rank <= target_rank + 1; ++rank) {
+            if ((file == target_file && rank == target_rank) ||
+                file < 0 || file >= 8 || rank < 0 || rank >= 8) {
+                continue;
+            }
+            if (has_piece((rank << 3) + file, PieceType::king)) {
+                return true;
+            }
+        }
+    }
+
+    constexpr int directions[8][2] = {
+        {1, 0}, {-1, 0}, {0, 1}, {0, -1},
+        {1, 1}, {1, -1}, {-1, 1}, {-1, -1},
+    };
+    for (int direction = 0; direction < 8; ++direction) {
+        const bool diagonal = direction >= 4;
+        int file = target_file + directions[direction][0];
+        int rank = target_rank + directions[direction][1];
+        while (file >= 0 && file < 8 && rank >= 0 && rank < 8) {
+            const Piece piece = board[static_cast<std::size_t>((rank << 3) + file)];
+            if (!piece.empty()) {
+                if (piece.color == attacker &&
+                    ((diagonal && (piece.type == PieceType::bishop || piece.type == PieceType::queen)) ||
+                     (!diagonal && (piece.type == PieceType::rook || piece.type == PieceType::queen)))) {
+                    return true;
+                }
+                break;
+            }
+            file += directions[direction][0];
+            rank += directions[direction][1];
+        }
+    }
     return false;
+}
+
+template <typename CandidateHandler>
+void for_each_exchange_attacker(const std::array<Piece, 64>& board, int target,
+                                Color attacker, CandidateHandler&& handler) noexcept {
+    if (!exchange_square_valid(target)) {
+        return;
+    }
+    const int target_file = target & 7;
+    const int target_rank = target >> 3;
+    const auto visit = [&board, attacker, &handler](int square, PieceType expected) noexcept {
+        if (exchange_square_valid(square) &&
+            board[static_cast<std::size_t>(square)].color == attacker &&
+            board[static_cast<std::size_t>(square)].type == expected) {
+            handler(square);
+        }
+    };
+
+    const int pawn_rank = target_rank - (attacker == Color::white ? 1 : -1);
+    if (pawn_rank >= 0 && pawn_rank < 8) {
+        if (target_file > 0) visit((pawn_rank << 3) + target_file - 1, PieceType::pawn);
+        if (target_file < 7) visit((pawn_rank << 3) + target_file + 1, PieceType::pawn);
+    }
+
+    constexpr int knight_directions[8][2] = {
+        {1, 2}, {2, 1}, {2, -1}, {1, -2},
+        {-1, -2}, {-2, -1}, {-2, 1}, {-1, 2},
+    };
+    for (const auto& direction : knight_directions) {
+        const int file = target_file + direction[0];
+        const int rank = target_rank + direction[1];
+        if (file >= 0 && file < 8 && rank >= 0 && rank < 8) {
+            visit((rank << 3) + file, PieceType::knight);
+        }
+    }
+
+    for (int file = target_file - 1; file <= target_file + 1; ++file) {
+        for (int rank = target_rank - 1; rank <= target_rank + 1; ++rank) {
+            if ((file == target_file && rank == target_rank) ||
+                file < 0 || file >= 8 || rank < 0 || rank >= 8) {
+                continue;
+            }
+            visit((rank << 3) + file, PieceType::king);
+        }
+    }
+
+    constexpr int directions[8][2] = {
+        {1, 0}, {-1, 0}, {0, 1}, {0, -1},
+        {1, 1}, {1, -1}, {-1, 1}, {-1, -1},
+    };
+    for (int direction = 0; direction < 8; ++direction) {
+        const bool diagonal = direction >= 4;
+        int file = target_file + directions[direction][0];
+        int rank = target_rank + directions[direction][1];
+        while (file >= 0 && file < 8 && rank >= 0 && rank < 8) {
+            const int square = (rank << 3) + file;
+            const Piece piece = board[static_cast<std::size_t>(square)];
+            if (!piece.empty()) {
+                if (piece.color == attacker &&
+                    ((diagonal && (piece.type == PieceType::bishop || piece.type == PieceType::queen)) ||
+                     (!diagonal && (piece.type == PieceType::rook || piece.type == PieceType::queen)))) {
+                    handler(square);
+                }
+                break;
+            }
+            file += directions[direction][0];
+            rank += directions[direction][1];
+        }
+    }
 }
 
 bool exchange_recapture_is_legal(std::array<Piece, 64>& board, std::array<int, 2>& king_squares,
@@ -1352,10 +1737,121 @@ bool exchange_recapture_is_legal(std::array<Piece, 64>& board, std::array<int, 2
     return legal;
 }
 
+int static_exchange_gain_from_features(const PositionFeatures& features,
+                                       const MoveMetadata& initial) noexcept {
+    const Move move = initial.move;
+    if (move.is_no_move() || move.from().index() == Square::kInvalid ||
+        move.to().index() == Square::kInvalid ||
+        (!initial.is_capture() && initial.captured_piece == PieceType::none)) {
+        return 0;
+    }
+
+    std::array<Piece, 64> board = features.board;
+    std::array<int, 2> king_squares{
+        static_cast<int>(features.king_squares[0].index()),
+        static_cast<int>(features.king_squares[1].index()),
+    };
+    const int source = move.from().index();
+    const int target = move.to().index();
+    if (!exchange_square_valid(source) || !exchange_square_valid(target)) {
+        return 0;
+    }
+
+    const Piece moving_piece = board[static_cast<std::size_t>(source)];
+    if (moving_piece.empty() || moving_piece.color != features.side_to_move ||
+        moving_piece.type != initial.moving_piece || king_squares[0] < 0 || king_squares[1] < 0) {
+        return 0;
+    }
+
+    int captured_square = target;
+    if (initial.kind == MoveKind::en_passant) {
+        captured_square += moving_piece.color == Color::white ? -8 : 8;
+    }
+    if (!exchange_square_valid(captured_square)) {
+        return 0;
+    }
+
+    constexpr std::size_t kMaximumExchangeDepth = 32;
+    std::array<int, kMaximumExchangeDepth> gains{};
+    const Piece captured_piece = board[static_cast<std::size_t>(captured_square)];
+    gains[0] = exchange_piece_value(captured_piece.type) + promotion_exchange_gain(move.promotion());
+
+    Piece placed_piece = moving_piece;
+    if (move.promotion() != Promotion::none) {
+        placed_piece.type = promotion_piece_type(move.promotion());
+    }
+    board[static_cast<std::size_t>(source)] = {};
+    board[static_cast<std::size_t>(captured_square)] = {};
+    board[static_cast<std::size_t>(target)] = placed_piece;
+    if (moving_piece.type == PieceType::king) {
+        king_squares[moving_piece.color == Color::white ? 0 : 1] = target;
+    }
+
+    Color side = opposite(moving_piece.color);
+    std::size_t depth = 0;
+    for (;;) {
+        int attacker_square = -1;
+        int attacker_value = std::numeric_limits<int>::max();
+        Piece recapturing_piece{};
+        int recapture_promotion_gain = 0;
+
+        for_each_exchange_attacker(board, target, side, [&](const int square) noexcept {
+            const Piece candidate = board[static_cast<std::size_t>(square)];
+            Piece replacement = candidate;
+            int candidate_promotion_gain = 0;
+            if (candidate.type == PieceType::pawn && (target >> 3 == 0 || target >> 3 == 7)) {
+                replacement.type = PieceType::queen;
+                candidate_promotion_gain =
+                    exchange_piece_value(PieceType::queen) - exchange_piece_value(PieceType::pawn);
+            }
+            if (!exchange_recapture_is_legal(board, king_squares, side, square, target, replacement)) {
+                return;
+            }
+
+            const int value = exchange_piece_value(candidate.type);
+            if (value < attacker_value ||
+                (value == attacker_value && (attacker_square < 0 || square < attacker_square))) {
+                attacker_square = square;
+                attacker_value = value;
+                recapturing_piece = replacement;
+                recapture_promotion_gain = candidate_promotion_gain;
+            }
+        });
+
+        if (attacker_square < 0 || depth + 1 >= kMaximumExchangeDepth) {
+            break;
+        }
+
+        const Piece target_piece = board[static_cast<std::size_t>(target)];
+        ++depth;
+        gains[depth] = exchange_piece_value(target_piece.type) - gains[depth - 1] +
+            recapture_promotion_gain;
+
+        const Piece departing_piece = board[static_cast<std::size_t>(attacker_square)];
+        board[static_cast<std::size_t>(attacker_square)] = {};
+        board[static_cast<std::size_t>(target)] = recapturing_piece;
+        if (departing_piece.type == PieceType::king) {
+            king_squares[side == Color::white ? 0 : 1] = target;
+        }
+        side = opposite(side);
+    }
+
+    while (depth > 0) {
+        gains[depth - 1] = -std::max(-gains[depth - 1], gains[depth]);
+        --depth;
+    }
+    return gains[0];
+}
+
 } // namespace
 
 class GameState::Impl {
 public:
+    struct FeatureCache {
+        std::uint64_t position_key = 0;
+        PositionFeatures features{};
+    };
+
     struct HistoryRecord {
         chess::Move move;
         bool null_move = false;
@@ -1368,21 +1864,60 @@ public:
     // adapters until those consumers are migrated to native snapshots.
     Position native_position{};
     std::vector<HistoryRecord> history;
-    struct FeatureCache {
-        std::uint64_t position_key = 0;
-        PositionFeatures features{};
-    };
     mutable std::shared_mutex feature_cache_mutex;
-    mutable FeatureCache feature_cache;
-    mutable bool feature_cache_valid = false;
+    mutable std::array<std::unique_ptr<FeatureCache>, kMaximumGameStateHistory>
+        feature_cache_slots{};
+    mutable std::array<bool, kMaximumGameStateHistory> feature_cache_valid{};
+    mutable std::array<std::atomic<FeatureCache*>, kMaximumGameStateHistory>
+        feature_cache_published{};
+    mutable std::array<std::atomic_bool, kMaximumGameStateHistory>
+        feature_cache_published_valid{};
+    mutable std::array<std::atomic_uint64_t, kMaximumGameStateHistory>
+        feature_cache_keys{};
+    mutable std::uint64_t feature_cache_misses = 0;
+    mutable std::atomic_uint64_t feature_cache_copies = 0;
+    mutable std::atomic_uint64_t feature_cache_fast_hits = 0;
+    mutable std::atomic_uint64_t check_flag_evaluations = 0;
 
-    Impl() = default;
+    Impl() {
+        for (std::size_t index = 0; index < kMaximumGameStateHistory; ++index) {
+            feature_cache_published[index].store(nullptr, std::memory_order_relaxed);
+            feature_cache_published_valid[index].store(false, std::memory_order_relaxed);
+            feature_cache_keys[index].store(0, std::memory_order_relaxed);
+        }
+    }
 
     Impl(const Impl& other) : board(other.board), native_position(other.native_position),
                               history(other.history) {
         std::shared_lock lock(other.feature_cache_mutex);
-        feature_cache = other.feature_cache;
-        feature_cache_valid = other.feature_cache_valid;
+        const std::size_t cache_count = std::min(
+            other.history.size() + 1, kMaximumGameStateHistory);
+        for (std::size_t index = 0; index < cache_count; ++index) {
+            if (other.feature_cache_slots[index] != nullptr) {
+                feature_cache_slots[index] =
+                    std::make_unique<FeatureCache>(*other.feature_cache_slots[index]);
+            }
+            feature_cache_valid[index] = other.feature_cache_valid[index];
+            const std::uint64_t key = feature_cache_valid[index] ?
+                other.feature_cache_keys[index].load(std::memory_order_acquire) : 0;
+            if (feature_cache_valid[index] && feature_cache_slots[index] != nullptr) {
+                feature_cache_slots[index]->position_key = key;
+                feature_cache_published[index].store(feature_cache_slots[index].get(),
+                                                      std::memory_order_release);
+                feature_cache_keys[index].store(key, std::memory_order_release);
+                feature_cache_published_valid[index].store(true, std::memory_order_release);
+            }
+        }
+        feature_cache_misses = other.feature_cache_misses;
+        feature_cache_copies.store(
+            other.feature_cache_copies.load(std::memory_order_relaxed),
+            std::memory_order_relaxed);
+        feature_cache_fast_hits.store(
+            other.feature_cache_fast_hits.load(std::memory_order_relaxed),
+            std::memory_order_relaxed);
+        check_flag_evaluations.store(
+            other.check_flag_evaluations.load(std::memory_order_relaxed),
+            std::memory_order_relaxed);
     }
 };
 
@@ -1439,116 +1974,8 @@ Piece GameState::piece_at(Square square) const noexcept {
 }
 
 int GameState::direct_static_exchange_gain(const MoveMetadata& initial) const noexcept {
-    const Move move = initial.move;
-    if (move.is_no_move() || move.from().index() == Square::kInvalid || move.to().index() == Square::kInvalid) {
-        return 0;
-    }
-    if (!initial.is_capture() && initial.captured_piece == PieceType::none) {
-        return 0;
-    }
-
-    std::array<Piece, 64> board{};
-    std::array<int, 2> king_squares{-1, -1};
-    for (int square = 0; square < 64; ++square) {
-        const chess::Piece native_piece = impl_->board.at(chess::Square(square));
-        if (native_piece == chess::Piece::NONE) {
-            continue;
-        }
-        const Piece piece{koi_piece_type(native_piece.type()), koi_color(native_piece.color())};
-        board[static_cast<std::size_t>(square)] = piece;
-        if (piece.type == PieceType::king) {
-            king_squares[piece.color == Color::white ? 0 : 1] = square;
-        }
-    }
-
-    const int source = move.from().index();
-    const int target = move.to().index();
-    const Piece moving_piece = board[static_cast<std::size_t>(source)];
-    if (moving_piece.empty() || moving_piece.color != side_to_move() || moving_piece.type != initial.moving_piece ||
-        king_squares[0] < 0 || king_squares[1] < 0) {
-        return 0;
-    }
-
-    int captured_square = target;
-    if (initial.kind == MoveKind::en_passant) {
-        captured_square += moving_piece.color == Color::white ? -8 : 8;
-    }
-    if (captured_square < 0 || captured_square >= 64) {
-        return 0;
-    }
-
-    constexpr std::size_t kMaximumExchangeDepth = 32;
-    std::array<int, kMaximumExchangeDepth> gains{};
-    const Piece captured_piece = board[static_cast<std::size_t>(captured_square)];
-    gains[0] = exchange_piece_value(captured_piece.type) + promotion_exchange_gain(move.promotion());
-
-    Piece placed_piece = moving_piece;
-    if (move.promotion() != Promotion::none) {
-        placed_piece.type = promotion_piece_type(move.promotion());
-    }
-    board[static_cast<std::size_t>(source)] = {};
-    board[static_cast<std::size_t>(captured_square)] = {};
-    board[static_cast<std::size_t>(target)] = placed_piece;
-    if (moving_piece.type == PieceType::king) {
-        king_squares[moving_piece.color == Color::white ? 0 : 1] = target;
-    }
-
-    Color side = opposite(moving_piece.color);
-    std::size_t depth = 0;
-    for (;;) {
-        int attacker_square = -1;
-        int attacker_value = std::numeric_limits<int>::max();
-        Piece recapturing_piece{};
-        int recapture_promotion_gain = 0;
-
-        for (int square = 0; square < 64; ++square) {
-            const Piece candidate = board[static_cast<std::size_t>(square)];
-            if (candidate.empty() || candidate.color != side ||
-                !exchange_piece_attacks_square(board, square, target)) {
-                continue;
-            }
-
-            Piece replacement = candidate;
-            int candidate_promotion_gain = 0;
-            if (candidate.type == PieceType::pawn && (target / 8 == 0 || target / 8 == 7)) {
-                replacement.type = PieceType::queen;
-                candidate_promotion_gain = exchange_piece_value(PieceType::queen) - exchange_piece_value(PieceType::pawn);
-            }
-            if (!exchange_recapture_is_legal(board, king_squares, side, square, target, replacement)) {
-                continue;
-            }
-
-            const int value = exchange_piece_value(candidate.type);
-            if (value < attacker_value) {
-                attacker_square = square;
-                attacker_value = value;
-                recapturing_piece = replacement;
-                recapture_promotion_gain = candidate_promotion_gain;
-            }
-        }
-
-        if (attacker_square < 0 || depth + 1 >= kMaximumExchangeDepth) {
-            break;
-        }
-
-        const Piece target_piece = board[static_cast<std::size_t>(target)];
-        ++depth;
-        gains[depth] = exchange_piece_value(target_piece.type) - gains[depth - 1] + recapture_promotion_gain;
-
-        const Piece departing_piece = board[static_cast<std::size_t>(attacker_square)];
-        board[static_cast<std::size_t>(attacker_square)] = {};
-        board[static_cast<std::size_t>(target)] = recapturing_piece;
-        if (departing_piece.type == PieceType::king) {
-            king_squares[side == Color::white ? 0 : 1] = target;
-        }
-        side = opposite(side);
-    }
-
-    while (depth > 0) {
-        gains[depth - 1] = -std::max(-gains[depth - 1], gains[depth]);
-        --depth;
-    }
-    return gains[0];
+    const PositionFeatures features = position_features();
+    return static_exchange_gain_from_features(features, initial);
 }
 
 std::vector<Move> GameState::legal_moves() const {
@@ -1598,6 +2025,10 @@ PositionConsistencySnapshot GameState::consistency_snapshot() const {
     return snapshot;
 }
 
+bool GameState::native_shadow_consistent() const noexcept {
+    return mirror_matches_native(impl_->native_position, impl_->board);
+}
+
 std::vector<MoveMetadata> GameState::legal_moves_with_metadata() const {
     MoveMetadataList fixed_moves;
     legal_moves_with_metadata(fixed_moves);
@@ -1611,13 +2042,18 @@ std::vector<MoveMetadata> GameState::legal_moves_with_metadata() const {
 }
 
 void GameState::legal_moves_with_metadata(MoveMetadataList& moves,
-                                           bool include_check_flags) const noexcept {
+                                           bool include_check_flags,
+                                           bool include_see,
+                                           CheckFlagMode check_flag_mode) const noexcept {
     moves.clear();
     const std::uint64_t key = position_key();
     try {
-        const std::vector<Move> legal = impl_->native_position.legal_moves();
-        for (const Move& move : legal) {
-            const auto metadata = metadata_for_native_move(move, include_check_flags);
+        std::array<Move, kMaximumLegalMoves> legal{};
+        const std::size_t legal_count = impl_->native_position.legal_moves_into(legal);
+        for (std::size_t index = 0; index < legal_count; ++index) {
+            const Move& move = legal[index];
+            const auto metadata = metadata_for_native_move(move, include_check_flags,
+                                                           check_flag_mode);
             if (!metadata.has_value() || !moves.push_back(*metadata)) {
                 break;
             }
@@ -1625,32 +2061,44 @@ void GameState::legal_moves_with_metadata(MoveMetadataList& moves,
     } catch (...) {
         moves.clear();
     }
-    finalize_metadata(moves, key);
+    finalize_metadata(moves, key, include_see);
 }
 
 bool GameState::legal_tactical_moves_with_metadata(MoveMetadataList& moves,
-                                                   bool include_quiet_checks) const noexcept {
+                                                    bool include_quiet_checks,
+                                                    bool include_see,
+                                                    CheckFlagMode check_flag_mode) const noexcept {
     moves.clear();
     const std::uint64_t key = position_key();
     bool has_legal_moves = false;
     try {
-        const std::vector<Move> legal = impl_->native_position.legal_moves();
-        has_legal_moves = !legal.empty();
+        std::array<Move, kMaximumLegalMoves> legal{};
+        const std::size_t legal_count = impl_->native_position.legal_moves_into(legal);
+        has_legal_moves = legal_count != 0;
         const bool checked = impl_->native_position.in_check();
-        for (const Move& move : legal) {
-            const auto metadata = metadata_for_native_move(move, true);
+        for (std::size_t index = 0; index < legal_count; ++index) {
+            const Move& move = legal[index];
+            auto metadata = metadata_for_native_move(move, false, check_flag_mode);
             if (!metadata.has_value()) {
                 continue;
             }
-            if (checked || metadata->is_capture() || metadata->move.promotion() != Promotion::none ||
-                (include_quiet_checks && metadata->gives_check)) {
+
+            const bool capture_or_promotion = metadata->is_capture() ||
+                metadata->move.promotion() != Promotion::none;
+            const bool needs_check_probe = checked || capture_or_promotion || include_quiet_checks;
+            if (needs_check_probe) {
+                const CheckFlagMode probe_mode = checked || capture_or_promotion ?
+                    CheckFlagMode::all_moves : CheckFlagMode::quiet_moves_only;
+                metadata = metadata_for_native_move(move, true, probe_mode);
+            }
+            if (checked || capture_or_promotion || (include_quiet_checks && metadata->gives_check)) {
                 (void)moves.push_back(*metadata);
             }
         }
     } catch (...) {
         moves.clear();
     }
-    finalize_metadata(moves, key);
+    finalize_metadata(moves, key, include_see);
     return has_legal_moves;
 }
 
@@ -1658,23 +2106,25 @@ std::optional<MoveMetadata> GameState::describe_move(const Move& move) const noe
     if (move.is_no_move() || !impl_->native_position.is_legal(move)) {
         return std::nullopt;
     }
-    auto metadata = metadata_for_native_move(move, true);
+    auto metadata = metadata_for_native_move(move, true, CheckFlagMode::all_moves);
     if (!metadata.has_value()) {
         return std::nullopt;
     }
     metadata->position_key = position_key();
     metadata->validation_token = metadata_validation_token(metadata->position_key, *metadata);
     if (metadata->is_capture() || move.promotion() != Promotion::none) {
-        metadata->see_score = static_cast<std::int16_t>(std::clamp(
+        metadata->see_score = metadata->is_capture() ? static_cast<std::int16_t>(std::clamp(
             direct_static_exchange_gain(*metadata),
             static_cast<int>(std::numeric_limits<std::int16_t>::min()),
-            static_cast<int>(std::numeric_limits<std::int16_t>::max())));
+            static_cast<int>(std::numeric_limits<std::int16_t>::max()))) : 0;
+        metadata->see_computed = true;
     }
     return metadata;
 }
 
 std::optional<MoveMetadata> GameState::metadata_for_native_move(
-    const Move& move, const bool include_check_flags) const noexcept {
+    const Move& move, const bool include_check_flags,
+    const CheckFlagMode check_flag_mode) const noexcept {
     if (move.is_no_move() || move.from().index() >= Square::kInvalid ||
         move.to().index() >= Square::kInvalid) {
         return std::nullopt;
@@ -1702,134 +2152,124 @@ std::optional<MoveMetadata> GameState::metadata_for_native_move(
         }
     }
 
-    if (include_check_flags) {
-        const chess::Move native_move = native_move_for(impl_->board, move);
-        if (native_move.move() != chess::Move::NO_MOVE) {
-            metadata.gives_check =
-                impl_->board.givesCheck(native_move) != chess::CheckType::NO_CHECK;
+    const bool analyze_check = include_check_flags &&
+        (check_flag_mode == CheckFlagMode::all_moves ||
+         (check_flag_mode == CheckFlagMode::quiet_moves_only &&
+          !metadata.is_capture() && move.promotion() == Promotion::none));
+    if (analyze_check) {
+        impl_->check_flag_evaluations.fetch_add(1, std::memory_order_relaxed);
+        if (check_flag_mode == CheckFlagMode::quiet_moves_only) {
+            metadata.gives_check = native_move_gives_check(impl_->native_position, move);
+        } else {
+            const chess::Move native_move = native_move_for(impl_->board, move);
+            if (native_move.move() != chess::Move::NO_MOVE) {
+                metadata.gives_check =
+                    impl_->board.givesCheck(native_move) != chess::CheckType::NO_CHECK;
+            }
         }
     }
     return metadata;
 }
 
-void GameState::finalize_metadata(MoveMetadataList& moves, const std::uint64_t key) const noexcept {
+void GameState::finalize_metadata(MoveMetadataList& moves, const std::uint64_t key,
+                                  const bool include_see,
+                                  const PositionFeatures* exchange_features) const noexcept {
+    std::optional<PositionFeatures> owned_features;
+    if (include_see && exchange_features == nullptr) {
+        const bool has_capture = std::any_of(moves.begin(), moves.end(),
+            [](const MoveMetadata& metadata) { return metadata.is_capture(); });
+        if (has_capture) {
+            owned_features = position_features();
+            exchange_features = &*owned_features;
+        }
+    }
+
     for (MoveMetadata& metadata : moves) {
         metadata.position_key = key;
         metadata.validation_token = metadata_validation_token(key, metadata);
-        if (metadata.is_capture() || metadata.move.promotion() != Promotion::none) {
-            metadata.see_score = static_cast<std::int16_t>(std::clamp(
-                direct_static_exchange_gain(metadata),
-                static_cast<int>(std::numeric_limits<std::int16_t>::min()),
-                static_cast<int>(std::numeric_limits<std::int16_t>::max())));
+        if (include_see && (metadata.is_capture() || metadata.move.promotion() != Promotion::none)) {
+            metadata.see_score = metadata.is_capture() && exchange_features != nullptr ?
+                static_cast<std::int16_t>(std::clamp(
+                    static_exchange_gain_from_features(*exchange_features, metadata),
+                    static_cast<int>(std::numeric_limits<std::int16_t>::min()),
+                    static_cast<int>(std::numeric_limits<std::int16_t>::max()))) : 0;
+            metadata.see_computed = true;
         }
     }
 }
 
 PositionFeatures GameState::position_features() const noexcept {
     const std::uint64_t key = position_key();
-    {
-        std::shared_lock lock(impl_->feature_cache_mutex);
-        if (impl_->feature_cache_valid && impl_->feature_cache.position_key == key) {
-            return impl_->feature_cache.features;
+    const std::size_t cache_index = impl_->history.size();
+    if (cache_index < kMaximumGameStateHistory) {
+        if (impl_->feature_cache_published_valid[cache_index].load(
+                std::memory_order_acquire)) {
+            const auto* cache = impl_->feature_cache_published[cache_index].load(
+                std::memory_order_acquire);
+            if (cache != nullptr && impl_->feature_cache_keys[cache_index].load(
+                    std::memory_order_acquire) == key) {
+                ++impl_->feature_cache_fast_hits;
+                return cache->features;
+            }
         }
     }
 
     std::unique_lock lock(impl_->feature_cache_mutex);
-    if (impl_->feature_cache_valid && impl_->feature_cache.position_key == key) {
-        return impl_->feature_cache.features;
+    if (cache_index < kMaximumGameStateHistory) {
+        const auto& cache = impl_->feature_cache_slots[cache_index];
+        if (impl_->feature_cache_valid[cache_index] && cache != nullptr &&
+            cache->position_key == key) {
+            return cache->features;
+        }
     }
 
-    PositionFeatures features;
-    features.side_to_move = side_to_move();
-    std::array<std::uint64_t, 2> attacks{};
-    const chess::Bitboard occupied = impl_->board.occ();
-    for (std::uint8_t index = 0; index < 64; ++index) {
-        const chess::Piece piece = impl_->board.at(chess::Square(index));
-        if (piece == chess::Piece::NONE) {
-            continue;
-        }
+    ++impl_->feature_cache_misses;
 
-        features.board[index] = {koi_piece_type(piece.type()), koi_color(piece.color())};
-        const chess::Square square(index);
-        const std::size_t color_index = piece.color() == chess::Color::WHITE ? 0 : 1;
-        if (piece.type() == chess::PieceType::PAWN) {
-            features.pawn_file_masks[color_index] = static_cast<std::uint8_t>(
-                features.pawn_file_masks[color_index] | (std::uint8_t{1} << square.file()));
-        }
-        switch (static_cast<int>(piece.type())) {
-        case static_cast<int>(chess::PieceType::KNIGHT):
-        case static_cast<int>(chess::PieceType::BISHOP):
-            features.game_phase = static_cast<std::uint8_t>(features.game_phase + 1);
-            break;
-        case static_cast<int>(chess::PieceType::ROOK):
-            features.game_phase = static_cast<std::uint8_t>(features.game_phase + 2);
-            break;
-        case static_cast<int>(chess::PieceType::QUEEN):
-            features.game_phase = static_cast<std::uint8_t>(features.game_phase + 4);
-            break;
-        default:
-            break;
-        }
-
-        if (piece.type() == chess::PieceType::KNIGHT || piece.type() == chess::PieceType::BISHOP) {
-            const bool white_home = piece.color() == chess::Color::WHITE &&
-                ((piece.type() == chess::PieceType::KNIGHT && (index == 1 || index == 6)) ||
-                 (piece.type() == chess::PieceType::BISHOP && (index == 2 || index == 5)));
-            const bool black_home = piece.color() == chess::Color::BLACK &&
-                ((piece.type() == chess::PieceType::KNIGHT && (index == 57 || index == 62)) ||
-                 (piece.type() == chess::PieceType::BISHOP && (index == 58 || index == 61)));
-            if (!white_home && !black_home) {
-                ++features.development[color_index];
+    // The native position already owns incremental piece bitboards.  Build
+    // evaluation features from that authority instead of walking the shadow
+    // chess.hpp board and asking it to recompute attacks for every piece.
+    // The shadow remains synchronized for legality/tablebase compatibility;
+    // it is intentionally no longer on the evaluator hot path.
+    const PositionFeatures features = native_position_features(impl_->native_position);
+    if (cache_index < kMaximumGameStateHistory) {
+        try {
+            if (impl_->feature_cache_slots[cache_index] == nullptr) {
+                impl_->feature_cache_slots[cache_index] =
+                    std::make_unique<Impl::FeatureCache>();
             }
+            impl_->feature_cache_slots[cache_index]->position_key = key;
+            impl_->feature_cache_slots[cache_index]->features = features;
+            impl_->feature_cache_valid[cache_index] = true;
+            impl_->feature_cache_published[cache_index].store(
+                impl_->feature_cache_slots[cache_index].get(), std::memory_order_release);
+            impl_->feature_cache_keys[cache_index].store(key, std::memory_order_release);
+            impl_->feature_cache_published_valid[cache_index].store(
+                true, std::memory_order_release);
+        } catch (...) {
+            impl_->feature_cache_valid[cache_index] = false;
+            impl_->feature_cache_published_valid[cache_index].store(
+                false, std::memory_order_release);
+            impl_->feature_cache_keys[cache_index].store(0, std::memory_order_release);
         }
-
-        chess::Bitboard piece_attacks;
-        switch (static_cast<int>(piece.type())) {
-        case static_cast<int>(chess::PieceType::PAWN):
-            piece_attacks = chess::attacks::pawn(piece.color(), square);
-            break;
-        case static_cast<int>(chess::PieceType::KNIGHT):
-            piece_attacks = chess::attacks::knight(square);
-            break;
-        case static_cast<int>(chess::PieceType::BISHOP):
-            piece_attacks = chess::attacks::bishop(square, occupied);
-            break;
-        case static_cast<int>(chess::PieceType::ROOK):
-            piece_attacks = chess::attacks::rook(square, occupied);
-            break;
-        case static_cast<int>(chess::PieceType::QUEEN):
-            piece_attacks = chess::attacks::queen(square, occupied);
-            break;
-        case static_cast<int>(chess::PieceType::KING):
-            piece_attacks = chess::attacks::king(square);
-            break;
-        case static_cast<int>(chess::PieceType::NONE):
-            continue;
-        }
-        attacks[color_index] |= piece_attacks.getBits();
     }
-
-    features.game_phase = std::min<std::uint8_t>(features.game_phase, 24);
-
-    const chess::Color colors[] = {chess::Color::WHITE, chess::Color::BLACK};
-    for (std::size_t color_index = 0; color_index < 2; ++color_index) {
-        const chess::Color color = colors[color_index];
-        features.attacked_squares[color_index] = attacks[color_index];
-        const std::uint64_t own = impl_->board.us(color).getBits();
-        features.mobility[color_index] = static_cast<std::uint16_t>(
-            std::popcount(attacks[color_index] & ~own));
-        features.king_squares[color_index] = Square::from_index(
-            static_cast<std::uint8_t>(impl_->board.kingSq(color).index()));
-        features.center_control[color_index] = static_cast<std::uint8_t>(
-            std::popcount(attacks[color_index] & kCoreCenterMask));
-    }
-    for (std::size_t color = 0; color < 2; ++color) {
-        features.king_zone_attacks[color] = static_cast<std::uint8_t>(std::popcount(
-            attacks[1 - color] & king_zone_mask(features.king_squares[color].index())));
-    }
-    impl_->feature_cache = Impl::FeatureCache{key, features};
-    impl_->feature_cache_valid = true;
     return features;
+}
+
+std::uint64_t GameState::position_feature_cache_misses() const noexcept {
+    std::shared_lock lock(impl_->feature_cache_mutex);
+    return impl_->feature_cache_misses;
+}
+
+std::uint64_t GameState::position_feature_cache_fast_hits() const noexcept {
+    return impl_->feature_cache_fast_hits.load(std::memory_order_relaxed);
+}
+
+std::uint64_t GameState::position_feature_cache_copies() const noexcept {
+    return impl_->feature_cache_copies.load(std::memory_order_relaxed);
+}
+
+std::uint64_t GameState::check_flag_evaluations() const noexcept {
+    return impl_->check_flag_evaluations.load(std::memory_order_relaxed);
 }
 
 std::size_t TablebaseSnapshot::piece_count() const noexcept {
@@ -1878,12 +2318,60 @@ bool GameState::make_move(const Move& move) noexcept {
         return false;
     }
     try {
-        impl_->history.push_back(Impl::HistoryRecord{native_move, false, impl_->board.hash()});
+        impl_->history.push_back(Impl::HistoryRecord{
+            native_move, false, impl_->board.hash()});
         bool shadow_applied = false;
         try {
             impl_->board.makeMove(native_move);
             shadow_applied = true;
             if (!mirror_matches_native(impl_->native_position, impl_->board)) {
+                impl_->board.unmakeMove(native_move);
+                impl_->history.pop_back();
+                (void)impl_->native_position.unmake_move();
+                return false;
+            }
+        } catch (...) {
+            if (shadow_applied) {
+                impl_->board.unmakeMove(native_move);
+            }
+            impl_->history.pop_back();
+            (void)impl_->native_position.unmake_move();
+            return false;
+        }
+        invalidate_feature_cache();
+        return true;
+    } catch (...) {
+        (void)impl_->native_position.unmake_move();
+        return false;
+    }
+}
+
+bool GameState::apply_generated_move(const MoveMetadata& metadata,
+                                     const bool verify_shadow_legality,
+                                     const bool verify_mirror) noexcept {
+    if (metadata.position_key != position_key()) {
+        return false;
+    }
+    if (metadata.validation_token == 0 ||
+        metadata.validation_token != metadata_validation_token(position_key(), metadata)) {
+        return false;
+    }
+    const chess::Move native_move = native_move_for_metadata(metadata);
+    if (native_move.move() == chess::Move::NO_MOVE ||
+        (verify_shadow_legality && !impl_->board.isLegal(native_move))) {
+        return false;
+    }
+    if (!impl_->native_position.make_generated_move(metadata.move)) {
+        return false;
+    }
+    try {
+        impl_->history.push_back(Impl::HistoryRecord{
+            native_move, false, impl_->board.hash()});
+        bool shadow_applied = false;
+        try {
+            impl_->board.makeMove(native_move);
+            shadow_applied = true;
+            if (verify_mirror && !mirror_matches_native(impl_->native_position, impl_->board)) {
                 impl_->board.unmakeMove(native_move);
                 impl_->history.pop_back();
                 (void)impl_->native_position.unmake_move();
@@ -1906,46 +2394,15 @@ bool GameState::make_move(const Move& move) noexcept {
 }
 
 bool GameState::make_legal_move(const MoveMetadata& metadata) noexcept {
-    if (metadata.position_key != position_key()) {
-        return false;
-    }
-    if (metadata.validation_token == 0 ||
-        metadata.validation_token != metadata_validation_token(position_key(), metadata)) {
-        return false;
-    }
-    const chess::Move native_move = native_move_for_metadata(metadata);
-    if (native_move.move() == chess::Move::NO_MOVE || !impl_->board.isLegal(native_move)) {
-        return false;
-    }
-    if (!impl_->native_position.make_generated_move(metadata.move)) {
-        return false;
-    }
-    try {
-        impl_->history.push_back(Impl::HistoryRecord{native_move, false, impl_->board.hash()});
-        bool shadow_applied = false;
-        try {
-            impl_->board.makeMove(native_move);
-            shadow_applied = true;
-            if (!mirror_matches_native(impl_->native_position, impl_->board)) {
-                impl_->board.unmakeMove(native_move);
-                impl_->history.pop_back();
-                (void)impl_->native_position.unmake_move();
-                return false;
-            }
-        } catch (...) {
-            if (shadow_applied) {
-                impl_->board.unmakeMove(native_move);
-            }
-            impl_->history.pop_back();
-            (void)impl_->native_position.unmake_move();
-            return false;
-        }
-        invalidate_feature_cache();
-        return true;
-    } catch (...) {
-        (void)impl_->native_position.unmake_move();
-        return false;
-    }
+    return apply_generated_move(metadata, true, true);
+}
+
+bool GameState::make_generated_move(const MoveMetadata& metadata) noexcept {
+    return apply_generated_move(metadata, false, true);
+}
+
+bool GameState::make_search_move(const MoveMetadata& metadata) noexcept {
+    return apply_generated_move(metadata, false, false);
 }
 
 bool GameState::unmake_move() noexcept {
@@ -1961,7 +2418,6 @@ bool GameState::unmake_move() noexcept {
         return false;
     }
     impl_->history.pop_back();
-    invalidate_feature_cache();
     return true;
 }
 
@@ -1996,13 +2452,18 @@ bool GameState::unmake_null_move() noexcept {
         return false;
     }
     impl_->history.pop_back();
-    invalidate_feature_cache();
     return true;
 }
 
 void GameState::invalidate_feature_cache() noexcept {
     std::unique_lock lock(impl_->feature_cache_mutex);
-    impl_->feature_cache_valid = false;
+    const std::size_t cache_index = impl_->history.size();
+    if (cache_index < kMaximumGameStateHistory) {
+        impl_->feature_cache_valid[cache_index] = false;
+        impl_->feature_cache_published_valid[cache_index].store(
+            false, std::memory_order_release);
+        impl_->feature_cache_keys[cache_index].store(0, std::memory_order_release);
+    }
 }
 
 bool GameState::is_capture(const Move& move) const noexcept {

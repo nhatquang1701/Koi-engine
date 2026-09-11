@@ -41,7 +41,8 @@ private:
 class SearchService {
 public:
     explicit SearchService(std::shared_ptr<const Evaluator> evaluator,
-                           HashMemoryPolicy hash_memory_policy = {});
+                           HashMemoryPolicy hash_memory_policy = {},
+                           std::size_t initial_hash_mb = 512);
 
     [[nodiscard]] SearchHandle start(GameState root, SearchLimits limits,
                                      SearchEventSink sink = {}, SearchOptions options = {});

@@ -127,6 +127,11 @@ struct TranspositionTable::Storage {
     std::size_t total_slot_count = 0;
     std::size_t size_mb = 0;
     std::uint16_t generation = 1;
+    // `generation_age` is also the storage epoch for logical Clear Hash
+    // invalidation.  A clear normally advances this fence without touching
+    // the segments, which keeps repeated cold benchmark runs bounded by the
+    // search work instead of the table size.
+    std::uint16_t clear_epoch = 0;
 };
 
 TranspositionTable::TranspositionTable(std::size_t megabytes, HashMemoryPolicy policy)
@@ -264,8 +269,13 @@ void TranspositionTable::clear() noexcept {
     for (std::size_t index = 0; index < kStripeCount; ++index) {
         stripe_locks[index] = std::unique_lock<std::shared_mutex>(storage->stripes[index]);
     }
-    for (const auto& segment : storage->segments) {
-        std::fill(segment->entries.begin(), segment->entries.end(), TranspositionEntry{});
+    if (storage->clear_epoch == std::numeric_limits<std::uint16_t>::max()) {
+        storage->clear_epoch = 0;
+        for (const auto& segment : storage->segments) {
+            std::fill(segment->entries.begin(), segment->entries.end(), TranspositionEntry{});
+        }
+    } else {
+        ++storage->clear_epoch;
     }
 }
 
@@ -299,15 +309,16 @@ void TranspositionTable::store(std::uint64_t key, int depth, int score, Transpos
     const std::size_t index = key % storage->total_slot_count;
     std::unique_lock stripe_lock(storage->stripes[index % kStripeCount]);
     TranspositionEntry& existing = storage->at(index);
-    const bool empty = !existing.occupied;
-    const bool same_key = existing.key == key;
+    const bool valid = existing.occupied && existing.generation_age == storage->clear_epoch;
+    const bool empty = !valid;
+    const bool same_key = valid && existing.key == key;
     if (!empty && same_key) {
         const bool keeps_deeper_entry = existing.depth > depth;
         const bool keeps_equal_exact_entry = existing.depth == depth &&
             existing.bound == TranspositionBound::exact && bound != TranspositionBound::exact;
         if (keeps_deeper_entry || keeps_equal_exact_entry) {
             existing.generation = storage->generation;
-            existing.generation_age = 0;
+            existing.generation_age = storage->clear_epoch;
             return;
         }
     }
@@ -319,7 +330,7 @@ void TranspositionTable::store(std::uint64_t key, int depth, int score, Transpos
     }
 
     existing = TranspositionEntry{key, depth, score_for_storage(score, ply), bound, best_move,
-                                  storage->generation, true, 0};
+                                  storage->generation, true, storage->clear_epoch};
 }
 
 std::optional<TranspositionEntry> TranspositionTable::probe(std::uint64_t key, int ply) const noexcept {
@@ -331,7 +342,7 @@ std::optional<TranspositionEntry> TranspositionTable::probe(std::uint64_t key, i
     const std::size_t index = key % storage->total_slot_count;
     std::shared_lock stripe_lock(storage->stripes[index % kStripeCount]);
     const TranspositionEntry& entry = storage->at(index);
-    if (!entry.occupied || entry.key != key) {
+    if (!entry.occupied || entry.generation_age != storage->clear_epoch || entry.key != key) {
         return std::nullopt;
     }
     TranspositionEntry result = entry;

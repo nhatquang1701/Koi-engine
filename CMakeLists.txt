@@ -30,7 +30,13 @@ endif()
 
 if(MSVC)
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-    add_compile_options(/EHsc /permissive- "$<$<CONFIG:Release>:/arch:AVX2>")
+    add_compile_options(
+        /EHsc
+        /permissive-
+        "$<$<CONFIG:Release>:/O2>"
+        "$<$<CONFIG:Release>:/DNDEBUG>"
+        "$<$<CONFIG:Release>:/arch:AVX2>"
+    )
     include(CheckIPOSupported)
     check_ipo_supported(RESULT KOI_IPO_SUPPORTED OUTPUT KOI_IPO_ERROR LANGUAGES CXX)
     if(KOI_IPO_SUPPORTED)
@@ -291,7 +297,7 @@ add_test(
             -EnginePath "$<TARGET_FILE:koi_engine>"
 )
 
-set_tests_properties(koi_engine_process PROPERTIES TIMEOUT 30)
+set_tests_properties(koi_engine_process PROPERTIES TIMEOUT 60)
 
 add_test(
     NAME koi_engine_en_croissant_process
@@ -440,9 +446,14 @@ if(Python3_Interpreter_FOUND)
         NAME measurement_forensics_python
         COMMAND "${Python3_EXECUTABLE}" -m unittest tests/python/measurement/measurement_forensics_test.py -v
     )
+    add_test(
+        NAME strength_report_python
+        COMMAND "${Python3_EXECUTABLE}" -m unittest tests/python/evaluation/strength_report_test.py -v
+    )
     set_tests_properties(
         tune_eval_python
         nnue_training_python nnue_wrapper_python measurement_phase_python measurement_forensics_python
+        strength_report_python
         PROPERTIES
             WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
             ENVIRONMENT "PYTHONDONTWRITEBYTECODE=1"

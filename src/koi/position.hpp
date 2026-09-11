@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -27,6 +28,10 @@ public:
     [[nodiscard]] Color side_to_move() const noexcept;
     [[nodiscard]] Piece piece_at(Square square) const noexcept;
     [[nodiscard]] std::vector<Move> legal_moves() const;
+    // Allocation-free legal generation for hot callers. The output preserves
+    // the same deterministic ordering as legal_moves(); entries beyond the
+    // returned count are untouched.
+    [[nodiscard]] std::size_t legal_moves_into(std::span<Move> output) const noexcept;
     [[nodiscard]] bool is_legal(const Move& move) const noexcept;
     [[nodiscard]] bool is_capture(const Move& move) const noexcept;
     bool make_move(const Move& move) noexcept;
@@ -45,6 +50,7 @@ public:
     bool set_fen_unchecked(std::string_view fen);
     [[nodiscard]] std::uint64_t position_key() const noexcept;
     [[nodiscard]] std::size_t piece_count() const noexcept;
+    [[nodiscard]] std::uint64_t piece_bitboard(PieceType type, Color color) const noexcept;
     [[nodiscard]] bool in_check() const noexcept;
     [[nodiscard]] bool in_check(Color color) const noexcept;
     [[nodiscard]] bool has_non_pawn_material(Color color) const noexcept;

@@ -299,8 +299,43 @@ int development_for(const EvaluationFeatures& extracted, Color color) noexcept {
         ((extracted.castling_rights & king_side) != 0 ? 1 : 0) +
         ((extracted.castling_rights & queen_side) != 0 ? 1 : 0);
     const int readiness = castling_rights * kEvaluation.castling_readiness_bonus;
-    return (static_cast<int>(features.development[own]) * kEvaluation.development_bonus + readiness) *
-        phase / kEvaluation.maximum_phase;
+    int opening_development =
+        static_cast<int>(features.development[own]) * kEvaluation.development_bonus + readiness;
+
+    // A queen sortie before the minor pieces are developed spends an opening
+    // tempo and often becomes a target. Keep this deliberately narrow: it is
+    // active only while the position still has opening material and only for
+    // squares on the moving side's half of the board. Once three minor pieces
+    // are developed, normal queen activity is left to mobility and tactical
+    // search rather than being penalized here.
+    if (phase >= 16 && features.fullmove_number <= 6 && features.development[own] < 3) {
+        const std::uint8_t home_square = color == Color::white ? 3 : 59;
+        int queen_development_penalty = 0;
+        const bool queen_on_early_square = [&]() noexcept {
+            for (std::uint8_t square = 0; square < 64; ++square) {
+                const Piece piece = features.board[square];
+                if (piece.type != PieceType::queen || piece.color != color) {
+                    continue;
+                }
+                const int rank = square / 8;
+                const bool on_own_half = color == Color::white ? rank <= 3 : rank >= 4;
+                if (square == home_square || !on_own_half) {
+                    return false;
+                }
+                const int file = square % 8;
+                queen_development_penalty = file <= 1 || file >= 6 ?
+                    kEvaluation.early_queen_development_penalty :
+                    kEvaluation.central_queen_development_penalty;
+                return true;
+            }
+            return false;
+        }();
+        if (queen_on_early_square) {
+            opening_development -= queen_development_penalty;
+        }
+    }
+
+    return opening_development * phase / kEvaluation.maximum_phase;
 }
 
 int center_control_for(const PositionFeatures& features, Color color) noexcept {
@@ -331,6 +366,165 @@ int knight_mobility(const PositionFeatures& features, std::uint8_t square) noexc
         }
     }
     return mobility;
+}
+
+bool piece_attacks_square(const PositionFeatures& features, std::uint8_t source,
+                          std::uint8_t target) noexcept {
+    if (source >= 64 || target >= 64 || source == target) {
+        return false;
+    }
+    const Piece piece = features.board[source];
+    if (piece.empty()) {
+        return false;
+    }
+
+    const int source_file = source % 8;
+    const int source_rank = source / 8;
+    const int target_file = target % 8;
+    const int target_rank = target / 8;
+    const int file_delta = target_file - source_file;
+    const int rank_delta = target_rank - source_rank;
+    const int abs_file_delta = std::abs(file_delta);
+    const int abs_rank_delta = std::abs(rank_delta);
+
+    switch (piece.type) {
+    case PieceType::pawn:
+        return rank_delta == (piece.color == Color::white ? 1 : -1) &&
+               abs_file_delta == 1;
+    case PieceType::knight:
+        return (abs_file_delta == 1 && abs_rank_delta == 2) ||
+               (abs_file_delta == 2 && abs_rank_delta == 1);
+    case PieceType::king:
+        return abs_file_delta <= 1 && abs_rank_delta <= 1 &&
+               (abs_file_delta != 0 || abs_rank_delta != 0);
+    case PieceType::bishop:
+    case PieceType::rook:
+    case PieceType::queen:
+        break;
+    case PieceType::none:
+        return false;
+    }
+
+    const bool diagonal = abs_file_delta == abs_rank_delta && abs_file_delta != 0;
+    const bool orthogonal = (file_delta == 0) != (rank_delta == 0);
+    if ((piece.type == PieceType::bishop && !diagonal) ||
+        (piece.type == PieceType::rook && !orthogonal) ||
+        (piece.type == PieceType::queen && !diagonal && !orthogonal)) {
+        return false;
+    }
+
+    const int file_step = file_delta == 0 ? 0 : (file_delta > 0 ? 1 : -1);
+    const int rank_step = rank_delta == 0 ? 0 : (rank_delta > 0 ? 1 : -1);
+    for (int file = source_file + file_step, rank = source_rank + rank_step;
+         file != target_file || rank != target_rank;
+         file += file_step, rank += rank_step) {
+        if (!features.board[static_cast<std::size_t>(rank * 8 + file)].empty()) {
+            return false;
+        }
+    }
+    return true;
+}
+
+int king_ring_attack_units(const PositionFeatures& features, Color color) noexcept {
+    // In sparse endgames the king is an active piece and static ring pressure
+    // is too noisy; the tapered king-activity and passed-pawn terms are the
+    // authoritative signals there.  Keep this middlegame safety feature out
+    // of bare-queen/king tactical references as well as practical endgames.
+    const auto piece_count = static_cast<int>(std::count_if(
+        features.board.begin(), features.board.end(), [](const Piece piece) {
+            return !piece.empty();
+        }));
+    if (features.game_phase < 8 || piece_count <= 8 || features.fullmove_number <= 10) {
+        return 0;
+    }
+
+    const std::uint8_t castling_rights = color == Color::white ?
+        kWhiteKingSideCastling | kWhiteQueenSideCastling :
+        kBlackKingSideCastling | kBlackQueenSideCastling;
+    if ((features.castling_rights & castling_rights) != 0) {
+        // A king that can still castle is not committed to the current ring;
+        // let the castling-readiness term and search decide whether to stay.
+        return 0;
+    }
+
+    const std::uint8_t king = features.king_squares[color_index(color)].index();
+    if (king >= 64) {
+        return 0;
+    }
+
+    const auto king_is_attacked = [&features](Color victim) noexcept {
+        const std::uint8_t victim_king = features.king_squares[color_index(victim)].index();
+        if (victim_king >= 64) {
+            return false;
+        }
+        const Color attacker = opposite(victim);
+        for (std::uint8_t source = 0; source < 64; ++source) {
+            const Piece piece = features.board[source];
+            if (!piece.empty() && piece.color == attacker &&
+                piece_attacks_square(features, source, victim_king)) {
+                return true;
+            }
+        }
+        return false;
+    };
+
+    // Checked positions are already handled by complete evasion, quiescence,
+    // and mate-distance search. Avoid adding a second static king-ring signal
+    // for either side while a forcing check is on the board.
+    if (king_is_attacked(color) || king_is_attacked(opposite(color))) {
+        return 0;
+    }
+
+    const int king_file = king % 8;
+    const int king_rank = king / 8;
+    const Color attacker = opposite(color);
+
+    int units = 0;
+    for (std::uint8_t source = 0; source < 64; ++source) {
+        const Piece piece = features.board[source];
+        if (piece.empty() || piece.color != attacker) {
+            continue;
+        }
+
+        bool attacks_ring = false;
+        for (int file = king_file - 1; file <= king_file + 1 && !attacks_ring; ++file) {
+            for (int rank = king_rank - 1; rank <= king_rank + 1; ++rank) {
+                if (!inside(file, rank) || (file == king_file && rank == king_rank)) {
+                    continue;
+                }
+                if (piece_attacks_square(features, source,
+                                         static_cast<std::uint8_t>(rank * 8 + file))) {
+                    attacks_ring = true;
+                    break;
+                }
+            }
+        }
+        if (!attacks_ring) {
+            continue;
+        }
+
+        switch (piece.type) {
+        case PieceType::pawn:
+            units += 1;
+            break;
+        case PieceType::knight:
+        case PieceType::bishop:
+            units += 2;
+            break;
+        case PieceType::rook:
+            units += 3;
+            break;
+        case PieceType::queen:
+            units += 5;
+            break;
+        case PieceType::king:
+            units += 1;
+            break;
+        case PieceType::none:
+            break;
+        }
+    }
+    return units;
 }
 
 int piece_mobility(const PositionFeatures& features, std::uint8_t square) noexcept {
@@ -673,6 +867,7 @@ int king_safety_for(const PositionFeatures& features, Color color) noexcept {
         score -= kEvaluation.king_open_file_penalty;
     }
     score -= static_cast<int>(features.king_zone_attacks[own]) * kEvaluation.king_zone_attack_penalty;
+    score -= king_ring_attack_units(features, color) * kEvaluation.king_attacker_weight;
     return score;
 }
 

@@ -95,6 +95,7 @@ private:
     std::optional<Move> ponder_predicted_move_;
     std::optional<Move> ponder_expected_move_;
     bool active_ponder_ = false;
+    std::size_t hash_mb_ = 512;
     std::size_t threads_ = 1;
     std::uint8_t speed_percent_ = 100;
     bool show_wdl_ = false;

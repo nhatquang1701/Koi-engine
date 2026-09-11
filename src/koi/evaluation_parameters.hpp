@@ -7,7 +7,7 @@
 namespace koi {
 
 struct ClassicalEvaluationParameters {
-    std::string_view version = "classical-eval-v4-development-center-threats";
+    std::string_view version = "classical-eval-v7-opening-queen-discipline";
     int pawn_value = 100;
     int knight_value = 320;
     int bishop_value = 330;
@@ -34,6 +34,8 @@ struct ClassicalEvaluationParameters {
     int queen_mobility_weight = 1;
     int development_bonus = 10;
     int castling_readiness_bonus = 8;
+    int early_queen_development_penalty = 14;
+    int central_queen_development_penalty = 6;
     int center_control_weight = 7;
     int center_control_phase_offset = 8;
     int pawn_break_bonus = 12;
@@ -44,6 +46,7 @@ struct ClassicalEvaluationParameters {
     int king_shield_bonus = 14;
     int king_open_file_penalty = 10;
     int king_zone_attack_penalty = 8;
+    int king_attacker_weight = 6;
     int king_safety_phase_offset = 8;
     int king_safety_phase_divisor = 32;
     int king_activity_weight = 1;

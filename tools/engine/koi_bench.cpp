@@ -178,7 +178,23 @@ void write_profile_json(const std::string& path, const BenchmarkConfig& config,
         output << ", \"fen\": ";
         write_json_string(output, benchmark.fen);
         output << ", \"limits\": {\"depth\": " << static_cast<unsigned>(benchmark.depth)
-               << "}, \"hash_mb\": 512, \"hash_state\": \""
+               << "}, \"expected_move\": ";
+        write_json_string(output, benchmark.expected_move);
+        output << ", \"accepted_moves\": [";
+        bool first_accepted_move = true;
+        for (const std::string_view accepted_move : benchmark.accepted_moves) {
+            if (accepted_move.empty()) {
+                continue;
+            }
+            if (!first_accepted_move) {
+                output << ", ";
+            }
+            write_json_string(output, accepted_move);
+            first_accepted_move = false;
+        }
+        output << "], \"category\": ";
+        write_json_string(output, benchmark.category);
+        output << ", \"hash_mb\": 512, \"hash_state\": \""
                << (config.warm_hash ? "warm" : "cold") << "\", \"threads\": " << config.threads
                << ", \"speed\": " << static_cast<unsigned>(config.speed_percent)
                << ", \"score_cp\": " << result.score_cp << ", \"pv\": [";

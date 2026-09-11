@@ -23,7 +23,7 @@ if (-not (Test-Path -LiteralPath $CampaignScript -PathType Leaf)) {
     throw "Cutechess stability campaign script is missing: $CampaignScript"
 }
 
-function New-FakeCutechess([string]$Path, [ValidateSet('success', 'one', 'crash', 'disconnect', 'no-result', 'timeout')][string]$Mode) {
+function New-FakeCutechess([string]$Path, [ValidateSet('success', 'one', 'crash', 'disconnect', 'no-result', 'timeout', 'time-forfeit')][string]$Mode) {
     $lines = switch ($Mode) {
         'success' {
             @(
@@ -73,6 +73,14 @@ function New-FakeCutechess([string]$Path, [ValidateSet('success', 'one', 'crash'
                 'echo Started game 1 (Koi vs Opponent)',
                 'echo timeout stderr 1>&2',
                 '%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -Command "Start-Sleep -Seconds 10"',
+                'exit /b 0'
+            )
+        }
+        'time-forfeit' {
+            @(
+                '@echo off',
+                'echo Started game 1 (Koi vs Opponent)',
+                'echo Finished game 1 (Koi vs Opponent): 0-1 {White loses on time}',
                 'exit /b 0'
             )
         }
@@ -271,6 +279,22 @@ function Assert-DiagnosticHarnessArtifacts {
         if ($timeoutReport.results.termination_classification -ne 'timeout' -or
             (Get-Content -LiteralPath $timeoutReport.artifacts.transcript -Raw) -notlike '*Started game 1*') {
             throw 'A timeout must preserve the partial transcript and classify the termination.'
+        }
+
+        New-FakeCutechess $fakeCutechess 'time-forfeit'
+        $timeForfeitDirectory = Join-Path $fixtureRoot 'time-forfeit'
+        $timeForfeitOutput = @(& $StabilityScript -KoiPath $fixtureKoi -OpponentPath $fixtureOpponent `
+            -CutechessPath $fakeCutechess -OutputDirectory $timeForfeitDirectory -Games 1 `
+            -MaxMoves 4 -TimeControl '1+0' -Hash 16 -Threads 1 -Speed 100 `
+            -OwnBook:$false -TimeoutMilliseconds 5000)
+        if ($LASTEXITCODE -eq 0) {
+            throw 'A Cutechess loses-on-time result must fail the stability run.'
+        }
+        $timeForfeitReport = Get-Content -LiteralPath (Get-ReportPath $timeForfeitOutput) -Raw | ConvertFrom-Json
+        if ($timeForfeitReport.results.failures -eq 0 -or
+            $timeForfeitReport.results.termination_classification -ne 'incomplete' -or
+            (@($timeForfeitReport.results.failure_lines | Where-Object { $_ -match '(?i)loses on time' }).Count -eq 0)) {
+            throw 'A Cutechess loses-on-time result must be recorded as a stability failure.'
         }
     }
     finally {
