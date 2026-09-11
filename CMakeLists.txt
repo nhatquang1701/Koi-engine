@@ -238,6 +238,14 @@ target_link_libraries(search_architecture_tests PRIVATE koi_core)
 
 add_test(NAME search_architecture_tests COMMAND search_architecture_tests)
 
+add_executable(search_policy_tests
+    tests/unit/search/search_policy_tests.cpp
+)
+
+target_link_libraries(search_policy_tests PRIVATE koi_core)
+
+add_test(NAME search_policy_tests COMMAND search_policy_tests)
+
 add_executable(static_exchange_tests
     tests/unit/search/static_exchange_tests.cpp
 )
