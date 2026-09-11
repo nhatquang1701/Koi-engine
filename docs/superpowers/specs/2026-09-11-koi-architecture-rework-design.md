@@ -313,9 +313,23 @@ through search or rules modules.
 ### Stage 5 — TT, time, and parallel-runtime hardening
 
 Finalize TT score/age/replacement contracts, time-manager observability, and
-thread-local/shared-state rules. Measure cold/warm hash behavior, resize/clear
-latency, cancellation, thread scaling, and deterministic result parity before
-considering Lazy-SMP-style work.
+thread-local/shared-state rules. The concrete boundary is now represented by
+the private `src/koi/detail/search_table_access.hpp` and
+`src/koi/detail/search_budget.hpp` seams. `SearchTableAccess` gates per-context
+probe/store use while the existing `TranspositionTable` remains responsible
+for physical storage, locking, generations, clear, resize, and mate-score
+normalization. `SearchBudget` snapshots `TimeManager::node_limit()` and owns
+serial local validation or bounded shared-atomic reservation; its observation
+path feeds `TimeManager` without moving deadline or cancellation policy into
+recursive search. `SearchContext` uses both seams, while root-worker scheduling,
+deterministic ranking, and the public search contract remain unchanged.
+
+Focused seam tests cover enabled/disabled TT access, local-limit exhaustion,
+shared-limit reservation, and local/shared visited-node observation. Cold/warm
+fixed-depth profiles are compared position-by-position before this stage is
+accepted. The stage deliberately adds no Lazy SMP, shared histories, or new
+worker scheduling; those remain future consumers of the explicit shared versus
+thread-local contract.
 
 ### Stage 6 — Tooling, modules, documentation, and strength validation
 

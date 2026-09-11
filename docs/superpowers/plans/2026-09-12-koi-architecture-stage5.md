@@ -54,9 +54,9 @@ public:
 }
 ```
 
-- [ ] **Step 1: Write tests that store/probe through enabled access, reject disabled access, exhaust a local limit, and cap a shared atomic counter at the node limit.**
-- [ ] **Step 2: Add `search_runtime_tests` to CMake/CTest.**
-- [ ] **Step 3: Build before adding production headers.**
+- [x] **Step 1: Write tests that store/probe through enabled access, reject disabled access, exhaust a local limit, and cap a shared atomic counter at the node limit.**
+- [x] **Step 2: Add `search_runtime_tests` to CMake/CTest.**
+- [x] **Step 3: Build before adding production headers.**
 
 ```powershell
 cmake --build build/release --config Release --target search_runtime_tests
@@ -65,7 +65,7 @@ ctest --test-dir build/release -C Release -R '^search_runtime_tests$' --output-o
 
 Expected: compilation fails specifically because the two private types do not exist.
 
-- [ ] **Step 4: Commit the RED test.**
+- [x] **Step 4: Commit the RED test.**
 
 ```powershell
 git add CMakeLists.txt tests/unit/search/search_runtime_tests.cpp
@@ -83,16 +83,16 @@ git commit -m "test: specify search runtime resource seams"
 - Consumes: public `TranspositionTable`, `TimeManager`, and existing score/move contracts.
 - Produces: private no-allocation access and budget objects with the exact APIs above.
 
-- [ ] **Step 1: Implement `SearchTableAccess` as a disabled no-op or direct TT delegate.**
-- [ ] **Step 2: Implement local reservation and shared CAS reservation in `SearchBudget`; snapshot `TimeManager::node_limit()` in the constructor.**
-- [ ] **Step 3: Run `search_runtime_tests` and the existing TT/time-manager tests.**
+- [x] **Step 1: Implement `SearchTableAccess` as a disabled no-op or direct TT delegate.**
+- [x] **Step 2: Implement local reservation and shared CAS reservation in `SearchBudget`; snapshot `TimeManager::node_limit()` in the constructor.**
+- [x] **Step 3: Run `search_runtime_tests` and the existing TT/time-manager tests.**
 
 ```powershell
 cmake --build build/release --config Release --target search_runtime_tests koi_search_tests
 ctest --test-dir build/release -C Release -R 'search_runtime_tests|koi_search_tests' --output-on-failure
 ```
 
-- [ ] **Step 4: Commit the resource seams.**
+- [x] **Step 4: Commit the resource seams.**
 
 ```powershell
 git add src/koi/detail/search_table_access.hpp src/koi/detail/search_budget.hpp
@@ -105,17 +105,17 @@ git commit -m "refactor: isolate search runtime resource contracts"
 - Modify: `src/koi/detail/search_context.hpp`
 - Test: `search_runtime_tests`, `search_architecture_tests`, search/rules/parallel gates
 
-- [ ] **Step 1: Replace direct context TT probes/stores and the mutable TT-enabled flag with `SearchTableAccess`.**
-- [ ] **Step 2: Replace direct global-node pointer reservation/observation with `SearchBudget`, preserving constructor compatibility for root workers.**
-- [ ] **Step 3: Keep `TimeManager::should_stop` and `SearchSession` cancellation at their current owners.**
-- [ ] **Step 4: Run focused serial, node-limit, and root-parallel tests.**
+- [x] **Step 1: Replace direct context TT probes/stores and the mutable TT-enabled flag with `SearchTableAccess`.**
+- [x] **Step 2: Replace direct global-node pointer reservation/observation with `SearchBudget`, preserving constructor compatibility for root workers.**
+- [x] **Step 3: Keep `TimeManager::should_stop` and `SearchSession` cancellation at their current owners.**
+- [x] **Step 4: Run focused serial, node-limit, and root-parallel tests.**
 
 ```powershell
 cmake --build build/release --config Release --target search_runtime_tests search_architecture_tests search_policy_tests koi_search_tests search_ordering_tests perft_tests koi_strength_tests
 ctest --test-dir build/release -C Release -R 'search_runtime_tests|search_architecture_tests|search_policy_tests|koi_search_tests|search_ordering_tests|perft_tests|koi_strength_tests' --output-on-failure
 ```
 
-- [ ] **Step 5: Commit the integration.**
+- [x] **Step 5: Commit the integration.**
 
 ```powershell
 git add src/koi/detail/search_context.hpp
@@ -129,10 +129,10 @@ git commit -m "refactor: route search through runtime resource seams"
 - Modify: `docs/superpowers/specs/2026-09-11-koi-architecture-rework-design.md`
 - Create: `docs/superpowers/verification/2026-09-12-koi-architecture-stage5.md`
 
-- [ ] **Step 1: Run fresh focused and full Release gates, including serial/root-parallel process tests.**
-- [ ] **Step 2: Run public-boundary/diff checks and cold/warm profiles against Stage 4.**
-- [ ] **Step 3: Record TT access/budget ownership and explicitly state that Lazy SMP remains deferred.**
-- [ ] **Step 4: Commit documentation and verification.**
+- [x] **Step 1: Run fresh focused and full Release gates, including serial/root-parallel process tests.**
+- [x] **Step 2: Run public-boundary/diff checks and cold/warm profiles against Stage 4.**
+- [x] **Step 3: Record TT access/budget ownership and explicitly state that Lazy SMP remains deferred.**
+- [x] **Step 4: Commit documentation and verification.**
 
 ```powershell
 git add README.md docs/superpowers/specs/2026-09-11-koi-architecture-rework-design.md docs/superpowers/verification/2026-09-12-koi-architecture-stage5.md

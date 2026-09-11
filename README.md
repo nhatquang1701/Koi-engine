@@ -48,8 +48,9 @@ exactly-once completion claim. Each worker owns a fixed-capacity
 recursive state and search-local statistics out of `GameState`. Root-line
 records and deterministic score/index ranking belong to
 `detail::RootCoordinator`. These types are private implementation headers in
-`src/koi/detail`; root-worker scheduling and the remaining ordering/policy
-migration are intentionally still staged behind the existing service.
+`src/koi/detail`; root-worker scheduling remains behind the existing service,
+while ordering, policy, evaluation, and runtime-resource ownership are
+separately testable internal seams.
 
 Adaptive ordering state is separately owned by
 `detail::SearchOrderingTables`, which stores killers, quiet history, counter
@@ -68,6 +69,25 @@ selects that worker path or the existing evaluator-plus-mutex fallback, so
 `SearchContext` no longer owns evaluator synchronization or a particular NNUE
 representation. The classical evaluator remains the default and malformed or
 absent NNUE input still falls back as before.
+
+Search runtime resources have the same ownership boundary. The private
+`detail::SearchTableAccess` view gates TT probes and stores for one search
+context while `TranspositionTable` remains the owner of striped physical
+storage, locking, generations, clear, resize, and mate-score normalization.
+The private `detail::SearchBudget` snapshots the node limit and keeps serial
+local-count validation separate from bounded shared-atomic reservation for
+root-parallel contexts. `TimeManager` remains the owner of clock/deadline and
+iteration pacing, while `SearchSession` owns cancellation; this stage adds no
+new scheduler, shared history, or Lazy-SMP behavior. These seams let future
+parallel search evolve shared-state policy without moving it through recursive
+search or changing the public `SearchService` contract.
+
+Stages 1 through 5 now cover native state ownership, search lifecycle and
+stack, ordering/policy, evaluation/NNUE worker state, and TT/budget runtime
+resources. Stage 6 remains for final module/tooling/documentation alignment,
+measurement review, strength validation, and the adversarial architecture
+self-review; `Goal.txt` is intentionally retained until that complete goal is
+finished.
 
 ## Build prerequisites
 
