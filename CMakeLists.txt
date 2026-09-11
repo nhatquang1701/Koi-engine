@@ -226,6 +226,14 @@ target_link_libraries(search_ordering_tests PRIVATE koi_core)
 
 add_test(NAME search_ordering_tests COMMAND search_ordering_tests)
 
+add_executable(search_architecture_tests
+    tests/unit/search/search_architecture_tests.cpp
+)
+
+target_link_libraries(search_architecture_tests PRIVATE koi_core)
+
+add_test(NAME search_architecture_tests COMMAND search_architecture_tests)
+
 add_executable(static_exchange_tests
     tests/unit/search/static_exchange_tests.cpp
 )
