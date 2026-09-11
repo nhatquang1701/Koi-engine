@@ -123,6 +123,7 @@ public:
 
     [[nodiscard]] int evaluate(const GameState&, Color perspective) const override;
     [[nodiscard]] bool supports_concurrent_evaluation() const noexcept override { return true; }
+    [[nodiscard]] std::unique_ptr<EvaluatorWorker> create_worker() const override;
     [[nodiscard]] NnueWorker make_worker() const;
     [[nodiscard]] bool enabled() const noexcept { return static_cast<bool>(weights_); }
 

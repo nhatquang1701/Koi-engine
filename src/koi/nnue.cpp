@@ -661,6 +661,23 @@ int NnueWorker::evaluate(const GameState& state, const Color perspective,
     return evaluate(EvaluationFeatureExtractor::extract(state), perspective, path);
 }
 
+namespace {
+
+class NnueEvaluatorWorker final : public EvaluatorWorker {
+public:
+    explicit NnueEvaluatorWorker(std::shared_ptr<const NnueNetwork> weights)
+        : worker_(std::move(weights)) {}
+
+    [[nodiscard]] int evaluate(const GameState& state, const Color perspective) override {
+        return worker_.evaluate(state, perspective);
+    }
+
+private:
+    NnueWorker worker_;
+};
+
+} // namespace
+
 NnueEvaluator::NnueEvaluator(std::shared_ptr<const NnueNetwork> weights)
     : NnueEvaluator(std::move(weights), std::make_shared<ClassicalEvaluator>()) {}
 
@@ -674,6 +691,13 @@ int NnueEvaluator::evaluate(const GameState& state, const Color perspective) con
     }
     NnueWorker worker(weights_);
     return worker.evaluate(state, perspective);
+}
+
+std::unique_ptr<EvaluatorWorker> NnueEvaluator::create_worker() const {
+    if (!weights_) {
+        return {};
+    }
+    return std::make_unique<NnueEvaluatorWorker>(weights_);
 }
 
 NnueWorker NnueEvaluator::make_worker() const {
