@@ -54,6 +54,8 @@ add_library(koi_core
     src/koi/detail/compatibility_mirror.cpp
     src/koi/detail/feature_state.cpp
     src/koi/detail/root_coordinator.cpp
+    src/koi/detail/search_context.cpp
+    src/koi/detail/search_context_support.cpp
     src/koi/detail/search_session.cpp
     src/koi/completion_gate.cpp
     src/koi/cpu_features.cpp

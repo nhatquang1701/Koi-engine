@@ -3,6 +3,7 @@
 #include <memory>
 
 #include "koi/evaluator.hpp"
+#include "koi/detail/search_constants.hpp"
 #include "koi/search_types.hpp"
 #include "koi/transposition_table.hpp"
 
@@ -11,10 +12,6 @@ namespace koi {
 namespace detail {
 
 class SearchSession;
-
-[[nodiscard]] constexpr bool high_history_move_excluded_from_lmr(int history_score) noexcept {
-    return history_score >= 128;
-}
 
 } // namespace detail
 
