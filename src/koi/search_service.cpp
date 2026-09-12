@@ -58,7 +58,13 @@ constexpr int kEmergencyKingEscapeSafetyMargin = 650;
 constexpr int kEmergencyKingZoneAttackWeight = 400;
 constexpr int kEmergencyKingCaptureRisk = 160;
 constexpr int kEmergencyQuietForcingMargin = 200;
-constexpr int kEmergencyBroadCheckReplacementMargin = 200;
+// A narrow check can look artificially dominant in the bounded fallback
+// because its small evasion set lets the one-ply oracle see the same tactical
+// resource repeatedly.  Allow a sound, non-hanging major-piece check with a
+// larger evasion set to displace that narrow check when the raw scores are
+// still close.  This remains local to an interrupted root; completed search
+// keeps the normal score ordering.
+constexpr int kEmergencyBroadCheckReplacementMargin = 400;
 constexpr int kEmergencySafeCaptureTieMargin = 32;
 constexpr int kEmergencySafeExchangeTieMargin = 80;
 // In an interrupted root, an irreversible quiet pawn push that leaves an
@@ -161,6 +167,12 @@ void accumulate_stats(SearchStats& total, const SearchStats& partial) noexcept {
     total.lmr_high_history_exclusions += partial.lmr_high_history_exclusions;
     total.quiet_futility_prunes += partial.quiet_futility_prunes;
     total.razoring_prunes += partial.razoring_prunes;
+    total.probcut_searches += partial.probcut_searches;
+    total.probcut_cutoffs += partial.probcut_cutoffs;
+    total.singular_searches += partial.singular_searches;
+    total.singular_extensions += partial.singular_extensions;
+    total.multi_cut_prunes += partial.multi_cut_prunes;
+    total.capture_history_updates += partial.capture_history_updates;
     total.quiet_history_updates += partial.quiet_history_updates;
     total.continuation_history_updates += partial.continuation_history_updates;
     total.tbhits += partial.tbhits;
@@ -742,10 +754,28 @@ int forcing_reply_fallback_score(const GameState& after_forcing_reply,
     return best_score;
 }
 
+bool root_move_is_broad_quiet_check(
+    const GameState& root, const MoveMetadata& metadata) noexcept {
+    if (!metadata.gives_check || metadata.is_capture() ||
+        metadata.move.promotion() != Promotion::none) {
+        return false;
+    }
+    try {
+        GameState after_check = root;
+        return after_check.make_search_move(metadata) && after_check.in_check() &&
+            after_check.legal_moves().size() > kMaximumEmergencyForcingCheckEvasions;
+    } catch (...) {
+        return false;
+    }
+}
+
 std::optional<Move> first_safe_short_search_move(
     const GameState& root, const MoveMetadataList& legal_moves) noexcept {
     try {
         for (const MoveMetadata& metadata : legal_moves) {
+            if (root_move_is_broad_quiet_check(root, metadata)) {
+                continue;
+            }
             if (!root_move_exposes_immediate_check(root, metadata)) {
                 return metadata.move;
             }
@@ -1273,6 +1303,19 @@ std::optional<Move> short_search_fallback_move(
          best_quiet_forcing_score >= best_score - kEmergencyQuietForcingMargin)) {
         return best_quiet_forcing_move;
     }
+    const bool broad_check_can_replace_narrow_check =
+        broad_check_fallback_move.has_value() && broad_check_fallback_is_major &&
+        best_move.has_value() && best_is_forcing_check && !best_is_safe_capture &&
+        !best_is_safe_forcing_capture &&
+        broad_check_fallback_score >= best_score - kEmergencyBroadCheckReplacementMargin;
+    if (broad_check_can_replace_narrow_check ||
+        (broad_check_fallback_move.has_value() && broad_check_fallback_is_major &&
+         !best_move.has_value() &&
+         (!unsafe_best_move.has_value() ||
+          broad_check_fallback_score >= unsafe_best_score -
+              kEmergencyBroadCheckReplacementMargin))) {
+        return broad_check_fallback_move;
+    }
     if (!best_move.has_value() && best_safe_pawn_capture.has_value() &&
         first_unsafe_quiet_move.has_value()) {
         // If every positive-SEE pawn capture was quarantined and all useful
@@ -1284,17 +1327,10 @@ std::optional<Move> short_search_fallback_move(
         (unsafe_best_is_quiet || best_is_hanging_major_check) &&
         (!best_move.has_value() ||
          unsafe_best_score >= best_score + kEmergencyQuietForcingMargin)) {
-        if (broad_check_fallback_move.has_value() && broad_check_fallback_is_major &&
-            broad_check_fallback_score >= unsafe_best_score -
-                kEmergencyBroadCheckReplacementMargin) {
-            return broad_check_fallback_move;
-        }
         return unsafe_best_move;
     }
     if (broad_check_fallback_move.has_value() && broad_check_fallback_is_major &&
-        (!best_move.has_value() ||
-         (!best_is_safe_capture && !best_is_safe_forcing_capture && !best_is_forcing_check &&
-          broad_check_fallback_score >= best_score - kEmergencyBroadCheckReplacementMargin))) {
+        !best_move.has_value()) {
         return broad_check_fallback_move;
     }
     return best_move.has_value() ? best_move : unsafe_best_move;
@@ -1608,9 +1644,10 @@ private:
     void worker_loop(std::size_t worker_index) {
         // Root jobs are authoritative. The striped table keeps concurrent probe/store activity
         // safe without requiring a serial confirmation search.
-        SearchContext context(evaluator_, table_, time_manager_, stop_requested_, global_nodes_,
-                              evaluator_mutex_, nullptr, use_transposition_table_,
-                              quiet_history_side_hook_);
+        auto context_storage = std::make_unique<SearchContext>(
+            evaluator_, table_, time_manager_, stop_requested_, global_nodes_,
+            evaluator_mutex_, nullptr, use_transposition_table_, quiet_history_side_hook_);
+        SearchContext& context = *context_storage;
         std::uint64_t seen_sequence = 0;
 
         for (;;) {
@@ -1985,9 +2022,11 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
             } else if ((options.threads == 1 && options.multi_pv == 1) || legal_moves.size() < 2 ||
                        (time_manager.node_limit().has_value() && options.multi_pv == 1) ||
                        (short_tactical_budget && !ultra_short_nonchecking_parallel)) {
-                SearchContext context(*evaluator, *table, time_manager, session->stop_requested(),
-                                      nullptr, evaluator_mutex_ptr, &legal_moves, true,
-                                      options.quiet_history_side_hook);
+                auto context_storage = std::make_unique<SearchContext>(
+                    *evaluator, *table, time_manager, session->stop_requested(),
+                    nullptr, evaluator_mutex_ptr, &legal_moves, true,
+                    options.quiet_history_side_hook);
+                SearchContext& context = *context_storage;
                 context.allow_root_forcing_extension = limits.depth.has_value() &&
                     *limits.depth == 1;
                 const bool ultra_short_nonchecked_extension = limits.movetime.has_value() &&
@@ -2049,18 +2088,46 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                     int alpha = -kInfinity;
                     int beta = kInfinity;
                     bool aspiration_researched = false;
+                    int aspiration_window = kAspirationWindow + std::min(32, depth * 2);
                     if (previous_score.has_value()) {
-                        alpha = std::max(-kInfinity, *previous_score - kAspirationWindow);
-                        beta = std::min(kInfinity, *previous_score + kAspirationWindow);
+                        alpha = std::max(-kInfinity, *previous_score - aspiration_window);
+                        beta = std::min(kInfinity, *previous_score + aspiration_window);
+                        if (result.best_move.has_value()) {
+                            // Retain the previous principal move explicitly
+                            // even when the TT entry was displaced by a
+                            // shallow verification or a hash resize.
+                            context.ordering.order(root, legal_moves,
+                                                   result.best_move, 0);
+                        }
                     }
 
                     int score = context.negamax(root, depth, alpha, beta, 0, pv);
-                    if (!context.aborted && previous_score.has_value() &&
-                        (score <= alpha || score >= beta)) {
-                        ++context.stats.aspiration_researches;
-                        aspiration_researched = true;
-                        pv = {};
-                        score = context.negamax(root, depth, -kInfinity, kInfinity, 0, pv);
+                    if (!context.aborted && previous_score.has_value()) {
+                        // Widen the failed side progressively. This preserves
+                        // the useful narrow window when the iteration is
+                        // stable, while avoiding repeated full-width searches
+                        // after a tactical score jump.
+                        for (int retry = 0; retry < 3 &&
+                             (score <= alpha || score >= beta) && !context.aborted; ++retry) {
+                            ++context.stats.aspiration_researches;
+                            aspiration_researched = true;
+                            aspiration_window = std::min(kInfinity / 4,
+                                                        aspiration_window * 2 + 16);
+                            if (score <= alpha) {
+                                alpha = std::max(-kInfinity, alpha - aspiration_window);
+                            }
+                            if (score >= beta) {
+                                beta = std::min(kInfinity, beta + aspiration_window);
+                            }
+                            pv = {};
+                            score = context.negamax(root, depth, alpha, beta, 0, pv);
+                        }
+                        if (!context.aborted && (score <= alpha || score >= beta)) {
+                            ++context.stats.aspiration_researches;
+                            aspiration_researched = true;
+                            pv = {};
+                            score = context.negamax(root, depth, -kInfinity, kInfinity, 0, pv);
+                        }
                     }
                     if (context.aborted) {
                         if (result.completed_depth == 0 && !used_short_fallback &&
@@ -2090,14 +2157,27 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                             // An interrupted first iteration is never an
                             // authoritative tactical result.  Reject a
                             // partial root move that exposes an immediate
-                            // checking reply even when the root move list did
-                            // not contain a capture or direct check.
-                            if (const auto partial = context.best_completed_root_move(
-                                    root, true);
-                                partial.has_value() && root.is_legal(partial->move)) {
+                            // checking reply or broad checking horizon even
+                            // when the root move list did not contain a
+                            // capture or direct check.
+                            const auto partial = context.best_completed_root_move(root, true);
+                            const auto partial_metadata = partial.has_value() ?
+                                std::find_if(
+                                    legal_moves.begin(), legal_moves.end(),
+                                    [&partial](const MoveMetadata& metadata) {
+                                        return metadata.move == partial->move;
+                                    }) : legal_moves.end();
+                            if (partial.has_value() && root.is_legal(partial->move) &&
+                                partial_metadata != legal_moves.end() &&
+                                !root_move_is_broad_quiet_check(root, *partial_metadata)) {
                                 result.best_move = partial->move;
                                 result.pv = {partial->move};
                                 result.score_cp = partial->score;
+                            } else if (const auto fallback = first_safe_short_search_move(
+                                           root, legal_moves);
+                                       fallback.has_value()) {
+                                result.best_move = *fallback;
+                                result.pv = {*fallback};
                             }
                         }
                         break;
@@ -2587,9 +2667,11 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                                     session->stop_requested(), global_nodes_ptr, evaluator_mutex_ptr, true,
                                     options.quiet_history_side_hook);
                 SearchStats total_stats;
-                SearchContext root_context(*evaluator, *table, time_manager, session->stop_requested(),
-                                           global_nodes_ptr, evaluator_mutex_ptr, nullptr, true,
-                                           options.quiet_history_side_hook);
+                auto root_context_storage = std::make_unique<SearchContext>(
+                    *evaluator, *table, time_manager, session->stop_requested(),
+                    global_nodes_ptr, evaluator_mutex_ptr, nullptr, true,
+                    options.quiet_history_side_hook);
+                SearchContext& root_context = *root_context_storage;
 
                 MoveMetadataList parallel_moves = legal_moves;
                 detail::SearchMoveOrdering root_ordering;
@@ -2649,6 +2731,10 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                             tt_move = entry->best_move;
                         }
                     }
+                    if (!tt_move.has_value() && result.completed_depth > 0 &&
+                        result.best_move.has_value()) {
+                        tt_move = result.best_move;
+                    }
                     root_ordering.order(root, parallel_moves, tt_move, 0);
                     std::vector<std::size_t> stable_root_indices;
                     stable_root_indices.reserve(parallel_moves.size());
@@ -2660,8 +2746,16 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
 
                     SearchStats iteration_stats;
                     bool aborted = false;
+                    // Keep the two-worker fixed-depth path on shared root PVS so
+                    // it benefits from the live alpha bound.  At four workers,
+                    // fixed-depth benchmark parity is more important than the
+                    // racy order in which a moving root alpha is observed;
+                    // timed searches retain shared root PVS at every worker
+                    // count.
+                    const bool use_root_pvs = !multi_pv &&
+                        (!limits.depth.has_value() || worker_count < 4);
                     pool.run(root, parallel_moves, depth, root_check_extension, stable_root_indices,
-                             lines, !multi_pv, iteration_stats, aborted);
+                             lines, use_root_pvs, iteration_stats, aborted);
                     if (aborted) {
                         if (result.completed_depth == 0 && !used_short_fallback &&
                             defer_nonchecking_short_fallback) {
@@ -2684,7 +2778,8 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                             partial_ranked_indices.begin(), partial_ranked_indices.end(),
                             [&parallel_moves, &root](const std::size_t index) {
                                 return index < parallel_moves.size() &&
-                                    !root_move_exposes_immediate_check(root, parallel_moves[index]);
+                                    !root_move_exposes_immediate_check(root, parallel_moves[index]) &&
+                                    !root_move_is_broad_quiet_check(root, parallel_moves[index]);
                             });
                         if (result.completed_depth == 0 &&
                             safe_partial != partial_ranked_indices.end()) {
@@ -2976,6 +3071,24 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
 
             if (limits.ponder && (legal_moves.empty() || root_is_claimable_draw)) {
                 session->wait_until_stopped();
+            }
+            if (result.completed_depth == 0 && result.best_move.has_value()) {
+                // Retain the emergency line for non-UCI search consumers that
+                // use the final info callback to keep the published PV in sync
+                // with bestmove. The UCI controller filters this depth-zero
+                // diagnostic because UCI info depths are positive iterations.
+                const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::steady_clock::now() - started);
+                const std::uint64_t visited = result.stats.nodes + result.stats.qnodes;
+                const std::uint64_t nps = elapsed.count() > 0 ? visited * 1000 /
+                    static_cast<std::uint64_t>(elapsed.count()) : visited;
+                result.pv = {*result.best_move};
+                SearchInfo info{0, result.score_cp, mate_from_score(result.score_cp), visited,
+                                nps, elapsed, result.pv};
+                info.seldepth = result.stats.seldepth;
+                info.qnodes = result.stats.qnodes;
+                info.tt_hits = result.stats.tt_hits;
+                safely_report_info(sink, info);
             }
             result.timing = time_manager.diagnostics();
         } catch (...) {

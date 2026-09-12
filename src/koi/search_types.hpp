@@ -107,6 +107,12 @@ struct SearchStats {
     std::uint64_t lmr_high_history_exclusions = 0;
     std::uint64_t quiet_futility_prunes = 0;
     std::uint64_t razoring_prunes = 0;
+    std::uint64_t probcut_searches = 0;
+    std::uint64_t probcut_cutoffs = 0;
+    std::uint64_t singular_searches = 0;
+    std::uint64_t singular_extensions = 0;
+    std::uint64_t multi_cut_prunes = 0;
+    std::uint64_t capture_history_updates = 0;
     std::uint64_t quiet_history_updates = 0;
     std::uint64_t continuation_history_updates = 0;
     std::uint64_t tbhits = 0;
@@ -164,7 +170,7 @@ struct SearchOptions {
 
     // The portable engine default is intentionally sized for the supported
     // 32 GiB development/match machine.  UCI can still reduce this for small
-    // GUI hosts, and the TT keeps its 1..4096 MiB safety bounds.
+    // GUI hosts, and the TT keeps its 1..8192 MiB safety bounds.
     std::size_t hash_mb = 512;
     std::size_t threads = 1;
     std::uint8_t speed_percent = 100;

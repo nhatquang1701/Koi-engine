@@ -24,7 +24,7 @@ constexpr int kMateThreshold = 99'000;
 constexpr std::size_t kBytesPerMegabyte = 1024ULL * 1024ULL;
 constexpr std::size_t kSegmentBytes = 32ULL * kBytesPerMegabyte;
 constexpr std::size_t kMinimumMegabytes = 1;
-constexpr std::size_t kMaximumMegabytes = 4096;
+constexpr std::size_t kMaximumMegabytes = 8192;
 
 int score_for_storage(int score, int ply) noexcept {
     if (score >= kMateThreshold) {

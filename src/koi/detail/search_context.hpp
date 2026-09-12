@@ -5,6 +5,7 @@
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
+#include <cmath>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -232,7 +233,6 @@ struct SearchContext {
             request_abort();
             return false;
         }
-
         if (quiescence) {
             ++stats.qnodes;
         } else {
@@ -268,7 +268,32 @@ struct SearchContext {
         stats.seldepth = std::max(stats.seldepth, ply);
     }
 
-    int quiescence(GameState& state, int alpha, int beta, int ply, int qdepth = 0) {
+    [[nodiscard]] SearchHistoryContext history_context(
+        const int ply, const std::optional<Move> previous_move,
+        const std::uint64_t pawn_key) const noexcept {
+        SearchHistoryContext context;
+        context.ply = ply;
+        context.pawn_key = pawn_key;
+
+        Move candidate = previous_move.value_or(Move::no_move());
+        if (!previous_move.has_value() && ply > 0) {
+            candidate = stack.frame(static_cast<std::size_t>(ply)).previous_move;
+        }
+        for (std::size_t distance = 0; distance < kSearchContinuationPlies &&
+             !candidate.is_no_move(); ++distance) {
+            context.continuation_moves[distance] = candidate;
+            ++context.count;
+            const int parent_ply = ply - static_cast<int>(distance) - 1;
+            if (parent_ply < 0) {
+                break;
+            }
+            candidate = stack.frame(static_cast<std::size_t>(parent_ply)).previous_move;
+        }
+        return context;
+    }
+
+    int quiescence(GameState& state, int alpha, int beta, int ply, int qdepth = 0,
+                   std::optional<Move> previous_move = std::nullopt) {
         if (!count_node(true)) {
             return 0;
         }
@@ -312,6 +337,20 @@ struct SearchContext {
             }
         }
 
+        const SearchHistoryContext history = history_context(ply, previous_move,
+                                                               state.position_key());
+        std::optional<Move> tt_move;
+        if (const auto entry = table_access.probe(state.position_key(), ply); entry.has_value()) {
+            ++stats.tt_hits;
+            if (!entry->best_move.is_no_move()) {
+                tt_move = entry->best_move;
+            }
+            // Regular-search TT entries do not carry a qsearch depth. Keep
+            // their move as an ordering hint, but do not reuse their bound as
+            // a qsearch score: a shallow full-width entry can contain a
+            // horizon-dependent result that is not exact at this frontier.
+        }
+
         int best = -kInfinity;
         if (!checked) {
             best = evaluate(state, state.side_to_move());
@@ -332,7 +371,7 @@ struct SearchContext {
             return 0;
         }
 
-        ordering.order(state, moves, std::nullopt, ply);
+        ordering.order(state, moves, tt_move, history);
         for (const MoveMetadata& metadata : moves) {
             if (interrupted()) {
                 return 0;
@@ -346,9 +385,13 @@ struct SearchContext {
                 continue;
             }
             const Move move = metadata.move;
+            const int capture_history = ordering.capture_history_score(metadata);
+            const int adjusted_see = metadata.is_capture() ?
+                static_cast<int>(metadata.see_score) + capture_history / 128 :
+                static_cast<int>(metadata.see_score);
             const auto capture_prune = SearchPolicy::quiescence_capture(
                 checked, metadata.is_capture(), metadata.gives_check,
-                move.promotion() != Promotion::none, metadata.see_score,
+                move.promotion() != Promotion::none, adjusted_see,
                 piece_value(metadata.captured_piece), best, alpha);
             if (capture_prune == QuiescenceCapturePrune::static_exchange) {
                     ++stats.see_prunes;
@@ -365,15 +408,25 @@ struct SearchContext {
             if (!state.make_search_move(metadata)) {
                 continue;
             }
-            const int score = -quiescence(state, -beta, -alpha, ply + 1, qdepth + 1);
+            const int score = -quiescence(state, -beta, -alpha, ply + 1, qdepth + 1,
+                                          metadata.move);
             state.unmake_move();
             if (aborted) {
                 return 0;
             }
+            if (metadata.is_capture() && score > best) {
+                ordering.record_capture_best(metadata, 1, history);
+            }
             best = std::max(best, score);
             alpha = std::max(alpha, score);
             if (alpha >= beta) {
+                if (metadata.is_capture()) {
+                    ordering.record_capture_cutoff(metadata, 1, history);
+                }
                 break;
+            }
+            if (metadata.is_capture()) {
+                ordering.record_capture_fail(metadata, 1, history);
             }
         }
         return best;
@@ -382,12 +435,18 @@ struct SearchContext {
     int negamax(GameState& state, int depth, int alpha, int beta, int ply,
                 PrincipalVariation& pv, std::optional<Move> previous_move = std::nullopt,
                 bool allow_null_pruning = true,
-                int check_extensions_remaining = kMaximumCheckExtensionsPerPath) {
-        if (ply == 0) {
+                int check_extensions_remaining = kMaximumCheckExtensionsPerPath,
+                Move excluded_move = Move::no_move()) {
+        const bool excluded_search = !excluded_move.is_no_move();
+        if (ply == 0 && !excluded_search) {
             root_move_score_count = 0;
         }
         if (depth <= 0) {
-            return quiescence(state, alpha, beta, ply);
+            return quiescence(state, alpha, beta, ply, 0, previous_move);
+        }
+        if (ply >= static_cast<int>(SearchStack::kCapacity) - 2) {
+            return state.in_check() ? quiescence(state, alpha, beta, ply, 0, previous_move) :
+                                      evaluate(state, state.side_to_move());
         }
         if (!count_node(false)) {
             return 0;
@@ -404,6 +463,10 @@ struct SearchContext {
         frame.move_count = 0;
         frame.reduction = 0;
         frame.extension = 0;
+        frame.cutoff_count = 0;
+        frame.static_eval_valid = false;
+        frame.prior_fail_high = false;
+        frame.tt_pv = false;
         MoveMetadataList moves;
         if (ply == 0 && root_moves != nullptr) {
             moves = *root_moves;
@@ -414,6 +477,21 @@ struct SearchContext {
         if (moves.empty()) {
             return terminal_score(state, moves.size(), ply);
         }
+        if (excluded_search) {
+            // MoveMetadataList is a fixed container; compact the excluded move
+            // without allocating and without exposing an alternate generator.
+            std::size_t write_index = 0;
+            const std::size_t original_move_count = moves.size();
+            for (std::size_t read_index = 0; read_index < original_move_count; ++read_index) {
+                if (moves[read_index].move != excluded_move) {
+                    moves[write_index++] = moves[read_index];
+                }
+            }
+            moves.resize(write_index);
+        }
+        if (moves.empty()) {
+            return excluded_search ? alpha : terminal_score(state, moves.size(), ply);
+        }
         if (state.is_draw_by_rule()) {
             return 0;
         }
@@ -421,12 +499,25 @@ struct SearchContext {
             time_manager.time_budget().has_value() &&
             *time_manager.time_budget() < kShortTimedFallbackMinimum;
         int child_check_extensions_remaining = check_extensions_remaining;
-        if (SearchPolicy::check_extension(
-                checked, depth, short_timed_root, check_extensions_remaining)) {
+        const bool check_extension_applied = SearchPolicy::check_extension(
+            checked, depth, short_timed_root, check_extensions_remaining);
+        if (check_extension_applied) {
             ++stats.check_extensions;
             ++depth;
             --child_check_extensions_remaining;
             frame.extension = 1;
+        }
+        // Mate-distance pruning keeps a delayed mate from displacing a mate
+        // already found nearer to the root. A checked node with an available
+        // extension gets the tactical horizon first; otherwise the tightened
+        // mate window can discard the very checking line the extension is
+        // meant to inspect.
+        if (!excluded_search && ply > 0) {
+            alpha = std::max(alpha, -kMateScore + ply);
+            beta = std::min(beta, kMateScore - ply - 1);
+            if (alpha >= beta) {
+                return alpha;
+            }
         }
 
         std::optional<PositionFeatures> features;
@@ -446,6 +537,31 @@ struct SearchContext {
                     metadata.move.promotion() != Promotion::none;
             });
         int static_eval = 0;
+        bool static_eval_valid = false;
+        if (checked) {
+            const int previous_ply = ply - 2;
+            if (previous_ply >= 0 && stack.frame(static_cast<std::size_t>(previous_ply))
+                    .static_eval_valid) {
+                static_eval = stack.frame(static_cast<std::size_t>(previous_ply)).static_eval;
+                static_eval_valid = true;
+            }
+        } else {
+            static_eval = evaluate(state, state.side_to_move());
+            static_eval_valid = true;
+        }
+        frame.static_eval = static_eval;
+        frame.static_eval_valid = static_eval_valid;
+        const bool pv_node = beta - alpha > 1;
+        const bool cut_node = !pv_node;
+        const SearchFrame& parent_frame = ply > 0 ?
+            stack.frame(static_cast<std::size_t>(ply - 1)) : frame;
+        const SearchFrame& grandparent_frame = ply > 1 ?
+            stack.frame(static_cast<std::size_t>(ply - 2)) : frame;
+        const bool improving = static_eval_valid && grandparent_frame.static_eval_valid &&
+            static_eval > grandparent_frame.static_eval;
+        const bool opponent_worsening = static_eval_valid && parent_frame.static_eval_valid &&
+            static_eval > -parent_frame.static_eval;
+        const bool search_improving = improving || opponent_worsening;
         const bool phase_rich_quiet_position = !checked && depth == 1 && !tactical_position &&
             ensure_features().game_phase >= 8;
         const PositionFeatures* quiet_forcing_parent_features = nullptr;
@@ -457,10 +573,9 @@ struct SearchContext {
             root_direct_forcing_features = &ensure_features();
         }
         if (phase_rich_quiet_position) {
-            static_eval = evaluate(state, state.side_to_move());
-            frame.static_eval = static_eval;
             if (depth == 1 && alpha > -kInfinity && static_eval + 120 <= alpha) {
-                const int razor_score = quiescence(state, alpha, beta, ply);
+                const int razor_score = quiescence(state, alpha, beta, ply, 0,
+                                                   previous_move);
                 if (!aborted && razor_score <= alpha) {
                     ++stats.razoring_prunes;
                     return razor_score;
@@ -471,10 +586,15 @@ struct SearchContext {
         const int original_alpha = alpha;
         const int original_beta = beta;
         std::optional<Move> tt_move;
+        std::optional<TranspositionEntry> tt_entry;
         if (const auto entry = table_access.probe(state.position_key(), ply); entry.has_value()) {
+            tt_entry = entry;
             ++stats.tt_hits;
-            tt_move = entry->best_move.is_no_move() ? std::nullopt : std::optional<Move>{entry->best_move};
-            if (ply > 0 && entry->depth >= depth) {
+            if (!entry->best_move.is_no_move() && entry->best_move != excluded_move) {
+                tt_move = entry->best_move;
+            }
+            frame.tt_pv = entry->bound == TranspositionBound::exact;
+            if (!excluded_search && ply > 0 && entry->depth >= depth) {
                 if (entry->bound == TranspositionBound::exact) {
                     return entry->score;
                 }
@@ -489,11 +609,17 @@ struct SearchContext {
             }
         }
 
-        const NullMoveDecision null_move_decision = SearchPolicy::null_move(
-            depth, alpha, beta, checked, allow_null_pruning);
-        if (null_move_decision.eligible && state.is_repetition_sensitive()) {
+        const NullMoveDecision null_move_gate = SearchPolicy::null_move(
+            depth, alpha, beta, checked, allow_null_pruning && !excluded_search);
+        if (null_move_gate.eligible && state.is_repetition_sensitive()) {
             ++stats.null_repetition_skips;
         }
+        const bool pawn_endgame = !state.has_non_pawn_material(state.side_to_move()) ||
+            !state.has_non_pawn_material(opposite(state.side_to_move()));
+        const DynamicNullMoveDecision null_move_decision = SearchPolicy::dynamic_null_move(
+            depth, alpha, beta, static_eval, checked,
+            allow_null_pruning && !excluded_search && !state.is_repetition_sensitive(),
+            search_improving, pawn_endgame);
         if (null_move_decision.eligible && null_move_is_safe(state, ensure_features())) {
             if (state.make_null_move()) {
                 PrincipalVariation null_pv;
@@ -508,47 +634,129 @@ struct SearchContext {
                 }
                 if (null_score >= beta) {
                     int verified_score = null_score;
-                    if (depth >= 5) {
+                    if (null_move_decision.verify) {
                         ++stats.null_verifications;
                         PrincipalVariation verification_pv;
-                        verified_score = negamax(
-                            state, depth - 1, alpha, beta, ply, verification_pv,
-                            previous_move, false, child_check_extensions_remaining);
+                        const bool saved_table_state = table_access.enabled();
+                        table_access.set_enabled(false);
+                        try {
+                            verified_score = negamax(
+                                state, depth - 1, alpha, beta, ply, verification_pv,
+                                previous_move, false, child_check_extensions_remaining);
+                        } catch (...) {
+                            table_access.set_enabled(saved_table_state);
+                            throw;
+                        }
+                        table_access.set_enabled(saved_table_state);
                         if (aborted) {
                             return 0;
                         }
                     }
-                    if (verified_score >= beta) {
+                    if (verified_score >= beta && verified_score < kMateThreshold) {
                         ++stats.null_cutoffs;
-                        table_access.store(state.position_key(), depth, verified_score,
-                                           TranspositionBound::lower, Move::no_move(), ply);
+                        if (!excluded_search) {
+                            table_access.store(state.position_key(), depth, verified_score,
+                                               TranspositionBound::lower, Move::no_move(), ply);
+                        }
                         return verified_score;
                     }
                 }
             }
         }
 
-        ordering.order(state, moves, tt_move, ply, previous_move);
+        const SearchHistoryContext history = history_context(
+            ply, previous_move, state.position_key());
+
+        // ProbCut is deliberately confined to scout/cut nodes and to
+        // positions with a reliable static margin. A capture must first hold
+        // in qsearch and then hold in a reduced regular search; this mirrors
+        // Stockfish 19's two-stage tactical verification and avoids turning a
+        // speculative capture into a PV score.
+        const ProbCutDecision probcut = SearchPolicy::prob_cut(
+            depth, alpha, beta, static_eval, checked, search_improving,
+            excluded_search, state.is_repetition_sensitive());
+        if (probcut.eligible && cut_node && !state.is_repetition_sensitive()) {
+            MoveMetadataList probcut_moves;
+            for (const MoveMetadata& candidate : moves) {
+                if ((candidate.is_capture() || candidate.move.promotion() != Promotion::none) &&
+                    candidate.move != excluded_move) {
+                    (void)probcut_moves.push_back(candidate);
+                }
+            }
+            ordering.order(state, probcut_moves, tt_move, history);
+            for (const MoveMetadata& candidate : probcut_moves) {
+                if (interrupted()) {
+                    return 0;
+                }
+                ++stats.probcut_searches;
+                if (candidate.is_capture() && candidate.see_score < -96 &&
+                    !candidate.gives_check) {
+                    continue;
+                }
+                if (!state.make_search_move(candidate)) {
+                    continue;
+                }
+                PrincipalVariation probcut_pv;
+                int probcut_score = -quiescence(
+                    state, -probcut.beta, -probcut.beta + 1, ply + 1, 0, candidate.move);
+                if (!aborted && probcut_score >= probcut.beta && probcut.depth > 0) {
+                    probcut_pv = {};
+                    probcut_score = -negamax(
+                        state, probcut.depth, -probcut.beta, -probcut.beta + 1,
+                        ply + 1, probcut_pv, candidate.move, false,
+                        child_check_extensions_remaining);
+                }
+                state.unmake_move();
+                if (aborted) {
+                    return 0;
+                }
+                if (probcut_score >= probcut.beta) {
+                    ++stats.probcut_cutoffs;
+                    if (!excluded_search) {
+                        table_access.store(state.position_key(), depth, probcut_score,
+                                           TranspositionBound::lower, candidate.move, ply);
+                    }
+                    return probcut_score - (probcut.beta - beta);
+                }
+            }
+        }
+
+        ordering.order(state, moves, tt_move, history);
         int best_score = -kInfinity;
         Move best_move = Move::no_move();
         int move_number = 0;
+        bool singular_probe_done = false;
+        const bool singular_candidate = !excluded_search && !checked && ply > 0 &&
+            depth >= 6 && !state.is_repetition_sensitive() && tt_move.has_value() &&
+            tt_entry.has_value() && tt_entry->bound == TranspositionBound::lower &&
+            tt_entry->depth >= depth - 3 &&
+            std::abs(tt_entry->score) < kMateThreshold;
         std::optional<PositionFeatures> lmr_parent_features;
         for (const MoveMetadata& metadata : moves) {
             if (interrupted()) {
                 return 0;
             }
             const Move move = metadata.move;
+            if (move == excluded_move) {
+                continue;
+            }
             frame.current_move = move;
             const Color moving_side = history_side(state.side_to_move(), false);
-            const int history_score = ordering.quiet_history_score(moving_side, move, previous_move);
+            const int history_score = metadata.is_capture() ? 0 :
+                ordering.quiet_history_score(moving_side, metadata, history);
             const bool is_tt_move = tt_move.has_value() && move == *tt_move;
             const bool root_pawn_move = ply == 0 && metadata.moving_piece == PieceType::pawn;
             const int full_child_depth = depth - 1;
-            const LateMoveDecision lmr_gate = SearchPolicy::late_move(
-                depth, move_number, full_child_depth, history_score, root_pawn_move,
+            const LateMoveDecision lmr_gate = SearchPolicy::dynamic_late_move(
+                depth, move_number, full_child_depth, history_score, history_score / 2,
+                ordering.capture_history_score(metadata), root_pawn_move,
                 checked, metadata.gives_check, metadata.is_capture(),
                 move.promotion() != Promotion::none, is_tt_move,
-                ordering.is_killer(move, ply), false, false);
+                ordering.is_killer(move, ply), false, false,
+                pv_node, cut_node, search_improving,
+                ply + 1 < static_cast<int>(SearchStack::kCapacity) &&
+                    stack.frame(static_cast<std::size_t>(ply + 1)).cutoff_count > 0,
+                tt_move.has_value());
             if (lmr_gate.high_history_exclusion) {
                 ++stats.lmr_high_history_exclusions;
             }
@@ -562,6 +770,35 @@ struct SearchContext {
                     }
                 } else {
                     ++stats.lmr_parent_feature_reuses;
+                }
+            }
+            int singular_extension = 0;
+            if (singular_candidate && move == *tt_move && !singular_probe_done) {
+                singular_probe_done = true;
+                ++stats.singular_searches;
+                const int singular_margin = 32 + depth * 8 + (pv_node ? 16 : 0);
+                const int singular_beta = tt_entry->score - singular_margin;
+                const int singular_depth = std::max(1, (depth - 1) / 2);
+                PrincipalVariation singular_pv;
+                const int excluded_score = negamax(
+                    state, singular_depth, singular_beta - 1, singular_beta, ply,
+                    singular_pv, previous_move, false,
+                    child_check_extensions_remaining, move);
+                if (aborted) {
+                    return 0;
+                }
+                if (excluded_score < singular_beta) {
+                    singular_extension = excluded_score < singular_beta - 96 ? 2 : 1;
+                    ++stats.singular_extensions;
+                } else if (!pv_node && depth >= 8 && excluded_score >= beta &&
+                           excluded_score < kMateThreshold) {
+                    ++stats.multi_cut_prunes;
+                    return excluded_score;
+                } else if (depth >= 8 &&
+                           (tt_entry->score >= beta || cut_node)) {
+                    // If the alternative moves are not singular, the TT move
+                    // is still useful but need not receive full depth.
+                    singular_extension = -1;
                 }
             }
             if (!state.make_search_move(metadata)) {
@@ -607,19 +844,42 @@ struct SearchContext {
                     }
                 }
             }
-            const LateMoveDecision lmr_decision = SearchPolicy::late_move(
-                depth, move_number, full_child_depth, history_score, root_pawn_move,
+            const LateMoveDecision lmr_decision = SearchPolicy::dynamic_late_move(
+                depth, move_number, full_child_depth, history_score, history_score / 2,
+                ordering.capture_history_score(metadata), root_pawn_move,
                 checked, metadata.gives_check, metadata.is_capture(),
                 move.promotion() != Promotion::none, is_tt_move,
-                ordering.is_killer(move, ply), reducible_quiet, quiet_forcing_extension);
+                ordering.is_killer(move, ply), reducible_quiet, quiet_forcing_extension,
+                pv_node, cut_node, search_improving,
+                ply + 1 < static_cast<int>(SearchStack::kCapacity) &&
+                    stack.frame(static_cast<std::size_t>(ply + 1)).cutoff_count > 0,
+                tt_move.has_value());
             const bool reduced = lmr_decision.reduced;
             const int reduction = lmr_decision.reduction;
             frame.reduction = reduced ? reduction : 0;
-            const int authoritative_child_depth = quiet_forcing_extension ?
-                full_child_depth + 1 : full_child_depth;
-            const int child_depth = reduced ? full_child_depth - reduction : authoritative_child_depth;
+            const int extension_depth = singular_extension + (quiet_forcing_extension ? 1 : 0);
+            const int authoritative_child_depth = std::max(
+                0, full_child_depth + extension_depth);
+            const int child_depth = reduced ?
+                std::max(0, authoritative_child_depth - reduction) : authoritative_child_depth;
             if (reduced) {
                 ++stats.lmr_reductions;
+            }
+            // Child futility is a narrow scout-node optimisation. It is
+            // intentionally unavailable to the first move, PV nodes,
+            // forcing moves, and TT moves, so a quiet move that is the only
+            // plausible continuation still receives an authoritative search.
+            const bool child_futility = !pv_node && !checked && depth <= 3 &&
+                !tactical_position && move_number > 0 && !metadata.is_capture() &&
+                !metadata.gives_check &&
+                move.promotion() == Promotion::none && !is_tt_move &&
+                static_eval + 96 + depth * 72 <= alpha;
+            if (child_futility) {
+                ++stats.quiet_futility_prunes;
+                state.unmake_move();
+                ++move_number;
+                frame.move_count = move_number;
+                continue;
             }
 
             if (SearchPolicy::quiet_futility(
@@ -652,7 +912,7 @@ struct SearchContext {
                     ++stats.lmr_verifications;
                     child_pv = {};
                     score = -negamax(
-                        state, full_child_depth, -beta, -alpha, ply + 1, child_pv,
+                        state, authoritative_child_depth, -beta, -alpha, ply + 1, child_pv,
                         move, allow_null_pruning, child_check_extensions_remaining);
                 } else if (!aborted && !reduced && score > alpha && score < beta) {
                     ++stats.pvs_researches;
@@ -671,39 +931,59 @@ struct SearchContext {
                 best_score = score;
                 best_move = move;
                 pv.prepend(move, child_pv);
+                if (ply > 0 && !metadata.is_capture() &&
+                    move.promotion() == Promotion::none) {
+                    const Color history_side_after_unmake = history_side(moving_side, true);
+                    ordering.record_quiet_best(history_side_after_unmake, metadata, depth, history);
+                } else if (ply > 0 && metadata.is_capture()) {
+                    ordering.record_capture_best(metadata, depth, history);
+                    ++stats.capture_history_updates;
+                }
             }
             if (ply == 0 && root_move_score_count < root_move_scores.size()) {
                 root_move_scores[root_move_score_count++] = RootMoveScore{move, score};
             }
             alpha = std::max(alpha, score);
             if (alpha >= beta) {
+                frame.cutoff_count++;
+                frame.prior_fail_high = true;
                 if (ply > 0 && !metadata.is_capture() && move.promotion() == Promotion::none) {
                     const Color history_side_after_unmake = history_side(moving_side, true);
-                    ordering.record_quiet_cutoff(history_side_after_unmake, move, ply, depth,
-                                                 previous_move);
+                    ordering.record_quiet_cutoff(history_side_after_unmake, metadata, depth,
+                                                 history);
                     ++stats.quiet_history_updates;
                     if (previous_move.has_value()) {
                         ++stats.continuation_history_updates;
                     }
+                } else if (ply > 0 && metadata.is_capture()) {
+                    ordering.record_capture_cutoff(metadata, depth, history);
+                    ++stats.capture_history_updates;
                 }
                 break;
             }
             if (ply > 0 && !metadata.is_capture() && move.promotion() == Promotion::none) {
                 const Color history_side_after_unmake = history_side(moving_side, true);
-                ordering.record_quiet_fail(history_side_after_unmake, move, ply, depth,
-                                           previous_move);
+                ordering.record_quiet_fail(history_side_after_unmake, metadata, depth, history);
                 ++stats.quiet_history_updates;
                 if (previous_move.has_value()) {
                     ++stats.continuation_history_updates;
                 }
+            } else if (ply > 0 && metadata.is_capture()) {
+                ordering.record_capture_fail(metadata, depth, history);
+                ++stats.capture_history_updates;
             }
             ++move_number;
             frame.move_count = move_number;
         }
 
+        if (best_score == -kInfinity) {
+            best_score = static_eval_valid ? static_eval : 0;
+        }
         const TranspositionBound bound = best_score <= original_alpha ? TranspositionBound::upper
             : best_score >= original_beta ? TranspositionBound::lower : TranspositionBound::exact;
-        table_access.store(state.position_key(), depth, best_score, bound, best_move, ply);
+        if (!excluded_search) {
+            table_access.store(state.position_key(), depth, best_score, bound, best_move, ply);
+        }
         return best_score;
     }
 };

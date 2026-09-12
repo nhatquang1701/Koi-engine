@@ -23,6 +23,10 @@ struct SearchFrame {
     int move_count = 0;
     int reduction = 0;
     int extension = 0;
+    int cutoff_count = 0;
+    bool static_eval_valid = false;
+    bool prior_fail_high = false;
+    bool tt_pv = false;
     bool in_check = false;
 };
 
