@@ -6,6 +6,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <cmath>
+#include <cstdio>
+#include <cstdlib>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -413,31 +415,11 @@ struct SearchContext {
                 return best;
             }
         } else if (qdepth >= kMaximumQuiescenceSafetyDepth) {
-            // A checked position has no stand-pat score. Keep the hard safety
-            // horizon for pathological checking cycles, but still inspect each
-            // legal evasion once. Returning a draw here can hide a forced mate
-            // or a forced material loss; a bounded static reply score is a
-            // safer fallback than inventing a draw.
-            int capped_best = -kInfinity;
-            for (const MoveMetadata& metadata : moves) {
-                if (interrupted()) {
-                    return 0;
-                }
-                if (!state.make_search_move(metadata)) {
-                    continue;
-                }
-                MoveMetadataList replies;
-                state.legal_moves_with_metadata(replies, false, false);
-                const int score = replies.empty() ?
-                    (state.in_check() ? kMateScore - (ply + 1) : 0) :
-                    -evaluate(state, state.side_to_move());
-                state.unmake_move();
-                if (aborted) {
-                    return 0;
-                }
-                capped_best = std::max(capped_best, score);
-            }
-            return capped_best == -kInfinity ? 0 : capped_best;
+            // A checked position has no stand-pat score.  Stop at the hard
+            // safety horizon before creating another large qsearch frame;
+            // this boundary exists specifically to prevent perpetual-check
+            // cycles from exhausting the native call stack.
+            return 0;
         }
 
         SearchMovePicker picker(
@@ -1274,6 +1256,16 @@ struct SearchContext {
             if (aborted) {
                 return 0;
             }
+            if (ply == 0 && std::getenv("KOI_TRACE_ROOT") != nullptr) {
+                const std::string move_text = move.uci();
+                std::fprintf(stderr,
+                             "root-trace depth=%d move=%s n=%d alpha=%d beta=%d score=%d "
+                             "child=%d auth=%d reduced=%d qext=%d check=%d tt=%d\n",
+                             depth, move_text.c_str(), move_number, alpha, beta, score,
+                             child_depth, authoritative_child_depth, reduced ? 1 : 0,
+                             quiet_forcing_extension ? 1 : 0, metadata.gives_check ? 1 : 0,
+                             is_tt_move ? 1 : 0);
+            }
             prior_child_fail_high = score > alpha;
             const bool quiet_history_move = !metadata.is_capture() &&
                 move.promotion() == Promotion::none;
@@ -1360,7 +1352,7 @@ struct SearchContext {
         // child must not turn its static fallback into an exact TT answer;
         // that value is only a heuristic estimate for the current node.
         const bool safe_to_store = best_metadata_valid &&
-            (!selective_pruning || bound != TranspositionBound::exact);
+            (!selective_pruning || bound == TranspositionBound::lower);
         if (!excluded_search && !repetition_sensitive && safe_to_store) {
             table_access.store(state.position_key(), depth, best_score, bound, best_move, ply);
         }
