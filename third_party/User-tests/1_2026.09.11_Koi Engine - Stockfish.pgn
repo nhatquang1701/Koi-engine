@@ -1,0 +1,11 @@
+[Event "Engine Match"]
+[Site "En Croissant"]
+[Date "2026.09.11"]
+[Round "?"]
+[White "Koi Engine"]
+[Black "Stockfish"]
+[Result "0-1"]
+[Orientation "white"]
+
+{[%eval +0.28] } 1. Nc3 {[%eval 0.00] } d5 {[%eval +0.01] } 2. d4 {[%eval 0.00] } Nf6 {[%eval +0.01] } 3. Qd3?! {[%eval -0.66] }  (3. Bf4  a6 4. e3 e6 5. g4 Bb4 6. Ne2 Nxg4 7. Rg1 Qh4) c5 {[%eval -0.71] } 4. dxc5 {[%eval -0.86] } Nc6 {[%eval -0.77] } 5. Nf3 $146 {[%eval -1.02] } e5 {[%eval -0.97] } 6. Qb5? {[%eval -3.20] }  (6. Bg5  e4 7. Qe3 Be7 8. O-O-O Ng4 9. Qf4 exf3 10. Rxd5 Qa5) a6 {[%eval -3.22] } 7. Qa4 {[%eval -3.87] } Bd7 {[%eval -3.66] } 8. Qb3 {[%eval -4.49] } e4 {[%eval -4.34] } 9. Nxd5 {[%eval -5.05] } Nxd5 {[%eval -5.05] } 10. Qxd5 {[%eval -5.09] } exf3 {[%eval -4.94] } 11. exf3 {[%eval -5.53] } Be6 {[%eval -5.53] } 12. Qxd8+ {[%eval -5.34] } Rxd8 {[%eval -5.29] } 13. Be3 {[%eval -5.23] } Nb4 {[%eval -5.23] } 14. Rc1 {[%eval -5.28] } Nxa2 {[%eval -5.27] } 15. Rd1 {[%eval -5.26] } Rc8 {[%eval -5.11] } 16. Bd4 {[%eval -5.09] } Nb4 {[%eval -5.13] } 17. Rd2 {[%eval -5.31] } Nc6 {[%eval -5.34] } 18. Bc3 {[%eval -5.28] } Bxc5 {[%eval -5.45] } 19. Bxg7 {[%eval -5.34] } Rg8 {[%eval -5.35] } 20. Bc3 {[%eval -5.56] } b5 {[%eval -5.42] } 21. g4 {[%eval -6.54] } Ke7 {[%eval -6.45] } 22. Rd1 {[%eval -6.31] } b4 {[%eval -6.56] } 23. Bxa6 {[%eval -7.64] } bxc3 {[%eval -7.54] } 24. Bxc8 {[%eval -7.52] } Rxc8 {[%eval -7.39] } 25. bxc3 {[%eval -7.34] } Bc4 {[%eval -7.27] } 26. Rg1 {[%eval -7.59] } Kf8 {[%eval -7.55] } 27. Rd2 {[%eval -8.06] } Re8+ {[%eval -7.88] } 28. Kd1 {[%eval -7.99] } Rb8 {[%eval -7.86] } 29. Ke1 {[%eval -7.86] } Re8+ {[%eval -7.46] } 30. Kd1 {[%eval -7.68] } Ra8 {[%eval -7.84] } 31. Ke1 {[%eval -7.54] } Nb4!? {[%eval -7.40] } 32. Rg2 {[%eval #-11] } Ra1+ {[%eval #-10] } 33. Rd1 {[%eval #-10] } Nxc2+ {[%eval #-9] } 34. Kd2 {[%eval #-9] } Ra2 {[%eval #-8] } 35. Kc1 {[%eval #-8] } Ba3+ {[%eval #-7] } 36. Kd2 {[%eval #-7] } Bd6 {[%eval #-6] } 37. Rc1 {[%eval #-6] } Bf4+ {[%eval #-5] } 38. Kd1 {[%eval #-5] } Na3 {[%eval #-4] } 39. Rg1 {[%eval #-4] } Bxc1 {[%eval #-3] } 40. Re1 {[%eval #-3] } Ra1 {[%eval #-2] } 41. Re8+ {[%eval #-2] } Kxe8 {[%eval #-1] } 42. g5 {[%eval #-1] } Bf4# 0-1
+
