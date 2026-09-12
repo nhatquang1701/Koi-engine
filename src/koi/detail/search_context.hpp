@@ -970,6 +970,7 @@ struct SearchContext {
             const int quiet_skip_threshold =
                 (3 + depth * depth) / (2 - static_cast<int>(improving));
             if (!excluded_search && ply > 0 && !pv_node && !checked &&
+                !parent_frame.in_check &&
                 parent_has_non_pawn_material &&
                 best_score > -kMateThreshold && next_move_number >= quiet_skip_threshold) {
                 picker.skip_quiet_moves();
@@ -1257,12 +1258,11 @@ struct SearchContext {
                 return 0;
             }
             if (ply == 0 && std::getenv("KOI_TRACE_ROOT") != nullptr) {
-                const std::string move_text = move.uci();
                 std::fprintf(stderr,
-                             "root-trace depth=%d move=%s n=%d alpha=%d beta=%d score=%d "
-                             "child=%d auth=%d reduced=%d qext=%d check=%d tt=%d\n",
-                             depth, move_text.c_str(), move_number, alpha, beta, score,
-                             child_depth, authoritative_child_depth, reduced ? 1 : 0,
+                             "root-trace key=%llu depth=%d move=%s n=%d alpha=%d beta=%d score=%d child=%d auth=%d reduced=%d qext=%d check=%d tt=%d\\n",
+                             static_cast<unsigned long long>(state.position_key()), depth,
+                             move.uci().c_str(), move_number, alpha, beta, score, child_depth,
+                             authoritative_child_depth, reduced ? 1 : 0,
                              quiet_forcing_extension ? 1 : 0, metadata.gives_check ? 1 : 0,
                              is_tt_move ? 1 : 0);
             }
