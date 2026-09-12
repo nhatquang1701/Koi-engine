@@ -1556,6 +1556,18 @@ bool quiet_move_leaves_safe_capture(
                        });
 }
 
+// Root workers consume a shared atomic index.  At a short time limit the
+// order of that queue is therefore part of playing strength: moves that were
+// strong at the preceding completed iteration should be handed to workers
+// before previously unseen tail moves.  Keep the identity separate from the
+// current vector position so reordering does not change deterministic ties.
+struct RootScheduleRecord {
+    Move move = Move::no_move();
+    std::size_t stable_index = 0;
+    int previous_score = -kInfinity;
+    bool has_previous_score = false;
+};
+
 class RootWorkerPool {
 public:
     RootWorkerPool(std::size_t worker_count, const Evaluator& evaluator, TranspositionTable& table,
@@ -1587,7 +1599,7 @@ public:
 
     void run(const GameState& root, const MoveMetadataList& root_moves, int depth,
              bool root_check_extension, const std::vector<std::size_t>& stable_root_indices,
-             std::vector<RootLine>& lines, bool use_root_pvs,
+             std::vector<RootLine>& lines, bool use_root_pvs, int root_static_eval,
              SearchStats& stats, bool& aborted) {
         auto job = std::make_shared<Job>();
         job->root = &root;
@@ -1598,6 +1610,7 @@ public:
         job->lines = &lines;
         job->worker_stats = &worker_stats_;
         job->use_root_pvs = use_root_pvs;
+        job->root_static_eval = root_static_eval;
         if (depth == 1) {
             job->root_features = root.position_features();
         }
@@ -1634,6 +1647,7 @@ private:
         std::vector<RootLine>* lines = nullptr;
         std::vector<SearchStats>* worker_stats = nullptr;
         std::optional<PositionFeatures> root_features;
+        int root_static_eval = 0;
         std::atomic<std::size_t> next_move = 0;
         std::atomic<int> root_alpha = -kInfinity;
         std::atomic_bool aborted = false;
@@ -1665,11 +1679,27 @@ private:
 
             seen_sequence = job->sequence;
             context.begin_iteration(&job->aborted);
+            // The serial root search initializes ply zero before descending
+            // into its children. Root-parallel workers start directly at ply
+            // one, so seed the same parent snapshot from the already computed
+            // root evaluation; this keeps improving/opponent-worsening and
+            // reduction hindsight identical without an extra evaluator call.
+            detail::SearchFrame& root_frame = context.stack.frame(0);
+            root_frame.static_eval = job->root_static_eval;
+            root_frame.static_eval_valid = true;
+            root_frame.in_check = job->root->in_check();
+            root_frame.previous_move = Move::no_move();
+            root_frame.current_move = Move::no_move();
+            root_frame.move_count = 0;
+            root_frame.reduction = 0;
+            root_frame.extension = 0;
+            root_frame.cutoff_count = 0;
+            root_frame.prior_fail_high = false;
+            root_frame.tt_pv = true;
 
             const auto search_root = [&context, &job](std::size_t move_index) {
                 const MoveMetadata& root_move = (*job->root_moves)[move_index];
                 try {
-                    context.ordering.clear();
                     GameState child = *job->root;
                     if (!child.make_search_move(root_move)) {
                         return;
@@ -1689,6 +1719,7 @@ private:
                     }
                     const int shared_alpha = job->root_alpha.load(std::memory_order_relaxed);
                     const bool scout = job->use_root_pvs && shared_alpha > -kInfinity;
+                    bool exact_score = !scout;
                     int score = 0;
                     if (scout) {
                         ++context.stats.root_pvs_searches;
@@ -1699,8 +1730,9 @@ private:
                             ++context.stats.root_pvs_researches;
                             child_pv = {};
                             score = -context.negamax(child, child_depth,
-                                                     -kInfinity, kInfinity, 1, child_pv,
-                                                     root_move.move);
+                                                      -kInfinity, kInfinity, 1, child_pv,
+                                                      root_move.move);
+                            exact_score = true;
                         }
                     } else {
                         score = -context.negamax(child, child_depth,
@@ -1718,7 +1750,7 @@ private:
                     }
 
                     int observed_alpha = job->root_alpha.load(std::memory_order_relaxed);
-                    while (score > observed_alpha &&
+                    while (exact_score && score > observed_alpha &&
                            !job->root_alpha.compare_exchange_weak(
                                observed_alpha, score, std::memory_order_relaxed,
                                std::memory_order_relaxed)) {
@@ -1728,7 +1760,12 @@ private:
                     line.score = score;
                     line.stable_index = (*job->stable_root_indices)[move_index];
                     line.pv.prepend(root_move.move, child_pv);
-                    line.completed = true;
+                    // A scout fail-low is an upper bound for this root move,
+                    // not an exact score. Keep it out of authoritative root
+                    // ranking; the shared alpha already comes from an exact
+                    // line, and any move that can exceed it is re-searched
+                    // above with a full window.
+                    line.completed = exact_score;
                 } catch (...) {
                     context.request_abort();
                     job->aborted.store(true, std::memory_order_relaxed);
@@ -1938,6 +1975,7 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
             } else {
                 result.score_cp = evaluator->evaluate(root, root.side_to_move());
             }
+            const int root_static_eval = result.score_cp;
             const bool root_is_claimable_draw = root.is_draw_by_rule();
 
             std::optional<SyzygyRootResult> tablebase_result;
@@ -2084,6 +2122,7 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                     const std::optional<Move> previous_best_move = result.best_move;
                     const std::vector<Move> previous_pv = result.pv;
                     const bool had_completed_iteration = result.completed_depth > 0;
+                    context.root_move_hint = had_completed_iteration ? result.best_move : std::nullopt;
                     PrincipalVariation pv;
                     int alpha = -kInfinity;
                     int beta = kInfinity;
@@ -2676,6 +2715,21 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                 MoveMetadataList parallel_moves = legal_moves;
                 detail::SearchMoveOrdering root_ordering;
                 root_ordering.order(root, parallel_moves, std::nullopt, 0);
+                std::vector<RootScheduleRecord> root_schedule;
+                root_schedule.reserve(parallel_moves.size());
+                for (std::size_t index = 0; index < parallel_moves.size(); ++index) {
+                    root_schedule.push_back(
+                        RootScheduleRecord{parallel_moves[index].move, index, -kInfinity, false});
+                }
+                const auto schedule_record_for = [&root_schedule](const Move move)
+                    -> RootScheduleRecord* {
+                    const auto record = std::find_if(
+                        root_schedule.begin(), root_schedule.end(),
+                        [move](const RootScheduleRecord& candidate) {
+                            return candidate.move == move;
+                        });
+                    return record == root_schedule.end() ? nullptr : &*record;
+                };
                 bool used_short_fallback = false;
                 const bool defer_nonchecking_short_fallback =
                     ultra_short_nonchecked_fallback || ultra_short_nonchecked_forcing_root;
@@ -2731,15 +2785,68 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                             tt_move = entry->best_move;
                         }
                     }
-                    if (!tt_move.has_value() && result.completed_depth > 0 &&
-                        result.best_move.has_value()) {
+                    // The previous completed root PV is the authoritative
+                    // iterative-deepening hint.  A TT move can come from a
+                    // displaced/partial worker and must not displace the
+                    // completed result at the root, matching Stockfish 19's
+                    // root PV precedence.
+                    if (result.completed_depth > 0 && result.best_move.has_value()) {
                         tt_move = result.best_move;
                     }
                     root_ordering.order(root, parallel_moves, tt_move, 0);
+                    if (depth > 1) {
+                        std::vector<std::size_t> schedule_indices;
+                        schedule_indices.reserve(parallel_moves.size());
+                        for (std::size_t index = 0; index < parallel_moves.size(); ++index) {
+                            schedule_indices.push_back(index);
+                        }
+                        std::stable_sort(
+                            schedule_indices.begin(), schedule_indices.end(),
+                            [&parallel_moves, &tt_move, &schedule_record_for](
+                                const std::size_t left, const std::size_t right) {
+                            const Move left_move = parallel_moves[left].move;
+                            const Move right_move = parallel_moves[right].move;
+                            const bool left_tt = tt_move.has_value() && left_move == *tt_move;
+                            const bool right_tt = tt_move.has_value() && right_move == *tt_move;
+                            if (left_tt != right_tt) {
+                                return left_tt;
+                            }
+
+                            const RootScheduleRecord* left_record =
+                                schedule_record_for(left_move);
+                            const RootScheduleRecord* right_record =
+                                schedule_record_for(right_move);
+                            const bool left_scored = left_record != nullptr &&
+                                left_record->has_previous_score;
+                            const bool right_scored = right_record != nullptr &&
+                                right_record->has_previous_score;
+                            if (left_scored != right_scored) {
+                                return left_scored;
+                            }
+                            if (left_scored && right_scored &&
+                                left_record->previous_score != right_record->previous_score) {
+                                return left_record->previous_score > right_record->previous_score;
+                            }
+                            const std::size_t left_stable = left_record != nullptr ?
+                                left_record->stable_index : left;
+                            const std::size_t right_stable = right_record != nullptr ?
+                                right_record->stable_index : right;
+                            return left_stable < right_stable;
+                        });
+
+                        MoveMetadataList scheduled_moves;
+                        for (const std::size_t index : schedule_indices) {
+                            (void)scheduled_moves.push_back(parallel_moves[index]);
+                        }
+                        parallel_moves = scheduled_moves;
+                    }
                     std::vector<std::size_t> stable_root_indices;
                     stable_root_indices.reserve(parallel_moves.size());
                     for (std::size_t index = 0; index < parallel_moves.size(); ++index) {
-                        stable_root_indices.push_back(index);
+                        const RootScheduleRecord* record =
+                            schedule_record_for(parallel_moves[index].move);
+                        stable_root_indices.push_back(
+                            record != nullptr ? record->stable_index : index);
                     }
 
                     std::vector<RootLine> lines(parallel_moves.size());
@@ -2755,7 +2862,7 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                     const bool use_root_pvs = !multi_pv &&
                         (!limits.depth.has_value() || worker_count < 4);
                     pool.run(root, parallel_moves, depth, root_check_extension, stable_root_indices,
-                             lines, use_root_pvs, iteration_stats, aborted);
+                             lines, use_root_pvs, root_static_eval, iteration_stats, aborted);
                     if (aborted) {
                         if (result.completed_depth == 0 && !used_short_fallback &&
                             defer_nonchecking_short_fallback) {
@@ -2959,6 +3066,23 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                                     break;
                                 }
                             }
+                        }
+                    }
+
+                    // Remember only a fully completed root iteration.  The
+                    // score may be a scout bound for a move below alpha, but
+                    // it is still the best available estimate for queue
+                    // scheduling; the completed principal move and its TT
+                    // entry retain authority for correctness.
+                    for (std::size_t index = 0; index < lines.size(); ++index) {
+                        if (!lines[index].completed) {
+                            continue;
+                        }
+                        if (RootScheduleRecord* record =
+                                schedule_record_for(parallel_moves[index].move);
+                            record != nullptr) {
+                            record->previous_score = lines[index].score;
+                            record->has_previous_score = true;
                         }
                     }
 

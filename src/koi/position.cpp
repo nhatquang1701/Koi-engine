@@ -712,6 +712,16 @@ public:
 
     [[nodiscard]] std::uint64_t position_key() const noexcept { return state.key; }
 
+    [[nodiscard]] std::uint64_t pawn_key() const noexcept {
+        constexpr std::size_t pawn = static_cast<std::size_t>(PieceType::pawn);
+        // The native state maintains these bitboards incrementally. Mix the
+        // two colors before the history table masks the result so nearby
+        // board squares do not create a biased bucket distribution.
+        std::uint64_t seed = state.piece_bitboards[0][pawn] ^
+            state.piece_bitboards[1][pawn] * 0xD6E8FEB86659FD93ULL;
+        return splitmix64(seed);
+    }
+
     [[nodiscard]] std::size_t piece_count() const noexcept {
         std::size_t count = 0;
         for (const Piece& piece : state.board) {
@@ -1171,6 +1181,8 @@ bool Position::set_fen_unchecked(std::string_view fen) {
 }
 
 std::uint64_t Position::position_key() const noexcept { return impl_->position.position_key(); }
+
+std::uint64_t Position::pawn_key() const noexcept { return impl_->position.pawn_key(); }
 
 std::size_t Position::piece_count() const noexcept { return impl_->position.piece_count(); }
 

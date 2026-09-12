@@ -255,6 +255,9 @@ public:
     bool make_null_move() noexcept;
     bool unmake_null_move() noexcept;
     [[nodiscard]] bool is_capture(const Move& move) const noexcept;
+    // Fast native check probe used by the search when regular move metadata
+    // intentionally omits capture check flags.
+    [[nodiscard]] bool move_gives_check(const Move& move) const noexcept;
     [[nodiscard]] bool in_check() const noexcept;
     [[nodiscard]] bool in_check(Color color) const noexcept;
     [[nodiscard]] bool has_non_pawn_material(Color color) const noexcept;
@@ -267,6 +270,8 @@ public:
     [[nodiscard]] bool is_draw_by_rule() const noexcept;
     [[nodiscard]] bool is_terminal() const noexcept;
     [[nodiscard]] std::uint64_t position_key() const noexcept;
+    // Search-only structural key for the adaptive pawn-history table.
+    [[nodiscard]] std::uint64_t pawn_key() const noexcept;
     [[nodiscard]] std::uint64_t polyglot_key() const noexcept;
     [[nodiscard]] std::uint8_t castling_rights() const noexcept;
     [[nodiscard]] Square en_passant_square() const noexcept;

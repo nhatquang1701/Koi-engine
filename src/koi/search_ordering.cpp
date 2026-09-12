@@ -183,10 +183,14 @@ int SearchMoveOrdering::priority(const GameState& state, const MoveMetadata& met
     if (metadata.is_capture()) {
         const int victim_value = piece_value(metadata.captured_piece);
         const int attacker_value = piece_value(metadata.moving_piece);
-        const int see = std::clamp(static_cast<int>(metadata.see_score),
-                                   -piece_value(PieceType::queen), piece_value(PieceType::queen));
+        // Staged search scores captures before SEE is needed, just like
+        // Stockfish 19's capture-history picker.  Once a candidate has been
+        // materialized, the exact exchange result is a useful tie-breaker.
+        const int see = metadata.see_computed ? std::clamp(
+            static_cast<int>(metadata.see_score),
+            -piece_value(PieceType::queen), piece_value(PieceType::queen)) : 0;
         const int capture_history = tables_.capture_history_score(metadata);
-        const int bad_capture_penalty = see < 0 && !metadata.gives_check ?
+        const int bad_capture_penalty = metadata.see_computed && see < 0 && !metadata.gives_check ?
             kBadCapturePenalty : 0;
         return kCapturePriority - bad_capture_penalty + (victim_value * 16) - attacker_value +
             promotion_value(move.promotion()) + see * kSeeOrderingWeight +
@@ -226,10 +230,11 @@ int SearchMoveOrdering::priority(const GameState& state, const MoveMetadata& met
     if (metadata.is_capture()) {
         const int victim_value = piece_value(metadata.captured_piece);
         const int attacker_value = piece_value(metadata.moving_piece);
-        const int see = std::clamp(static_cast<int>(metadata.see_score),
-                                   -piece_value(PieceType::queen), piece_value(PieceType::queen));
+        const int see = metadata.see_computed ? std::clamp(
+            static_cast<int>(metadata.see_score),
+            -piece_value(PieceType::queen), piece_value(PieceType::queen)) : 0;
         const int capture_history = tables_.capture_history_score(metadata);
-        const int bad_capture_penalty = see < 0 && !metadata.gives_check ?
+        const int bad_capture_penalty = metadata.see_computed && see < 0 && !metadata.gives_check ?
             kBadCapturePenalty : 0;
         return kCapturePriority - bad_capture_penalty + (victim_value * 16) - attacker_value +
             promotion_value(move.promotion()) + see * kSeeOrderingWeight +
@@ -301,6 +306,11 @@ int SearchMoveOrdering::quiet_history_score(
     return tables_.quiet_history_score(side, metadata, history_context);
 }
 
+int SearchMoveOrdering::continuation_history_score(
+    const MoveMetadata& metadata, const SearchHistoryContext& history_context) const noexcept {
+    return tables_.continuation_history_score(metadata, history_context);
+}
+
 int SearchMoveOrdering::capture_history_score(
     const MoveMetadata& metadata) const noexcept {
     return tables_.capture_history_score(metadata);
@@ -352,6 +362,227 @@ void SearchMoveOrdering::record_capture_fail(
     const MoveMetadata& metadata, const int depth,
     const SearchHistoryContext& history_context) noexcept {
     tables_.record_capture_fail(metadata, depth, history_context);
+}
+
+SearchMovePicker::SearchMovePicker(
+    const SearchMoveOrdering& ordering, const GameState& state,
+    const MoveMetadataList& moves, std::optional<Move> tt_move,
+    const SearchHistoryContext& history_context, const int ply, const Mode mode,
+    const Move excluded_move) noexcept
+    : ordering_(ordering), state_(state), moves_(moves),
+      history_context_(history_context), tt_move_(tt_move),
+      excluded_move_(excluded_move), ply_(ply), mode_(mode), stage_(first_stage()) {}
+
+bool SearchMovePicker::is_excluded(const std::size_t index) const noexcept {
+    return index >= moves_.size() || emitted_.test(index) ||
+        moves_[index].move == excluded_move_;
+}
+
+bool SearchMovePicker::is_good_capture(const MoveMetadata& metadata) const noexcept {
+    if (!metadata.is_capture()) {
+        return false;
+    }
+    // Stockfish 19 scales the SEE threshold with capture history and victim
+    // value (its `-cur->value / 18` gate). A fixed threshold over-searches
+    // poorly ordered pawn captures while delaying high-value tactical
+    // recaptures, so retain that calibrated relationship in centipawn units.
+    const int capture_score = ordering_.capture_history_score(metadata) +
+        7 * piece_value(metadata.captured_piece);
+    const int threshold = std::clamp(-(capture_score / 18), -1024, 1024);
+    return metadata.gives_check || metadata.see_score >= threshold;
+}
+
+SearchMovePicker::Stage SearchMovePicker::first_stage() const noexcept {
+    return Stage::tt;
+}
+
+MoveMetadata SearchMovePicker::materialize(const std::size_t index) {
+    MoveMetadata metadata = moves_[index];
+    if (metadata.is_capture()) {
+        if (!see_computed_.test(index)) {
+            if (metadata.see_computed) {
+                see_scores_[index] = metadata.see_score;
+            } else {
+                see_scores_[index] = static_cast<std::int16_t>(std::clamp(
+                    static_exchange_gain(state_, metadata),
+                    static_cast<int>(std::numeric_limits<std::int16_t>::min()),
+                    static_cast<int>(std::numeric_limits<std::int16_t>::max())));
+            }
+            see_computed_.set(index);
+        }
+        metadata.see_score = see_scores_[index];
+        metadata.see_computed = true;
+    }
+    const bool promotion = metadata.move.promotion() != Promotion::none;
+    if (mode_ == Mode::main && (metadata.is_capture() || promotion) &&
+        !metadata.gives_check && !capture_check_computed_.test(index)) {
+        capture_checks_[index] = state_.move_gives_check(metadata.move);
+        capture_check_computed_.set(index);
+    }
+    if (capture_check_computed_.test(index)) {
+        metadata.gives_check = metadata.gives_check || capture_checks_.test(index);
+    }
+    return metadata;
+}
+
+void SearchMovePicker::prepare_candidates() {
+    candidate_count_ = 0;
+    candidate_index_ = 0;
+    deferred_bad_capture_count_ = 0;
+    deferred_bad_capture_index_ = 0;
+    candidates_prepared_ = true;
+
+    for (std::size_t index = 0; index < moves_.size(); ++index) {
+        if (is_excluded(index)) {
+            continue;
+        }
+        MoveMetadata metadata = moves_[index];
+
+        Stage candidate_stage = Stage::done;
+        if (mode_ == Mode::evasion) {
+            candidate_stage = Stage::evasions;
+        } else if (mode_ == Mode::quiescence) {
+            // Stockfish's qsearch capture stage emits the complete capture
+            // list and lets qsearch SEE/delta pruning decide what is safe;
+            // do not discard a mildly losing recapture in the picker.
+            if (metadata.is_capture() || metadata.move.promotion() != Promotion::none) {
+                candidate_stage = Stage::good_captures;
+            } else if (metadata.gives_check) {
+                candidate_stage = Stage::quiet_checks;
+            }
+        } else if (metadata.move.promotion() != Promotion::none || metadata.is_capture()) {
+            candidate_stage = Stage::good_captures;
+        } else if (metadata.gives_check) {
+            candidate_stage = Stage::quiet_checks;
+        } else {
+            const bool special_quiet = ordering_.is_killer(metadata.move, ply_) ||
+                 (history_context_.count > 0 &&
+                  ordering_.tables_.is_proven_counter_move(
+                      state_.side_to_move(), history_context_.continuation_moves[0],
+                      metadata.move));
+            candidate_stage = special_quiet ? Stage::special_quiets : Stage::quiets;
+        }
+        if (candidate_stage == Stage::done) {
+            continue;
+        }
+        const int priority = ordering_.priority(
+            state_, metadata, std::nullopt, history_context_);
+        staged_[candidate_count_++] = Candidate{
+            static_cast<std::uint16_t>(index), static_cast<std::uint8_t>(candidate_stage),
+            priority, move_tie_break_key(metadata.move)};
+    }
+
+    std::sort(staged_.begin(), staged_.begin() + candidate_count_,
+              [](const Candidate& lhs, const Candidate& rhs) {
+                  if (lhs.stage_rank != rhs.stage_rank) {
+                      return lhs.stage_rank < rhs.stage_rank;
+                  }
+                  if (lhs.priority != rhs.priority) {
+                      return lhs.priority > rhs.priority;
+                  }
+                  if (lhs.tie_break != rhs.tie_break) {
+                      return lhs.tie_break < rhs.tie_break;
+                  }
+                  return lhs.source_index < rhs.source_index;
+              });
+}
+
+void SearchMovePicker::advance_stage() noexcept {
+    switch (stage_) {
+    case Stage::tt:
+        stage_ = mode_ == Mode::evasion ? Stage::evasions : Stage::good_captures;
+        break;
+    case Stage::good_captures:
+        stage_ = Stage::quiet_checks;
+        break;
+    case Stage::quiet_checks:
+        stage_ = mode_ == Mode::quiescence ? Stage::done : Stage::special_quiets;
+        break;
+    case Stage::special_quiets:
+        stage_ = Stage::quiets;
+        break;
+    case Stage::quiets:
+        stage_ = Stage::bad_captures;
+        break;
+    case Stage::bad_captures:
+    case Stage::evasions:
+    case Stage::done:
+        stage_ = Stage::done;
+        break;
+    }
+}
+
+std::optional<MoveMetadata> SearchMovePicker::emit_tt() {
+    if (tt_emitted_ || !tt_move_.has_value()) {
+        return std::nullopt;
+    }
+    tt_emitted_ = true;
+    for (std::size_t index = 0; index < moves_.size(); ++index) {
+        if (!is_excluded(index) && moves_[index].move == *tt_move_) {
+            emitted_.set(index);
+            MoveMetadata metadata = materialize(index);
+            metadata.ordering_score = ordering_.priority(
+                state_, metadata, tt_move_, history_context_);
+            return metadata;
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<MoveMetadata> SearchMovePicker::next() {
+    for (;;) {
+        if (stage_ == Stage::done) {
+            return std::nullopt;
+        }
+        if (stage_ == Stage::tt) {
+            if (const auto tt = emit_tt(); tt.has_value()) {
+                advance_stage();
+                return tt;
+            }
+            advance_stage();
+            continue;
+        }
+        if (skip_quiets_ && (stage_ == Stage::special_quiets ||
+                             stage_ == Stage::quiets)) {
+            advance_stage();
+            continue;
+        }
+        if (!candidates_prepared_) {
+            prepare_candidates();
+        }
+        while (candidate_index_ < candidate_count_ &&
+               staged_[candidate_index_].stage_rank < static_cast<std::uint8_t>(stage_)) {
+            ++candidate_index_;
+        }
+        if (candidate_index_ < candidate_count_ &&
+            staged_[candidate_index_].stage_rank == static_cast<std::uint8_t>(stage_)) {
+            const Candidate candidate = staged_[candidate_index_++];
+            emitted_.set(candidate.source_index);
+            MoveMetadata metadata = materialize(candidate.source_index);
+            if (mode_ == Mode::main && stage_ == Stage::good_captures &&
+                metadata.is_capture() && !is_good_capture(metadata)) {
+                if (deferred_bad_capture_count_ < deferred_bad_capture_indices_.size()) {
+                    deferred_bad_capture_indices_[deferred_bad_capture_count_++] =
+                        candidate.source_index;
+                }
+                continue;
+            }
+            metadata.ordering_score = ordering_.priority(
+                state_, metadata, std::nullopt, history_context_);
+            return metadata;
+        }
+        if (stage_ == Stage::bad_captures) {
+            if (deferred_bad_capture_index_ < deferred_bad_capture_count_) {
+                const std::size_t source_index =
+                    deferred_bad_capture_indices_[deferred_bad_capture_index_++];
+                MoveMetadata metadata = materialize(source_index);
+                metadata.ordering_score = ordering_.priority(
+                    state_, metadata, std::nullopt, history_context_);
+                return metadata;
+            }
+        }
+        advance_stage();
+    }
 }
 
 } // namespace koi::detail

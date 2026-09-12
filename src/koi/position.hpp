@@ -49,6 +49,10 @@ public:
     // check-state, or king-distance legality rules used by production UCI.
     bool set_fen_unchecked(std::string_view fen);
     [[nodiscard]] std::uint64_t position_key() const noexcept;
+    // Key containing only the two pawn bitboards. Search history tables use
+    // it so equal pawn structures share experience across otherwise
+    // different piece placements and rule-state fields.
+    [[nodiscard]] std::uint64_t pawn_key() const noexcept;
     [[nodiscard]] std::size_t piece_count() const noexcept;
     [[nodiscard]] std::uint64_t piece_bitboard(PieceType type, Color color) const noexcept;
     [[nodiscard]] bool in_check() const noexcept;

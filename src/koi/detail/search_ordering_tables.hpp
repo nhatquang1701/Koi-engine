@@ -19,8 +19,8 @@ struct SearchHistoryContext {
     std::array<Move, kSearchContinuationPlies> continuation_moves{};
     std::size_t count = 0;
     int ply = 0;
-    // GameState does not expose a separate pawn key.  The search uses the
-    // position key as a stable, collision-tolerant pawn-structure bucket;
+    // The search supplies a pawn-only structural key so equal pawn
+    // structures share experience across otherwise different piece layouts;
     // the move dimensions remain explicit in the table index.
     std::uint64_t pawn_key = 0;
 };
@@ -43,6 +43,8 @@ public:
     [[nodiscard]] int quiet_history_score(
         Color side, const MoveMetadata& metadata,
         const SearchHistoryContext& context) const noexcept;
+    [[nodiscard]] int continuation_history_score(
+        const MoveMetadata& metadata, const SearchHistoryContext& context) const noexcept;
     [[nodiscard]] int capture_history_score(const MoveMetadata& metadata) const noexcept;
     [[nodiscard]] bool is_proven_counter_move(
         Color side, Move previous_move, Move move) const noexcept;

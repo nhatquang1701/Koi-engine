@@ -1974,7 +1974,23 @@ bool GameState::make_generated_move(const MoveMetadata& metadata) noexcept {
 }
 
 bool GameState::make_search_move(const MoveMetadata& metadata) noexcept {
-    return apply_generated_move(metadata, false, false);
+    // The staged picker may lazily discover that a generated capture or
+    // promotion gives check. `gives_check` is part of the public metadata
+    // authenticity token for ordinary generated moves, so refresh only this
+    // one search-local annotation after proving that the supplied token
+    // matches the original unannotated move. No other metadata mutation is
+    // accepted here.
+    MoveMetadata search_metadata = metadata;
+    if ((metadata.is_capture() || metadata.move.promotion() != Promotion::none) &&
+        metadata.gives_check) {
+        MoveMetadata unannotated = metadata;
+        unannotated.gives_check = false;
+        const std::uint64_t key = position_key();
+        if (metadata.validation_token == metadata_validation_token(key, unannotated)) {
+            search_metadata.validation_token = metadata_validation_token(key, search_metadata);
+        }
+    }
+    return apply_generated_move(search_metadata, false, false);
 }
 
 bool GameState::unmake_move() noexcept {
@@ -2025,6 +2041,10 @@ bool GameState::is_capture(const Move& move) const noexcept {
     return impl_->native_position.is_capture(move);
 }
 
+bool GameState::move_gives_check(const Move& move) const noexcept {
+    return native_move_gives_check(impl_->native_position, move);
+}
+
 bool GameState::in_check() const noexcept {
     return impl_->native_position.in_check();
 }
@@ -2051,6 +2071,10 @@ bool GameState::is_terminal() const noexcept {
 
 std::uint64_t GameState::position_key() const noexcept {
     return impl_->native_position.position_key();
+}
+
+std::uint64_t GameState::pawn_key() const noexcept {
+    return impl_->native_position.pawn_key();
 }
 
 std::uint64_t GameState::polyglot_key() const noexcept {

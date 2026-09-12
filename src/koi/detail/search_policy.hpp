@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <cmath>
 
 #include "koi/detail/search_constants.hpp"
 
@@ -58,15 +59,23 @@ public:
         const bool checked, const bool allowed, const bool improving,
         const bool pawn_endgame) noexcept {
         const NullMoveDecision base = null_move(depth, alpha, beta, checked, allowed);
-        if (!base.eligible || pawn_endgame || static_eval < beta - 80 - depth * 24) {
+        // Match Stockfish 19's static-evaluation guard.  Null move is only a
+        // useful proof at a cut node when the side to move is already well
+        // above beta; making this gate permissive is a common source of
+        // zugzwang and defensive-resource losses.
+        const int static_eval_floor = beta + 365 - 13 * depth -
+            (improving ? 47 : 0);
+        if (!base.eligible || pawn_endgame || beta < -2'000 ||
+            static_eval < static_eval_floor) {
             return {};
         }
 
         const int excess = std::max(0, static_eval - beta);
-        const int reduction = std::clamp(
-            2 + depth / 5 + std::min(2, excess / 192) + (!improving ? 1 : 0),
-            2, std::max(2, depth - 2));
-        return DynamicNullMoveDecision{true, reduction, depth >= 5 && reduction >= 3};
+        // Stockfish 19: R = 7 + depth / 3 + max((eval - beta) / 256, 0).
+        // Keep the exact shape; the call site clamps the resulting child
+        // depth at qsearch when R exceeds the remaining horizon.
+        const int reduction = 7 + depth / 3 + excess / 256;
+        return DynamicNullMoveDecision{true, reduction, depth >= 16};
     }
 
     [[nodiscard]] static constexpr bool check_extension(
@@ -102,19 +111,25 @@ public:
         const int history_score, const int continuation_score,
         const int capture_history_score, const bool root_pawn_move,
         const bool checked, const bool gives_check, const bool capture,
-        const bool promotion, const bool tt_move, const bool killer,
-        const bool reducible_quiet, const bool quiet_forcing,
-        const bool pv_node, const bool cut_node, const bool improving,
-        const bool prior_fail_high, const bool has_tt_move) noexcept {
-        const bool candidate = !root_pawn_move && move_number >= 3 && depth >= 3 &&
-            !checked && !gives_check && !capture && !promotion && !tt_move && !killer;
+         const bool promotion, const bool tt_move, const bool killer,
+         const bool reducible_quiet, const bool quiet_forcing,
+         const bool pv_node, const bool cut_node, const bool improving,
+         const bool prior_fail_high, const int next_cutoff_count,
+         const bool has_tt_move,
+         const bool tt_pv) noexcept {
+        // Stockfish applies LMR to sufficiently late non-checking captures as
+        // well as quiet moves. Captures start one step more conservatively,
+        // while their capture history still controls the final reduction.
+        const bool candidate = !root_pawn_move && move_number >= 2 && depth >= 4 &&
+            !checked && !gives_check && !promotion && !tt_move && !killer &&
+            (!capture || capture_history_score > -8'192);
         const bool high_history_exclusion = candidate &&
             high_history_move_excluded_from_lmr(history_score);
         if (!candidate) {
             return LateMoveDecision{false, false, 0, false};
         }
 
-        int reduction = 1;
+        int reduction = capture ? 0 : 1;
         if (depth >= 7 && move_number >= 7) {
             ++reduction;
         }
@@ -127,6 +142,15 @@ public:
         if (cut_node) {
             ++reduction;
         }
+        // A TT-PV entry is a stronger ordering signal than an ordinary TT
+        // move.  Stockfish's fixed-point LMR formula gives these nodes a
+        // compensating reduction decrease after its node-type adjustments;
+        // mirror that behavior in the integer-depth policy.
+        // The legacy late_move() contract remains unchanged for diagnostics;
+        // live search uses this dynamic form with the TT-PV state supplied.
+        if (tt_pv) {
+            --reduction;
+        }
         if (!improving) {
             ++reduction;
         }
@@ -136,7 +160,16 @@ public:
         if (!has_tt_move) {
             ++reduction;
         }
-        if (prior_fail_high) {
+        // Stockfish uses the number of fail-high children in the next ply as
+        // a direct signal that this move is likely to be a late/less useful
+        // continuation. Keep the old one-bit sibling signal as a small
+        // compensating hint when that stronger count is unavailable.
+        if (next_cutoff_count > 1) {
+            ++reduction;
+            if (next_cutoff_count > 2) {
+                ++reduction;
+            }
+        } else if (prior_fail_high) {
             --reduction;
         }
         if (history_score > 512) {
@@ -151,14 +184,15 @@ public:
         }
         if (capture_history_score < -512) {
             ++reduction;
+        } else if (capture && capture_history_score > 512) {
+            --reduction;
         }
         // Stockfish 19 still performs the late-move probe on PV nodes; its
         // PV adjustment makes the probe shallower/less reduced but does not
         // turn it into an unconditional full-depth move. Preserve that
         // distinction in Koi's integer-depth representation.
-        const int minimum_reduction = pv_node && full_child_depth > 0 ? 1 : 0;
         reduction = std::clamp(
-            reduction, minimum_reduction, std::max(minimum_reduction, full_child_depth));
+            reduction, 0, std::max(0, full_child_depth));
         return LateMoveDecision{
             candidate, high_history_exclusion, reduction,
             !high_history_exclusion && reducible_quiet && !quiet_forcing && reduction > 0};
@@ -169,14 +203,15 @@ public:
         const bool checked, const bool improving, const bool excluded_move,
         const bool repetition_sensitive) noexcept {
         const bool eligible = !checked && !excluded_move && !repetition_sensitive &&
-            depth >= 4 && beta > -kInfinity + 512 && beta < kInfinity - 512 &&
+            depth >= 3 && std::abs(beta) < kMateThreshold &&
+            beta > -kInfinity + 512 && beta < kInfinity - 512 &&
             static_eval >= beta - 160 - depth * 16;
         if (!eligible) {
             return {};
         }
-        const int margin = 180 - (improving ? 32 : 0) + std::clamp(beta - alpha, 0, 32);
+        const int margin = 241 - (improving ? 64 : 0);
         return ProbCutDecision{true, beta + margin,
-                               std::max(1, depth - (improving ? 4 : 3))};
+                               std::max(0, depth - (improving ? 5 : 3))};
     }
 
     [[nodiscard]] static constexpr bool quiet_futility(
@@ -194,7 +229,7 @@ public:
         if (checked || !capture || gives_check || promotion) {
             return QuiescenceCapturePrune::none;
         }
-        if (see_score < 0) {
+        if (see_score < kQuiescenceSeeThreshold) {
             return QuiescenceCapturePrune::static_exchange;
         }
         return best + captured_piece_value + 100 < alpha ?
