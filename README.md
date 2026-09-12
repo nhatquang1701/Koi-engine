@@ -1,6 +1,6 @@
-# Koi Engine v1.1.0
+# Koi Engine
 
-Koi Engine v1.1.0 is a Windows x64 UCI chess engine for standard chess. It is
+Koi Engine is a Windows x64 UCI chess engine for standard chess. It is
 written in C++26 and is documented and process-tested against En Croissant as
 the primary GUI workflow. It uses deterministic iterative-deepening alpha-beta search
 with a classical evaluator, an opt-in Koi-native NNUE boundary, and a persistent

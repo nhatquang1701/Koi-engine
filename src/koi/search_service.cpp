@@ -2429,38 +2429,59 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                             };
                             std::array<MoveMetadata, 4> candidates{};
                             std::size_t candidate_count = 0;
+                            bool has_quiet_forcing_candidate = false;
                             candidates[candidate_count++] = *best_metadata;
-                            for (std::size_t index = 0;
-                                 index < context.root_move_score_count && candidate_count < candidates.size();
-                                 ++index) {
-                                const SearchContext::RootMoveScore& root_score =
-                                    context.root_move_scores[index];
-                                if (root_score.move == *result.best_move ||
-                                    root_score.score < score - shallow_root_margin) {
-                                    continue;
+                            const auto append_candidates = [&] (const bool quiet_only) {
+                                for (std::size_t index = 0;
+                                     index < context.root_move_score_count &&
+                                     candidate_count < candidates.size(); ++index) {
+                                    const SearchContext::RootMoveScore& root_score =
+                                        context.root_move_scores[index];
+                                    if (root_score.move == *result.best_move ||
+                                        root_score.score < score - shallow_root_margin) {
+                                        continue;
+                                    }
+                                    const auto metadata = std::find_if(
+                                        legal_moves.begin(), legal_moves.end(),
+                                        [&root_score](const MoveMetadata& move_metadata) {
+                                            return move_metadata.move == root_score.move;
+                                        });
+                                    if (metadata == legal_moves.end()) {
+                                        continue;
+                                    }
+                                    const bool conventional_forcing = metadata->is_capture() ||
+                                        metadata->gives_check ||
+                                        metadata->move.promotion() != Promotion::none;
+                                    if (quiet_only) {
+                                        if (conventional_forcing ||
+                                            !is_root_forcing_candidate(*metadata)) {
+                                            continue;
+                                        }
+                                        has_quiet_forcing_candidate = true;
+                                    } else if (!conventional_forcing) {
+                                        continue;
+                                    }
+                                    candidates[candidate_count++] = *metadata;
                                 }
-                                const auto metadata = std::find_if(
-                                    legal_moves.begin(), legal_moves.end(),
-                                    [&root_score](const MoveMetadata& move_metadata) {
-                                        return move_metadata.move == root_score.move;
-                                    });
-                                if (metadata == legal_moves.end() ||
-                                    !is_root_forcing_candidate(*metadata)) {
-                                    continue;
-                                }
-                                candidates[candidate_count++] = *metadata;
-                            }
+                            };
+                            // Keep checks/captures/promotions ahead of the more
+                            // expensive quiet-forcing confirmation candidates.
+                            append_candidates(false);
+                            append_candidates(true);
 
                             if (candidate_count > 1) {
                                 int extended_score = -kInfinity;
                                 std::optional<Move> extended_move;
                                 bool extended_forcing = false;
                                 PrincipalVariation extended_pv;
+                                const int confirmation_depth =
+                                    has_quiet_forcing_candidate && limits.depth.has_value() ?
+                                        depth + 2 : depth + 1;
                                 for (std::size_t index = 0; index < candidate_count; ++index) {
                                     ++context.stats.root_selective_candidates;
                                     const SearchContext::RootVerification verification =
                                         context.selectively_research_root_move(root, candidates[index],
-                                                                               depth + 1);
+                                                                               confirmation_depth);
                                     if (context.aborted) {
                                         break;
                                     }
