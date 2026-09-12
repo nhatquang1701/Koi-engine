@@ -2407,6 +2407,26 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                             // centipawns ahead of a check, capture, or promotion.  At an
                             // incomplete depth-one root the quiet score is not authoritative;
                             // compare the quiet move and a small forcing band at depth two.
+                            // A quiet move can itself be forcing (for example, a fork or
+                            // direct attack) even though it has no check flag. Include those
+                            // moves in the same confirmation band so root ordering does not
+                            // discard the tactical signal already used by the recursive search.
+                            const PositionFeatures root_features = root.position_features();
+                            const auto is_root_forcing_candidate = [&root, &root_features](
+                                const MoveMetadata& metadata) {
+                                if (metadata.is_capture() || metadata.gives_check ||
+                                    metadata.move.promotion() != Promotion::none) {
+                                    return true;
+                                }
+                                if (!quiet_move_has_direct_forcing_target(root_features, metadata) ||
+                                    !root.make_search_move(metadata)) {
+                                    return false;
+                                }
+                                const bool forcing = quiet_move_is_forcing(
+                                    root_features, root.position_features(), metadata);
+                                (void)root.unmake_move();
+                                return forcing;
+                            };
                             std::array<MoveMetadata, 4> candidates{};
                             std::size_t candidate_count = 0;
                             candidates[candidate_count++] = *best_metadata;
@@ -2425,8 +2445,7 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                                         return move_metadata.move == root_score.move;
                                     });
                                 if (metadata == legal_moves.end() ||
-                                    (!metadata->is_capture() && !metadata->gives_check &&
-                                     metadata->move.promotion() == Promotion::none)) {
+                                    !is_root_forcing_candidate(*metadata)) {
                                     continue;
                                 }
                                 candidates[candidate_count++] = *metadata;
