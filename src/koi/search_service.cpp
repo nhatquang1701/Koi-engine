@@ -851,6 +851,11 @@ std::optional<Move> short_search_fallback_move(
             if (deadline_seen && !permit_overdue_shallow) {
                 break;
             }
+            if (std::getenv("KOI_TRACE_FALLBACK") != nullptr) {
+                std::fprintf(stderr, "fallback-candidate key=%llu move=%s overdue=%d\\n",
+                             static_cast<unsigned long long>(root.position_key()),
+                             metadata.move.uci().c_str(), deadline_seen ? 1 : 0);
+            }
             if (stats != nullptr) {
                 ++stats->short_fallback_candidates;
                 if (deadline_seen) {
@@ -1270,6 +1275,15 @@ std::optional<Move> short_search_fallback_move(
                 best_quiet_forcing_score = score;
                 best_quiet_forcing_move = metadata.move;
             }
+            if (std::getenv("KOI_TRACE_FALLBACK") != nullptr) {
+                std::fprintf(stderr,
+                             "fallback-trace key=%llu move=%s score=%d deep=%d overdue=%d replies=%zu check=%d quiet_forcing=%d\\n",
+                             static_cast<unsigned long long>(root.position_key()),
+                             metadata.move.uci().c_str(), score,
+                             perform_deep_fallback ? 1 : 0, deadline_seen ? 1 : 0,
+                             forcing_reply_count, exposes_immediate_check ? 1 : 0,
+                             quiet_forcing ? 1 : 0);
+            }
             if ((!best_move.has_value() || score > best_score || safer_king_evasion ||
                  safe_capture_tie || safe_capture_safety_tie || safe_equal_exchange_tie ||
                  forcing_check_tie || prefer_quiet_king_evasion) &&
@@ -1292,6 +1306,18 @@ std::optional<Move> short_search_fallback_move(
         }
     } catch (...) {
         return std::nullopt;
+    }
+    if (std::getenv("KOI_TRACE_FALLBACK") != nullptr) {
+        std::fprintf(stderr,
+                     "fallback-result key=%llu best=%s score=%d quiet=%s quiet_score=%d broad=%s broad_score=%d unsafe=%s unsafe_score=%d\\n",
+                     static_cast<unsigned long long>(root.position_key()),
+                     best_move.has_value() ? best_move->uci().c_str() : "none", best_score,
+                     best_quiet_forcing_move.has_value() ? best_quiet_forcing_move->uci().c_str() : "none",
+                     best_quiet_forcing_score,
+                     broad_check_fallback_move.has_value() ? broad_check_fallback_move->uci().c_str() : "none",
+                     broad_check_fallback_score,
+                     unsafe_best_move.has_value() ? unsafe_best_move->uci().c_str() : "none",
+                     unsafe_best_score);
     }
     if (best_quiet_forcing_move.has_value() &&
         !best_is_safe_capture &&
