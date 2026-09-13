@@ -48,6 +48,7 @@ private:
         chess::Move move;
         bool null_move = false;
         std::uint64_t position_key = 0;
+        bool repetition_history_suppressed = false;
     };
 
     [[nodiscard]] chess::Move native_move_for(const Move& move) const noexcept;
@@ -56,6 +57,7 @@ private:
 
     chess::Board board_{};
     std::vector<HistoryRecord> history_;
+    bool repetition_history_suppressed_ = false;
 };
 
 } // namespace koi::detail

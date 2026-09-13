@@ -102,10 +102,10 @@ private:
     enum class Stage : std::uint8_t {
         tt,
         good_captures,
-        quiet_checks,
-        special_quiets,
-        quiets,
+        good_quiets,
         bad_captures,
+        bad_quiets,
+        quiet_checks,
         evasions,
         done,
     };

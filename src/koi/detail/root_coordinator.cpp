@@ -14,6 +14,13 @@ std::vector<std::size_t> RootCoordinator::rank(const std::vector<RootLine>& line
     }
     std::sort(ranked.begin(), ranked.end(), [&lines](const std::size_t left,
                                                       const std::size_t right) {
+        // A selective result is useful as a fallback estimate, but it is not
+        // comparable authority when another root move has a nominal-depth
+        // exact score.  Keep proven lines ahead of selective lines before
+        // applying score and stable-index ordering.
+        if (lines[left].exact != lines[right].exact) {
+            return lines[left].exact;
+        }
         if (lines[left].score != lines[right].score) {
             return lines[left].score > lines[right].score;
         }

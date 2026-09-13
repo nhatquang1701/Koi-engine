@@ -47,6 +47,16 @@ constexpr int kAspirationWindow = 50;
 constexpr int kRootSelectiveDepth = 3;
 constexpr int kRootSelectiveMargin = 20;
 constexpr int kRootSelectiveImprovement = 15;
+constexpr std::size_t kMaximumRootCheckConfirmationCandidates = 2;
+// A depth-two root commonly has enough work for PVS scouts to establish a
+// useful ordering, but not enough horizon to make every scout fail-low an
+// exact score.  Recheck a small, score-banded set at the same depth so root
+// ranking is based on comparable full-window results rather than a mixture of
+// exact scores and upper bounds.
+constexpr int kRootShallowConfirmationDepth = 2;
+constexpr int kRootShallowConfirmationMargin = 32;
+constexpr int kRootShallowForcingMargin = 200;
+constexpr std::size_t kMaximumRootShallowConfirmationCandidates = 4;
 constexpr int kRootKingSafetySelectiveDepth = 5;
 constexpr int kRootKingSafetyTieMargin = 50;
 constexpr std::size_t kMaximumRootKingSafetyCandidates = 2;
@@ -74,6 +84,7 @@ constexpr int kEmergencySafeExchangeTieMargin = 80;
 constexpr int kEmergencyUnsafePawnQuietPenalty = 75;
 constexpr std::size_t kMaximumEmergencyForcingCheckEvasions = 3;
 constexpr std::size_t kMaximumEmergencyQuietForcingResearches = 16;
+constexpr std::size_t kMaximumEmergencyRootEvasionReplies = 6;
 // Root workers have a fixed startup/coordination cost.  For short tactical
 // roots that cost can consume the whole first iteration, leaving only the
 // initial ordered move when the clock expires.  Keep quiet roots parallel, but
@@ -134,10 +145,12 @@ using detail::quiet_move_has_king_ring_target;
 using detail::quiet_move_has_pawn_break_target;
 using detail::quiet_move_is_forcing;
 using detail::root_move_exposes_immediate_check;
+using detail::search_transposition_key;
 
 void accumulate_stats(SearchStats& total, const SearchStats& partial) noexcept {
     total.nodes += partial.nodes;
     total.qnodes += partial.qnodes;
+    total.qsearch_cache_hits += partial.qsearch_cache_hits;
     total.position_feature_extractions += partial.position_feature_extractions;
     total.lmr_parent_feature_reuses += partial.lmr_parent_feature_reuses;
     total.evaluation_cache_hits += partial.evaluation_cache_hits;
@@ -166,6 +179,7 @@ void accumulate_stats(SearchStats& total, const SearchStats& partial) noexcept {
     total.lmr_king_zone_exclusions += partial.lmr_king_zone_exclusions;
     total.lmr_high_history_exclusions += partial.lmr_high_history_exclusions;
     total.quiet_futility_prunes += partial.quiet_futility_prunes;
+    total.reverse_futility_prunes += partial.reverse_futility_prunes;
     total.razoring_prunes += partial.razoring_prunes;
     total.probcut_searches += partial.probcut_searches;
     total.probcut_cutoffs += partial.probcut_cutoffs;
@@ -200,6 +214,27 @@ struct FallbackControl {
     }
 };
 
+// Emergency scanners evaluate a position from the original root's
+// perspective, while the side to move changes after every copied move.  Keep
+// terminal ordering in one place: a no-legal-move mate must win over a rule
+// draw, and a stalemate must remain neutral.  Returning nullopt means the
+// position is live and not currently draw-terminated.
+std::optional<int> fallback_terminal_or_draw_score(
+    const GameState& state, const Color root_color, const int mate_distance) {
+    const std::vector<Move> legal_moves = state.legal_moves();
+    if (legal_moves.empty()) {
+        if (!state.in_check()) {
+            return 0;
+        }
+        return state.side_to_move() == root_color ?
+            -kMateScore + mate_distance : kMateScore - mate_distance;
+    }
+    if (state.is_draw_by_rule()) {
+        return 0;
+    }
+    return std::nullopt;
+}
+
 std::optional<int> emergency_king_escape_risk(
     const GameState& root, const MoveMetadata& metadata,
     const GameState& after_move) noexcept {
@@ -221,11 +256,18 @@ int quiet_forcing_fallback_score(
     if (control != nullptr && control->interrupted()) {
         return -kInfinity;
     }
+    if (const auto terminal = fallback_terminal_or_draw_score(
+            after_move, root_color, 1); terminal.has_value()) {
+        return *terminal;
+    }
     MoveMetadataList opponent_moves;
     after_move.legal_moves_with_metadata(
         opponent_moves, true, false, CheckFlagMode::all_moves);
     if (opponent_moves.empty()) {
-        return after_move.in_check() ? -kMateScore + 2 : 0;
+        // after_move is the position immediately after the root candidate,
+        // so no legal reply while in check means the root side delivered
+        // mate, not that it was mated.
+        return after_move.in_check() ? kMateScore - 1 : 0;
     }
 
     int worst_score = kInfinity;
@@ -236,6 +278,13 @@ int quiet_forcing_fallback_score(
         }
         GameState after_opponent = after_move;
         if (!after_opponent.make_search_move(opponent_move)) {
+            continue;
+        }
+
+        if (const auto terminal = fallback_terminal_or_draw_score(
+                after_opponent, root_color, 2); terminal.has_value()) {
+            worst_score = std::min(worst_score, *terminal);
+            found_reply = true;
             continue;
         }
 
@@ -258,6 +307,11 @@ int quiet_forcing_fallback_score(
             if (!after_response.make_search_move(response)) {
                 continue;
             }
+            if (const auto terminal = fallback_terminal_or_draw_score(
+                    after_response, root_color, 2); terminal.has_value()) {
+                best_response_score = std::max(best_response_score, *terminal);
+                continue;
+            }
             best_response_score = std::max(
                 best_response_score,
                 short_fallback_evaluate(evaluator, after_response,
@@ -278,6 +332,10 @@ int checked_root_fallback_score(
     if (control != nullptr && control->interrupted()) {
         return -kInfinity;
     }
+    if (const auto terminal = fallback_terminal_or_draw_score(
+            after_check, root_color, 1); terminal.has_value()) {
+        return *terminal;
+    }
     MoveMetadataList evasions;
     after_check.legal_moves_with_metadata(
         evasions, true, true, CheckFlagMode::all_moves);
@@ -293,6 +351,12 @@ int checked_root_fallback_score(
         }
         GameState after_evasion = after_check;
         if (!after_evasion.make_search_move(evasion)) {
+            continue;
+        }
+        if (const auto terminal = fallback_terminal_or_draw_score(
+                after_evasion, root_color, 2); terminal.has_value()) {
+            worst_evasion_score = std::min(worst_evasion_score, *terminal);
+            found_evasion = true;
             continue;
         }
         // A static score immediately after the evasion rewards a checking
@@ -320,6 +384,11 @@ int checked_root_fallback_score(
             }
             GameState after_reply = after_evasion;
             if (!after_reply.make_search_move(reply)) {
+                continue;
+            }
+            if (const auto terminal = fallback_terminal_or_draw_score(
+                    after_reply, root_color, 2); terminal.has_value()) {
+                best_reply_score = std::max(best_reply_score, *terminal);
                 continue;
             }
             int reply_score = short_fallback_evaluate(
@@ -360,6 +429,10 @@ int shallow_checked_root_fallback_score(
     if (control != nullptr && control->interrupted()) {
         return -kInfinity;
     }
+    if (const auto terminal = fallback_terminal_or_draw_score(
+            after_check, root_color, 1); terminal.has_value()) {
+        return *terminal;
+    }
     MoveMetadataList evasions;
     after_check.legal_moves_with_metadata(
         evasions, true, true, CheckFlagMode::all_moves);
@@ -367,13 +440,25 @@ int shallow_checked_root_fallback_score(
         return after_check.in_check() ? kMateScore - 1 : 0;
     }
 
-    int best_evasion_score = -kInfinity;
+    // The checking move has just been made by the root side, so every
+    // evasion belongs to the opponent.  Select the worst root-perspective
+    // result, not the best one; using max here lets one attractive evasion
+    // hide a stronger defensive answer and makes a shallow check look
+    // artificially decisive.
+    int worst_evasion_score = kInfinity;
+    bool found_evasion = false;
     for (const MoveMetadata& evasion : evasions) {
         if (control != nullptr && control->interrupted()) {
             return -kInfinity;
         }
         GameState after_evasion = after_check;
         if (!after_evasion.make_search_move(evasion)) {
+            continue;
+        }
+        if (const auto terminal = fallback_terminal_or_draw_score(
+                after_evasion, root_color, 2); terminal.has_value()) {
+            worst_evasion_score = std::min(worst_evasion_score, *terminal);
+            found_evasion = true;
             continue;
         }
         int evasion_score = short_fallback_evaluate(
@@ -391,11 +476,15 @@ int shallow_checked_root_fallback_score(
             evasion_score = std::min(evasion_score, -3'000);
         }
         if (after_evasion.in_check() && after_evasion.legal_moves().empty()) {
-            evasion_score = kMateScore - 2;
+            // The root side is to move after the opponent's evasion.  If
+            // that evasion also checks the root and leaves no legal move,
+            // the original checking candidate has been refuted by mate.
+            evasion_score = -kMateScore + 2;
         }
-        best_evasion_score = std::max(best_evasion_score, evasion_score);
+        worst_evasion_score = std::min(worst_evasion_score, evasion_score);
+        found_evasion = true;
     }
-    return best_evasion_score;
+    return found_evasion ? worst_evasion_score : -kInfinity;
 }
 
 int forcing_reply_fallback_score(const GameState& after_forcing_reply,
@@ -415,6 +504,10 @@ int king_evasion_fallback_score(
     // capturable opponent checker is favorable to Koi.
     if (control != nullptr && control->interrupted()) {
         return -kInfinity;
+    }
+    if (const auto terminal = fallback_terminal_or_draw_score(
+            after_evasion, root_color, 2); terminal.has_value()) {
+        return *terminal;
     }
 
     const PositionFeatures evasion_features = after_evasion.position_features();
@@ -442,6 +535,12 @@ int king_evasion_fallback_score(
         }
         GameState after_check = after_evasion;
         if (!after_check.make_search_move(opponent_move)) {
+            continue;
+        }
+        if (const auto terminal = fallback_terminal_or_draw_score(
+                after_check, root_color, 1); terminal.has_value()) {
+            found_check = true;
+            worst_score = std::min(worst_score, *terminal);
             continue;
         }
         if (!opponent_move.gives_check) {
@@ -473,11 +572,13 @@ int king_evasion_fallback_score(
             if (!after_check_evasion.make_search_move(evasion)) {
                 continue;
             }
-            int evasion_score = short_fallback_evaluate(
-                evaluator, after_check_evasion, root_color, evaluator_mutex);
-            if (after_check_evasion.in_check() &&
-                after_check_evasion.legal_moves().empty()) {
-                evasion_score = kMateScore - 2;
+            int evasion_score = 0;
+            if (const auto terminal = fallback_terminal_or_draw_score(
+                    after_check_evasion, root_color, 2); terminal.has_value()) {
+                evasion_score = *terminal;
+            } else {
+                evasion_score = short_fallback_evaluate(
+                    evaluator, after_check_evasion, root_color, evaluator_mutex);
             }
             best_evasion_score = std::max(best_evasion_score, evasion_score);
         }
@@ -505,6 +606,10 @@ int checked_reply_fallback_score(const GameState& after_check, const Color root_
     if (control != nullptr && control->interrupted()) {
         return -kInfinity;
     }
+    if (const auto terminal = fallback_terminal_or_draw_score(
+            after_check, root_color, 2); terminal.has_value()) {
+        return *terminal;
+    }
     MoveMetadataList evasions;
     after_check.legal_moves_with_metadata(
         evasions, true, false, CheckFlagMode::all_moves);
@@ -522,6 +627,12 @@ int checked_reply_fallback_score(const GameState& after_check, const Color root_
             continue;
         }
 
+        const auto evasion_terminal = fallback_terminal_or_draw_score(
+            after_evasion, root_color, 2);
+        if (evasion_terminal.has_value()) {
+            best_evasion_score = std::max(best_evasion_score, *evasion_terminal);
+            continue;
+        }
         int evasion_score = short_fallback_evaluate(
             evaluator, after_evasion, root_color, evaluator_mutex);
         if (after_evasion.in_check()) {
@@ -549,9 +660,12 @@ int checked_reply_fallback_score(const GameState& after_check, const Color root_
                 if (!after_forcing_reply.make_search_move(opponent_move)) {
                     continue;
                 }
-                const int forcing_score = forcing_reply_fallback_score(
-                    after_forcing_reply, root_color, evaluator, evaluator_mutex,
-                    opponent_move.captured_piece, control);
+                const auto forcing_terminal = fallback_terminal_or_draw_score(
+                    after_forcing_reply, root_color, 2);
+                const int forcing_score = forcing_terminal.has_value() ? *forcing_terminal :
+                    forcing_reply_fallback_score(
+                        after_forcing_reply, root_color, evaluator, evaluator_mutex,
+                        opponent_move.captured_piece, control);
                 evasion_score = std::min(evasion_score, forcing_score);
             }
         }
@@ -560,11 +674,82 @@ int checked_reply_fallback_score(const GameState& after_check, const Color root_
     return best_evasion_score;
 }
 
+int root_evasion_fallback_score(
+    const GameState& after_evasion, const Color root_color,
+    const Evaluator& evaluator, std::mutex* evaluator_mutex,
+    const FallbackControl* control = nullptr) {
+    // This helper is entered after the root side has answered an initial
+    // check, so the opponent is to move.  `checked_reply_fallback_score()`
+    // has the opposite contract: it expects the side to move to be in check.
+    // Keep the minimax direction explicit here so a non-king evasion is not
+    // accidentally evaluated as though it were itself a checked position.
+    if (control != nullptr && control->interrupted()) {
+        return -kInfinity;
+    }
+    if (const auto terminal = fallback_terminal_or_draw_score(
+            after_evasion, root_color, 2); terminal.has_value()) {
+        return *terminal;
+    }
+
+    MoveMetadataList opponent_moves;
+    after_evasion.legal_moves_with_metadata(
+        opponent_moves, true, false, CheckFlagMode::all_moves);
+    if (opponent_moves.empty()) {
+        return after_evasion.in_check() ? kMateScore - 2 : 0;
+    }
+
+    int score = short_fallback_evaluate(
+        evaluator, after_evasion, root_color, evaluator_mutex);
+    std::size_t examined_forcing_replies = 0;
+    for (const MoveMetadata& opponent_move : opponent_moves) {
+        const bool forcing = opponent_move.gives_check ||
+            opponent_move.is_capture() ||
+            opponent_move.move.promotion() != Promotion::none;
+        if (!forcing) {
+            continue;
+        }
+        if (control == nullptr && examined_forcing_replies++ >=
+                kMaximumEmergencyRootEvasionReplies) {
+            // The no-control form is used after a very short deadline, where
+            // completion matters more than exhaustive emergency scanning.
+            // Keep that path bounded even if the opponent has a wide forcing
+            // move set.
+            break;
+        }
+        if (control != nullptr && control->interrupted()) {
+            return -kInfinity;
+        }
+        GameState after_forcing = after_evasion;
+        if (!after_forcing.make_search_move(opponent_move)) {
+            continue;
+        }
+        const auto forcing_terminal = fallback_terminal_or_draw_score(
+            after_forcing, root_color, 2);
+        const int forcing_score = forcing_terminal.has_value() ? *forcing_terminal :
+            (opponent_move.gives_check ?
+                checked_reply_fallback_score(
+                    after_forcing, root_color, evaluator, evaluator_mutex, control) :
+                forcing_reply_fallback_score(
+                    after_forcing, root_color, evaluator, evaluator_mutex,
+                    opponent_move.captured_piece, control));
+        if (forcing_score <= -kInfinity) {
+            return -kInfinity;
+        }
+        score = std::min(score, forcing_score);
+    }
+    return score;
+}
+
 int overdue_check_reply_fallback_score(
     const GameState& after_check, const Color root_color,
     const Evaluator& evaluator, std::mutex* evaluator_mutex) {
     constexpr std::size_t kMaximumEvasions = 2;
     constexpr std::size_t kMaximumForcingReplies = 1;
+
+    if (const auto terminal = fallback_terminal_or_draw_score(
+            after_check, root_color, 2); terminal.has_value()) {
+        return *terminal;
+    }
 
     MoveMetadataList evasions;
     after_check.legal_moves_with_metadata(
@@ -604,12 +789,19 @@ int overdue_check_reply_fallback_score(
         if (!after_evasion.make_search_move(evasion)) {
             continue;
         }
+        if (const auto terminal = fallback_terminal_or_draw_score(
+                after_evasion, root_color, 2); terminal.has_value()) {
+            best_evasion_score = std::max(best_evasion_score, *terminal);
+            continue;
+        }
 
         int evasion_score = short_fallback_evaluate(
             evaluator, after_evasion, root_color, evaluator_mutex);
         if (after_evasion.in_check()) {
             if (after_evasion.legal_moves().empty()) {
-                evasion_score = -kMateScore + 2;
+                // The evasion belongs to the root side.  A checking evasion
+                // that mates the opponent is a win for the root, not a loss.
+                evasion_score = kMateScore - 2;
             }
             best_evasion_score = std::max(best_evasion_score, evasion_score);
             continue;
@@ -651,12 +843,13 @@ int overdue_check_reply_fallback_score(
             if (!after_reply.make_search_move(reply)) {
                 continue;
             }
-            int reply_score = forcing_reply_fallback_score(
-                after_reply, root_color, evaluator, evaluator_mutex,
-                reply.captured_piece, nullptr);
-            if (after_reply.in_check() && after_reply.legal_moves().empty()) {
-                reply_score = -kMateScore + 2;
-            } else if (reply.is_capture() &&
+            const auto reply_terminal = fallback_terminal_or_draw_score(
+                after_reply, root_color, 2);
+            int reply_score = reply_terminal.has_value() ? *reply_terminal :
+                forcing_reply_fallback_score(
+                    after_reply, root_color, evaluator, evaluator_mutex,
+                    reply.captured_piece, nullptr);
+            if (!reply_terminal.has_value() && reply.is_capture() &&
                        (reply.captured_piece == PieceType::queen ||
                         reply.captured_piece == PieceType::rook)) {
                 // The overdue continuation is an emergency safety oracle,
@@ -685,6 +878,10 @@ int forcing_reply_fallback_score(const GameState& after_forcing_reply,
     if (control != nullptr && control->interrupted()) {
         return -kInfinity;
     }
+    if (const auto terminal = fallback_terminal_or_draw_score(
+            after_forcing_reply, root_color, 2); terminal.has_value()) {
+        return *terminal;
+    }
     MoveMetadataList responses;
     after_forcing_reply.legal_moves_with_metadata(
         responses, true, false, CheckFlagMode::all_moves);
@@ -699,11 +896,19 @@ int forcing_reply_fallback_score(const GameState& after_forcing_reply,
     // still has checking or material counterplay. Keep this emergency
     // comparison conservative unless a forcing reply or mate compensates for
     // the loss.
+    const bool has_forcing_loss_floor = captured_piece == PieceType::queen ||
+        captured_piece == PieceType::rook || captured_piece == PieceType::bishop ||
+        captured_piece == PieceType::knight;
     const int forcing_loss_floor = captured_piece == PieceType::queen ? -1'200 :
-        captured_piece == PieceType::rook ? -650 :
-        (captured_piece == PieceType::bishop || captured_piece == PieceType::knight) ? -425 :
-        -kInfinity;
-    best_score = std::min(best_score, forcing_loss_floor);
+        captured_piece == PieceType::rook ? -650 : -425;
+    if (has_forcing_loss_floor) {
+        // A pawn capture (and a non-capturing promotion, represented by
+        // `none`) still has a real static continuation when the defender's
+        // replies are quiet.  Do not turn that ordinary baseline into the
+        // interruption sentinel merely because no major/minor material floor
+        // applies.
+        best_score = std::min(best_score, forcing_loss_floor);
+    }
     for (const MoveMetadata& response : responses) {
         if (control != nullptr && control->interrupted()) {
             return -kInfinity;
@@ -716,9 +921,12 @@ int forcing_reply_fallback_score(const GameState& after_forcing_reply,
         if (!after_response.make_search_move(response)) {
             continue;
         }
-        int response_score = short_fallback_evaluate(
-            evaluator, after_response, root_color, evaluator_mutex);
-        if (response.is_capture() && captured_piece == PieceType::none &&
+        const auto response_terminal = fallback_terminal_or_draw_score(
+            after_response, root_color, 2);
+        int response_score = response_terminal.has_value() ? *response_terminal :
+            short_fallback_evaluate(evaluator, after_response, root_color, evaluator_mutex);
+        if (!response_terminal.has_value() && response.is_capture() &&
+            captured_piece == PieceType::none &&
             (response.captured_piece == PieceType::rook ||
              response.captured_piece == PieceType::queen)) {
             // A checking sacrifice is often answered by capturing the checker,
@@ -740,14 +948,15 @@ int forcing_reply_fallback_score(const GameState& after_forcing_reply,
                 if (!after_counter.make_search_move(counter_response)) {
                     continue;
                 }
+                const auto counter_terminal = fallback_terminal_or_draw_score(
+                    after_counter, root_color, 3);
+                const int counter_score = counter_terminal.has_value() ? *counter_terminal :
+                    short_fallback_evaluate(
+                        evaluator, after_counter, root_color, evaluator_mutex);
                 response_score = std::min(
                     response_score,
-                    short_fallback_evaluate(
-                        evaluator, after_counter, root_color, evaluator_mutex));
+                    counter_score);
             }
-        }
-        if (after_response.in_check() && after_response.legal_moves().empty()) {
-            response_score = kMateScore - 2;
         }
         best_score = std::max(best_score, response_score);
     }
@@ -787,22 +996,76 @@ std::optional<Move> first_safe_short_search_move(
 
 bool is_safe_equal_non_pawn_exchange(const MoveMetadata& metadata) noexcept;
 bool short_quiet_needs_fallback(
-    const MoveMetadataList& legal_moves,
+    const GameState& root, const MoveMetadataList& legal_moves,
     const std::optional<Move>& candidate) noexcept;
 bool quiet_move_leaves_safe_capture(
     const MoveMetadata& candidate, const MoveMetadataList& opponent_moves) noexcept;
 
-std::optional<Move> first_safe_checking_capture(
-    const MoveMetadataList& legal_moves) noexcept {
-    for (const MoveMetadata& metadata : legal_moves) {
-        if (metadata.is_capture() && metadata.gives_check) {
-            return metadata.move;
+struct ShortFallbackChoice {
+    Move move = Move::no_move();
+    int score = -kInfinity;
+};
+
+std::optional<ShortFallbackChoice> scored_safe_checking_capture(
+    const GameState& root, const MoveMetadataList& legal_moves,
+    const Evaluator& evaluator, std::mutex* evaluator_mutex,
+    const bool allow_deep_fallback, const FallbackControl* control = nullptr) noexcept {
+    try {
+        for (const MoveMetadata& metadata : legal_moves) {
+            if (control != nullptr && control->interrupted()) {
+                return std::nullopt;
+            }
+            if (!metadata.is_capture() || !metadata.see_computed || metadata.see_score < 0 ||
+                (!metadata.gives_check && !root.move_gives_check(metadata.move))) {
+                continue;
+            }
+
+            GameState after_check = root;
+            if (!after_check.make_search_move(metadata)) {
+                continue;
+            }
+            // The move itself may end the game.  Preserve an immediate mate,
+            // but do not nominate a stalemate or rule-draw move as a tactical
+            // replacement for a completed root line.
+            if (const auto terminal = fallback_terminal_or_draw_score(
+                    after_check, root.side_to_move(), 1); terminal.has_value()) {
+                if (*terminal >= kMateThreshold) {
+                    return ShortFallbackChoice{metadata.move, *terminal};
+                }
+                continue;
+            }
+
+            const std::vector<Move> evasions = after_check.legal_moves();
+            if (evasions.empty()) {
+                return ShortFallbackChoice{
+                    metadata.move, after_check.in_check() ? kMateScore - 1 : 0};
+            }
+
+            const bool deadline_seen = control != nullptr && control->interrupted();
+            const bool use_deep_fallback = allow_deep_fallback && !deadline_seen;
+            const FallbackControl* score_control = use_deep_fallback ? control : nullptr;
+            const int score = use_deep_fallback ?
+                checked_root_fallback_score(
+                    after_check, root.side_to_move(), evaluator, evaluator_mutex, score_control) :
+                shallow_checked_root_fallback_score(
+                    after_check, metadata, root.side_to_move(), evaluator, evaluator_mutex,
+                    score_control);
+            if (score <= -kInfinity && control != nullptr && control->interrupted()) {
+                return std::nullopt;
+            }
+            if (score > -kInfinity) {
+                // A move-only safety helper is allowed to nominate this
+                // candidate, but it must publish the score obtained from the
+                // candidate's own checked continuation.
+                return ShortFallbackChoice{metadata.move, score};
+            }
         }
+    } catch (...) {
     }
     return std::nullopt;
 }
 
-std::optional<Move> short_search_fallback_move(
+std::optional<ShortFallbackChoice> short_search_fallback_move(
     const GameState& root, const MoveMetadataList& legal_moves,
     const Evaluator& evaluator, std::mutex* evaluator_mutex,
     SearchStats* stats = nullptr,
@@ -843,6 +1106,7 @@ std::optional<Move> short_search_fallback_move(
     int unsafe_best_score = -kInfinity;
     bool unsafe_best_is_quiet = false;
     std::optional<Move> first_unsafe_quiet_move;
+    int first_unsafe_quiet_score = -kInfinity;
     std::optional<Move> best_safe_pawn_capture;
     int best_safe_pawn_capture_score = -kInfinity;
     try {
@@ -850,11 +1114,6 @@ std::optional<Move> short_search_fallback_move(
             const bool deadline_seen = control != nullptr && control->interrupted();
             if (deadline_seen && !permit_overdue_shallow) {
                 break;
-            }
-            if (std::getenv("KOI_TRACE_FALLBACK") != nullptr) {
-                std::fprintf(stderr, "fallback-candidate key=%llu move=%s overdue=%d\\n",
-                             static_cast<unsigned long long>(root.position_key()),
-                             metadata.move.uci().c_str(), deadline_seen ? 1 : 0);
             }
             if (stats != nullptr) {
                 ++stats->short_fallback_candidates;
@@ -871,8 +1130,17 @@ std::optional<Move> short_search_fallback_move(
             }
 
             int score = 0;
+            const auto move_terminal = fallback_terminal_or_draw_score(
+                after_move, root.side_to_move(), 1);
+            const bool move_is_terminal = move_terminal.has_value();
             bool hanging_major_check = false;
-            if (after_move.in_check()) {
+            if (move_is_terminal) {
+                // A fallback move that reaches a terminal position or a
+                // claimable/automatic rule draw must not be replaced by a
+                // static evaluation.  The helper checks mate before draw so
+                // an immediate checkmate remains decisive.
+                score = *move_terminal;
+            } else if (after_move.in_check()) {
                 const std::vector<Move> evasions = after_move.legal_moves();
                 if (evasions.empty()) {
                     score = kMateScore - 1;
@@ -915,19 +1183,30 @@ std::optional<Move> short_search_fallback_move(
                         king_evasion_fallback_score(
                             after_move, root.side_to_move(), evaluator, evaluator_mutex,
                             metadata.is_capture(), nullptr) :
-                        checked_reply_fallback_score(
+                        root_evasion_fallback_score(
                             after_move, root.side_to_move(), evaluator, evaluator_mutex, nullptr);
                 } else if (metadata.moving_piece == PieceType::king) {
                     score = king_evasion_fallback_score(
                         after_move, root.side_to_move(), evaluator, evaluator_mutex,
                         metadata.is_capture(), control);
                 } else {
-                    score = checked_reply_fallback_score(
+                    score = root_evasion_fallback_score(
                         after_move, root.side_to_move(), evaluator, evaluator_mutex, control);
                 }
             } else {
                 score = short_fallback_evaluate(
                     evaluator, after_move, root.side_to_move(), evaluator_mutex);
+            }
+
+            // A bounded reply scanner can observe the deadline after this
+            // root candidate has already been made. Its -kInfinity result is
+            // an interruption sentinel, not a real evaluation; never let it
+            // become the authoritative score or feed the fallback tie-breaks.
+            if (score <= -kInfinity) {
+                if (control != nullptr && control->interrupted()) {
+                    break;
+                }
+                continue;
             }
 
             // A static root score can overvalue a material-winning move that
@@ -939,7 +1218,7 @@ std::optional<Move> short_search_fallback_move(
             std::size_t forcing_reply_count = 0;
             std::size_t check_evasion_count = 0;
             bool consequence_scan_incomplete = false;
-            if (!after_move.in_check() && perform_deep_fallback &&
+            if (!move_is_terminal && !after_move.in_check() && perform_deep_fallback &&
                 !(root.in_check() && metadata.moving_piece == PieceType::king)) {
                 MoveMetadataList opponent_moves;
                 after_move.legal_moves_with_metadata(
@@ -988,7 +1267,7 @@ std::optional<Move> short_search_fallback_move(
                     score = short_fallback_evaluate(
                         evaluator, after_move, root.side_to_move(), evaluator_mutex);
                 }
-            } else if (!after_move.in_check() && permit_overdue_shallow &&
+            } else if (!move_is_terminal && !after_move.in_check() && permit_overdue_shallow &&
                        (deadline_seen || !allow_deep_checked_fallback)) {
                 // Once the deadline has fired, inspect one opponent forcing
                 // reply and only our forcing continuations. This catches a
@@ -1223,9 +1502,15 @@ std::optional<Move> short_search_fallback_move(
 
 
             if (broad_quiet_check) {
+                // Keep a broad, non-hanging major-piece check as a deferred
+                // forcing candidate.  Minor-piece and pawn checks with a
+                // broad evasion set are too easy to overvalue at this shallow
+                // horizon, while a queen/rook check can still be the critical
+                // forcing resource an interrupted root needs.
                 const bool major_check = metadata.moving_piece == PieceType::queen ||
                     metadata.moving_piece == PieceType::rook;
-                if (major_check && (!broad_check_fallback_move.has_value() ||
+                if (major_check && !hanging_major_check &&
+                    (!broad_check_fallback_move.has_value() ||
                     score > broad_check_fallback_score)) {
                     broad_check_fallback_move = metadata.move;
                     broad_check_fallback_score = score;
@@ -1235,13 +1520,14 @@ std::optional<Move> short_search_fallback_move(
             }
             if (exposes_immediate_check && !root.in_check() &&
                 !safe_equal_non_pawn_exchange && !safe_non_pawn_capture) {
-                if (!first_unsafe_quiet_move.has_value() && !metadata.is_capture() &&
-                    metadata.move.promotion() == Promotion::none) {
-                    first_unsafe_quiet_move = metadata.move;
-                }
                 const int unsafe_score = score -
                     (metadata.moving_piece == PieceType::pawn && !metadata.is_capture() ?
                          kEmergencyUnsafePawnQuietPenalty : 0);
+                if (!first_unsafe_quiet_move.has_value() && !metadata.is_capture() &&
+                    metadata.move.promotion() == Promotion::none) {
+                    first_unsafe_quiet_move = metadata.move;
+                    first_unsafe_quiet_score = unsafe_score;
+                }
                 if (!unsafe_best_move.has_value() || unsafe_score > unsafe_best_score) {
                     unsafe_best_score = unsafe_score;
                     unsafe_best_move = metadata.move;
@@ -1275,15 +1561,6 @@ std::optional<Move> short_search_fallback_move(
                 best_quiet_forcing_score = score;
                 best_quiet_forcing_move = metadata.move;
             }
-            if (std::getenv("KOI_TRACE_FALLBACK") != nullptr) {
-                std::fprintf(stderr,
-                             "fallback-trace key=%llu move=%s score=%d deep=%d overdue=%d replies=%zu check=%d quiet_forcing=%d\\n",
-                             static_cast<unsigned long long>(root.position_key()),
-                             metadata.move.uci().c_str(), score,
-                             perform_deep_fallback ? 1 : 0, deadline_seen ? 1 : 0,
-                             forcing_reply_count, exposes_immediate_check ? 1 : 0,
-                             quiet_forcing ? 1 : 0);
-            }
             if ((!best_move.has_value() || score > best_score || safer_king_evasion ||
                  safe_capture_tie || safe_capture_safety_tie || safe_equal_exchange_tie ||
                  forcing_check_tie || prefer_quiet_king_evasion) &&
@@ -1307,59 +1584,54 @@ std::optional<Move> short_search_fallback_move(
     } catch (...) {
         return std::nullopt;
     }
-    if (std::getenv("KOI_TRACE_FALLBACK") != nullptr) {
-        std::fprintf(stderr,
-                     "fallback-result key=%llu best=%s score=%d quiet=%s quiet_score=%d broad=%s broad_score=%d unsafe=%s unsafe_score=%d\\n",
-                     static_cast<unsigned long long>(root.position_key()),
-                     best_move.has_value() ? best_move->uci().c_str() : "none", best_score,
-                     best_quiet_forcing_move.has_value() ? best_quiet_forcing_move->uci().c_str() : "none",
-                     best_quiet_forcing_score,
-                     broad_check_fallback_move.has_value() ? broad_check_fallback_move->uci().c_str() : "none",
-                     broad_check_fallback_score,
-                     unsafe_best_move.has_value() ? unsafe_best_move->uci().c_str() : "none",
-                     unsafe_best_score);
-    }
     if (best_quiet_forcing_move.has_value() &&
         !best_is_safe_capture &&
         (!best_is_safe_equal_non_pawn_exchange ||
          best_quiet_forcing_score > best_score + kEmergencySafeExchangeTieMargin) &&
         (!best_is_forcing_check ||
          best_quiet_forcing_score > best_score + kEmergencyQuietForcingMargin) &&
-        (!best_move.has_value() ||
-         best_quiet_forcing_score >= best_score - kEmergencyQuietForcingMargin)) {
-        return best_quiet_forcing_move;
+         (!best_move.has_value() ||
+          best_quiet_forcing_score >= best_score - kEmergencyQuietForcingMargin)) {
+        return ShortFallbackChoice{*best_quiet_forcing_move, best_quiet_forcing_score};
     }
-    const bool broad_check_can_replace_narrow_check =
+    const bool broad_check_can_replace_competitive_move =
         broad_check_fallback_move.has_value() && broad_check_fallback_is_major &&
-        best_move.has_value() && best_is_forcing_check && !best_is_safe_capture &&
-        !best_is_safe_forcing_capture &&
+        best_move.has_value() &&
+        !best_is_safe_capture && !best_is_safe_forcing_capture &&
+        !best_is_safe_equal_non_pawn_exchange &&
         broad_check_fallback_score >= best_score - kEmergencyBroadCheckReplacementMargin;
-    if (broad_check_can_replace_narrow_check ||
+    if (broad_check_can_replace_competitive_move ||
         (broad_check_fallback_move.has_value() && broad_check_fallback_is_major &&
          !best_move.has_value() &&
          (!unsafe_best_move.has_value() ||
-          broad_check_fallback_score >= unsafe_best_score -
+         broad_check_fallback_score >= unsafe_best_score -
               kEmergencyBroadCheckReplacementMargin))) {
-        return broad_check_fallback_move;
+        return ShortFallbackChoice{*broad_check_fallback_move, broad_check_fallback_score};
     }
     if (!best_move.has_value() && best_safe_pawn_capture.has_value() &&
         first_unsafe_quiet_move.has_value()) {
         // If every positive-SEE pawn capture was quarantined and all useful
         // quiet alternatives expose immediate checks, retain stable move
         // ordering instead of promoting the least-bad unsafe quiet score.
-        return first_unsafe_quiet_move;
+        return ShortFallbackChoice{*first_unsafe_quiet_move, first_unsafe_quiet_score};
     }
     if (unsafe_best_move.has_value() &&
         (unsafe_best_is_quiet || best_is_hanging_major_check) &&
         (!best_move.has_value() ||
          unsafe_best_score >= best_score + kEmergencyQuietForcingMargin)) {
-        return unsafe_best_move;
+        return ShortFallbackChoice{*unsafe_best_move, unsafe_best_score};
     }
     if (broad_check_fallback_move.has_value() && broad_check_fallback_is_major &&
         !best_move.has_value()) {
-        return broad_check_fallback_move;
+        return ShortFallbackChoice{*broad_check_fallback_move, broad_check_fallback_score};
     }
-    return best_move.has_value() ? best_move : unsafe_best_move;
+    if (best_move.has_value()) {
+        return ShortFallbackChoice{*best_move, best_score};
+    }
+    if (unsafe_best_move.has_value()) {
+        return ShortFallbackChoice{*unsafe_best_move, unsafe_best_score};
+    }
+    return std::nullopt;
 }
 
 bool short_fallback_should_replace_completed_root(
@@ -1514,7 +1786,7 @@ bool is_safe_equal_non_pawn_exchange(const MoveMetadata& metadata) noexcept {
 }
 
 bool short_quiet_needs_fallback(
-    const MoveMetadataList& legal_moves,
+    const GameState& root, const MoveMetadataList& legal_moves,
     const std::optional<Move>& candidate) noexcept {
     if (!candidate.has_value()) {
         return false;
@@ -1530,10 +1802,11 @@ bool short_quiet_needs_fallback(
     }
 
     return std::any_of(legal_moves.begin(), legal_moves.end(),
-                       [candidate](const MoveMetadata& move) {
+                       [candidate, &root](const MoveMetadata& move) {
                            return move.move != *candidate &&
                                (is_safe_material_capture(move) ||
-                                (move.is_capture() && move.gives_check));
+                                (move.is_capture() &&
+                                 (move.gives_check || root.move_gives_check(move.move))));
                        });
 }
 
@@ -1592,6 +1865,7 @@ struct RootScheduleRecord {
     std::size_t stable_index = 0;
     int previous_score = -kInfinity;
     bool has_previous_score = false;
+    bool previous_exact = false;
 };
 
 class RootWorkerPool {
@@ -1626,7 +1900,8 @@ public:
     void run(const GameState& root, const MoveMetadataList& root_moves, int depth,
              bool root_check_extension, const std::vector<std::size_t>& stable_root_indices,
              std::vector<RootLine>& lines, bool use_root_pvs, int root_static_eval,
-             SearchStats& stats, bool& aborted) {
+             int window_alpha, int window_beta, SearchStats& stats, bool& aborted,
+             bool& window_failed_low, bool& window_failed_high) {
         auto job = std::make_shared<Job>();
         job->root = &root;
         job->root_moves = &root_moves;
@@ -1637,6 +1912,9 @@ public:
         job->worker_stats = &worker_stats_;
         job->use_root_pvs = use_root_pvs;
         job->root_static_eval = root_static_eval;
+        job->window_alpha = window_alpha;
+        job->window_beta = window_beta;
+        job->root_alpha.store(window_alpha, std::memory_order_relaxed);
         if (depth == 1) {
             job->root_features = root.position_features();
         }
@@ -1661,6 +1939,18 @@ public:
         }
         aborted = job->aborted.load(std::memory_order_relaxed) ||
             stop_requested_.load(std::memory_order_relaxed);
+        window_failed_high = job->window_failed_high.load(std::memory_order_relaxed);
+        window_failed_low = false;
+        if (!aborted && !window_failed_high && window_alpha > -kInfinity) {
+            const bool has_exact_score_above_alpha = std::any_of(
+                lines.begin(), lines.end(), [window_alpha](const RootLine& line) {
+                    return line.completed && line.exact && line.score > window_alpha;
+                });
+            // A selective full-window line may still be useful for ranking,
+            // but it cannot certify that the aspiration floor was cleared.
+            // Only an exact root line may prevent a fail-low retry.
+            window_failed_low = !has_exact_score_above_alpha;
+        }
     }
 
 private:
@@ -1676,6 +1966,9 @@ private:
         int root_static_eval = 0;
         std::atomic<std::size_t> next_move = 0;
         std::atomic<int> root_alpha = -kInfinity;
+        int window_alpha = -kInfinity;
+        int window_beta = kInfinity;
+        std::atomic_bool window_failed_high = false;
         std::atomic_bool aborted = false;
         bool use_root_pvs = false;
         std::uint64_t sequence = 0;
@@ -1728,12 +2021,21 @@ private:
                 try {
                     GameState child = *job->root;
                     if (!child.make_search_move(root_move)) {
+                        // Root metadata is generated from the unchanged job
+                        // position. A failed application therefore signals a
+                        // broken root contract, not a move that may simply be
+                        // omitted from an otherwise completed iteration.
+                        context.request_abort();
+                        job->aborted.store(true, std::memory_order_relaxed);
                         return;
                     }
 
                     PrincipalVariation child_pv;
                     int child_depth = job->depth - 1 +
                         (job->root_check_extension ? 1 : 0);
+                    const int child_check_extensions_remaining =
+                        job->root_check_extension ? kMaximumCheckExtensionsPerPath - 1 :
+                            kMaximumCheckExtensionsPerPath;
                     if (job->depth == 1 && job->root_features.has_value() &&
                         !root_move.is_capture() && !root_move.gives_check &&
                         root_move.move.promotion() == Promotion::none &&
@@ -1744,26 +2046,66 @@ private:
                         ++child_depth;
                     }
                     const int shared_alpha = job->root_alpha.load(std::memory_order_relaxed);
-                    const bool scout = job->use_root_pvs && shared_alpha > -kInfinity;
-                    bool exact_score = !scout;
+                    const bool scout = job->use_root_pvs && move_index != 0 &&
+                        shared_alpha > job->window_alpha;
+                    bool exact_score = false;
+                    bool completed_score = false;
+                    bool child_selective_bound = false;
                     int score = 0;
                     if (scout) {
                         ++context.stats.root_pvs_searches;
+                        bool scout_selective_bound = false;
                         score = -context.negamax(child, child_depth,
                                                  -shared_alpha - 1, -shared_alpha, 1, child_pv,
-                                                 root_move.move);
-                        if (!context.aborted && score > shared_alpha) {
+                                                 root_move.move, true,
+                                                 child_check_extensions_remaining,
+                                                 Move::no_move(), nullptr,
+                                                 &scout_selective_bound);
+                        child_selective_bound = scout_selective_bound;
+                        if (!context.aborted && score >= shared_alpha) {
                             ++context.stats.root_pvs_researches;
                             child_pv = {};
+                            // A scout that returns exactly the current root
+                            // alpha may be an upper-bound hit rather than an
+                            // exact tie.  Re-search equality from the full
+                            // aspiration floor so deterministic stable-index
+                            // ranking sees every genuinely equal line.
+                            const int research_alpha = score > shared_alpha ?
+                                shared_alpha : job->window_alpha;
+                            bool research_selective_bound = false;
                             score = -context.negamax(child, child_depth,
-                                                      -kInfinity, kInfinity, 1, child_pv,
-                                                      root_move.move);
-                            exact_score = true;
+                                                     -job->window_beta, -research_alpha, 1,
+                                                     child_pv,
+                                                     root_move.move, true,
+                                                     child_check_extensions_remaining,
+                                                     Move::no_move(), nullptr,
+                                                     &research_selective_bound);
+                            child_selective_bound = research_selective_bound;
+                            completed_score = !context.aborted &&
+                                score > job->window_alpha && score < job->window_beta;
+                            exact_score = score > research_alpha &&
+                                score < job->window_beta && !child_selective_bound;
                         }
                     } else {
                         score = -context.negamax(child, child_depth,
-                                                 -kInfinity, kInfinity, 1, child_pv,
-                                                 root_move.move);
+                                                 -job->window_beta, -job->window_alpha, 1, child_pv,
+                                                 root_move.move, true,
+                                                 child_check_extensions_remaining,
+                                                 Move::no_move(), nullptr,
+                                                 &child_selective_bound);
+                        completed_score = !context.aborted &&
+                            score > job->window_alpha && score < job->window_beta;
+                        exact_score = score > job->window_alpha &&
+                            score < job->window_beta && !child_selective_bound;
+                    }
+                    // A selective child can return a useful score at the
+                    // aspiration ceiling without proving that the root move
+                    // truly failed high.  Only an authoritative child may
+                    // widen the aspiration window; otherwise a selective
+                    // estimate can repeatedly drive the root away from the
+                    // previous completed score.
+                    if (score >= job->window_beta && !child_selective_bound) {
+                        job->window_failed_high.store(true, std::memory_order_relaxed);
                     }
                     if (context.aborted) {
                         job->aborted.store(true, std::memory_order_relaxed);
@@ -1787,11 +2129,13 @@ private:
                     line.stable_index = (*job->stable_root_indices)[move_index];
                     line.pv.prepend(root_move.move, child_pv);
                     // A scout fail-low is an upper bound for this root move,
-                    // not an exact score. Keep it out of authoritative root
-                    // ranking; the shared alpha already comes from an exact
-                    // line, and any move that can exceed it is re-searched
-                    // above with a full window.
-                    line.completed = exact_score;
+                    // not a completed comparable score. A full-window
+                    // selective result, however, is still useful when a
+                    // full-window fallback must rank otherwise incomplete
+                    // root lines. Keep that estimate out of exact aspiration
+                    // authority and shared-alpha publication.
+                    line.completed = completed_score;
+                    line.exact = exact_score;
                 } catch (...) {
                     context.request_abort();
                     job->aborted.store(true, std::memory_order_relaxed);
@@ -1951,7 +2295,8 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
         try {
             RootTimingContext timing_context;
             timing_context.table_available = table->size_mb() != 0;
-            if (const auto entry = table->probe(root.position_key(), 0); entry.has_value()) {
+            if (const auto entry = table->probe(search_transposition_key(root), 0);
+                entry.has_value()) {
                 timing_context.tt_hit = true;
                 timing_context.tt_exact = entry->bound == TranspositionBound::exact;
                 timing_context.tt_has_best_move = !entry->best_move.is_no_move();
@@ -2003,6 +2348,14 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
             }
             const int root_static_eval = result.score_cp;
             const bool root_is_claimable_draw = root.is_draw_by_rule();
+            if (root_is_claimable_draw) {
+                // A draw already present at the root is terminal for search
+                // consumers even if the clock prevents the first iteration
+                // from starting. Keep the depth-zero result consistent with
+                // the regular negamax terminal boundary.
+                result.score_cp = 0;
+                result.mate.reset();
+            }
 
             std::optional<SyzygyRootResult> tablebase_result;
             if (options.syzygy && options.multi_pv == 1 && !options.analyse_mode &&
@@ -2083,7 +2436,8 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                 SearchInfo info{1, result.score_cp, result.mate, 0, 0, elapsed,
                                 {result.best_move.value()}, 0, 0, 0, 1, 1};
                 safely_report_info(sink, info);
-            } else if ((options.threads == 1 && options.multi_pv == 1) || legal_moves.size() < 2 ||
+            } else if (root_is_claimable_draw ||
+                       (options.threads == 1 && options.multi_pv == 1) || legal_moves.size() < 2 ||
                        (time_manager.node_limit().has_value() && options.multi_pv == 1) ||
                        (short_tactical_budget && !ultra_short_nonchecking_parallel)) {
                 auto context_storage = std::make_unique<SearchContext>(
@@ -2115,8 +2469,10 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                             root, legal_moves, *evaluator, evaluator_mutex_ptr,
                             &context.stats, allow_deep_checked_fallback, &fallback_control);
                         fallback.has_value()) {
-                        result.best_move = *fallback;
-                        result.pv = {*fallback};
+                        result.best_move = fallback->move;
+                        result.pv = {fallback->move};
+                        result.score_cp = fallback->score;
+                        result.mate = mate_from_score(fallback->score);
                         used_short_fallback = true;
                     }
                 } else if (short_search_fallback && !defer_nonchecking_short_fallback &&
@@ -2202,8 +2558,10 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                                     &context.stats, allow_deep_checked_fallback, &fallback_control,
                                     true, true);
                                 fallback.has_value()) {
-                                result.best_move = *fallback;
-                                result.pv = {*fallback};
+                                result.best_move = fallback->move;
+                                result.pv = {fallback->move};
+                                result.score_cp = fallback->score;
+                                result.mate = mate_from_score(fallback->score);
                                 used_short_fallback = true;
                             }
                         }
@@ -2213,8 +2571,10 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                                     root, legal_moves, *evaluator, evaluator_mutex_ptr,
                                     &context.stats, false, &fallback_control, true);
                                 fallback.has_value()) {
-                                result.best_move = *fallback;
-                                result.pv = {*fallback};
+                                result.best_move = fallback->move;
+                                result.pv = {fallback->move};
+                                result.score_cp = fallback->score;
+                                result.mate = mate_from_score(fallback->score);
                                 used_short_fallback = true;
                             }
                         }
@@ -2255,12 +2615,24 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                         result.best_move = pv.moves[0];
                         result.pv = pv.to_vector();
                     }
+                    // The bounded short-search correction below is allowed to
+                    // improve the move handed to the caller, but its static
+                    // score is not an iterative-deepening proof.  Retain the
+                    // ordinary full-width result for aspiration and timing
+                    // observations so a heuristic safety choice cannot make
+                    // the next iteration look artificially unstable.
+                    const int searched_iteration_score = score;
+                    const bool searched_best_move_changed = had_completed_iteration &&
+                        previous_best_move != result.best_move;
+                    const bool searched_pv_changed = had_completed_iteration &&
+                        previous_pv != result.pv;
+                    bool bounded_fallback_result = false;
 
                     if ((short_tactical_fallback || defer_nonchecking_short_fallback) &&
                         !defer_expensive_short_fallback &&
                         result.completed_depth == 1 &&
                         (short_capture_needs_fallback(legal_moves, result.best_move) ||
-                         short_quiet_needs_fallback(legal_moves, result.best_move) ||
+                         short_quiet_needs_fallback(root, legal_moves, result.best_move) ||
                          short_quiet_exposes_immediate_check(
                              root, legal_moves, result.best_move) ||
                          short_check_needs_fallback(legal_moves, result.best_move) ||
@@ -2274,6 +2646,12 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                             root, legal_moves, *evaluator, evaluator_mutex_ptr,
                             &context.stats, allow_deep_checked_fallback,
                             &fallback_control, true, true);
+                        std::optional<Move> fallback_move;
+                        int fallback_score = score;
+                        if (fallback.has_value()) {
+                            fallback_move = fallback->move;
+                            fallback_score = fallback->score;
+                        }
                         const auto current_metadata = result.best_move.has_value() ?
                             std::find_if(
                                 legal_moves.begin(), legal_moves.end(),
@@ -2283,14 +2661,27 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                         if (current_metadata != legal_moves.end() &&
                             !current_metadata->is_capture() && !current_metadata->gives_check &&
                             current_metadata->move.promotion() == Promotion::none &&
-                            (!fallback.has_value() || *fallback == current_metadata->move)) {
-                            fallback = first_safe_checking_capture(legal_moves);
+                            (!fallback_move.has_value() ||
+                             *fallback_move == current_metadata->move)) {
+                            if (const auto checking_capture = scored_safe_checking_capture(
+                                    root, legal_moves, *evaluator, evaluator_mutex_ptr,
+                                    allow_deep_checked_fallback, &fallback_control);
+                                checking_capture.has_value()) {
+                                fallback_move = checking_capture->move;
+                                fallback_score = checking_capture->score;
+                            } else {
+                                fallback_move.reset();
+                            }
                         }
-                        if (fallback.has_value() &&
+                        if (fallback_move.has_value() &&
                             short_fallback_should_replace_completed_root(
-                                root, legal_moves, result.best_move, *fallback)) {
-                            result.best_move = *fallback;
-                            result.pv = {*fallback};
+                                root, legal_moves, result.best_move, *fallback_move)) {
+                            result.best_move = *fallback_move;
+                            result.pv = {*fallback_move};
+                            result.score_cp = fallback_score;
+                            result.mate = mate_from_score(fallback_score);
+                            score = fallback_score;
+                            bounded_fallback_result = true;
                             // Keep the protocol PV in lockstep with the
                             // corrected authoritative root move. The normal
                             // iteration PV still contains the pre-correction
@@ -2298,7 +2689,7 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                             // following bestmove disagree with the final
                             // info line.
                             pv = {};
-                            pv.moves[0] = *fallback;
+                            pv.moves[0] = *fallback_move;
                             pv.length = 1;
                         }
                     }
@@ -2309,11 +2700,188 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                     // check so later safety decisions remain based on this
                     // iteration's complete root ordering.
                     std::vector<SearchContext::RootMoveScore> root_score_snapshot;
-                    if (limits.depth.has_value() && *limits.depth == kRootSelectiveDepth &&
-                        depth == kRootSelectiveDepth && context.root_move_score_count != 0) {
+                    if (limits.depth.has_value() &&
+                        (depth == kRootShallowConfirmationDepth ||
+                         depth == kRootSelectiveDepth) &&
+                        context.root_move_score_count != 0) {
                         root_score_snapshot.assign(
                             context.root_move_scores.begin(),
                             context.root_move_scores.begin() + context.root_move_score_count);
+                    }
+                    // Some bounded root safety passes compare candidates at a
+                    // deeper horizon to expose a shallow tactical trap.  The
+                    // selected move still belongs to the requested iteration,
+                    // so refresh its line at the nominal depth before
+                    // publishing the score/PV.  This keeps fixed-depth UCI
+                    // results and timing observations tied to one horizon.
+                    const auto nominal_root_verification =
+                        [&context, &root, &legal_moves](const Move move, const int nominal_depth)
+                        -> std::optional<SearchContext::RootVerification> {
+                        const auto metadata = std::find_if(
+                            legal_moves.begin(), legal_moves.end(),
+                            [move](const MoveMetadata& candidate) {
+                                return candidate.move == move;
+                            });
+                        if (metadata == legal_moves.end()) {
+                            return std::nullopt;
+                        }
+                        ++context.stats.root_selective_candidates;
+                        const SearchContext::RootVerification verification =
+                            context.selectively_research_root_move(root, *metadata, nominal_depth);
+                        if (context.aborted || !verification.authoritative) {
+                            return std::nullopt;
+                        }
+                        return verification;
+                    };
+
+                    if (limits.depth.has_value() &&
+                        *limits.depth == kRootShallowConfirmationDepth &&
+                        depth == kRootShallowConfirmationDepth &&
+                        !limits.search_moves_specified && !context.aborted &&
+                        !root_score_snapshot.empty() && result.best_move.has_value() &&
+                        !mate_from_score(score).has_value()) {
+                        struct ShallowRootCandidate {
+                            MoveMetadata metadata;
+                            int score = -kInfinity;
+                            bool forcing = false;
+                        };
+
+                        const auto metadata_for = [&legal_moves](const Move move) {
+                            return std::find_if(
+                                legal_moves.begin(), legal_moves.end(),
+                                [move](const MoveMetadata& metadata) {
+                                    return metadata.move == move;
+                                });
+                        };
+                        const auto incumbent_metadata = metadata_for(*result.best_move);
+                        const bool incumbent_forcing = incumbent_metadata != legal_moves.end() &&
+                            (incumbent_metadata->is_capture() || incumbent_metadata->gives_check ||
+                             incumbent_metadata->move.promotion() != Promotion::none);
+                        const auto is_same_target_capture =
+                            [&incumbent_metadata, &legal_moves](
+                                const auto metadata) {
+                            return incumbent_metadata != legal_moves.end() &&
+                                metadata != legal_moves.end() &&
+                                incumbent_metadata->is_capture() && metadata->is_capture() &&
+                                metadata->move.to() == incumbent_metadata->move.to();
+                        };
+                        const bool has_mixed_forcing_alternative = incumbent_metadata != legal_moves.end() &&
+                            std::any_of(
+                                root_score_snapshot.begin(), root_score_snapshot.end(),
+                                [&metadata_for, &legal_moves, &incumbent_forcing,
+                                 &is_same_target_capture, &result](
+                                    const SearchContext::RootMoveScore& root_score) {
+                                    if (root_score.move == *result.best_move) {
+                                        return false;
+                                    }
+                                    const auto metadata = metadata_for(root_score.move);
+                                    if (metadata == legal_moves.end()) {
+                                        return false;
+                                    }
+                                    const bool forcing = metadata->is_capture() || metadata->gives_check ||
+                                        metadata->move.promotion() != Promotion::none;
+                                    return (root_score.exact && forcing != incumbent_forcing) ||
+                                        is_same_target_capture(metadata);
+                                });
+                        if (incumbent_metadata != legal_moves.end() &&
+                            has_mixed_forcing_alternative) {
+                            std::vector<ShallowRootCandidate> alternatives;
+                            alternatives.reserve(root_score_snapshot.size());
+                            for (const SearchContext::RootMoveScore& root_score :
+                                 root_score_snapshot) {
+                                if (root_score.move == *result.best_move) {
+                                    continue;
+                                }
+                                const auto metadata = metadata_for(root_score.move);
+                                if (metadata == legal_moves.end()) {
+                                    continue;
+                                }
+                                const bool same_target_capture =
+                                    is_same_target_capture(metadata);
+                                if (!root_score.exact && !same_target_capture) {
+                                    // A scout bound may nominate a defensive
+                                    // recapture cluster, but no other
+                                    // inexact root line may enter the
+                                    // authoritative confirmation set.
+                                    continue;
+                                }
+                                const bool forcing = metadata->is_capture() || metadata->gives_check ||
+                                    metadata->move.promotion() != Promotion::none;
+                                const int score_margin = forcing ? kRootShallowForcingMargin :
+                                    kRootShallowConfirmationMargin;
+                                if (root_score.score < score - score_margin) {
+                                    continue;
+                                }
+                                alternatives.push_back(
+                                    ShallowRootCandidate{*metadata, root_score.score, forcing});
+                            }
+                            std::stable_sort(
+                                alternatives.begin(), alternatives.end(),
+                                [](const ShallowRootCandidate& left,
+                                   const ShallowRootCandidate& right) {
+                                    if (left.forcing != right.forcing) {
+                                        return left.forcing;
+                                    }
+                                    if (left.score != right.score) {
+                                        return left.score > right.score;
+                                    }
+                                    return detail::move_tie_break_key(left.metadata.move) <
+                                        detail::move_tie_break_key(right.metadata.move);
+                                });
+
+                            std::array<ShallowRootCandidate,
+                                       kMaximumRootShallowConfirmationCandidates> candidates{};
+                            std::size_t candidate_count = 0;
+                            candidates[candidate_count++] =
+                                ShallowRootCandidate{*incumbent_metadata, score,
+                                                      incumbent_metadata->is_capture() ||
+                                                          incumbent_metadata->gives_check ||
+                                                          incumbent_metadata->move.promotion() !=
+                                                              Promotion::none};
+                            for (const ShallowRootCandidate& candidate : alternatives) {
+                                if (candidate_count == candidates.size()) {
+                                    break;
+                                }
+                                candidates[candidate_count++] = candidate;
+                            }
+
+                            int confirmed_score = -kInfinity;
+                            std::optional<Move> confirmed_move;
+                            PrincipalVariation confirmed_pv;
+                            for (std::size_t index = 0; index < candidate_count; ++index) {
+                                ++context.stats.root_selective_candidates;
+                                const SearchContext::RootVerification verification =
+                                    context.selectively_research_root_move(
+                                        root, candidates[index].metadata,
+                                        kRootShallowConfirmationDepth);
+                                if (context.aborted) {
+                                    break;
+                                }
+                                if (!verification.authoritative) {
+                                    continue;
+                                }
+                                if (!confirmed_move.has_value() ||
+                                    verification.score > confirmed_score) {
+                                    confirmed_score = verification.score;
+                                    confirmed_move = candidates[index].metadata.move;
+                                    confirmed_pv = verification.pv;
+                                }
+                            }
+                            if (!context.aborted && confirmed_move.has_value()) {
+                                if (confirmed_move != result.best_move ||
+                                    confirmed_score != score) {
+                                    ++context.stats.root_selective_researches;
+                                }
+                                score = confirmed_score;
+                                result.score_cp = confirmed_score;
+                                result.mate = mate_from_score(confirmed_score);
+                                result.best_move = confirmed_move;
+                                pv = confirmed_pv;
+                                result.pv = confirmed_pv.length > 0 ? confirmed_pv.to_vector() :
+                                    std::vector<Move>{*confirmed_move};
+                                bounded_fallback_result = false;
+                            }
+                        }
                     }
 
                     // A forcing capture can look marginally best at the first
@@ -2351,6 +2919,10 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                             for (std::size_t index = 0; index < context.root_move_score_count; ++index) {
                                 const SearchContext::RootMoveScore& root_score =
                                     context.root_move_scores[index];
+                                // This band only nominates a candidate for a
+                                // deeper full-window comparison. A scout
+                                // score is useful discovery evidence here; it
+                                // never becomes authoritative by itself.
                                 if (!short_timed_root_research &&
                                     root_score.score < score - shallow_root_margin) {
                                     continue;
@@ -2402,6 +2974,9 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                                     if (context.aborted) {
                                         break;
                                     }
+                                    if (!verification.authoritative) {
+                                        continue;
+                                    }
                                     if (!extended_move.has_value() || verification.score > extended_score) {
                                         extended_score = verification.score;
                                         extended_move = candidates[index].move;
@@ -2414,17 +2989,28 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                                 // poisoned captures.  A later candidate may hit the hard
                                 // deadline; in that case the best completed candidate remains
                                 // authoritative.
-                                if (extended_move.has_value()) {
+                                bool nominal_score_authoritative = false;
+                                if (extended_move.has_value() && !context.aborted) {
+                                    if (const auto nominal = nominal_root_verification(
+                                            *extended_move, depth); nominal.has_value()) {
+                                        extended_score = nominal->score;
+                                        extended_pv = nominal->pv;
+                                        nominal_score_authoritative = true;
+                                    }
+                                }
+                                if (extended_move.has_value() && nominal_score_authoritative &&
+                                    !context.aborted) {
                                     if (extended_move != result.best_move || extended_score != score) {
                                         ++context.stats.root_selective_researches;
                                     }
                                     score = extended_score;
                                     result.score_cp = score;
                                     result.mate = mate_from_score(score);
-                                    result.best_move = extended_move;
-                                    pv = extended_pv;
-                                    result.pv = extended_pv.to_vector();
-                                }
+                                     result.best_move = extended_move;
+                                     pv = extended_pv;
+                                     result.pv = extended_pv.to_vector();
+                                     bounded_fallback_result = false;
+                                 }
                             }
                         } else if (best_metadata != legal_moves.end() &&
                                    !best_metadata->is_capture() && !best_metadata->gives_check &&
@@ -2463,6 +3049,9 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                                      candidate_count < candidates.size(); ++index) {
                                     const SearchContext::RootMoveScore& root_score =
                                         context.root_move_scores[index];
+                                    // Scout scores may nominate a candidate;
+                                    // the bounded re-search below supplies the
+                                    // only score used for replacement.
                                     if (root_score.move == *result.best_move ||
                                         root_score.score < score - shallow_root_margin) {
                                         continue;
@@ -2511,6 +3100,9 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                                     if (context.aborted) {
                                         break;
                                     }
+                                    if (!verification.authoritative) {
+                                        continue;
+                                    }
                                     const bool candidate_forcing = candidates[index].is_capture() ||
                                         candidates[index].gives_check ||
                                         candidates[index].move.promotion() != Promotion::none;
@@ -2523,7 +3115,17 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                                         extended_pv = verification.pv;
                                     }
                                 }
-                                if (extended_move.has_value()) {
+                                bool nominal_score_authoritative = false;
+                                if (extended_move.has_value() && !context.aborted) {
+                                    if (const auto nominal = nominal_root_verification(
+                                            *extended_move, depth); nominal.has_value()) {
+                                        extended_score = nominal->score;
+                                        extended_pv = nominal->pv;
+                                        nominal_score_authoritative = true;
+                                    }
+                                }
+                                if (extended_move.has_value() && nominal_score_authoritative &&
+                                    !context.aborted) {
                                     if (extended_move != result.best_move || extended_score != score) {
                                         ++context.stats.root_selective_researches;
                                     }
@@ -2574,6 +3176,9 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                             for (std::size_t index = 0; index < context.root_move_score_count; ++index) {
                                 const SearchContext::RootMoveScore& root_score =
                                     context.root_move_scores[index];
+                                // A scout bound is discovery-only. Every
+                                // candidate selected from this band is
+                                // re-searched before it can change the root.
                                 if (root_score.move == *result.best_move ||
                                     root_score.score < score - kRootSelectiveMargin) {
                                     continue;
@@ -2613,15 +3218,159 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                                 if (context.aborted) {
                                     break;
                                 }
+                                if (!verification.authoritative) {
+                                    continue;
+                                }
                                 if (verification.score > shallow_score + kRootSelectiveImprovement) {
+                                    const auto nominal = nominal_root_verification(
+                                        candidate.move, depth);
+                                    if (!nominal.has_value()) {
+                                        continue;
+                                    }
                                     ++context.stats.root_selective_researches;
-                                    score = verification.score;
+                                    score = nominal->score;
                                     result.score_cp = score;
                                     result.mate = mate_from_score(score);
                                     result.best_move = candidate.move;
-                                    pv = verification.pv;
+                                    pv = nominal->pv;
                                     result.pv = pv.to_vector();
+                                    bounded_fallback_result = false;
                                     break;
+                                }
+                            }
+                        }
+                    }
+
+                    // A shallow root can also leave two quiet checking moves
+                    // with nearly identical scores.  The incumbent may be an
+                    // exact first-move result while the alternative is only a
+                    // PVS upper bound, so ordinary root ranking is not a
+                    // comparable check-versus-check decision.  Re-search the
+                    // incumbent and at most two near-tied quiet checks at one
+                    // common full-window horizon; this is restricted to the
+                    // explicit depth-three diagnostic path and does not alter
+                    // timed or deeper searches.
+                    if (limits.depth.has_value() && !limits.search_moves_specified &&
+                        depth == kRootSelectiveDepth &&
+                        !context.aborted && result.best_move.has_value() &&
+                        !root_score_snapshot.empty() &&
+                        !mate_from_score(score).has_value()) {
+                        const auto best_metadata = std::find_if(
+                            legal_moves.begin(), legal_moves.end(),
+                            [&result](const MoveMetadata& metadata) {
+                                return metadata.move == *result.best_move;
+                            });
+                        if (best_metadata != legal_moves.end() &&
+                            !best_metadata->is_capture() && best_metadata->gives_check &&
+                            best_metadata->move.promotion() == Promotion::none) {
+                            std::vector<std::pair<int, MoveMetadata>> alternatives;
+                            for (const SearchContext::RootMoveScore& root_score :
+                                 root_score_snapshot) {
+                                if (root_score.move == *result.best_move ||
+                                    root_score.score < score - kRootSelectiveMargin) {
+                                    continue;
+                                }
+                                const auto metadata = std::find_if(
+                                    legal_moves.begin(), legal_moves.end(),
+                                    [&root_score](const MoveMetadata& move_metadata) {
+                                        return move_metadata.move == root_score.move;
+                                    });
+                                if (metadata == legal_moves.end() || metadata->is_capture() ||
+                                    !metadata->gives_check ||
+                                    metadata->move.promotion() != Promotion::none) {
+                                    continue;
+                                }
+                                alternatives.emplace_back(root_score.score, *metadata);
+                            }
+                            std::stable_sort(
+                                alternatives.begin(), alternatives.end(),
+                                [](const auto& left, const auto& right) {
+                                    if (left.first != right.first) {
+                                        return left.first > right.first;
+                                    }
+                                    return detail::move_tie_break_key(left.second.move) <
+                                        detail::move_tie_break_key(right.second.move);
+                                });
+                            if (alternatives.size() > kMaximumRootCheckConfirmationCandidates) {
+                                alternatives.resize(kMaximumRootCheckConfirmationCandidates);
+                            }
+
+                            if (!alternatives.empty()) {
+                                int confirmed_score = -kInfinity;
+                                std::optional<Move> confirmed_move;
+                                PrincipalVariation confirmed_pv;
+                                ++context.stats.root_selective_candidates;
+                                    const SearchContext::RootVerification incumbent_verification =
+                                        context.selectively_research_root_move(
+                                            root, *best_metadata, depth + 1);
+                                if (!context.aborted && incumbent_verification.authoritative) {
+                                    confirmed_score = incumbent_verification.score;
+                                    confirmed_move = best_metadata->move;
+                                    confirmed_pv = incumbent_verification.pv;
+                                }
+                                for (const auto& [unused_shallow_score, candidate] : alternatives) {
+                                    (void)unused_shallow_score;
+                                    if (context.aborted) {
+                                        break;
+                                    }
+                                    ++context.stats.root_selective_candidates;
+                                    const SearchContext::RootVerification verification =
+                                        context.selectively_research_root_move(
+                                            root, candidate, depth + 1);
+                                    if (context.aborted) {
+                                        break;
+                                    }
+                                    if (!verification.authoritative) {
+                                        continue;
+                                    }
+                                    if (!confirmed_move.has_value() ||
+                                        verification.score > confirmed_score) {
+                                        confirmed_score = verification.score;
+                                        confirmed_move = candidate.move;
+                                        confirmed_pv = verification.pv;
+                                    }
+                                }
+                                if (!context.aborted && confirmed_move.has_value()) {
+                                    // The deeper confirmation chooses the move,
+                                    // but the public result still represents
+                                    // the requested fixed depth.  Refresh the
+                                    // selected line at that nominal depth so a
+                                    // deeper horizon score is never published
+                                    // as the depth-three evaluation.
+                                    const auto confirmed_metadata = std::find_if(
+                                        legal_moves.begin(), legal_moves.end(),
+                                        [&confirmed_move](const MoveMetadata& metadata) {
+                                            return metadata.move == *confirmed_move;
+                                        });
+                                    bool nominal_score_authoritative = false;
+                                    if (confirmed_metadata != legal_moves.end()) {
+                                        ++context.stats.root_selective_candidates;
+                                        const SearchContext::RootVerification nominal_verification =
+                                            context.selectively_research_root_move(
+                                                root, *confirmed_metadata, depth);
+                                        if (!context.aborted && nominal_verification.authoritative) {
+                                            confirmed_score = nominal_verification.score;
+                                            confirmed_pv = nominal_verification.pv;
+                                            nominal_score_authoritative = true;
+                                        }
+                                    }
+                                    if (!nominal_score_authoritative) {
+                                        confirmed_move.reset();
+                                    }
+                                }
+                                if (!context.aborted && confirmed_move.has_value()) {
+                                    if (confirmed_move != result.best_move ||
+                                        confirmed_score != score) {
+                                        ++context.stats.root_selective_researches;
+                                    }
+                                    score = confirmed_score;
+                                    result.score_cp = score;
+                                    result.mate = mate_from_score(score);
+                                    result.best_move = confirmed_move;
+                                    pv = confirmed_pv;
+                                    result.pv = confirmed_pv.length > 0 ? confirmed_pv.to_vector() :
+                                        std::vector<Move>{*confirmed_move};
+                                    bounded_fallback_result = false;
                                 }
                             }
                         }
@@ -2653,6 +3402,9 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                             root_features.king_zone_attacks[own_side] != 0) {
                             std::vector<std::pair<int, MoveMetadata>> defensive_candidates;
                             for (const SearchContext::RootMoveScore& root_score : root_score_snapshot) {
+                                // Use the shallow value only to prioritize a
+                                // bounded candidate list; depth-five
+                                // confirmation remains authoritative.
                                 if (root_score.move == *result.best_move) {
                                     continue;
                                 }
@@ -2693,7 +3445,7 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                                 const SearchContext::RootVerification best_verification =
                                     context.selectively_research_root_move(
                                         root, *best_metadata, kRootKingSafetySelectiveDepth);
-                                if (!context.aborted) {
+                                if (!context.aborted && best_verification.authoritative) {
                                     int selected_score = best_verification.score;
                                     Move selected_move = best_metadata->move;
                                     PrincipalVariation selected_pv = best_verification.pv;
@@ -2707,6 +3459,9 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                                         if (context.aborted) {
                                             break;
                                         }
+                                        if (!verification.authoritative) {
+                                            continue;
+                                        }
                                         if (verification.score > selected_score ||
                                             verification.score >= best_verification.score -
                                                 kRootKingSafetyTieMargin) {
@@ -2715,19 +3470,29 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                                             selected_pv = verification.pv;
                                         }
                                     }
+                                    bool nominal_score_authoritative = false;
                                     if (!context.aborted) {
+                                        if (const auto nominal = nominal_root_verification(
+                                                selected_move, depth); nominal.has_value()) {
+                                            selected_score = nominal->score;
+                                            selected_pv = nominal->pv;
+                                            nominal_score_authoritative = true;
+                                        }
+                                    }
+                                    if (nominal_score_authoritative && !context.aborted) {
                                         if (selected_move != result.best_move ||
                                             selected_score != result.score_cp) {
                                             ++context.stats.root_selective_researches;
                                         }
                                         result.score_cp = selected_score;
                                         result.mate = mate_from_score(selected_score);
-                                        result.best_move = selected_move;
-                                        pv = selected_pv;
-                                        result.pv = pv.length > 0 ? pv.to_vector() :
-                                            std::vector<Move>{selected_move};
-                                        score = selected_score;
-                                    }
+                                         result.best_move = selected_move;
+                                         pv = selected_pv;
+                                         result.pv = pv.length > 0 ? pv.to_vector() :
+                                             std::vector<Move>{selected_move};
+                                         score = selected_score;
+                                         bounded_fallback_result = false;
+                                     }
                                 }
                             }
                         }
@@ -2744,15 +3509,22 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                     info.qnodes = context.stats.qnodes;
                     info.tt_hits = context.stats.tt_hits;
                     safely_report_info(sink, info);
+                    const int iteration_observation_score = bounded_fallback_result ?
+                        searched_iteration_score : score;
                     time_manager.observe_iteration(SearchIterationObservation{
                         depth,
-                        score,
-                        had_completed_iteration && previous_best_move != result.best_move,
-                        had_completed_iteration && previous_pv != result.pv,
+                        iteration_observation_score,
+                        bounded_fallback_result ? searched_best_move_changed :
+                            (had_completed_iteration && previous_best_move != result.best_move),
+                        bounded_fallback_result ? searched_pv_changed :
+                            (had_completed_iteration && previous_pv != result.pv),
                         aspiration_researched,
                         visited});
                     result.timing = time_manager.diagnostics();
-                    previous_score = score;
+                    // Keep a bounded safety score visible in the result, but
+                    // anchor the next aspiration window to the full-width
+                    // search score when that correction is still active.
+                    previous_score = iteration_observation_score;
                     previous_iteration_elapsed = elapsed - previous_report_elapsed;
                     previous_report_elapsed = elapsed;
 
@@ -2785,7 +3557,8 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                 root_schedule.reserve(parallel_moves.size());
                 for (std::size_t index = 0; index < parallel_moves.size(); ++index) {
                     root_schedule.push_back(
-                        RootScheduleRecord{parallel_moves[index].move, index, -kInfinity, false});
+                        RootScheduleRecord{
+                            parallel_moves[index].move, index, -kInfinity, false, false});
                 }
                 const auto schedule_record_for = [&root_schedule](const Move move)
                     -> RootScheduleRecord* {
@@ -2805,8 +3578,10 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                             root, parallel_moves, *evaluator, evaluator_mutex_ptr,
                             &root_context.stats, allow_deep_checked_fallback, &fallback_control);
                         fallback.has_value()) {
-                        result.best_move = *fallback;
-                        result.pv = {*fallback};
+                        result.best_move = fallback->move;
+                        result.pv = {fallback->move};
+                        result.score_cp = fallback->score;
+                        result.mate = mate_from_score(fallback->score);
                         used_short_fallback = true;
                     }
                 } else if (short_search_fallback && !defer_nonchecking_short_fallback) {
@@ -2820,6 +3595,7 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                 const int maximum_depth =
                     std::min(kMaximumSearchDepth, std::max(1, limits.depth.value_or(kMaximumSearchDepth)));
                 const bool unbounded = limits.infinite || limits.ponder;
+                std::optional<int> previous_score;
                 std::chrono::milliseconds previous_iteration_elapsed{1};
                 std::chrono::milliseconds previous_report_elapsed{0};
                 for (int depth = 1;; depth = depth < maximum_depth ? depth + 1 : maximum_depth) {
@@ -2839,13 +3615,19 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                         accumulate_stats(total_stats, root_context.stats);
                         break;
                     }
-                    const bool root_check_extension = root.in_check() && depth < kMaximumSearchDepth;
+                    const std::optional<std::chrono::milliseconds> iteration_time_budget =
+                        time_manager.time_budget();
+                    const bool short_timed_root = iteration_time_budget.has_value() &&
+                        *iteration_time_budget < kShortTimedFallbackMinimum;
+                    const bool root_check_extension = root.in_check() &&
+                        depth < kMaximumSearchDepth && !short_timed_root;
                     if (root_check_extension) {
                         ++root_context.stats.check_extensions;
                     }
 
                     std::optional<Move> tt_move;
-                    if (const auto entry = table->probe(root.position_key(), 0); entry.has_value()) {
+                    if (const auto entry = table->probe(search_transposition_key(root), 0);
+                        entry.has_value()) {
                         ++root_context.stats.tt_hits;
                         if (!entry->best_move.is_no_move()) {
                             tt_move = entry->best_move;
@@ -2889,6 +3671,11 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                             if (left_scored != right_scored) {
                                 return left_scored;
                             }
+                            const bool left_exact = left_scored && left_record->previous_exact;
+                            const bool right_exact = right_scored && right_record->previous_exact;
+                            if (left_exact != right_exact) {
+                                return left_exact;
+                            }
                             if (left_scored && right_scored &&
                                 left_record->previous_score != right_record->previous_score) {
                                 return left_record->previous_score > right_record->previous_score;
@@ -2919,16 +3706,80 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
 
                     SearchStats iteration_stats;
                     bool aborted = false;
-                    // Keep the two-worker fixed-depth path on shared root PVS so
-                    // it benefits from the live alpha bound.  At four workers,
+                    bool aspiration_researched = false;
+                    int window_alpha = -kInfinity;
+                    int window_beta = kInfinity;
+                    int aspiration_window = kAspirationWindow + std::min(32, depth * 2);
+                    const bool use_aspiration = previous_score.has_value() && !multi_pv;
+                    if (use_aspiration) {
+                        window_alpha = std::max(-kInfinity,
+                                                *previous_score - aspiration_window);
+                        window_beta = std::min(kInfinity,
+                                               *previous_score + aspiration_window);
+                    }
+                    // Keep the two-worker fixed-depth path for non-checked
+                    // roots on shared root PVS so it benefits from the live
+                    // alpha bound.  At four workers,
                     // fixed-depth benchmark parity is more important than the
                     // racy order in which a moving root alpha is observed;
                     // timed searches retain shared root PVS at every worker
                     // count.
-                    const bool use_root_pvs = !multi_pv &&
+                    // A checked root has only a small evasion set, and a
+                    // shared null-window alpha is both unnecessary and
+                    // nondeterministic there: concurrent equal evasions can
+                    // leave the stable-order line as an incomplete scout.
+                    // Search checked roots with full windows so every legal
+                    // evasion receives an authoritative score before the
+                    // stable root ranking is applied.
+                    const bool use_root_pvs = !multi_pv && !root.in_check() &&
                         (!limits.depth.has_value() || worker_count < 4);
-                    pool.run(root, parallel_moves, depth, root_check_extension, stable_root_indices,
-                             lines, use_root_pvs, root_static_eval, iteration_stats, aborted);
+                    int aspiration_retry_count = 0;
+                    for (;;) {
+                        SearchStats attempt_stats;
+                        bool attempt_aborted = false;
+                        bool window_failed_low = false;
+                        bool window_failed_high = false;
+                        // Every aspiration attempt must rank only lines
+                        // searched under its own window.  If a later attempt
+                        // is interrupted, retaining `completed` flags from a
+                        // prior failed window would make stale bounds look
+                        // like current root results.
+                        std::fill(lines.begin(), lines.end(), RootLine{});
+                        pool.run(root, parallel_moves, depth, root_check_extension,
+                                 stable_root_indices, lines, use_root_pvs, root_static_eval,
+                                 window_alpha, window_beta, attempt_stats, attempt_aborted,
+                                 window_failed_low, window_failed_high);
+                        accumulate_stats(iteration_stats, attempt_stats);
+                        if (attempt_aborted) {
+                            aborted = true;
+                            break;
+                        }
+                        if (!use_aspiration || (!window_failed_low && !window_failed_high)) {
+                            break;
+                        }
+
+                        aspiration_researched = true;
+                        ++iteration_stats.aspiration_researches;
+                        ++aspiration_retry_count;
+                        if (aspiration_retry_count > 3) {
+                            // A pathological score swing gets one final
+                            // full-window search so no inexact aspiration line
+                            // can become the completed root result.
+                            window_alpha = -kInfinity;
+                            window_beta = kInfinity;
+                            continue;
+                        }
+                        aspiration_window = std::min(
+                            kInfinity / 4, aspiration_window * 2 + 16);
+                        if (window_failed_low) {
+                            window_alpha = std::max(-kInfinity,
+                                                    window_alpha - aspiration_window);
+                        }
+                        if (window_failed_high) {
+                            window_beta = std::min(kInfinity,
+                                                   window_beta + aspiration_window);
+                        }
+                    }
                     if (aborted) {
                         if (result.completed_depth == 0 && !used_short_fallback &&
                             defer_nonchecking_short_fallback) {
@@ -2937,8 +3788,10 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                                     &root_context.stats, allow_deep_checked_fallback, &fallback_control,
                                     true, true);
                                 fallback.has_value()) {
-                                result.best_move = *fallback;
-                                result.pv = {*fallback};
+                                result.best_move = fallback->move;
+                                result.pv = {fallback->move};
+                                result.score_cp = fallback->score;
+                                result.mate = mate_from_score(fallback->score);
                                 used_short_fallback = true;
                             }
                         }
@@ -2967,21 +3820,12 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                         break;
                     }
 
-                    std::vector<std::size_t> ranked_indices;
-                    if (multi_pv) {
-                        ranked_indices = RootCoordinator::rank(lines);
-                    } else {
-                        ranked_indices.reserve(lines.size());
-                        for (std::size_t index = 0; index < lines.size(); ++index) {
-                            if (lines[index].completed) {
-                                ranked_indices.push_back(index);
-                            }
-                        }
-                        std::stable_sort(ranked_indices.begin(), ranked_indices.end(),
-                                         [&lines](std::size_t left, std::size_t right) {
-                                             return lines[left].score > lines[right].score;
-                                         });
-                    }
+                    // Use one deterministic ranking path for both single-PV
+                    // and MultiPV roots. The explicit stable index matters
+                    // when concurrent workers finish equal-scoring lines in
+                    // different orders.
+                    std::vector<std::size_t> ranked_indices =
+                        RootCoordinator::rank(lines);
                     if (ranked_indices.empty()) {
                         if (result.completed_depth == 0 && !used_short_fallback &&
                             defer_nonchecking_short_fallback) {
@@ -2989,8 +3833,10 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                                     root, parallel_moves, *evaluator, evaluator_mutex_ptr,
                                     &root_context.stats, allow_deep_checked_fallback, &fallback_control);
                                 fallback.has_value()) {
-                                result.best_move = *fallback;
-                                result.pv = {*fallback};
+                                result.best_move = fallback->move;
+                                result.pv = {fallback->move};
+                                result.score_cp = fallback->score;
+                                result.mate = mate_from_score(fallback->score);
                                 used_short_fallback = true;
                             }
                         }
@@ -2998,6 +3844,20 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                         accumulate_stats(total_stats, iteration_stats);
                         break;
                     }
+
+                    // Some fixed-depth threaded confirmations deliberately
+                    // look one or two plies deeper to choose a candidate. A
+                    // RootLine must not publish that selective score under
+                    // the shallower completed depth, so retain the ordinary
+                    // root lines until the selected move is refreshed at the
+                    // requested horizon.
+                    std::optional<std::vector<RootLine>> pre_selective_lines;
+                    bool needs_nominal_root_refresh = false;
+                    const auto snapshot_before_selective_update = [&]() {
+                        if (!pre_selective_lines.has_value()) {
+                            pre_selective_lines = lines;
+                        }
+                    };
 
                     // Root-parallel searches otherwise stop at the shallow result when a
                     // short timed search finishes depth two. Re-search a small, stable set of
@@ -3062,12 +3922,18 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                                 if (root_context.aborted) {
                                     break;
                                 }
+                                if (!verification.authoritative) {
+                                    continue;
+                                }
                                 if (verification.score > shallow_best.score +
                                         kRootSelectiveImprovement) {
                                     ++root_context.stats.root_selective_researches;
+                                    snapshot_before_selective_update();
                                     lines[candidate_index].score = verification.score;
                                     lines[candidate_index].pv = verification.pv;
                                     lines[candidate_index].completed = true;
+                                    lines[candidate_index].exact = true;
+                                    needs_nominal_root_refresh = true;
                                     ranked_indices = RootCoordinator::rank(lines);
                                     break;
                                 }
@@ -3112,36 +3978,121 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                                 }
                             }
 
-                            for (const auto& [candidate_index, metadata] : candidates) {
+                            if (!candidates.empty()) {
+                                // Compare the incumbent at the same horizon as
+                                // every forcing alternative.  Comparing a
+                                // depth-one quiet score directly with a depth-two
+                                // forcing score lets a merely near-tied check
+                                // replace a genuinely stronger quiet move.
                                 ++root_context.stats.root_selective_candidates;
-                                const SearchContext::RootVerification verification =
-                                    root_context.selectively_research_root_move(root, metadata, depth + 1);
-                                if (root_context.aborted) {
-                                    break;
-                                }
-                                const bool candidate_forcing = metadata.is_capture() || metadata.gives_check ||
-                                    metadata.move.promotion() != Promotion::none;
-                                if (verification.score > shallow_best.score + kRootSelectiveImprovement ||
-                                    (candidate_forcing &&
-                                     verification.score >= shallow_best.score - kRootSelectiveMargin)) {
-                                    ++root_context.stats.root_selective_researches;
-                                    lines[candidate_index].score = verification.score;
-                                    lines[candidate_index].pv = verification.pv;
-                                    lines[candidate_index].completed = true;
-                                    ranked_indices = RootCoordinator::rank(lines);
-                                    break;
+                                const SearchContext::RootVerification incumbent_verification =
+                                    root_context.selectively_research_root_move(
+                                        root, best_metadata, depth + 1);
+                                if (!root_context.aborted && incumbent_verification.authoritative) {
+                                    const int shallow_best_score = shallow_best.score;
+                                    int confirmed_score = incumbent_verification.score;
+                                    std::size_t confirmed_index = best_candidate_index;
+                                    snapshot_before_selective_update();
+                                    lines[best_candidate_index].score = incumbent_verification.score;
+                                    lines[best_candidate_index].pv = incumbent_verification.pv;
+                                    lines[best_candidate_index].completed = true;
+                                    lines[best_candidate_index].exact = true;
+                                    needs_nominal_root_refresh = true;
+
+                                    for (const auto& [candidate_index, metadata] : candidates) {
+                                        ++root_context.stats.root_selective_candidates;
+                                        const SearchContext::RootVerification verification =
+                                            root_context.selectively_research_root_move(
+                                                root, metadata, depth + 1);
+                                        if (root_context.aborted) {
+                                            break;
+                                        }
+                                        if (!verification.authoritative) {
+                                            continue;
+                                        }
+                                        lines[candidate_index].score = verification.score;
+                                        lines[candidate_index].pv = verification.pv;
+                                        lines[candidate_index].completed = true;
+                                        lines[candidate_index].exact = true;
+                                        if (verification.score > confirmed_score) {
+                                            confirmed_score = verification.score;
+                                            confirmed_index = candidate_index;
+                                        }
+                                    }
+                                    if (!root_context.aborted) {
+                                        if (confirmed_index != best_candidate_index ||
+                                            confirmed_score != shallow_best_score) {
+                                            ++root_context.stats.root_selective_researches;
+                                        }
+                                        ranked_indices = RootCoordinator::rank(lines);
+                                    }
                                 }
                             }
                         }
                     }
 
-                    // Remember only a fully completed root iteration.  The
-                    // score may be a scout bound for a move below alpha, but
-                    // it is still the best available estimate for queue
-                    // scheduling; the completed principal move and its TT
-                    // entry retain authority for correctness.
+                    if (needs_nominal_root_refresh) {
+                        bool nominal_refresh_completed = false;
+                        if (!root_context.aborted &&
+                            !time_manager.should_stop(root_context.visited_nodes()) &&
+                            !ranked_indices.empty()) {
+                            const std::size_t selected_index = ranked_indices.front();
+                            if (selected_index < parallel_moves.size()) {
+                                ++root_context.stats.root_selective_candidates;
+                                const SearchContext::RootVerification verification =
+                                    root_context.selectively_research_root_move(
+                                        root, parallel_moves[selected_index], depth);
+                                if (!root_context.aborted && verification.authoritative) {
+                                    lines[selected_index].score = verification.score;
+                                    lines[selected_index].pv = verification.pv;
+                                    lines[selected_index].completed = true;
+                                    lines[selected_index].exact = true;
+                                    nominal_refresh_completed = true;
+                                    if (pre_selective_lines.has_value()) {
+                                        // The selective pass may have updated
+                                        // several candidates at a deeper
+                                        // horizon. Keep only the selected
+                                        // candidate's nominal-depth refresh;
+                                        // restoring the other lines prevents
+                                        // mixed-horizon scores from entering
+                                        // ranking, MultiPV publication, or the
+                                        // next iteration's schedule.
+                                        const RootLine nominal_line = lines[selected_index];
+                                        lines = *pre_selective_lines;
+                                        lines[selected_index] = nominal_line;
+                                        ranked_indices = RootCoordinator::rank(lines);
+                                    }
+                                }
+                            }
+                        }
+                        if (!nominal_refresh_completed && pre_selective_lines.has_value()) {
+                            // A selective confirmation that cannot finish its
+                            // nominal refresh is discovery-only. Restore the
+                            // fully searched root lines before result and info
+                            // publication, including the interrupted case.
+                            lines = *pre_selective_lines;
+                            ranked_indices = RootCoordinator::rank(lines);
+                        }
+                    }
+
+                    const std::optional<Move> previous_best_move = result.best_move;
+                    const std::vector<Move> previous_pv = result.pv;
+                    const bool had_completed_iteration = result.completed_depth > 0;
+                    const bool authoritative_root_iteration = !ranked_indices.empty() &&
+                        lines[ranked_indices.front()].exact;
+
+                    // Remember completed lines for the next root schedule.
+                    // Selective estimates are useful ordering hints when the
+                    // iteration also contains an authoritative line.  If an
+                    // entire attempted iteration is selective, do not replace
+                    // the previous iteration's queue evidence unless there is
+                    // no completed iteration yet and the estimate is serving
+                    // as the initial fallback.
                     for (std::size_t index = 0; index < lines.size(); ++index) {
                         if (!lines[index].completed) {
+                            continue;
+                        }
+                        if (!authoritative_root_iteration && had_completed_iteration) {
                             continue;
                         }
                         if (RootScheduleRecord* record =
@@ -3149,37 +4100,49 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                             record != nullptr) {
                             record->previous_score = lines[index].score;
                             record->has_previous_score = true;
+                            record->previous_exact = lines[index].exact;
                         }
                     }
 
-                    accumulate_stats(iteration_stats, root_context.stats);
-                    accumulate_stats(total_stats, iteration_stats);
-                    if (root_context.aborted) {
-                        break;
-                    }
-
-                    const std::optional<Move> previous_best_move = result.best_move;
-                    const std::vector<Move> previous_pv = result.pv;
-                    const bool had_completed_iteration = result.completed_depth > 0;
                     const std::size_t best_index = ranked_indices.front();
                     const RootLine& best_line = lines[best_index];
 
-                    result.completed_depth = depth;
-                    result.score_cp = best_line.score;
-                    result.mate = mate_from_score(best_line.score);
-                    result.best_move = best_line.pv.length > 0 ?
-                        std::optional<Move>{best_line.pv.moves[0]} : result.best_move;
-                    if (best_line.pv.length > 0) {
-                        result.pv = best_line.pv.to_vector();
-                    } else if (result.best_move.has_value()) {
-                        result.pv = {*result.best_move};
+                    if (authoritative_root_iteration) {
+                        result.completed_depth = depth;
+                        result.score_cp = best_line.score;
+                        result.mate = mate_from_score(best_line.score);
+                        result.best_move = best_line.pv.length > 0 ?
+                            std::optional<Move>{best_line.pv.moves[0]} : result.best_move;
+                        if (best_line.pv.length > 0) {
+                            result.pv = best_line.pv.to_vector();
+                        } else if (result.best_move.has_value()) {
+                            result.pv = {*result.best_move};
+                        }
+                    } else if (!had_completed_iteration && best_line.completed) {
+                        // Keep a fully returned selective line as a depth-zero
+                        // fallback when no authoritative iteration exists yet.
+                        // It remains deliberately outside completed-depth and
+                        // aspiration authority.
+                        result.score_cp = best_line.score;
+                        result.mate = mate_from_score(best_line.score);
+                        if (best_line.pv.length > 0) {
+                            result.best_move = best_line.pv.moves[0];
+                            result.pv = best_line.pv.to_vector();
+                        }
                     }
+                    const int searched_iteration_score = result.score_cp;
+                    const bool searched_best_move_changed = had_completed_iteration &&
+                        previous_best_move != result.best_move;
+                    const bool searched_pv_changed = had_completed_iteration &&
+                        previous_pv != result.pv;
+                    bool bounded_fallback_result = false;
 
-                    if ((short_tactical_fallback || defer_nonchecking_short_fallback) &&
+                    if (authoritative_root_iteration && !multi_pv &&
+                        (short_tactical_fallback || defer_nonchecking_short_fallback) &&
                         !defer_expensive_short_fallback &&
                         result.completed_depth == 1 &&
                         (short_capture_needs_fallback(parallel_moves, result.best_move) ||
-                         short_quiet_needs_fallback(parallel_moves, result.best_move) ||
+                         short_quiet_needs_fallback(root, parallel_moves, result.best_move) ||
                          short_quiet_exposes_immediate_check(
                              root, parallel_moves, result.best_move) ||
                          short_check_needs_fallback(parallel_moves, result.best_move) ||
@@ -3192,6 +4155,12 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                             root, parallel_moves, *evaluator, evaluator_mutex_ptr,
                             &root_context.stats, allow_deep_checked_fallback,
                             &fallback_control, true, true);
+                        std::optional<Move> fallback_move;
+                        int fallback_score = best_line.score;
+                        if (fallback.has_value()) {
+                            fallback_move = fallback->move;
+                            fallback_score = fallback->score;
+                        }
                         const auto current_metadata = result.best_move.has_value() ?
                             std::find_if(
                                 parallel_moves.begin(), parallel_moves.end(),
@@ -3201,30 +4170,90 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                         if (current_metadata != parallel_moves.end() &&
                             !current_metadata->is_capture() && !current_metadata->gives_check &&
                             current_metadata->move.promotion() == Promotion::none &&
-                            (!fallback.has_value() || *fallback == current_metadata->move)) {
-                            fallback = first_safe_checking_capture(parallel_moves);
+                            (!fallback_move.has_value() ||
+                             *fallback_move == current_metadata->move)) {
+                            if (const auto checking_capture = scored_safe_checking_capture(
+                                    root, parallel_moves, *evaluator, evaluator_mutex_ptr,
+                                    allow_deep_checked_fallback, &fallback_control);
+                                checking_capture.has_value()) {
+                                fallback_move = checking_capture->move;
+                                fallback_score = checking_capture->score;
+                            } else {
+                                fallback_move.reset();
+                            }
                         }
-                        const bool should_replace = fallback.has_value() &&
+                        const bool should_replace = fallback_move.has_value() &&
                             short_fallback_should_replace_completed_root(
-                                root, parallel_moves, result.best_move, *fallback);
+                                root, parallel_moves, result.best_move, *fallback_move);
                         if (should_replace) {
-                            result.best_move = *fallback;
-                            result.pv = {*fallback};
+                            const std::optional<Move> superseded_move = result.best_move;
+                            result.best_move = *fallback_move;
+                            result.pv = {*fallback_move};
+                            result.score_cp = fallback_score;
+                            result.mate = mate_from_score(fallback_score);
                             // The info loop below reads the ranked root line,
                             // not result.pv. Replace that line as well so a
                             // bounded safety correction cannot publish a PV
                             // for the superseded move before bestmove.
                             if (!ranked_indices.empty()) {
                                 RootLine& corrected_line = lines[ranked_indices.front()];
+                                corrected_line.score = fallback_score;
+                                corrected_line.exact = false;
                                 corrected_line.pv = {};
-                                corrected_line.pv.moves[0] = *fallback;
+                                corrected_line.pv.moves[0] = *fallback_move;
                                 corrected_line.pv.length = 1;
                             }
+                            if (RootScheduleRecord* record =
+                                    schedule_record_for(*fallback_move);
+                                record != nullptr) {
+                                // Keep the next iteration's queue ordering in
+                                // sync with the corrected authoritative root
+                                // result. Otherwise the old line score would
+                                // still make the superseded move look like
+                                // the strongest continuation to workers.
+                                record->previous_score = fallback_score;
+                                record->has_previous_score = true;
+                                record->previous_exact = false;
+                            }
+                            if (superseded_move.has_value() &&
+                                *superseded_move != *fallback_move) {
+                                if (RootScheduleRecord* record =
+                                        schedule_record_for(*superseded_move);
+                                    record != nullptr) {
+                                    // The old line was superseded by a
+                                    // bounded safety decision. Do not let its
+                                    // stale high score outrank the corrected
+                                    // move when the next iteration is queued.
+                                    record->previous_score = -kInfinity;
+                                    record->has_previous_score = false;
+                                    record->previous_exact = false;
+                                }
+                            }
+                            bounded_fallback_result = true;
                         }
+                    }
+
+                    accumulate_stats(iteration_stats, root_context.stats);
+                    accumulate_stats(total_stats, iteration_stats);
+                    if (root_context.aborted) {
+                        break;
                     }
 
                     const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
                         std::chrono::steady_clock::now() - started);
+                    if (!authoritative_root_iteration) {
+                        // The attempted pass still consumed real search time,
+                        // so use its duration to pace the next attempt while
+                        // withholding publication and aspiration state.
+                        previous_iteration_elapsed = std::max(
+                            std::chrono::milliseconds{1}, elapsed - previous_report_elapsed);
+                        if ((!unbounded && depth == maximum_depth) || root_is_claimable_draw ||
+                            time_manager.should_stop_after_iteration()) {
+                            break;
+                        }
+                        continue;
+                    }
+
                     const std::uint64_t visited = total_stats.nodes + total_stats.qnodes;
                     const std::uint64_t nps = elapsed.count() > 0 ? visited * 1000 /
                         static_cast<std::uint64_t>(elapsed.count()) : visited;
@@ -3241,14 +4270,23 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                         safely_report_info(sink, info);
                     }
                     const auto iteration_elapsed = elapsed - previous_report_elapsed;
+                    const int iteration_observation_score = bounded_fallback_result ?
+                        searched_iteration_score : result.score_cp;
                     time_manager.observe_iteration(SearchIterationObservation{
                         depth,
-                        best_line.score,
-                        had_completed_iteration && previous_best_move != result.best_move,
-                        had_completed_iteration && previous_pv != result.pv,
-                        false,
+                        // Selective root confirmation is a full-window result
+                        // and remains part of pacing. A bounded fallback is a
+                        // caller-facing safety choice, so use the ordinary
+                        // root line for hardness and aspiration state.
+                        iteration_observation_score,
+                        bounded_fallback_result ? searched_best_move_changed :
+                            (had_completed_iteration && previous_best_move != result.best_move),
+                        bounded_fallback_result ? searched_pv_changed :
+                            (had_completed_iteration && previous_pv != result.pv),
+                        aspiration_researched,
                         visited});
                     result.timing = time_manager.diagnostics();
+                    previous_score = iteration_observation_score;
                     previous_iteration_elapsed = iteration_elapsed;
                     previous_report_elapsed = elapsed;
                     if ((!unbounded && depth == maximum_depth) || root_is_claimable_draw ||

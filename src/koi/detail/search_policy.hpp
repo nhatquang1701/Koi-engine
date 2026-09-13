@@ -31,6 +31,11 @@ struct ProbCutDecision {
     int depth = 0;
 };
 
+struct ReverseFutilityDecision {
+    bool eligible = false;
+    int margin = 0;
+};
+
 enum class QuiescenceCapturePrune {
     none,
     static_exchange,
@@ -52,18 +57,20 @@ public:
     // The compatibility null_move() above intentionally retains its small,
     // stable contract. Live search uses this dynamic form, which follows the
     // Stockfish 19 shape: deeper nodes and positions comfortably above beta
-    // can afford a larger null reduction, while marginal positions retain a
-    // shallower probe and are more likely to be verified.
+    // can afford a larger null reduction. Every eligible fail-high is then
+    // verified before Koi accepts the selective cutoff.
     [[nodiscard]] static constexpr DynamicNullMoveDecision dynamic_null_move(
         const int depth, const int alpha, const int beta, const int static_eval,
         const bool checked, const bool allowed, const bool improving,
         const bool pawn_endgame) noexcept {
         const NullMoveDecision base = null_move(depth, alpha, beta, checked, allowed);
-        // Match Stockfish 19's static-evaluation guard.  Null move is only a
-        // useful proof at a cut node when the side to move is already well
-        // above beta; making this gate permissive is a common source of
-        // zugzwang and defensive-resource losses.
-        const int static_eval_floor = beta + 365 - 13 * depth -
+        // Stockfish 19 uses a +365 NNUE-calibrated confidence margin here.
+        // Koi's classical evaluator has a narrower positional-score range;
+        // retain the same depth/improving slope but calibrate the margin to
+        // that scale.  A null fail-high is still re-searched before cutoff,
+        // while the node-type, repetition, and sparse-material gates provide
+        // the Koi-specific safety envelope.
+        const int static_eval_floor = beta + kNullMoveStaticMargin - 13 * depth -
             (improving ? 47 : 0);
         if (!base.eligible || pawn_endgame || beta < -2'000 ||
             static_eval < static_eval_floor) {
@@ -75,7 +82,13 @@ public:
         // Keep the exact shape; the call site clamps the resulting child
         // depth at qsearch when R exceeds the remaining horizon.
         const int reduction = 7 + depth / 3 + excess / 256;
-        return DynamicNullMoveDecision{true, reduction, depth >= 16};
+        // The dynamic reduction reaches the qsearch horizon at shallow
+        // regular depths, so every eligible fail-high needs a no-null
+        // confirmation before it can cut off.  This is deliberately more
+        // conservative than a depth-only verification threshold: a shallow
+        // verification is cheap, and an unverified shallow null result is
+        // precisely where zugzwang and tactical-horizon errors are likeliest.
+        return DynamicNullMoveDecision{true, reduction, reduction >= 3};
     }
 
     [[nodiscard]] static constexpr bool check_extension(
@@ -120,7 +133,7 @@ public:
         // Stockfish applies LMR to sufficiently late non-checking captures as
         // well as quiet moves. Captures start one step more conservatively,
         // while their capture history still controls the final reduction.
-        const bool candidate = !root_pawn_move && move_number >= 2 && depth >= 4 &&
+        const bool candidate = !root_pawn_move && move_number >= 2 && depth >= 3 &&
             !checked && !gives_check && !promotion && !tt_move && !killer &&
             (!capture || capture_history_score > -8'192);
         const bool high_history_exclusion = candidate &&
@@ -212,6 +225,30 @@ public:
         const int margin = 241 - (improving ? 64 : 0);
         return ProbCutDecision{true, beta + margin,
                                std::max(0, depth - (improving ? 5 : 3))};
+    }
+
+    // Reverse futility is a static fail-high shortcut.  It is useful when a
+    // quiet scout node is already comfortably above beta, but unlike a TT
+    // bound it is an evaluation-based estimate and must remain selective.
+    // The live call site supplies the position-sensitive safety envelope;
+    // this function keeps the depth and improving-state calibration pure.
+    [[nodiscard]] static constexpr ReverseFutilityDecision reverse_futility(
+        const int depth, const int beta, const int static_eval,
+        const bool checked, const bool pv_node, const bool allowed,
+        const bool improving, const bool opponent_worsening) noexcept {
+        const bool eligible = allowed && !checked && !pv_node &&
+            depth >= kReverseFutilityMinimumDepth &&
+            depth <= kReverseFutilityMaximumDepth &&
+            std::abs(beta) < kMateThreshold &&
+            std::abs(static_eval) < kMateThreshold && static_eval >= beta;
+        if (!eligible) {
+            return {};
+        }
+        const int margin = std::max(
+            0, kReverseFutilityBaseMargin + kReverseFutilityDepthMargin * depth -
+                (improving ? kReverseFutilityImprovingDiscount : 0) +
+                (opponent_worsening ? kReverseFutilityWorseningSurcharge : 0));
+        return ReverseFutilityDecision{static_eval - margin >= beta, margin};
     }
 
     [[nodiscard]] static constexpr bool quiet_futility(

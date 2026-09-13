@@ -10,6 +10,11 @@ namespace koi::detail {
 
 struct RootLine {
     bool completed = false;
+    // `completed` means the root move was searched to a usable return value;
+    // `exact` is stricter and excludes scout-only or selective-bound scores.
+    // Root ranking may use a completed selective estimate as a fallback/order
+    // hint, but public completed-depth and aspiration authority require `exact`.
+    bool exact = false;
     int score = -1'000'000;
     std::size_t stable_index = 0;
     PrincipalVariation pv;

@@ -22,7 +22,7 @@ namespace {
 
 constexpr std::uint64_t kMaximumRandomSeed = 2'147'483'647;
 constexpr std::uint64_t kMinimumHashMegabytes = 1;
-constexpr std::uint64_t kMaximumHashMegabytes = 8'192;
+constexpr std::uint64_t kMaximumHashMegabytes = 4'096;
 constexpr std::uint64_t kMinimumSpeedPercent = 1;
 constexpr std::uint64_t kMaximumSpeedPercent = 100;
 constexpr std::uint64_t kMinimumSlowMoverPercent = 10;
@@ -1216,7 +1216,7 @@ void UciController::write_handshake() {
     output_ << "id name Koi Engine\n"
                "id author Koi Engine contributors\n"
                "option name RandomSeed type spin default 0 min 0 max 2147483647\n"
-               "option name Hash type spin default 512 min 1 max 8192\n"
+               "option name Hash type spin default 512 min 1 max 4096\n"
                "option name Threads type spin default 1 min 1 max " << maximum_search_threads() << "\n"
                "option name Speed type spin default 100 min 1 max 100\n"
                "option name UCI_AnalyseMode type check default false\n"

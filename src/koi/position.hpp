@@ -49,6 +49,15 @@ public:
     // check-state, or king-distance legality rules used by production UCI.
     bool set_fen_unchecked(std::string_view fen);
     [[nodiscard]] std::uint64_t position_key() const noexcept;
+    // Search-only fingerprint of reversible ancestor position keys since the
+    // most recent pawn move, capture, or castling-rights change. Null moves
+    // do not contribute to this fingerprint, and move unmake restores it.
+    [[nodiscard]] std::uint64_t repetition_history_fingerprint() const noexcept;
+    // Search-only marker for the speculative null-move branch. Such a branch
+    // suppresses legal repetition and move-clock draws until an irreversible
+    // move starts a fresh real-history segment, so it must not share a search
+    // bound with an otherwise identical legal position.
+    [[nodiscard]] bool repetition_history_suppressed() const noexcept;
     // Key containing only the two pawn bitboards. Search history tables use
     // it so equal pawn structures share experience across otherwise
     // different piece placements and rule-state fields.

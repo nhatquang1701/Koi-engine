@@ -61,6 +61,18 @@ std::uint64_t splitmix64(std::uint64_t& state) noexcept {
     return value ^ (value >> 31);
 }
 
+std::uint64_t extend_repetition_history_fingerprint(
+    const std::uint64_t fingerprint, const std::uint64_t ancestor_key) noexcept {
+    // This is an order-sensitive incremental combiner. The order is not
+    // needed by repetition itself, but distinguishing different reversible
+    // paths makes accidental TT context sharing less likely while snapshots
+    // still make the operation exactly reversible on unmake.
+    std::uint64_t seed = ancestor_key + 0x9E3779B97F4A7C15ULL;
+    seed ^= fingerprint + 0xD6E8FEB86659FD93ULL +
+        (seed << 6U) + (seed >> 2U);
+    return splitmix64(seed) | 1ULL;
+}
+
 const ZobristKeys& zobrist() noexcept {
     static const ZobristKeys keys = [] {
         ZobristKeys result;
@@ -151,6 +163,8 @@ struct Snapshot {
     std::array<std::uint64_t, 2> occupancy{};
     std::uint64_t occupied = 0;
     bool null_move = false;
+    std::uint64_t repetition_history_fingerprint = 0;
+    bool repetition_history_suppressed = false;
 };
 
 struct NativeState {
@@ -161,6 +175,8 @@ struct NativeState {
     std::uint16_t halfmove = 0;
     std::uint16_t fullmove = 1;
     std::uint64_t key = 0;
+    std::uint64_t repetition_history_fingerprint = 0;
+    bool repetition_history_suppressed = false;
     std::array<std::array<std::uint64_t, 7>, 2> piece_bitboards{};
     std::array<std::uint64_t, 2> occupancy{};
     std::uint64_t occupied = 0;
@@ -699,6 +715,10 @@ public:
                 std::min<unsigned>(std::numeric_limits<std::uint16_t>::max(), state.fullmove + 1));
         }
         state.side = opposite(state.side);
+        // Null transitions are search-only passes. Keep the real reversible
+        // history fingerprint intact, but suppress all positions derived from
+        // the pass while that speculative branch remains active.
+        state.repetition_history_suppressed = true;
         rebuild_derived(state);
         return true;
     }
@@ -711,6 +731,14 @@ public:
     }
 
     [[nodiscard]] std::uint64_t position_key() const noexcept { return state.key; }
+
+    [[nodiscard]] std::uint64_t repetition_history_fingerprint() const noexcept {
+        return state.repetition_history_fingerprint;
+    }
+
+    [[nodiscard]] bool repetition_history_suppressed() const noexcept {
+        return state.repetition_history_suppressed;
+    }
 
     [[nodiscard]] std::uint64_t pawn_key() const noexcept {
         constexpr std::size_t pawn = static_cast<std::size_t>(PieceType::pawn);
@@ -757,10 +785,20 @@ public:
     [[nodiscard]] Square en_passant_square() const noexcept { return state.en_passant; }
 
     [[nodiscard]] std::size_t repetition_count() const noexcept {
+        // A null move is a search-only pass, not a legal game-history entry.
+        // Its descendants may still make ordinary moves before the probe is
+        // undone, so checking only for the most recent null snapshot would
+        // let those artificial positions participate in repetition draws.
+        if (state.repetition_history_suppressed) {
+            return 1;
+        }
         std::size_t count = 1;
-        for (std::size_t index = 0; index < state.history_size; ++index) {
-            const Snapshot& previous = state.history[index];
-            if (!previous.null_move && previous.key == state.key) {
+        for (std::size_t index = state.history_size; index > 0; --index) {
+            const Snapshot& previous = state.history[index - 1];
+            if (previous.null_move) {
+                break;
+            }
+            if (previous.key == state.key) {
                 ++count;
             }
         }
@@ -781,7 +819,11 @@ public:
     }
 
     [[nodiscard]] bool can_claim_fifty_move_draw() const noexcept {
-        return state.halfmove >= 100 && !is_checkmate();
+        // A search null move advances the stored compatibility clock, but it
+        // is not a legal game move and must not create a claimable draw by
+        // itself (or while a reversible descendant is still on that branch).
+        return !state.repetition_history_suppressed && state.halfmove >= 100 &&
+            !is_checkmate();
     }
 
     [[nodiscard]] bool is_automatic_fivefold_repetition() const noexcept {
@@ -789,7 +831,8 @@ public:
     }
 
     [[nodiscard]] bool is_automatic_seventy_five_move_draw() const noexcept {
-        return state.halfmove >= 150 && !is_checkmate();
+        return !state.repetition_history_suppressed && state.halfmove >= 150 &&
+            !is_checkmate();
     }
 
     [[nodiscard]] bool is_insufficient_material() const noexcept {
@@ -879,7 +922,9 @@ private:
     Snapshot snapshot() const noexcept {
         return Snapshot{state.board, state.side, state.castling, state.en_passant,
                          state.halfmove, state.fullmove, state.key, state.piece_bitboards,
-                         state.occupancy, state.occupied, false};
+                         state.occupancy, state.occupied, false,
+                         state.repetition_history_fingerprint,
+                         state.repetition_history_suppressed};
     }
 
     void restore(const Snapshot& saved) noexcept {
@@ -890,6 +935,8 @@ private:
         state.halfmove = saved.halfmove;
         state.fullmove = saved.fullmove;
         state.key = saved.key;
+        state.repetition_history_fingerprint = saved.repetition_history_fingerprint;
+        state.repetition_history_suppressed = saved.repetition_history_suppressed;
         state.piece_bitboards = saved.piece_bitboards;
         state.occupancy = saved.occupancy;
         state.occupied = saved.occupied;
@@ -1023,6 +1070,8 @@ private:
     void apply_unchecked(const Move& move) noexcept {
         const int from = move.from().index();
         const int to = move.to().index();
+        const std::uint64_t previous_position_key = state.key;
+        const std::uint8_t previous_castling = state.castling;
         const Piece moving = state.board[static_cast<std::size_t>(from)];
         const Piece captured = state.board[static_cast<std::size_t>(to)];
         const bool pawn_move = moving.type == PieceType::pawn;
@@ -1098,6 +1147,19 @@ private:
         }
         state.occupied = state.occupancy[0] | state.occupancy[1];
         add_rule_keys(state);
+        const bool irreversible = pawn_move || capture || state.castling != previous_castling;
+        if (!state.repetition_history_suppressed) {
+            state.repetition_history_fingerprint = irreversible ? 0 :
+                extend_repetition_history_fingerprint(
+                    state.repetition_history_fingerprint, previous_position_key);
+        } else if (irreversible) {
+            // Do not let a real move made after a search null move turn the
+            // artificial null branch into a legal repetition ancestor. This
+            // irreversible move starts a fresh real-history segment, so later
+            // reversible moves must be tracked again.
+            state.repetition_history_fingerprint = 0;
+            state.repetition_history_suppressed = false;
+        }
     }
 };
 
@@ -1181,6 +1243,14 @@ bool Position::set_fen_unchecked(std::string_view fen) {
 }
 
 std::uint64_t Position::position_key() const noexcept { return impl_->position.position_key(); }
+
+std::uint64_t Position::repetition_history_fingerprint() const noexcept {
+    return impl_->position.repetition_history_fingerprint();
+}
+
+bool Position::repetition_history_suppressed() const noexcept {
+    return impl_->position.repetition_history_suppressed();
+}
 
 std::uint64_t Position::pawn_key() const noexcept { return impl_->position.pawn_key(); }
 

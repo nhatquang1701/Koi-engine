@@ -270,6 +270,14 @@ public:
     [[nodiscard]] bool is_draw_by_rule() const noexcept;
     [[nodiscard]] bool is_terminal() const noexcept;
     [[nodiscard]] std::uint64_t position_key() const noexcept;
+    // Search-only fingerprint of reversible ancestor position keys. It is
+    // intentionally separate from position_key(), which remains the public
+    // board/repetition identity used by UCI and search-session cancellation.
+    [[nodiscard]] std::uint64_t repetition_history_fingerprint() const noexcept;
+    // Search-only marker for a speculative null-move branch. It prevents
+    // artificial null descendants from sharing regular TT bounds with legal
+    // positions that happen to have the same board and rule-clock values.
+    [[nodiscard]] bool repetition_history_suppressed() const noexcept;
     // Search-only structural key for the adaptive pawn-history table.
     [[nodiscard]] std::uint64_t pawn_key() const noexcept;
     [[nodiscard]] std::uint64_t polyglot_key() const noexcept;

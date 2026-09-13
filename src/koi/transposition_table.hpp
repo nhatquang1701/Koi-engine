@@ -24,6 +24,10 @@ struct TranspositionEntry {
     std::uint16_t generation = 0;
     bool occupied = false;
     std::uint16_t generation_age = 0;
+    // PV provenance survives transposition.  Search uses it to keep the
+    // stronger PV-side reduction/singular gates when a position is revisited
+    // through a non-PV window; bound type alone cannot recover that context.
+    bool pv = false;
 };
 
 enum class HashResizeStatus : std::uint8_t {
@@ -77,7 +81,7 @@ public:
     void clear() noexcept;
     void new_generation() noexcept;
     void store(std::uint64_t key, int depth, int score, TranspositionBound bound, Move best_move,
-               int ply = 0) noexcept;
+               int ply = 0, bool pv = false) noexcept;
     [[nodiscard]] std::optional<TranspositionEntry> probe(std::uint64_t key, int ply = 0) const noexcept;
 
 private:

@@ -72,6 +72,10 @@ struct TimeManagementStats {
 struct SearchStats {
     std::uint64_t nodes = 0;
     std::uint64_t qnodes = 0;
+    // Worker-local qsearch cache hits. This is diagnostic-only; qsearch cache
+    // entries are intentionally not shared through the regular TT because
+    // their frontier includes q-depth and predecessor context.
+    std::uint64_t qsearch_cache_hits = 0;
     // Number of full PositionFeatures snapshots requested by the search
     // context. This is diagnostic-only and helps keep expensive feature
     // extraction out of nodes that do not need it.
@@ -106,6 +110,7 @@ struct SearchStats {
     std::uint64_t lmr_king_zone_exclusions = 0;
     std::uint64_t lmr_high_history_exclusions = 0;
     std::uint64_t quiet_futility_prunes = 0;
+    std::uint64_t reverse_futility_prunes = 0;
     std::uint64_t razoring_prunes = 0;
     std::uint64_t probcut_searches = 0;
     std::uint64_t probcut_cutoffs = 0;
@@ -170,7 +175,7 @@ struct SearchOptions {
 
     // The portable engine default is intentionally sized for the supported
     // 32 GiB development/match machine.  UCI can still reduce this for small
-    // GUI hosts, and the TT keeps its 1..8192 MiB safety bounds.
+    // GUI hosts, and the TT keeps its 1..4096 MiB safety bounds.
     std::size_t hash_mb = 512;
     std::size_t threads = 1;
     std::uint8_t speed_percent = 100;

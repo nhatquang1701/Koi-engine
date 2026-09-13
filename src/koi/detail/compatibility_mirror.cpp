@@ -139,6 +139,7 @@ bool CompatibilityMirror::set_fen(std::string_view fen) {
         }
         board_ = std::move(candidate);
         history_.clear();
+        repetition_history_suppressed_ = false;
         return true;
     } catch (...) {
         return false;
@@ -216,11 +217,27 @@ bool CompatibilityMirror::apply_native(const chess::Move move, const bool null_m
         return false;
     }
     try {
-        history_.push_back(HistoryRecord{move, null_move, board_.hash()});
+        const std::uint8_t previous_castling_rights = shadow_castling_rights(board_);
+        const chess::Piece moving_piece = null_move ? chess::Piece::NONE : board_.at(move.from());
+        const bool pawn_move = !null_move && moving_piece.type() == chess::PieceType::PAWN;
+        const bool capture = !null_move &&
+            (move.typeOf() == chess::Move::ENPASSANT || board_.at(move.to()) != chess::Piece::NONE);
+        history_.push_back(HistoryRecord{
+            move, null_move, board_.hash(), repetition_history_suppressed_});
         if (null_move) {
             board_.makeNullMove();
         } else {
             board_.makeMove(move);
+        }
+        if (null_move) {
+            repetition_history_suppressed_ = true;
+        } else if (repetition_history_suppressed_ &&
+                   (pawn_move || capture ||
+                    previous_castling_rights != shadow_castling_rights(board_))) {
+            // Match the native position: an irreversible move starts a fresh
+            // real-history segment even when the move itself follows a
+            // speculative null branch.
+            repetition_history_suppressed_ = false;
         }
         return true;
     } catch (...) {
@@ -261,6 +278,7 @@ bool CompatibilityMirror::undo_move() noexcept {
         return false;
     }
     history_.pop_back();
+    repetition_history_suppressed_ = record.repetition_history_suppressed;
     return true;
 }
 
@@ -272,12 +290,14 @@ bool CompatibilityMirror::undo_null_move() noexcept {
     if (history_.empty() || !history_.back().null_move) {
         return false;
     }
+    const HistoryRecord record = history_.back();
     try {
         board_.unmakeNullMove();
     } catch (...) {
         return false;
     }
     history_.pop_back();
+    repetition_history_suppressed_ = record.repetition_history_suppressed;
     return true;
 }
 
@@ -320,10 +340,16 @@ Color CompatibilityMirror::side_to_move() const noexcept {
 }
 
 std::size_t CompatibilityMirror::repetition_count() const noexcept {
+    if (repetition_history_suppressed_) {
+        return 1;
+    }
     const std::uint64_t key = position_key();
     std::size_t count = 1;
-    for (const HistoryRecord& record : history_) {
-        if (!record.null_move && record.position_key == key) {
+    for (auto record = history_.rbegin(); record != history_.rend(); ++record) {
+        if (record->null_move) {
+            break;
+        }
+        if (record->position_key == key) {
             ++count;
         }
     }

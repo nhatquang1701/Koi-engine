@@ -2073,6 +2073,14 @@ std::uint64_t GameState::position_key() const noexcept {
     return impl_->native_position.position_key();
 }
 
+std::uint64_t GameState::repetition_history_fingerprint() const noexcept {
+    return impl_->native_position.repetition_history_fingerprint();
+}
+
+bool GameState::repetition_history_suppressed() const noexcept {
+    return impl_->native_position.repetition_history_suppressed();
+}
+
 std::uint64_t GameState::pawn_key() const noexcept {
     return impl_->native_position.pawn_key();
 }

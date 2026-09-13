@@ -24,7 +24,12 @@ constexpr int kMateThreshold = 99'000;
 constexpr std::size_t kBytesPerMegabyte = 1024ULL * 1024ULL;
 constexpr std::size_t kSegmentBytes = 32ULL * kBytesPerMegabyte;
 constexpr std::size_t kMinimumMegabytes = 1;
-constexpr std::size_t kMaximumMegabytes = 8192;
+constexpr std::size_t kMaximumMegabytes = 4096;
+// Keep several entries in each replacement bucket.  The search key includes
+// rule-history context, so unrelated reversible paths collide more often than
+// a board-only TT would.  A small cluster preserves those useful bounds while
+// keeping the probe/store lock and memory layout cache-friendly.
+constexpr std::size_t kClusterSize = 4;
 
 int score_for_storage(int score, int ply) noexcept {
     if (score >= kMateThreshold) {
@@ -90,10 +95,14 @@ struct TranspositionTable::Storage {
     };
 
     explicit Storage(std::size_t megabytes, const HashAllocationFailureProvider& failure)
-        : entries_per_segment(std::max<std::size_t>(1, kSegmentBytes / sizeof(TranspositionEntry))) {
+        : entries_per_segment(std::max<std::size_t>(
+              kClusterSize,
+              (kSegmentBytes / sizeof(TranspositionEntry)) / kClusterSize * kClusterSize)) {
         const std::size_t requested_bytes = megabytes_to_bytes(megabytes);
+        const std::size_t requested_entries = std::max<std::size_t>(
+            kClusterSize, requested_bytes / sizeof(TranspositionEntry));
         const std::size_t total_entries = std::max<std::size_t>(
-            1, requested_bytes / sizeof(TranspositionEntry));
+            kClusterSize, requested_entries / kClusterSize * kClusterSize);
         const std::size_t segment_count =
             (total_entries + entries_per_segment - 1) / entries_per_segment;
         segments.reserve(segment_count);
@@ -104,6 +113,7 @@ struct TranspositionTable::Storage {
             remaining -= count;
         }
         total_slot_count = total_entries;
+        cluster_count = total_entries / kClusterSize;
         allocated_bytes = total_entries * sizeof(TranspositionEntry);
         size_mb = std::max<std::size_t>(1, bytes_to_megabytes(allocated_bytes));
     }
@@ -125,6 +135,7 @@ struct TranspositionTable::Storage {
     const std::size_t entries_per_segment;
     std::size_t allocated_bytes = 0;
     std::size_t total_slot_count = 0;
+    std::size_t cluster_count = 0;
     std::size_t size_mb = 0;
     std::uint16_t generation = 1;
     // `generation_age` is also the storage epoch for logical Clear Hash
@@ -300,55 +311,99 @@ void TranspositionTable::new_generation() noexcept {
 }
 
 void TranspositionTable::store(std::uint64_t key, int depth, int score, TranspositionBound bound,
-                               Move best_move, int ply) noexcept {
+                               Move best_move, int ply, bool pv) noexcept {
     const auto storage = snapshot();
-    if (storage == nullptr || storage->total_slot_count == 0) {
+    if (storage == nullptr || storage->cluster_count == 0) {
         return;
     }
 
-    const std::size_t index = key % storage->total_slot_count;
-    std::unique_lock stripe_lock(storage->stripes[index % kStripeCount]);
-    TranspositionEntry& existing = storage->at(index);
-    const bool valid = existing.occupied && existing.generation_age == storage->clear_epoch;
-    const bool empty = !valid;
-    const bool same_key = valid && existing.key == key;
-    if (!empty && same_key) {
-        const bool keeps_deeper_entry = existing.depth > depth;
-        const bool keeps_equal_exact_entry = existing.depth == depth &&
-            existing.bound == TranspositionBound::exact && bound != TranspositionBound::exact;
-        if (keeps_deeper_entry || keeps_equal_exact_entry) {
-            existing.generation = storage->generation;
-            existing.generation_age = storage->clear_epoch;
+    const std::size_t cluster = key % storage->cluster_count;
+    const std::size_t first_slot = cluster * kClusterSize;
+    std::unique_lock stripe_lock(storage->stripes[cluster % kStripeCount]);
+
+    std::size_t empty_slot = storage->total_slot_count;
+    std::size_t replacement_slot = first_slot;
+    std::uint32_t replacement_priority = std::numeric_limits<std::uint32_t>::max();
+    for (std::size_t offset = 0; offset < kClusterSize; ++offset) {
+        const std::size_t slot = first_slot + offset;
+        TranspositionEntry& candidate = storage->at(slot);
+        const bool valid = candidate.occupied &&
+            candidate.generation_age == storage->clear_epoch;
+        if (valid && candidate.key == key) {
+            const bool keeps_deeper_entry = candidate.depth > depth;
+            const bool keeps_equal_exact_entry = candidate.depth == depth &&
+                candidate.bound == TranspositionBound::exact &&
+                bound != TranspositionBound::exact;
+            if (keeps_deeper_entry || keeps_equal_exact_entry) {
+                candidate.generation = storage->generation;
+                candidate.generation_age = storage->clear_epoch;
+                return;
+            }
+            candidate = TranspositionEntry{key, depth, score_for_storage(score, ply), bound,
+                                          best_move, storage->generation, true,
+                                          storage->clear_epoch, pv};
+            return;
+        }
+        if (!valid && empty_slot == storage->total_slot_count) {
+            empty_slot = slot;
+            continue;
+        }
+
+        // Prefer stale generations, then shallow entries.  The final key
+        // component makes replacement deterministic when all other signals
+        // tie, which is useful for fixed-depth reproducibility.
+        const std::uint16_t age = static_cast<std::uint16_t>(
+            storage->generation - candidate.generation);
+        const std::uint32_t age_rank = age == 0 ? 1U : 0U;
+        const std::uint32_t depth_rank = static_cast<std::uint32_t>(
+            std::clamp(candidate.depth, 0,
+                       static_cast<int>(std::numeric_limits<std::uint16_t>::max())));
+        const std::uint32_t key_rank = static_cast<std::uint32_t>(candidate.key);
+        const std::uint32_t priority = (age_rank << 24U) |
+            (std::min<std::uint32_t>(depth_rank, 0xFFFFU) << 8U) |
+            (key_rank & 0xFFU);
+        if (priority < replacement_priority) {
+            replacement_priority = priority;
+            replacement_slot = slot;
+        }
+    }
+
+    const std::size_t slot = empty_slot != storage->total_slot_count ?
+        empty_slot : replacement_slot;
+    TranspositionEntry& destination = storage->at(slot);
+    if (empty_slot == storage->total_slot_count) {
+        const bool older_generation = destination.generation != storage->generation;
+        const bool deeper = depth > destination.depth;
+        const bool deterministic_tie_break = depth == destination.depth && key < destination.key;
+        if (!older_generation && !deeper && !deterministic_tie_break) {
             return;
         }
     }
-    const bool older_generation = existing.generation != storage->generation;
-    const bool deeper = depth > existing.depth;
-    const bool deterministic_tie_break = depth == existing.depth && key < existing.key;
-    if (!empty && !same_key && !older_generation && !deeper && !deterministic_tie_break) {
-        return;
-    }
-
-    existing = TranspositionEntry{key, depth, score_for_storage(score, ply), bound, best_move,
-                                  storage->generation, true, storage->clear_epoch};
+    destination = TranspositionEntry{key, depth, score_for_storage(score, ply), bound, best_move,
+                                     storage->generation, true, storage->clear_epoch, pv};
 }
 
 std::optional<TranspositionEntry> TranspositionTable::probe(std::uint64_t key, int ply) const noexcept {
     const auto storage = snapshot();
-    if (storage == nullptr || storage->total_slot_count == 0) {
+    if (storage == nullptr || storage->cluster_count == 0) {
         return std::nullopt;
     }
 
-    const std::size_t index = key % storage->total_slot_count;
-    std::shared_lock stripe_lock(storage->stripes[index % kStripeCount]);
-    const TranspositionEntry& entry = storage->at(index);
-    if (!entry.occupied || entry.generation_age != storage->clear_epoch || entry.key != key) {
-        return std::nullopt;
+    const std::size_t cluster = key % storage->cluster_count;
+    const std::size_t first_slot = cluster * kClusterSize;
+    std::shared_lock stripe_lock(storage->stripes[cluster % kStripeCount]);
+    for (std::size_t offset = 0; offset < kClusterSize; ++offset) {
+        const TranspositionEntry& entry = storage->at(first_slot + offset);
+        if (!entry.occupied || entry.generation_age != storage->clear_epoch ||
+            entry.key != key) {
+            continue;
+        }
+        TranspositionEntry result = entry;
+        result.score = score_for_probe(result.score, ply);
+        result.generation_age = static_cast<std::uint16_t>(storage->generation - entry.generation);
+        return result;
     }
-    TranspositionEntry result = entry;
-    result.score = score_for_probe(result.score, ply);
-    result.generation_age = static_cast<std::uint16_t>(storage->generation - entry.generation);
-    return result;
+    return std::nullopt;
 }
 
 } // namespace koi

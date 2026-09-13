@@ -16,7 +16,7 @@
 - Do not change evaluation, NNUE, tests, fixtures, or the User-tests PGN.
 - Do not run the accuracy match during implementation.
 - Defer the complete Release and Debug suites until the implementation is judged complete.
-- Preserve deterministic `Threads=1` fixed-depth behavior, legal PVs, cancellation, completed-iteration authority, repetition safety, and the 8192 MB Hash boundary.
+- Preserve deterministic `Threads=1` fixed-depth behavior, legal PVs, cancellation, completed-iteration authority, repetition safety, and the established 4096 MB Hash boundary.
 
 ### Task 1: Add a staged worker-local move picker
 
@@ -30,11 +30,11 @@
 - Consumes: `GameState`, `MoveMetadataList`, optional TT move, `SearchHistoryContext`, and existing history/capture-history accessors.
 - Produces: `SearchMovePicker`, constructed as `SearchMovePicker(const SearchMoveOrdering&, const GameState&, const MoveMetadataList&, std::optional<Move>, const SearchHistoryContext&, int, SearchMovePicker::Mode, Move excluded_move = Move::no_move())` and consumed through `std::optional<MoveMetadata> next()`. Existing `order(...)` overloads remain available to diagnostics and root helpers.
 
-- [ ] Preserve the public `order(...)` behavior and current deterministic tie-break key.
-- [ ] Define explicit picker stages for TT, good captures/promotions, killer/counter quiets, history-ranked quiets, and deferred losing captures; define a complete evasion stage for checked positions.
-- [ ] Validate the TT move against the current metadata list before emitting it and skip excluded moves without duplicating candidates.
-- [ ] Compute SEE only when a capture candidate enters a capture stage; use capture history and the existing static-exchange result to separate good and losing captures.
-- [ ] Keep picker storage fixed-size and worker-local so the recursive path performs no per-node heap allocation.
+- [x] Preserve the public `order(...)` behavior and current deterministic tie-break key.
+- [x] Define explicit picker stages for TT, good captures/promotions, scored good/bad quiets, deferred losing captures, and a complete evasion stage for checked positions.
+- [x] Validate the TT move against the current metadata list before emitting it and skip excluded moves without duplicating candidates.
+- [x] Compute SEE only when a capture candidate enters a capture stage; use capture history and the existing static-exchange result to separate good and losing captures.
+- [x] Keep picker storage fixed-size and worker-local so the recursive path performs no per-node heap allocation.
 
 ### Task 2: Integrate staged selection into regular and quiescence search
 
@@ -48,11 +48,13 @@
 - Consumes: Task 1 picker and existing `SearchFrame`/history context.
 - Produces: regular negamax and qsearch loops that consume one staged candidate at a time and preserve current PV, TT, history-update, and cancellation contracts.
 
-- [ ] Replace the regular-search eager ordering loop with staged candidate emission while retaining excluded-move singular probes and legal-move terminal handling.
-- [ ] Preserve qsearch stand-pat, complete checked evasions, TT move hints, bounded quiet checks, SEE/delta pruning, and qsearch history updates.
-- [ ] Calibrate LMR inputs from depth, move number, PV/cut node, TT/PV state, improving state, history/continuation/capture history, and prior child fail-high state.
-- [ ] Re-search every reduced move that exceeds alpha at the authoritative child depth; do not let a reduced score become a PV without verification.
-- [ ] Keep ProbCut, null move, singular extension, and multi-cut disabled for excluded/repetition-sensitive/check/mate/sparse-pawn cases where their bounds are not trustworthy.
+- [x] Replace the regular-search eager ordering loop with staged candidate emission while retaining excluded-move singular probes and legal-move terminal handling.
+- [x] Preserve qsearch stand-pat, complete checked evasions, TT move hints, bounded quiet checks, SEE/delta pruning, and qsearch history updates.
+- [x] Add a worker-local, context-keyed qsearch cache without storing selective upper bounds or reusing entries across reversible-history-sensitive positions.
+- [x] Calibrate LMR inputs from depth, one-based move number, PV/cut node, TT/PV state, improving state, history/continuation/capture history, and prior child fail-high state.
+- [x] Re-search every reduced move that exceeds alpha at the authoritative child depth; do not let a reduced score become a PV without verification.
+- [x] Keep reverse futility, ProbCut, null move, singular extension, and multi-cut disabled for excluded/repetition-sensitive/check/mate/sparse-pawn or tactical cases where their bounds are not trustworthy.
+- [x] Propagate selective-bound provenance across razor, reverse futility, internal iterative reduction, null/ProbCut/multi-cut cutoffs, selective-pruned nodes, and inexact child paths so parent TT authority and root exactness remain conservative.
 
 ### Task 3: Preserve root authority and one-second throughput
 
@@ -64,10 +66,10 @@
 - Consumes: Task 1 staged root ordering and Task 2 recursive search results.
 - Produces: root iterations that retain the previous PV/TT move, publish only completed iterations as authoritative, and remain deterministic for fixed-depth single-thread searches.
 
-- [ ] Seed each root iteration with the previous authoritative move and staged ordering without changing search-move filters.
-- [ ] Preserve aspiration widening, full-window fallback, cancellation, and short-search safety fallbacks.
-- [ ] Keep multi-thread root scheduling legal and cancellation-safe; never replace a completed iteration with a partial result.
-- [ ] Avoid new evaluator or NNUE calls beyond the existing search contracts.
+- [x] Seed each root iteration with the previous authoritative move and staged ordering without changing search-move filters.
+- [x] Preserve aspiration widening, full-window fallback, cancellation, and short-search safety fallbacks.
+- [x] Keep multi-thread root scheduling legal and cancellation-safe; never replace a completed iteration with a partial result.
+- [x] Avoid new evaluator or NNUE calls beyond the existing search contracts.
 
 ### Task 4: Final audit and verification
 

@@ -15,9 +15,10 @@ constexpr int kCheckingMovePriority = 350'000;
 constexpr int kKillerPriority = 300'000;
 constexpr int kCounterMovePriority = kKillerPriority - 1;
 constexpr int kSeeOrderingWeight = 12;
-// Stockfish's staged picker searches good captures, then quiets, and only
-// then poisoned captures. Keep bad captures available for tactical recovery,
-// but place them below checks and the strongest quiet history.
+// Koi's history tables use a wider range than Stockfish's fixed-point quiet
+// score. This threshold leaves initially neutral quiets in the good stage,
+// while allowing repeatedly failing quiets to move behind bad captures.
+constexpr int kGoodQuietPriorityThreshold = -4'096;
 constexpr int kBadCapturePenalty = 210'000;
 constexpr int kCaptureHistoryWeight = 2;
 
@@ -379,6 +380,12 @@ bool SearchMovePicker::is_excluded(const std::size_t index) const noexcept {
 }
 
 bool SearchMovePicker::is_good_capture(const MoveMetadata& metadata) const noexcept {
+    // A quiet promotion is still a forcing material transformation.  It has
+    // no SEE score to certify it as a capture, so never defer it with poisoned
+    // captures merely because it does not give check.
+    if (metadata.move.promotion() != Promotion::none) {
+        return true;
+    }
     if (!metadata.is_capture()) {
         return false;
     }
@@ -452,21 +459,34 @@ void SearchMovePicker::prepare_candidates() {
             }
         } else if (metadata.move.promotion() != Promotion::none || metadata.is_capture()) {
             candidate_stage = Stage::good_captures;
-        } else if (metadata.gives_check) {
-            candidate_stage = Stage::quiet_checks;
         } else {
-            const bool special_quiet = ordering_.is_killer(metadata.move, ply_) ||
-                 (history_context_.count > 0 &&
-                  ordering_.tables_.is_proven_counter_move(
-                      state_.side_to_move(), history_context_.continuation_moves[0],
-                      metadata.move));
-            candidate_stage = special_quiet ? Stage::special_quiets : Stage::quiets;
+            // Quiet checks, killers, counter moves, and ordinary quiets all
+            // compete in one history-ranked quiet pass.  Their priority
+            // carries the forcing/special-move bonus; the stage split only
+            // separates the proven good quiet prefix from the tail that can
+            // safely be searched after deferred captures.
+            candidate_stage = Stage::good_quiets;
         }
         if (candidate_stage == Stage::done) {
             continue;
         }
+        // Qsearch deliberately asks the generator for captures without SEE
+        // so the picker can own the work.  Materialize tactical candidates
+        // before ranking them, however: qsearch may discard candidates after
+        // only its first two ordered moves, and a victim/attacker score alone
+        // can put a sound defensive recapture behind a poisoned capture.
+        // This remains fixed-storage and computes SEE only for candidates
+        // entering a tactical stage.
+        if (mode_ == Mode::quiescence &&
+            (metadata.is_capture() || metadata.move.promotion() != Promotion::none)) {
+            metadata = materialize(index);
+        }
         const int priority = ordering_.priority(
             state_, metadata, std::nullopt, history_context_);
+        if (mode_ == Mode::main && candidate_stage == Stage::good_quiets &&
+            priority <= kGoodQuietPriorityThreshold) {
+            candidate_stage = Stage::bad_quiets;
+        }
         staged_[candidate_count_++] = Candidate{
             static_cast<std::uint16_t>(index), static_cast<std::uint8_t>(candidate_stage),
             priority, move_tie_break_key(metadata.move)};
@@ -493,18 +513,18 @@ void SearchMovePicker::advance_stage() noexcept {
         stage_ = mode_ == Mode::evasion ? Stage::evasions : Stage::good_captures;
         break;
     case Stage::good_captures:
-        stage_ = Stage::quiet_checks;
+        stage_ = mode_ == Mode::quiescence ? Stage::quiet_checks : Stage::good_quiets;
         break;
-    case Stage::quiet_checks:
-        stage_ = mode_ == Mode::quiescence ? Stage::done : Stage::special_quiets;
-        break;
-    case Stage::special_quiets:
-        stage_ = Stage::quiets;
-        break;
-    case Stage::quiets:
+    case Stage::good_quiets:
         stage_ = Stage::bad_captures;
         break;
     case Stage::bad_captures:
+        stage_ = mode_ == Mode::main ? Stage::bad_quiets : Stage::done;
+        break;
+    case Stage::bad_quiets:
+    case Stage::quiet_checks:
+        stage_ = Stage::done;
+        break;
     case Stage::evasions:
     case Stage::done:
         stage_ = Stage::done;
@@ -520,7 +540,8 @@ std::optional<MoveMetadata> SearchMovePicker::emit_tt() {
     for (std::size_t index = 0; index < moves_.size(); ++index) {
         if (!is_excluded(index) && moves_[index].move == *tt_move_) {
             emitted_.set(index);
-            MoveMetadata metadata = materialize(index);
+            MoveMetadata metadata = mode_ == Mode::evasion ? moves_[index] :
+                materialize(index);
             metadata.ordering_score = ordering_.priority(
                 state_, metadata, tt_move_, history_context_);
             return metadata;
@@ -542,8 +563,12 @@ std::optional<MoveMetadata> SearchMovePicker::next() {
             advance_stage();
             continue;
         }
-        if (skip_quiets_ && (stage_ == Stage::special_quiets ||
-                             stage_ == Stage::quiets)) {
+        // Quiet checks, killers, and proven counters receive large priority
+        // bonuses inside the good-quiet stage.  Once a cut node decides to
+        // skip quiets, the remaining quiet prefix and tail are both deferred;
+        // captures still flow through their own stages.
+        if (skip_quiets_ && (stage_ == Stage::good_quiets ||
+                             stage_ == Stage::bad_quiets)) {
             advance_stage();
             continue;
         }
@@ -558,7 +583,8 @@ std::optional<MoveMetadata> SearchMovePicker::next() {
             staged_[candidate_index_].stage_rank == static_cast<std::uint8_t>(stage_)) {
             const Candidate candidate = staged_[candidate_index_++];
             emitted_.set(candidate.source_index);
-            MoveMetadata metadata = materialize(candidate.source_index);
+            MoveMetadata metadata = mode_ == Mode::evasion ? moves_[candidate.source_index] :
+                materialize(candidate.source_index);
             if (mode_ == Mode::main && stage_ == Stage::good_captures &&
                 metadata.is_capture() && !is_good_capture(metadata)) {
                 if (deferred_bad_capture_count_ < deferred_bad_capture_indices_.size()) {

@@ -35,10 +35,13 @@ the implementation headers remain internal so future search and evaluation work
 does not create an ABI promise.
 
 Search ordering is also an internal search concern: TT best moves are tried
-first, followed by MVV-LVA captures/promotions, two killer moves, and quiet-move
-history. Stable UCI-coordinate tie-breaking keeps repeated searches
-deterministic. There is no public rule API for these policies; `Threads` and
-`Speed` are UCI controls over the search runtime.
+first, followed by staged good captures/promotions, history-ranked good quiets
+(including checks, killers, and proven counters), deferred losing captures, and
+bad quiets. Stable UCI-coordinate tie-breaking keeps repeated searches
+deterministic. The public diagnostic ordering API retains its documented
+capture/killer/history view; the richer staged picker is recursive-search
+state. There is no public rule API for these policies; `Threads` and `Speed`
+are UCI controls over the search runtime.
 
 The search lifecycle is decomposed behind the public `SearchService` and
 `SearchHandle` contracts. `detail::SearchSession` owns one request's immutable
@@ -56,8 +59,9 @@ Adaptive ordering state is separately owned by
 `detail::SearchOrderingTables`, which stores killers, quiet history, counter
 moves/confidence, and continuation history for one worker. The
 `detail::SearchPolicy` seam contains the scalar null-move, check-extension,
-LMR, quiet-futility, and quiescence-capture decisions; `SearchContext` still
-applies the decisions and owns recursion and statistics. This keeps future
+LMR, reverse-futility, quiet-futility, and quiescence-capture decisions;
+`SearchContext` still applies the decisions and owns recursion and statistics.
+This keeps future
 heuristic experiments local while preserving the current formulas and avoids
 making search policy depend on the physical layout of ordering tables.
 
