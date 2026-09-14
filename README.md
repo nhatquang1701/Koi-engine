@@ -93,8 +93,7 @@ Debug evidence, Stockfish-informed self-review, future-change test, and the
 known short-clock/Debug limitations:
 [final architecture review](docs/superpowers/verification/2026-09-12-koi-architecture-stage6-final-review.md).
 The architecture is accepted as the baseline for future strength work. Lazy
-SMP and shared histories remain deliberately future work, and `Goal.txt` is
-only a temporary task input rather than an engine artifact.
+SMP and shared histories remain deliberately future work.
 
 ## Build prerequisites
 

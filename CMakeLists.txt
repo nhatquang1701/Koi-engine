@@ -370,6 +370,15 @@ add_test(
 set_tests_properties(koi_uci_match_process PROPERTIES TIMEOUT 120)
 
 add_test(
+    NAME koi_stockfish_strength_option
+    COMMAND ${POWERSHELL_EXECUTABLE} -NoProfile -ExecutionPolicy Bypass -File
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/matches/stockfish_strength_test.ps1"
+            -EnginePath "$<TARGET_FILE:koi_engine>"
+)
+
+set_tests_properties(koi_stockfish_strength_option PROPERTIES TIMEOUT 60)
+
+add_test(
     NAME koi_uci_match_clock
     COMMAND ${POWERSHELL_EXECUTABLE} -NoProfile -ExecutionPolicy Bypass -File
             "${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/matches/uci_match_clock_test.ps1"
