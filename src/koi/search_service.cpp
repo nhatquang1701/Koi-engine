@@ -40,6 +40,7 @@ using detail::kNullMoveRuleSafetyHalfmoves;
 using detail::kNullMoveSparsePieceLimit;
 using detail::kShortTimedFallbackMinimum;
 using detail::kShortTimedFallbackThreshold;
+using detail::kShortTimedSerialThreshold;
 
 namespace {
 
@@ -85,11 +86,6 @@ constexpr int kEmergencyUnsafePawnQuietPenalty = 75;
 constexpr std::size_t kMaximumEmergencyForcingCheckEvasions = 3;
 constexpr std::size_t kMaximumEmergencyQuietForcingResearches = 16;
 constexpr std::size_t kMaximumEmergencyRootEvasionReplies = 6;
-// Root workers have a fixed startup/coordination cost.  For short tactical
-// roots that cost can consume the whole first iteration, leaving only the
-// initial ordered move when the clock expires.  Keep quiet roots parallel, but
-// give forcing roots enough room to complete an authoritative serial iteration.
-constexpr auto kShortTimedSerialThreshold = std::chrono::milliseconds{500};
 // The emergency static fallback is deliberately limited to the middle of the
 // short-search band. At very low requested movetime the fixed overhead/safety
 // ceiling leaves too little budget for both fallback scoring and a root pass;
@@ -178,6 +174,7 @@ void accumulate_stats(SearchStats& total, const SearchStats& partial) noexcept {
     total.lmr_verifications += partial.lmr_verifications;
     total.lmr_king_zone_exclusions += partial.lmr_king_zone_exclusions;
     total.lmr_high_history_exclusions += partial.lmr_high_history_exclusions;
+    total.continuation_history_prunes += partial.continuation_history_prunes;
     total.quiet_futility_prunes += partial.quiet_futility_prunes;
     total.reverse_futility_prunes += partial.reverse_futility_prunes;
     total.razoring_prunes += partial.razoring_prunes;
@@ -193,13 +190,27 @@ void accumulate_stats(SearchStats& total, const SearchStats& partial) noexcept {
     total.seldepth = std::max(total.seldepth, partial.seldepth);
 }
 
+int apply_claimable_draw_option(const GameState& state, const Color root_color,
+                                const int score) noexcept {
+    // Preserve the interruption sentinel: it is control flow, not a chess
+    // score that can be replaced by the draw option.
+    if (score <= -kInfinity || !state.is_claimable_draw()) {
+        return score;
+    }
+    return state.side_to_move() == root_color ?
+        std::max(0, score) : std::min(0, score);
+}
+
 int short_fallback_evaluate(const Evaluator& evaluator, const GameState& state,
                             const Color root_color, std::mutex* evaluator_mutex) {
+    int score = 0;
     if (evaluator_mutex != nullptr) {
         std::lock_guard lock(*evaluator_mutex);
-        return evaluator.evaluate(state, root_color);
+        score = evaluator.evaluate(state, root_color);
+    } else {
+        score = evaluator.evaluate(state, root_color);
     }
-    return evaluator.evaluate(state, root_color);
+    return apply_claimable_draw_option(state, root_color, score);
 }
 
 struct FallbackControl {
@@ -229,7 +240,9 @@ std::optional<int> fallback_terminal_or_draw_score(
         return state.side_to_move() == root_color ?
             -kMateScore + mate_distance : kMateScore - mate_distance;
     }
-    if (state.is_draw_by_rule()) {
+    // Claimable draws are not terminal: the emergency scanner must continue
+    // through legal moves and let the side to move choose the zero option.
+    if (state.is_forced_draw()) {
         return 0;
     }
     return std::nullopt;
@@ -298,7 +311,13 @@ int quiet_forcing_fallback_score(
             continue;
         }
 
-        int best_response_score = -kInfinity;
+        // The root side may already be able to claim a draw after the
+        // opponent's reply.  That claim is a real zero-valued response and
+        // must compete with the legal continuations below; otherwise a
+        // short fallback can incorrectly treat an all-losing response set as
+        // an interruption sentinel and let the opponent's minimization hide
+        // the draw option.
+        int best_response_score = after_opponent.is_claimable_draw() ? 0 : -kInfinity;
         for (const MoveMetadata& response : responses) {
             if (control != nullptr && control->interrupted()) {
                 return -kInfinity;
@@ -322,7 +341,8 @@ int quiet_forcing_fallback_score(
             found_reply = true;
         }
     }
-    return found_reply ? worst_score : -kInfinity;
+    return apply_claimable_draw_option(
+        after_move, root_color, found_reply ? worst_score : -kInfinity);
 }
 
 int checked_root_fallback_score(
@@ -401,7 +421,8 @@ int checked_root_fallback_score(
         worst_evasion_score = std::min(worst_evasion_score, best_reply_score);
         found_evasion = true;
     }
-    return found_evasion ? worst_evasion_score : -kInfinity;
+    return apply_claimable_draw_option(
+        after_check, root_color, found_evasion ? worst_evasion_score : -kInfinity);
 }
 
 bool hanging_major_piece_check(const GameState& after_check,
@@ -484,7 +505,8 @@ int shallow_checked_root_fallback_score(
         worst_evasion_score = std::min(worst_evasion_score, evasion_score);
         found_evasion = true;
     }
-    return found_evasion ? worst_evasion_score : -kInfinity;
+    return apply_claimable_draw_option(
+        after_check, root_color, found_evasion ? worst_evasion_score : -kInfinity);
 }
 
 int forcing_reply_fallback_score(const GameState& after_forcing_reply,
@@ -596,7 +618,9 @@ int king_evasion_fallback_score(
         }
         worst_score = std::min(worst_score, check_score);
     }
-    return found_check ? worst_score - king_exposure_penalty : static_score;
+    return apply_claimable_draw_option(
+        after_evasion, root_color,
+        found_check ? worst_score - king_exposure_penalty : static_score);
 }
 
 int checked_reply_fallback_score(const GameState& after_check, const Color root_color,
@@ -671,7 +695,7 @@ int checked_reply_fallback_score(const GameState& after_check, const Color root_
         }
         best_evasion_score = std::max(best_evasion_score, evasion_score);
     }
-    return best_evasion_score;
+    return apply_claimable_draw_option(after_check, root_color, best_evasion_score);
 }
 
 int root_evasion_fallback_score(
@@ -737,7 +761,7 @@ int root_evasion_fallback_score(
         }
         score = std::min(score, forcing_score);
     }
-    return score;
+    return apply_claimable_draw_option(after_evasion, root_color, score);
 }
 
 int overdue_check_reply_fallback_score(
@@ -867,7 +891,7 @@ int overdue_check_reply_fallback_score(
         }
         best_evasion_score = std::max(best_evasion_score, evasion_score);
     }
-    return best_evasion_score;
+    return apply_claimable_draw_option(after_check, root_color, best_evasion_score);
 }
 
 int forcing_reply_fallback_score(const GameState& after_forcing_reply,
@@ -960,7 +984,7 @@ int forcing_reply_fallback_score(const GameState& after_forcing_reply,
         }
         best_score = std::max(best_score, response_score);
     }
-    return best_score;
+    return apply_claimable_draw_option(after_forcing_reply, root_color, best_score);
 }
 
 bool root_move_is_broad_quiet_check(
@@ -1136,9 +1160,11 @@ std::optional<ShortFallbackChoice> short_search_fallback_move(
             bool hanging_major_check = false;
             if (move_is_terminal) {
                 // A fallback move that reaches a terminal position or a
-                // claimable/automatic rule draw must not be replaced by a
-                // static evaluation.  The helper checks mate before draw so
-                // an immediate checkmate remains decisive.
+                // forced rule draw must not be replaced by a static
+                // evaluation. Claimable draws remain live and are handled as
+                // an optional zero score by the continuation helpers. The
+                // helper checks mate before draw so an immediate checkmate
+                // remains decisive.
                 score = *move_terminal;
             } else if (after_move.in_check()) {
                 const std::vector<Move> evasions = after_move.legal_moves();
@@ -2051,16 +2077,20 @@ private:
                     bool exact_score = false;
                     bool completed_score = false;
                     bool child_selective_bound = false;
+                    bool child_lower_bound = false;
+                    int score_alpha = job->window_alpha;
                     int score = 0;
                     if (scout) {
                         ++context.stats.root_pvs_searches;
+                        score_alpha = shared_alpha;
                         bool scout_selective_bound = false;
                         score = -context.negamax(child, child_depth,
                                                  -shared_alpha - 1, -shared_alpha, 1, child_pv,
                                                  root_move.move, true,
                                                  child_check_extensions_remaining,
                                                  Move::no_move(), nullptr,
-                                                 &scout_selective_bound);
+                                                 &scout_selective_bound, nullptr,
+                                                 &child_lower_bound);
                         child_selective_bound = scout_selective_bound;
                         if (!context.aborted && score >= shared_alpha) {
                             ++context.stats.root_pvs_researches;
@@ -2072,6 +2102,7 @@ private:
                             // ranking sees every genuinely equal line.
                             const int research_alpha = score > shared_alpha ?
                                 shared_alpha : job->window_alpha;
+                            score_alpha = research_alpha;
                             bool research_selective_bound = false;
                             score = -context.negamax(child, child_depth,
                                                      -job->window_beta, -research_alpha, 1,
@@ -2079,7 +2110,8 @@ private:
                                                      root_move.move, true,
                                                      child_check_extensions_remaining,
                                                      Move::no_move(), nullptr,
-                                                     &research_selective_bound);
+                                                     &research_selective_bound, nullptr,
+                                                     &child_lower_bound);
                             child_selective_bound = research_selective_bound;
                             completed_score = !context.aborted &&
                                 score > job->window_alpha && score < job->window_beta;
@@ -2092,7 +2124,8 @@ private:
                                                  root_move.move, true,
                                                  child_check_extensions_remaining,
                                                  Move::no_move(), nullptr,
-                                                 &child_selective_bound);
+                                                 &child_selective_bound, nullptr,
+                                                 &child_lower_bound);
                         completed_score = !context.aborted &&
                             score > job->window_alpha && score < job->window_beta;
                         exact_score = score > job->window_alpha &&
@@ -2125,6 +2158,7 @@ private:
                     }
 
                     RootLine& line = (*job->lines)[move_index];
+                    line.searched = true;
                     line.score = score;
                     line.stable_index = (*job->stable_root_indices)[move_index];
                     line.pv.prepend(root_move.move, child_pv);
@@ -2136,6 +2170,15 @@ private:
                     // authority and shared-alpha publication.
                     line.completed = completed_score;
                     line.exact = exact_score;
+                    line.selective_bound = child_selective_bound;
+                    // A non-selective fail-low is an upper bound for this root
+                    // move at the alpha used by its final search. A selective
+                    // fail-low is safe only when the child explicitly proved
+                    // a lower bound before negation; unresolved/upper-bound
+                    // selective paths must block root authority.
+                    line.safe_upper_bound = !exact_score && score <= score_alpha &&
+                        (!child_selective_bound || child_lower_bound);
+                    line.selective_upper_bound = child_selective_bound && child_lower_bound;
                 } catch (...) {
                     context.request_abort();
                     job->aborted.store(true, std::memory_order_relaxed);
@@ -2347,19 +2390,30 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                 result.score_cp = evaluator->evaluate(root, root.side_to_move());
             }
             const int root_static_eval = result.score_cp;
-            const bool root_is_claimable_draw = root.is_draw_by_rule();
-            if (root_is_claimable_draw) {
-                // A draw already present at the root is terminal for search
-                // consumers even if the clock prevents the first iteration
-                // from starting. Keep the depth-zero result consistent with
-                // the regular negamax terminal boundary.
-                result.score_cp = 0;
+            const bool root_is_claimable_draw = root.is_claimable_draw();
+            const bool root_is_forced_draw = root.is_forced_draw();
+            const auto normalize_root_fallback_score =
+                [root_is_claimable_draw, root_is_forced_draw](const int score) {
+                    if (root_is_forced_draw) {
+                        return 0;
+                    }
+                    return root_is_claimable_draw ? std::max(0, score) : score;
+                };
+            if (root_is_claimable_draw || root_is_forced_draw) {
+                // A claim is an available zero-valued root option, but legal
+                // continuations may still win. Automatic/dead draws remain
+                // terminal; keep both depth-zero fallbacks neutral.
+                result.score_cp = std::max(0, result.score_cp);
+                if (root_is_forced_draw) {
+                    result.score_cp = 0;
+                }
                 result.mate.reset();
             }
 
             std::optional<SyzygyRootResult> tablebase_result;
             if (options.syzygy && options.multi_pv == 1 && !options.analyse_mode &&
-                !limits.ponder && !limits.search_moves_specified && !root_is_claimable_draw &&
+                !limits.ponder && !limits.search_moves_specified &&
+                !root_is_claimable_draw && !root_is_forced_draw &&
                 options.syzygy->allows_depth(limits.depth.value_or(1))) {
                 std::vector<Move> allowed_moves;
                 allowed_moves.reserve(legal_moves.size());
@@ -2436,7 +2490,7 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                 SearchInfo info{1, result.score_cp, result.mate, 0, 0, elapsed,
                                 {result.best_move.value()}, 0, 0, 0, 1, 1};
                 safely_report_info(sink, info);
-            } else if (root_is_claimable_draw ||
+            } else if (root_is_claimable_draw || root_is_forced_draw ||
                        (options.threads == 1 && options.multi_pv == 1) || legal_moves.size() < 2 ||
                        (time_manager.node_limit().has_value() && options.multi_pv == 1) ||
                        (short_tactical_budget && !ultra_short_nonchecking_parallel)) {
@@ -2471,8 +2525,9 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                         fallback.has_value()) {
                         result.best_move = fallback->move;
                         result.pv = {fallback->move};
-                        result.score_cp = fallback->score;
-                        result.mate = mate_from_score(fallback->score);
+                        const int fallback_score = normalize_root_fallback_score(fallback->score);
+                        result.score_cp = fallback_score;
+                        result.mate = mate_from_score(fallback_score);
                         used_short_fallback = true;
                     }
                 } else if (short_search_fallback && !defer_nonchecking_short_fallback &&
@@ -2522,7 +2577,11 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                         }
                     }
 
-                    int score = context.negamax(root, depth, alpha, beta, 0, pv);
+                    bool root_authoritative = false;
+                    int score = context.negamax(
+                        root, depth, alpha, beta, 0, pv, std::nullopt, true,
+                        kMaximumCheckExtensionsPerPath, Move::no_move(), nullptr,
+                        nullptr, &root_authoritative);
                     if (!context.aborted && previous_score.has_value()) {
                         // Widen the failed side progressively. This preserves
                         // the useful narrow window when the iteration is
@@ -2541,13 +2600,19 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                                 beta = std::min(kInfinity, beta + aspiration_window);
                             }
                             pv = {};
-                            score = context.negamax(root, depth, alpha, beta, 0, pv);
+                            score = context.negamax(
+                                root, depth, alpha, beta, 0, pv, std::nullopt, true,
+                                kMaximumCheckExtensionsPerPath, Move::no_move(), nullptr,
+                                nullptr, &root_authoritative);
                         }
                         if (!context.aborted && (score <= alpha || score >= beta)) {
                             ++context.stats.aspiration_researches;
                             aspiration_researched = true;
                             pv = {};
-                            score = context.negamax(root, depth, -kInfinity, kInfinity, 0, pv);
+                            score = context.negamax(
+                                root, depth, -kInfinity, kInfinity, 0, pv, std::nullopt, true,
+                                kMaximumCheckExtensionsPerPath, Move::no_move(), nullptr,
+                                nullptr, &root_authoritative);
                         }
                     }
                     if (context.aborted) {
@@ -2560,8 +2625,10 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                                 fallback.has_value()) {
                                 result.best_move = fallback->move;
                                 result.pv = {fallback->move};
-                                result.score_cp = fallback->score;
-                                result.mate = mate_from_score(fallback->score);
+                                const int fallback_score =
+                                    normalize_root_fallback_score(fallback->score);
+                                result.score_cp = fallback_score;
+                                result.mate = mate_from_score(fallback_score);
                                 used_short_fallback = true;
                             }
                         }
@@ -2573,8 +2640,10 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                                 fallback.has_value()) {
                                 result.best_move = fallback->move;
                                 result.pv = {fallback->move};
-                                result.score_cp = fallback->score;
-                                result.mate = mate_from_score(fallback->score);
+                                const int fallback_score =
+                                    normalize_root_fallback_score(fallback->score);
+                                result.score_cp = fallback_score;
+                                result.mate = mate_from_score(fallback_score);
                                 used_short_fallback = true;
                             }
                         }
@@ -2606,6 +2675,27 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                             }
                         }
                         break;
+                    }
+
+                    const bool root_result_publishable = context.root_result_publishable(pv);
+                    if (!root_result_publishable) {
+                        // The recursive search did not establish a complete,
+                        // provenance-safe root result. Preserve the last completed
+                        // result and use this work only to pace the next
+                        // attempt. A fully selective pass with no exact
+                        // incumbent remains publishable as heuristic progress;
+                        // an unresolved selective challenger beside an exact
+                        // line does not.
+                        const auto elapsed = std::chrono::duration_cast<
+                            std::chrono::milliseconds>(
+                                std::chrono::steady_clock::now() - started);
+                        previous_iteration_elapsed = std::max(
+                            std::chrono::milliseconds{1}, elapsed - previous_report_elapsed);
+                        if ((!unbounded && depth == maximum_depth) || root_is_forced_draw ||
+                            time_manager.should_stop_after_iteration()) {
+                            break;
+                        }
+                        continue;
                     }
 
                     result.completed_depth = depth;
@@ -2650,7 +2740,7 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                         int fallback_score = score;
                         if (fallback.has_value()) {
                             fallback_move = fallback->move;
-                            fallback_score = fallback->score;
+                            fallback_score = normalize_root_fallback_score(fallback->score);
                         }
                         const auto current_metadata = result.best_move.has_value() ?
                             std::find_if(
@@ -2668,7 +2758,7 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                                     allow_deep_checked_fallback, &fallback_control);
                                 checking_capture.has_value()) {
                                 fallback_move = checking_capture->move;
-                                fallback_score = checking_capture->score;
+                                fallback_score = normalize_root_fallback_score(checking_capture->score);
                             } else {
                                 fallback_move.reset();
                             }
@@ -3524,11 +3614,19 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                     // Keep a bounded safety score visible in the result, but
                     // anchor the next aspiration window to the full-width
                     // search score when that correction is still active.
-                    previous_score = iteration_observation_score;
+                    if (root_authoritative) {
+                        previous_score = iteration_observation_score;
+                    } else {
+                        // A complete selective iteration is useful to the UCI
+                        // caller, but its score is not a safe aspiration
+                        // center. Force the next iteration to establish a
+                        // fresh full-window baseline.
+                        previous_score.reset();
+                    }
                     previous_iteration_elapsed = elapsed - previous_report_elapsed;
                     previous_report_elapsed = elapsed;
 
-                    if ((!unbounded && depth == maximum_depth) || root_is_claimable_draw ||
+                    if ((!unbounded && depth == maximum_depth) ||
                         time_manager.should_stop_after_iteration()) {
                         break;
                     }
@@ -3580,8 +3678,9 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                         fallback.has_value()) {
                         result.best_move = fallback->move;
                         result.pv = {fallback->move};
-                        result.score_cp = fallback->score;
-                        result.mate = mate_from_score(fallback->score);
+                        const int fallback_score = normalize_root_fallback_score(fallback->score);
+                        result.score_cp = fallback_score;
+                        result.mate = mate_from_score(fallback_score);
                         used_short_fallback = true;
                     }
                 } else if (short_search_fallback && !defer_nonchecking_short_fallback) {
@@ -3790,8 +3889,10 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                                 fallback.has_value()) {
                                 result.best_move = fallback->move;
                                 result.pv = {fallback->move};
-                                result.score_cp = fallback->score;
-                                result.mate = mate_from_score(fallback->score);
+                                const int fallback_score =
+                                    normalize_root_fallback_score(fallback->score);
+                                result.score_cp = fallback_score;
+                                result.mate = mate_from_score(fallback_score);
                                 used_short_fallback = true;
                             }
                         }
@@ -3802,8 +3903,9 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                         const auto safe_partial = used_short_fallback ?
                             partial_ranked_indices.end() : std::find_if(
                             partial_ranked_indices.begin(), partial_ranked_indices.end(),
-                            [&parallel_moves, &root](const std::size_t index) {
+                            [&lines, &parallel_moves, &root](const std::size_t index) {
                                 return index < parallel_moves.size() &&
+                                    lines[index].exact &&
                                     !root_move_exposes_immediate_check(root, parallel_moves[index]) &&
                                     !root_move_is_broad_quiet_check(root, parallel_moves[index]);
                             });
@@ -3835,8 +3937,10 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                                 fallback.has_value()) {
                                 result.best_move = fallback->move;
                                 result.pv = {fallback->move};
-                                result.score_cp = fallback->score;
-                                result.mate = mate_from_score(fallback->score);
+                                const int fallback_score =
+                                    normalize_root_fallback_score(fallback->score);
+                                result.score_cp = fallback_score;
+                                result.mate = mate_from_score(fallback_score);
                                 used_short_fallback = true;
                             }
                         }
@@ -3933,6 +4037,9 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                                     lines[candidate_index].pv = verification.pv;
                                     lines[candidate_index].completed = true;
                                     lines[candidate_index].exact = true;
+                                    lines[candidate_index].selective_bound = false;
+                                    lines[candidate_index].safe_upper_bound = false;
+                                    lines[candidate_index].selective_upper_bound = false;
                                     needs_nominal_root_refresh = true;
                                     ranked_indices = RootCoordinator::rank(lines);
                                     break;
@@ -3997,6 +4104,9 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                                     lines[best_candidate_index].pv = incumbent_verification.pv;
                                     lines[best_candidate_index].completed = true;
                                     lines[best_candidate_index].exact = true;
+                                    lines[best_candidate_index].selective_bound = false;
+                                    lines[best_candidate_index].safe_upper_bound = false;
+                                    lines[best_candidate_index].selective_upper_bound = false;
                                     needs_nominal_root_refresh = true;
 
                                     for (const auto& [candidate_index, metadata] : candidates) {
@@ -4014,6 +4124,9 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                                         lines[candidate_index].pv = verification.pv;
                                         lines[candidate_index].completed = true;
                                         lines[candidate_index].exact = true;
+                                        lines[candidate_index].selective_bound = false;
+                                        lines[candidate_index].safe_upper_bound = false;
+                                        lines[candidate_index].selective_upper_bound = false;
                                         if (verification.score > confirmed_score) {
                                             confirmed_score = verification.score;
                                             confirmed_index = candidate_index;
@@ -4047,6 +4160,9 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                                     lines[selected_index].pv = verification.pv;
                                     lines[selected_index].completed = true;
                                     lines[selected_index].exact = true;
+                                    lines[selected_index].selective_bound = false;
+                                    lines[selected_index].safe_upper_bound = false;
+                                    lines[selected_index].selective_upper_bound = false;
                                     nominal_refresh_completed = true;
                                     if (pre_selective_lines.has_value()) {
                                         // The selective pass may have updated
@@ -4078,8 +4194,52 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                     const std::optional<Move> previous_best_move = result.best_move;
                     const std::vector<Move> previous_pv = result.pv;
                     const bool had_completed_iteration = result.completed_depth > 0;
-                    const bool authoritative_root_iteration = !ranked_indices.empty() &&
+                    const bool complete_root_coverage = std::all_of(
+                        lines.begin(), lines.end(), [](const RootLine& line) {
+                            return line.searched;
+                        });
+                    const bool has_exact_incumbent = !ranked_indices.empty() &&
                         lines[ranked_indices.front()].exact;
+                    const int exact_incumbent_score = has_exact_incumbent ?
+                        lines[ranked_indices.front()].score : -kInfinity;
+                    const bool root_lines_have_safe_provenance = complete_root_coverage &&
+                        std::all_of(lines.begin(), lines.end(), [has_exact_incumbent,
+                                                                 exact_incumbent_score](
+                                                                    const RootLine& line) {
+                            return line.exact || line.safe_upper_bound ||
+                                (has_exact_incumbent && line.selective_bound &&
+                                 line.selective_upper_bound &&
+                                 line.score <= exact_incumbent_score);
+                        });
+                    const bool authoritative_root_iteration =
+                        root_lines_have_safe_provenance && has_exact_incumbent;
+                    // A complete root pass is publishable even when normal
+                    // qsearch/selective provenance prevents strict authority.
+                    // If an exact incumbent exists, however, an unresolved
+                    // selective challenger cannot be masked by the exact
+                    // line merely because it returned a score: it must carry
+                    // a safe upper-bound direction or remain out of the
+                    // publishable pass. With no exact incumbent, a fully
+                    // covered selective pass is still useful heuristic
+                    // progress and remains outside aspiration authority.
+                    const bool root_lines_have_usable_provenance = complete_root_coverage &&
+                        std::all_of(lines.begin(), lines.end(), [has_exact_incumbent,
+                                                                 exact_incumbent_score](
+                                                                    const RootLine& line) {
+                            if (!has_exact_incumbent) {
+                                return line.completed || line.safe_upper_bound;
+                            }
+                            if (!line.selective_bound) {
+                                return line.completed || line.safe_upper_bound;
+                            }
+                            return line.safe_upper_bound ||
+                                (line.selective_upper_bound &&
+                                 line.score <= exact_incumbent_score);
+                        });
+                    const bool publishable_root_iteration = root_lines_have_usable_provenance &&
+                        !ranked_indices.empty() &&
+                        lines[ranked_indices.front()].completed &&
+                        lines[ranked_indices.front()].pv.length > 0;
 
                     // Remember completed lines for the next root schedule.
                     // Selective estimates are useful ordering hints when the
@@ -4107,7 +4267,7 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                     const std::size_t best_index = ranked_indices.front();
                     const RootLine& best_line = lines[best_index];
 
-                    if (authoritative_root_iteration) {
+                    if (publishable_root_iteration) {
                         result.completed_depth = depth;
                         result.score_cp = best_line.score;
                         result.mate = mate_from_score(best_line.score);
@@ -4159,7 +4319,7 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                         int fallback_score = best_line.score;
                         if (fallback.has_value()) {
                             fallback_move = fallback->move;
-                            fallback_score = fallback->score;
+                            fallback_score = normalize_root_fallback_score(fallback->score);
                         }
                         const auto current_metadata = result.best_move.has_value() ?
                             std::find_if(
@@ -4177,7 +4337,7 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                                     allow_deep_checked_fallback, &fallback_control);
                                 checking_capture.has_value()) {
                                 fallback_move = checking_capture->move;
-                                fallback_score = checking_capture->score;
+                                fallback_score = normalize_root_fallback_score(checking_capture->score);
                             } else {
                                 fallback_move.reset();
                             }
@@ -4199,6 +4359,9 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                                 RootLine& corrected_line = lines[ranked_indices.front()];
                                 corrected_line.score = fallback_score;
                                 corrected_line.exact = false;
+                                corrected_line.selective_bound = false;
+                                corrected_line.safe_upper_bound = false;
+                                corrected_line.selective_upper_bound = false;
                                 corrected_line.pv = {};
                                 corrected_line.pv.moves[0] = *fallback_move;
                                 corrected_line.pv.length = 1;
@@ -4241,13 +4404,13 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
 
                     const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
                         std::chrono::steady_clock::now() - started);
-                    if (!authoritative_root_iteration) {
+                    if (!publishable_root_iteration) {
                         // The attempted pass still consumed real search time,
                         // so use its duration to pace the next attempt while
                         // withholding publication and aspiration state.
                         previous_iteration_elapsed = std::max(
                             std::chrono::milliseconds{1}, elapsed - previous_report_elapsed);
-                        if ((!unbounded && depth == maximum_depth) || root_is_claimable_draw ||
+                        if ((!unbounded && depth == maximum_depth) ||
                             time_manager.should_stop_after_iteration()) {
                             break;
                         }
@@ -4286,10 +4449,17 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                         aspiration_researched,
                         visited});
                     result.timing = time_manager.diagnostics();
-                    previous_score = iteration_observation_score;
+                    if (authoritative_root_iteration) {
+                        previous_score = iteration_observation_score;
+                    } else {
+                        // A complete selective root pass is a valid published
+                        // iteration, but its score is not a safe aspiration
+                        // center. Force a fresh full-window baseline next.
+                        previous_score.reset();
+                    }
                     previous_iteration_elapsed = iteration_elapsed;
                     previous_report_elapsed = elapsed;
-                    if ((!unbounded && depth == maximum_depth) || root_is_claimable_draw ||
+                    if ((!unbounded && depth == maximum_depth) ||
                         time_manager.should_stop_after_iteration()) {
                         break;
                     }
@@ -4297,7 +4467,7 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                 result.stats = total_stats;
             }
 
-            if (limits.ponder && (legal_moves.empty() || root_is_claimable_draw)) {
+            if (limits.ponder && (legal_moves.empty() || root_is_forced_draw)) {
                 session->wait_until_stopped();
             }
             if (result.completed_depth == 0 && result.best_move.has_value()) {

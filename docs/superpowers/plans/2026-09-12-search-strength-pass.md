@@ -55,6 +55,8 @@
 - [x] Re-search every reduced move that exceeds alpha at the authoritative child depth; do not let a reduced score become a PV without verification.
 - [x] Keep reverse futility, ProbCut, null move, singular extension, and multi-cut disabled for excluded/repetition-sensitive/check/mate/sparse-pawn or tactical cases where their bounds are not trustworthy.
 - [x] Propagate selective-bound provenance across razor, reverse futility, internal iterative reduction, null/ProbCut/multi-cut cutoffs, selective-pruned nodes, and inexact child paths so parent TT authority and root exactness remain conservative.
+- [x] Distinguish automatic/dead draws from claimable draws: search claimable positions with a zero floor, retain legal root moves for UCI, and keep selective cutoffs/TT storage from bypassing the claim option.
+- [x] Add conservative negative continuation-history pruning only for late quiet interior scout nodes, excluding tactical, repetition-sensitive, sparse-material, and special-history moves.
 
 ### Task 3: Preserve root authority and one-second throughput
 
@@ -69,6 +71,7 @@
 - [x] Seed each root iteration with the previous authoritative move and staged ordering without changing search-move filters.
 - [x] Preserve aspiration widening, full-window fallback, cancellation, and short-search safety fallbacks.
 - [x] Keep multi-thread root scheduling legal and cancellation-safe; never replace a completed iteration with a partial result.
+- [x] Separate complete root publication from strict provenance: full root coverage and a valid PV may publish progress, while only strict exact/provenance results seed aspiration or proof-sensitive metadata.
 - [x] Avoid new evaluator or NNUE calls beyond the existing search contracts.
 
 ### Task 4: Final audit and verification

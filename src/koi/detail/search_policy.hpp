@@ -259,6 +259,22 @@ public:
             move_number > 0 && static_eval + 80 + depth * 60 <= alpha;
     }
 
+    // A very negative continuation-history score is evidence that this move
+    // repeatedly failed in the same predecessor context.  Use that signal
+    // only for late quiet moves at interior scout nodes; the call site adds
+    // the position-sensitive repetition, material, and special-move guards.
+    [[nodiscard]] static constexpr bool negative_continuation_history(
+        const int depth, const int move_number, const int continuation_score,
+        const bool pv_node, const bool checked, const bool capture,
+        const bool gives_check, const bool promotion, const bool tt_move,
+        const bool killer, const bool counter_move, const bool allowed) noexcept {
+        return allowed && !pv_node && !checked && !capture && !gives_check &&
+            !promotion && !tt_move && !killer && !counter_move &&
+            depth >= kNegativeContinuationHistoryMinimumDepth &&
+            move_number >= kNegativeContinuationHistoryMinimumMove &&
+            continuation_score < -kNegativeContinuationHistoryBase * depth;
+    }
+
     [[nodiscard]] static constexpr QuiescenceCapturePrune quiescence_capture(
         const bool checked, const bool capture, const bool gives_check,
         const bool promotion, const int see_score, const int captured_piece_value,

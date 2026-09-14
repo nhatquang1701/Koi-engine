@@ -869,11 +869,43 @@ public:
     }
 
     [[nodiscard]] bool is_known_locked_pawn_wall() const noexcept {
-        // Keep dead-position recognition intentionally narrow. This exact
-        // blocked-pawn wall is a known FIDE dead-position example; uncertain
-        // pawn structures must remain searchable.
-        return fen() ==
-            "8/2b1k3/7p/p1p1p2P/PpP1P3/1P1BK3/8/8 w - - 0 1";
+        // Keep dead-position recognition intentionally narrow. This blocked
+        // pawn wall is a known FIDE dead-position example; the board is what
+        // makes it dead, not the side to move or the bookkeeping fields in a
+        // FEN. An actually legal en-passant capture is an exception because it
+        // creates a pawn continuation from an otherwise locked wall. Compare
+        // the normalized board directly so a normal clock/full-move update
+        // cannot make the same dead position searchable again.
+        if (has_legal_en_passant_capture(state)) {
+            return false;
+        }
+        static constexpr Board pattern = [] {
+            Board result{};
+            result[17] = {PieceType::pawn, Color::white};
+            result[19] = {PieceType::bishop, Color::white};
+            result[20] = {PieceType::king, Color::white};
+            result[24] = {PieceType::pawn, Color::white};
+            result[25] = {PieceType::pawn, Color::black};
+            result[26] = {PieceType::pawn, Color::white};
+            result[28] = {PieceType::pawn, Color::white};
+            result[32] = {PieceType::pawn, Color::black};
+            result[34] = {PieceType::pawn, Color::black};
+            result[36] = {PieceType::pawn, Color::black};
+            result[39] = {PieceType::pawn, Color::white};
+            result[50] = {PieceType::bishop, Color::black};
+            result[52] = {PieceType::king, Color::black};
+            result[47] = {PieceType::pawn, Color::black};
+            return result;
+        }();
+        for (std::size_t square = 0; square < pattern.size(); ++square) {
+            const Piece actual = state.board[square];
+            const Piece expected = pattern[square];
+            if (actual.type != expected.type ||
+                (!actual.empty() && actual.color != expected.color)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     [[nodiscard]] bool is_dead_position() const noexcept {
@@ -1302,6 +1334,19 @@ bool Position::is_dead_position() const noexcept {
 
 DrawStatus Position::draw_status() const noexcept {
     return impl_->position.draw_status();
+}
+
+bool Position::is_claimable_draw() const noexcept {
+    const DrawStatus status = draw_status();
+    return status == DrawStatus::claimable_threefold ||
+        status == DrawStatus::claimable_fifty_move;
+}
+
+bool Position::is_forced_draw() const noexcept {
+    const DrawStatus status = draw_status();
+    return status == DrawStatus::dead_position ||
+        status == DrawStatus::automatic_fivefold ||
+        status == DrawStatus::automatic_seventy_five_move;
 }
 
 bool Position::is_repetition_sensitive() const noexcept {

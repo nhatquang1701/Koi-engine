@@ -76,6 +76,11 @@ public:
     [[nodiscard]] bool is_automatic_seventy_five_move_draw() const noexcept;
     [[nodiscard]] bool is_dead_position() const noexcept;
     [[nodiscard]] DrawStatus draw_status() const noexcept;
+    // A claimable draw is an option for the side to move, not an automatic
+    // terminal result. Search must still consider legal continuations.
+    [[nodiscard]] bool is_claimable_draw() const noexcept;
+    // Dead positions and automatic rule draws end the game immediately.
+    [[nodiscard]] bool is_forced_draw() const noexcept;
     [[nodiscard]] bool is_repetition_sensitive() const noexcept;
     [[nodiscard]] bool is_draw_by_rule() const noexcept;
     [[nodiscard]] bool is_terminal() const noexcept;

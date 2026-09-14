@@ -56,6 +56,8 @@ public:
     [[nodiscard]] int continuation_history_score(
         const MoveMetadata& metadata, const SearchHistoryContext& history_context) const noexcept;
     [[nodiscard]] int capture_history_score(const MoveMetadata& metadata) const noexcept;
+    [[nodiscard]] bool is_proven_counter_move(
+        Color side, Move previous_move, Move move) const noexcept;
 
 private:
     friend class SearchMovePicker;

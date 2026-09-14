@@ -29,11 +29,23 @@ inline constexpr int kReverseFutilityBaseMargin = 80;
 inline constexpr int kReverseFutilityDepthMargin = 60;
 inline constexpr int kReverseFutilityImprovingDiscount = 32;
 inline constexpr int kReverseFutilityWorseningSurcharge = 24;
+// A continuation-history pruning threshold adapted to Koi's signed history
+// range.  Keep it materially below the neutral initialization so only a
+// repeatedly failing move is removed from a late quiet scout node.
+inline constexpr int kNegativeContinuationHistoryBase = 4'136;
+inline constexpr int kNegativeContinuationHistoryMinimumDepth = 4;
+inline constexpr int kNegativeContinuationHistoryMinimumMove = 3;
 inline constexpr int kNarrowQuietCheckProbeStartDepth = 6;
 inline constexpr int kMaximumQuiescenceNarrowQuietCheckDepth = 7;
+inline constexpr int kMaximumQuiescenceNarrowQuietChecks = 2;
 inline constexpr int kIncompleteRootForcingMargin = 50;
 inline constexpr auto kShortTimedFallbackMinimum = std::chrono::milliseconds{150};
 inline constexpr auto kShortTimedFallbackThreshold = std::chrono::milliseconds{300};
+// Root workers have enough startup/coordination cost that a forcing root with
+// roughly half a second of requested time needs a bounded first qsearch pass
+// to finish its serial root iteration.  This is a timing-policy boundary, not
+// a change to fixed-depth or ordinary long-search qsearch.
+inline constexpr auto kShortTimedSerialThreshold = std::chrono::milliseconds{500};
 inline constexpr std::size_t kNullMoveSparsePieceLimit = 8;
 inline constexpr std::uint16_t kNullMoveRuleSafetyHalfmoves = 90;
 // Koi's classical evaluator has a substantially narrower positional-score

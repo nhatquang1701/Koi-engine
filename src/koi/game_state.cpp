@@ -2184,4 +2184,12 @@ DrawStatus GameState::draw_status() const noexcept {
     return impl_->native_position.draw_status();
 }
 
+bool GameState::is_claimable_draw() const noexcept {
+    return impl_->native_position.is_claimable_draw();
+}
+
+bool GameState::is_forced_draw() const noexcept {
+    return impl_->native_position.is_forced_draw();
+}
+
 } // namespace koi

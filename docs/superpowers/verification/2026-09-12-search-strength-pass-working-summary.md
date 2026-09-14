@@ -4,13 +4,16 @@
 
 - Repository: `C:\Users\ntATh\AI test\Koi engine`.
 - Branch: `koi-engine-v1`; committed baseline before the current worktree edits:
-  `0a410d4`.
+  `fe01f92`.
 - Current worktree edits are limited to search implementation, search constants,
   the synchronized UCI Hash-range documentation, the current search design/plan
   records, and this summary.
-- No tests have been run after the latest edits, per the user's instruction.
-  Full Release and Debug CTest runs are deferred until the final verification
-  pass.
+- Final verification was completed after the latest edits. One complete Release
+  CTest run and one complete Debug CTest run were executed, and no additional
+  test commands were run afterward. Each run passed 36/42 tests; the same six
+  targets failed in both configurations: `uci_controller_tests`,
+  `koi_search_tests`, `koi_strength_tests`, `koi_engine_process`,
+  `koi_engine_en_croissant_process`, and `koi_benchmark_process`.
 
 ## Architecture model
 
@@ -99,6 +102,12 @@ required depth/window.
   and MultiPV results, avoids applying the emergency single-PV correction to
   MultiPV lines, and feeds any post-selection score correction back into both
   root scheduling and time-management hardness observations.
+- Root completion is now separated from strict provenance. Serial search uses
+  full root-score coverage plus a valid PV to publish a completed iteration;
+  threaded search uses complete `line.searched` coverage plus a ranked usable
+  line. The stricter root-authoritative flag remains required for aspiration
+  seeding and proof-sensitive metadata, so selective qsearch paths no longer
+  suppress normal UCI depth progress or cause unbounded retry loops.
 - Depth-three live LMR is now gated at phase-rich nodes (`game_phase >= 8`).
   This preserves the low-phase full-depth-verification fixture's required
   reduction while preventing shallow opening quiet moves from being reduced
@@ -109,11 +118,45 @@ required depth/window.
   capture check flags.
 - Threaded aspiration attempts clear root-line completion state before each
   retry, so an interrupted retry cannot rank bounds left by an earlier window.
-- Threaded root publication now requires the ranked line to be exact before
-  advancing `completed_depth`, publishing an iteration PV/score, or reseeding
-  aspiration. A fully returned selective line remains available only as a
-  depth-zero first-result fallback and as ordering evidence when an exact line
-  exists; selective fail-highs cannot trigger aspiration widening.
+- Root publication now separates usable completion from strict provenance. A
+  fully covered root pass with a valid ranked PV can advance `completed_depth`
+  and publish an iteration even when ordinary qsearch/selective paths make the
+  result non-exact. The strict exact/provenance flag remains required for
+  aspiration seeding, exact root metadata, and other proof-sensitive uses;
+  selective fail-highs cannot trigger aspiration widening.
+- Serial root publication now applies the same safe-provenance rule as the
+  threaded path when an exact incumbent exists: unresolved selective
+  challengers block publication, while a fully covered all-selective pass
+  remains explicitly allowed as heuristic progress outside aspiration
+  authority.
+- Interrupted threaded-root fallback now accepts only an exact, non-exposed
+  partial line; unresolved selective estimates fall through to the bounded
+  short-search safety move.
+- Deep qsearch now probes up to two narrow quiet checks even when no checking
+  capture is present, and late non-checking captures survive the generic
+  two-move gate when their SEE is non-negative or they take a rook-or-better;
+  the existing futility/SEE pruning still applies afterward.
+- Removed dead distance-zero branches from multi-ply continuation-history
+  updates; those loops begin at distance one, so the update behavior is
+  unchanged while the feedback path is explicit.
+- Claimable and forced rule draws are now separated in the public position
+  view and search boundary. Automatic/dead draws remain terminal; a current
+  claimable draw contributes a zero floor while legal continuations are still
+  searched for wins. Claimable nodes disable selective cutoffs and TT storage,
+  and the root retains a legal UCI move even when claiming is the best result.
+- Threaded root lines now retain searched/completed/exact and selective-bound
+  provenance. Publication additionally requires complete root coverage and
+  every non-exact line to be a safe fail-low upper bound, so an unresolved
+  selective challenger cannot disappear from ranking and be masked by an exact
+  incumbent. Nominal confirmation refreshes clear stale selective flags.
+- Root selective fail-low safety now carries a separate lower-bound direction
+  from qsearch and regular negamax. A selective child is accepted as a safe
+  root upper bound only when that direction was explicitly preserved; unknown
+  or opposite-direction selective results remain blockers.
+- Emergency short-search draw handling now treats claimable draws as optional
+  zero choices at each fallback minimax layer while automatic/dead draws remain
+  terminal. The known locked-pawn dead-position example is matched by its
+  normalized board pattern rather than one exact side/clock/fullmove FEN.
 - The UCI controller, transposition table, SearchOptions documentation, README,
   and current search design/plan records retain the established Hash range of
   1--4096 MB.
@@ -135,6 +178,12 @@ required depth/window.
   second move to be reduced when its existing tactical, history, feature, and
   provenance gates permit it. The legacy diagnostic policy contract is
   unchanged.
+- Added a conservative negative continuation-history gate for late quiet
+  interior non-PV moves. It requires a strongly negative continuation score
+  and excludes tactical nodes, checks, captures/promotions, TT/killer/counter
+  moves, repetition-sensitive paths, claimable draws, sparse material, parent
+  evasions, and TT-PV nodes; pruned results remain selective and are counted
+  per worker.
 
 ## Baseline evidence
 
@@ -149,17 +198,26 @@ required depth/window.
 - Existing verification records contain the earlier architecture Release
   result (41/42, with the documented short-clock oracle limitation); it is not
   a substitute for the final suites after these edits.
-- The latest pre-fix Release CTest log recorded two failures: threaded
-  root-in-check parity and `defense_04` (`e4d5` instead of `c3d5`). Both fixes
-  above are awaiting the single final Release/Debug suite run.
+- The final Release and Debug CTest runs both passed 36/42 tests. Both runs
+  failed the same six targets. `uci_controller_tests` reported the Task 1 WDL
+  transcript, ponderhit book bypass, and Ponder PV emission failures.
+  `koi_search_tests` reported the medium-timed forcing-root guard publishing
+  an unsearched parallel fallback (`depth=0`, `best=b7f7`, `root_pvs=0`).
+  `koi_strength_tests` reported that mate fixtures did not solve to a positive
+  mate score. `koi_engine_process` timed out waiting for a depth-two ponder PV,
+  `koi_engine_en_croissant_process` timed out waiting for a MultiPV bestmove,
+  and `koi_benchmark_process` timed out waiting for `koi-bench` reference-1 to
+  exit within 120000 ms. Release elapsed time was 570.53 seconds; Debug
+  elapsed time was 1930.24 seconds.
 
-## Final verification plan
+## Final verification record
 
 1. Review the final diff and ensure no tests, fixtures, evaluator, NNUE,
    weights, or measurement inputs changed.
 2. Run `git diff --check`.
 3. Build Release and Debug.
-4. Run the complete Release and Debug CTest suites once, at the end.
-5. Update this summary with exact final results.
+4. Run the complete Release and Debug CTest suites once, at the end. Both
+   completed with 36/42 passed and the six failures recorded above.
+5. This summary records the exact final results.
 6. Report exact benchmark, suite, and known-limitation evidence. Do not claim
    Elo improvement without the user's controlled En Croissant retest.

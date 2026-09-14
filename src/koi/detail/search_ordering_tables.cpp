@@ -312,7 +312,7 @@ void SearchOrderingTables::record_quiet_cutoff(
         update_history(multi_ply_continuation_history_[
                            distance * kContinuationHistorySize +
                            continuation_index(previous, metadata.move)],
-                       bonus * (distance == 0 ? 2 : 1), kHistoryTableMaximum);
+                       bonus, kHistoryTableMaximum);
     }
     update_history(pawn_history_[pawn_index(context, metadata.moving_piece, metadata.move.to())],
                    bonus, kHistoryTableMaximum);
@@ -408,7 +408,7 @@ void SearchOrderingTables::record_quiet_fail(
         update_history(multi_ply_continuation_history_[
                            distance * kContinuationHistorySize +
                            continuation_index(previous, metadata.move)],
-                       malus * (distance == 0 ? 2 : 1), kHistoryTableMaximum);
+                       malus, kHistoryTableMaximum);
     }
     update_history(pawn_history_[pawn_index(context, metadata.moving_piece, metadata.move.to())],
                    malus, kHistoryTableMaximum);

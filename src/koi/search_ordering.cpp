@@ -317,6 +317,11 @@ int SearchMoveOrdering::capture_history_score(
     return tables_.capture_history_score(metadata);
 }
 
+bool SearchMoveOrdering::is_proven_counter_move(
+    const Color side, const Move previous_move, const Move move) const noexcept {
+    return tables_.is_proven_counter_move(side, previous_move, move);
+}
+
 void SearchMoveOrdering::record_quiet_cutoff(
     const Color side, const Move move, const int ply, const int depth,
     const std::optional<Move> previous_move) noexcept {

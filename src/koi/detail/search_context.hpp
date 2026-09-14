@@ -27,6 +27,19 @@
 
 namespace koi::detail {
 
+[[nodiscard]] constexpr bool is_claimable_draw_status(
+    const DrawStatus status) noexcept {
+    return status == DrawStatus::claimable_threefold ||
+        status == DrawStatus::claimable_fifty_move;
+}
+
+[[nodiscard]] constexpr bool is_forced_draw_status(
+    const DrawStatus status) noexcept {
+    return status == DrawStatus::dead_position ||
+        status == DrawStatus::automatic_fivefold ||
+        status == DrawStatus::automatic_seventy_five_move;
+}
+
 struct SearchContext {
     // History maluses are deferred until a node has selected its final best
     // move.  They do not need SEE, provenance, or ordering data; retaining a
@@ -63,6 +76,13 @@ struct SearchContext {
         Move move = Move::no_move();
         int score = -kInfinity;
         bool exact = false;
+        // An inexact/selective child can still be a safe upper bound for the
+        // root move when it failed low against the incumbent. Keep that
+        // direction separate from `exact`: the serial root may ignore such a
+        // move while an unresolved selective challenger must block authority.
+        bool selective_bound = false;
+        bool safe_upper_bound = false;
+        bool selective_upper_bound = false;
     };
 
     struct RootVerification {
@@ -100,6 +120,17 @@ struct SearchContext {
         const bool* value = nullptr;
 
         ~SelectiveBoundPathGuard() noexcept {
+            if (output != nullptr && value != nullptr) {
+                *output = *value;
+            }
+        }
+    };
+
+    struct LowerBoundPathGuard {
+        bool* output = nullptr;
+        const bool* value = nullptr;
+
+        ~LowerBoundPathGuard() noexcept {
             if (output != nullptr && value != nullptr) {
                 *output = *value;
             }
@@ -154,9 +185,9 @@ struct SearchContext {
           evaluation_cache(std::make_unique<EvaluationCacheEntry[]>(kEvaluationCacheSize)),
           quiet_history_side_hook(std::move(quiet_history_side_hook)) {
         if (const auto budget = time_manager.time_budget(); budget.has_value() &&
-            *budget < kShortTimedFallbackMinimum) {
-            // A sub-150 ms search must finish its first root iteration before
-            // spending time on the third quiet-checking layer. Fixed-depth
+            *budget <= kShortTimedSerialThreshold) {
+            // A short timed search must finish its first root iteration before
+            // spending time on the deepest quiet-checking layer. Fixed-depth
             // searches remain on the full horizon.
             quiescence_check_depth_limit = kMaximumQuiescenceCheckDepth - 1;
         }
@@ -183,6 +214,51 @@ struct SearchContext {
         iteration_aborted = shared_abort;
         root_move_score_count = 0;
         stack.reset();
+    }
+
+    [[nodiscard]] bool root_result_complete(const PrincipalVariation& pv) const noexcept {
+        if (aborted || root_moves == nullptr || pv.length == 0 ||
+            root_move_score_count != root_moves->size()) {
+            return false;
+        }
+        // Every root score is recorded only after its child has returned. A
+        // complete score set plus a PV whose first move belongs to that set
+        // establishes coverage; callers may then apply the provenance rule
+        // appropriate to publication versus strict root authority.
+        return std::any_of(
+            root_moves->begin(), root_moves->end(), [&pv](const MoveMetadata& metadata) {
+                return metadata.move == pv.moves[0];
+            });
+    }
+
+    [[nodiscard]] bool root_result_publishable(const PrincipalVariation& pv) const noexcept {
+        if (!root_result_complete(pv)) {
+            return false;
+        }
+
+        bool has_exact_incumbent = false;
+        int exact_incumbent_score = -kInfinity;
+        for (std::size_t index = 0; index < root_move_score_count; ++index) {
+            const RootMoveScore& root_score = root_move_scores[index];
+            if (root_score.exact) {
+                has_exact_incumbent = true;
+                exact_incumbent_score = std::max(exact_incumbent_score, root_score.score);
+            }
+        }
+
+        // A fully covered root pass is useful heuristic progress when every
+        // line is selective. Once an exact incumbent exists, an unresolved
+        // selective challenger must not be allowed to disappear behind it.
+        return std::all_of(
+            root_move_scores.begin(), root_move_scores.begin() + root_move_score_count,
+            [has_exact_incumbent, exact_incumbent_score](const RootMoveScore& root_score) {
+                if (!has_exact_incumbent) {
+                    return true;
+                }
+                return root_score.exact || root_score.safe_upper_bound ||
+                    (root_score.selective_bound && root_score.selective_upper_bound &&
+                     root_score.score <= exact_incumbent_score);
+            });
     }
 
     [[nodiscard]] std::optional<RootMoveScore> best_completed_root_move(
@@ -438,7 +514,8 @@ struct SearchContext {
     int quiescence(GameState& state, int alpha, int beta, int ply, int qdepth = 0,
                    std::optional<Move> previous_move = std::nullopt,
                    bool* repetition_sensitive_path = nullptr,
-                   bool* selective_bound_path = nullptr) {
+                   bool* selective_bound_path = nullptr,
+                   bool* lower_bound_path = nullptr) {
         if (!count_node(true)) {
             return 0;
         }
@@ -454,6 +531,12 @@ struct SearchContext {
         if (selective_bound_path != nullptr) {
             *selective_bound_path = false;
         }
+        bool path_lower_bound = false;
+        if (lower_bound_path != nullptr) {
+            *lower_bound_path = false;
+        }
+        const LowerBoundPathGuard lower_bound_path_guard{
+            lower_bound_path, &path_lower_bound};
         const SelectiveBoundPathGuard selective_path_guard{
             selective_bound_path, &path_selective_bound};
         // A regular search near the fixed-stack boundary may enter qsearch
@@ -465,14 +548,19 @@ struct SearchContext {
             if (legal_moves.empty()) {
                 return terminal_score(state, 0, ply);
             }
-            if (state.is_draw_by_rule()) {
+            const DrawStatus draw_status = state.draw_status();
+            if (is_forced_draw_status(draw_status)) {
                 return 0;
             }
             // There are legal moves, but the fixed stack boundary prevents
             // this qsearch node from examining its tactical frontier.
             path_selective_bound = true;
-            return checked ? terminal_score(state, legal_moves.size(), ply) :
-                evaluate(state, state.side_to_move());
+            if (checked) {
+                return terminal_score(state, legal_moves.size(), ply);
+            }
+            const int static_score = evaluate(state, state.side_to_move());
+            return is_claimable_draw_status(draw_status) ?
+                std::max(0, static_score) : static_score;
         }
         // Qsearch can be entered before regular negamax initializes the frame
         // at this ply, and its recursive children enter the same way.  Reset
@@ -504,6 +592,7 @@ struct SearchContext {
                 // window, but it is not an exact qsearch result for the
                 // nominal regular-search parent.
                 path_selective_bound = entry.lower_bound;
+                path_lower_bound = entry.lower_bound;
                 return entry.score;
             }
         }
@@ -524,7 +613,8 @@ struct SearchContext {
             if (legal_moves.empty()) {
                 return terminal_score(state, 0, ply);
             }
-            if (state.is_draw_by_rule()) {
+            const DrawStatus draw_status = state.draw_status();
+            if (is_forced_draw_status(draw_status)) {
                 return 0;
             }
             // A checked qsearch node with legal evasions has no stand-pat
@@ -553,15 +643,17 @@ struct SearchContext {
             }
             return score;
         }
-        if (state.is_draw_by_rule()) {
+        const DrawStatus draw_status = state.draw_status();
+        if (is_forced_draw_status(draw_status)) {
             return 0;
         }
+        const bool claimable_draw = is_claimable_draw_status(draw_status);
 
         // At this boundary the tactical generator deliberately stops probing
         // quiet checks.  Even when no capture remains, the stand-pat value is
         // therefore only a bounded lower estimate rather than a complete
         // qsearch frontier.  Preserve that provenance before the empty-list
-        // cache path below; terminal and rule-draw returns above remain exact.
+        // cache path below; terminal and forced-draw returns above remain exact.
         const bool quiet_check_horizon_reached = !checked &&
             qdepth >= quiescence_check_depth_limit;
         if (quiet_check_horizon_reached) {
@@ -579,22 +671,21 @@ struct SearchContext {
         // narrow evasion set.
         // This rescues short mating nets without paying the full quiet-check
         // annotation cost at every quiescence node.
-        const bool has_checking_capture = std::any_of(
-            moves.begin(), moves.end(), [](const MoveMetadata& metadata) {
-                return metadata.is_capture() && metadata.gives_check;
-            });
         if (!checked && qdepth >= kNarrowQuietCheckProbeStartDepth &&
-            qdepth < kMaximumQuiescenceNarrowQuietCheckDepth &&
-            has_checking_capture) {
+            qdepth < kMaximumQuiescenceNarrowQuietCheckDepth) {
             MoveMetadataList quiet_check_candidates;
             state.legal_moves_with_metadata(
                 quiet_check_candidates, true, false, CheckFlagMode::quiet_moves_only);
+            int quiet_checks_added = 0;
             for (const MoveMetadata& candidate : quiet_check_candidates) {
                 if (candidate.is_capture() || !candidate.gives_check ||
                     !narrow_deep_quiet_check_candidate(state, candidate)) {
                     continue;
                 }
                 (void)moves.push_back(candidate);
+                if (++quiet_checks_added >= kMaximumQuiescenceNarrowQuietChecks) {
+                    break;
+                }
             }
         }
 
@@ -605,11 +696,23 @@ struct SearchContext {
             tt_move = tt_entry->best_move;
         }
 
-        int best = -kInfinity;
+        int best = claimable_draw ? 0 : -kInfinity;
+        bool best_lower_bound = false;
+        bool unknown_selective_child = false;
+        int selective_upper_bound = -kInfinity;
         if (!checked) {
             best = evaluate(state, state.side_to_move());
+            if (claimable_draw) {
+                best = std::max(0, best);
+            }
+            // Stand-pat is a legal null continuation in qsearch terms, so it
+            // provides a safe lower bound for the tactical frontier.  This
+            // direction remains useful to a parent even when later pruning
+            // makes the qsearch result selective.
+            best_lower_bound = true;
             if (best >= beta) {
                 path_selective_bound = true;
+                path_lower_bound = true;
                 if (use_qsearch_cache) {
                     store_qsearch_cache(qsearch_key, best, true);
                 }
@@ -620,6 +723,7 @@ struct SearchContext {
                 if (!moves.empty()) {
                     path_selective_bound = true;
                 }
+                path_lower_bound = best_lower_bound;
                 if (use_qsearch_cache) {
                     // The stand-pat score is a valid lower bound, but it is
                     // not exact when the tactical frontier still contains
@@ -631,6 +735,7 @@ struct SearchContext {
                 return best;
             }
             if (moves.empty()) {
+                path_lower_bound = best_lower_bound;
                 if (use_qsearch_cache) {
                     store_qsearch_cache(qsearch_key, best, quiet_check_horizon_reached);
                 }
@@ -680,7 +785,10 @@ struct SearchContext {
             if (!checked && best > -kMateThreshold) {
                 if (!metadata.gives_check && !protects_previous_destination &&
                     futility_base > -kMateThreshold && !promotion) {
-                    if (move_count > kQuiescenceFutilityMoveLimit) {
+                    const bool materially_interesting = metadata.see_score >= 0 ||
+                        piece_value(metadata.captured_piece) >= piece_value(PieceType::rook);
+                    if (move_count > kQuiescenceFutilityMoveLimit &&
+                        !materially_interesting) {
                         path_selective_bound = true;
                         ++stats.delta_prunes;
                         continue;
@@ -689,13 +797,26 @@ struct SearchContext {
                         futility_base + piece_value(metadata.captured_piece);
                     if (futility_value <= alpha) {
                         path_selective_bound = true;
-                        best = std::max(best, futility_value);
+                        if (futility_value > best) {
+                            // This margin-based estimate is not a searched
+                            // continuation, so it cannot remain the node's
+                            // lower-bound certificate if it raises best.
+                            best = futility_value;
+                            best_lower_bound = false;
+                        }
                         ++stats.delta_prunes;
                         continue;
                     }
                     if (capture && metadata.see_score < alpha - futility_base) {
                         path_selective_bound = true;
-                        best = std::max(best, std::min(alpha, futility_base));
+                        const int see_floor = std::min(alpha, futility_base);
+                        if (see_floor > best) {
+                            // The SEE floor is a pruning estimate rather than
+                            // a proven child score; do not expose it as a
+                            // lower bound after negation.
+                            best = see_floor;
+                            best_lower_bound = false;
+                        }
                         ++stats.see_prunes;
                         continue;
                     }
@@ -737,28 +858,59 @@ struct SearchContext {
             }
             bool child_repetition_sensitive = false;
             bool child_selective_bound = false;
+            bool child_lower_bound = false;
             const int score = -quiescence(state, -beta, -alpha, ply + 1, qdepth + 1,
                                           metadata.move, &child_repetition_sensitive,
-                                          &child_selective_bound);
+                                          &child_selective_bound, &child_lower_bound);
             state.unmake_move();
             if (aborted) {
                 return 0;
             }
             path_repetition_sensitive = path_repetition_sensitive ||
                 child_repetition_sensitive;
-            // A child qsearch lower-bound cutoff becomes an upper bound after
+            const bool child_score_is_selective_upper =
+                child_selective_bound && child_lower_bound;
+            if (child_selective_bound) {
+                if (child_score_is_selective_upper) {
+                    // The child proved a lower bound from its own side to
+                    // move. Negation turns that into an upper bound for this
+                    // qsearch node. Retain the strongest such challenger and
+                    // decide whether it matters only after the final best
+                    // lower bound is known.
+                    selective_upper_bound = std::max(selective_upper_bound, score);
+                } else {
+                    // A selective result without a directional certificate
+                    // may hide a stronger continuation even when its scout
+                    // score failed low.
+                    unknown_selective_child = true;
+                }
+            }
+            // A known child lower bound becomes a safe upper bound after
             // negation. If it is already no better than the parent's current
-            // best score, it cannot affect this node's result; avoid making a
-            // fully searched qsearch look selective merely because a failed
-            // low tactical sibling used a narrow child window. A selective
-            // child that actually becomes the best candidate still taints
-            // the parent provenance.
+            // best score, it cannot affect this node's result. An unknown
+            // selective direction, however, may hide a stronger continuation
+            // even when its returned score failed low, so it always taints the
+            // parent provenance.
             path_selective_bound = path_selective_bound ||
-                (child_selective_bound && score > best);
+                (child_selective_bound && !child_score_is_selective_upper);
+            const bool child_score_lower_bound = !child_selective_bound &&
+                !child_score_is_selective_upper && score > alpha;
+            if (score > best) {
+                best_lower_bound = child_score_lower_bound;
+            } else if (score == best && child_score_lower_bound) {
+                best_lower_bound = true;
+            }
             best = std::max(best, score);
-            alpha = std::max(alpha, score);
+            // A selective child with a known lower-bound direction is an
+            // upper bound after negation; an unknown selective result is not
+            // a trustworthy floor either. Neither may tighten the window or
+            // trigger a qsearch cutoff for later siblings.
+            if (child_score_lower_bound) {
+                alpha = score;
+            }
             if (alpha >= beta) {
                 path_selective_bound = true;
+                path_lower_bound = best_lower_bound;
                 // A selective child result is a lower bound from the child's
                 // point of view.  After negation it is an upper bound here,
                 // so this cutoff is not proof that the current qsearch node
@@ -777,9 +929,19 @@ struct SearchContext {
         // only terminal/stand-pat values and proven lower cutoffs are stored.
         // This avoids turning a selective qsearch estimate into an exact TT
         // value while still making repeated fail-high frontiers cheap.
+        // A selective child whose direction is known can be harmless once a
+        // later candidate has a higher lower bound. Keep its upper bound until
+        // the final best score is known instead of permanently tainting the
+        // whole qsearch node merely because it was searched first.
+        path_selective_bound = path_selective_bound ||
+            unknown_selective_child ||
+            (selective_upper_bound > -kInfinity &&
+             (selective_upper_bound > best ||
+              (selective_upper_bound == best && !best_lower_bound)));
         if (repetition_sensitive_path != nullptr) {
             *repetition_sensitive_path = path_repetition_sensitive;
         }
+        path_lower_bound = best_lower_bound;
         return best;
     }
 
@@ -789,7 +951,9 @@ struct SearchContext {
                 int check_extensions_remaining = kMaximumCheckExtensionsPerPath,
                 Move excluded_move = Move::no_move(),
                 bool* repetition_sensitive_path = nullptr,
-                bool* selective_bound_path = nullptr) {
+                bool* selective_bound_path = nullptr,
+                bool* root_authoritative_path = nullptr,
+                bool* lower_bound_path = nullptr) {
         bool path_repetition_sensitive = state.is_repetition_sensitive();
         const RepetitionPathGuard repetition_path_guard{
             repetition_sensitive_path, &path_repetition_sensitive};
@@ -797,6 +961,15 @@ struct SearchContext {
         if (selective_bound_path != nullptr) {
             *selective_bound_path = false;
         }
+        if (root_authoritative_path != nullptr) {
+            *root_authoritative_path = false;
+        }
+        bool path_lower_bound = false;
+        if (lower_bound_path != nullptr) {
+            *lower_bound_path = false;
+        }
+        const LowerBoundPathGuard lower_bound_path_guard{
+            lower_bound_path, &path_lower_bound};
         const SelectiveBoundPathGuard selective_bound_path_guard{
             selective_bound_path, &path_selective_bound};
         const bool excluded_search = !excluded_move.is_no_move();
@@ -817,7 +990,8 @@ struct SearchContext {
         }
         if (depth <= 0) {
             return quiescence(state, alpha, beta, ply, 0, previous_move,
-                              &path_repetition_sensitive, &path_selective_bound);
+                              &path_repetition_sensitive, &path_selective_bound,
+                              &path_lower_bound);
         }
         if (ply >= static_cast<int>(SearchStack::kCapacity) - 2) {
             // The fixed stack guard is a last-resort horizon, not a license
@@ -827,14 +1001,16 @@ struct SearchContext {
             // rule-drawn position reached at the defensive boundary.
             const int score = quiescence(
                 state, alpha, beta, ply, 0, previous_move,
-                &path_repetition_sensitive, &path_selective_bound);
+                &path_repetition_sensitive, &path_selective_bound,
+                &path_lower_bound);
             // A quiet nonterminal position can have an empty qsearch
             // frontier, in which case qsearch quite correctly returns its
             // stand-pat evaluation without setting a selective flag.  At
             // this regular-search stack boundary that value is still only a
             // safety horizon, not a nominal-depth proof. Terminal and
-            // rule-drawn positions remain authoritative.
-            if (!state.is_draw_by_rule() && !state.is_terminal()) {
+            // forced-draw positions remain authoritative; a claimable draw is
+            // an option and therefore remains a nonterminal safety horizon.
+            if (!state.is_terminal()) {
                 path_selective_bound = true;
             }
             return score;
@@ -888,11 +1064,13 @@ struct SearchContext {
         if (moves.empty()) {
             return terminal_score(state, moves.size(), ply);
         }
-        // Rule draws are properties of the current position, not of the
-        // remaining move subset.  A singular probe may exclude the TT move
-        // and leave no alternatives, but that must not turn an already-drawn
-        // node into the probe's alpha fallback.
-        if (state.is_draw_by_rule()) {
+        const DrawStatus draw_status = state.draw_status();
+        const bool claimable_draw = is_claimable_draw_status(draw_status);
+        // Automatic/dead draws are properties of the current position, not
+        // of the remaining move subset. A claimable draw is different: it is
+        // a legal zero-valued option for the side to move, so the move loop
+        // must still be allowed to discover a better continuation.
+        if (is_forced_draw_status(draw_status)) {
             return 0;
         }
         if (excluded_search) {
@@ -908,7 +1086,19 @@ struct SearchContext {
             moves.resize(write_index);
         }
         if (moves.empty()) {
-            return excluded_search ? alpha : terminal_score(state, moves.size(), ply);
+            return claimable_draw ? 0 :
+                (excluded_search ? alpha : terminal_score(state, moves.size(), ply));
+        }
+        if (claimable_draw) {
+            // A claim is an available floor, not a forced terminal result.
+            // Raise the lower edge before node-type selection so a null
+            // window with beta <= 0 can use the claim as a valid cutoff.
+            alpha = std::max(alpha, 0);
+            if (alpha >= beta) {
+                path_selective_bound = true;
+                path_lower_bound = true;
+                return alpha;
+            }
         }
         const bool short_timed_root = ply == 0 &&
             time_manager.time_budget().has_value() &&
@@ -1000,7 +1190,8 @@ struct SearchContext {
         if (!excluded_search) {
             frame.tt_pv = pv_node;
         }
-        const bool phase_rich_quiet_position = !checked && depth == 1 && !tactical_position &&
+        const bool phase_rich_quiet_position = !claimable_draw && !checked && depth == 1 &&
+            !tactical_position &&
             ensure_features().game_phase >= 8;
         const PositionFeatures* quiet_forcing_parent_features = nullptr;
         const PositionFeatures* root_direct_forcing_features = nullptr;
@@ -1013,16 +1204,19 @@ struct SearchContext {
         if (phase_rich_quiet_position && !pv_node) {
             if (depth == 1 && alpha > -kInfinity && static_eval + 120 <= alpha) {
                 bool razor_selective_bound = false;
+                bool razor_lower_bound = false;
                 const int razor_score = quiescence(state, alpha, beta, ply, 0,
                                                    previous_move,
                                                    &path_repetition_sensitive,
-                                                   &razor_selective_bound);
+                                                   &razor_selective_bound,
+                                                   &razor_lower_bound);
                 if (!aborted && razor_score <= alpha) {
                     // Razoring replaces the nominal regular horizon with a
                     // qsearch upper-bound probe. It can safely prune this
                     // node, but its score must not be promoted through the
                     // recursive boundary as a full-depth child result.
                     path_selective_bound = true;
+                    path_lower_bound = razor_lower_bound;
                     ++stats.razoring_prunes;
                     return razor_score;
                 }
@@ -1046,7 +1240,7 @@ struct SearchContext {
             if (!excluded_search) {
                 frame.tt_pv = pv_node || entry->pv;
             }
-            if (!excluded_search && !repetition_sensitive && !pv_node && ply > 0 &&
+            if (!claimable_draw && !excluded_search && !repetition_sensitive && !pv_node && ply > 0 &&
                 entry->depth >= depth) {
                 if (entry->bound == TranspositionBound::exact) {
                     return entry->score;
@@ -1092,6 +1286,7 @@ struct SearchContext {
                     // Propagate that distinction so a parent PVS/root line
                     // re-searches before promoting the value to exact data.
                     path_selective_bound = true;
+                    path_lower_bound = entry->bound == TranspositionBound::lower;
                     return entry->score;
                 }
             }
@@ -1108,7 +1303,8 @@ struct SearchContext {
         // root score (especially during aspiration), and can also corrupt the
         // principal variation's first move.  Keep the compatibility policy
         // unchanged, but enforce the node-type boundary at its live call site.
-        const bool null_move_shape_allowed = allow_null_pruning && !excluded_search &&
+        const bool null_move_shape_allowed = allow_null_pruning && !claimable_draw &&
+            !excluded_search &&
             ply > 0 && cut_node;
         const bool null_move_allowed = null_move_shape_allowed && !repetition_sensitive;
         const NullMoveDecision null_move_gate = SearchPolicy::null_move(
@@ -1195,19 +1391,14 @@ struct SearchContext {
                     if (null_cutoff_proven && cutoff_score >= beta &&
                         cutoff_score < kMateThreshold) {
                         path_selective_bound = true;
+                        // Verification removes the reduced-probe uncertainty,
+                        // but null-move pruning is still a selective heuristic
+                        // rather than a nominal-depth proof. Do not expose its
+                        // score as a lower-bound direction: after negation a
+                        // parent would otherwise treat it as a safe upper
+                        // bound for an incompletely searched move.
+                        path_lower_bound = false;
                         ++stats.null_cutoffs;
-                        if (!excluded_search) {
-                            // The null result was proven only at its reduced
-                            // verification horizon. Storing it at the parent
-                            // depth would make a speculative bound look like
-                            // a full-depth search to later nodes.
-                            if (!path_repetition_sensitive) {
-                                table_access.store(
-                                    search_transposition_key(state), null_depth, cutoff_score,
-                                    TranspositionBound::lower, Move::no_move(), ply,
-                                    frame.tt_pv);
-                            }
-                        }
                         return cutoff_score;
                     }
                 }
@@ -1228,7 +1419,7 @@ struct SearchContext {
         // material position may turn this evaluation estimate into a cutoff.
         // The result is explicitly selective, so neither this node nor a
         // parent may promote it to nominal-depth exact information.
-        const bool reverse_futility_allowed = !excluded_search && ply > 0 &&
+        const bool reverse_futility_allowed = !claimable_draw && !excluded_search && ply > 0 &&
             !repetition_sensitive && !state.is_repetition_sensitive() &&
             !pawn_endgame && !tactical_position && !tt_move.has_value() &&
             static_eval_valid;
@@ -1238,6 +1429,10 @@ struct SearchContext {
                 reverse_futility_allowed, improving, opponent_worsening);
         if (reverse_futility.eligible) {
             path_selective_bound = true;
+            // The static margin is a pruning estimate, not a proof that the
+            // position reaches beta at this node's requested horizon. Its
+            // direction is therefore unknown to a parent after negation.
+            path_lower_bound = false;
             ++stats.reverse_futility_prunes;
             return static_eval - reverse_futility.margin;
         }
@@ -1249,7 +1444,7 @@ struct SearchContext {
         // informative and where a one-ply horizon change can hide a forcing
         // continuation. This is the conservative counterpart of Stockfish
         // 19's no-TT IIR gate.
-        if (!excluded_search && ply > 0 && !pv_node && !checked &&
+        if (!claimable_draw && !excluded_search && ply > 0 && !pv_node && !checked &&
             !tactical_position && !state.is_repetition_sensitive() &&
             !tt_move.has_value() && depth >= kInternalIterativeReductionMinimumDepth) {
             path_selective_bound = true;
@@ -1264,7 +1459,8 @@ struct SearchContext {
         const ProbCutDecision probcut = SearchPolicy::prob_cut(
             depth, alpha, beta, static_eval, checked, improving,
             excluded_search, repetition_sensitive);
-        if (probcut.eligible && cut_node && !repetition_sensitive && !pawn_endgame &&
+        if (!claimable_draw && probcut.eligible && cut_node && !repetition_sensitive &&
+            !pawn_endgame &&
             !(tt_entry.has_value() && tt_entry->score < probcut.beta)) {
             MoveMetadataList probcut_moves;
             for (const MoveMetadata& candidate : moves) {
@@ -1328,21 +1524,25 @@ struct SearchContext {
                 if (probcut_score >= probcut.beta &&
                     (probcut.depth > 0 || !probcut_qsearch_selective_bound)) {
                     path_selective_bound = true;
+                    // ProbCut deliberately proves only a reduced tactical
+                    // probe. Keep it selective, but do not claim a lower
+                    // bound at the parent horizon; otherwise negation can
+                    // make an unsafe root upper-bound certificate.
+                    path_lower_bound = false;
                     ++stats.probcut_cutoffs;
-                    if (!excluded_search) {
-                        // The lower bound was established at the reduced
-                        // ProbCut horizon, not at the parent depth. Keeping
-                        // the real proof depth prevents a later full search
-                        // from treating this selective result as exact.
-                        if (!path_repetition_sensitive) {
-                            table_access.store(
-                                search_transposition_key(state), probcut.depth > 0 ?
-                                    probcut.depth + 1 : 0, probcut_score,
-                                TranspositionBound::lower, candidate.move, ply,
-                                frame.tt_pv);
-                        }
-                    }
                     if (std::abs(probcut_score) < kMateThreshold) {
+                        if (probcut.depth > 0 && !path_repetition_sensitive &&
+                            table_access.enabled()) {
+                            // The legal tactical child established a real
+                            // lower bound at the reduced horizon. Retain it
+                            // at that horizon for future move ordering and
+                            // selective cutoffs, but never label it PV or
+                            // store it at the parent's nominal depth.
+                            table_access.store(
+                                search_transposition_key(state), probcut.depth + 1,
+                                probcut_score, TranspositionBound::lower,
+                                candidate.move, ply, false);
+                        }
                         return probcut_score - (probcut.beta - beta);
                     }
                 }
@@ -1354,7 +1554,8 @@ struct SearchContext {
         // bounded margin above beta rather than exposing a stale TT score as
         // exact, and mate/repetition-sensitive positions remain on the full
         // move loop.
-        const bool tt_probcut = !excluded_search && !pv_node && !checked && !pawn_endgame &&
+        const bool tt_probcut = !claimable_draw && !excluded_search && !pv_node && !checked &&
+            !pawn_endgame &&
             !state.is_repetition_sensitive() && tt_entry.has_value() &&
             tt_entry->bound == TranspositionBound::lower &&
             depth >= 4 && tt_entry->depth >= std::max(1, depth - 4) &&
@@ -1363,6 +1564,10 @@ struct SearchContext {
             std::abs(tt_entry->score) < kMateThreshold;
         if (tt_probcut) {
             path_selective_bound = true;
+            // A TT lower bound is useful evidence for this selective probe,
+            // but the soft margin still does not establish the current
+            // nominal-depth node's lower-bound direction.
+            path_lower_bound = false;
             return beta + kTranspositionProbCutMargin;
         }
 
@@ -1370,7 +1575,11 @@ struct SearchContext {
             ordering, state, moves, tt_move, history, ply,
             checked ? SearchMovePicker::Mode::evasion : SearchMovePicker::Mode::main,
             excluded_move);
-        int best_score = -kInfinity;
+        // A claimable draw is an implicit zero-valued option for the side to
+        // move. Keep it as the initial floor while still searching every
+        // legal move for a positive continuation.
+        int best_score = claimable_draw ? 0 : -kInfinity;
+        bool best_score_safe_lower_bound = claimable_draw;
         Move best_move = Move::no_move();
         int move_number = 0;
         bool prior_child_fail_high = false;
@@ -1397,10 +1606,21 @@ struct SearchContext {
         // but its result must not justify an exact/upper TT entry at this
         // node. A later full-depth fail-high remains a valid lower bound.
         bool inexact_child_search = false;
-        const bool singular_candidate = !excluded_search && !checked && !pawn_endgame && ply > 0 &&
+        bool unknown_selective_child = false;
+        int selective_upper_bound = -kInfinity;
+        // An exact TT score is also a valid singularity reference.  Koi keeps
+        // exact and lower bounds as separate enum values, whereas the
+        // reference search represents an exact value as a bound containing
+        // the lower bit.  Restrict this to PV nodes that reach the singular
+        // path (non-PV exact hits return earlier), and retain the same depth,
+        // mate, repetition, and material guards as lower-bound entries.
+        const bool singular_tt_bound = tt_entry.has_value() &&
+            (tt_entry->bound == TranspositionBound::lower ||
+             tt_entry->bound == TranspositionBound::exact);
+        const bool singular_candidate = !claimable_draw && !excluded_search && !checked &&
+            !pawn_endgame && ply > 0 &&
             depth >= 6 + (frame.tt_pv ? 1 : 0) && !repetition_sensitive &&
-            tt_move.has_value() &&
-            tt_entry.has_value() && tt_entry->bound == TranspositionBound::lower &&
+            tt_move.has_value() && singular_tt_bound &&
             tt_entry->depth >= depth - 3 &&
             std::abs(tt_entry->score) < kMateThreshold;
         std::optional<PositionFeatures> lmr_parent_features;
@@ -1420,7 +1640,7 @@ struct SearchContext {
             const int next_move_number = move_number + 1;
             const int quiet_skip_threshold =
                 (3 + depth * depth) / (2 - static_cast<int>(improving));
-            if (!excluded_search && ply > 0 && !pv_node && !checked &&
+            if (!claimable_draw && !excluded_search && ply > 0 && !pv_node && !checked &&
                 !parent_frame.in_check &&
                 parent_has_non_pawn_material &&
                 best_score > -kMateThreshold && next_move_number >= quiet_skip_threshold) {
@@ -1430,13 +1650,36 @@ struct SearchContext {
             const Color moving_side = history_side(state.side_to_move(), false);
             const int history_score = metadata.is_capture() ? 0 :
                 ordering.quiet_history_score(moving_side, metadata, history);
+            const int continuation_score = ordering.continuation_history_score(metadata, history);
             const bool is_tt_move = tt_move.has_value() && move == *tt_move;
+            const Move previous_history_move = history.count > 0 ?
+                history.continuation_moves[0] : Move::no_move();
+            const bool is_proven_counter_move = !previous_history_move.is_no_move() &&
+                ordering.is_proven_counter_move(
+                    moving_side, previous_history_move, move);
             const bool root_pawn_move = ply == 0 && metadata.moving_piece == PieceType::pawn;
             const int full_child_depth = depth - 1;
-            const LateMoveDecision lmr_gate = excluded_search ? LateMoveDecision{} :
+            const bool negative_continuation_allowed = !claimable_draw &&
+                !excluded_search && ply > 0 && !repetition_sensitive &&
+                !tactical_position && !pawn_endgame && !parent_frame.in_check &&
+                !frame.tt_pv && best_score > -kMateThreshold;
+            if (SearchPolicy::negative_continuation_history(
+                    depth, next_move_number, continuation_score, pv_node, checked,
+                    metadata.is_capture(), metadata.gives_check,
+                    move.promotion() != Promotion::none, is_tt_move,
+                    ordering.is_killer(move, ply), is_proven_counter_move,
+                    negative_continuation_allowed)) {
+                selective_pruning = true;
+                ++stats.continuation_history_prunes;
+                ++move_number;
+                frame.move_count = move_number;
+                continue;
+            }
+            const LateMoveDecision lmr_gate = excluded_search || claimable_draw ?
+                LateMoveDecision{} :
                 SearchPolicy::dynamic_late_move(
                     depth, next_move_number, full_child_depth, history_score,
-                    ordering.continuation_history_score(metadata, history),
+                    continuation_score,
                     ordering.capture_history_score(metadata), root_pawn_move,
                     checked, metadata.gives_check, metadata.is_capture(),
                     move.promotion() != Promotion::none, is_tt_move,
@@ -1540,6 +1783,11 @@ struct SearchContext {
                            excluded_score >= beta &&
                            excluded_score < kMateThreshold) {
                     path_selective_bound = true;
+                    // Multi-cut is another selective probe: an alternative
+                    // meeting beta does not prove the current node at its
+                    // nominal horizon. Keep its direction unknown so a
+                    // parent cannot convert it into a safe root upper bound.
+                    path_lower_bound = false;
                     ++stats.multi_cut_prunes;
                     return excluded_score;
                 } else if (!excluded_selective_bound && depth >= 8 &&
@@ -1621,11 +1869,12 @@ struct SearchContext {
                     }
                 }
             }
-            const LateMoveDecision lmr_decision = excluded_search || !lmr_candidate ?
+            const LateMoveDecision lmr_decision = excluded_search || claimable_draw ||
+                !lmr_candidate ?
                 LateMoveDecision{} :
                 SearchPolicy::dynamic_late_move(
                     depth, next_move_number, full_child_depth, history_score,
-                    ordering.continuation_history_score(metadata, history),
+                    continuation_score,
                     ordering.capture_history_score(metadata), root_pawn_move,
                     checked, metadata.gives_check, metadata.is_capture(),
                     move.promotion() != Promotion::none, is_tt_move,
@@ -1653,7 +1902,8 @@ struct SearchContext {
             // too important for mate and defensive resource discovery.
             const int lmr_depth = std::max(0, full_child_depth - (reduced ? reduction : 0));
             const int capture_history_score = ordering.capture_history_score(metadata);
-            const bool capture_pruning = !excluded_search && ply > 0 && !pv_node && !checked &&
+            const bool capture_pruning = !claimable_draw && !excluded_search && ply > 0 &&
+                !pv_node && !checked &&
                 !child_in_check && !repetition_sensitive && move_number > 0 &&
                 best_score > -kMateThreshold && parent_has_non_pawn_material &&
                 metadata.is_capture() && !is_tt_move;
@@ -1680,7 +1930,7 @@ struct SearchContext {
             // intentionally unavailable to the first move, PV nodes,
             // forcing moves, and TT moves, so a quiet move that is the only
             // plausible continuation still receives an authoritative search.
-            const bool child_futility = !pv_node && !checked && depth <= 3 &&
+            const bool child_futility = !claimable_draw && !pv_node && !checked && depth <= 3 &&
                 !tactical_position && move_number > 0 && !metadata.is_capture() &&
                 !metadata.gives_check &&
                 move.promotion() == Promotion::none && !is_tt_move &&
@@ -1694,7 +1944,7 @@ struct SearchContext {
                 continue;
             }
 
-            if (!pv_node && SearchPolicy::quiet_futility(
+            if (!claimable_draw && !pv_node && SearchPolicy::quiet_futility(
                     phase_rich_quiet_position, metadata.is_capture(), metadata.gives_check,
                     move.promotion() != Promotion::none, move_number, static_eval, depth, alpha)) {
                 selective_pruning = true;
@@ -1721,8 +1971,10 @@ struct SearchContext {
             int score = 0;
             bool reduced_child_verified = !reduced;
             bool exact_root_score = false;
+            bool safe_upper_bound = false;
             bool child_repetition_sensitive = false;
             bool child_selective_bound = false;
+            bool child_lower_bound = false;
             const bool root_forcing_move = allow_root_forcing_extension &&
                 ply == 0 && quiet_forcing_extension;
             if (move_number == 0) {
@@ -1730,7 +1982,7 @@ struct SearchContext {
                     state, child_depth, -beta, -alpha, ply + 1, child_pv,
                     move, allow_null_pruning, child_check_extensions_remaining,
                     Move::no_move(), &child_repetition_sensitive,
-                    &child_selective_bound);
+                    &child_selective_bound, nullptr, &child_lower_bound);
                 exact_root_score = (ply != 0 || (score > alpha && score < beta)) &&
                     !child_selective_bound;
             } else if (root_forcing_move) {
@@ -1738,7 +1990,7 @@ struct SearchContext {
                     state, child_depth, -kInfinity, kInfinity, ply + 1, child_pv,
                     move, allow_null_pruning, child_check_extensions_remaining,
                     Move::no_move(), &child_repetition_sensitive,
-                    &child_selective_bound);
+                    &child_selective_bound, nullptr, &child_lower_bound);
                 exact_root_score = !child_selective_bound;
             } else {
                 ++stats.pvs_searches;
@@ -1747,7 +1999,7 @@ struct SearchContext {
                     state, child_depth, -alpha - 1, -alpha, ply + 1, child_pv,
                     move, allow_null_pruning, child_check_extensions_remaining,
                     Move::no_move(), &child_repetition_sensitive,
-                    &scout_selective_bound);
+                    &scout_selective_bound, nullptr, &child_lower_bound);
                 path_repetition_sensitive = path_repetition_sensitive ||
                     child_repetition_sensitive;
                 child_selective_bound = scout_selective_bound;
@@ -1760,7 +2012,7 @@ struct SearchContext {
                         state, authoritative_child_depth, -beta, -alpha, ply + 1, child_pv,
                         move, allow_null_pruning, child_check_extensions_remaining,
                         Move::no_move(), &verification_repetition_sensitive,
-                        &verification_selective_bound);
+                        &verification_selective_bound, nullptr, &child_lower_bound);
                     path_repetition_sensitive = path_repetition_sensitive ||
                         verification_repetition_sensitive;
                     child_selective_bound = verification_selective_bound;
@@ -1776,7 +2028,7 @@ struct SearchContext {
                         state, authoritative_child_depth, -beta, -alpha, ply + 1, child_pv,
                         move, allow_null_pruning, child_check_extensions_remaining,
                         Move::no_move(), &verification_repetition_sensitive,
-                        &verification_selective_bound);
+                        &verification_selective_bound, nullptr, &child_lower_bound);
                     path_repetition_sensitive = path_repetition_sensitive ||
                         verification_repetition_sensitive;
                     child_selective_bound = verification_selective_bound;
@@ -1784,15 +2036,6 @@ struct SearchContext {
                         (ply != 0 || (score > alpha && score < beta)) &&
                         !child_selective_bound;
                 }
-            }
-            path_selective_bound = path_selective_bound || child_selective_bound;
-            if (child_selective_bound) {
-                // A selective child may have failed low on a bound rather
-                // than proving that this move is below alpha. Keep the
-                // current node from manufacturing an exact/upper result from
-                // an incomplete alternative, and propagate the uncertainty
-                // to its caller as well.
-                inexact_child_search = true;
             }
             // Any searched child can make the node's result depend on the
             // reversible ancestor set, even when that child is not the
@@ -1810,11 +2053,42 @@ struct SearchContext {
             }
             const bool child_nominal_depth_complete = !child_depth_reduced_by_extension &&
                 (!reduced || reduced_child_verified);
+            const bool child_selective_upper = child_nominal_depth_complete &&
+                child_selective_bound && child_lower_bound;
+            if (child_selective_bound) {
+                if (child_selective_upper) {
+                    // The child proved a lower bound from its own side to
+                    // move. Negation turns it into an upper bound for this
+                    // node. Keep the strongest challenger until the final
+                    // lower bound is known; a later exact sibling can make
+                    // this selective line harmless.
+                    selective_upper_bound = std::max(selective_upper_bound, score);
+                } else {
+                    // A selective result with no trusted direction may hide
+                    // a stronger move and must remain an unresolved source of
+                    // inexactness for this node and its callers.
+                    unknown_selective_child = true;
+                    inexact_child_search = true;
+                }
+            }
             const bool child_score_nominally_authoritative =
                 child_nominal_depth_complete && !child_selective_bound;
+            const bool root_score_inexact = child_selective_bound ||
+                !child_nominal_depth_complete;
+            // A selective child is a safe upper bound for this candidate
+            // after negation only when the child itself proved a lower bound.
+            // The broad selective flag also covers unresolved/upper-bound
+            // paths, so score-versus-alpha alone is not enough to certify
+            // those lines. Ordinary non-selective fail-lows remain safe
+            // upper bounds through the normal window contract.
+            safe_upper_bound = !exact_root_score && child_nominal_depth_complete &&
+                score <= alpha && (!child_selective_bound || child_lower_bound);
+            const bool child_score_safe_lower_bound = child_nominal_depth_complete &&
+                !child_selective_bound && score > alpha;
             const bool child_lower_bound_authoritative =
                 child_score_nominally_authoritative && score >= original_beta;
-            prior_child_fail_high = score > alpha;
+            const bool child_raises_alpha = child_score_safe_lower_bound;
+            prior_child_fail_high = child_raises_alpha;
             const bool quiet_history_move = !metadata.is_capture() &&
                 move.promotion() == Promotion::none;
             const Color history_side_after_unmake = quiet_history_move ?
@@ -1833,6 +2107,7 @@ struct SearchContext {
                 best_history_side = history_side_after_unmake;
                 best_score_authoritative = child_score_nominally_authoritative;
                 best_score_lower_bound_authoritative = child_lower_bound_authoritative;
+                best_score_safe_lower_bound = child_score_safe_lower_bound;
                 pv.prepend(move, child_pv);
             } else {
                 bool promoted_equal_authoritative = false;
@@ -1861,6 +2136,8 @@ struct SearchContext {
                     best_score_lower_bound_authoritative =
                         best_score_lower_bound_authoritative ||
                         child_lower_bound_authoritative;
+                    best_score_safe_lower_bound = best_score_safe_lower_bound ||
+                        child_score_safe_lower_bound;
                 }
                 if (!promoted_equal_authoritative && failed_move_count < failed_moves.size()) {
                     failed_moves[failed_move_count++] =
@@ -1871,9 +2148,17 @@ struct SearchContext {
             }
             if (ply == 0 && root_move_score_count < root_move_scores.size()) {
                 root_move_scores[root_move_score_count++] =
-                    RootMoveScore{move, score, exact_root_score};
+                    RootMoveScore{move, score, exact_root_score && child_nominal_depth_complete,
+                                  root_score_inexact, safe_upper_bound,
+                                  child_selective_upper};
             }
-            alpha = std::max(alpha, score);
+            // Only a non-selective child result is a proven lower bound from
+            // this node's perspective. Selective scores are retained for
+            // candidate ranking, but never become the floor for the next
+            // PVS window or a cutoff decision.
+            if (child_raises_alpha) {
+                alpha = score;
+            }
             if (alpha >= beta) {
                 frame.cutoff_count++;
                 frame.prior_fail_high = true;
@@ -1882,6 +2167,33 @@ struct SearchContext {
             }
             ++move_number;
             frame.move_count = move_number;
+        }
+
+        if (ply == 0 && claimable_draw && !best_metadata_valid &&
+            root_move_score_count != 0) {
+            // The claim option can be the root score even when every legal
+            // move is below zero. Keep the UCI contract of returning a legal
+            // move and choose the least-losing searched continuation as its
+            // PV placeholder; the reported score remains the exact claim
+            // value of zero.
+            const RootMoveScore* fallback = &root_move_scores[0];
+            for (std::size_t index = 1; index < root_move_score_count; ++index) {
+                if (root_move_scores[index].score > fallback->score) {
+                    fallback = &root_move_scores[index];
+                }
+            }
+            const auto metadata = std::find_if(
+                moves.begin(), moves.end(), [&fallback](const MoveMetadata& candidate) {
+                    return candidate.move == fallback->move;
+                });
+            if (metadata != moves.end()) {
+                best_move = fallback->move;
+                best_metadata = *metadata;
+                best_metadata_valid = true;
+                best_history_side = history_side(side_to_move, false);
+                pv.clear();
+                pv.prepend(best_move, PrincipalVariation{});
+            }
         }
 
         // Stockfish updates the selected move and all searched alternatives
@@ -1960,6 +2272,7 @@ struct SearchContext {
             best_score = tt_lower_bound_floor;
             best_score_authoritative = false;
             best_score_lower_bound_authoritative = false;
+            best_score_safe_lower_bound = true;
             inexact_child_search = true;
             path_selective_bound = true;
         }
@@ -1968,8 +2281,12 @@ struct SearchContext {
         // nominal-depth proof for its caller. Propagate the same provenance
         // used by null/ProbCut/razor cutoffs so a parent cannot promote it to
         // exact or authoritative full-depth metadata.
+        const bool unresolved_selective_child = unknown_selective_child ||
+            (selective_upper_bound > -kInfinity &&
+             (!best_score_safe_lower_bound || selective_upper_bound > best_score));
         path_selective_bound = path_selective_bound || selective_pruning ||
-            inexact_child_search;
+            inexact_child_search || unresolved_selective_child;
+        path_lower_bound = best_score_safe_lower_bound;
         const TranspositionBound bound = best_score <= original_alpha ? TranspositionBound::upper
             : best_score >= original_beta ? TranspositionBound::lower : TranspositionBound::exact;
         // An exact bound requires at least one authoritative child and no
@@ -1979,11 +2296,62 @@ struct SearchContext {
         const bool safe_to_store = best_metadata_valid &&
             ((bound == TranspositionBound::lower &&
               best_score_lower_bound_authoritative) ||
-             (!selective_pruning && !inexact_child_search));
-        if (!excluded_search && !path_repetition_sensitive && safe_to_store) {
+             (!selective_pruning && !inexact_child_search &&
+              !unresolved_selective_child));
+        if (!excluded_search && !claimable_draw && !path_repetition_sensitive && safe_to_store) {
             table_access.store(
                 search_transposition_key(state), depth, best_score, bound, best_move, ply,
                 frame.tt_pv);
+        }
+        if (root_authoritative_path != nullptr && ply == 0 && !excluded_search) {
+            const bool complete_root_coverage = root_move_score_count == moves.size();
+            const auto root_score_is_safe = [](const RootMoveScore& root_score,
+                                                    const int incumbent_score,
+                                                    const bool incumbent_has_lower_bound) {
+                if (root_score.exact || root_score.safe_upper_bound) {
+                    return true;
+                }
+                // A selective child lower bound becomes an upper bound after
+                // negation. Once an exact/lower-bound incumbent is known to
+                // be at least as good, that root line cannot displace it.
+                return root_score.selective_upper_bound && incumbent_has_lower_bound &&
+                    root_score.score <= incumbent_score;
+            };
+            bool claim_option_authoritative = claimable_draw && best_score == 0 &&
+                best_metadata_valid && complete_root_coverage;
+            if (claim_option_authoritative) {
+                // With a claim available, zero is exact only when every root
+                // move has been searched and no line can prove a positive
+                // score. Ordinary fail-lows are safe upper bounds here; a
+                // selective fail-high remains an unresolved challenger.
+                for (std::size_t index = 0; index < root_move_score_count; ++index) {
+                    const RootMoveScore& root_score = root_move_scores[index];
+                    if (root_score.score > 0 ||
+                        !root_score_is_safe(root_score, 0, true)) {
+                        claim_option_authoritative = false;
+                        break;
+                    }
+                }
+            }
+            bool root_authoritative = claim_option_authoritative ||
+                (best_metadata_valid && best_score_authoritative && complete_root_coverage);
+            if (root_authoritative) {
+                bool exact_incumbent = false;
+                for (std::size_t index = 0; index < root_move_score_count; ++index) {
+                    const RootMoveScore& root_score = root_move_scores[index];
+                    if (root_score.move == best_move) {
+                        exact_incumbent = root_score.exact;
+                    }
+                    if (!root_score_is_safe(root_score, best_score,
+                                            best_score_safe_lower_bound)) {
+                        root_authoritative = false;
+                        break;
+                    }
+                }
+                root_authoritative = root_authoritative &&
+                    (exact_incumbent || claim_option_authoritative);
+            }
+            *root_authoritative_path = root_authoritative;
         }
         return best_score;
     }
