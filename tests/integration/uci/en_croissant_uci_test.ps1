@@ -4,7 +4,11 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$TimeoutMilliseconds = 5000
+$TimeoutMilliseconds = if ($env:KOI_UCI_TIMEOUT_MS) {
+    [int]$env:KOI_UCI_TIMEOUT_MS
+} else {
+    15000
+}
 
 function Start-Engine {
     $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
@@ -40,6 +44,7 @@ function Read-Line($Session, [string]$Description) {
             $Session.Process.Kill()
             $Session.Process.WaitForExit()
         }
+        try { $null = $task.GetAwaiter().GetResult() } catch { }
         throw "Timed out waiting for $Description."
     }
     $line = $task.GetAwaiter().GetResult()
@@ -159,4 +164,6 @@ try {
         $session.Process.Kill()
         $session.Process.WaitForExit()
     }
+    try { $null = $session.StderrTask.GetAwaiter().GetResult() } catch { }
+    $session.Process.Dispose()
 }

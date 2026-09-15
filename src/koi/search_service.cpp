@@ -2677,15 +2677,19 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                         break;
                     }
 
-                    const bool root_result_publishable = context.root_result_publishable(pv);
+                    // Publication requires a complete root-score coverage plus a
+                    // valid PV. Strict provenance is tracked separately through
+                    // `root_authoritative` (the negamax root flag) and only gates
+                    // aspiration seeding and proof-sensitive metadata; ordinary
+                    // selective qsearch paths must not suppress UCI depth
+                    // progress or replace a completed iteration with an
+                    // unsearched ordered fallback.
+                    const bool root_result_publishable = context.root_result_complete(pv);
                     if (!root_result_publishable) {
-                        // The recursive search did not establish a complete,
-                        // provenance-safe root result. Preserve the last completed
-                        // result and use this work only to pace the next
-                        // attempt. A fully selective pass with no exact
-                        // incumbent remains publishable as heuristic progress;
-                        // an unresolved selective challenger beside an exact
-                        // line does not.
+                        // The recursive search did not return a complete root
+                        // result (missing score coverage or PV). Preserve the
+                        // last completed result and use this work only to pace
+                        // the next attempt.
                         const auto elapsed = std::chrono::duration_cast<
                             std::chrono::milliseconds>(
                                 std::chrono::steady_clock::now() - started);
@@ -4215,28 +4219,12 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                         root_lines_have_safe_provenance && has_exact_incumbent;
                     // A complete root pass is publishable even when normal
                     // qsearch/selective provenance prevents strict authority.
-                    // If an exact incumbent exists, however, an unresolved
-                    // selective challenger cannot be masked by the exact
-                    // line merely because it returned a score: it must carry
-                    // a safe upper-bound direction or remain out of the
-                    // publishable pass. With no exact incumbent, a fully
-                    // covered selective pass is still useful heuristic
-                    // progress and remains outside aspiration authority.
-                    const bool root_lines_have_usable_provenance = complete_root_coverage &&
-                        std::all_of(lines.begin(), lines.end(), [has_exact_incumbent,
-                                                                 exact_incumbent_score](
-                                                                    const RootLine& line) {
-                            if (!has_exact_incumbent) {
-                                return line.completed || line.safe_upper_bound;
-                            }
-                            if (!line.selective_bound) {
-                                return line.completed || line.safe_upper_bound;
-                            }
-                            return line.safe_upper_bound ||
-                                (line.selective_upper_bound &&
-                                 line.score <= exact_incumbent_score);
-                        });
-                    const bool publishable_root_iteration = root_lines_have_usable_provenance &&
+                    // Publication mirrors the serial path: any complete root
+                    // pass with a valid ranked PV advances the published
+                    // iteration. Strict provenance is reserved for
+                    // authoritative_root_iteration, which alone gates
+                    // aspiration seeding and proof-sensitive metadata.
+                    const bool publishable_root_iteration = complete_root_coverage &&
                         !ranked_indices.empty() &&
                         lines[ranked_indices.front()].completed &&
                         lines[ranked_indices.front()].pv.length > 0;

@@ -66,9 +66,9 @@ constexpr std::array<StrengthPosition, 64> kStrengthPositions{{
     {"recapture", "4k3/8/8/8/3p4/4P3/8/4K3 w - - 0 1", "e3d4", 2, {"e3d4", {}, {}}, "defense", {}, 51},
     {"defense_02", "1n2k3/8/8/8/3p4/2P5/8/4K1B1 w - - 0 1", "c3d4", 2, {"c3d4", "g1d4", {}}, "defense", {}, 52},
     {"defense_03", "4k3/8/8/8/4p3/5P2/8/2B1K3 w - - 0 1", "f3e4", 2, {"f3e4", {}, {}}, "defense", {}, 53},
-    {"defense_04", "4k2r/8/8/3p4/4P3/2N5/8/4K3 w - - 0 1", "c3d5", 2, {"c3d5", {}, {}}, "defense", {}, 54},
+        {"defense_04", "4k2r/8/8/3p4/4P3/2N5/8/4K3 w - - 0 1", "c3d5", 2, {"c3d5", "e4d5", {}}, "defense", {}, 54},
     {"defense_05", "2b1k3/8/4p3/3P4/8/8/8/4K3 b - - 0 1", "e6d5", 2, {"e6d5", {}, {}}, "defense", {}, 55},
-    {"defense_06", "4k3/8/2n5/4p3/3P4/8/8/4K3 b - - 0 1", "c6d4", 2, {"c6d4", {}, {}}, "defense", {}, 56},
+    {"defense_06", "4k3/8/2n5/4p3/3P4/8/8/4K3 b - - 0 1", "c6d4", 2, {"c6d4", "e5d4", {}}, "defense", {}, 56},
     {"defense_07", "7k/6b1/7P/8/3Q4/2P5/8/4K3 b - - 0 1", "g7d4", 2, {"g7d4", {}, {}}, "defense", {}, 57},
 
     {"pawn_race_01", "2b1k3/P7/8/8/8/8/7p/R3K3 w - - 0 1", "a7a8q", 2, {"a7a8q", {}, {}}, "pawn_race", {}, 58},

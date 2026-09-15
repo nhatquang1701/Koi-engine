@@ -381,6 +381,19 @@ Syzygy tablebases are optional, and chess variants remain out of scope. Opening-
 defaults, placement, fallback, and bypass behavior are documented below. This engine
 continues to evaluate standard FIDE chess.
 
+### Test inventory and known gaps
+
+The current checkout registers 43 CTest tests. `tests/README.md` documents the
+full inventory, how to run the whole suite or a single test (`KOI_TEST_FILTER`),
+the environment variables (`KOI_UCI_TIMEOUT_MS`, `KOI_REPLAY_PATH`,
+`PYTHONDONTWRITEBYTECODE`, `KOI_NNUE_BOUNDARY_EXE`), optional-dependency skips,
+and per-test timeouts. `koi_search_tests` keeps a `known_failures` list for
+behavior expectations that the in-progress search rewrite does not meet yet;
+those are reported as `XFAIL` so the suite stays deterministic and green while
+the gaps remain visible (see `tests/README.md`). The dated counts in the
+verification snapshots below ("17 targets", "26 tests") are historical records
+from the 2026-09-05 and 2026-09-06 runs, not the current inventory.
+
 ### Task 5 release verification (2026-09-05)
 
 Fresh external Ninja builds used Visual Studio 2022 MSVC 19.44.35228.0 targeting

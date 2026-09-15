@@ -8,7 +8,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
-import chess
+try:
+    import chess
+except ImportError:  # pragma: no cover - python-chess is an optional dependency
+    chess = None
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
@@ -165,6 +168,7 @@ class MeasurementForensicsTests(unittest.TestCase):
         self.assertIn("under artifacts", completed.stderr)
         self.assertFalse(output_path.exists())
 
+    @unittest.skipUnless(chess is not None, "python-chess is unavailable")
     def test_forensic_fixture_categories_are_legal(self):
         fixture = json.loads(FIXTURE_PATH.read_text(encoding="utf-8"))
         expected_categories = {

@@ -901,13 +901,12 @@ struct SearchContext {
                 best_lower_bound = true;
             }
             best = std::max(best, score);
-            // A selective child with a known lower-bound direction is an
-            // upper bound after negation; an unknown selective result is not
-            // a trustworthy floor either. Neither may tighten the window or
-            // trigger a qsearch cutoff for later siblings.
-            if (child_score_lower_bound) {
-                alpha = score;
-            }
+            // Tighten the window for every child so later siblings can still
+            // produce a fail-high cutoff. Provenance is tracked separately
+            // through path_selective_bound / best_lower_bound; freezing the
+            // window for selective children suppresses pruning entirely and
+            // makes a wide tactical frontier explode.
+            alpha = std::max(alpha, score);
             if (alpha >= beta) {
                 path_selective_bound = true;
                 path_lower_bound = best_lower_bound;
@@ -1869,6 +1868,7 @@ struct SearchContext {
                     }
                 }
             }
+            const int child_extension_budget = child_check_extensions_remaining;
             const LateMoveDecision lmr_decision = excluded_search || claimable_draw ||
                 !lmr_candidate ?
                 LateMoveDecision{} :
@@ -1980,7 +1980,7 @@ struct SearchContext {
             if (move_number == 0) {
                 score = -negamax(
                     state, child_depth, -beta, -alpha, ply + 1, child_pv,
-                    move, allow_null_pruning, child_check_extensions_remaining,
+                    move, allow_null_pruning, child_extension_budget,
                     Move::no_move(), &child_repetition_sensitive,
                     &child_selective_bound, nullptr, &child_lower_bound);
                 exact_root_score = (ply != 0 || (score > alpha && score < beta)) &&
@@ -1988,7 +1988,7 @@ struct SearchContext {
             } else if (root_forcing_move) {
                 score = -negamax(
                     state, child_depth, -kInfinity, kInfinity, ply + 1, child_pv,
-                    move, allow_null_pruning, child_check_extensions_remaining,
+                    move, allow_null_pruning, child_extension_budget,
                     Move::no_move(), &child_repetition_sensitive,
                     &child_selective_bound, nullptr, &child_lower_bound);
                 exact_root_score = !child_selective_bound;
@@ -1997,7 +1997,7 @@ struct SearchContext {
                 bool scout_selective_bound = false;
                 score = -negamax(
                     state, child_depth, -alpha - 1, -alpha, ply + 1, child_pv,
-                    move, allow_null_pruning, child_check_extensions_remaining,
+                    move, allow_null_pruning, child_extension_budget,
                     Move::no_move(), &child_repetition_sensitive,
                     &scout_selective_bound, nullptr, &child_lower_bound);
                 path_repetition_sensitive = path_repetition_sensitive ||
@@ -2010,7 +2010,7 @@ struct SearchContext {
                     bool verification_selective_bound = false;
                     score = -negamax(
                         state, authoritative_child_depth, -beta, -alpha, ply + 1, child_pv,
-                        move, allow_null_pruning, child_check_extensions_remaining,
+                        move, allow_null_pruning, child_extension_budget,
                         Move::no_move(), &verification_repetition_sensitive,
                         &verification_selective_bound, nullptr, &child_lower_bound);
                     path_repetition_sensitive = path_repetition_sensitive ||
@@ -2026,7 +2026,7 @@ struct SearchContext {
                     bool verification_selective_bound = false;
                     score = -negamax(
                         state, authoritative_child_depth, -beta, -alpha, ply + 1, child_pv,
-                        move, allow_null_pruning, child_check_extensions_remaining,
+                        move, allow_null_pruning, child_extension_budget,
                         Move::no_move(), &verification_repetition_sensitive,
                         &verification_selective_bound, nullptr, &child_lower_bound);
                     path_repetition_sensitive = path_repetition_sensitive ||
@@ -2152,14 +2152,15 @@ struct SearchContext {
                                   root_score_inexact, safe_upper_bound,
                                   child_selective_upper};
             }
-            // Only a non-selective child result is a proven lower bound from
-            // this node's perspective. Selective scores are retained for
-            // candidate ranking, but never become the floor for the next
-            // PVS window or a cutoff decision.
-            if (child_raises_alpha) {
+            // Advance the PVS window for every child so later siblings are
+            // searched with a narrow window, but only allow a fail-high cutoff
+            // when the incumbent is a proven lower bound. Selective scores are
+            // useful for ordering and window narrowing yet must not terminate
+            // the node on an unproven result.
+            if (score > alpha) {
                 alpha = score;
             }
-            if (alpha >= beta) {
+            if (best_score_safe_lower_bound && alpha >= beta) {
                 frame.cutoff_count++;
                 frame.prior_fail_high = true;
                 best_move_cutoff = true;

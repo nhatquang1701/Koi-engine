@@ -4,8 +4,25 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$TimeoutMilliseconds = 5000
+$TimeoutMilliseconds = if ($env:KOI_UCI_TIMEOUT_MS) {
+    [int]$env:KOI_UCI_TIMEOUT_MS
+} else {
+    15000
+}
 $MaximumThreads = [Math]::Max(1, [Math]::Min(64, [Environment]::ProcessorCount))
+
+# Every engine process this script starts is tracked so a failed assertion can
+# never orphan a running koi-engine.exe. The trap runs on any terminating
+# error, kills the survivors, and then lets the error propagate.
+$script:KoiSessions = [System.Collections.Generic.List[System.Diagnostics.Process]]::new()
+trap {
+    foreach ($tracked in $script:KoiSessions) {
+        if ($null -ne $tracked -and -not $tracked.HasExited) {
+            try { $tracked.Kill() } catch { }
+        }
+    }
+    break
+}
 
 function Start-UciSession([string]$Executable = $EnginePath, [string]$WorkingDirectory = '') {
     $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
@@ -24,6 +41,7 @@ function Start-UciSession([string]$Executable = $EnginePath, [string]$WorkingDir
     if (-not $process.Start()) {
         throw 'Unable to start koi-engine.'
     }
+    $script:KoiSessions.Add($process)
 
     return [pscustomobject]@{
         Process = $process

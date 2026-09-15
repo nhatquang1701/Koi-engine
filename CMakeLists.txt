@@ -37,6 +37,11 @@ if(MSVC)
         "$<$<CONFIG:Release>:/DNDEBUG>"
         "$<$<CONFIG:Release>:/arch:AVX2>"
     )
+    # The recursive search can legitimately descend through check, singular,
+    # and quiet-forcing extensions. A 1 MiB default stack is not enough for a
+    # deep tactical line, so reserve a larger stack for the image (worker
+    # threads inherit this reserve on Windows).
+    add_link_options("/STACK:16777216")
     include(CheckIPOSupported)
     check_ipo_supported(RESULT KOI_IPO_SUPPORTED OUTPUT KOI_IPO_ERROR LANGUAGES CXX)
     if(KOI_IPO_SUPPORTED)
@@ -355,7 +360,7 @@ add_test(
     NAME koi_benchmark_process
     COMMAND ${POWERSHELL_EXECUTABLE} -NoProfile -ExecutionPolicy Bypass -File
             "${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/tools/koi_bench_process_test.ps1"
-            -BenchPath "$<TARGET_FILE_DIR:koi_engine>/koi-bench.exe"
+            -BenchPath "$<TARGET_FILE:koi_bench>"
 )
 
 set_tests_properties(koi_benchmark_process PROPERTIES TIMEOUT 300)
@@ -512,6 +517,18 @@ if(Python3_Interpreter_FOUND)
     )
 else()
     message(STATUS
-        "Skipping elo_oracle_python: Python 3 interpreter is unavailable."
+        "Skipping all Python tests: the Python 3 interpreter is unavailable."
     )
 endif()
+
+# Bound every registered test. A pathological search, an unresponsive child
+# process, or a stalled network call must fail the test instead of hanging the
+# whole suite. Tests that need a different budget set an explicit TIMEOUT above;
+# this loop only fills in the ones that would otherwise run unbounded.
+get_property(KOI_REGISTERED_TESTS DIRECTORY PROPERTY TESTS)
+foreach(KOI_TEST_NAME IN LISTS KOI_REGISTERED_TESTS)
+    get_test_property(${KOI_TEST_NAME} TIMEOUT KOI_TEST_TIMEOUT)
+    if(KOI_TEST_TIMEOUT STREQUAL "NOTFOUND")
+        set_tests_properties(${KOI_TEST_NAME} PROPERTIES TIMEOUT 600)
+    endif()
+endforeach()
