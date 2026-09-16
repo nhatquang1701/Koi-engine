@@ -23,6 +23,8 @@
 #include "koi/time_manager.hpp"
 #include "koi/uci_controller.hpp"
 
+#include "koi_test_support.hpp"
+
 namespace {
 
 using koi::Position;
@@ -41,11 +43,7 @@ struct ControllerResult {
     std::string diagnostics;
 };
 
-void require(bool condition, std::string_view message) {
-    if (!condition) {
-        throw std::runtime_error(std::string(message));
-    }
-}
+using koi::test::require;
 
 std::size_t maximum_threads() {
     const unsigned hardware = std::thread::hardware_concurrency();

@@ -291,6 +291,9 @@ void TranspositionTable::clear() noexcept {
 }
 
 void TranspositionTable::new_generation() noexcept {
+    // Advance the per-search replacement epoch.  This counter is internal to
+    // the table; it is neither the UCI protocol generation nor a search
+    // request identity (see transposition_table.hpp).
     std::lock_guard maintenance_lock(maintenance_mutex_);
     const auto storage = snapshot();
     if (storage == nullptr || storage->total_slot_count == 0) {

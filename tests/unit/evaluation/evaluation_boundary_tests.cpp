@@ -7,13 +7,11 @@
 #include "koi/evaluation_parameters_generated.hpp"
 #include "koi/game_state.hpp"
 
+#include "koi_test_support.hpp"
+
 namespace {
 
-void require(bool condition, const std::string& message) {
-    if (!condition) {
-        throw std::runtime_error(message);
-    }
-}
+using koi::test::require;
 
 koi::GameState require_state(std::string_view fen) {
     const auto state = koi::GameState::from_fen(fen);

@@ -4,13 +4,11 @@ import koi;
 #include <iostream>
 #include <stdexcept>
 
+#include "koi_test_support.hpp"
+
 namespace {
 
-void require(bool condition, const char* message) {
-    if (!condition) {
-        throw std::runtime_error(message);
-    }
-}
+using koi::test::require;
 
 } // namespace
 

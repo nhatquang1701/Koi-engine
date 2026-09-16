@@ -8,13 +8,11 @@
 
 #include "koi/detail/search_ordering.hpp"
 
+#include "koi_test_support.hpp"
+
 namespace {
 
-void require(bool condition, std::string_view message) {
-    if (!condition) {
-        throw std::runtime_error(std::string(message));
-    }
-}
+using koi::test::require;
 
 koi::GameState require_state(std::string_view fen) {
     const auto state = koi::GameState::from_fen(fen);

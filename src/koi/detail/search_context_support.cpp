@@ -4,27 +4,12 @@
 #include <cmath>
 
 #include "koi/detail/search_constants.hpp"
+#include "koi/piece_values.hpp"
 
 namespace koi::detail {
 
 int piece_value(const PieceType type) noexcept {
-    switch (type) {
-    case PieceType::pawn:
-        return 100;
-    case PieceType::knight:
-        return 320;
-    case PieceType::bishop:
-        return 330;
-    case PieceType::rook:
-        return 500;
-    case PieceType::queen:
-        return 900;
-    case PieceType::king:
-        return 20'000;
-    case PieceType::none:
-        return 0;
-    }
-    return 0;
+    return piece_material_value(type);
 }
 
 bool piece_attacks_square(const PositionFeatures& features, const std::uint8_t source,

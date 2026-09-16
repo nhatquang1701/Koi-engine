@@ -8,13 +8,11 @@
 #include "koi/detail/search_context.hpp"
 #include "koi/evaluator.hpp"
 
+#include "koi_test_support.hpp"
+
 namespace {
 
-void require(const bool condition, const std::string_view message) {
-    if (!condition) {
-        throw std::runtime_error(std::string(message));
-    }
-}
+using koi::test::require;
 
 class CountingWorker final : public koi::EvaluatorWorker {
 public:

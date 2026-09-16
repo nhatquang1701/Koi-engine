@@ -121,6 +121,12 @@ private:
     std::shared_ptr<const SyzygyTablebase> syzygy_ =
         std::make_shared<SyzygyTablebase>();
     CompletionGate completion_gate_;
+    // Protocol staleness counter: begin_generation() bumps this for every new
+    // search request and write_search_completion() drops replies whose
+    // captured generation no longer matches.  This is not the transposition
+    // table's replacement epoch (advanced by TranspositionTable::new_generation)
+    // and not a SearchRequestIdentity; see search_types.hpp for the three
+    // distinct "generation" concepts.
     std::uint64_t generation_ = 0;
     std::string last_command_;
     ControllerState state_ = ControllerState::Idle;

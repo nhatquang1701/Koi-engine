@@ -41,10 +41,6 @@ FeatureState::FeatureState(const FeatureState& other,
         }
     }
     cache_misses_ = other.cache_misses_;
-    snapshot_copies_.store(
-        other.snapshot_copies_.load(std::memory_order_relaxed), std::memory_order_relaxed);
-    fast_hits_.store(other.fast_hits_.load(std::memory_order_relaxed),
-                     std::memory_order_relaxed);
 }
 
 PositionFeatures FeatureState::get_or_compute(const std::size_t cache_index,
@@ -59,7 +55,6 @@ PositionFeatures FeatureState::get_or_compute(const std::size_t cache_index,
         published_valid_[cache_index].load(std::memory_order_acquire)) {
         const Entry* entry = published_[cache_index].load(std::memory_order_acquire);
         if (entry != nullptr && keys_[cache_index].load(std::memory_order_acquire) == position_key) {
-            ++fast_hits_;
             return entry->features;
         }
     }
@@ -107,14 +102,6 @@ void FeatureState::invalidate(const std::size_t cache_index) noexcept {
 std::uint64_t FeatureState::cache_misses() const noexcept {
     std::shared_lock lock(mutex_);
     return cache_misses_;
-}
-
-std::uint64_t FeatureState::fast_hits() const noexcept {
-    return fast_hits_.load(std::memory_order_relaxed);
-}
-
-std::uint64_t FeatureState::snapshot_copies() const noexcept {
-    return snapshot_copies_.load(std::memory_order_relaxed);
 }
 
 } // namespace koi::detail

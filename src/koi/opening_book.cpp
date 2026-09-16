@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "koi/game_state.hpp"
+#include "koi/piece_values.hpp"
 
 namespace koi {
 
@@ -141,16 +142,7 @@ constexpr std::size_t kBookSafetyNodeBudget = 512;
 constexpr std::uintmax_t kMaximumBookFileSize = 16U * 1024U * 1024U;
 
 int piece_value(PieceType type) noexcept {
-    switch (type) {
-    case PieceType::pawn: return 100;
-    case PieceType::knight: return 320;
-    case PieceType::bishop: return 330;
-    case PieceType::rook: return 500;
-    case PieceType::queen: return 900;
-    case PieceType::king: return 20'000;
-    case PieceType::none: break;
-    }
-    return 0;
+    return piece_material_value(type);
 }
 
 int material_score(const GameState& state, Color perspective) noexcept {

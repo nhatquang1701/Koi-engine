@@ -72,11 +72,16 @@ local while immutable network data remains shared. `detail::EvaluationContext`
 selects that worker path or the existing evaluator-plus-mutex fallback, so
 `SearchContext` no longer owns evaluator synchronization or a particular NNUE
 representation. The classical evaluator remains the default and malformed or
-absent NNUE input still falls back as before.
+absent NNUE input still falls back as before. `EvaluatorSelection` and
+`make_evaluator` remain a library-only selection seam: the engine entry points
+construct `ClassicalEvaluator` directly, and the advertised UCI option list
+intentionally exposes no network-path setting.
 
 Search runtime resources have the same ownership boundary. The private
-`detail::SearchTableAccess` view gates TT probes and stores for one search
-context while `TranspositionTable` remains the owner of striped physical
+`detail::SearchTableAccess` view is the only TT boundary used by search code:
+both the orchestrator (`SearchRunner`) and the recursive contexts make their
+probes and the once-per-search generation advance through it, while
+`TranspositionTable` remains the owner of striped physical
 storage, locking, generations, clear, resize, and mate-score normalization.
 The private `detail::SearchBudget` snapshots the node limit and keeps serial
 local-count validation separate from bounded shared-atomic reservation for
@@ -383,7 +388,10 @@ continues to evaluate standard FIDE chess.
 
 ### Test inventory and known gaps
 
-The current checkout registers 43 CTest tests. `tests/README.md` documents the
+The checkout registers 45 CTest tests: 44 by default when python-chess is
+available (43 without the python-chess-gated oracle test), plus one more when
+the opt-in `KOI_BUILD_SHADOW_DIFF` target is enabled (CI enables it).
+`tests/README.md` documents the
 full inventory, how to run the whole suite or a single test (`KOI_TEST_FILTER`),
 the environment variables (`KOI_UCI_TIMEOUT_MS`, `KOI_REPLAY_PATH`,
 `PYTHONDONTWRITEBYTECODE`, `KOI_NNUE_BOUNDARY_EXE`), optional-dependency skips,

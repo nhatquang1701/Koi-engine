@@ -44,7 +44,9 @@ that switch removes only the selected, verified source bundles.
 
 `tools/build/prune_generated_trees.ps1` previews stale direct children of
 `build/` and the historical `out/` root. It preserves only
-`build/debug`, `build/release`, `build/ci-debug`, and `build/ci-release`:
+`build/debug`, `build/release`, `build/ci-debug`, and `build/ci-release`
+(an additional local `build/asan` tree is not on the preserve list and will be
+previewed as stale):
 
 ```powershell
 & .\tools\build\prune_generated_trees.ps1

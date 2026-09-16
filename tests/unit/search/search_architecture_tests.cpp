@@ -11,13 +11,11 @@
 #include "koi/detail/search_session.hpp"
 #include "koi/detail/search_stack.hpp"
 
+#include "koi_test_support.hpp"
+
 namespace {
 
-void require(bool condition, std::string_view message) {
-    if (!condition) {
-        throw std::runtime_error(std::string(message));
-    }
-}
+using koi::test::require;
 
 koi::Move require_move(std::string_view uci) {
     const auto parsed = koi::Move::parse_uci(uci);

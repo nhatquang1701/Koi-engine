@@ -11,6 +11,7 @@
 #include <thread>
 #include <vector>
 
+#include "koi/game_state.hpp"
 #include "koi/move.hpp"
 
 namespace koi {
@@ -141,10 +142,37 @@ struct SearchInfo {
     std::uint64_t tbhits = 0;
 };
 
+// Identity of one controller request as seen by the completion pipeline.
+//
+// "Generation" names three unrelated concepts in this codebase:
+//   * protocol staleness -- UciController::generation_, which makes the
+//     controller ignore replies to a superseded go/position command;
+//   * request identity -- SearchOptions::generation carries that same protocol
+//     counter into a search session, and this struct stores it together with
+//     the root key and fen so the completion gate can prove a result belongs
+//     to the request that is still current;
+//   * TT replacement epoch -- TranspositionTable::generation (advanced once
+//     per search by new_generation()), which only orders entry replacement.
+// The first and second share a value; the TT epoch never leaves the table.
 struct SearchRequestIdentity {
     std::uint64_t generation = 0;
     std::uint64_t root_key = 0;
     std::string root_fen;
+
+    // The single definition of request-identity equality: generation + root
+    // key + root fen.  The completion gate and the UCI controller call this
+    // instead of comparing the three fields by hand.
+    [[nodiscard]] bool matches(const SearchRequestIdentity& other) const noexcept {
+        return generation == other.generation && root_key == other.root_key &&
+            root_fen == other.root_fen;
+    }
+
+    // Builds the identity of a live root.  The board supplies key and fen; the
+    // caller supplies the protocol generation.
+    [[nodiscard]] static SearchRequestIdentity from(const GameState& root,
+                                                    const std::uint64_t generation) {
+        return SearchRequestIdentity{generation, root.position_key(), root.fen()};
+    }
 };
 
 struct SearchResult {
@@ -187,6 +215,10 @@ struct SearchOptions {
     std::uint32_t slow_mover_percent = 100;
     bool limit_strength = false;
     std::uint32_t elo = 1320;
+    // Protocol generation copied from UciController::generation_ so a result
+    // can be matched back to the request that started the search.  This is
+    // request identity, not the transposition table's replacement epoch (see
+    // SearchRequestIdentity).
     std::uint64_t generation = 0;
     // Stable UCI snapshot for the future calibrated strength profile; currently neutral.
     bool strength_mode = false;

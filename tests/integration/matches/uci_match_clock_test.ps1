@@ -12,29 +12,9 @@ $fixturePath = Join-Path (Split-Path -Parent $enginePath) 'uci_match_fixture.exe
 $replayPath = Join-Path (Split-Path -Parent $enginePath) 'koi-replay.exe'
 $outputDirectory = Join-Path ([System.IO.Path]::GetTempPath()) ('koi-uci-match-clock-' + [guid]::NewGuid().ToString('N'))
 
-function Get-PowerShellExecutable {
-    if ($PSVersionTable.PSEdition -eq 'Core') {
-        return (Get-Process -Id $PID -ErrorAction Stop).Path
-    }
-
-    $pwsh = Get-Command pwsh -ErrorAction SilentlyContinue
-    if ($null -ne $pwsh) {
-        return $pwsh.Source
-    }
-
-    return (Get-Command powershell.exe -ErrorAction Stop).Source
-}
+Import-Module ([System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\support\MatchSupport.psm1'))) -Force
 
 $PowerShellExecutable = Get-PowerShellExecutable
-
-function New-ScriptedUciEngine([string]$Directory, [string]$Name) {
-    $path = Join-Path $Directory "$Name.exe"
-    Copy-Item -LiteralPath $fixturePath -Destination $path
-    return [pscustomobject]@{
-        path = $path
-        log = Join-Path $Directory "$Name.log"
-    }
-}
 
 function Invoke-ClockMatch([string]$KoiPath, [string]$OpponentPath, [string]$Directory, [int]$Games) {
     $output = & $PowerShellExecutable -NoProfile -ExecutionPolicy Bypass -File $matchScript `
@@ -60,8 +40,8 @@ try {
     }
 
     New-Item -ItemType Directory -Path $outputDirectory -Force | Out-Null
-    $beforeKoi = New-ScriptedUciEngine $outputDirectory 'clock-before-deadline-koi'
-    $beforeOpponent = New-ScriptedUciEngine $outputDirectory 'clock-before-deadline-opponent'
+    $beforeKoi = New-ScriptedUciEngine -FixturePath $fixturePath -Directory $outputDirectory 'clock-before-deadline-koi'
+    $beforeOpponent = New-ScriptedUciEngine -FixturePath $fixturePath -Directory $outputDirectory 'clock-before-deadline-opponent'
     $beforeReport = Invoke-ClockMatch $beforeKoi.path $beforeOpponent.path $outputDirectory 1
     $beforeGame = $beforeReport.games[0]
     if ($beforeReport.games.Count -ne 1 -or $beforeGame.termination -ne 'max plies' -or
@@ -73,8 +53,8 @@ try {
 
     $afterDirectory = Join-Path $outputDirectory 'after-deadline'
     New-Item -ItemType Directory -Path $afterDirectory -Force | Out-Null
-    $afterKoi = New-ScriptedUciEngine $afterDirectory 'clock-after-deadline-koi'
-    $afterOpponent = New-ScriptedUciEngine $afterDirectory 'clock-after-deadline-opponent'
+    $afterKoi = New-ScriptedUciEngine -FixturePath $fixturePath -Directory $afterDirectory 'clock-after-deadline-koi'
+    $afterOpponent = New-ScriptedUciEngine -FixturePath $fixturePath -Directory $afterDirectory 'clock-after-deadline-opponent'
     $afterReport = Invoke-ClockMatch $afterKoi.path $afterOpponent.path $afterDirectory 2
     $afterGame = $afterReport.games[0]
     if ($afterReport.games.Count -ne 1 -or $afterGame.result -ne '*' -or

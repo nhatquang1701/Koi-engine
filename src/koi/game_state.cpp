@@ -1,4 +1,5 @@
 #include "koi/game_state.hpp"
+#include "koi/piece_values.hpp"
 
 #include <algorithm>
 #include <atomic>
@@ -989,23 +990,7 @@ std::uint64_t metadata_validation_token(const std::uint64_t key,
 }
 
 constexpr int exchange_piece_value(PieceType type) noexcept {
-    switch (type) {
-    case PieceType::pawn:
-        return 100;
-    case PieceType::knight:
-        return 320;
-    case PieceType::bishop:
-        return 330;
-    case PieceType::rook:
-        return 500;
-    case PieceType::queen:
-        return 900;
-    case PieceType::king:
-        return 20'000;
-    case PieceType::none:
-        return 0;
-    }
-    return 0;
+    return piece_material_value(type);
 }
 
 constexpr PieceType promotion_piece_type(Promotion promotion) noexcept {
@@ -1577,18 +1562,13 @@ public:
     detail::CompatibilityMirror compatibility_mirror{};
     Position native_position{};
     mutable detail::FeatureState feature_state{};
-    mutable std::atomic_uint64_t check_flag_evaluations = 0;
 
     Impl() = default;
 
     Impl(const Impl& other) : compatibility_mirror(other.compatibility_mirror),
                               native_position(other.native_position),
                               feature_state(other.feature_state,
-                                            other.compatibility_mirror.history_size()) {
-        check_flag_evaluations.store(
-            other.check_flag_evaluations.load(std::memory_order_relaxed),
-            std::memory_order_relaxed);
-    }
+                                            other.compatibility_mirror.history_size()) {}
 };
 
 GameState::GameState() : impl_(std::make_unique<Impl>()) {}
@@ -1816,7 +1796,6 @@ std::optional<MoveMetadata> GameState::metadata_for_native_move(
          (check_flag_mode == CheckFlagMode::quiet_moves_only &&
           !metadata.is_capture() && move.promotion() == Promotion::none));
     if (analyze_check) {
-        impl_->check_flag_evaluations.fetch_add(1, std::memory_order_relaxed);
         if (check_flag_mode == CheckFlagMode::quiet_moves_only) {
             metadata.gives_check = native_move_gives_check(impl_->native_position, move);
         } else {
@@ -1860,7 +1839,7 @@ PositionFeatures GameState::position_features() const noexcept {
     // The shadow remains synchronized for legality/tablebase compatibility;
     // it is intentionally no longer on the evaluator hot path.
     return impl_->feature_state.get_or_compute(
-        impl_->compatibility_mirror.history_size(),
+        impl_->native_position.history_size(),
         impl_->native_position.position_key(),
         impl_->native_position,
         native_position_features);
@@ -1868,18 +1847,6 @@ PositionFeatures GameState::position_features() const noexcept {
 
 std::uint64_t GameState::position_feature_cache_misses() const noexcept {
     return impl_->feature_state.cache_misses();
-}
-
-std::uint64_t GameState::position_feature_cache_fast_hits() const noexcept {
-    return impl_->feature_state.fast_hits();
-}
-
-std::uint64_t GameState::position_feature_cache_copies() const noexcept {
-    return impl_->feature_state.snapshot_copies();
-}
-
-std::uint64_t GameState::check_flag_evaluations() const noexcept {
-    return impl_->check_flag_evaluations.load(std::memory_order_relaxed);
 }
 
 std::size_t TablebaseSnapshot::piece_count() const noexcept {
@@ -2034,7 +2001,7 @@ bool GameState::unmake_null_move() noexcept {
 }
 
 void GameState::invalidate_feature_cache() noexcept {
-    impl_->feature_state.invalidate(impl_->compatibility_mirror.history_size());
+    impl_->feature_state.invalidate(impl_->native_position.history_size());
 }
 
 bool GameState::is_capture(const Move& move) const noexcept {
@@ -2097,7 +2064,7 @@ std::uint64_t GameState::polyglot_key() const noexcept {
         key ^= kPolyglotRandom[piece_index * 64 + index];
     }
 
-    const std::uint8_t rights = impl_->compatibility_mirror.castling_rights();
+    const std::uint8_t rights = impl_->native_position.castling_rights();
     if ((rights & kWhiteKingSideCastling) != 0) {
         key ^= kPolyglotRandom[768];
     }
@@ -2111,27 +2078,13 @@ std::uint64_t GameState::polyglot_key() const noexcept {
         key ^= kPolyglotRandom[771];
     }
 
-    const Square en_passant = impl_->compatibility_mirror.en_passant_square();
+    // The native position records the en-passant square only while a legal
+    // en-passant capture exists, so the Polyglot capturable-square condition is
+    // already enforced by the native authority. Do not consult the shadow
+    // adapter here: it is a compatibility mirror, not a rule authority.
+    const Square en_passant = impl_->native_position.en_passant_square();
     if (en_passant.index() < Square::kInvalid) {
-        const int target = en_passant.index();
-        const int source_rank_delta = side_to_move() == Color::white ? -8 : 8;
-        const int pawn_rank = target + source_rank_delta;
-        const Color side = side_to_move();
-        bool capturable = false;
-        for (const int file_delta : {-1, 1}) {
-            const int source = pawn_rank + file_delta;
-            if (source < 0 || source >= 64 || source / 8 != pawn_rank / 8) {
-                continue;
-            }
-            const Piece piece = piece_at(Square::from_index(static_cast<std::uint8_t>(source)));
-            if (piece.type == PieceType::pawn && piece.color == side) {
-                capturable = true;
-                break;
-            }
-        }
-        if (capturable) {
-            key ^= kPolyglotRandom[772 + (en_passant.file() - 'a')];
-        }
+        key ^= kPolyglotRandom[772 + (en_passant.file() - 'a')];
     }
 
     if (side_to_move() == Color::white) {

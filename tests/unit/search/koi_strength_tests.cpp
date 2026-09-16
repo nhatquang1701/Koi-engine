@@ -15,13 +15,11 @@
 #include "koi/search_service.hpp"
 #include "koi/strength_suite.hpp"
 
+#include "koi_test_support.hpp"
+
 namespace {
 
-void require(bool condition, std::string_view message) {
-    if (!condition) {
-        throw std::runtime_error(std::string(message));
-    }
-}
+using koi::test::require;
 
 bool accepts_move(const koi::StrengthPosition& position, std::string_view move) {
     return std::find(position.accepted_moves.begin(), position.accepted_moves.end(), move) !=

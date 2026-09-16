@@ -31,8 +31,10 @@ ctest --test-dir build\release -N
 ctest --test-dir build\release -C Release -R koi_strength_tests --output-on-failure
 ```
 
-The default checkout registers 45 CTest tests (43 in a build without the opt-in
-shadow-diff target and the python-chess-gated oracle test).
+The checkout registers 45 CTest registrations when the opt-in shadow-diff
+target is enabled: 44 by default with python-chess, 43 without it
+(`elo_oracle_python` is gated on `python-chess`), and 45 with
+`-DKOI_BUILD_SHADOW_DIFF=ON`, which CI turns on.
 
 Each C++ test is a standalone executable with its own `main`; there is no shared
 runner. `koi_search_tests` and `uci_controller_tests` honor the

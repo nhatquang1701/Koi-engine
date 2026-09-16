@@ -1041,7 +1041,7 @@ void UciController::start_search(GameState root, SearchLimits limits, bool skip_
         candidate.identity = result.identity;
         candidate.source = result.stats.tbhits != 0 ? CompletionSource::tablebase :
             (limits.ponder ? CompletionSource::ponder : CompletionSource::search);
-        const SearchRequestIdentity expected{generation, search_root.position_key(), search_root.fen()};
+        const SearchRequestIdentity expected = SearchRequestIdentity::from(search_root, generation);
         std::string last_command;
         {
             std::lock_guard lock(output_mutex_);
@@ -1338,7 +1338,7 @@ void UciController::write_book_completion(std::uint64_t generation, const GameSt
     CompletionCandidate candidate;
     candidate.best_move = choice.move;
     candidate.pv = {choice.move};
-    candidate.identity = SearchRequestIdentity{generation, root.position_key(), root.fen()};
+    candidate.identity = SearchRequestIdentity::from(root, generation);
     candidate.source = CompletionSource::book;
     const CompletionValidation validation = completion_gate_.validate(
         root, limits, candidate.identity, candidate);

@@ -11,11 +11,11 @@
 #include "koi/game_state.hpp"
 #include "koi/position.hpp"
 
+#include "koi_test_support.hpp"
+
 namespace {
 
-void require(bool condition, std::string_view message) {
-    if (!condition) throw std::runtime_error(std::string(message));
-}
+using koi::test::require;
 
 std::vector<std::string> sorted_moves(const std::vector<koi::Move>& moves) {
     std::vector<std::string> result;

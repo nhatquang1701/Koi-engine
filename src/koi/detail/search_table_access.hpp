@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 
@@ -36,6 +37,13 @@ namespace koi::detail {
     return key ^ (key >> 31U);
 }
 
+// One search component's view of the shared transposition table.  Every TT
+// call from search code (probes, stores, and the per-search generation
+// advance) is made through this seam so a disabled view is a complete no-op
+// on the shared table and the physical storage stays private to
+// TranspositionTable.  The transposition "generation" advanced here is the
+// table's replacement epoch, not the UCI protocol generation or a
+// SearchRequestIdentity (see transposition_table.hpp).
 class SearchTableAccess final {
 public:
     explicit SearchTableAccess(TranspositionTable& table, const bool enabled = true) noexcept
@@ -47,6 +55,20 @@ public:
 
     [[nodiscard]] bool enabled() const noexcept {
         return enabled_;
+    }
+
+    // Physical table presence, independent of this view's probe/store gate.
+    [[nodiscard]] std::size_t size_mb() const noexcept {
+        return table_->size_mb();
+    }
+
+    // Advances the shared replacement epoch for a new search.  Called once per
+    // search by the orchestrator, at the same point as before this seam was
+    // introduced; a disabled view must not age the shared table.
+    void new_generation() noexcept {
+        if (enabled_) {
+            table_->new_generation();
+        }
     }
 
     [[nodiscard]] std::optional<TranspositionEntry> probe(

@@ -29,29 +29,9 @@ if (-not (Test-Path -LiteralPath $fixturePath -PathType Leaf)) {
     throw "UCI match fixture executable is missing: $fixturePath"
 }
 
-function Get-PowerShellExecutable {
-    if ($PSVersionTable.PSEdition -eq 'Core') {
-        return (Get-Process -Id $PID -ErrorAction Stop).Path
-    }
-
-    $pwsh = Get-Command pwsh -ErrorAction SilentlyContinue
-    if ($null -ne $pwsh) {
-        return $pwsh.Source
-    }
-
-    return (Get-Command powershell.exe -ErrorAction Stop).Source
-}
+Import-Module ([System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\support\MatchSupport.psm1'))) -Force
 
 $PowerShellExecutable = Get-PowerShellExecutable
-
-function New-ScriptedUciEngine([string]$Directory, [string]$Name) {
-    $enginePath = Join-Path $Directory "$Name.exe"
-    Copy-Item -LiteralPath $fixturePath -Destination $enginePath
-    return [pscustomobject]@{
-        path = $enginePath
-        log = Join-Path $Directory "$Name.log"
-    }
-}
 
 function Invoke-ScriptedMatch([string]$KoiPath, [string]$OpponentPath, [string]$OutputDirectory,
                                [int]$Games, [int]$MaxPlies, [int]$TimeoutMilliseconds = 5000,
@@ -201,8 +181,8 @@ try {
 
     $repetitionDirectory = Join-Path $outputDirectory 'repetition'
     New-Item -ItemType Directory -Path $repetitionDirectory -Force | Out-Null
-    $whiteRepeater = New-ScriptedUciEngine $repetitionDirectory 'white-repeater'
-    $blackRepeater = New-ScriptedUciEngine $repetitionDirectory 'black-repeater'
+    $whiteRepeater = New-ScriptedUciEngine -FixturePath $fixturePath -Directory $repetitionDirectory 'white-repeater'
+    $blackRepeater = New-ScriptedUciEngine -FixturePath $fixturePath -Directory $repetitionDirectory 'black-repeater'
     $repetitionMatch = Invoke-ScriptedMatch $whiteRepeater.path $blackRepeater.path $repetitionDirectory 1 8
     $repetitionGame = $repetitionMatch.report.games[0]
     if ($repetitionGame.result -ne '1/2-1/2' -or $repetitionGame.termination -ne 'rule draw' -or
@@ -212,8 +192,8 @@ try {
 
     $illegalDirectory = Join-Path $outputDirectory 'illegal-move'
     New-Item -ItemType Directory -Path $illegalDirectory -Force | Out-Null
-    $illegalKoi = New-ScriptedUciEngine $illegalDirectory 'illegal-koi'
-    $unusedOpponent = New-ScriptedUciEngine $illegalDirectory 'unused-opponent'
+    $illegalKoi = New-ScriptedUciEngine -FixturePath $fixturePath -Directory $illegalDirectory 'illegal-koi'
+    $unusedOpponent = New-ScriptedUciEngine -FixturePath $fixturePath -Directory $illegalDirectory 'unused-opponent'
     $illegalMatch = Invoke-ScriptedMatch $illegalKoi.path $unusedOpponent.path $illegalDirectory 1 2
     $illegalGame = $illegalMatch.report.games[0]
     if ($illegalGame.termination -ne 'illegal move' -or $illegalGame.moves.Count -ne 1 -or
@@ -226,8 +206,8 @@ try {
 
     $openingDirectory = Join-Path $outputDirectory 'opening-clock-book'
     New-Item -ItemType Directory -Path $openingDirectory -Force | Out-Null
-    $bookKoi = New-ScriptedUciEngine $openingDirectory 'book-koi'
-    $openingOpponent = New-ScriptedUciEngine $openingDirectory 'opening-opponent'
+    $bookKoi = New-ScriptedUciEngine -FixturePath $fixturePath -Directory $openingDirectory 'book-koi'
+    $openingOpponent = New-ScriptedUciEngine -FixturePath $fixturePath -Directory $openingDirectory 'opening-opponent'
     $openingMatch = Invoke-ScriptedMatch $bookKoi.path $openingOpponent.path $openingDirectory `
         1 1 5000 $openingFile '1+0' 'black' 29 $false 'fixtures\elo-book.bin' 7
     $openingReport = $openingMatch.report
@@ -293,8 +273,8 @@ try {
 
     $clockDirectory = Join-Path $outputDirectory 'five-plus-three-clock'
     New-Item -ItemType Directory -Path $clockDirectory -Force | Out-Null
-    $clockKoi = New-ScriptedUciEngine $clockDirectory 'clock-koi'
-    $clockOpponent = New-ScriptedUciEngine $clockDirectory 'clock-opponent'
+    $clockKoi = New-ScriptedUciEngine -FixturePath $fixturePath -Directory $clockDirectory 'clock-koi'
+    $clockOpponent = New-ScriptedUciEngine -FixturePath $fixturePath -Directory $clockDirectory 'clock-opponent'
     $clockMatch = Invoke-ScriptedMatch $clockKoi.path $clockOpponent.path $clockDirectory 1 3 5000 '' '5+3' 'white'
     $clockGame = $clockMatch.report.games[0]
     if ($clockMatch.report.configuration.time_control -ne '5+3' -or $clockGame.moves.Count -ne 3) {
@@ -314,8 +294,8 @@ try {
     New-Item -ItemType Directory -Path $invalidOpeningDirectory -Force | Out-Null
     $invalidOpeningFile = Join-Path $invalidOpeningDirectory 'invalid-openings.txt'
     Set-Content -LiteralPath $invalidOpeningFile -Value 'illegal | e2e5' -Encoding UTF8
-    $preflightKoi = New-ScriptedUciEngine $invalidOpeningDirectory 'preflight-koi'
-    $preflightOpponent = New-ScriptedUciEngine $invalidOpeningDirectory 'preflight-opponent'
+    $preflightKoi = New-ScriptedUciEngine -FixturePath $fixturePath -Directory $invalidOpeningDirectory 'preflight-koi'
+    $preflightOpponent = New-ScriptedUciEngine -FixturePath $fixturePath -Directory $invalidOpeningDirectory 'preflight-opponent'
     $invalidOutput = & $PowerShellExecutable -NoProfile -ExecutionPolicy Bypass -File $matchScript `
         -KoiPath $preflightKoi.path -OpponentPath $preflightOpponent.path -ReplayPath $replayPath `
         -OpeningFile $invalidOpeningFile -OutputDirectory $invalidOpeningDirectory
@@ -326,8 +306,8 @@ try {
 
     $timeoutDirectory = Join-Path $outputDirectory 'timeout'
     New-Item -ItemType Directory -Path $timeoutDirectory -Force | Out-Null
-    $slowKoi = New-ScriptedUciEngine $timeoutDirectory 'slow-koi'
-    $idleOpponent = New-ScriptedUciEngine $timeoutDirectory 'idle-opponent'
+    $slowKoi = New-ScriptedUciEngine -FixturePath $fixturePath -Directory $timeoutDirectory 'slow-koi'
+    $idleOpponent = New-ScriptedUciEngine -FixturePath $fixturePath -Directory $timeoutDirectory 'idle-opponent'
     $timeoutMatch = Invoke-ScriptedMatch $slowKoi.path $idleOpponent.path $timeoutDirectory 2 2 1000
     $timeoutGame = $timeoutMatch.report.games[0]
     if ($timeoutMatch.report.games.Count -ne 1 -or $timeoutGame.termination -ne 'timeout' -or

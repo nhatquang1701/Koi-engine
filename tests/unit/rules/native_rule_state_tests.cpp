@@ -9,15 +9,15 @@
 #include "koi/detail/feature_state.hpp"
 #include "koi/position.hpp"
 
+#include "koi_test_support.hpp"
+
 namespace {
 
 using koi::GameState;
 using koi::Move;
 using koi::Square;
 
-void require(bool condition, std::string_view message) {
-    if (!condition) throw std::runtime_error(std::string(message));
-}
+using koi::test::require;
 
 Move require_move(std::string_view uci) {
     const auto move = Move::parse_uci(uci);
@@ -122,8 +122,8 @@ void test_feature_state_owns_cache_publication_and_invalidation() {
         0, key, native, ownership_feature_builder);
     require(first.side_to_move == koi::Color::white && second.fullmove_number == 1,
             "feature ownership seam must return the builder's published value");
-    require(cache.cache_misses() == 1 && cache.fast_hits() == 1,
-            "a repeated feature request must publish once and hit the lock-free path once");
+    require(cache.cache_misses() == 1,
+            "a repeated feature request must be served from the published cache without rebuilding");
 
     cache.invalidate(0);
     (void)cache.get_or_compute(0, key, native, ownership_feature_builder);

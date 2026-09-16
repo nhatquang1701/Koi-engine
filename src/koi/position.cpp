@@ -821,6 +821,8 @@ public:
 
     [[nodiscard]] Square en_passant_square() const noexcept { return state.en_passant; }
 
+    [[nodiscard]] std::size_t history_size() const noexcept { return state.history_size; }
+
     [[nodiscard]] std::size_t repetition_count() const noexcept {
         // A null move is a search-only pass, not a legal game-history entry.
         // Its descendants may still make ordinary moves before the probe is
@@ -1397,5 +1399,7 @@ bool Position::is_terminal() const noexcept { return impl_->position.is_terminal
 std::uint16_t Position::halfmove_clock() const noexcept { return impl_->position.halfmove_clock(); }
 
 std::uint16_t Position::fullmove_number() const noexcept { return impl_->position.fullmove_number(); }
+
+std::size_t Position::history_size() const noexcept { return impl_->position.history_size(); }
 
 } // namespace koi

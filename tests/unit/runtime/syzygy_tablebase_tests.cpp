@@ -14,15 +14,13 @@
 #include "koi/game_state.hpp"
 #include "koi/syzygy_tablebase.hpp"
 
+#include "koi_test_support.hpp"
+
 extern "C" unsigned TB_LARGEST;
 
 namespace {
 
-void require(bool condition, std::string_view message) {
-    if (!condition) {
-        throw std::runtime_error(std::string(message));
-    }
-}
+using koi::test::require;
 
 koi::GameState state_from_fen(std::string_view fen) {
     const auto state = koi::GameState::from_fen(fen);

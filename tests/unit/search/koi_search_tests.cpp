@@ -24,15 +24,13 @@
 #include "koi/time_manager.hpp"
 #include "koi/transposition_table.hpp"
 
+#include "koi_test_support.hpp"
+
 namespace {
 
 using namespace std::chrono_literals;
 
-void require(bool condition, std::string_view message) {
-    if (!condition) {
-        throw std::runtime_error(std::string(message));
-    }
-}
+using koi::test::require;
 
 koi::GameState require_state(std::string_view fen) {
     const auto state = koi::GameState::from_fen(fen);
@@ -41,10 +39,8 @@ koi::GameState require_state(std::string_view fen) {
 }
 
 koi::GameState require_evaluation_fixture(std::string_view name) {
-    const std::filesystem::path repository_root = std::filesystem::path(__FILE__).parent_path()
-        .parent_path().parent_path().parent_path();
-    const std::filesystem::path path = repository_root / "tests" / "data" / "positions" /
-        "evaluation-positions.txt";
+    const std::filesystem::path path =
+        koi::test::fixture_path("positions/evaluation-positions.txt");
     std::ifstream input(path);
     require(input.good(), "evaluation fixture data must be readable");
 
@@ -2717,12 +2713,10 @@ void test_search_feature_extraction_is_not_needed_at_every_normal_node() {
 void test_position_features_restore_parent_cache_after_unmake() {
     koi::GameState state = koi::GameState::startpos();
     (void)state.position_features();
-    const auto fast_hits_before = state.position_feature_cache_fast_hits();
-    (void)state.position_features();
-    require(state.position_feature_cache_fast_hits() > fast_hits_before,
-            "a repeated feature request must use the published cache fast path");
     const auto root_misses = state.position_feature_cache_misses();
-    const auto root_copies = state.position_feature_cache_copies();
+    (void)state.position_features();
+    require(state.position_feature_cache_misses() == root_misses,
+            "a repeated feature request must be served from the published cache");
     const auto moves = state.legal_moves_with_metadata();
     require(!moves.empty(), "the cache restoration fixture must have a legal move");
     require(state.make_search_move(moves.front()),
@@ -2735,8 +2729,6 @@ void test_position_features_restore_parent_cache_after_unmake() {
     (void)state.position_features();
     require(state.position_feature_cache_misses() == child_misses,
             "unmake must restore the parent feature cache instead of rebuilding it");
-    require(state.position_feature_cache_copies() == root_copies,
-            "search make/unmake must restore feature state without copying cache snapshots");
 }
 
 void test_claimable_draw_root_retains_a_legal_best_move() {

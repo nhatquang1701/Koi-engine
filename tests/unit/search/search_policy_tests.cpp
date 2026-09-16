@@ -8,13 +8,11 @@
 #include "koi/detail/search_ordering_tables.hpp"
 #include "koi/detail/search_policy.hpp"
 
+#include "koi_test_support.hpp"
+
 namespace {
 
-void require(const bool condition, const std::string_view message) {
-    if (!condition) {
-        throw std::runtime_error(std::string(message));
-    }
-}
+using koi::test::require;
 
 koi::Move require_move(const std::string_view uci) {
     const auto parsed = koi::Move::parse_uci(uci);

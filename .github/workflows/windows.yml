@@ -35,3 +35,12 @@ jobs:
           cmake --build ${{ matrix.build_dir }} --config ${{ matrix.configuration }}
           if errorlevel 1 exit /b 1
           ctest --test-dir ${{ matrix.build_dir }} -C ${{ matrix.configuration }} --output-on-failure
+          if errorlevel 1 exit /b 1
+          rem The native/shadow differential target is opt-in, so CI reconfigures the
+          rem same build directory with the switch enabled and runs just that test.
+          cmake -S . -B ${{ matrix.build_dir }} -G Ninja -DCMAKE_BUILD_TYPE=${{ matrix.configuration }} -DCMAKE_CXX_COMPILER=cl -DKOI_BUILD_SHADOW_DIFF=ON
+          if errorlevel 1 exit /b 1
+          cmake --build ${{ matrix.build_dir }} --config ${{ matrix.configuration }}
+          if errorlevel 1 exit /b 1
+          ctest --test-dir ${{ matrix.build_dir }} -C ${{ matrix.configuration }} -R koi_shadow_diff_tests --output-on-failure
+          if errorlevel 1 exit /b 1

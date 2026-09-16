@@ -7,6 +7,8 @@
 
 #include "koi/game_state.hpp"
 
+#include "koi_test_support.hpp"
+
 #ifdef CHESS_HPP
 #error "Public Koi rules headers must not include chess.hpp"
 #endif
@@ -21,11 +23,7 @@ using koi::Square;
 constexpr std::string_view kInitialFen =
     "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
-void require(bool condition, std::string_view message) {
-    if (!condition) {
-        throw std::runtime_error(std::string(message));
-    }
-}
+using koi::test::require;
 
 Move require_move(std::string_view uci) {
     const auto move = Move::parse_uci(uci);

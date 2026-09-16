@@ -7,6 +7,8 @@
 #include <string>
 #include <vector>
 
+#include "koi_test_support.hpp"
+
 namespace {
 
 using koi::CompletionCandidate;
@@ -18,11 +20,7 @@ using koi::Move;
 using koi::SearchLimits;
 using koi::SearchRequestIdentity;
 
-void require(bool condition, const std::string& message) {
-    if (!condition) {
-        throw std::runtime_error(message);
-    }
-}
+using koi::test::require;
 
 Move move(std::string_view uci) {
     const auto parsed = Move::parse_uci(uci);
@@ -142,6 +140,24 @@ void test_completion_once_accepts_only_one_claim() {
     require(!once.try_claim(), "a duplicate completion claim must be rejected");
 }
 
+void test_request_identity_helper_builds_and_matches() {
+    const GameState root = GameState::startpos();
+    const SearchRequestIdentity built = SearchRequestIdentity::from(root, 7);
+    require(built.generation == 7 && built.root_key == root.position_key() &&
+                built.root_fen == root.fen(),
+            "from() must capture generation, root key, and root fen");
+    require(built.matches(SearchRequestIdentity::from(root, 7)),
+            "identical request identities must match");
+    require(!built.matches(SearchRequestIdentity::from(root, 8)),
+            "a different generation must not match");
+    SearchRequestIdentity same = built;
+    same.root_key ^= 1ULL;
+    require(!built.matches(same), "a different root key must not match");
+    same = built;
+    same.root_fen = "8/8/8/8/8/8/8/8 w - - 0 1";
+    require(!built.matches(same), "a different root fen must not match");
+}
+
 struct TestCase {
     const char* name;
     void (*run)();
@@ -159,6 +175,7 @@ int main() {
         {"invalid PV fallback", test_invalid_pv_cannot_be_emitted_as_valid_completion},
         {"terminal 0000", test_terminal_root_emits_0000},
         {"completion once", test_completion_once_accepts_only_one_claim},
+        {"request identity helper", test_request_identity_helper_builds_and_matches},
     };
     int failures = 0;
     for (const TestCase& test : tests) {

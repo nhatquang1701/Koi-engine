@@ -228,14 +228,6 @@ public:
     // Diagnostic-only count of cache rebuilds. Search uses this to verify that
     // make/unmake restores parent feature snapshots instead of rebuilding them.
     [[nodiscard]] std::uint64_t position_feature_cache_misses() const noexcept;
-    // Diagnostic-only count of repeated feature requests served without
-    // acquiring the cache maintenance lock.
-    [[nodiscard]] std::uint64_t position_feature_cache_fast_hits() const noexcept;
-    // Diagnostic-only count of feature-cache snapshot copies on the search move path.
-    [[nodiscard]] std::uint64_t position_feature_cache_copies() const noexcept;
-    // Diagnostic-only count of compatibility-board check probes performed while
-    // annotating generated moves.
-    [[nodiscard]] std::uint64_t check_flag_evaluations() const noexcept;
     [[nodiscard]] TablebaseSnapshot tablebase_snapshot() const noexcept;
     [[nodiscard]] bool is_legal(const Move& move) const noexcept;
     bool make_move(const Move& move) noexcept;

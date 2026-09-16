@@ -12,6 +12,8 @@
 
 #include "koi/time_manager.hpp"
 
+#include "koi_test_support.hpp"
+
 namespace {
 
 using std::chrono::milliseconds;
@@ -25,11 +27,7 @@ using koi::TimeManager;
 
 constexpr std::uint32_t kMoveOverheadMs = 30;
 
-void require(bool condition, std::string_view message) {
-    if (!condition) {
-        throw std::runtime_error(std::string(message));
-    }
-}
+using koi::test::require;
 
 SearchLimits clock_limits(milliseconds remaining, milliseconds increment) {
     SearchLimits limits;

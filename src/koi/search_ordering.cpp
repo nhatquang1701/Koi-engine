@@ -4,6 +4,7 @@
 #include <limits>
 
 #include "koi/detail/static_exchange.hpp"
+#include "koi/piece_values.hpp"
 
 namespace koi::detail {
 namespace {
@@ -23,22 +24,11 @@ constexpr int kBadCapturePenalty = 210'000;
 constexpr int kCaptureHistoryWeight = 2;
 
 int piece_value(const PieceType type) noexcept {
-    switch (type) {
-    case PieceType::pawn:
-        return 100;
-    case PieceType::knight:
-        return 320;
-    case PieceType::bishop:
-        return 330;
-    case PieceType::rook:
-        return 500;
-    case PieceType::queen:
-        return 900;
-    case PieceType::king:
-    case PieceType::none:
-        return 0;
-    }
-    return 0;
+    // Shared material table. A king can appear here as the *attacker* of a
+    // capture delta, and Koi's ordering has always treated a king attacker as
+    // weightless, so the king maps to 0 instead of kKingMaterialValue.
+    // Kings can never be captured, so the victim side is unaffected.
+    return type == PieceType::king ? 0 : piece_material_value(type);
 }
 
 int promotion_value(const Promotion promotion) noexcept {

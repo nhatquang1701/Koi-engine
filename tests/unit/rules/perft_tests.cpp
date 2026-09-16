@@ -8,13 +8,11 @@
 #include "koi/game_state.hpp"
 #include "koi/perft.hpp"
 
+#include "koi_test_support.hpp"
+
 namespace {
 
-void require(bool condition, std::string_view message) {
-    if (!condition) {
-        throw std::runtime_error(std::string(message));
-    }
-}
+using koi::test::require;
 
 void test_start_position_perft_counts() {
     koi::GameState state = koi::GameState::startpos();

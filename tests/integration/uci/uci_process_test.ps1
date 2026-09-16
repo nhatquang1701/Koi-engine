@@ -11,101 +11,18 @@ $TimeoutMilliseconds = if ($env:KOI_UCI_TIMEOUT_MS) {
 }
 $MaximumThreads = [Math]::Max(1, [Math]::Min(64, [Environment]::ProcessorCount))
 
-# Every engine process this script starts is tracked so a failed assertion can
-# never orphan a running koi-engine.exe. The trap runs on any terminating
-# error, kills the survivors, and then lets the error propagate.
-$script:KoiSessions = [System.Collections.Generic.List[System.Diagnostics.Process]]::new()
+Import-Module ([System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\support\UciSession.psm1'))) -Force
+
+# Every engine process the shared session module starts is tracked there so a
+# failed assertion can never orphan a running koi-engine.exe. The trap runs on
+# any terminating error, kills the survivors, and then lets the error propagate.
 trap {
-    foreach ($tracked in $script:KoiSessions) {
-        if ($null -ne $tracked -and -not $tracked.HasExited) {
-            try { $tracked.Kill() } catch { }
-        }
-    }
+    Stop-AllUciSessions
     break
 }
 
-function Start-UciSession([string]$Executable = $EnginePath, [string]$WorkingDirectory = '') {
-    $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
-    $startInfo.FileName = $Executable
-    if (-not [string]::IsNullOrWhiteSpace($WorkingDirectory)) {
-        $startInfo.WorkingDirectory = $WorkingDirectory
-    }
-    $startInfo.UseShellExecute = $false
-    $startInfo.CreateNoWindow = $true
-    $startInfo.RedirectStandardInput = $true
-    $startInfo.RedirectStandardOutput = $true
-    $startInfo.RedirectStandardError = $true
-
-    $process = [System.Diagnostics.Process]::new()
-    $process.StartInfo = $startInfo
-    if (-not $process.Start()) {
-        throw 'Unable to start koi-engine.'
-    }
-    $script:KoiSessions.Add($process)
-
-    return [pscustomobject]@{
-        Process = $process
-        StderrTask = $process.StandardError.ReadToEndAsync()
-        Lines = [System.Collections.Generic.List[string]]::new()
-    }
-}
-
-function Stop-TimedOutSession($Session, [string]$Message) {
-    if (-not $Session.Process.HasExited) {
-        $Session.Process.Kill()
-        $Session.Process.WaitForExit()
-    }
-    throw $Message
-}
-
-function Send-UciCommand($Session, [string]$Command) {
-    $Session.Process.StandardInput.WriteLine($Command)
-    $Session.Process.StandardInput.Flush()
-}
-
-function Read-UciLine($Session, [string]$Description) {
-    $readTask = $Session.Process.StandardOutput.ReadLineAsync()
-    if (-not $readTask.Wait($TimeoutMilliseconds)) {
-        Stop-TimedOutSession $Session "Timed out waiting for $Description."
-    }
-
-    $line = $readTask.GetAwaiter().GetResult()
-    if ($null -eq $line) {
-        throw "koi-engine closed stdout while waiting for $Description."
-    }
-    $Session.Lines.Add($line)
-    return $line
-}
-
-function Complete-UciSession($Session, [bool]$SendQuit) {
-    $stdoutTailTask = $Session.Process.StandardOutput.ReadToEndAsync()
-    if ($SendQuit -and -not $Session.Process.HasExited) {
-        Send-UciCommand $Session 'quit'
-    }
-    $Session.Process.StandardInput.Close()
-
-    if (-not $Session.Process.WaitForExit($TimeoutMilliseconds)) {
-        Stop-TimedOutSession $Session 'koi-engine did not exit within 5000 ms.'
-    }
-
-    $tail = $stdoutTailTask.GetAwaiter().GetResult()
-    foreach ($line in @($tail -split "`r?`n" | Where-Object { $_.Length -ne 0 })) {
-        $Session.Lines.Add($line)
-    }
-    $diagnostics = $Session.StderrTask.GetAwaiter().GetResult()
-
-    if ($Session.Process.ExitCode -ne 0) {
-        throw "koi-engine exited with $($Session.Process.ExitCode): $diagnostics"
-    }
-    if ($diagnostics.Length -ne 0) {
-        throw "koi-engine wrote diagnostics for a valid transcript: $diagnostics"
-    }
-
-    return @($Session.Lines)
-}
-
 function Invoke-UciTranscript([string]$Transcript) {
-    $session = Start-UciSession
+    $session = Start-UciSession -Executable $EnginePath
     $stdoutTask = $session.Process.StandardOutput.ReadToEndAsync()
     $session.Process.StandardInput.Write($Transcript)
     $session.Process.StandardInput.Close()
@@ -126,10 +43,6 @@ function Invoke-UciTranscript([string]$Transcript) {
     return @($output -split "`r?`n" | Where-Object { $_.Length -ne 0 })
 }
 
-function Test-SearchInfo([string]$Line) {
-    return $Line -match '^info depth [1-9][0-9]* seldepth [0-9]+ multipv [1-9][0-6]? score (cp|mate) -?[0-9]+ nodes [0-9]+ nps [0-9]+ time [0-9]+ pv( [a-h][1-8][a-h][1-8][nbrq]?)*( tbhits [0-9]+)?$'
-}
-
 function Write-StartPositionBook([string]$Path) {
     [byte[]]$bytes = @(
         0x46, 0x3b, 0x96, 0x18, 0x16, 0x91, 0xfc, 0x9c,
@@ -138,7 +51,7 @@ function Write-StartPositionBook([string]$Path) {
     [System.IO.File]::WriteAllBytes($Path, $bytes)
 }
 
-$session = Start-UciSession
+$session = Start-UciSession -Executable $EnginePath
 Send-UciCommand $session 'uci'
 $expectedHandshake = @(
     'id name Koi Engine',
@@ -190,7 +103,7 @@ try {
     Write-StartPositionBook $bookPath
     New-Item -ItemType Directory -Path $bookLaunchDirectory | Out-Null
     $env:PATH = "$(Split-Path -Parent $EnginePath);$originalPath"
-    $bookSession = Start-UciSession 'koi-engine.exe' $bookLaunchDirectory
+    $bookSession = Start-UciSession -Executable 'koi-engine.exe' -WorkingDirectory $bookLaunchDirectory
     Send-UciCommand $bookSession 'uci'
     foreach ($expected in $expectedHandshake) {
         if ((Read-UciLine $bookSession $expected) -cne $expected) {
@@ -379,7 +292,7 @@ while ($true) {
 }
 $null = Complete-UciSession $session $true
 
-$immediatePonder = Start-UciSession
+$immediatePonder = Start-UciSession -Executable $EnginePath
 Send-UciCommand $immediatePonder 'position startpos'
 $immediatePonder.Process.StandardInput.Write("go ponder depth 2`nponderhit`n")
 $immediatePonder.Process.StandardInput.Flush()
@@ -408,7 +321,7 @@ if ($immediatePonderBestmoves.Count -ne 1) {
         "$($immediatePonderBestmoves.Count) bestmoves")
 }
 
-$replacement = Start-UciSession
+$replacement = Start-UciSession -Executable $EnginePath
 Send-UciCommand $replacement 'position startpos'
 Send-UciCommand $replacement 'go infinite'
 Send-UciCommand $replacement 'position fen 7k/6Q1/5K2/8/8/8/8/8 b - - 0 1'
@@ -478,7 +391,7 @@ foreach ($line in $limitLines) {
     }
 }
 
-$asymmetricClock = Start-UciSession
+$asymmetricClock = Start-UciSession -Executable $EnginePath
 Send-UciCommand $asymmetricClock 'position fen 4k3/8/8/8/8/8/4P3/4K3 b - - 0 1'
 Send-UciCommand $asymmetricClock 'go wtime 1000'
 $asymmetricBestmove = $null
@@ -499,7 +412,7 @@ if ((Read-UciLine $asymmetricClock 'readyok after asymmetric clock command') -cn
 }
 $null = Complete-UciSession $asymmetricClock $true
 
-$infiniteNodes = Start-UciSession
+$infiniteNodes = Start-UciSession -Executable $EnginePath
 Send-UciCommand $infiniteNodes 'position startpos'
 Send-UciCommand $infiniteNodes 'go infinite nodes 1'
 $infiniteNodesBestmove = $null
@@ -520,7 +433,7 @@ if ((Read-UciLine $infiniteNodes 'readyok after infinite node limit') -cne 'read
 }
 $null = Complete-UciSession $infiniteNodes $true
 
-$ponderNodes = Start-UciSession
+$ponderNodes = Start-UciSession -Executable $EnginePath
 Send-UciCommand $ponderNodes 'position startpos'
 Send-UciCommand $ponderNodes 'go ponder nodes 1'
 $ponderNodesBestmove = $null
@@ -537,7 +450,7 @@ if ($ponderNodesBestmove -notmatch '^bestmove [a-h][1-8][a-h][1-8][nbrq]?( ponde
 }
 $null = Complete-UciSession $ponderNodes $true
 
-$quitSession = Start-UciSession
+$quitSession = Start-UciSession -Executable $EnginePath
 Send-UciCommand $quitSession 'position startpos'
 Send-UciCommand $quitSession 'go infinite'
 $quitLines = @(Complete-UciSession $quitSession $true)
@@ -545,7 +458,7 @@ if (@($quitLines | Where-Object { $_ -like 'bestmove *' }).Count -ne 0) {
     throw "quit emitted a late bestmove: $($quitLines -join ' | ')"
 }
 
-$eofSession = Start-UciSession
+$eofSession = Start-UciSession -Executable $EnginePath
 Send-UciCommand $eofSession 'position startpos'
 Send-UciCommand $eofSession 'go infinite'
 $eofLines = @(Complete-UciSession $eofSession $false)
@@ -553,7 +466,7 @@ if (@($eofLines | Where-Object { $_ -like 'bestmove *' }).Count -ne 0) {
     throw "EOF emitted a late bestmove: $($eofLines -join ' | ')"
 }
 
-$gameSession = Start-UciSession
+$gameSession = Start-UciSession -Executable $EnginePath
 Send-UciCommand $gameSession 'uci'
 foreach ($expected in $expectedHandshake) {
     if ((Read-UciLine $gameSession $expected) -cne $expected) {

@@ -11,6 +11,8 @@
 #include "koi/game_state.hpp"
 #include "koi/opening_book.hpp"
 
+#include "koi_test_support.hpp"
+
 #ifdef CHESS_HPP
 #error "Public Koi opening-book headers must not include chess.hpp"
 #endif
@@ -28,11 +30,7 @@ struct BookRecord {
     std::uint32_t learn;
 };
 
-void require(bool condition, std::string_view message) {
-    if (!condition) {
-        throw std::runtime_error(std::string(message));
-    }
-}
+using koi::test::require;
 
 Move require_move(std::string_view uci) {
     const auto move = Move::parse_uci(uci);

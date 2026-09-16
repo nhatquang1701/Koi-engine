@@ -86,6 +86,10 @@ public:
     [[nodiscard]] bool is_terminal() const noexcept;
     [[nodiscard]] std::uint16_t halfmove_clock() const noexcept;
     [[nodiscard]] std::uint16_t fullmove_number() const noexcept;
+    // Native rule-history depth (one entry per applied move). Feature caches
+    // are keyed by this instead of any adapter depth so the cache index stays
+    // owned by the native authority.
+    [[nodiscard]] std::size_t history_size() const noexcept;
 
 private:
     class Impl;

@@ -7,7 +7,7 @@ namespace koi::detail {
 
 SearchSession::SearchSession(GameState root, SearchLimits limits, SearchOptions options)
     : root_(std::move(root)), limits_(std::move(limits)), options_(std::move(options)),
-      identity_{options_.generation, root_.position_key(), root_.fen()} {}
+      identity_(SearchRequestIdentity::from(root_, options_.generation)) {}
 
 SearchSession::~SearchSession() {
     stop();

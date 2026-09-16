@@ -54,6 +54,16 @@ endif()
 include(CTest)
 enable_testing()
 
+# Shared helpers for the C++ test binaries: assertion helpers and the absolute
+# location of the repository test data so no test has to walk `__FILE__`.
+add_library(koi_test_support INTERFACE)
+target_include_directories(koi_test_support INTERFACE
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/support
+)
+target_compile_definitions(koi_test_support INTERFACE
+    KOI_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/data"
+)
+
 add_library(koi_core
     src/koi/classical_evaluator.cpp
     src/koi/detail/compatibility_mirror.cpp
@@ -63,6 +73,7 @@ add_library(koi_core
     src/koi/detail/search_context.cpp
     src/koi/detail/search_context_support.cpp
     src/koi/detail/search_ordering_tables.cpp
+    src/koi/detail/search_runner.cpp
     src/koi/detail/search_session.cpp
     src/koi/completion_gate.cpp
     src/koi/cpu_features.cpp
@@ -343,6 +354,39 @@ add_executable(koi_engine
 
 target_link_libraries(koi_engine PRIVATE koi_core)
 set_target_properties(koi_engine PROPERTIES OUTPUT_NAME "koi-engine")
+
+# Every C++ test binary shares the assertion/fixture helpers. The optional
+# shadow-diff oracle joins the list only when it is part of the build.
+set(KOI_TEST_SUPPORT_TARGETS
+    koi_core_tests
+    evaluation_boundary_tests
+    evaluation_architecture_tests
+    nnue_boundary_tests
+    koi_module_tests
+    syzygy_tablebase_tests
+    koi_rules_tests
+    native_rule_state_tests
+    opening_book_tests
+    uci_controller_tests
+    completion_gate_tests
+    koi_search_tests
+    search_ordering_tests
+    search_architecture_tests
+    search_policy_tests
+    search_runtime_tests
+    static_exchange_tests
+    time_manager_tests
+    koi_strength_tests
+    perft_tests
+)
+
+if(TARGET koi_shadow_diff_tests)
+    list(APPEND KOI_TEST_SUPPORT_TARGETS koi_shadow_diff_tests)
+endif()
+
+foreach(KOI_TEST_TARGET IN LISTS KOI_TEST_SUPPORT_TARGETS)
+    target_link_libraries(${KOI_TEST_TARGET} PRIVATE koi_test_support)
+endforeach()
 
 find_program(POWERSHELL_EXECUTABLE NAMES pwsh powershell REQUIRED)
 

@@ -28,8 +28,6 @@ public:
         const Position& position, FeatureBuilder builder) const noexcept;
     void invalidate(std::size_t cache_index) noexcept;
     [[nodiscard]] std::uint64_t cache_misses() const noexcept;
-    [[nodiscard]] std::uint64_t fast_hits() const noexcept;
-    [[nodiscard]] std::uint64_t snapshot_copies() const noexcept;
 
 private:
     struct Entry {
@@ -44,8 +42,6 @@ private:
     mutable std::array<std::atomic_bool, kMaximumGameStateHistory> published_valid_{};
     mutable std::array<std::atomic_uint64_t, kMaximumGameStateHistory> keys_{};
     mutable std::uint64_t cache_misses_ = 0;
-    mutable std::atomic_uint64_t snapshot_copies_ = 0;
-    mutable std::atomic_uint64_t fast_hits_ = 0;
 };
 
 } // namespace koi::detail

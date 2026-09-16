@@ -66,10 +66,10 @@ CompletionValidation CompletionGate::validate(
     const SearchRequestIdentity& expected,
     const CompletionCandidate& candidate) const {
     CompletionValidation result;
-    result.identity_match = candidate.identity.generation == expected.generation &&
-        candidate.identity.root_key == expected.root_key &&
-        candidate.identity.root_fen == expected.root_fen &&
-        expected.root_key == root.position_key() && expected.root_fen == root.fen();
+    // The candidate must match the request identity the controller built, and
+    // that identity must still describe the live root.
+    result.identity_match = candidate.identity.matches(expected) &&
+        expected.matches(SearchRequestIdentity::from(root, expected.generation));
     if (!result.identity_match) {
         result.disposition = CompletionDisposition::suppress_stale;
         result.reason = "identity_mismatch";
