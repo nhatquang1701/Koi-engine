@@ -26,6 +26,7 @@ public:
     void stop() noexcept;
     void wait();
     [[nodiscard]] bool running() const noexcept;
+    void request_ponderhit(SearchLimits limits);
 
 private:
     explicit SearchHandle(std::shared_ptr<detail::SearchSession> state) noexcept;
@@ -45,6 +46,9 @@ public:
                                      SearchEventSink sink = {}, SearchOptions options = {});
     [[nodiscard]] HashResizeResult set_hash_size_mb(std::size_t megabytes);
     [[nodiscard]] std::size_t hash_size_mb() const noexcept;
+    // Approximate transposition-table occupancy in permill (0..1000) for UCI
+    // `info ... hashfull` reporting.
+    [[nodiscard]] std::size_t hashfull_permill() const noexcept;
     void clear_hash() noexcept;
 
 private:

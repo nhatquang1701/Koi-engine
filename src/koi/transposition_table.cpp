@@ -30,6 +30,10 @@ constexpr std::size_t kMaximumMegabytes = 4096;
 // a board-only TT would.  A small cluster preserves those useful bounds while
 // keeping the probe/store lock and memory layout cache-friendly.
 constexpr std::size_t kClusterSize = 4;
+// Number of slots inspected by TranspositionTable::hashfull_permill().  The
+// UCI value is permill, so 1000 slots is the natural resolution and keeps the
+// sampling cost independent of the configured Hash size.
+constexpr std::size_t kHashfullSampleSlots = 1000;
 
 int score_for_storage(int score, int ply) noexcept {
     if (score >= kMateThreshold) {
@@ -267,6 +271,35 @@ HashResizeResult TranspositionTable::resize_locked(std::size_t megabytes) noexce
 std::size_t TranspositionTable::size_mb() const noexcept {
     const auto storage = snapshot();
     return storage == nullptr ? 0 : storage->size_mb;
+}
+
+std::size_t TranspositionTable::hashfull_permill() const noexcept {
+    const auto storage = snapshot();
+    if (storage == nullptr || storage->total_slot_count == 0) {
+        return 0;
+    }
+
+    // Latch every stripe shared so the sample is consistent without blocking
+    // probes or stores for longer than the scan itself, which is bounded by
+    // kHashfullSampleSlots and spread with a stride so the whole table is
+    // covered regardless of size.
+    std::array<std::shared_lock<std::shared_mutex>, kStripeCount> stripe_locks;
+    for (std::size_t index = 0; index < kStripeCount; ++index) {
+        stripe_locks[index] = std::shared_lock<std::shared_mutex>(storage->stripes[index]);
+    }
+
+    const std::size_t sample_slots = std::min(kHashfullSampleSlots, storage->total_slot_count);
+    const std::size_t stride = std::max<std::size_t>(1, storage->total_slot_count / sample_slots);
+    std::size_t sampled = 0;
+    std::size_t used = 0;
+    for (std::size_t slot = 0; slot < storage->total_slot_count && sampled < sample_slots;
+         slot += stride, ++sampled) {
+        const TranspositionEntry& entry = storage->at(slot);
+        if (entry.occupied && entry.generation_age == storage->clear_epoch) {
+            ++used;
+        }
+    }
+    return sampled == 0 ? 0 : used * 1000 / sampled;
 }
 
 void TranspositionTable::clear() noexcept {

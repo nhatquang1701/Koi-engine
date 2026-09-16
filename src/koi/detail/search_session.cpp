@@ -56,6 +56,35 @@ void SearchSession::wait_until_stopped() {
     });
 }
 
+void SearchSession::wait_until_stopped_or_ponderhit() {
+    std::unique_lock lock(stop_mutex_);
+    stop_condition_.wait(lock, [this] {
+        return stop_requested_.load(std::memory_order_relaxed) ||
+               ponderhit_requested_.load(std::memory_order_acquire);
+    });
+}
+
+void SearchSession::request_ponderhit(SearchLimits limits) {
+    // The stop mutex serializes with the wait predicates so a conversion
+    // signalled between a predicate check and its wait is never lost.
+    std::lock_guard stop_lock(stop_mutex_);
+    {
+        std::lock_guard ponderhit_lock(ponderhit_mutex_);
+        ponderhit_limits_ = std::move(limits);
+    }
+    ponderhit_requested_.store(true, std::memory_order_release);
+    stop_condition_.notify_all();
+}
+
+std::optional<SearchLimits> SearchSession::take_ponderhit_limits() {
+    if (!ponderhit_requested_.load(std::memory_order_acquire)) {
+        return std::nullopt;
+    }
+    std::lock_guard lock(ponderhit_mutex_);
+    ponderhit_requested_.store(false, std::memory_order_release);
+    return std::exchange(ponderhit_limits_, std::nullopt);
+}
+
 bool SearchSession::publish_completion(const SearchEventSink& sink,
                                        const SearchResult& result) noexcept {
     if (!completion_once_.try_claim()) {

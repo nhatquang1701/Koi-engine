@@ -2242,7 +2242,9 @@ void SearchRunner::run() {
 
     const auto started = std::chrono::steady_clock::now();
     GameState root = session->root();
-    const SearchLimits& limits = session->limits();
+    // Mutable copy: a UCI ponderhit converts the running search in place and
+    // re-arms timing at the top of the next iteration.
+    SearchLimits limits = session->limits();
     const SearchOptions& options = session->options();
     SearchResult result;
     result.identity = session->identity();
@@ -2454,13 +2456,23 @@ void SearchRunner::run() {
                 }
             }
 
-            const int maximum_depth =
+            int maximum_depth =
                 std::min(kMaximumSearchDepth, std::max(1, limits.depth.value_or(kMaximumSearchDepth)));
-            const bool unbounded = limits.infinite || limits.ponder;
+            bool unbounded = limits.infinite || limits.ponder;
             std::optional<int> previous_score;
             std::chrono::milliseconds previous_iteration_elapsed{1};
             std::chrono::milliseconds previous_report_elapsed{0};
             for (int depth = 1;; depth = depth < maximum_depth ? depth + 1 : maximum_depth) {
+                if (auto conversion = session->take_ponderhit_limits(); conversion.has_value()) {
+                    limits = std::move(*conversion);
+                    time_manager.reconfigure(limits, root.side_to_move(), options.speed_percent,
+                                             options.move_overhead_ms, options.slow_mover_percent,
+                                             timing_context);
+                    maximum_depth = std::min(
+                        kMaximumSearchDepth,
+                        std::max(1, limits.depth.value_or(kMaximumSearchDepth)));
+                    unbounded = limits.infinite || limits.ponder;
+                }
                 if (!unbounded && depth > maximum_depth) {
                     break;
                 }
@@ -3609,13 +3621,23 @@ void SearchRunner::run() {
                     used_short_fallback = true;
                 }
             }
-            const int maximum_depth =
+            int maximum_depth =
                 std::min(kMaximumSearchDepth, std::max(1, limits.depth.value_or(kMaximumSearchDepth)));
-            const bool unbounded = limits.infinite || limits.ponder;
+            bool unbounded = limits.infinite || limits.ponder;
             std::optional<int> previous_score;
             std::chrono::milliseconds previous_iteration_elapsed{1};
             std::chrono::milliseconds previous_report_elapsed{0};
             for (int depth = 1;; depth = depth < maximum_depth ? depth + 1 : maximum_depth) {
+                if (auto conversion = session->take_ponderhit_limits(); conversion.has_value()) {
+                    limits = std::move(*conversion);
+                    time_manager.reconfigure(limits, root.side_to_move(), options.speed_percent,
+                                             options.move_overhead_ms, options.slow_mover_percent,
+                                             timing_context);
+                    maximum_depth = std::min(
+                        kMaximumSearchDepth,
+                        std::max(1, limits.depth.value_or(kMaximumSearchDepth)));
+                    unbounded = limits.infinite || limits.ponder;
+                }
                 if (!unbounded && depth > maximum_depth) {
                     break;
                 }
@@ -4370,7 +4392,10 @@ void SearchRunner::run() {
         }
 
         if (limits.ponder && (legal_moves.empty() || root_is_forced_draw)) {
-            session->wait_until_stopped();
+            // A terminal ponder root has nothing to deepen; it answers as soon
+            // as the GUI stops it or converts the ponder with a ponderhit.
+            session->wait_until_stopped_or_ponderhit();
+            (void)session->take_ponderhit_limits();
         }
         if (result.completed_depth == 0 && result.best_move.has_value()) {
             // Retain the emergency line for non-UCI search consumers that

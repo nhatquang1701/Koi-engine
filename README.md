@@ -472,9 +472,12 @@ from the starting position (for example, `bestmove e2e4`).
   `min(64, hardware_concurrency)`), `Speed` (1–100, default 100), the opening
   book options, and the `Clear Hash` button.
 - `isready` responds immediately with `readyok`, including while searching.
-- `ucinewgame` resets the position; `position startpos` and `position fen ...`
-  set a position, optionally followed by legal UCI moves. Replacing the root
-  cancels and joins the old search without leaking its result.
+- `ucinewgame` resets the position and clears the persistent search hash
+  (equivalent to `Clear Hash`) after cancelling and joining any active search;
+  the reset is recorded in the Debug log. `position startpos` and
+  `position fen ...` set a position, optionally followed by legal UCI moves.
+  Replacing the root cancels and joins the old search without leaking its
+  result.
 - `setoption name RandomSeed value 0` uses runtime randomness (`RandomSeed 0`).
   A nonzero seed remains available to the compatibility random chooser, but
   normal `go` search is deterministic and does not use it.
@@ -507,8 +510,9 @@ from the starting position (for example, `bestmove e2e4`).
 - A depth limit is capped internally at 64 plies. `nodes`, `movetime`, and
   side-to-move clock limits stop search at their requested boundary; `infinite`
   continues until `stop`.
-- Search may report completed iterations as UCI `info depth ... score ... nodes
-  ... nps ... time ... pv ...` lines.
+- Search reports completed iterations as UCI `info depth ... score ... nodes
+  ... nps ... hashfull ... time ... pv ...` lines, where `hashfull` is the
+  approximate transposition-table occupancy in permill (0..1000).
 - `stop` cancels and joins the active worker and emits exactly one final legal
   `bestmove` for that search.
 - A terminal position with no legal moves returns `bestmove 0000`.
@@ -531,9 +535,12 @@ than a quarter of the usable clock, the increment credit is capped at that same
 quarter, and a final ceiling reserves `max(2 x Move Overhead + 15 ms, min(50 ms,
 remaining/20))` on top of the normal reserve. The stop deadline is fixed when the
 search starts, so iteration evidence can pace the search but can never push it
-past the safe ceiling. A `ponderhit` that does not match the stored prediction
-starts a bounded search of the current position instead of returning without a
-move, so every `go` is answered. `time_manager_tests` and
+past the safe ceiling. `ponderhit` converts a still-running ponder search in
+place: the same worker keeps its accumulated work and switches to the original
+limit or clock budget with the ponder flag cleared. If no ponder search is
+running (for example a node-limited ponder already completed), Koi starts a
+bounded search of the current position instead of returning without a move, so
+every `go` is answered. `time_manager_tests` and
 `koi_engine_time_safety_process` enforce these invariants.
 
 ### WDL and strength controls
@@ -561,7 +568,10 @@ with Koi.
 ### Hidden developer diagnostics
 
 The unadvertised `Debug` check option and `DebugFile` string option are for local
-diagnostics only. `Debug` defaults to false. With an empty `DebugFile`, Koi writes
+diagnostics only. `Debug` defaults to false. The same switch can be toggled
+during a session with the UCI `debug on` and `debug off` commands; changing it
+stops and joins any active search, exactly like the option. With an empty
+`DebugFile`, Koi writes
 `koi-debug.log` beside the executable; a relative path is also resolved beside
 the executable, while an absolute path is used as supplied. Logs are best-effort,
 rotate at 8 MiB, and retain three backups. Debug events never go to UCI stdout
@@ -683,9 +693,11 @@ go ponder wtime 60000 btime 60000
 ponderhit
 ```
 
-In v1, `ponderhit` safely restarts the search from the saved root instead of
-retaining speculative ponder work. Send `stop` if the expected move did not
-arrive or the GUI cancels the ponder search.
+When the expected move arrives, `ponderhit` keeps the running ponder search and
+converts it in place to a normal timed search, so no speculative work is
+discarded. If the ponder search already finished or none is running, Koi answers
+with a bounded search of the current position. Send `stop` if the expected move
+did not arrive or the GUI cancels the ponder search.
 
 Menu labels can vary by Lucas Chess version. Use an absolute executable path,
 or another path that remains valid when Lucas Chess starts the engine.

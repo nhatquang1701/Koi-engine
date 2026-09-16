@@ -3729,6 +3729,41 @@ void test_ponder_ignores_time_but_honors_node_limits() {
     require(manager.should_stop(1), "ponder must stop at its explicit node limit");
 }
 
+void test_ponderhit_converts_a_running_ponder_search_in_place() {
+    auto evaluator = std::make_shared<koi::ClassicalEvaluator>();
+    koi::SearchService service(evaluator);
+    koi::SearchLimits limits;
+    limits.ponder = true;
+    limits.depth = 2;
+    limits.white_clock = koi::ClockLimit{60s, 0ms};
+    CompletedSearch completed;
+
+    koi::SearchHandle handle = service.start(koi::GameState::startpos(), limits, completed.sink());
+    require(handle.running(), "a ponder search must be running before its ponderhit");
+    require(completed.completion_count() == 0, "a ponder search must not complete before its ponderhit");
+
+    koi::SearchLimits converted = limits;
+    converted.ponder = false;
+    handle.request_ponderhit(converted);
+
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+    while (handle.running() && std::chrono::steady_clock::now() < deadline) {
+        std::this_thread::sleep_for(1ms);
+    }
+    const bool finished = !handle.running();
+    if (!finished) {
+        handle.stop();
+    }
+    handle.wait();
+    require(finished, "a ponderhit must let the search finish through its converted limits");
+
+    const koi::SearchResult result = completed.take_result();
+    require(result.completed && !result.cancelled && !result.failed,
+            "a converted ponder search must complete on its own instead of being cancelled");
+    require(result.best_move.has_value() && koi::GameState::startpos().is_legal(*result.best_move),
+            "a converted ponder search must retain a legal best move");
+}
+
 void test_service_hash_configuration_survives_default_start_and_non_default_override() {
     auto evaluator = std::make_shared<koi::ClassicalEvaluator>();
     koi::SearchService service(evaluator);
@@ -3795,6 +3830,24 @@ void test_transposition_table_stores_probes_and_clears_entries() {
     require(!table.probe(0x0123456789abcdefULL).has_value(), "clear must remove a stored entry");
     table.set_size_mb(1);
     require(table.size_mb() == 1, "hash configuration must accept the lower 1 MB bound");
+}
+
+void test_transposition_table_reports_hashfull_occupancy() {
+    koi::TranspositionTable table(1);
+    const auto move = koi::Move::parse_uci("e2e4");
+    require(move.has_value(), "test move must parse");
+
+    require(table.hashfull_permill() == 0, "a fresh table must report zero hashfull occupancy");
+    // Writing far more keys than the table has clusters guarantees every
+    // cluster is populated, so the bounded hashfull sample always observes
+    // occupied slots regardless of the internal segment sizing.
+    for (std::uint64_t key = 0; key < 65536; ++key) {
+        table.store(key, 3, 0, koi::TranspositionBound::exact, *move);
+    }
+    require(table.hashfull_permill() == 1000,
+            "a fully populated table must report full hashfull occupancy");
+    table.clear();
+    require(table.hashfull_permill() == 0, "Clear Hash must reset reported hashfull occupancy");
 }
 
 void test_search_result_reports_root_tt_timing_context() {
@@ -4183,10 +4236,12 @@ int main() {
         {"ponder search lifecycle", test_ponder_search_runs_until_stopped_and_completes_once},
         {"ponder terminal lifecycle", test_ponder_terminal_and_empty_roots_wait_for_stop},
         {"ponder time and node limits", test_ponder_ignores_time_but_honors_node_limits},
+        {"ponderhit in-place conversion", test_ponderhit_converts_a_running_ponder_search_in_place},
         {"service hash persistence", test_service_hash_configuration_survives_default_start_and_non_default_override},
         {"search timing context", test_search_result_reports_root_tt_timing_context},
         {"hash bounds and clear", test_hash_configuration_clamps_to_uci_bounds_and_clear_discards_warmed_entries},
         {"transposition table", test_transposition_table_stores_probes_and_clears_entries},
+        {"transposition table hashfull", test_transposition_table_reports_hashfull_occupancy},
         {"transposition table memory cap", test_transposition_table_caps_large_requests_without_throwing},
         {"transposition table unchanged cap", test_transposition_table_does_not_reallocate_an_unchanged_effective_size},
         {"transposition table allocation failure", test_transposition_table_allocation_failure_preserves_previous_storage},

@@ -1,6 +1,7 @@
 #include "koi/uci_controller.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <charconv>
 #include <chrono>
@@ -39,6 +40,10 @@ constexpr std::uint64_t kMaximumSyzygyProbeDepth = 100;
 constexpr std::uint64_t kMaximumSyzygyProbeLimit = 7;
 constexpr std::uintmax_t kDebugRotationBytes = 8U * 1024U * 1024U;
 constexpr int kWdlScoreLimit = 1'000;
+// Bounded fallback for a bare `go` and for malformed or asymmetric clock
+// commands. A UCI `go` always has to be answered, so a missing usable limit
+// must never leave the engine searching indefinitely.
+constexpr std::chrono::milliseconds kBareGoFallback{250};
 
 const char* hash_status_name(HashResizeStatus status) noexcept {
     switch (status) {
@@ -109,6 +114,116 @@ bool equals_ignore_case(std::string_view left, std::string_view right) {
         }
     }
     return true;
+}
+
+enum class UciOptionKind {
+    check,
+    spin,
+    string,
+    button,
+};
+
+enum class UciOptionId {
+    random_seed,
+    hash,
+    threads,
+    speed,
+    analyse_mode,
+    multi_pv,
+    ponder,
+    own_book,
+    book_file,
+    book_depth,
+    book_random,
+    book_safety,
+    book_safety_depth,
+    clear_hash,
+    show_wdl,
+    move_overhead,
+    slow_mover,
+    limit_strength,
+    elo,
+    strength_mode,
+    syzygy_path,
+    syzygy_probe_depth,
+    syzygy_probe_limit,
+    syzygy_50_move_rule,
+    debug,
+    debug_file,
+};
+
+struct UciOptionDescriptor {
+    std::string_view name;
+    UciOptionKind kind;
+    UciOptionId id;
+    std::string_view default_value;
+    std::uint64_t minimum;
+    std::uint64_t maximum;
+    bool dynamic_maximum;
+    bool advertised;
+};
+
+// Single source of truth for the UCI option surface. Both `write_handshake`
+// and `handle_setoption` consume this table, so an advertised option can never
+// drift out of sync with the option the controller actually applies. The order
+// of the entries is the order advertised to a GUI and must stay stable.
+constexpr std::array<UciOptionDescriptor, 26> kUciOptions{{
+    {"RandomSeed", UciOptionKind::spin, UciOptionId::random_seed, "0", 0,
+     kMaximumRandomSeed, false, true},
+    {"Hash", UciOptionKind::spin, UciOptionId::hash, "512", kMinimumHashMegabytes,
+     kMaximumHashMegabytes, false, true},
+    {"Threads", UciOptionKind::spin, UciOptionId::threads, "1", 1, 0, true, true},
+    {"Speed", UciOptionKind::spin, UciOptionId::speed, "100", kMinimumSpeedPercent,
+     kMaximumSpeedPercent, false, true},
+    {"UCI_AnalyseMode", UciOptionKind::check, UciOptionId::analyse_mode, "false", 0, 0, false,
+     true},
+    {"MultiPV", UciOptionKind::spin, UciOptionId::multi_pv, "1", kMinimumMultiPv,
+     kMaximumMultiPv, false, true},
+    {"Ponder", UciOptionKind::check, UciOptionId::ponder, "false", 0, 0, false, true},
+    {"OwnBook", UciOptionKind::check, UciOptionId::own_book, "true", 0, 0, false, true},
+    {"BookFile", UciOptionKind::string, UciOptionId::book_file, "book.bin", 0, 0, false, true},
+    {"BookDepth", UciOptionKind::spin, UciOptionId::book_depth, "16", 0, kMaximumBookDepth,
+     false, true},
+    {"BookRandom", UciOptionKind::check, UciOptionId::book_random, "false", 0, 0, false, true},
+    {"BookSafety", UciOptionKind::check, UciOptionId::book_safety, "true", 0, 0, false, true},
+    {"BookSafetyDepth", UciOptionKind::spin, UciOptionId::book_safety_depth, "2", 0,
+     kMaximumBookSafetyDepth, false, true},
+    {"Clear Hash", UciOptionKind::button, UciOptionId::clear_hash, "", 0, 0, false, true},
+    {"UCI_ShowWDL", UciOptionKind::check, UciOptionId::show_wdl, "false", 0, 0, false, true},
+    {"Move Overhead", UciOptionKind::spin, UciOptionId::move_overhead, "30", 0,
+     kMaximumMoveOverheadMs, false, true},
+    {"Slow Mover", UciOptionKind::spin, UciOptionId::slow_mover, "100", kMinimumSlowMoverPercent,
+     kMaximumSlowMoverPercent, false, true},
+    {"UCI_LimitStrength", UciOptionKind::check, UciOptionId::limit_strength, "false", 0, 0, false,
+     true},
+    {"UCI_Elo", UciOptionKind::spin, UciOptionId::elo, "1320", kMinimumElo, kMaximumElo, false,
+     true},
+    {"StrengthMode", UciOptionKind::check, UciOptionId::strength_mode, "false", 0, 0, false, true},
+    {"SyzygyPath", UciOptionKind::string, UciOptionId::syzygy_path, "", 0, 0, false, true},
+    {"SyzygyProbeDepth", UciOptionKind::spin, UciOptionId::syzygy_probe_depth, "1",
+     kMinimumSyzygyProbeDepth, kMaximumSyzygyProbeDepth, false, true},
+    {"SyzygyProbeLimit", UciOptionKind::spin, UciOptionId::syzygy_probe_limit, "5", 0,
+     kMaximumSyzygyProbeLimit, false, true},
+    {"Syzygy50MoveRule", UciOptionKind::check, UciOptionId::syzygy_50_move_rule, "true", 0, 0,
+     false, true},
+    // Developer diagnostics stay settable but are intentionally not advertised.
+    {"Debug", UciOptionKind::check, UciOptionId::debug, "false", 0, 0, false, false},
+    {"DebugFile", UciOptionKind::string, UciOptionId::debug_file, "koi-debug.log", 0, 0, false,
+     false},
+}};
+
+const UciOptionDescriptor* find_uci_option(std::string_view name) {
+    for (const UciOptionDescriptor& option : kUciOptions) {
+        if (equals_ignore_case(name, option.name)) {
+            return &option;
+        }
+    }
+    return nullptr;
+}
+
+std::uint64_t option_maximum(const UciOptionDescriptor& option) {
+    return option.dynamic_maximum ? static_cast<std::uint64_t>(maximum_search_threads())
+                                  : option.maximum;
 }
 
 std::optional<ParsedOption> parse_setoption(const std::vector<std::string>& tokens) {
@@ -430,7 +545,7 @@ SearchLimits parse_go_limits(std::string_view arguments) {
         limits.movetime.has_value() || limits.white_clock.has_value() ||
         limits.black_clock.has_value() || limits.infinite || limits.ponder;
     if (!has_usable_limit) {
-        limits.movetime = std::chrono::milliseconds{250};
+        limits.movetime = kBareGoFallback;
     }
     return limits;
 }
@@ -476,6 +591,8 @@ int UciController::run() {
             write_readyok();
         } else if (name == "ucinewgame") {
             stop_and_suppress_active_search();
+            search_service_.clear_hash();
+            debug_json_event("ucinewgame", "\"hash_cleared\":true");
             position_ = GameState::startpos();
         } else if (name == "position") {
             handle_position(command, line);
@@ -485,6 +602,20 @@ int UciController::run() {
             handle_go(command);
         } else if (name == "ponderhit") {
             handle_ponderhit();
+        } else if (name == "debug") {
+            // Standard UCI `debug on|off` command. It aliases the unadvertised
+            // Debug option so both spellings configure the same diagnostics.
+            std::string debug_value;
+            if ((command >> debug_value) &&
+                (equals_ignore_case(debug_value, "on") ||
+                 equals_ignore_case(debug_value, "off"))) {
+                const bool debug = equals_ignore_case(debug_value, "on");
+                if (debug_enabled_ != debug) {
+                    stop_and_suppress_active_search();
+                    debug_enabled_ = debug;
+                    configure_debug_file();
+                }
+            }
         } else if (name == "stop") {
             stop_active_search();
         } else if (name == "quit") {
@@ -599,21 +730,45 @@ void UciController::handle_setoption(std::istream& command) {
     }
     const std::string& name = parsed->name;
     const std::string& value = parsed->value;
+    const UciOptionDescriptor* option = find_uci_option(name);
+    if (option == nullptr) {
+        return;
+    }
 
-    if (equals_ignore_case(name, "RandomSeed")) {
+    // Type-aware helpers keep the parse -> ignore-invalid -> stop/suppress ->
+    // commit sequence identical for every option: an invalid value never stops
+    // the active search and never changes engine state.
+    const auto apply_boolean = [this, &value](const auto& commit) {
+        bool parsed_boolean = false;
+        if (parse_boolean(value, parsed_boolean)) {
+            stop_and_suppress_active_search();
+            commit(parsed_boolean);
+        }
+    };
+    const auto apply_unsigned = [this, &value](const UciOptionDescriptor& descriptor,
+                                               const auto& commit) {
+        std::uint64_t parsed_value = 0;
+        if (parse_uint64(value, parsed_value) && parsed_value >= descriptor.minimum &&
+            parsed_value <= option_maximum(descriptor)) {
+            stop_and_suppress_active_search();
+            commit(parsed_value);
+        }
+    };
+
+    switch (option->id) {
+    case UciOptionId::random_seed: {
         std::uint32_t seed = 0;
         if (parse_random_seed(value, seed)) {
             stop_and_suppress_active_search();
             chooser_.set_seed(seed);
             random_seed_ = seed;
         }
-        return;
+        break;
     }
-
-    if (equals_ignore_case(name, "Hash")) {
+    case UciOptionId::hash: {
         std::uint64_t megabytes = 0;
-        if (parse_uint64(value, megabytes) && megabytes >= kMinimumHashMegabytes &&
-            megabytes <= kMaximumHashMegabytes) {
+        if (parse_uint64(value, megabytes) && megabytes >= option->minimum &&
+            megabytes <= option->maximum) {
             stop_and_suppress_active_search();
             hash_mb_ = static_cast<std::size_t>(megabytes);
             try {
@@ -648,223 +803,153 @@ void UciController::handle_setoption(std::istream& command) {
                 output_ << "info string hash resize failed; previous table preserved\n" << std::flush;
             }
         }
-        return;
+        break;
     }
 
-    if (equals_ignore_case(name, "Threads")) {
-        std::uint64_t threads = 0;
-        if (parse_uint64(value, threads) && threads >= 1 && threads <= maximum_search_threads()) {
-            stop_and_suppress_active_search();
+
+    case UciOptionId::threads:
+        apply_unsigned(*option, [this](std::uint64_t threads) {
             threads_ = static_cast<std::size_t>(threads);
-        }
-        return;
-    }
+        });
+        break;
 
-    if (equals_ignore_case(name, "Speed")) {
-        std::uint64_t speed = 0;
-        if (parse_uint64(value, speed) && speed >= kMinimumSpeedPercent &&
-            speed <= kMaximumSpeedPercent) {
-            stop_and_suppress_active_search();
+    case UciOptionId::speed:
+        apply_unsigned(*option, [this](std::uint64_t speed) {
             speed_percent_ = static_cast<std::uint8_t>(speed);
-        }
-        return;
-    }
+        });
+        break;
 
-    if (equals_ignore_case(name, "UCI_AnalyseMode")) {
+    case UciOptionId::analyse_mode: {
         bool analyse_mode = false;
         if (parse_boolean(value, analyse_mode) && analyse_mode_ != analyse_mode) {
             stop_and_suppress_active_search();
             analyse_mode_ = analyse_mode;
         }
-        return;
+        break;
     }
 
-    if (equals_ignore_case(name, "MultiPV")) {
-        std::uint64_t multi_pv = 0;
-        if (parse_uint64(value, multi_pv) && multi_pv >= kMinimumMultiPv &&
-            multi_pv <= kMaximumMultiPv) {
-            stop_and_suppress_active_search();
+    case UciOptionId::multi_pv:
+        apply_unsigned(*option, [this](std::uint64_t multi_pv) {
             multi_pv_ = static_cast<std::size_t>(multi_pv);
-        }
-        return;
-    }
+        });
+        break;
 
-    if (equals_ignore_case(name, "Ponder")) {
-        bool ponder_enabled = false;
-        if (parse_boolean(value, ponder_enabled)) {
-            stop_and_suppress_active_search();
-            ponder_enabled_ = ponder_enabled;
-        }
-        return;
-    }
+    case UciOptionId::ponder:
+        apply_boolean([this](bool ponder_enabled) { ponder_enabled_ = ponder_enabled; });
+        break;
 
-    if (equals_ignore_case(name, "OwnBook")) {
-        bool own_book = false;
-        if (parse_boolean(value, own_book)) {
-            stop_and_suppress_active_search();
-            own_book_ = own_book;
-        }
-        return;
-    }
+    case UciOptionId::own_book:
+        apply_boolean([this](bool own_book) { own_book_ = own_book; });
+        break;
 
-    if (equals_ignore_case(name, "BookRandom")) {
-        bool book_random = false;
-        if (parse_boolean(value, book_random)) {
-            stop_and_suppress_active_search();
-            book_random_ = book_random;
-        }
-        return;
-    }
+    case UciOptionId::book_random:
+        apply_boolean([this](bool book_random) { book_random_ = book_random; });
+        break;
 
-    if (equals_ignore_case(name, "BookSafety")) {
-        bool book_safety = false;
-        if (parse_boolean(value, book_safety)) {
-            stop_and_suppress_active_search();
-            book_safety_ = book_safety;
-        }
-        return;
-    }
+    case UciOptionId::book_safety:
+        apply_boolean([this](bool book_safety) { book_safety_ = book_safety; });
+        break;
 
-    if (equals_ignore_case(name, "BookSafetyDepth")) {
-        std::uint64_t book_safety_depth = 0;
-        if (parse_uint64(value, book_safety_depth) && book_safety_depth <= kMaximumBookSafetyDepth) {
-            stop_and_suppress_active_search();
+    case UciOptionId::book_safety_depth:
+        apply_unsigned(*option, [this](std::uint64_t book_safety_depth) {
             book_safety_depth_ = static_cast<std::uint8_t>(book_safety_depth);
-        }
-        return;
-    }
+        });
+        break;
 
-    if (equals_ignore_case(name, "BookFile")) {
+    case UciOptionId::book_file:
         if (!value.empty()) {
             stop_and_suppress_active_search();
             opening_book_.set_file(value);
         }
-        return;
-    }
+        break;
 
-    if (equals_ignore_case(name, "BookDepth")) {
-        std::uint64_t book_depth = 0;
-        if (parse_uint64(value, book_depth) && book_depth <= kMaximumBookDepth) {
-            stop_and_suppress_active_search();
+    case UciOptionId::book_depth:
+        apply_unsigned(*option, [this](std::uint64_t book_depth) {
             book_depth_ = static_cast<std::uint8_t>(book_depth);
-        }
-        return;
-    }
+        });
+        break;
 
-    if (equals_ignore_case(name, "Clear Hash")) {
+    case UciOptionId::clear_hash:
         stop_and_suppress_active_search();
         search_service_.clear_hash();
-    }
+        break;
 
-    if (equals_ignore_case(name, "UCI_ShowWDL")) {
-        bool show_wdl = false;
-        if (parse_boolean(value, show_wdl)) {
-            stop_and_suppress_active_search();
-            show_wdl_ = show_wdl;
-        }
-        return;
-    }
+    case UciOptionId::show_wdl:
+        apply_boolean([this](bool show_wdl) { show_wdl_ = show_wdl; });
+        break;
 
-    if (equals_ignore_case(name, "Move Overhead")) {
-        std::uint64_t overhead = 0;
-        if (parse_uint64(value, overhead) && overhead <= kMaximumMoveOverheadMs) {
-            stop_and_suppress_active_search();
+    case UciOptionId::move_overhead:
+        apply_unsigned(*option, [this](std::uint64_t overhead) {
             move_overhead_ms_ = static_cast<std::uint32_t>(overhead);
-        }
-        return;
-    }
+        });
+        break;
 
-    if (equals_ignore_case(name, "Slow Mover")) {
-        std::uint64_t slow_mover = 0;
-        if (parse_uint64(value, slow_mover) && slow_mover >= kMinimumSlowMoverPercent &&
-            slow_mover <= kMaximumSlowMoverPercent) {
-            stop_and_suppress_active_search();
+    case UciOptionId::slow_mover:
+        apply_unsigned(*option, [this](std::uint64_t slow_mover) {
             slow_mover_percent_ = static_cast<std::uint32_t>(slow_mover);
-        }
-        return;
-    }
+        });
+        break;
 
-    if (equals_ignore_case(name, "UCI_LimitStrength")) {
-        bool limit_strength = false;
-        if (parse_boolean(value, limit_strength)) {
-            stop_and_suppress_active_search();
-            limit_strength_ = limit_strength;
-        }
-        return;
-    }
+    case UciOptionId::limit_strength:
+        apply_boolean([this](bool limit_strength) { limit_strength_ = limit_strength; });
+        break;
 
-    if (equals_ignore_case(name, "UCI_Elo")) {
-        std::uint64_t elo = 0;
-        if (parse_uint64(value, elo) && elo >= kMinimumElo && elo <= kMaximumElo) {
-            stop_and_suppress_active_search();
+    case UciOptionId::elo:
+        apply_unsigned(*option, [this](std::uint64_t elo) {
             elo_ = static_cast<std::uint32_t>(elo);
-        }
-        return;
-    }
+        });
+        break;
 
-    if (equals_ignore_case(name, "StrengthMode")) {
+    case UciOptionId::strength_mode: {
         bool strength_mode = false;
         if (parse_boolean(value, strength_mode) && strength_mode_ != strength_mode) {
             stop_and_suppress_active_search();
             strength_mode_ = strength_mode;
         }
-        return;
+        break;
     }
 
-    if (equals_ignore_case(name, "SyzygyPath")) {
+    case UciOptionId::syzygy_path:
         stop_and_suppress_active_search();
         syzygy_path_ = value;
         rebuild_syzygy();
-        return;
-    }
+        break;
 
-    if (equals_ignore_case(name, "SyzygyProbeDepth")) {
-        std::uint64_t depth = 0;
-        if (parse_uint64(value, depth) && depth >= kMinimumSyzygyProbeDepth &&
-            depth <= kMaximumSyzygyProbeDepth) {
-            stop_and_suppress_active_search();
+    case UciOptionId::syzygy_probe_depth:
+        apply_unsigned(*option, [this](std::uint64_t depth) {
             syzygy_probe_depth_ = static_cast<std::uint8_t>(depth);
             rebuild_syzygy();
-        }
-        return;
-    }
+        });
+        break;
 
-    if (equals_ignore_case(name, "SyzygyProbeLimit")) {
-        std::uint64_t limit = 0;
-        if (parse_uint64(value, limit) && limit <= kMaximumSyzygyProbeLimit) {
-            stop_and_suppress_active_search();
+    case UciOptionId::syzygy_probe_limit:
+        apply_unsigned(*option, [this](std::uint64_t limit) {
             syzygy_probe_limit_ = static_cast<std::uint8_t>(limit);
             rebuild_syzygy();
-        }
-        return;
-    }
+        });
+        break;
 
-    if (equals_ignore_case(name, "Syzygy50MoveRule")) {
-        bool fifty_move_rule = false;
-        if (parse_boolean(value, fifty_move_rule)) {
-            stop_and_suppress_active_search();
+    case UciOptionId::syzygy_50_move_rule:
+        apply_boolean([this](bool fifty_move_rule) {
             syzygy_50_move_rule_ = fifty_move_rule;
             rebuild_syzygy();
-        }
-        return;
-    }
+        });
+        break;
 
-    if (equals_ignore_case(name, "Debug")) {
-        bool debug = false;
-        if (parse_boolean(value, debug)) {
-            stop_and_suppress_active_search();
+    case UciOptionId::debug:
+        apply_boolean([this](bool debug) {
             debug_enabled_ = debug;
             configure_debug_file();
-        }
-        return;
-    }
+        });
+        break;
 
-    if (equals_ignore_case(name, "DebugFile")) {
+    case UciOptionId::debug_file:
         stop_and_suppress_active_search();
         debug_file_path_ = value;
         if (debug_enabled_) {
             configure_debug_file();
         }
+        break;
     }
 }
 
@@ -881,7 +966,7 @@ void UciController::handle_go(std::istream& command) {
         // A malformed or asymmetric clock command must still complete. The
         // TimeManager intentionally leaves a clock for the other side unset;
         // the controller supplies the same bounded fallback as bare `go`.
-        limits.movetime = std::chrono::milliseconds{250};
+        limits.movetime = kBareGoFallback;
     }
     stop_and_suppress_active_search();
 
@@ -896,74 +981,57 @@ void UciController::handle_go(std::istream& command) {
 }
 
 void UciController::handle_ponderhit() {
-    std::optional<GameState> root;
-    std::optional<GameState> origin;
-    std::optional<SearchLimits> limits;
-    std::optional<Move> predicted_move;
-    std::optional<Move> expected_move;
+    SearchLimits base_limits;
     {
         std::lock_guard lock(output_mutex_);
-        if (!active_ponder_ || !ponder_origin_.has_value() || !ponder_root_.has_value() ||
-            !ponder_limits_.has_value()) {
+        if (!active_ponder_ || !ponder_limits_.has_value()) {
             return;
         }
-        origin = ponder_origin_;
-        root = ponder_root_;
-        limits = ponder_limits_;
-        predicted_move = ponder_predicted_move_;
-        expected_move = ponder_expected_move_;
+        base_limits = *ponder_limits_;
     }
 
+    SearchLimits converted = base_limits;
+    converted.ponder = false;
+    const bool has_side_to_move_clock = position_.side_to_move() == Color::white ?
+        converted.white_clock.has_value() : converted.black_clock.has_value();
+    const bool has_normal_limit = converted.depth.has_value() || converted.nodes.has_value() ||
+        converted.movetime.has_value() || has_side_to_move_clock || converted.infinite;
+    if (!has_normal_limit) {
+        converted.movetime = kBareGoFallback;
+    }
+
+    if (active_search_.has_value() && active_search_->running()) {
+        // Standard UCI continuation: the pondering search already searches the
+        // exact root the GUI ponders after, so the ponderhit is converted in
+        // place. The worker keeps its TT-warm state, identity, and generation;
+        // only time management switches from unbounded to the real budget.
+        active_search_->request_ponderhit(std::move(converted));
+        std::uint64_t generation = 0;
+        {
+            std::lock_guard lock(output_mutex_);
+            ponder_origin_.reset();
+            ponder_root_.reset();
+            ponder_limits_.reset();
+            ponder_predicted_move_.reset();
+            ponder_expected_move_.reset();
+            active_ponder_ = false;
+            state_ = ControllerState::Searching;
+            generation = generation_;
+        }
+        debug_json_event("ponderhit",
+                         "\"continued\":true,\"generation\":" + std::to_string(generation));
+        return;
+    }
+
+    // No running search to convert (for example a node-limited ponder that
+    // already completed). The stale ponder search is suppressed and a fresh,
+    // bounded search of the real position answers this move so the GUI always
+    // receives exactly one bestmove.
+    debug_event("ponderhit without a running ponder search; searching the current position");
     stop_and_suppress_active_search();
-
-    const bool prediction_matches = origin.has_value() && root.has_value() &&
-        limits.has_value() && predicted_move.has_value() && expected_move.has_value() &&
-        position_.position_key() == origin->position_key() && position_.fen() == origin->fen() &&
-        origin->is_legal(*predicted_move);
-    if (prediction_matches) {
-        GameState expected_root = *origin;
-        if (expected_root.make_move(*predicted_move) && expected_root.fen() == root->fen() &&
-            expected_root.position_key() == root->position_key() &&
-            root->is_legal(*expected_move) && root->make_move(*expected_move)) {
-            limits->ponder = false;
-            const bool has_side_to_move_clock = root->side_to_move() == Color::white ?
-                limits->white_clock.has_value() : limits->black_clock.has_value();
-            const bool has_normal_limit = limits->depth.has_value() || limits->nodes.has_value() ||
-                limits->movetime.has_value() || has_side_to_move_clock || limits->infinite;
-            if (!has_normal_limit) {
-                limits->movetime = std::chrono::milliseconds{250};
-            }
-            limits->search_moves_specified = false;
-            limits->search_moves.clear();
-            start_search(std::move(*root), std::move(*limits), true);
-            return;
-        }
-    }
-
-    // The stored prediction no longer matches the position. The ponder search
-    // was already suppressed, but a ponderhit still obliges the engine to answer
-    // this move: returning here without a bestmove leaves the GUI waiting until
-    // the clock runs out. Fall back to a fresh, bounded search of the real
-    // position so exactly one bestmove is always published.
-    debug_event("ponderhit prediction did not match; searching the current position");
-    SearchLimits fallback_limits;
-    if (limits.has_value()) {
-        fallback_limits = *limits;
-        fallback_limits.ponder = false;
-        const bool has_side_to_move_clock = position_.side_to_move() == Color::white ?
-            fallback_limits.white_clock.has_value() : fallback_limits.black_clock.has_value();
-        const bool has_normal_limit = fallback_limits.depth.has_value() ||
-            fallback_limits.nodes.has_value() || fallback_limits.movetime.has_value() ||
-            has_side_to_move_clock || fallback_limits.infinite;
-        if (!has_normal_limit) {
-            fallback_limits.movetime = std::chrono::milliseconds{250};
-        }
-    } else {
-        fallback_limits.movetime = std::chrono::milliseconds{250};
-    }
-    fallback_limits.search_moves_specified = false;
-    fallback_limits.search_moves.clear();
-    start_search(position_, fallback_limits, true);
+    converted.search_moves_specified = false;
+    converted.search_moves.clear();
+    start_search(position_, converted, true);
 }
 
 void UciController::start_search(GameState root, SearchLimits limits, bool skip_book) {
@@ -1237,33 +1305,30 @@ std::uint64_t UciController::begin_generation() {
 void UciController::write_handshake() {
     std::lock_guard lock(output_mutex_);
     output_ << "id name Koi Engine\n"
-               "id author Koi Engine contributors\n"
-               "option name RandomSeed type spin default 0 min 0 max 2147483647\n"
-               "option name Hash type spin default 512 min 1 max 4096\n"
-               "option name Threads type spin default 1 min 1 max " << maximum_search_threads() << "\n"
-               "option name Speed type spin default 100 min 1 max 100\n"
-               "option name UCI_AnalyseMode type check default false\n"
-               "option name MultiPV type spin default 1 min 1 max 16\n"
-               "option name Ponder type check default false\n"
-               "option name OwnBook type check default true\n"
-               "option name BookFile type string default book.bin\n"
-               "option name BookDepth type spin default 16 min 0 max 40\n"
-               "option name BookRandom type check default false\n"
-               "option name BookSafety type check default true\n"
-               "option name BookSafetyDepth type spin default 2 min 0 max 3\n"
-               "option name Clear Hash type button\n"
-               "option name UCI_ShowWDL type check default false\n"
-               "option name Move Overhead type spin default 30 min 0 max 5000\n"
-               "option name Slow Mover type spin default 100 min 10 max 1000\n"
-               "option name UCI_LimitStrength type check default false\n"
-               "option name UCI_Elo type spin default 1320 min 1320 max 3190\n"
-               "option name StrengthMode type check default false\n"
-               "option name SyzygyPath type string default \n"
-               "option name SyzygyProbeDepth type spin default 1 min 1 max 100\n"
-               "option name SyzygyProbeLimit type spin default 5 min 0 max 7\n"
-               "option name Syzygy50MoveRule type check default true\n"
-               "uciok\n"
-            << std::flush;
+               "id author Koi Engine contributors\n";
+    for (const UciOptionDescriptor& option : kUciOptions) {
+        if (!option.advertised) {
+            continue;
+        }
+        output_ << "option name " << option.name << " type ";
+        switch (option.kind) {
+        case UciOptionKind::spin:
+            output_ << "spin default " << option.default_value << " min " << option.minimum
+                    << " max " << option_maximum(option);
+            break;
+        case UciOptionKind::check:
+            output_ << "check default " << option.default_value;
+            break;
+        case UciOptionKind::string:
+            output_ << "string default " << option.default_value;
+            break;
+        case UciOptionKind::button:
+            output_ << "button";
+            break;
+        }
+        output_ << '\n';
+    }
+    output_ << "uciok\n" << std::flush;
 }
 
 void UciController::write_readyok() {
@@ -1300,6 +1365,7 @@ void UciController::write_search_info(std::uint64_t generation, const SearchInfo
         output_ << " wdl " << wdl.win << ' ' << wdl.draw << ' ' << wdl.loss;
     }
     output_ << " nodes " << info.nodes << " nps " << info.nps
+            << " hashfull " << search_service_.hashfull_permill()
             << " time " << info.elapsed.count() << " pv";
     for (const Move& move : info.pv) {
         output_ << ' ' << move.uci();
@@ -1392,6 +1458,19 @@ void UciController::write_book_completion(std::uint64_t generation, const GameSt
     }
     if (!completion_once->try_claim()) {
         debug_event("duplicate book completion suppressed generation " + std::to_string(generation));
+        return;
+    }
+    if (!validation.best_move.has_value()) {
+        // Defensive hardening: a validated book completion must never be
+        // dereferenced without a move. Mirrors the search path, which answers
+        // 0000 so a `go` always receives exactly one bestmove.
+        debug_event("book completion without a validated move generation " +
+                    std::to_string(generation) + "; answering 0000");
+        std::lock_guard lock(output_mutex_);
+        if (generation != generation_) {
+            return;
+        }
+        output_ << "bestmove 0000\n" << std::flush;
         return;
     }
     debug_json_event(

@@ -57,6 +57,12 @@ bool SearchHandle::running() const noexcept {
     return state_ && state_->running();
 }
 
+void SearchHandle::request_ponderhit(SearchLimits limits) {
+    if (state_) {
+        state_->request_ponderhit(std::move(limits));
+    }
+}
+
 SearchService::SearchService(std::shared_ptr<const Evaluator> evaluator,
                              HashMemoryPolicy hash_memory_policy,
                              std::size_t initial_hash_mb) {
@@ -99,6 +105,10 @@ HashResizeResult SearchService::set_hash_size_mb(std::size_t megabytes) {
 
 std::size_t SearchService::hash_size_mb() const noexcept {
     return impl_->table->size_mb();
+}
+
+std::size_t SearchService::hashfull_permill() const noexcept {
+    return impl_->table->hashfull_permill();
 }
 
 void SearchService::clear_hash() noexcept {

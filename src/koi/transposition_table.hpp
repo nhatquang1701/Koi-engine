@@ -85,6 +85,12 @@ public:
 
     [[nodiscard]] HashResizeResult set_size_mb(std::size_t megabytes) noexcept;
     [[nodiscard]] std::size_t size_mb() const noexcept;
+    // Approximate occupancy in permill (0..1000) of entries from the current
+    // clear epoch.  Samples a bounded number of slots (see
+    // kHashfullSampleSlots) so the cost is independent of table size; used to
+    // report UCI `info ... hashfull`.  Clear Hash logically invalidates all
+    // entries, so the sampled value drops to zero after clear().
+    [[nodiscard]] std::size_t hashfull_permill() const noexcept;
     void clear() noexcept;
     // Starts the replacement epoch for a new search; search code calls this
     // once per search through detail::SearchTableAccess.  Unrelated to the UCI

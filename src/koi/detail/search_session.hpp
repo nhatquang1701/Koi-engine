@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <functional>
 #include <mutex>
+#include <optional>
 #include <thread>
 
 #include "koi/completion_gate.hpp"
@@ -32,11 +33,20 @@ public:
     void stop() noexcept;
     void wait();
     void wait_until_stopped();
+    void wait_until_stopped_or_ponderhit();
     [[nodiscard]] bool running() const noexcept {
         return running_.load(std::memory_order_relaxed);
     }
     [[nodiscard]] bool publish_completion(const SearchEventSink& sink,
                                           const SearchResult& result) noexcept;
+
+    // Records a UCI ponderhit conversion for the running worker. The worker
+    // consumes it at the top of the next iteration and re-arms timing.
+    void request_ponderhit(SearchLimits limits);
+    [[nodiscard]] bool ponderhit_requested() const noexcept {
+        return ponderhit_requested_.load(std::memory_order_acquire);
+    }
+    [[nodiscard]] std::optional<SearchLimits> take_ponderhit_limits();
 
 private:
     void mark_finished() noexcept;
@@ -47,9 +57,12 @@ private:
     SearchRequestIdentity identity_;
     std::atomic_bool stop_requested_ = false;
     std::atomic_bool running_ = false;
+    std::atomic_bool ponderhit_requested_ = false;
     CompletionOnce completion_once_;
     std::mutex stop_mutex_;
     std::condition_variable stop_condition_;
+    std::mutex ponderhit_mutex_;
+    std::optional<SearchLimits> ponderhit_limits_;
     std::thread worker_;
 };
 

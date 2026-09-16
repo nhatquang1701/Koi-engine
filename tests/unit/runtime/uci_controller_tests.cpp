@@ -193,19 +193,23 @@ bool is_valid_search_info(std::string_view line) {
     std::uint64_t nodes = 0;
     std::string nps_name;
     std::uint64_t nps = 0;
+    std::string hashfull_name;
+    std::uint64_t hashfull = 0;
     std::string time_name;
     std::uint64_t time = 0;
     std::string pv_name;
 
     if (!(stream >> info >> depth_name >> depth >> seldepth_name >> seldepth >> multipv_name >> multipv >>
           score_name >> score_kind >> score >>
-          nodes_name >> nodes >> nps_name >> nps >> time_name >> time >> pv_name)) {
+          nodes_name >> nodes >> nps_name >> nps >> hashfull_name >> hashfull >>
+          time_name >> time >> pv_name)) {
         return false;
     }
     if (info != "info" || depth_name != "depth" || depth <= 0 || seldepth_name != "seldepth" ||
         seldepth < depth || multipv_name != "multipv" || multipv < 1 || multipv > 16 || score_name != "score" ||
         (score_kind != "cp" && score_kind != "mate") || nodes_name != "nodes" ||
-        nps_name != "nps" || time_name != "time" || pv_name != "pv") {
+        nps_name != "nps" || hashfull_name != "hashfull" || hashfull > 1000 ||
+        time_name != "time" || pv_name != "pv") {
         return false;
     }
 
@@ -925,14 +929,10 @@ void test_ponderhit_keeps_the_entire_ponder_workflow_out_of_the_book() {
         expected_pv.clear();
     }
     require(expected_pv.size() >= 2, "ponderhit book bypass must retain an expected reply");
-    koi::GameState after_expected_reply = koi::GameState::startpos();
-    require(after_expected_reply.make_move(expected_pv[0]) &&
-                after_expected_reply.make_move(expected_pv[1]),
-            "ponder book bypass expected reply must remain legal");
-    const auto restarted_bestmove = bestmoves.size() == 1 ?
+    const auto continued_bestmove = bestmoves.size() == 1 ?
         koi::Move::parse_uci(bestmoves[0].substr(9)) : std::nullopt;
-    require(bestmoves.size() == 1 && restarted_bestmove.has_value() &&
-                after_expected_reply.is_legal(*restarted_bestmove),
+    require(bestmoves.size() == 1 && continued_bestmove.has_value() &&
+                Position{}.is_legal(*continued_bestmove),
             "ponderhit must retain one legal search completion outside the book");
 }
 
@@ -1143,8 +1143,12 @@ void test_lucas_analysis_option_changes_suppress_the_active_generation() {
             "changing Lucas analysis options must suppress replaced search generations");
 }
 
-void test_ponderhit_restarts_the_ponder_search_once() {
+void test_ponderhit_continues_the_ponder_search_in_place() {
+    TestDirectory files;
+    const std::filesystem::path log_path = files.path() / "ponderhit-continuation.log";
     GatedInputBuffer input(
+        "setoption name Debug value true\n"
+        "setoption name DebugFile value " + log_path.string() + "\n"
         "position startpos\n"
         "go ponder searchmoves e2e4 depth 2\n",
         "ponderhit\n"
@@ -1156,7 +1160,9 @@ void test_ponderhit_restarts_the_ponder_search_once() {
     std::ostringstream diagnostics;
     int exit_code = -1;
     std::thread controller_thread([&] {
-        UciController controller(input_stream, output, diagnostics);
+        UciController controller(input_stream, output, diagnostics,
+                                 koi::SearchService{std::make_shared<koi::ClassicalEvaluator>()},
+                                 files.path());
         exit_code = controller.run();
     });
     const bool marker_seen = input.wait_for_marker(std::chrono::seconds(5));
@@ -1167,38 +1173,25 @@ void test_ponderhit_restarts_the_ponder_search_once() {
     const std::vector<std::string> lines = output_lines(output_buffer.str());
     const std::vector<std::string> bestmoves = lines_starting_with(lines, "bestmove ");
 
-    std::vector<koi::Move> expected_pv;
-    for (const std::string& line : lines) {
-        if (!line.starts_with("info depth ") || line.find(" multipv 1 ") == std::string::npos) {
-            continue;
-        }
-        const std::size_t pv_start = line.find(" pv ");
-        if (pv_start == std::string::npos) {
-            continue;
-        }
-        std::istringstream pv_stream(line.substr(pv_start + 4));
-        for (std::string move; pv_stream >> move;) {
-            const auto parsed = koi::Move::parse_uci(move);
-            require(parsed.has_value(), "ponder PV must contain coordinate moves");
-            expected_pv.push_back(*parsed);
-        }
-        if (expected_pv.size() >= 2) {
-            break;
-        }
-        expected_pv.clear();
-    }
+    require(marker_seen, "ponderhit continuation must observe a completed two-move ponder PV");
+    require(exit_code == 0 && diagnostics.str().empty(),
+            "a ponderhit continuation transcript must shut down normally");
+    require(bestmoves.size() == 1 && bestmoves[0] == "bestmove e2e4",
+            "a ponderhit must continue the filtered search root instead of restarting it");
 
-    require(marker_seen, "ponderhit must wait for a completed two-move ponder PV");
-    require(exit_code == 0 && diagnostics.str().empty(), "ponderhit transcript must shut down normally");
-    require(bestmoves.size() == 1, "ponderhit must emit exactly one completion result");
-    require(expected_pv.size() >= 2 && expected_pv[0].uci() == "e2e4",
-            "ponderhit must observe the filtered first PV and its expected reply");
-    koi::GameState after_expected_reply = koi::GameState::startpos();
-    require(after_expected_reply.make_move(expected_pv[0]) && after_expected_reply.make_move(expected_pv[1]),
-            "the observed ponder reply must be legal after the predicted first move");
-    const auto restarted_bestmove = koi::Move::parse_uci(bestmoves[0].substr(9));
-    require(restarted_bestmove.has_value() && after_expected_reply.is_legal(*restarted_bestmove),
-            "ponderhit must search from the position after the expected reply");
+    std::ifstream log_stream(log_path);
+    const std::string log((std::istreambuf_iterator<char>(log_stream)),
+                          std::istreambuf_iterator<char>());
+    require(log.find("\"event\":\"ponderhit\"") != std::string::npos &&
+                log.find("\"continued\":true") != std::string::npos,
+            "a ponderhit must be recorded as an in-place continuation");
+    std::size_t search_starts = 0;
+    for (std::size_t position = log.find("search start generation");
+         position != std::string::npos;
+         position = log.find("search start generation", position + 1)) {
+        ++search_starts;
+    }
+    require(search_starts == 1, "a ponderhit continuation must not launch a second search");
 }
 
 void test_large_hash_option_is_capped_without_crashing_the_controller() {
@@ -1658,6 +1651,98 @@ void test_ucinewgame_and_hash_changes_suppress_active_generations() {
             "the surviving post-option search must use the reset start position");
 }
 
+void test_ucinewgame_clears_the_transposition_table_and_records_it() {
+    TestDirectory files;
+    const ControllerResult result = run_controller_in_directory(
+        "setoption name Debug value true\n"
+        "setoption name DebugFile value ucinewgame-debug.log\n"
+        "position startpos\n"
+        "go depth 1\n"
+        "ucinewgame\n"
+        "quit\n", files.path());
+    require(result.exit_code == 0 && result.diagnostics.empty(),
+            "ucinewgame with hidden diagnostics must leave stdio clean");
+    std::ifstream log(files.path() / "ucinewgame-debug.log", std::ios::binary);
+    const std::string contents((std::istreambuf_iterator<char>(log)), {});
+    require(contents.find("\"event\":\"ucinewgame\"") != std::string::npos &&
+                contents.find("\"hash_cleared\":true") != std::string::npos,
+            "ucinewgame must clear the transposition table and record the event");
+}
+
+void test_debug_command_toggles_hidden_diagnostics() {
+    TestDirectory files;
+    const ControllerResult result = run_controller_in_directory(
+        "setoption name DebugFile value debug-command.log\n"
+        "debug on\n"
+        "position startpos\n"
+        "debug off\n"
+        "isready\n"
+        "quit\n", files.path());
+    require(result.exit_code == 0 && result.diagnostics.empty(),
+            "the standard debug command must not disturb UCI stdio");
+    std::ifstream log(files.path() / "debug-command.log", std::ios::binary);
+    const std::string contents((std::istreambuf_iterator<char>(log)), {});
+    require(contents.find("command position startpos") != std::string::npos,
+            "debug on must enable the hidden diagnostics log");
+    require(contents.find("command isready") == std::string::npos,
+            "debug off must disable the hidden diagnostics log");
+    require(!std::filesystem::exists(files.path() / "koi-debug.log"),
+            "the debug command must honor the configured DebugFile path");
+}
+
+void test_handshake_option_table_is_unique_and_well_formed() {
+    const ControllerResult handshake = run_controller("uci\nisready\nquit\n");
+    require(handshake.exit_code == 0 && handshake.diagnostics.empty(),
+            "a handshake-only transcript must stay clean");
+    const std::vector<std::string> options =
+        lines_starting_with(output_lines(handshake.output), "option name ");
+    require(options.size() == 24, "the handshake must advertise exactly 24 options");
+
+    const std::string prefix = "option name ";
+    std::vector<std::string> names;
+    std::string defaults_transcript;
+    for (const std::string& line : options) {
+        const std::size_t type_at = line.find(" type ", prefix.size());
+        require(type_at != std::string::npos, "every advertised option must declare a type");
+        const std::string name = line.substr(prefix.size(), type_at - prefix.size());
+        const std::string rest = line.substr(type_at + std::string(" type ").size());
+        require(!name.empty(), "advertised option names must not be empty");
+        require(std::find(names.begin(), names.end(), name) == names.end(),
+                "advertised option names must be unique: " + name);
+        names.push_back(name);
+
+        require(rest == "button" || rest.starts_with("spin ") || rest.starts_with("check ") ||
+                    rest.starts_with("string "),
+                "advertised option types must be well formed: " + line);
+        if (rest == "button") {
+            continue;
+        }
+        const std::string default_marker = " default ";
+        const std::size_t default_at = rest.find(default_marker);
+        require(default_at != std::string::npos, "value options must declare a default: " + line);
+        std::string default_value = rest.substr(default_at + default_marker.size());
+        if (rest.starts_with("spin ")) {
+            const std::size_t min_at = default_value.find(" min ");
+            require(min_at != std::string::npos, "spin options must declare a minimum: " + line);
+            const std::string bounds = default_value.substr(min_at);
+            require(bounds.find(" max ") != std::string::npos,
+                    "spin options must declare a maximum: " + line);
+            default_value = default_value.substr(0, min_at);
+        }
+        defaults_transcript += "setoption name " + name + " value " + default_value + "\n";
+    }
+
+    const ControllerResult defaults =
+        run_controller(defaults_transcript + "isready\nquit\n");
+    require(defaults.exit_code == 0 && defaults.diagnostics.empty(),
+            "setting every advertised default must leave stdio clean");
+    const std::vector<std::string> lines = output_lines(defaults.output);
+    require(lines_starting_with(lines, "readyok").size() == 1,
+            "setting every advertised default must still answer isready");
+    require(lines_starting_with(lines, "bestmove ").empty(),
+            "setting options must never start or complete a search");
+}
+
 void test_quit_and_eof_join_without_late_bestmove() {
     const ControllerResult quit = run_controller("position startpos\ngo infinite\nquit\n");
     const ControllerResult eof = run_controller("position startpos\ngo infinite\n");
@@ -1748,7 +1833,7 @@ int main() {
          test_lucas_analysis_options_accept_valid_values_ignore_invalid_values_and_emit_multipv},
         {"Lucas analysis option generation replacement",
          test_lucas_analysis_option_changes_suppress_the_active_generation},
-        {"ponderhit restart lifecycle", test_ponderhit_restarts_the_ponder_search_once},
+        {"ponderhit continuation lifecycle", test_ponderhit_continues_the_ponder_search_in_place},
         {"immediate ponderhit completion", test_immediate_ponderhit_without_observed_reply_still_answers},
         {"ponderhit shutdown suppression", test_quit_and_eof_suppress_a_ponderhit_replacement_search},
         {"idle ponderhit", test_idle_ponderhit_is_quiet},
@@ -1770,6 +1855,9 @@ int main() {
         {"ready during search", test_isready_remains_responsive_during_infinite_search},
         {"position generation replacement", test_position_replacement_suppresses_the_stale_generation},
         {"new game and hash generation replacement", test_ucinewgame_and_hash_changes_suppress_active_generations},
+        {"ucinewgame clears the hash", test_ucinewgame_clears_the_transposition_table_and_records_it},
+        {"debug command toggle", test_debug_command_toggles_hidden_diagnostics},
+        {"handshake option table", test_handshake_option_table_is_unique_and_well_formed},
         {"quit and EOF cleanup", test_quit_and_eof_join_without_late_bestmove},
         {"unknown stop quit", test_unknown_stop_and_blank_commands_are_quiet_and_quit},
         {"protocol-clean output", test_protocol_output_contains_only_valid_uci_responses},

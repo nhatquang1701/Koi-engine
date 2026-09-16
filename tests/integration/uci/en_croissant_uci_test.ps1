@@ -46,7 +46,7 @@ try {
             $secondBestmoves.Add($line)
         } elseif ($line -match ' multipv ([1-9][0-9]*) score ') {
             $null = $multiPvRanks.Add([int]$Matches[1])
-        } elseif ($line -notmatch '^info depth [1-9][0-9]* seldepth [0-9]+ multipv [1-9][0-9]* score (cp|mate) -?[0-9]+ nodes [0-9]+ nps [0-9]+ time [0-9]+ pv( [a-h][1-8][a-h][1-8][nbrq]?)*( tbhits [0-9]+)?$') {
+        } elseif ($line -notmatch '^info depth [1-9][0-9]* seldepth [0-9]+ multipv [1-9][0-9]* score (cp|mate) -?[0-9]+ nodes [0-9]+ nps [0-9]+ hashfull [0-9]+ time [0-9]+ pv( [a-h][1-8][a-h][1-8][nbrq]?)*( tbhits [0-9]+)?$') {
             throw "Invalid MultiPV output: $line"
         }
     }

@@ -103,6 +103,30 @@ TimeManager::TimeManager(SearchLimits limits, Color side_to_move, std::uint8_t s
                          RootTimingContext root_context,
                          TimePointProvider now)
     : limits_(std::move(limits)), root_context_(root_context), now_(std::move(now)), started_(this->now()) {
+    initialize(side_to_move, speed_percent, move_overhead_ms, slow_mover_percent);
+}
+
+void TimeManager::reconfigure(const SearchLimits& limits, Color side_to_move,
+                              std::uint8_t speed_percent, std::uint32_t move_overhead_ms,
+                              std::uint32_t slow_mover_percent,
+                              const RootTimingContext& root_context) {
+    limits_ = limits;
+    root_context_ = root_context;
+    started_ = now();
+    initialize(side_to_move, speed_percent, move_overhead_ms, slow_mover_percent);
+}
+
+void TimeManager::initialize(Color side_to_move, std::uint8_t speed_percent,
+                             std::uint32_t move_overhead_ms, std::uint32_t slow_mover_percent) {
+    budget_.reset();
+    timing_ = TimeManagementStats{};
+    previous_score_.reset();
+    stable_observations_ = 0;
+    hard_position_ = false;
+    clock_mode_ = false;
+    emergency_pacing_ = false;
+    hard_deadline_reached_.store(false, std::memory_order_relaxed);
+
     timing_.initial_hardness = initial_hardness(root_context_);
     timing_.observed_hardness = timing_.initial_hardness;
     hard_position_ = timing_.initial_hardness >= 35;

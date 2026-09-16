@@ -30,9 +30,18 @@ public:
         std::chrono::milliseconds estimated_next_iteration) const noexcept;
     [[nodiscard]] TimeManagementStats diagnostics() const noexcept;
 
+    // Re-arms the manager for a search that keeps running but changes limits
+    // mid-flight (UCI ponderhit). The elapsed clock restarts at the moment of
+    // the conversion so the new budget is fully available.
+    void reconfigure(const SearchLimits& limits, Color side_to_move, std::uint8_t speed_percent,
+                     std::uint32_t move_overhead_ms, std::uint32_t slow_mover_percent,
+                     const RootTimingContext& root_context);
+
 private:
     [[nodiscard]] std::chrono::steady_clock::time_point now() const noexcept;
     [[nodiscard]] static int initial_hardness(const RootTimingContext& context) noexcept;
+    void initialize(Color side_to_move, std::uint8_t speed_percent, std::uint32_t move_overhead_ms,
+                    std::uint32_t slow_mover_percent);
 
     SearchLimits limits_;
     std::optional<std::chrono::milliseconds> budget_;

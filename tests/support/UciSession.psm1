@@ -29,7 +29,7 @@ $script:UciShutdownMilliseconds = 5000
 $script:KoiSessions = [System.Collections.Generic.List[System.Diagnostics.Process]]::new()
 
 $script:UciTranscriptLinePattern =
-    '^(id |option |info depth [1-9][0-9]* seldepth [0-9]+ multipv [1-9][0-9]* score (cp|mate) -?[0-9]+ nodes [0-9]+ nps [0-9]+ time [0-9]+ pv( [a-h][1-8][a-h][1-8][nbrq]?)*( tbhits [0-9]+)?$)'
+    '^(id |option |info depth [1-9][0-9]* seldepth [0-9]+ multipv [1-9][0-9]* score (cp|mate) -?[0-9]+ nodes [0-9]+ nps [0-9]+ hashfull [0-9]+ time [0-9]+ pv( [a-h][1-8][a-h][1-8][nbrq]?)*( tbhits [0-9]+)?$)'
 
 function Start-UciSession {
     <#
@@ -262,7 +262,7 @@ function Test-SearchInfo {
         [string]$Line
     )
 
-    return $Line -match '^info depth [1-9][0-9]* seldepth [0-9]+ multipv [1-9][0-6]? score (cp|mate) -?[0-9]+ nodes [0-9]+ nps [0-9]+ time [0-9]+ pv( [a-h][1-8][a-h][1-8][nbrq]?)*( tbhits [0-9]+)?$'
+    return $Line -match '^info depth [1-9][0-9]* seldepth [0-9]+ multipv [1-9][0-6]? score (cp|mate) -?[0-9]+ nodes [0-9]+ nps [0-9]+ hashfull [0-9]+ time [0-9]+ pv( [a-h][1-8][a-h][1-8][nbrq]?)*( tbhits [0-9]+)?$'
 }
 
 Export-ModuleMember -Function Start-UciSession, Stop-AllUciSessions, Send-UciCommand,

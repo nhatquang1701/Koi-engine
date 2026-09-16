@@ -12,3 +12,4 @@ strength pass. Paths are intentionally stable because plans link to them.
 | `2026-09-12-koi-architecture-stage5.md` | Stage 5 verification. |
 | `2026-09-12-koi-architecture-stage6-final-review.md` | Stage 6 / final architecture review and accepted baseline. |
 | `2026-09-12-search-strength-pass-working-summary.md` | Search strength pass working summary. |
+| `2026-09-16-uci-controller-improvement.md` | UCI controller improvement verification. |
