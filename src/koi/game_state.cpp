@@ -1562,13 +1562,20 @@ public:
     detail::CompatibilityMirror compatibility_mirror{};
     Position native_position{};
     mutable detail::FeatureState feature_state{};
+    // Search-only states disable shadow maintenance (see detach_mirror()).
+    // The flag is copied so every search descendant inherits it.
+    bool mirror_tracking = true;
 
     Impl() = default;
 
+    // The feature cache is a pure accelerator: a copied state recomputes the
+    // features it needs.  Dropping the 256-slot copy keeps per-node search
+    // copies (root-parallel workers, legality probes) inexpensive while
+    // preserving identical evaluation results.
     Impl(const Impl& other) : compatibility_mirror(other.compatibility_mirror),
                               native_position(other.native_position),
-                              feature_state(other.feature_state,
-                                            other.compatibility_mirror.history_size()) {}
+                              feature_state(),
+                              mirror_tracking(other.mirror_tracking) {}
 };
 
 GameState::GameState() : impl_(std::make_unique<Impl>()) {}
@@ -1665,6 +1672,11 @@ PositionConsistencySnapshot GameState::consistency_snapshot() const {
 }
 
 bool GameState::native_shadow_consistent() const noexcept {
+    if (!impl_->mirror_tracking) {
+        // Search states deliberately stop maintaining the shadow board; there
+        // is no recorded shadow state left to compare against.
+        return true;
+    }
     return impl_->compatibility_mirror.matches(impl_->native_position);
 }
 
@@ -1796,7 +1808,7 @@ std::optional<MoveMetadata> GameState::metadata_for_native_move(
          (check_flag_mode == CheckFlagMode::quiet_moves_only &&
           !metadata.is_capture() && move.promotion() == Promotion::none));
     if (analyze_check) {
-        if (check_flag_mode == CheckFlagMode::quiet_moves_only) {
+        if (check_flag_mode == CheckFlagMode::quiet_moves_only || !impl_->mirror_tracking) {
             metadata.gives_check = native_move_gives_check(impl_->native_position, move);
         } else {
             metadata.gives_check = impl_->compatibility_mirror.gives_check(move);
@@ -1912,21 +1924,23 @@ bool GameState::apply_generated_move(const MoveMetadata& metadata,
     if (!impl_->native_position.make_generated_move(metadata.move)) {
         return false;
     }
-    const std::size_t mirror_history_before =
-        impl_->compatibility_mirror.history_size();
-    if (!impl_->compatibility_mirror.apply_generated_move(metadata, verify_shadow_legality)) {
-        if (impl_->compatibility_mirror.history_size() > mirror_history_before) {
-            (void)impl_->compatibility_mirror.undo_move();
+    if (impl_->mirror_tracking) {
+        const std::size_t mirror_history_before =
+            impl_->compatibility_mirror.history_size();
+        if (!impl_->compatibility_mirror.apply_generated_move(metadata, verify_shadow_legality)) {
+            if (impl_->compatibility_mirror.history_size() > mirror_history_before) {
+                (void)impl_->compatibility_mirror.undo_move();
+            }
+            (void)impl_->native_position.unmake_move();
+            return false;
         }
-        (void)impl_->native_position.unmake_move();
-        return false;
-    }
-    if (verify_mirror && !impl_->compatibility_mirror.matches(impl_->native_position)) {
-        if (impl_->compatibility_mirror.history_size() > mirror_history_before) {
-            (void)impl_->compatibility_mirror.undo_move();
+        if (verify_mirror && !impl_->compatibility_mirror.matches(impl_->native_position)) {
+            if (impl_->compatibility_mirror.history_size() > mirror_history_before) {
+                (void)impl_->compatibility_mirror.undo_move();
+            }
+            (void)impl_->native_position.unmake_move();
+            return false;
         }
-        (void)impl_->native_position.unmake_move();
-        return false;
     }
     invalidate_feature_cache();
     return true;
@@ -1960,25 +1974,28 @@ bool GameState::make_search_move(const MoveMetadata& metadata) noexcept {
     return apply_generated_move(search_metadata, false, false);
 }
 
+void GameState::detach_mirror() noexcept {
+    impl_->mirror_tracking = false;
+}
+
 bool GameState::unmake_move() noexcept {
-    if (impl_->compatibility_mirror.history_size() == 0 ||
-        impl_->compatibility_mirror.last_move_is_null()) {
-        return false;
+    if (impl_->mirror_tracking) {
+        if (impl_->compatibility_mirror.history_size() == 0 ||
+            impl_->compatibility_mirror.last_move_is_null()) {
+            return false;
+        }
+        if (!impl_->compatibility_mirror.undo_move()) {
+            return false;
+        }
     }
-    if (!impl_->compatibility_mirror.undo_move()) {
-        return false;
-    }
-    if (!impl_->native_position.unmake_move()) {
-        return false;
-    }
-    return true;
+    return impl_->native_position.unmake_move();
 }
 
 bool GameState::make_null_move() noexcept {
     if (!impl_->native_position.make_null_move()) {
         return false;
     }
-    if (!impl_->compatibility_mirror.apply_null_move()) {
+    if (impl_->mirror_tracking && !impl_->compatibility_mirror.apply_null_move()) {
         (void)impl_->native_position.unmake_null_move();
         return false;
     }
@@ -1987,17 +2004,16 @@ bool GameState::make_null_move() noexcept {
 }
 
 bool GameState::unmake_null_move() noexcept {
-    if (impl_->compatibility_mirror.history_size() == 0 ||
-        !impl_->compatibility_mirror.last_move_is_null()) {
-        return false;
+    if (impl_->mirror_tracking) {
+        if (impl_->compatibility_mirror.history_size() == 0 ||
+            !impl_->compatibility_mirror.last_move_is_null()) {
+            return false;
+        }
+        if (!impl_->compatibility_mirror.undo_null_move()) {
+            return false;
+        }
     }
-    if (!impl_->compatibility_mirror.undo_null_move()) {
-        return false;
-    }
-    if (!impl_->native_position.unmake_null_move()) {
-        return false;
-    }
-    return true;
+    return impl_->native_position.unmake_null_move();
 }
 
 void GameState::invalidate_feature_cache() noexcept {

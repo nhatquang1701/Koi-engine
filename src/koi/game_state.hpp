@@ -243,6 +243,12 @@ public:
     // is performed at search boundaries to avoid repeating the same 12-piece
     // comparison at every interior node.
     bool make_search_move(const MoveMetadata& metadata) noexcept;
+    // Search-only: stop maintaining the vendored compatibility board for this
+    // state and every state copied from it. Search never reads the shadow, so
+    // detaching removes a second board copy from each interior make/unmake.
+    // Public API states must keep mirror tracking enabled because legacy
+    // consumers (Polyglot, diagnostics, shadow verification) rely on it.
+    void detach_mirror() noexcept;
     bool unmake_move() noexcept;
     bool make_null_move() noexcept;
     bool unmake_null_move() noexcept;

@@ -186,6 +186,7 @@ struct NativeState {
 };
 
 bool has_legal_en_passant_capture(const NativeState& state) noexcept;
+bool has_legal_en_passant_capture_mutable(NativeState& state) noexcept;
 
 std::uint64_t bit(int square) noexcept {
     return valid_square(square) ? (std::uint64_t{1} << square) : 0;
@@ -250,7 +251,7 @@ void add_derived_piece(NativeState& state, Piece piece, int square) noexcept {
 void remove_rule_keys(NativeState& state) noexcept {
     const ZobristKeys& keys = zobrist();
     state.key ^= keys.castling[state.castling & kAllCastling];
-    if (has_legal_en_passant_capture(state)) {
+    if (has_legal_en_passant_capture_mutable(state)) {
         state.key ^= keys.en_passant[state.en_passant.index() & 7];
     }
     if (state.side == Color::black) {
@@ -261,7 +262,7 @@ void remove_rule_keys(NativeState& state) noexcept {
 void add_rule_keys(NativeState& state) noexcept {
     const ZobristKeys& keys = zobrist();
     state.key ^= keys.castling[state.castling & kAllCastling];
-    if (has_legal_en_passant_capture(state)) {
+    if (has_legal_en_passant_capture_mutable(state)) {
         state.key ^= keys.en_passant[state.en_passant.index() & 7];
     }
     if (state.side == Color::black) {
@@ -404,7 +405,14 @@ bool is_checked(const NativeState& state, Color color) noexcept {
     return king < 0 || square_attacked(state, king, opposite(color));
 }
 
-bool has_legal_en_passant_capture(const NativeState& state) noexcept {
+namespace {
+
+// In-place variant used by the make/unmake hot path.  Applying the candidate
+// capture directly to the board and the two pawn bitboards -- and restoring
+// the exact same fields afterwards -- avoids the full NativeState copy
+// (board + 256-entry history, roughly 75 KiB) that the read-only wrapper must
+// still pay for its rare const callers.
+bool has_legal_en_passant_capture_in_place(NativeState& state) noexcept {
     if (state.en_passant.index() >= Square::kInvalid) {
         return false;
     }
@@ -423,6 +431,9 @@ bool has_legal_en_passant_capture(const NativeState& state) noexcept {
         return false;
     }
 
+    const std::size_t side_index = side == Color::white ? 0U : 1U;
+    const std::size_t opposite_index = 1U - side_index;
+    const std::size_t pawn_index = static_cast<std::size_t>(PieceType::pawn);
     for (const int source_file : {file_of(target) - 1, file_of(target) + 1}) {
         if (source_file < 0 || source_file >= 8) {
             continue;
@@ -433,15 +444,38 @@ bool has_legal_en_passant_capture(const NativeState& state) noexcept {
             continue;
         }
 
-        NativeState candidate = state;
-        candidate.board[static_cast<std::size_t>(source)] = {};
-        candidate.board[static_cast<std::size_t>(captured_square)] = {};
-        candidate.board[static_cast<std::size_t>(target)] = pawn;
-        if (!is_checked(candidate, side)) {
+        const std::uint64_t source_bit = std::uint64_t{1} << source;
+        const std::uint64_t captured_bit = std::uint64_t{1} << captured_square;
+        const std::uint64_t target_bit = std::uint64_t{1} << target;
+        state.board[static_cast<std::size_t>(source)] = {};
+        state.board[static_cast<std::size_t>(captured_square)] = {};
+        state.board[static_cast<std::size_t>(target)] = pawn;
+        state.piece_bitboards[side_index][pawn_index] &= ~source_bit;
+        state.piece_bitboards[side_index][pawn_index] |= target_bit;
+        state.piece_bitboards[opposite_index][pawn_index] &= ~captured_bit;
+        const bool legal = !is_checked(state, side);
+        state.board[static_cast<std::size_t>(source)] = pawn;
+        state.board[static_cast<std::size_t>(captured_square)] = captured;
+        state.board[static_cast<std::size_t>(target)] = {};
+        state.piece_bitboards[side_index][pawn_index] |= source_bit;
+        state.piece_bitboards[side_index][pawn_index] &= ~target_bit;
+        state.piece_bitboards[opposite_index][pawn_index] |= captured_bit;
+        if (legal) {
             return true;
         }
     }
     return false;
+}
+
+} // namespace
+
+bool has_legal_en_passant_capture_mutable(NativeState& state) noexcept {
+    return has_legal_en_passant_capture_in_place(state);
+}
+
+bool has_legal_en_passant_capture(const NativeState& state) noexcept {
+    NativeState scratch = state;
+    return has_legal_en_passant_capture_in_place(scratch);
 }
 
 bool safe_king_step(NativeState& state, int from, int to, Color side) noexcept {
@@ -1213,7 +1247,7 @@ private:
         }
         state.side = opposite(state.side);
         if (state.en_passant.index() < Square::kInvalid &&
-            !has_legal_en_passant_capture(state)) {
+            !has_legal_en_passant_capture_mutable(state)) {
             state.en_passant = {};
         }
         state.occupied = state.occupancy[0] | state.occupancy[1];

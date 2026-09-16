@@ -2242,6 +2242,11 @@ void SearchRunner::run() {
 
     const auto started = std::chrono::steady_clock::now();
     GameState root = session->root();
+    // Search never reads the vendored compatibility board. Detaching it keeps
+    // interior make/unmake from copying a second board on every node; native
+    // legality and keys remain the sole authority. Public GameState consumers
+    // (UCI book probing, diagnostics) keep mirror tracking enabled.
+    root.detach_mirror();
     // Mutable copy: a UCI ponderhit converts the running search in place and
     // re-arms timing at the top of the next iteration.
     SearchLimits limits = session->limits();
