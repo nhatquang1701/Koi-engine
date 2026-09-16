@@ -137,8 +137,13 @@ struct SearchContext {
         }
     };
 
-    static constexpr std::size_t kEvaluationCacheSize = 8 * 1024;
+    static constexpr std::size_t kEvaluationCacheSize = 32 * 1024;
     static constexpr std::size_t kQSearchCacheSize = 4 * 1024;
+    // Upper bound on how many `interrupted()` calls may skip the wall-clock
+    // read. Every call still inspects the atomic stop flags, so an external
+    // stop is immediate; only a timer deadline can be observed a few hundred
+    // microseconds late.
+    static constexpr int kClockPollInterval = 256;
 
     static constexpr std::size_t stack_capacity() noexcept {
         return SearchStack::kCapacity;
@@ -160,6 +165,7 @@ struct SearchContext {
     SearchStats stats;
     bool aborted = false;
     bool allow_root_forcing_extension = false;
+    int clock_poll_countdown = 0;
     int quiescence_check_depth_limit = kMaximumQuiescenceCheckDepth;
     SearchStack stack;
     std::unique_ptr<EvaluationCacheEntry[]> evaluation_cache;
@@ -369,6 +375,11 @@ struct SearchContext {
             aborted = true;
             return true;
         }
+        if (clock_poll_countdown > 0) {
+            --clock_poll_countdown;
+            return false;
+        }
+        clock_poll_countdown = kClockPollInterval;
         if (time_manager.should_stop(visited_nodes())) {
             request_abort();
             return true;
@@ -1583,7 +1594,10 @@ struct SearchContext {
         int move_number = 0;
         bool prior_child_fail_high = false;
         bool singular_probe_done = false;
-        std::array<DeferredHistoryMove, kMaximumLegalMoves> failed_moves{};
+        // Only the first `failed_move_count` entries are ever read, so the
+        // array is intentionally left uninitialized to avoid clearing ~3 KB
+        // at every negamax node.
+        std::array<DeferredHistoryMove, kMaximumLegalMoves> failed_moves;
         std::size_t failed_move_count = 0;
         MoveMetadata best_metadata{};
         Color best_history_side = side_to_move;

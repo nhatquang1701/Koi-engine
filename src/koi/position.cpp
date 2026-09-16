@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <charconv>
 #include <cctype>
 #include <cstdint>
@@ -298,66 +299,102 @@ bool aligned_slider_attacks(const Board& board, int source, int target, PieceTyp
 
 bool square_attacked(const NativeState& state, int target, Color attacker) noexcept {
     if (!valid_square(target)) return false;
-    for (int source = 0; source < 64; ++source) {
-        const Piece piece = state.board[static_cast<std::size_t>(source)];
-        if (piece.empty() || piece.color != attacker) continue;
-        const int file_delta = file_of(target) - file_of(source);
-        const int rank_delta = rank_of(target) - rank_of(source);
-        const int abs_file = std::abs(file_delta);
-        const int abs_rank = std::abs(rank_delta);
-        bool attacks = false;
-        switch (piece.type) {
-        case PieceType::pawn:
-            attacks = rank_delta == (attacker == Color::white ? 1 : -1) && abs_file == 1;
-            break;
-        case PieceType::knight:
-            attacks = (abs_file == 1 && abs_rank == 2) || (abs_file == 2 && abs_rank == 1);
-            break;
-        case PieceType::king:
-            attacks = abs_file <= 1 && abs_rank <= 1 && (abs_file != 0 || abs_rank != 0);
-            break;
-        case PieceType::bishop:
-        case PieceType::rook:
-        case PieceType::queen:
-            attacks = aligned_slider_attacks(state.board, source, target, piece.type);
-            break;
-        case PieceType::none:
-            break;
+    const std::size_t color_index = attacker == Color::white ? 0U : 1U;
+    const int target_file = file_of(target);
+    const int target_rank = rank_of(target);
+
+    // Pawn attackers are found by testing the two squares a pawn of the given
+    // colour could attack from, instead of scanning the whole board.
+    const std::uint64_t pawns =
+        state.piece_bitboards[color_index][static_cast<std::size_t>(PieceType::pawn)];
+    if (attacker == Color::white) {
+        if (target_file >= 1 && (pawns & bit(target - 9)) != 0) return true;
+        if (target_file <= 6 && (pawns & bit(target - 7)) != 0) return true;
+    } else {
+        if (target_file >= 1 && (pawns & bit(target + 7)) != 0) return true;
+        if (target_file <= 6 && (pawns & bit(target + 9)) != 0) return true;
+    }
+
+    // Knights and kings move without blocking, so their attack test is a pure
+    // geometric check over a handful of pieces.
+    for (const PieceType type : {PieceType::knight, PieceType::king}) {
+        std::uint64_t remaining =
+            state.piece_bitboards[color_index][static_cast<std::size_t>(type)];
+        while (remaining != 0) {
+            const int source = static_cast<int>(std::countr_zero(remaining));
+            remaining &= remaining - 1;
+            const int abs_file = std::abs(target_file - file_of(source));
+            const int abs_rank = std::abs(target_rank - rank_of(source));
+            if (type == PieceType::knight) {
+                if ((abs_file == 1 && abs_rank == 2) || (abs_file == 2 && abs_rank == 1)) {
+                    return true;
+                }
+            } else if (abs_file <= 1 && abs_rank <= 1 && (abs_file != 0 || abs_rank != 0)) {
+                return true;
+            }
         }
-        if (attacks) return true;
+    }
+
+    // Sliders need the board for blocking, but only the pieces of the attacking
+    // side have to be examined.
+    for (const PieceType type : {PieceType::bishop, PieceType::rook, PieceType::queen}) {
+        std::uint64_t remaining =
+            state.piece_bitboards[color_index][static_cast<std::size_t>(type)];
+        while (remaining != 0) {
+            const int source = static_cast<int>(std::countr_zero(remaining));
+            remaining &= remaining - 1;
+            if (aligned_slider_attacks(state.board, source, target, type)) {
+                return true;
+            }
+        }
     }
     return false;
 }
 
 int attacker_count(const NativeState& state, int target, Color attacker) noexcept {
     int count = 0;
-    for (int source = 0; source < 64; ++source) {
-        const Piece piece = state.board[static_cast<std::size_t>(source)];
-        if (piece.empty() || piece.color != attacker) continue;
-        const int file_delta = file_of(target) - file_of(source);
-        const int rank_delta = rank_of(target) - rank_of(source);
-        const int abs_file = std::abs(file_delta);
-        const int abs_rank = std::abs(rank_delta);
-        bool attacks = false;
-        switch (piece.type) {
-        case PieceType::pawn:
-            attacks = rank_delta == (attacker == Color::white ? 1 : -1) && abs_file == 1;
-            break;
-        case PieceType::knight:
-            attacks = (abs_file == 1 && abs_rank == 2) || (abs_file == 2 && abs_rank == 1);
-            break;
-        case PieceType::king:
-            attacks = abs_file <= 1 && abs_rank <= 1 && (abs_file != 0 || abs_rank != 0);
-            break;
-        case PieceType::bishop:
-        case PieceType::rook:
-        case PieceType::queen:
-            attacks = aligned_slider_attacks(state.board, source, target, piece.type);
-            break;
-        case PieceType::none:
-            break;
+    const std::size_t color_index = attacker == Color::white ? 0U : 1U;
+    const int target_file = file_of(target);
+    const int target_rank = rank_of(target);
+
+    const std::uint64_t pawns =
+        state.piece_bitboards[color_index][static_cast<std::size_t>(PieceType::pawn)];
+    if (attacker == Color::white) {
+        if (target_file >= 1 && (pawns & bit(target - 9)) != 0) ++count;
+        if (target_file <= 6 && (pawns & bit(target - 7)) != 0) ++count;
+    } else {
+        if (target_file >= 1 && (pawns & bit(target + 7)) != 0) ++count;
+        if (target_file <= 6 && (pawns & bit(target + 9)) != 0) ++count;
+    }
+
+    for (const PieceType type : {PieceType::knight, PieceType::king}) {
+        std::uint64_t remaining =
+            state.piece_bitboards[color_index][static_cast<std::size_t>(type)];
+        while (remaining != 0) {
+            const int source = static_cast<int>(std::countr_zero(remaining));
+            remaining &= remaining - 1;
+            const int abs_file = std::abs(target_file - file_of(source));
+            const int abs_rank = std::abs(target_rank - rank_of(source));
+            if (type == PieceType::knight) {
+                if ((abs_file == 1 && abs_rank == 2) || (abs_file == 2 && abs_rank == 1)) {
+                    ++count;
+                }
+            } else if (abs_file <= 1 && abs_rank <= 1 && (abs_file != 0 || abs_rank != 0)) {
+                ++count;
+            }
         }
-        if (attacks) ++count;
+    }
+
+    for (const PieceType type : {PieceType::bishop, PieceType::rook, PieceType::queen}) {
+        std::uint64_t remaining =
+            state.piece_bitboards[color_index][static_cast<std::size_t>(type)];
+        while (remaining != 0) {
+            const int source = static_cast<int>(std::countr_zero(remaining));
+            remaining &= remaining - 1;
+            if (aligned_slider_attacks(state.board, source, target, type)) {
+                ++count;
+            }
+        }
     }
     return count;
 }

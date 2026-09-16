@@ -452,20 +452,17 @@ int king_ring_attack_units(const PositionFeatures& features, Color color) noexce
         return 0;
     }
 
+    // `attacked_squares[color]` is the union of every attack mask for that
+    // color, so whether a king square is attacked is a single bit test instead
+    // of a full-board scan with sliding-piece ray walks.
     const auto king_is_attacked = [&features](Color victim) noexcept {
         const std::uint8_t victim_king = features.king_squares[color_index(victim)].index();
         if (victim_king >= 64) {
             return false;
         }
         const Color attacker = opposite(victim);
-        for (std::uint8_t source = 0; source < 64; ++source) {
-            const Piece piece = features.board[source];
-            if (!piece.empty() && piece.color == attacker &&
-                piece_attacks_square(features, source, victim_king)) {
-                return true;
-            }
-        }
-        return false;
+        return (features.attacked_squares[color_index(attacker)] &
+                (std::uint64_t{1} << victim_king)) != 0;
     };
 
     // Checked positions are already handled by complete evasion, quiescence,
