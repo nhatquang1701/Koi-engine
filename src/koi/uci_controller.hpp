@@ -115,6 +115,7 @@ private:
     std::uint8_t book_depth_ = 16;
     std::uint32_t random_seed_ = 0;
     std::filesystem::path syzygy_path_;
+    std::filesystem::path eval_file_;
     std::uint8_t syzygy_probe_depth_ = 1;
     std::uint8_t syzygy_probe_limit_ = 5;
     bool syzygy_50_move_rule_ = true;

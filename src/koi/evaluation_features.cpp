@@ -19,16 +19,31 @@ constexpr std::size_t kPassedPawnFlag = 3;
     return color == Color::white ? kWhite : kBlack;
 }
 
+// NNUE features are expressed from the side to move's perspective: squares are
+// mirrored vertically and piece colours are swapped so the mover always looks
+// like white. This is what lets one network distinguish positions that differ
+// only in whose turn it is, and it is the standard half-king-style convention.
+[[nodiscard]] constexpr std::size_t perspective_square(const std::size_t square,
+                                                       const Color side) noexcept {
+    return side == Color::white ? square : square ^ 56U;
+}
+
+[[nodiscard]] constexpr std::size_t perspective_color(const Color color,
+                                                      const Color side) noexcept {
+    return color == side ? kWhite : kBlack;
+}
+
 [[nodiscard]] NnueFeatureVectorV1 encode_piece_square(const EvaluationFeatures& features) noexcept {
     NnueFeatureVectorV1 encoded{};
+    const Color mover = features.position.side_to_move;
     for (std::size_t square = 0; square < features.position.board.size(); ++square) {
         const Piece piece = features.position.board[square];
         if (piece.empty() || piece.type == PieceType::king) {
             continue;
         }
-        const std::size_t color_offset = color_index(piece.color) * 6U;
+        const std::size_t color_offset = perspective_color(piece.color, mover) * 6U;
         const std::size_t type_offset = static_cast<std::size_t>(piece.type) - 1U;
-        encoded[(color_offset + type_offset) * 64U + square] = 1;
+        encoded[(color_offset + type_offset) * 64U + perspective_square(square, mover)] = 1;
     }
     return encoded;
 }
@@ -41,19 +56,20 @@ struct PawnFileState {
 
 [[nodiscard]] PawnFileState pawn_file_state(const EvaluationFeatures& features) noexcept {
     PawnFileState result;
+    const Color mover = features.position.side_to_move;
     for (std::size_t square = 0; square < features.position.board.size(); ++square) {
         const Piece pawn = features.position.board[square];
         if (pawn.type != PieceType::pawn) {
             continue;
         }
-        const std::size_t color = color_index(pawn.color);
+        const std::size_t color = perspective_color(pawn.color, mover);
         const std::size_t file = square % 8U;
         result.counts[color][file] = static_cast<std::uint8_t>(
             std::min<unsigned>(255U, result.counts[color][file] + 1U));
     }
 
     for (std::size_t color = 0; color < 2; ++color) {
-        const Color own_color = color == kWhite ? Color::white : Color::black;
+        const Color own_color = color == kWhite ? mover : opposite(mover);
         const Color enemy_color = opposite(own_color);
         for (std::size_t file = 0; file < 8; ++file) {
             const bool has_pawn = result.counts[color][file] != 0;
@@ -68,7 +84,8 @@ struct PawnFileState {
             bool has_passed_pawn = false;
             for (std::size_t square = 0; square < features.position.board.size(); ++square) {
                 const Piece pawn = features.position.board[square];
-                if (pawn.type != PieceType::pawn || pawn.color != own_color ||
+                if (pawn.type != PieceType::pawn ||
+                    perspective_color(pawn.color, mover) != color ||
                     square % 8U != file) {
                     continue;
                 }
@@ -125,9 +142,13 @@ NnueFeatureVectorV2 EvaluationFeatureExtractor::encode_piece_square_king_pawn_v2
     std::copy(piece_square.begin(), piece_square.end(), encoded.begin());
 
     for (std::size_t color = 0; color < 2; ++color) {
-        const std::uint8_t king_square = features.position.king_squares[color].index();
+        const Color king_color = color == kWhite ? features.position.side_to_move :
+                                                   opposite(features.position.side_to_move);
+        const std::uint8_t king_square = features.position.king_squares[
+            color_index(king_color)].index();
         if (king_square < Square::kInvalid) {
-            encoded[kNnuePieceSquareV1FeatureCount + color * 64U + king_square] = 1;
+            encoded[kNnuePieceSquareV1FeatureCount + color * 64U +
+                    perspective_square(king_square, features.position.side_to_move)] = 1;
         }
     }
 
@@ -143,6 +164,22 @@ NnueFeatureVectorV2 EvaluationFeatureExtractor::encode_piece_square_king_pawn_v2
         }
     }
     return encoded;
+}
+
+NnueSparseFeatures EvaluationFeatureExtractor::encode_sparse_v2(
+    const EvaluationFeatures& features) noexcept {
+    const NnueFeatureVectorV2 dense = encode_piece_square_king_pawn_v2(features);
+    NnueSparseFeatures sparse;
+    for (std::size_t index = 0; index < dense.size(); ++index) {
+        if (dense[index] == 0) {
+            continue;
+        }
+        if (sparse.count >= sparse.indices.size()) {
+            break;
+        }
+        sparse.indices[sparse.count++] = static_cast<std::uint16_t>(index);
+    }
+    return sparse;
 }
 
 } // namespace koi

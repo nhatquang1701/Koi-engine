@@ -45,6 +45,10 @@ public:
     [[nodiscard]] SearchHandle start(GameState root, SearchLimits limits,
                                      SearchEventSink sink = {}, SearchOptions options = {});
     [[nodiscard]] HashResizeResult set_hash_size_mb(std::size_t megabytes);
+    // Replaces the evaluator used by subsequent searches.  A search that is
+    // already running keeps the evaluator it started with; the next start()
+    // observes the new one.  The caller must not pass a null pointer.
+    void set_evaluator(std::shared_ptr<const Evaluator> evaluator);
     [[nodiscard]] std::size_t hash_size_mb() const noexcept;
     // Approximate transposition-table occupancy in permill (0..1000) for UCI
     // `info ... hashfull` reporting.

@@ -1,7 +1,9 @@
 #include <array>
+#include <cstdlib>
 #include <filesystem>
 #include <iostream>
 #include <memory>
+#include <optional>
 #include <utility>
 
 #ifdef _WIN32
@@ -12,6 +14,7 @@
 
 #include "koi/classical_evaluator.hpp"
 #include "koi/cpu_features.hpp"
+#include "koi/nnue.hpp"
 #include "koi/search_service.hpp"
 #include "koi/uci_controller.hpp"
 
@@ -49,8 +52,33 @@ int main(int argc, char* argv[]) {
     // Bootstrap with a tiny table so a GUI/tournament can deliver its Hash
     // option before a large default allocation is charged to the first clock.
     // UciController materializes the configured 512 MB default at isready.
-    koi::SearchService search_service(std::make_shared<koi::ClassicalEvaluator>(), {}, 1);
+    //
+    // Evaluator selection: a network named `koi.nnue` beside the executable
+    // (or the path in KOI_NNUE_PATH) is activated automatically; otherwise the
+    // classical evaluator stays in charge.  `setoption name EvalFile` can load
+    // a different network at runtime, and a rejected file always falls back to
+    // the classical evaluator instead of failing the engine.
+    const std::filesystem::path engine_directory = executable_directory(argc, argv);
+    std::filesystem::path nnue_path;
+    if (const char* environment_path = std::getenv("KOI_NNUE_PATH");
+        environment_path != nullptr && *environment_path != '\0') {
+        nnue_path = environment_path;
+    } else if (!engine_directory.empty()) {
+        const std::filesystem::path candidate = engine_directory / "koi.nnue";
+        std::error_code exists_error;
+        if (std::filesystem::exists(candidate, exists_error) && !exists_error) {
+            nnue_path = candidate;
+        }
+    }
+    const koi::EvaluatorSelection selection =
+        nnue_path.empty() ? koi::make_evaluator()
+                          : koi::make_evaluator(std::optional<std::filesystem::path>(nnue_path));
+    if (selection.nnue_error.has_value()) {
+        std::cerr << "koi-engine: NNUE network rejected (" << selection.nnue_error->message
+                  << "); using the classical evaluator.\n";
+    }
+    koi::SearchService search_service(selection.evaluator, {}, 1);
     koi::UciController controller(std::cin, std::cout, std::cerr, std::move(search_service),
-                                  executable_directory(argc, argv));
+                                  engine_directory);
     return controller.run();
 }

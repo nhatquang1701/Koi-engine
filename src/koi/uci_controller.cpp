@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "koi/classical_evaluator.hpp"
+#include "koi/nnue.hpp"
 
 namespace koi {
 
@@ -148,6 +149,7 @@ enum class UciOptionId {
     syzygy_probe_depth,
     syzygy_probe_limit,
     syzygy_50_move_rule,
+    eval_file,
     debug,
     debug_file,
 };
@@ -167,7 +169,7 @@ struct UciOptionDescriptor {
 // and `handle_setoption` consume this table, so an advertised option can never
 // drift out of sync with the option the controller actually applies. The order
 // of the entries is the order advertised to a GUI and must stay stable.
-constexpr std::array<UciOptionDescriptor, 26> kUciOptions{{
+constexpr std::array<UciOptionDescriptor, 27> kUciOptions{{
     {"RandomSeed", UciOptionKind::spin, UciOptionId::random_seed, "0", 0,
      kMaximumRandomSeed, false, true},
     {"Hash", UciOptionKind::spin, UciOptionId::hash, "512", kMinimumHashMegabytes,
@@ -206,6 +208,11 @@ constexpr std::array<UciOptionDescriptor, 26> kUciOptions{{
      kMaximumSyzygyProbeLimit, false, true},
     {"Syzygy50MoveRule", UciOptionKind::check, UciOptionId::syzygy_50_move_rule, "true", 0, 0,
      false, true},
+    // Empty keeps whatever evaluator the engine booted with (the classical
+    // evaluator unless a `koi.nnue` network was found beside the executable or
+    // advertised with KOI_NNUE_PATH).  A non-empty path loads and activates a
+    // Koi NNUE network, with the classical evaluator retained as a fallback.
+    {"EvalFile", UciOptionKind::string, UciOptionId::eval_file, "", 0, 0, false, true},
     // Developer diagnostics stay settable but are intentionally not advertised.
     {"Debug", UciOptionKind::check, UciOptionId::debug, "false", 0, 0, false, false},
     {"DebugFile", UciOptionKind::string, UciOptionId::debug_file, "koi-debug.log", 0, 0, false,
@@ -935,6 +942,38 @@ void UciController::handle_setoption(std::istream& command) {
             rebuild_syzygy();
         });
         break;
+
+    case UciOptionId::eval_file: {
+        if (value.empty()) {
+            // The advertised default is empty: keep the boot-time evaluator
+            // rather than failing a GUI that replays every default value.
+            break;
+        }
+        // Relative paths resolve against the engine directory so a GUI can
+        // pass a bare file name that sits next to koi-engine.exe.
+        std::filesystem::path resolved = value;
+        if (resolved.is_relative() && !executable_directory_.empty()) {
+            resolved = executable_directory_ / resolved;
+        }
+        stop_and_suppress_active_search();
+        const std::expected<NnueNetwork, NnueError> network = NnueLoader::load_file(resolved);
+        if (!network.has_value()) {
+            debug_event("EvalFile rejected " + resolved.string() + ": " +
+                        network.error().message);
+            std::lock_guard lock(output_mutex_);
+            output_ << "info string EvalFile rejected: " << network.error().message << '\n'
+                    << std::flush;
+            break;
+        }
+        auto weights = std::make_shared<const NnueNetwork>(std::move(*network));
+        search_service_.set_evaluator(std::make_shared<NnueEvaluator>(std::move(weights)));
+        eval_file_ = value;
+        debug_json_event("eval_file", "\"path\":" + debug_quoted(resolved.string()) +
+                                           ",\"enabled\":true");
+        std::lock_guard lock(output_mutex_);
+        output_ << "info string NNUE enabled from " << resolved.string() << '\n' << std::flush;
+        break;
+    }
 
     case UciOptionId::debug:
         apply_boolean([this](bool debug) {

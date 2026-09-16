@@ -335,6 +335,96 @@ void accumulate_hidden_avx2(const NnueNetwork& network,
 }
 #endif
 
+void accumulate_hidden_sparse_scalar(const NnueNetwork& network,
+                                     std::span<const std::uint16_t> active,
+                                     std::vector<std::int32_t>& sums) noexcept {
+    const std::size_t hidden_units = network.manifest.layer_sizes[1];
+    for (std::size_t hidden = 0; hidden < hidden_units; ++hidden) {
+        std::int64_t activation = network.hidden_bias[hidden];
+        for (const std::uint16_t feature : active) {
+            activation += network.feature_weights[
+                static_cast<std::size_t>(feature) * hidden_units + hidden];
+        }
+        activation = std::clamp<std::int64_t>(
+            activation, std::numeric_limits<std::int32_t>::min(),
+            std::numeric_limits<std::int32_t>::max());
+        sums[hidden] = static_cast<std::int32_t>(activation);
+    }
+}
+
+#if KOI_NNUE_COMPILED_AVX2
+void accumulate_hidden_sparse_avx2(const NnueNetwork& network,
+                                   std::span<const std::uint16_t> active,
+                                   std::vector<std::int32_t>& sums) noexcept {
+    const std::size_t hidden_units = network.manifest.layer_sizes[1];
+    if (hidden_units % 16U != 0) {
+        accumulate_hidden_sparse_scalar(network, active, sums);
+        return;
+    }
+    // The active features are binary inputs, so the first layer is a sum of
+    // weight rows.  Bounding the accumulated delta keeps the int32 arithmetic
+    // in range exactly like the dense path; the active list is tiny (tens of
+    // entries), so this is safe for any realistic network here.
+    const std::int64_t minimum_delta = static_cast<std::int64_t>(active.size()) *
+        std::numeric_limits<std::int16_t>::min();
+    const std::int64_t maximum_delta = static_cast<std::int64_t>(active.size()) *
+        std::numeric_limits<std::int16_t>::max();
+    for (const std::int32_t bias : network.hidden_bias) {
+        if (static_cast<std::int64_t>(bias) + minimum_delta <
+                std::numeric_limits<std::int32_t>::min() ||
+            static_cast<std::int64_t>(bias) + maximum_delta >
+                std::numeric_limits<std::int32_t>::max()) {
+            accumulate_hidden_sparse_scalar(network, active, sums);
+            return;
+        }
+    }
+    for (std::size_t hidden = 0; hidden < hidden_units; hidden += 16U) {
+        __m256i low = _mm256_loadu_si256(
+            reinterpret_cast<const __m256i*>(network.hidden_bias.data() + hidden));
+        __m256i high = _mm256_loadu_si256(
+            reinterpret_cast<const __m256i*>(network.hidden_bias.data() + hidden + 8U));
+        for (const std::uint16_t feature : active) {
+            const auto* feature_weights = network.feature_weights.data() +
+                static_cast<std::size_t>(feature) * hidden_units + hidden;
+            const __m256i weights = _mm256_loadu_si256(
+                reinterpret_cast<const __m256i*>(feature_weights));
+            const __m128i low_weights = _mm256_castsi256_si128(weights);
+            const __m128i high_weights = _mm256_extracti128_si256(weights, 1);
+            low = _mm256_add_epi32(low, _mm256_cvtepi16_epi32(low_weights));
+            high = _mm256_add_epi32(high, _mm256_cvtepi16_epi32(high_weights));
+        }
+        _mm256_storeu_si256(
+            reinterpret_cast<__m256i*>(sums.data() + hidden), low);
+        _mm256_storeu_si256(
+            reinterpret_cast<__m256i*>(sums.data() + hidden + 8U), high);
+    }
+}
+#endif
+
+[[nodiscard]] int complete_inference(const NnueNetwork& network,
+                                     std::span<const std::int32_t> hidden_sums,
+                                     NnueAccumulator& accumulator) noexcept {
+    const std::size_t hidden_units = network.manifest.layer_sizes[1];
+    const std::size_t bottleneck_units = network.manifest.layer_sizes[2];
+    for (std::size_t hidden = 0; hidden < hidden_units; ++hidden) {
+        accumulator.values[hidden] = static_cast<std::int16_t>(std::clamp<std::int32_t>(
+            hidden_sums[hidden], 0, kKoiNnueClippedReluMaximum));
+    }
+
+    std::int64_t output = network.output_bias;
+    for (std::size_t bottleneck = 0; bottleneck < bottleneck_units; ++bottleneck) {
+        std::int64_t activation = network.bottleneck_bias[bottleneck];
+        for (std::size_t hidden = 0; hidden < hidden_units; ++hidden) {
+            activation += static_cast<std::int64_t>(accumulator.values[hidden]) *
+                network.bottleneck_weights[hidden * bottleneck_units + bottleneck];
+        }
+        activation = std::clamp<std::int64_t>(activation, 0, kKoiNnueClippedReluMaximum);
+        accumulator.bottleneck_values[bottleneck] = static_cast<std::int16_t>(activation);
+        output += activation * network.output_weights[bottleneck];
+    }
+    return clamp_score(output);
+}
+
 [[nodiscard]] int infer_network(const NnueNetwork& network,
                                 std::span<const std::int8_t> encoded,
                                 NnueAccumulator& accumulator,
@@ -360,24 +450,35 @@ void accumulate_hidden_avx2(const NnueNetwork& network,
     (void)use_avx2;
     accumulate_hidden_scalar(network, encoded, hidden_sums);
 #endif
+    return complete_inference(network, hidden_sums, accumulator);
+}
 
-    for (std::size_t hidden = 0; hidden < hidden_units; ++hidden) {
-        accumulator.values[hidden] = static_cast<std::int16_t>(std::clamp<std::int32_t>(
-            hidden_sums[hidden], 0, kKoiNnueClippedReluMaximum));
+[[nodiscard]] int infer_network_sparse(const NnueNetwork& network,
+                                       std::span<const std::uint16_t> active,
+                                       NnueAccumulator& accumulator,
+                                       const bool use_avx2) noexcept {
+    const std::size_t hidden_units = network.manifest.layer_sizes[1];
+    const std::size_t bottleneck_units = network.manifest.layer_sizes[2];
+    if (!arrays_match_manifest(network)) {
+        accumulator.values.clear();
+        accumulator.bottleneck_values.clear();
+        return 0;
     }
 
-    std::int64_t output = network.output_bias;
-    for (std::size_t bottleneck = 0; bottleneck < bottleneck_units; ++bottleneck) {
-        std::int64_t activation = network.bottleneck_bias[bottleneck];
-        for (std::size_t hidden = 0; hidden < hidden_units; ++hidden) {
-            activation += static_cast<std::int64_t>(accumulator.values[hidden]) *
-                network.bottleneck_weights[hidden * bottleneck_units + bottleneck];
-        }
-        activation = std::clamp<std::int64_t>(activation, 0, kKoiNnueClippedReluMaximum);
-        accumulator.bottleneck_values[bottleneck] = static_cast<std::int16_t>(activation);
-        output += activation * network.output_weights[bottleneck];
+    accumulator.values.assign(hidden_units, 0);
+    accumulator.bottleneck_values.assign(bottleneck_units, 0);
+    std::vector<std::int32_t> hidden_sums(hidden_units, 0);
+#if KOI_NNUE_COMPILED_AVX2
+    if (use_avx2) {
+        accumulate_hidden_sparse_avx2(network, active, hidden_sums);
+    } else {
+        accumulate_hidden_sparse_scalar(network, active, hidden_sums);
     }
-    return clamp_score(output);
+#else
+    (void)use_avx2;
+    accumulate_hidden_sparse_scalar(network, active, hidden_sums);
+#endif
+    return complete_inference(network, hidden_sums, accumulator);
 }
 
 } // namespace
@@ -647,13 +748,20 @@ int NnueWorker::evaluate(const EvaluationFeatures& features, const Color perspec
         (path == NnueInferencePath::automatic && avx2_available());
     int score = 0;
     if (use_v2) {
-        const auto encoded = EvaluationFeatureExtractor::encode_piece_square_king_pawn_v2(features);
-        score = infer_network(*weights_, encoded, accumulator_, use_avx2);
+        const NnueSparseFeatures sparse =
+            EvaluationFeatureExtractor::encode_sparse_v2(features);
+        score = infer_network_sparse(
+            *weights_, std::span<const std::uint16_t>(sparse.indices.data(), sparse.count),
+            accumulator_, use_avx2);
     } else {
         const auto encoded = EvaluationFeatureExtractor::encode_piece_square_v1(features);
         score = infer_network(*weights_, encoded, accumulator_, use_avx2);
     }
-    return perspective == Color::white ? score : -score;
+    // The encoder expresses features from the side to move's perspective, so
+    // the raw network score is already relative to the mover. Flip it only
+    // when the caller asked for the opposite perspective.
+    const Color mover = features.position.side_to_move;
+    return perspective == mover ? score : -score;
 }
 
 int NnueWorker::evaluate(const GameState& state, const Color perspective,

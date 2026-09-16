@@ -99,6 +99,13 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
     return SearchHandle(std::move(session));
 }
 
+void SearchService::set_evaluator(std::shared_ptr<const Evaluator> evaluator) {
+    if (!evaluator) {
+        throw std::invalid_argument("SearchService requires a non-null evaluator");
+    }
+    impl_->evaluator = std::move(evaluator);
+}
+
 HashResizeResult SearchService::set_hash_size_mb(std::size_t megabytes) {
     return impl_->table->set_size_mb(megabytes);
 }
