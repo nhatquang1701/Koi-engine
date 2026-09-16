@@ -411,6 +411,7 @@ void test_uci_handshake_has_identity_and_supported_options_in_order() {
         "option name SyzygyProbeDepth type spin default 1 min 1 max 100\n"
         "option name SyzygyProbeLimit type spin default 5 min 0 max 7\n"
         "option name Syzygy50MoveRule type check default true\n"
+        "option name EvalFile type string default \n"
         "uciok\n";
 
     require(result.exit_code == 0, "quit must cause a normal shutdown");
@@ -1696,7 +1697,7 @@ void test_handshake_option_table_is_unique_and_well_formed() {
             "a handshake-only transcript must stay clean");
     const std::vector<std::string> options =
         lines_starting_with(output_lines(handshake.output), "option name ");
-    require(options.size() == 24, "the handshake must advertise exactly 24 options");
+    require(options.size() == 25, "the handshake must advertise exactly 25 options");
 
     const std::string prefix = "option name ";
     std::vector<std::string> names;
