@@ -145,7 +145,11 @@ TimeManager::TimeManager(SearchLimits limits, Color side_to_move, std::uint8_t s
     timing_.emergency_pacing = emergency_pacing_;
 
     const auto base_allocation = timing_.usable / timing_.horizon;
-    const auto increment_credit = three_quarters(clock->increment);
+    // The increment may only pay for a bounded share of the clock. On a fast
+    // control such as 6+1 an uncapped 3/4 increment credit alone can approach
+    // the whole remaining time and leave a single move free to burn it.
+    const auto increment_credit = std::min(three_quarters(clock->increment),
+                                           scale_fraction(timing_.usable, 1, 4));
     const auto raw_soft = saturating_add(base_allocation, increment_credit);
     const auto raw_hard = saturating_add(scale_fraction(base_allocation, 3, 1),
                                          scale_fraction(increment_credit, 3, 2));
@@ -157,7 +161,6 @@ TimeManager::TimeManager(SearchLimits limits, Color side_to_move, std::uint8_t s
     timing_.soft_budget = scale_budget(std::min(raw_soft, timing_.usable));
     timing_.hard_budget = scale_budget(std::min(raw_hard, timing_.usable));
     timing_.soft_budget = std::min(timing_.soft_budget, timing_.hard_budget);
-    normal_hard_budget_ = timing_.hard_budget;
 
     // A three-move extension is useful with a normal clock, but it is unsafe
     // when the entire remaining clock is only a few seconds. TT misses are
@@ -182,6 +185,26 @@ TimeManager::TimeManager(SearchLimits limits, Color side_to_move, std::uint8_t s
         }
         timing_.hard_budget = std::max(timing_.hard_budget, timing_.soft_budget);
     }
+
+    // Flag-proof ceiling. Every heuristic above (increment credit, position
+    // hardness, a skipped emergency reduction) can raise the hard budget up to
+    // the whole usable clock, which would leave only the reserve between the
+    // engine and a flag once the teardown and the GUI round trip are paid for.
+    // These caps are applied last so nothing can bypass them: a single move may
+    // only ever spend a quarter of the usable clock, and it must always leave a
+    // safety margin that covers the move overhead and search teardown.
+    const auto hard_safety = std::max(
+        saturating_add(overhead, saturating_add(overhead, std::chrono::milliseconds{15})),
+        std::min(std::chrono::milliseconds{50}, remaining / 20));
+    const auto usable_ceiling = nonnegative_difference(timing_.usable, hard_safety);
+    const auto fraction_ceiling = std::max(std::chrono::milliseconds{5},
+                                           scale_fraction(timing_.usable, 1, 4));
+    const auto capped_hard = std::min(std::min(timing_.hard_budget, fraction_ceiling),
+                                      usable_ceiling);
+    // A one-millisecond floor keeps the deadline comparable and still fires on
+    // the first stop check rather than never.
+    timing_.hard_budget = std::max(std::chrono::milliseconds{1}, capped_hard);
+    timing_.soft_budget = std::min(timing_.soft_budget, timing_.hard_budget);
     budget_ = timing_.hard_budget;
 }
 
@@ -264,9 +287,9 @@ void TimeManager::observe_iteration(const SearchIterationObservation& observatio
         score_swing || observation.aspiration_researched;
     if (hard_evidence) {
         hard_position_ = true;
-        if (emergency_pacing_) {
-            timing_.hard_budget = std::max(timing_.hard_budget, normal_hard_budget_);
-        }
+        // The stop deadline is fixed when the search starts and the safety
+        // ceilings were applied there. Hard evidence must therefore not raise
+        // the hard budget here; it only feeds diagnostics and iteration pacing.
         stable_observations_ = 0;
         timing_.extended_for_hard_position = true;
         timing_.observed_hardness = std::max(timing_.observed_hardness, 100);

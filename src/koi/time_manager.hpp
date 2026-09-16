@@ -15,7 +15,7 @@ using TimePointProvider = std::function<std::chrono::steady_clock::time_point()>
 class TimeManager {
 public:
     TimeManager(SearchLimits limits, Color side_to_move, std::uint8_t speed_percent = 100,
-                std::uint32_t move_overhead_ms = 10,
+                std::uint32_t move_overhead_ms = 30,
                 std::uint32_t slow_mover_percent = 100);
     TimeManager(SearchLimits limits, Color side_to_move, std::uint8_t speed_percent,
                 std::uint32_t move_overhead_ms, std::uint32_t slow_mover_percent,
@@ -36,7 +36,6 @@ private:
 
     SearchLimits limits_;
     std::optional<std::chrono::milliseconds> budget_;
-    std::chrono::milliseconds normal_hard_budget_{0};
     RootTimingContext root_context_;
     TimePointProvider now_;
     std::chrono::steady_clock::time_point started_;

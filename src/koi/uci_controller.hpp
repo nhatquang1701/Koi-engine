@@ -99,7 +99,7 @@ private:
     std::size_t threads_ = 1;
     std::uint8_t speed_percent_ = 100;
     bool show_wdl_ = false;
-    std::uint32_t move_overhead_ms_ = 10;
+    std::uint32_t move_overhead_ms_ = 30;
     std::uint32_t slow_mover_percent_ = 100;
     bool limit_strength_ = false;
     std::uint32_t elo_ = 1320;

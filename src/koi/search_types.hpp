@@ -183,7 +183,7 @@ struct SearchOptions {
     std::size_t multi_pv = 1;
     bool analyse_mode = false;
     bool show_wdl = false;
-    std::uint32_t move_overhead_ms = 10;
+    std::uint32_t move_overhead_ms = 30;
     std::uint32_t slow_mover_percent = 100;
     bool limit_strength = false;
     std::uint32_t elo = 1320;

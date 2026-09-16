@@ -31,7 +31,7 @@ ctest --test-dir build\release -N
 ctest --test-dir build\release -C Release -R koi_strength_tests --output-on-failure
 ```
 
-The default checkout registers 43 CTest tests (41 in a build without the opt-in
+The default checkout registers 45 CTest tests (43 in a build without the opt-in
 shadow-diff target and the python-chess-gated oracle test).
 
 Each C++ test is a standalone executable with its own `main`; there is no shared
@@ -55,7 +55,7 @@ C++ unit / integration tests (built as executables under `tests/unit/` and
   `nnue_boundary_tests`.
 - Search: `koi_search_tests`, `search_ordering_tests`, `search_architecture_tests`,
   `search_policy_tests`, `search_runtime_tests`, `static_exchange_tests`,
-  `completion_gate_tests`, `koi_strength_tests`.
+  `time_manager_tests`, `completion_gate_tests`, `koi_strength_tests`.
 - Runtime and boundaries: `koi_cpu_features_tests`, `koi_module_tests`,
   `syzygy_tablebase_tests`, `opening_book_tests`, `uci_controller_tests`,
   `koi_replay_tests`.
@@ -63,7 +63,8 @@ C++ unit / integration tests (built as executables under `tests/unit/` and
 PowerShell process tests (`tests/integration/**/*.ps1`), driven through
 `pwsh`/`powershell` with the built engine path:
 
-- `koi_engine_process`, `koi_engine_en_croissant_process`, `koi_benchmark_process`,
+- `koi_engine_process`, `koi_engine_en_croissant_process`,
+  `koi_engine_time_safety_process`, `koi_benchmark_process`,
   `koi_uci_match_process`, `koi_stockfish_strength_option`, `koi_uci_match_clock`,
   `cutechess_stability_smoke`, `hash_memory_stability`, `windows_ci_configuration`,
   `install_book_script`, `package_release_layout`.
@@ -127,7 +128,8 @@ green run with zero `XFAIL` lines means the list is empty.
 
 CMake sets explicit per-test `TIMEOUT` values for the process tests (for example
 `koi_engine_process` 60s, `koi_engine_en_croissant_process` 30s,
-`koi_benchmark_process` 300s, `koi_uci_match_clock` 120s) and applies a default
+`koi_engine_time_safety_process` 180s, `koi_benchmark_process` 300s,
+`koi_uci_match_clock` 120s) and applies a default
 600s timeout to every test that does not declare one. The PowerShell scripts
 also enforce their own per-line timeout, configurable through
 `KOI_UCI_TIMEOUT_MS`.

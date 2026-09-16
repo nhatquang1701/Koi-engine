@@ -678,7 +678,7 @@ void test_search_options_include_thread_and_speed_controls() {
     const koi::SearchOptions defaults;
     require(defaults.threads == 1, "SearchOptions must default to one search thread");
     require(defaults.speed_percent == 100, "SearchOptions must default to Speed 100");
-    require(!defaults.show_wdl && defaults.move_overhead_ms == 10 &&
+    require(!defaults.show_wdl && defaults.move_overhead_ms == 30 &&
                 defaults.slow_mover_percent == 100 && !defaults.limit_strength && defaults.elo == 1320 &&
                 !defaults.strength_mode,
             "SearchOptions must default to the Task 1 compatibility values");
@@ -2163,8 +2163,9 @@ void test_adaptive_time_manager_uses_tt_stability_and_hardness() {
     const koi::TimeManagementStats initial = manager.diagnostics();
     require(initial.reserve == 300ms, "clock timing must reserve three percent at ten seconds");
     require(initial.usable == 9700ms, "clock timing must spend only time outside the reserve");
-    require(initial.soft_budget == 1235ms && initial.hard_budget == 2580ms,
-            "clock timing must calculate the approved soft and hard budgets");
+    require(initial.soft_budget == 1235ms && initial.hard_budget == 2425ms,
+            "clock timing must calculate the approved soft and hard budgets, with the hard budget "
+            "capped at a quarter of the usable time");
     require(initial.initial_hardness == 0,
             "a recent deep exact root entry must classify as easy before iteration evidence");
 

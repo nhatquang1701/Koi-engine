@@ -400,7 +400,7 @@ void test_uci_handshake_has_identity_and_supported_options_in_order() {
         "option name BookSafetyDepth type spin default 2 min 0 max 3\n"
         "option name Clear Hash type button\n"
         "option name UCI_ShowWDL type check default false\n"
-        "option name Move Overhead type spin default 10 min 0 max 5000\n"
+                    "option name Move Overhead type spin default 30 min 0 max 5000\n"
         "option name Slow Mover type spin default 100 min 10 max 1000\n"
         "option name UCI_LimitStrength type check default false\n"
         "option name UCI_Elo type spin default 1320 min 1320 max 3190\n"
@@ -442,7 +442,7 @@ void test_task1_handshake_appends_exact_compatibility_options() {
     const ControllerResult result = run_controller("uci\nquit\n");
     const std::string expected =
         "option name UCI_ShowWDL type check default false\n"
-        "option name Move Overhead type spin default 10 min 0 max 5000\n"
+                    "option name Move Overhead type spin default 30 min 0 max 5000\n"
         "option name Slow Mover type spin default 100 min 10 max 1000\n"
         "option name UCI_LimitStrength type check default false\n"
         "option name UCI_Elo type spin default 1320 min 1320 max 3190\n";
@@ -1230,7 +1230,7 @@ void test_large_hash_option_is_capped_without_crashing_the_controller() {
             "a capped large hash request must leave isready usable");
 }
 
-void test_immediate_ponderhit_without_observed_reply_suppresses_restart() {
+void test_immediate_ponderhit_without_observed_reply_still_answers() {
     GatedInputBuffer input(
         "position startpos\n"
         "go ponder depth 2\n",
@@ -1255,8 +1255,11 @@ void test_immediate_ponderhit_without_observed_reply_suppresses_restart() {
 
     require(exit_code == 0 && diagnostics.str().empty(),
             "an immediate ponderhit must shut down cleanly");
-    require(lines_starting_with(output_lines(output.str()), "bestmove ").empty(),
-            "ponderhit without an observed expected reply must not restart on an unverified root");
+    const std::vector<std::string> bestmoves =
+        lines_starting_with(output_lines(output.str()), "bestmove ");
+    require(bestmoves.size() == 1 && is_legal_move(Position{}, bestmoves[0].substr(9)),
+            "a ponderhit always obliges the engine to answer: even without an observed expected "
+            "reply it must emit exactly one legal bestmove instead of leaving the GUI waiting");
 }
 
 void test_quit_and_eof_suppress_a_ponderhit_replacement_search() {
@@ -1748,7 +1751,7 @@ int main() {
         {"Lucas analysis option generation replacement",
          test_lucas_analysis_option_changes_suppress_the_active_generation},
         {"ponderhit restart lifecycle", test_ponderhit_restarts_the_ponder_search_once},
-        {"immediate ponderhit suppression", test_immediate_ponderhit_without_observed_reply_suppresses_restart},
+        {"immediate ponderhit completion", test_immediate_ponderhit_without_observed_reply_still_answers},
         {"ponderhit shutdown suppression", test_quit_and_eof_suppress_a_ponderhit_replacement_search},
         {"idle ponderhit", test_idle_ponderhit_is_quiet},
         {"ponder stop lifecycle", test_stopping_ponder_search_emits_one_legal_bestmove},

@@ -513,10 +513,20 @@ Koi separates search limits from time-allocation policy. Explicit `go depth`,
 For `movetime` and clock searches, the requested budget is adjusted in this
 order: `Slow Mover`, then `Speed`, then `Move Overhead` is subtracted, followed
 by the existing safety margin and minimum safe budget. `Move Overhead` defaults
-to 10 ms and accepts 0..5000; `Slow Mover` defaults to 100 and accepts 10..1000.
+to 30 ms and accepts 0..5000; `Slow Mover` defaults to 100 and accepts 10..1000.
 `Speed` defaults to 100 and accepts 1..100. These controls affect allocation,
 not explicit depth or node limits, and changing one while searching cancels and
 joins the old generation before the next search uses the new snapshot.
+
+Clock searches are additionally flag-proof. A single move can never consume more
+than a quarter of the usable clock, the increment credit is capped at that same
+quarter, and a final ceiling reserves `max(2 x Move Overhead + 15 ms, min(50 ms,
+remaining/20))` on top of the normal reserve. The stop deadline is fixed when the
+search starts, so iteration evidence can pace the search but can never push it
+past the safe ceiling. A `ponderhit` that does not match the stored prediction
+starts a bounded search of the current position instead of returning without a
+move, so every `go` is answered. `time_manager_tests` and
+`koi_engine_time_safety_process` enforce these invariants.
 
 ### WDL and strength controls
 
@@ -692,7 +702,7 @@ the options at session start; the portable release defaults are `RandomSeed=0`,
 `Hash=512`, `Threads=1`, `Speed=100`, `UCI_AnalyseMode=false`, `MultiPV=1`,
 `Ponder=false`, `OwnBook=true`, `BookFile=book.bin`, `BookDepth=16`,
 `BookRandom=false`, `BookSafety=true`, `BookSafetyDepth=2`,
-`UCI_ShowWDL=false`, `Move Overhead=10`, `Slow Mover=100`,
+`UCI_ShowWDL=false`, `Move Overhead=30`, `Slow Mover=100`,
 `UCI_LimitStrength=false`, `UCI_Elo=1320`, `StrengthMode=false`,
 `SyzygyPath=""`, `SyzygyProbeDepth=1`, `SyzygyProbeLimit=5`, and
 `Syzygy50MoveRule=true`.

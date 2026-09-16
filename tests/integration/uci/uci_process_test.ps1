@@ -158,7 +158,7 @@ $expectedHandshake = @(
     'option name BookSafetyDepth type spin default 2 min 0 max 3',
     'option name Clear Hash type button',
     'option name UCI_ShowWDL type check default false',
-    'option name Move Overhead type spin default 10 min 0 max 5000',
+    'option name Move Overhead type spin default 30 min 0 max 5000',
     'option name Slow Mover type spin default 100 min 10 max 1000',
     'option name UCI_LimitStrength type check default false',
     'option name UCI_Elo type spin default 1320 min 1320 max 3190',
@@ -391,20 +391,21 @@ while ($true) {
     if ($line -ceq 'readyok') {
         break
     }
-    if ($line -like 'bestmove *') {
-        throw "Immediate invalid ponderhit emitted a completion: $line"
-    } elseif (-not (Test-SearchInfo $line)) {
+    if ($line -notlike 'bestmove *' -and -not (Test-SearchInfo $line)) {
         throw "Invalid output after immediate ponderhit: $line"
     }
     $immediatePonderLines.Add($line)
 }
-$immediatePonderLines += @(Complete-UciSession $immediatePonder $true)
+$null = Complete-UciSession $immediatePonder $true
 foreach ($line in @($immediatePonderLines)) {
-    if ($line -like 'bestmove *') {
-        throw "Immediate invalid ponderhit emitted a late completion: $line"
-    } elseif ($line -cne 'readyok' -and -not (Test-SearchInfo $line)) {
+    if ($line -cne 'readyok' -and $line -notlike 'bestmove *' -and -not (Test-SearchInfo $line)) {
         throw "Invalid shutdown output after immediate ponderhit: $line"
     }
+}
+$immediatePonderBestmoves = @($immediatePonderLines | Where-Object { $_ -like 'bestmove *' })
+if ($immediatePonderBestmoves.Count -ne 1) {
+    throw ("a ponderhit always obliges the engine to answer, but the immediate ponderhit emitted " +
+        "$($immediatePonderBestmoves.Count) bestmoves")
 }
 
 $replacement = Start-UciSession

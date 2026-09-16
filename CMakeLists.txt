@@ -277,6 +277,14 @@ target_link_libraries(static_exchange_tests PRIVATE koi_core)
 
 add_test(NAME static_exchange_tests COMMAND static_exchange_tests)
 
+add_executable(time_manager_tests
+    tests/unit/search/time_manager_tests.cpp
+)
+
+target_link_libraries(time_manager_tests PRIVATE koi_core)
+
+add_test(NAME time_manager_tests COMMAND time_manager_tests)
+
 add_executable(koi_strength_tests
     tests/unit/search/koi_strength_tests.cpp
 )
@@ -355,6 +363,15 @@ add_test(
 )
 
 set_tests_properties(koi_engine_en_croissant_process PROPERTIES TIMEOUT 30)
+
+add_test(
+    NAME koi_engine_time_safety_process
+    COMMAND ${POWERSHELL_EXECUTABLE} -NoProfile -ExecutionPolicy Bypass -File
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/uci/time_safety_test.ps1"
+            -EnginePath "$<TARGET_FILE:koi_engine>"
+)
+
+set_tests_properties(koi_engine_time_safety_process PROPERTIES TIMEOUT 180)
 
 add_test(
     NAME koi_benchmark_process

@@ -915,32 +915,55 @@ void UciController::handle_ponderhit() {
     }
 
     stop_and_suppress_active_search();
-    if (!origin.has_value() || !root.has_value() || !limits.has_value() ||
-        !predicted_move.has_value() || !expected_move.has_value() ||
-        position_.position_key() != origin->position_key() || position_.fen() != origin->fen() ||
-        !origin->is_legal(*predicted_move)) {
-        debug_event("ponderhit suppressed without a matching origin, prediction, and reply");
-        return;
-    }
-    GameState expected_root = *origin;
-    if (!expected_root.make_move(*predicted_move) || expected_root.fen() != root->fen() ||
-        expected_root.position_key() != root->position_key() || !root->is_legal(*expected_move) ||
-        !root->make_move(*expected_move)) {
-        debug_event("ponderhit suppressed because the stored ponder root or reply no longer matches");
-        return;
+
+    const bool prediction_matches = origin.has_value() && root.has_value() &&
+        limits.has_value() && predicted_move.has_value() && expected_move.has_value() &&
+        position_.position_key() == origin->position_key() && position_.fen() == origin->fen() &&
+        origin->is_legal(*predicted_move);
+    if (prediction_matches) {
+        GameState expected_root = *origin;
+        if (expected_root.make_move(*predicted_move) && expected_root.fen() == root->fen() &&
+            expected_root.position_key() == root->position_key() &&
+            root->is_legal(*expected_move) && root->make_move(*expected_move)) {
+            limits->ponder = false;
+            const bool has_side_to_move_clock = root->side_to_move() == Color::white ?
+                limits->white_clock.has_value() : limits->black_clock.has_value();
+            const bool has_normal_limit = limits->depth.has_value() || limits->nodes.has_value() ||
+                limits->movetime.has_value() || has_side_to_move_clock || limits->infinite;
+            if (!has_normal_limit) {
+                limits->movetime = std::chrono::milliseconds{250};
+            }
+            limits->search_moves_specified = false;
+            limits->search_moves.clear();
+            start_search(std::move(*root), std::move(*limits), true);
+            return;
+        }
     }
 
-    limits->ponder = false;
-    const bool has_side_to_move_clock = root->side_to_move() == Color::white ?
-        limits->white_clock.has_value() : limits->black_clock.has_value();
-    const bool has_normal_limit = limits->depth.has_value() || limits->nodes.has_value() ||
-        limits->movetime.has_value() || has_side_to_move_clock || limits->infinite;
-    if (!has_normal_limit) {
-        limits->movetime = std::chrono::milliseconds{250};
+    // The stored prediction no longer matches the position. The ponder search
+    // was already suppressed, but a ponderhit still obliges the engine to answer
+    // this move: returning here without a bestmove leaves the GUI waiting until
+    // the clock runs out. Fall back to a fresh, bounded search of the real
+    // position so exactly one bestmove is always published.
+    debug_event("ponderhit prediction did not match; searching the current position");
+    SearchLimits fallback_limits;
+    if (limits.has_value()) {
+        fallback_limits = *limits;
+        fallback_limits.ponder = false;
+        const bool has_side_to_move_clock = position_.side_to_move() == Color::white ?
+            fallback_limits.white_clock.has_value() : fallback_limits.black_clock.has_value();
+        const bool has_normal_limit = fallback_limits.depth.has_value() ||
+            fallback_limits.nodes.has_value() || fallback_limits.movetime.has_value() ||
+            has_side_to_move_clock || fallback_limits.infinite;
+        if (!has_normal_limit) {
+            fallback_limits.movetime = std::chrono::milliseconds{250};
+        }
+    } else {
+        fallback_limits.movetime = std::chrono::milliseconds{250};
     }
-    limits->search_moves_specified = false;
-    limits->search_moves.clear();
-    start_search(std::move(*root), std::move(*limits), true);
+    fallback_limits.search_moves_specified = false;
+    fallback_limits.search_moves.clear();
+    start_search(position_, fallback_limits, true);
 }
 
 void UciController::start_search(GameState root, SearchLimits limits, bool skip_book) {
@@ -1230,7 +1253,7 @@ void UciController::write_handshake() {
                "option name BookSafetyDepth type spin default 2 min 0 max 3\n"
                "option name Clear Hash type button\n"
                "option name UCI_ShowWDL type check default false\n"
-               "option name Move Overhead type spin default 10 min 0 max 5000\n"
+               "option name Move Overhead type spin default 30 min 0 max 5000\n"
                "option name Slow Mover type spin default 100 min 10 max 1000\n"
                "option name UCI_LimitStrength type check default false\n"
                "option name UCI_Elo type spin default 1320 min 1320 max 3190\n"
