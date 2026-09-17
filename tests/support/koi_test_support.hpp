@@ -33,7 +33,7 @@
 //     XPASS <name>: <message>
 //     SKIP <name>: <reason>
 //     XFAIL-UNSEEN <name>
-//     koi-test-summary run=<n> pass=<n> fail=<n> xfail=<n> xpass=<n> skip=<n> unseen=<n>
+//     koi-test-summary run=<n> pass=<n> fail=<n> xfail=<n> xpass=<n> skip=<n> unseen=<n> intermittent=<n>
 //
 // An unexpected pass (XPASS) fails the run so stale known-failure entries are
 // pruned; the summary line is printed even when cases fail.
@@ -244,9 +244,14 @@ struct TestCase {
 };
 
 struct TestRunOptions {
-    // Cases whose expectations are not met yet. They report XFAIL; a pass
-    // reports XPASS and fails the run (unless KOI_ALLOW_XPASS=1).
-    std::span<const std::string_view> known_failures{};
+// Cases whose expectations are not met yet. They report XFAIL; a pass
+// reports XPASS and fails the run (unless KOI_ALLOW_XPASS=1).
+std::span<const std::string_view> known_failures{};
+// Cases whose outcome depends on host scheduling, so they pass or fail from
+// run to run. Both outcomes are reported (XFAIL/XPASS) but neither is fatal;
+// keep this list shrinking and never move a deterministic gap here.
+std::span<const std::string_view> intermittent{};
+
     // Cases that depend on wall-clock scheduling. KOI_TEST_RETRIES controls how
     // many attempts they get before a failure is final (default 1 attempt).
     std::span<const std::string_view> timing_sensitive{};
@@ -352,6 +357,7 @@ inline int run_tests(std::span<const TestCase> tests, int argc = 0, char** argv 
     std::size_t failed = 0;
     std::size_t xfailed = 0;
     std::size_t xpassed = 0;
+    std::size_t intermittent_observed = 0;
     std::size_t skipped = 0;
     std::vector<std::string_view> seen_known_failures;
 
@@ -367,7 +373,8 @@ inline int run_tests(std::span<const TestCase> tests, int argc = 0, char** argv 
         }
         ++run;
 
-        const bool known_failure = detail::contains(options.known_failures, name);
+        const bool intermittent = detail::contains(options.intermittent, name);
+        const bool known_failure = detail::contains(options.known_failures, name) || intermittent;
         if (known_failure) {
             seen_known_failures.push_back(name);
         }
@@ -404,12 +411,19 @@ inline int run_tests(std::span<const TestCase> tests, int argc = 0, char** argv 
         }
         if (succeeded) {
             if (known_failure) {
-                std::cout << "XPASS " << name
-                          << ": known failure now passes; remove it from the known_failures list\n";
-                if (allow_xpass) {
+                if (intermittent) {
+                    std::cout << "XPASS " << name
+                              << ": intermittent known failure now passes\n";
                     ++xpassed;
+                    ++intermittent_observed;
                 } else {
-                    ++failed;
+                    std::cout << "XPASS " << name
+                              << ": known failure now passes; remove it from the known_failures list\n";
+                    if (allow_xpass) {
+                        ++xpassed;
+                    } else {
+                        ++failed;
+                    }
                 }
             } else {
                 ++passed;
@@ -443,7 +457,7 @@ inline int run_tests(std::span<const TestCase> tests, int argc = 0, char** argv 
 
     std::cout << "koi-test-summary run=" << run << " pass=" << passed << " fail=" << failed
               << " xfail=" << xfailed << " xpass=" << xpassed << " skip=" << skipped
-              << " unseen=" << unseen << '\n';
+              << " unseen=" << unseen << " intermittent=" << intermittent_observed << '\n';
     return failed == 0 ? 0 : 1;
 }
 

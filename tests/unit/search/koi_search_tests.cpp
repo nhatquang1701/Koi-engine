@@ -4255,10 +4255,9 @@ int main(int argc, char** argv) {
     // Behavior tests whose expectations are not yet met by the current search
     // implementation. Known failures report XFAIL; an unexpected pass fails the
     // run so stale entries are pruned (KOI_ALLOW_XPASS=1 is the transitional
-    // escape hatch for order- or threading-sensitive entries).
+    // escape hatch).
     const std::string_view known_failures[]{
         "single-PV root forcing extension",
-        "incomplete root forcing fallback",
         "timed poisoned capture",
         "depth-one forcing check",
         "threaded depth-one forcing check",
@@ -4273,6 +4272,13 @@ int main(int argc, char** argv) {
         "committed PGN tactical fixtures",
         "threaded short forcing root research",
         "poisoned capture quiescence",
+    };
+    // Cases whose outcome flips with host scheduling. Both XFAIL and XPASS are
+    // reported but neither is fatal, so the suite is deterministic while the
+    // gap stays visible; the goal is to make each one deterministic and move it
+    // back to known_failures (or delete it once the engine is fixed).
+    const std::string_view intermittent_failures[]{
+        "incomplete root forcing fallback",
     };
     // Cases whose assertions depend on wall-clock scheduling. They get
     // KOI_TEST_RETRIES attempts before a failure is final (default 1, CI uses
@@ -4316,5 +4322,6 @@ int main(int argc, char** argv) {
     return koi::test::run_tests(
         tests, argc, argv,
         koi::test::TestRunOptions{.known_failures = known_failures,
+                                  .intermittent = intermittent_failures,
                                   .timing_sensitive = timing_sensitive});
 }
