@@ -66,18 +66,19 @@ Full Release CTest: 45 registered tests. The first full run finished 44/45 in
 439.00 s with `koi_engine_process` failing because its handshake expectation
 predated the advertised `EvalFile` option. The expectation in
 `tests/integration/uci/uci_process_test.ps1` was updated and the follow-up full
-run finished **45/45 in 435.33 s**.
+run finished **45/45 in 435.33 s**. After the lightweight SEE context the final
+full run finished **45/45 in 414.19 s**.
 
-| Test | First run | Final run |
-| --- | --- | --- |
-| `koi_search_tests` | 236.98 s | 239.14 s |
-| `koi_uci_match_clock` | 67.98 s | 68.22 s |
-| `koi_benchmark_process` | 49.35 s | 47.35 s |
-| `cutechess_stability_smoke` | 30.08 s | 27.69 s |
-| `koi_engine_time_safety_process` | 11.26 s | 11.10 s |
-| `koi_uci_match_process` | 10.05 s | 8.59 s |
-| `uci_controller_tests` | 1.81 s | 1.75 s |
-| `koi_engine_process` | 0.60 s (failed) | 1.58 s |
+| Test | First run | EvalFile fix | Final (post-SEE) |
+| --- | --- | --- | --- |
+| `koi_search_tests` | 236.98 s | 239.14 s | 224.08 s |
+| `koi_uci_match_clock` | 67.98 s | 68.22 s | 67.97 s |
+| `koi_benchmark_process` | 49.35 s | 47.35 s | 45.78 s |
+| `cutechess_stability_smoke` | 30.08 s | 27.69 s | 27.16 s |
+| `koi_engine_time_safety_process` | 11.26 s | 11.10 s | 11.05 s |
+| `koi_uci_match_process` | 10.05 s | 8.59 s | 8.42 s |
+| `uci_controller_tests` | 1.81 s | 1.75 s | 1.74 s |
+| `koi_engine_process` | 0.60 s (failed) | 1.58 s | 1.57 s |
 
 Targeted Release runs before the full suite: `koi_core_tests`,
 `koi_rules_tests`, `native_rule_state_tests`, `perft_tests`,
