@@ -67,6 +67,7 @@ target_compile_definitions(koi_test_support INTERFACE
 add_library(koi_core
     src/koi/classical_evaluator.cpp
     src/koi/detail/compatibility_mirror.cpp
+    src/koi/detail/attack_tables.cpp
     src/koi/detail/evaluation_context.cpp
     src/koi/detail/feature_state.cpp
     src/koi/detail/root_coordinator.cpp
