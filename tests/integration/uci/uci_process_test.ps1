@@ -80,6 +80,7 @@ $expectedHandshake = @(
     'option name SyzygyProbeDepth type spin default 1 min 1 max 100',
     'option name SyzygyProbeLimit type spin default 5 min 0 max 7',
     'option name Syzygy50MoveRule type check default true',
+    'option name EvalFile type string default ',
     'uciok'
 )
 foreach ($expected in $expectedHandshake) {

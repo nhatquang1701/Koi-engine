@@ -3,7 +3,8 @@
 Koi Engine is a Windows x64 UCI chess engine for standard chess. It is
 written in C++26 and is documented and process-tested against En Croissant as
 the primary GUI workflow. It uses deterministic iterative-deepening alpha-beta search
-with a classical evaluator, an opt-in Koi-native NNUE boundary, and a persistent
+with a classical evaluator, an opt-in Koi-native NNUE pipeline (training
+tooling, a versioned container, and runtime `EvalFile` loading), and a persistent
 transposition table. Search runs on a cancellable outer worker; `Threads > 1`
 enables deterministic authoritative root-parallel work while the UCI command loop
 remains responsive.
@@ -234,6 +235,27 @@ python .\tools\measurement\export_nnue.py --help
 PyTorch backend is offline-only, records corpus and network provenance, and must pass
 the Koi loader and strength gates before any network is considered for runtime use.
 
+A complete Stockfish-labeled training pipeline lives next to the boundary. Positions
+come from Stockfish self-play (with tactical noise games), labels are depth-10
+centipawn scores, and the trainer quantizes the float network into the explicit-shift
+version 3 container so small weights survive rounding:
+
+```powershell
+python .\tools\measurement\gen_training_data.py all --games 30000 --workers 3 --label-depth 10
+python .\tools\measurement\train_nnue_sf.py --epochs 20 --float-out .\artifacts\training\koi.pt `
+  --net-out .\artifacts\training\koi.nnue --meta-out .\artifacts\training\koi.metadata.json
+.\build\release\koi-bench.exe --nnue .\artifacts\training\koi.nnue
+```
+
+Load a trained network with the UCI `EvalFile` option, or place `koi.nnue` beside
+the executable (or point the `KOI_NNUE_PATH` environment variable at it) to select it
+at startup. A missing or rejected file falls back to the classical evaluator and
+writes one explanatory line to stderr. Trained networks are local artifacts and are
+not committed. Koi's own trained net passes the 64/64 tactical gate and the loader
+boundary tests, runs at about 65k nodes/s against about 87k for the classical
+evaluator on the same single-thread probe, and lost the equal-node A/B match
+that finished, so the classical evaluator remains the default.
+
 For a reproducible local match against Stockfish or another UCI engine, use the
 optional PowerShell harness:
 
@@ -442,6 +464,18 @@ scenario, package layout, and Python measurement-tool tests. This confirms the
 current checkout is regression-clean; it does not replace the still-missing
 external Stockfish/Lc0 strength campaign.
 
+The 2026-09-16 strength program replaced the mailbox attack scans with
+precomputed bitboard attack tables and made quiet check flags O(1) table
+lookups. A startpos `go depth 6` probe still visits exactly 406,067 nodes,
+while single-thread throughput on that probe rose from 58,697 to 86,989 nps.
+The same program added the Stockfish-labeled NNUE pipeline described above:
+1,200,002 depth-10 labels produced a 960-256-32-1 network that round-trips
+through the version 3 container, passes the 64/64 tactical gate when loaded,
+and runs at about 65k nps against about 87k for the classical evaluator. It
+lost the equal-node A/B match that finished, so the classical evaluator
+remains the default and NNUE stays opt-in. Full Release CTest stayed green.
+No Elo or CPL claim is made.
+
 ## UCI smoke test
 
 Run this PowerShell transcript after building:
@@ -489,6 +523,11 @@ from the starting position (for example, `bestmove e2e4`).
   clock-derived budgets; explicit depth, node, and infinite searches are
   unchanged. Changing either option stops and joins the active search before
   the new snapshot is used by the next `go` command.
+- `setoption name EvalFile value <path>` loads a Koi NNUE network for the next
+  search (an empty value keeps the boot-time evaluator, so replaying defaults
+  never triggers a load). A rejected or missing file leaves the current
+  evaluator in place and reports `info string EvalFile rejected: ...`. Running
+  searches keep the evaluator they started with.
 - `setoption name BookRandom value false` (the default) selects the highest-
   weight legal Polyglot move, using deterministic coordinate ordering for equal
   weights. `BookRandom true` enables weighted random selection; `RandomSeed 0`
@@ -724,8 +763,8 @@ the options at session start; the portable release defaults are `RandomSeed=0`,
 `BookRandom=false`, `BookSafety=true`, `BookSafetyDepth=2`,
 `UCI_ShowWDL=false`, `Move Overhead=30`, `Slow Mover=100`,
 `UCI_LimitStrength=false`, `UCI_Elo=1320`, `StrengthMode=false`,
-`SyzygyPath=""`, `SyzygyProbeDepth=1`, `SyzygyProbeLimit=5`, and
-`Syzygy50MoveRule=true`.
+`SyzygyPath=""`, `SyzygyProbeDepth=1`, `SyzygyProbeLimit=5`,
+`Syzygy50MoveRule=true`, and `EvalFile=""` (empty keeps the boot-time evaluator).
 For the recommended En Croissant smoke scenario, use `Hash=512`, `Threads=4`, and
 `Speed=100`, then keep the book and Syzygy paths explicitly configured if those
 assets are available.
