@@ -210,8 +210,14 @@ template <typename Integer>
     if (manifest.magic != kKoiNnueMagic) {
         return make_error(NnueErrorCode::bad_magic, "NNUE container magic is not KOI-NNUE");
     }
-    if (manifest.version != kKoiNnueFormatVersion) {
+    if (manifest.version != kKoiNnueFormatVersion &&
+        manifest.version != kKoiNnuePerspectiveV3FormatVersion) {
         return make_error(NnueErrorCode::unsupported_version, "unsupported Koi NNUE container version");
+    }
+    if (manifest.version == kKoiNnuePerspectiveV3FormatVersion &&
+        manifest.feature_set != kKoiNnuePieceSquareKingPawnV2FeatureSet) {
+        return make_error(NnueErrorCode::unsupported_feature_set,
+                          "NNUE v3 requires the piece-square-king-pawn-v2 feature set");
     }
     if (manifest.feature_set != kKoiNnueFeatureSet &&
         manifest.feature_set != kKoiNnuePieceSquareKingPawnV2FeatureSet) {
@@ -413,14 +419,21 @@ void accumulate_hidden_sparse_avx2(const NnueNetwork& network,
 
     std::int64_t output = network.output_bias;
     for (std::size_t bottleneck = 0; bottleneck < bottleneck_units; ++bottleneck) {
-        std::int64_t activation = network.bottleneck_bias[bottleneck];
+        std::int64_t activation = 0;
         for (std::size_t hidden = 0; hidden < hidden_units; ++hidden) {
             activation += static_cast<std::int64_t>(accumulator.values[hidden]) *
                 network.bottleneck_weights[hidden * bottleneck_units + bottleneck];
         }
+        if (network.bottleneck_shift > 0) {
+            activation >>= network.bottleneck_shift;
+        }
+        activation += network.bottleneck_bias[bottleneck];
         activation = std::clamp<std::int64_t>(activation, 0, kKoiNnueClippedReluMaximum);
         accumulator.bottleneck_values[bottleneck] = static_cast<std::int16_t>(activation);
         output += activation * network.output_weights[bottleneck];
+    }
+    if (network.output_shift > 0) {
+        output >>= network.output_shift;
     }
     return clamp_score(output);
 }
@@ -547,6 +560,12 @@ std::expected<std::vector<std::uint8_t>, NnueError> NnueLoader::serialize(
     if (const auto error = validate_manifest(network.manifest); error.has_value()) {
         return std::unexpected(*error);
     }
+    if (network.manifest.version >= kKoiNnuePerspectiveV3FormatVersion &&
+        (network.hidden_shift > 20 || network.bottleneck_shift > 20 ||
+         network.output_shift > 20)) {
+        return std::unexpected(make_error(NnueErrorCode::malformed_manifest,
+                                          "NNUE v3 shift is out of range"));
+    }
     const auto expected_payload_size = payload_size_for(network.manifest);
     if (!expected_payload_size.has_value() || !arrays_match_manifest(network)) {
         return std::unexpected(make_error(
@@ -589,6 +608,12 @@ std::expected<std::vector<std::uint8_t>, NnueError> NnueLoader::serialize(
     for (const std::uint32_t layer_size : network.manifest.layer_sizes) {
         append_little_endian(container, layer_size);
     }
+    if (network.manifest.version >= kKoiNnuePerspectiveV3FormatVersion) {
+        container.push_back(network.hidden_shift);
+        container.push_back(network.bottleneck_shift);
+        container.push_back(network.output_shift);
+        container.push_back(0);
+    }
     append_little_endian(container, static_cast<std::uint16_t>(network.manifest.quantization.size()));
     append_little_endian(container, static_cast<std::uint16_t>(network.manifest.feature_set.size()));
     append_little_endian(container, static_cast<std::uint64_t>(payload.size()));
@@ -618,6 +643,23 @@ std::expected<NnueNetwork, NnueError> NnueLoader::load(
         if (!read_little_endian(container, offset, layer_size)) {
             return std::unexpected(make_error(NnueErrorCode::malformed_manifest,
                                                "NNUE layer manifest is truncated"));
+        }
+    }
+    std::uint8_t hidden_shift = 0;
+    std::uint8_t bottleneck_shift = 0;
+    std::uint8_t output_shift = 0;
+    if (manifest.version >= kKoiNnuePerspectiveV3FormatVersion) {
+        if (container.size() - offset < 4) {
+            return std::unexpected(make_error(NnueErrorCode::malformed_manifest,
+                                               "NNUE v3 scale metadata is truncated"));
+        }
+        hidden_shift = container[offset++];
+        bottleneck_shift = container[offset++];
+        output_shift = container[offset++];
+        ++offset;
+        if (hidden_shift > 20 || bottleneck_shift > 20 || output_shift > 20) {
+            return std::unexpected(make_error(NnueErrorCode::malformed_manifest,
+                                               "NNUE v3 shift is out of range"));
         }
     }
     std::uint16_t quantization_size = 0;
@@ -658,6 +700,9 @@ std::expected<NnueNetwork, NnueError> NnueLoader::load(
 
     NnueNetwork network;
     network.manifest = std::move(manifest);
+    network.hidden_shift = hidden_shift;
+    network.bottleneck_shift = bottleneck_shift;
+    network.output_shift = output_shift;
     const std::size_t input_units = network.manifest.layer_sizes[0];
     const std::size_t hidden_units = network.manifest.layer_sizes[1];
     const std::size_t bottleneck_units = network.manifest.layer_sizes[2];

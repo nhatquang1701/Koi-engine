@@ -19,6 +19,11 @@ namespace koi {
 
 inline constexpr std::string_view kKoiNnueMagic = "KOI-NNUE";
 inline constexpr std::uint32_t kKoiNnueFormatVersion = 2;
+// Version 3 keeps the v2 tensor layout but stores explicit fixed-point shifts
+// (hidden, bottleneck, output) in the header.  Trained models whose weight
+// magnitudes are far from the activation range can then be quantized without
+// collapsing to zero, which the single-scale v2 chain cannot avoid.
+inline constexpr std::uint32_t kKoiNnuePerspectiveV3FormatVersion = 3;
 inline constexpr std::uint32_t kKoiNnueFeatureCount =
     static_cast<std::uint32_t>(kNnuePieceSquareV1FeatureCount);
 inline constexpr std::uint32_t kKoiNnuePieceSquareKingPawnV2FeatureCount =
@@ -74,6 +79,13 @@ struct NnueNetwork {
     std::vector<std::int32_t> bottleneck_bias;
     std::vector<std::int8_t> output_weights;
     std::int32_t output_bias = 0;
+
+    // Fixed-point right shifts used by the v3 integer pipeline.  Version 1 and
+    // version 2 containers leave them at zero, which reproduces the original
+    // v2 activation-only quantization exactly.
+    std::uint8_t hidden_shift = 0;
+    std::uint8_t bottleneck_shift = 0;
+    std::uint8_t output_shift = 0;
 
     [[nodiscard]] static NnueNetwork synthetic();
     [[nodiscard]] static NnueNetwork synthetic_v2();

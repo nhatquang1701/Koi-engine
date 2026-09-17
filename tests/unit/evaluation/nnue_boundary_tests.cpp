@@ -303,6 +303,59 @@ void test_invalid_network_does_not_allocate_worker_accumulators() {
             "invalid NNUE manifests must not size worker accumulators before validation");
 }
 
+void test_v3_shift_explicit_inference_and_container() {
+    koi::NnueNetwork network = koi::NnueNetwork::synthetic_v2();
+    std::fill(network.feature_weights.begin(), network.feature_weights.end(), 0);
+    std::fill(network.hidden_bias.begin(), network.hidden_bias.end(), 0);
+    std::fill(network.bottleneck_weights.begin(), network.bottleneck_weights.end(), 0);
+    std::fill(network.bottleneck_bias.begin(), network.bottleneck_bias.end(), 0);
+    std::fill(network.output_weights.begin(), network.output_weights.end(), 0);
+    network.output_bias = 0;
+    network.manifest.version = koi::kKoiNnuePerspectiveV3FormatVersion;
+    network.hidden_shift = 7;
+    network.bottleneck_shift = 7;
+    network.output_shift = 5;
+    network.feature_weights[8U * 256U] = 128;
+    network.bottleneck_weights[0] = 127;
+    network.output_weights[0] = 25;
+
+    const auto weights = std::make_shared<const koi::NnueNetwork>(std::move(network));
+    koi::NnueWorker worker(weights);
+    const koi::EvaluationFeatures features = koi::EvaluationFeatureExtractor::extract(
+        require_state("4k3/8/8/8/8/8/P7/4K3 w - - 0 1"));
+    const int scalar = worker.evaluate(features, koi::Color::white,
+                                       koi::NnueInferencePath::scalar);
+    require(scalar == 98 && worker.accumulator().values[0] == 127 &&
+                worker.accumulator().bottleneck_values[0] == 126,
+            "v3 shift-explicit inference must apply arithmetic shifts exactly: score=" +
+                std::to_string(scalar) + " hidden0=" +
+                std::to_string(worker.accumulator().values[0]) + " bottleneck0=" +
+                std::to_string(worker.accumulator().bottleneck_values[0]));
+    const auto scalar_accumulator = worker.accumulator();
+    const int avx2 = worker.evaluate(features, koi::Color::white,
+                                     koi::NnueInferencePath::avx2_compatible);
+    require(avx2 == scalar && worker.accumulator().values == scalar_accumulator.values &&
+                worker.accumulator().bottleneck_values == scalar_accumulator.bottleneck_values,
+            "v3 scalar and AVX2-compatible paths must agree");
+    require(worker.evaluate(features, koi::Color::black,
+                            koi::NnueInferencePath::scalar) == -scalar,
+            "v3 perspective sign must match the v2 contract");
+
+    const auto v2_reference = koi::NnueLoader::serialize(koi::NnueNetwork::synthetic_v2());
+    require(v2_reference.has_value(), "v2 reference network must serialize");
+    const auto encoded = koi::NnueLoader::serialize(*weights);
+    require(encoded.has_value(), "v3 network must serialize");
+    require(encoded->size() == v2_reference->size() + 4,
+            "v3 containers must add exactly the four shift bytes");
+    const auto decoded = koi::NnueLoader::load(*encoded);
+    require(decoded.has_value(), "v3 container must load");
+    require(decoded->manifest.version == koi::kKoiNnuePerspectiveV3FormatVersion &&
+                decoded->hidden_shift == 7 && decoded->bottleneck_shift == 7 &&
+                decoded->output_shift == 5 &&
+                decoded->manifest.layer_sizes == weights->manifest.layer_sizes,
+            "v3 shifts must survive the container round trip");
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -327,6 +380,8 @@ int main(int argc, char** argv) {
         std::cout << "PASS NNUE AVX2 wide accumulation\n";
         test_invalid_network_does_not_allocate_worker_accumulators();
         std::cout << "PASS NNUE invalid worker guard\n";
+        test_v3_shift_explicit_inference_and_container();
+        std::cout << "PASS NNUE v3 shifts\n";
         if (argc > 1) {
             test_external_v2_container(argv[1]);
             std::cout << "PASS external NNUE container\n";

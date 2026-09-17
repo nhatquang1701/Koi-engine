@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cstdint>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <memory>
@@ -13,6 +14,7 @@
 #include <vector>
 
 #include "koi/classical_evaluator.hpp"
+#include "koi/nnue.hpp"
 #include "koi/search_service.hpp"
 #include "koi/strength_suite.hpp"
 
@@ -29,6 +31,7 @@ struct BenchmarkConfig {
     bool warm_hash = false;
     bool optional = false;
     std::optional<std::string> profile_json_path;
+    std::optional<std::string> nnue_path;
 };
 
 constexpr std::string_view suite_name(const BenchmarkConfig& config) noexcept {
@@ -72,6 +75,15 @@ std::optional<BenchmarkConfig> parse_arguments(int argc, char** argv) {
                 return std::nullopt;
             }
             config.profile_json_path = argv[++index];
+            continue;
+        }
+        if (argument == "--nnue") {
+            // Optional trained network for the benchmark suite; the classical
+            // evaluator is used when the flag is absent.
+            if (index + 1 >= argc) {
+                return std::nullopt;
+            }
+            config.nnue_path = argv[++index];
             continue;
         }
         if (argument != "--threads" && argument != "--speed") {
@@ -257,7 +269,19 @@ int main(int argc, char** argv) {
         if (config->profile_json_path.has_value()) {
             profile_runs.reserve(benchmarks.size());
         }
-        koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>());
+        koi::EvaluatorSelection selection;
+        if (config->nnue_path.has_value()) {
+            selection = koi::make_evaluator(std::filesystem::path{*config->nnue_path});
+            if (selection.nnue_error.has_value()) {
+                std::cerr << "koi-bench: NNUE network rejected ("
+                          << selection.nnue_error->message
+                          << "); using the classical evaluator.\n";
+            }
+        }
+        if (!selection.evaluator) {
+            selection.evaluator = std::make_shared<koi::ClassicalEvaluator>();
+        }
+        koi::SearchService service(std::move(selection.evaluator));
         for (const koi::StrengthPosition& benchmark : benchmarks) {
             if (!config->warm_hash) {
                 // Reuse the 512 MB allocation while keeping every cold position

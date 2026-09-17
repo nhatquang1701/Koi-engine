@@ -19,8 +19,10 @@ the C++ loader validates the same magic, version, quantization and SHA-256.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import pathlib
+import struct
 import sys
 import time
 
@@ -34,6 +36,7 @@ sys.path.insert(0, str(TOOLS_DIR))
 from tune_eval import (  # noqa: E402
     NNUE_ARCHITECTURE,
     NNUE_FEATURE_SET,
+    NNUE_MAGIC,
     NNUE_QUANTIZATION,
     nnue_container,
     nnue_payload,
@@ -237,6 +240,101 @@ def integer_scores(params: dict, indices: np.ndarray, offsets: np.ndarray,
     return bottleneck @ params["output_weights"].astype(np.int64) + params["output_bias"]
 
 
+def quantize_v3(model: KoiNet, hidden_shift: int, bottleneck_shift: int,
+                output_shift: int, score_scale: float) -> dict:
+    """Fixed-point quantization with explicit per-layer shifts (version 3).
+
+    The v2 container has one shared scale, so a trained model whose bottleneck
+    weights are small rounds to zero and the integer net degenerates to a
+    constant.  Version 3 stores the shifts instead and gives every layer its
+    own resolution:
+
+        w1_q = round(W1 * 2^s1)                (int16)
+        b1_q = round(b1 * 2^s1)                (int32)
+        w2_q = round(W2 * 2^s2)                (int8)
+        b2_q = round(b2 * 2^s1)                (int32)
+        w3_q = round(W3 * 100 * 2^k3 / 2^s1)   (int8)
+        b3_q = round(b3 * 100 * 2^k3)          (int32)
+
+    The integer pipeline clips hidden and bottleneck activations to [0, 127],
+    shifts the bottleneck accumulation back down by s2, and shifts the final
+    centipawn score by k3.
+    """
+    feature = model.feature.weight.detach().numpy()
+    hidden_bias = model.hidden_bias.detach().numpy()
+    bottleneck = model.bottleneck.weight.detach().numpy().T  # (256, 32)
+    bottleneck_bias = model.bottleneck.bias.detach().numpy()
+    output = model.output.weight.detach().numpy()[0]  # (32,)
+    output_bias = float(model.output.bias.detach().numpy()[0])
+
+    scale_hidden = float(2 ** hidden_shift)
+    scale_bottleneck = float(2 ** bottleneck_shift)
+    feature_q = np.clip(np.rint(feature * scale_hidden), -32768, 32767).astype(np.int64)
+    hidden_bias_q = np.rint(hidden_bias * scale_hidden).astype(np.int64)
+    bottleneck_q = np.clip(np.rint(bottleneck * scale_bottleneck), -128, 127).astype(np.int64)
+    bottleneck_bias_q = np.rint(bottleneck_bias * scale_hidden).astype(np.int64)
+    output_q = np.clip(np.rint(output * score_scale * (2 ** output_shift) / scale_hidden),
+                       -128, 127).astype(np.int64)
+    output_bias_q = int(round(output_bias * score_scale * (2 ** output_shift)))
+    return {
+        "feature_weights": feature_q.reshape(-1),
+        "hidden_bias": hidden_bias_q,
+        "bottleneck_weights": bottleneck_q.reshape(-1),
+        "bottleneck_bias": bottleneck_bias_q,
+        "output_weights": output_q,
+        "output_bias": output_bias_q,
+        "hidden_shift": hidden_shift,
+        "bottleneck_shift": bottleneck_shift,
+        "output_shift": output_shift,
+    }
+
+
+def integer_scores_v3(params: dict, indices: np.ndarray, offsets: np.ndarray,
+                      samples: np.ndarray | None = None) -> np.ndarray:
+    """Integer forward pass for the version-3 fixed-point container."""
+    if samples is None:
+        samples = np.arange(len(offsets) - 1)
+    weights = params["feature_weights"].reshape(INPUT_UNITS, HIDDEN_UNITS)
+    count = samples.size
+    one_hot = np.zeros((count, INPUT_UNITS), dtype=np.int64)
+    for position, sample in enumerate(samples):
+        one_hot[position, indices[offsets[sample]:offsets[sample + 1]]] = 1
+    hidden = one_hot @ weights.astype(np.int64) + params["hidden_bias"]
+    np.clip(hidden, 0, 127, out=hidden)
+    bottleneck = hidden @ params["bottleneck_weights"].reshape(
+        HIDDEN_UNITS, BOTTLENECK_UNITS).astype(np.int64)
+    bottleneck = bottleneck >> int(params["bottleneck_shift"])
+    bottleneck = bottleneck + params["bottleneck_bias"]
+    np.clip(bottleneck, 0, 127, out=bottleneck)
+    score = bottleneck @ params["output_weights"].astype(np.int64) + params["output_bias"]
+    return score >> int(params["output_shift"])
+
+
+def nnue_container_v3(payload: bytes, hidden_shift: int, bottleneck_shift: int,
+                      output_shift: int) -> tuple[bytes, str]:
+    """Version-3 container: v2 layout plus four scale bytes after the layer sizes."""
+    payload_hash = hashlib.sha256(payload).hexdigest()
+    header = struct.pack(
+        "<8sI4I4B",
+        NNUE_MAGIC,
+        3,
+        *NNUE_ARCHITECTURE,
+        hidden_shift,
+        bottleneck_shift,
+        output_shift,
+        0,
+    )
+    header += struct.pack("<HHQ", len(NNUE_QUANTIZATION), len(NNUE_FEATURE_SET), len(payload))
+    encoded = (
+        header
+        + bytes.fromhex(payload_hash)
+        + NNUE_QUANTIZATION
+        + NNUE_FEATURE_SET
+        + payload
+    )
+    return encoded, payload_hash
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--corpus", type=pathlib.Path,
@@ -254,6 +352,14 @@ def main() -> int:
     parser.add_argument("--threads", type=int, default=4)
     parser.add_argument("--hidden-scale", type=int, default=0, help="0 = auto grid search")
     parser.add_argument("--bottleneck-scale", type=int, default=0)
+    parser.add_argument("--format", choices=("v2", "v3"), default="v3",
+                        help="container format: v3 stores explicit fixed-point shifts")
+    parser.add_argument("--hidden-shift", type=int, default=7,
+                        help="v3 hidden activation shift (s1)")
+    parser.add_argument("--bottleneck-shift", type=int, default=7,
+                        help="v3 bottleneck activation shift (s2)")
+    parser.add_argument("--output-shifts", type=int, nargs="+", default=[3, 4, 5, 6],
+                        help="v3 output shift (k3) candidates to grid search")
     # The integer model clips activations at 127, so the quantization scale that
     # reproduces the float model's [0, 1] clamp is 127; neighbouring scales are
     # grid-searched because weight rounding shifts the optimum slightly.
@@ -336,25 +442,43 @@ def main() -> int:
         torch.save(model.state_dict(), args.float_out)
         print(f"wrote float checkpoint {args.float_out}", flush=True)
 
-    # Quantization: grid search the two activation scales by integer validation MAE.
-    hidden_candidates = [args.hidden_scale] if args.hidden_scale else [96, 112, 127, 144]
-    bottleneck_candidates = [args.bottleneck_scale] if args.bottleneck_scale else [96, 112, 127, 144]
+    # Quantization: pick the fixed-point representation with the lowest integer
+    # validation MAE. V3 keeps explicit per-layer shifts; the v2 single-scale
+    # chain stays available for the existing golden tests.
     tune_samples = val_order if val_order.size <= 4000 else \
         rng.choice(val_order, size=4000, replace=False)
     best = None
-    for hidden_scale in hidden_candidates:
-        for bottleneck_scale in bottleneck_candidates:
-            params = quantize(model, hidden_scale, bottleneck_scale, target_scale)
-            candidate = integer_scores(params, indices, offsets, tune_samples)
+    if args.format == "v3":
+        for output_shift in args.output_shifts:
+            candidate_params = quantize_v3(model, args.hidden_shift, args.bottleneck_shift,
+                                           output_shift, target_scale)
+            candidate = integer_scores_v3(candidate_params, indices, offsets, tune_samples)
             mae = float(np.mean(np.abs(candidate - scores[tune_samples])))
-            print(f"quantization hidden={hidden_scale} bottleneck={bottleneck_scale} "
-                  f"val_mae_cp {mae:.1f}", flush=True)
+            print(f"quantization v3 s1={args.hidden_shift} s2={args.bottleneck_shift} "
+                  f"k3={output_shift} val_mae_cp {mae:.1f}", flush=True)
             if best is None or mae < best[0]:
-                best = (mae, hidden_scale, bottleneck_scale, params)
-    assert best is not None
-    mae, hidden_scale, bottleneck_scale, params = best
-    print(f"selected hidden={hidden_scale} bottleneck={bottleneck_scale} "
-          f"val_mae_cp {mae:.1f}", flush=True)
+                best = (mae, output_shift, candidate_params)
+        assert best is not None
+        mae, output_shift, params = best
+        print(f"selected v3 shifts s1={args.hidden_shift} s2={args.bottleneck_shift} "
+              f"k3={output_shift} val_mae_cp {mae:.1f}", flush=True)
+    else:
+        hidden_candidates = [args.hidden_scale] if args.hidden_scale else [96, 112, 127, 144]
+        bottleneck_candidates = [args.bottleneck_scale] if args.bottleneck_scale else [96, 112, 127, 144]
+        for hidden_scale in hidden_candidates:
+            for bottleneck_scale in bottleneck_candidates:
+                candidate_params = quantize(model, hidden_scale, bottleneck_scale, target_scale)
+                candidate = integer_scores(candidate_params, indices, offsets, tune_samples)
+                mae = float(np.mean(np.abs(candidate - scores[tune_samples])))
+                print(f"quantization hidden={hidden_scale} bottleneck={bottleneck_scale} "
+                      f"val_mae_cp {mae:.1f}", flush=True)
+                if best is None or mae < best[0]:
+                    best = (mae, hidden_scale, bottleneck_scale, candidate_params)
+        assert best is not None
+        mae, hidden_scale, bottleneck_scale, params = best
+        output_shift = 0
+        print(f"selected hidden={hidden_scale} bottleneck={bottleneck_scale} "
+              f"val_mae_cp {mae:.1f}", flush=True)
 
     payload = nnue_payload(
         params["feature_weights"].tolist(),
@@ -364,7 +488,11 @@ def main() -> int:
         params["output_weights"].tolist(),
         params["output_bias"],
     )
-    container, payload_hash = nnue_container(payload)
+    if args.format == "v3":
+        container, payload_hash = nnue_container_v3(payload, args.hidden_shift,
+                                                    args.bottleneck_shift, output_shift)
+    else:
+        container, payload_hash = nnue_container(payload)
     args.net_out.parent.mkdir(parents=True, exist_ok=True)
     args.net_out.write_bytes(container)
     metadata = {
@@ -381,8 +509,10 @@ def main() -> int:
         "learning_rate": args.learning_rate,
         "seed": args.seed,
         "target_scale": target_scale,
-        "hidden_scale": hidden_scale,
-        "bottleneck_scale": bottleneck_scale,
+        "format": args.format,
+        "hidden_shift": args.hidden_shift if args.format == "v3" else 0,
+        "bottleneck_shift": args.bottleneck_shift if args.format == "v3" else 0,
+        "output_shift": output_shift,
         "val_mae_cp": mae,
         "payload_sha256": payload_hash,
         "network_sha256": __import__("hashlib").sha256(container).hexdigest(),
