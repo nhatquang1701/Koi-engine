@@ -1,5 +1,8 @@
 #include "koi/classical_evaluator.hpp"
 #include "koi/evaluation_features.hpp"
+#include "koi/piece_values.hpp"
+
+#include "koi/detail/attack_tables.hpp"
 
 #include <algorithm>
 #include <array>
@@ -13,22 +16,9 @@ namespace {
 constexpr const auto& kEvaluation = kClassicalEvaluationParameters;
 
 constexpr int piece_value(PieceType type) noexcept {
-    switch (type) {
-    case PieceType::pawn:
-        return kEvaluation.pawn_value;
-    case PieceType::knight:
-        return kEvaluation.knight_value;
-    case PieceType::bishop:
-        return kEvaluation.bishop_value;
-    case PieceType::rook:
-        return kEvaluation.rook_value;
-    case PieceType::queen:
-        return kEvaluation.queen_value;
-    case PieceType::king:
-    case PieceType::none:
-        return 0;
-    }
-    return 0;
+    // Kings are never exchanged; the evaluator keeps them out of the material
+    // term even though the shared table gives them a counting value.
+    return type == PieceType::king ? 0 : piece_material_value(type);
 }
 
 constexpr std::array<int, 64> kPawnMiddleGame{
@@ -203,81 +193,43 @@ constexpr bool inside(int file, int rank) noexcept {
     return file >= 0 && file < 8 && rank >= 0 && rank < 8;
 }
 
-bool insufficient_material(const PositionFeatures& features) noexcept {
-    int minor_count = 0;
-    bool only_bishops = true;
-    int bishop_complex = -1;
-    for (std::uint8_t square = 0; square < 64; ++square) {
-        const Piece piece = features.board[square];
-        switch (piece.type) {
-        case PieceType::pawn:
-        case PieceType::rook:
-        case PieceType::queen:
-            return false;
-        case PieceType::knight:
-            ++minor_count;
-            only_bishops = false;
-            break;
-        case PieceType::bishop: {
-            ++minor_count;
-            const int complex = (square % 8 + square / 8) & 1;
-            if (bishop_complex == -1) {
-                bishop_complex = complex;
-            } else if (bishop_complex != complex) {
-                return false;
-            }
-            break;
-        }
-        case PieceType::king:
-        case PieceType::none:
-            break;
-        }
-    }
+// Occupancy masks derived from the cached mailbox board. Bitboard attack
+// queries need these, and deriving them here keeps the evaluator independent
+// of the native position's internal bitboards.
+struct FeatureMasks {
+    std::uint64_t occupied = 0;
+    std::array<std::uint64_t, 2> colors{};
+};
 
-    if (minor_count == 0 || minor_count == 1) {
-        return true;
+FeatureMasks feature_masks(const PositionFeatures& features) noexcept {
+    FeatureMasks masks;
+    for (std::size_t square = 0; square < 64; ++square) {
+        const Piece piece = features.board[square];
+        if (piece.empty()) {
+            continue;
+        }
+        const std::uint64_t bit = std::uint64_t{1} << square;
+        masks.occupied |= bit;
+        masks.colors[color_index(piece.color)] |= bit;
     }
-    return only_bishops && bishop_complex != -1;
+    return masks;
 }
 
 int sliding_mobility(const PositionFeatures& features, std::uint8_t square,
                      PieceType type) noexcept {
-    constexpr int bishop_directions[4][2] = {
-        {1, 1}, {1, -1}, {-1, 1}, {-1, -1},
-    };
-    constexpr int rook_directions[4][2] = {
-        {1, 0}, {-1, 0}, {0, 1}, {0, -1},
-    };
-    constexpr int queen_directions[8][2] = {
-        {1, 1}, {1, -1}, {-1, 1}, {-1, -1},
-        {1, 0}, {-1, 0}, {0, 1}, {0, -1},
-    };
-    const int (*directions)[2] = type == PieceType::bishop ? bishop_directions :
-        (type == PieceType::rook ? rook_directions : queen_directions);
-    const int direction_count = type == PieceType::bishop || type == PieceType::rook ? 4 : 8;
-    const Piece moving = features.board[square];
-    const int file = square % 8;
-    const int rank = square / 8;
-    int mobility = 0;
-
-    for (int direction = 0; direction < direction_count; ++direction) {
-        int target_file = file + directions[direction][0];
-        int target_rank = rank + directions[direction][1];
-        while (inside(target_file, target_rank)) {
-            const Piece target = features.board[static_cast<std::size_t>(target_rank * 8 + target_file)];
-            if (target.empty()) {
-                ++mobility;
-            } else {
-                if (target.color != moving.color) {
-                    ++mobility;
-                }
-                break;
-            }
-            target_file += directions[direction][0];
-            target_rank += directions[direction][1];
-        }
+    if (square >= 64) {
+        return 0;
     }
-    return mobility;
+    const Piece moving = features.board[square];
+    if (moving.empty()) {
+        return 0;
+    }
+    const FeatureMasks masks = feature_masks(features);
+    const std::uint64_t attacks = type == PieceType::bishop ?
+        detail::bishop_attacks(square, masks.occupied) :
+        (type == PieceType::rook ? detail::rook_attacks(square, masks.occupied) :
+                                   detail::queen_attacks(square, masks.occupied));
+    return std::popcount(attacks & ~masks.colors[color_index(moving.color)]);
 }
 
 int tapered_piece_square(PieceType type, std::uint8_t square, int phase) noexcept {
@@ -346,30 +298,19 @@ int center_control_for(const PositionFeatures& features, Color color) noexcept {
 }
 
 int knight_mobility(const PositionFeatures& features, std::uint8_t square) noexcept {
-    constexpr int directions[8][2] = {
-        {1, 2}, {2, 1}, {2, -1}, {1, -2},
-        {-1, -2}, {-2, -1}, {-2, 1}, {-1, 2},
-    };
-    const Piece moving = features.board[square];
-    const int file = square % 8;
-    const int rank = square / 8;
-    int mobility = 0;
-    for (const auto& direction : directions) {
-        const int target_file = file + direction[0];
-        const int target_rank = rank + direction[1];
-        if (!inside(target_file, target_rank)) {
-            continue;
-        }
-        const Piece target = features.board[static_cast<std::size_t>(target_rank * 8 + target_file)];
-        if (target.empty() || target.color != moving.color) {
-            ++mobility;
-        }
+    if (square >= 64) {
+        return 0;
     }
-    return mobility;
+    const Piece moving = features.board[square];
+    if (moving.empty()) {
+        return 0;
+    }
+    const FeatureMasks masks = feature_masks(features);
+    return std::popcount(detail::knight_attacks(square) & ~masks.colors[color_index(moving.color)]);
 }
 
 bool piece_attacks_square(const PositionFeatures& features, std::uint8_t source,
-                          std::uint8_t target) noexcept {
+                          std::uint8_t target, std::uint64_t occupied) noexcept {
     if (source >= 64 || target >= 64 || source == target) {
         return false;
     }
@@ -378,51 +319,24 @@ bool piece_attacks_square(const PositionFeatures& features, std::uint8_t source,
         return false;
     }
 
-    const int source_file = source % 8;
-    const int source_rank = source / 8;
-    const int target_file = target % 8;
-    const int target_rank = target / 8;
-    const int file_delta = target_file - source_file;
-    const int rank_delta = target_rank - source_rank;
-    const int abs_file_delta = std::abs(file_delta);
-    const int abs_rank_delta = std::abs(rank_delta);
-
+    const std::uint64_t target_bit = std::uint64_t{1} << target;
     switch (piece.type) {
     case PieceType::pawn:
-        return rank_delta == (piece.color == Color::white ? 1 : -1) &&
-               abs_file_delta == 1;
+        return (detail::pawn_attacks(source, piece.color == Color::white) & target_bit) != 0;
     case PieceType::knight:
-        return (abs_file_delta == 1 && abs_rank_delta == 2) ||
-               (abs_file_delta == 2 && abs_rank_delta == 1);
+        return (detail::knight_attacks(source) & target_bit) != 0;
     case PieceType::king:
-        return abs_file_delta <= 1 && abs_rank_delta <= 1 &&
-               (abs_file_delta != 0 || abs_rank_delta != 0);
+        return (detail::king_attacks(source) & target_bit) != 0;
     case PieceType::bishop:
+        return (detail::bishop_attacks(source, occupied) & target_bit) != 0;
     case PieceType::rook:
+        return (detail::rook_attacks(source, occupied) & target_bit) != 0;
     case PieceType::queen:
-        break;
+        return (detail::queen_attacks(source, occupied) & target_bit) != 0;
     case PieceType::none:
         return false;
     }
-
-    const bool diagonal = abs_file_delta == abs_rank_delta && abs_file_delta != 0;
-    const bool orthogonal = (file_delta == 0) != (rank_delta == 0);
-    if ((piece.type == PieceType::bishop && !diagonal) ||
-        (piece.type == PieceType::rook && !orthogonal) ||
-        (piece.type == PieceType::queen && !diagonal && !orthogonal)) {
-        return false;
-    }
-
-    const int file_step = file_delta == 0 ? 0 : (file_delta > 0 ? 1 : -1);
-    const int rank_step = rank_delta == 0 ? 0 : (rank_delta > 0 ? 1 : -1);
-    for (int file = source_file + file_step, rank = source_rank + rank_step;
-         file != target_file || rank != target_rank;
-         file += file_step, rank += rank_step) {
-        if (!features.board[static_cast<std::size_t>(rank * 8 + file)].empty()) {
-            return false;
-        }
-    }
-    return true;
+    return false;
 }
 
 int king_ring_attack_units(const PositionFeatures& features, Color color) noexcept {
@@ -475,6 +389,7 @@ int king_ring_attack_units(const PositionFeatures& features, Color color) noexce
     const int king_file = king % 8;
     const int king_rank = king / 8;
     const Color attacker = opposite(color);
+    const FeatureMasks masks = feature_masks(features);
 
     int units = 0;
     for (std::uint8_t source = 0; source < 64; ++source) {
@@ -490,7 +405,8 @@ int king_ring_attack_units(const PositionFeatures& features, Color color) noexce
                     continue;
                 }
                 if (piece_attacks_square(features, source,
-                                         static_cast<std::uint8_t>(rank * 8 + file))) {
+                                         static_cast<std::uint8_t>(rank * 8 + file),
+                                         masks.occupied)) {
                     attacks_ring = true;
                     break;
                 }
@@ -874,7 +790,12 @@ EvaluationBreakdown ClassicalEvaluator::breakdown(const GameState& state, Color 
     const EvaluationFeatures extracted = EvaluationFeatureExtractor::extract(state);
     const PositionFeatures& features = extracted.position;
     EvaluationBreakdown score;
-    const bool dead_material = insufficient_material(features);
+    // One authoritative dead-position test: the native position already
+    // recognizes insufficient material (including same-complex bishop endings)
+    // and the known locked-pawn-wall dead position, with its en-passant
+    // exception. Routing through it here keeps the evaluator's zero from
+    // drifting away from the rules layer.
+    const bool dead_position = state.is_dead_position();
 
     const int phase = features.game_phase;
 
@@ -917,7 +838,7 @@ EvaluationBreakdown ClassicalEvaluator::breakdown(const GameState& state, Color 
     score.total = score.material + score.piece_square + score.mobility + score.pawn_structure +
                   score.activity + score.development + score.center_control + score.initiative +
                   score.king_safety + score.king_activity + score.passed_pawn + score.tempo;
-    if (dead_material) {
+    if (dead_position) {
         score.total = 0;
     }
 

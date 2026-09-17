@@ -469,7 +469,74 @@ candidate B; the shortfall is recorded rather than tuned around.
 
 ## Phase 7 — classical evaluation modernization
 
-Pending.
+Behavior-preserving deduplication first, then a real (but not adopted) tuning
+pipeline.  The classical evaluator stays the default and its fixed-depth
+benchmark rows stay byte-identical.
+
+### Deduplication (behavior-preserving)
+
+- Single material source: `evaluation_parameters.hpp` now includes
+  `piece_values.hpp`, and five `static_assert`s bind the evaluator's
+  pawn/knight/bishop/rook/queen values to
+  `kPawnMaterialValue`/`kKnightMaterialValue`/`kBishopMaterialValue`/
+  `kRookMaterialValue`/`kQueenMaterialValue`, so the evaluator and the
+  SEE/ordering/book table can no longer silently diverge.
+- Attack-table routing: `native_feature_attacks` (`game_state.cpp`) now uses
+  the precomputed tables instead of hand-walked rays, and the evaluator's
+  `sliding_mobility`, `knight_mobility`, `piece_attacks_square`, and
+  `king_ring_attack_units` go through `detail::attack_tables` with one
+  mailbox occupancy scan per call.
+- Dead-position unification: the evaluator no longer owns an
+  `insufficient_material` copy; `ClassicalEvaluator::breakdown` defers to
+  `GameState::is_dead_position()`, which covers native insufficient material
+  plus the known locked pawn wall (with the legal en-passant exception).
+  This is the one deliberate behavioral extension: the locked-wall FIDE
+  example now evaluates as 0.  New test `classical evaluator locked pawn
+  wall` pins the fixture and the zero total.
+
+### Evidence
+
+| Check | Result | Evidence |
+|---|---|---|
+| Fixed-depth classical rows | 64 rows byte-identical to the Phase 0 baseline | `bench-classical-phase7.log` vs `bench-baseline-t1.log` (`Compare-Object`: 0 diff lines) |
+| `classical_evaluator_tests` | 8/8 | direct run |
+| `evaluation_boundary_tests` | 12/12 | direct run |
+| `evaluation_architecture_tests` | 4/4 | direct run |
+| `koi_strength_tests` (64/64 tactical gate) | 7/7 | direct run |
+| Release CTest | 58/58, 233.93 s | `ctest-release-phase7.log` |
+| Debug smoke | 50/50, 73.48 s | `ctest-debug-phase7.log` |
+
+### Tuning pipeline
+
+- `koi-eval-features` (`tools/engine/koi_eval_features.cpp`, built as
+  `koi-eval-features.exe`) reads `FEN` or `FEN;cp;...` rows and writes
+  `fen,cp,phase,<12 terms>,total` breakdowns from the side-to-move
+  perspective (matching the label corpus convention).
+- `tune_classical.py` ridge-fits the 12 documented term columns to `cp` when
+  labels are present, otherwise to `total`, and writes a candidate header
+  (`kTunedClassicalScale<Term>` + offset) and a JSON report; it never edits
+  `src/`.
+- Sample run: first 50,000 labeled positions
+  (`classical-features-sample.csv`) — current terms MAE 196.74 cp / R² 0.7638;
+  fitted MAE 181.17 cp / R² 0.8085.  Candidate scales live in
+  `tuned-classical-report.json` (offset +57.10; mobility 0.10, king_activity
+  6.57, tempo −3.07, initiative 4.31, ...).
+- **Not adopted.** The fit is a label-regression report, not a gated strength
+  result: there is no classical-vs-classical equal-node A/B harness, the
+  candidate scales are confounded (collinearity plus a +57 cp intercept), and
+  adoption would require the 64/64 gate + full suite + A/B evidence.  The
+  canonical weights stay in place, satisfying the plan's revert-with-evidence
+  clause.
+- New Python test `tune_classical_python` (5 cases) covers known-scale
+  recovery, degenerate corpora, header/report emission, and an end-to-end
+  `koi-eval-features` CSV round trip (skipped when the tool is not built).
+
+### Deferred
+
+- PSQT (768 literals) weighting and trapped bishop/rook terms were not
+  attempted; both are behavioral candidates that need the same gated adoption
+  path this phase could not provide.  The fitted term scales are available for
+  a future campaign once a classical A/B harness exists.
 
 ## Phase 8 — release verification
 

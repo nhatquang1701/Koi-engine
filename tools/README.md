@@ -87,6 +87,26 @@ python -m pip install -r .\tools\measurement\requirements-elo-oracle.txt
 python -m unittest .\tests\python\measurement\elo_oracle_test.py -v
 ```
 
+## Classical evaluation term tuning
+
+`koi-eval-features` (built as `build/release/koi-eval-features.exe`) reads FEN
+lines (optionally `FEN;cp;best_move`) and writes the classical evaluator's term
+breakdown as CSV. `tune_classical.py` fits the twelve term columns to the label
+`cp` (or to the evaluator's `total`) with a centered ridge solve, then writes a
+candidate parameter header and a JSON report under `artifacts/`:
+
+```powershell
+Get-Content .\artifacts\training\labels.txt -TotalCount 50000 |
+  .\build\release\koi-eval-features.exe --output .\artifacts\verification\classical-features-sample.csv
+python .\tools\measurement\tune_classical.py --input .\artifacts\verification\classical-features-sample.csv `
+  --header-out .\artifacts\verification\tuned-classical.h `
+  --report-out .\artifacts\verification\tuned-classical-report.json
+```
+
+The emitted header is a report, not an adopted parameter set: the evaluator
+never reads it, and tuned scales are only adopted after the tactical, suite,
+and match gates pass.
+
 ## PGN extraction and oracle analysis
 
 `elo_oracle.py` reads standard SAN PGN mainlines. Comments, NAGs, and recursive

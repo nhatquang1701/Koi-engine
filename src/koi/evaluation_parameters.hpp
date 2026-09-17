@@ -3,6 +3,7 @@
 #include <string_view>
 
 #include "koi/evaluation_parameters_generated.hpp"
+#include "koi/piece_values.hpp"
 
 namespace koi {
 
@@ -57,5 +58,15 @@ struct ClassicalEvaluationParameters {
 };
 
 inline constexpr ClassicalEvaluationParameters kClassicalEvaluationParameters{};
+
+// The evaluator's material fields are a tuning-facing view of the single
+// material table in piece_values.hpp. Bind them at compile time so a change to
+// one source cannot silently desynchronize evaluation from SEE, ordering, and
+// book scoring.
+static_assert(kClassicalEvaluationParameters.pawn_value == kPawnMaterialValue);
+static_assert(kClassicalEvaluationParameters.knight_value == kKnightMaterialValue);
+static_assert(kClassicalEvaluationParameters.bishop_value == kBishopMaterialValue);
+static_assert(kClassicalEvaluationParameters.rook_value == kRookMaterialValue);
+static_assert(kClassicalEvaluationParameters.queen_value == kQueenMaterialValue);
 
 } // namespace koi

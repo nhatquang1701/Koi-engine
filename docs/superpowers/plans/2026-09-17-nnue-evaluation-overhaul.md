@@ -90,7 +90,7 @@ UCI handshake byte-identical, and v1/v2/v3 containers loadable.
   64-position match count, equal-node color-balanced A/B versus classical
   and versus `koi-sf-v1`, NPS, and fixed-depth classical non-regression.
   Record nets and reports under `artifacts/`. Commit.
-- [ ] **Phase 7 — Classical evaluation modernization.** Behavior-preserving
+- [x] **Phase 7 — Classical evaluation modernization.** Behavior-preserving
   deduplication (single material source, attack-table routing for feature
   generation and mobility, unified insufficient-material/dead-position
   handling) plus `koi-eval-features` and `tune_classical.py` producing a

@@ -1039,77 +1039,33 @@ std::uint64_t king_zone_mask(std::uint8_t square) noexcept {
 
 using NativeFeatureBitboards = std::array<std::array<std::uint64_t, 7>, 2>;
 
-constexpr std::uint64_t feature_bit(int square) noexcept {
-    return square >= 0 && square < 64 ? std::uint64_t{1} << square : 0;
-}
-
 std::uint64_t native_feature_attacks(const NativeFeatureBitboards& pieces,
                                      std::uint64_t occupied, int source,
                                      PieceType type, Color color) noexcept {
-    const int file = source % 8;
-    const int rank = source / 8;
-    std::uint64_t attacks = 0;
-
-    if (type == PieceType::pawn) {
-        const int direction = color == Color::white ? 1 : -1;
-        for (const int file_delta : {-1, 1}) {
-            const int target_file = file + file_delta;
-            const int target_rank = rank + direction;
-            if (target_file >= 0 && target_file < 8 && target_rank >= 0 && target_rank < 8) {
-                attacks |= feature_bit(target_rank * 8 + target_file);
-            }
-        }
-        return attacks;
-    }
-
-    if (type == PieceType::knight || type == PieceType::king) {
-        constexpr int knight_directions[8][2] = {
-            {1, 2}, {2, 1}, {2, -1}, {1, -2},
-            {-1, -2}, {-2, -1}, {-2, 1}, {-1, 2},
-        };
-        constexpr int king_directions[8][2] = {
-            {1, 1}, {1, 0}, {1, -1}, {0, 1},
-            {0, -1}, {-1, 1}, {-1, 0}, {-1, -1},
-        };
-        const auto& directions = type == PieceType::knight ? knight_directions : king_directions;
-        for (const auto& direction : directions) {
-            const int target_file = file + direction[0];
-            const int target_rank = rank + direction[1];
-            if (target_file >= 0 && target_file < 8 && target_rank >= 0 && target_rank < 8) {
-                attacks |= feature_bit(target_rank * 8 + target_file);
-            }
-        }
-        return attacks;
-    }
-
-    constexpr int bishop_directions[4][2] = {
-        {1, 1}, {1, -1}, {-1, 1}, {-1, -1},
-    };
-    constexpr int rook_directions[4][2] = {
-        {1, 0}, {-1, 0}, {0, 1}, {0, -1},
-    };
-    constexpr int queen_directions[8][2] = {
-        {1, 1}, {1, -1}, {-1, 1}, {-1, -1},
-        {1, 0}, {-1, 0}, {0, 1}, {0, -1},
-    };
-    const auto& directions = type == PieceType::bishop ? bishop_directions :
-        (type == PieceType::rook ? rook_directions : queen_directions);
-    const int direction_count = type == PieceType::queen ? 8 : 4;
-    for (int direction = 0; direction < direction_count; ++direction) {
-        int target_file = file + directions[direction][0];
-        int target_rank = rank + directions[direction][1];
-        while (target_file >= 0 && target_file < 8 && target_rank >= 0 && target_rank < 8) {
-            const std::uint64_t target = feature_bit(target_rank * 8 + target_file);
-            attacks |= target;
-            if ((occupied & target) != 0) {
-                break;
-            }
-            target_file += directions[direction][0];
-            target_rank += directions[direction][1];
-        }
-    }
+    // Precomputed tables already encode exactly the masks this routine used to
+    // walk by hand (including the first blocker for sliders), so feature
+    // generation shares one attack implementation with the rules core.
     (void)pieces;
-    return attacks;
+    if (source < 0 || source >= 64) {
+        return 0;
+    }
+    switch (type) {
+    case PieceType::pawn:
+        return detail::pawn_attacks(source, color == Color::white);
+    case PieceType::knight:
+        return detail::knight_attacks(source);
+    case PieceType::king:
+        return detail::king_attacks(source);
+    case PieceType::bishop:
+        return detail::bishop_attacks(source, occupied);
+    case PieceType::rook:
+        return detail::rook_attacks(source, occupied);
+    case PieceType::queen:
+        return detail::queen_attacks(source, occupied);
+    case PieceType::none:
+        return 0;
+    }
+    return 0;
 }
 
 bool native_move_gives_check(const Position& position, const Move& move) noexcept {

@@ -123,6 +123,8 @@ the repository root as the working directory:
 - Evaluation/NNUE: `tune_eval_python`, `nnue_training_python`, `nnue_wrapper_python`,
   `strength_report_python`, `koi_dataset_python`, `gen_training_data_python`,
   `koi_trainer_python` (cross-language v4 parity against the boundary executable),
+  `tune_classical_python` (ridge-fit recovery plus a `koi-eval-features` CSV
+  round trip when the Release tool is built),
   `nnue_studio_python` (progress parser, backend CLI contract, GUI smoke, and a
   torch-gated tiny training selftest).
 
