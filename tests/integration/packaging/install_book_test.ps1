@@ -47,6 +47,8 @@ if (Test-Path -LiteralPath $installerPath -PathType Leaf) {
     $source = Get-Content -LiteralPath $installerPath -Raw
     Assert-Contains $source 'Mandatory = $true' 'EnginePath must be mandatory.'
     Assert-Contains $source '[string]$EnginePath' 'Installer must expose EnginePath.'
+    Assert-Contains $source '[string]$SourceFile' 'Installer must expose the offline SourceFile seam.'
+    Assert-Contains $source '[string]$ExpectedSha256' 'Installer must expose the ExpectedSha256 seam.'
     Assert-Contains $source '[switch]$Force' 'Installer must expose the optional Force switch.'
     Assert-Contains $source 'books-2026-05-v1' 'Installer must pin the approved release.'
     Assert-Contains $source 'releases/tag/$BookReleaseTag' 'Installer must retain the pinned release URL.'
@@ -93,6 +95,33 @@ if (Test-Path -LiteralPath $installerPath -PathType Leaf) {
         Assert-Contains $refusalOutput 'Refusing to overwrite' 'Overwrite refusal must be explicit.'
         $currentHash = Get-TestSha256 -Path $bookPath
         Assert-True ($currentHash -eq $originalHash) 'Overwrite refusal must leave the existing book unchanged.'
+
+        # Successful offline install using the documented test seams.
+        $successRoot = Join-Path $tempRoot 'success'
+        New-Item -ItemType Directory -Path $successRoot | Out-Null
+        $successEngine = Join-Path $successRoot 'koi-engine.exe'
+        [System.IO.File]::WriteAllBytes($successEngine, [byte[]](0x4B, 0x4F, 0x49))
+        $fixturePath = Join-Path $tempRoot 'fixture-book.bin'
+        [System.IO.File]::WriteAllBytes($fixturePath, [byte[]](0x50, 0x4F, 0x4C, 0x59))
+        $fixtureHash = Get-TestSha256 -Path $fixturePath
+
+        $installOutput = & $installerPath -EnginePath $successEngine -SourceFile $fixturePath -ExpectedSha256 $fixtureHash
+        $installedPath = Join-Path $successRoot 'book.bin'
+        Assert-True (Test-Path -LiteralPath $installedPath -PathType Leaf) 'A verified local install must publish book.bin.'
+        if (Test-Path -LiteralPath $installedPath -PathType Leaf) {
+            Assert-True ((Get-TestSha256 -Path $installedPath) -eq $fixtureHash) 'The installed book must match the verified source hash.'
+        }
+        Assert-Contains ($installOutput | Out-String) 'Installed' 'A successful install must report the installed path.'
+
+        # A second run must detect the already-installed verified book.
+        $repeatOutput = & $installerPath -EnginePath $successEngine -SourceFile $fixturePath -ExpectedSha256 $fixtureHash
+        Assert-Contains ($repeatOutput | Out-String) 'already installed' 'Reinstalling a verified book must be a no-op.'
+
+        # Force must replace a different existing book with the verified asset.
+        [System.IO.File]::WriteAllBytes($installedPath, [byte[]](0xAA, 0xBB))
+        $forceOutput = & $installerPath -EnginePath $successEngine -SourceFile $fixturePath -ExpectedSha256 $fixtureHash -Force
+        Assert-True ((Get-TestSha256 -Path $installedPath) -eq $fixtureHash) 'Force must replace a different existing book.'
+        Assert-Contains ($forceOutput | Out-String) 'Installed' 'A forced install must report the installed path.'
     }
     finally {
         if (Test-Path -LiteralPath $tempRoot) {

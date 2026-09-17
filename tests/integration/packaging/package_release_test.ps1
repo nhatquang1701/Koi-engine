@@ -7,9 +7,11 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+# Use the current PowerShell host so the test runs wherever pwsh is available.
+$powerShellExecutable = (Get-Process -Id $PID).Path
 $outputDirectory = Join-Path ([System.IO.Path]::GetTempPath()) ('koi-package-test-' + [guid]::NewGuid().ToString('N'))
 try {
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $PackageScript `
+    & $powerShellExecutable -NoProfile -ExecutionPolicy Bypass -File $PackageScript `
         -BuildDirectory $BuildDirectory -OutputDirectory $outputDirectory | Out-Null
     if ($LASTEXITCODE -ne 0) {
         throw "package script exited with $LASTEXITCODE"

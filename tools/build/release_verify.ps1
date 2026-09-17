@@ -252,7 +252,9 @@ try {
     New-Item -ItemType Directory -Path $enCroissantDirectory -Force | Out-Null
     $enCroissantThreads = if ($maximumThreads -ge 4) { 4 } else { $maximumThreads }
     $matchScript = Join-Path $repositoryRoot 'tools\stability\uci_match.ps1'
-    $matchOutput = Invoke-LoggedCommand 'powershell.exe' @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $matchScript,
+    # Use the current PowerShell host instead of a hardcoded powershell.exe so
+    # the gate works on hosts that only ship pwsh.
+    $matchOutput = Invoke-LoggedCommand (Get-Process -Id $PID).Path @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $matchScript,
         '-KoiPath', $enginePath, '-OpponentPath', $enginePath, '-ReplayPath', $replayPath,
         '-Depth', '2', '-Games', '1', '-MaxPlies', '24', '-TimeoutMilliseconds', '5000',
         '-Threads', "$enCroissantThreads", '-Speed', '100', '-Hash', '512', '-KoiOwnBook', 'false',

@@ -3,7 +3,11 @@ param(
     [string]$EnginePath,
     [string]$CutechessPath = 'C:\Program Files (x86)\Cute Chess\cutechess-cli.exe',
     [string]$OpponentPath = '',
-    [string]$StabilityScript = ''
+    [string]$StabilityScript = '',
+    # Runs only the fabricated-engine diagnostic harness.  CMake registers this
+    # mode unconditionally so the harness is always exercised, and registers the
+    # real Cutechess smoke only when cutechess-cli is installed.
+    [switch]$DiagnosticsOnly
 )
 
 $ErrorActionPreference = 'Stop'
@@ -305,6 +309,11 @@ function Assert-DiagnosticHarnessArtifacts {
 }
 
 Assert-DiagnosticHarnessArtifacts
+
+if ($DiagnosticsOnly) {
+    Write-Output 'PASS cutechess diagnostic harness'
+    exit 0
+}
 
 if (-not (Test-Path -LiteralPath $CutechessPath -PathType Leaf)) {
     Write-Output "SKIP Cutechess is not installed: $CutechessPath"

@@ -523,14 +523,38 @@ add_test(
 
 koi_set_timeout(koi_uci_match_clock 120)
 
+# The diagnostic half of the Cutechess harness uses fabricated engines and runs
+# everywhere.  The real smoke requires cutechess-cli, so it is only registered
+# when the executable is actually present instead of reporting a silent SKIP.
 add_test(
-    NAME cutechess_stability_smoke
+    NAME cutechess_stability_diagnostics
     COMMAND ${POWERSHELL_EXECUTABLE} -NoProfile -ExecutionPolicy Bypass -File
             "${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/matches/cutechess_stability_test.ps1"
             -EnginePath "$<TARGET_FILE:koi_engine>"
+            -DiagnosticsOnly
 )
 
-koi_set_timeout(cutechess_stability_smoke 180)
+koi_set_timeout(cutechess_stability_diagnostics 120)
+
+find_program(
+    CUTECHESS_EXECUTABLE
+    NAMES cutechess-cli.exe
+    HINTS "C:/Program Files (x86)/Cute Chess"
+)
+
+if(CUTECHESS_EXECUTABLE)
+    add_test(
+        NAME cutechess_stability_smoke
+        COMMAND ${POWERSHELL_EXECUTABLE} -NoProfile -ExecutionPolicy Bypass -File
+                "${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/matches/cutechess_stability_test.ps1"
+                -EnginePath "$<TARGET_FILE:koi_engine>"
+                -CutechessPath "${CUTECHESS_EXECUTABLE}"
+    )
+
+    koi_set_timeout(cutechess_stability_smoke 180)
+else()
+    message(STATUS "cutechess-cli not found; the real Cutechess smoke test is omitted")
+endif()
 
 add_test(
     NAME hash_memory_stability
@@ -694,8 +718,12 @@ set_tests_properties(koi_uci_match_process koi_uci_match_clock
     PROPERTIES LABELS "process;matches")
 set_tests_properties(koi_uci_match_clock PROPERTIES PROCESSORS 2)
 set_tests_properties(koi_stockfish_strength_option PROPERTIES LABELS "process;matches")
-set_tests_properties(cutechess_stability_smoke
-    PROPERTIES LABELS "process;matches;heavy" PROCESSORS 2)
+set_tests_properties(cutechess_stability_diagnostics
+    PROPERTIES LABELS "process;matches")
+if(TEST cutechess_stability_smoke)
+    set_tests_properties(cutechess_stability_smoke
+        PROPERTIES LABELS "process;matches;heavy" PROCESSORS 2)
+endif()
 set_tests_properties(hash_memory_stability PROPERTIES LABELS "process;runtime")
 set_tests_properties(windows_ci_configuration install_book_script package_release_layout
     PROPERTIES LABELS "process;packaging")

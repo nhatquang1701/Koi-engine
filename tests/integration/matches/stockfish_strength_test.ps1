@@ -5,6 +5,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+# Invoke the match harness with the current PowerShell host instead of a
+# hardcoded powershell.exe so the test works on hosts that only ship pwsh.
+$powerShellExecutable = (Get-Process -Id $PID).Path
+
 $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\..'))
 $matchScript = Join-Path $repositoryRoot 'tools\stability\uci_match.ps1'
 $enginePath = (Resolve-Path -LiteralPath $EnginePath).Path
@@ -21,7 +25,7 @@ try {
         throw "replay executable is missing: $replayPath"
     }
 
-    $defaultOutput = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $matchScript `
+    $defaultOutput = & $powerShellExecutable -NoProfile -ExecutionPolicy Bypass -File $matchScript `
         -KoiPath $enginePath -OpponentPath $fixturePath -ReplayPath $replayPath `
         -Depth 1 -Games 1 -MaxPlies 2 -KoiOwnBook false `
         -OutputDirectory $defaultOutputDirectory
@@ -35,7 +39,7 @@ try {
         throw 'omitted opponent strength must not send Stockfish strength options.'
     }
 
-    $output = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $matchScript `
+    $output = & $powerShellExecutable -NoProfile -ExecutionPolicy Bypass -File $matchScript `
         -KoiPath $enginePath -OpponentPath $fixturePath -ReplayPath $replayPath `
         -Depth 1 -Games 1 -MaxPlies 2 -KoiOwnBook false -OpponentElo 0 `
         -OutputDirectory $outputDirectory

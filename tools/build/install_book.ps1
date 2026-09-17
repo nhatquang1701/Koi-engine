@@ -6,6 +6,13 @@ param(
     [ValidateNotNullOrEmpty()]
     [string]$EnginePath,
 
+    # Optional offline test seams. SourceFile installs a local asset instead of
+    # downloading, and ExpectedSha256 overrides the pinned hash. The pinned
+    # values below stay authoritative when the parameters are omitted.
+    [string]$SourceFile = '',
+
+    [string]$ExpectedSha256 = '',
+
     [switch]$Force
 )
 
@@ -20,7 +27,9 @@ $BookReleaseUrl = "$BookSourceRepository/releases/tag/$BookReleaseTag"
 $BookAssetName = 'lichess_1900_rapid_2026-05.bin'
 $BookDownloadUri = "$BookSourceRepository/releases/download/$BookReleaseTag/$BookAssetName"
 $BookLicense = 'CC0 1.0 Universal'
-$ExpectedSha256 = '56abc70e5291b4338356009d380e565fd85eab8067f6bf34927b5807ff231370'
+if ([string]::IsNullOrWhiteSpace($ExpectedSha256)) {
+    $ExpectedSha256 = '56abc70e5291b4338356009d380e565fd85eab8067f6bf34927b5807ff231370'
+}
 $DestinationName = 'book.bin'
 
 function Write-InstallerMessage {
@@ -181,28 +190,40 @@ $replacementBackupPath = $null
 
 try {
     $temporaryDownloadPath = New-TemporaryDownloadPath -Directory $engineDirectoryItem.FullName
-    Write-InstallerMessage "Downloading $BookAssetName from the pinned $BookReleaseTag release."
-    Write-InstallerMessage "Provenance: $BookLicense; release $BookReleaseUrl"
 
-    try {
-        # GitHub requires modern TLS on supported Windows installations. The hash
-        # check below remains authoritative even when the download follows a CDN redirect.
+    if (-not [string]::IsNullOrWhiteSpace($SourceFile)) {
+        Write-InstallerMessage "Installing the supplied local asset instead of downloading $BookAssetName."
         try {
-            $currentProtocol = [System.Net.ServicePointManager]::SecurityProtocol
-            if (($currentProtocol -band [System.Net.SecurityProtocolType]::Tls12) -eq 0) {
-                [System.Net.ServicePointManager]::SecurityProtocol = $currentProtocol -bor [System.Net.SecurityProtocolType]::Tls12
+            Copy-Item -LiteralPath $SourceFile -Destination $temporaryDownloadPath -Force -ErrorAction Stop
+        }
+        catch {
+            throw "Unable to read the supplied local book source: $($_.Exception.Message)"
+        }
+    }
+    else {
+        Write-InstallerMessage "Downloading $BookAssetName from the pinned $BookReleaseTag release."
+        Write-InstallerMessage "Provenance: $BookLicense; release $BookReleaseUrl"
+
+        try {
+            # GitHub requires modern TLS on supported Windows installations. The hash
+            # check below remains authoritative even when the download follows a CDN redirect.
+            try {
+                $currentProtocol = [System.Net.ServicePointManager]::SecurityProtocol
+                if (($currentProtocol -band [System.Net.SecurityProtocolType]::Tls12) -eq 0) {
+                    [System.Net.ServicePointManager]::SecurityProtocol = $currentProtocol -bor [System.Net.SecurityProtocolType]::Tls12
+                }
+            }
+            catch {
+                # PowerShell 7 may use a handler that does not expose this legacy setting.
+            }
+
+            Invoke-WebRequest -Uri $BookDownloadUri -OutFile $temporaryDownloadPath -UseBasicParsing -MaximumRedirection 5 -Headers @{
+                'User-Agent' = 'Koi-book-installer/1.0'
             }
         }
         catch {
-            # PowerShell 7 may use a handler that does not expose this legacy setting.
+            throw "Unable to download the pinned opening book: $($_.Exception.Message)"
         }
-
-        Invoke-WebRequest -Uri $BookDownloadUri -OutFile $temporaryDownloadPath -UseBasicParsing -MaximumRedirection 5 -Headers @{
-            'User-Agent' = 'Koi-book-installer/1.0'
-        }
-    }
-    catch {
-        throw "Unable to download the pinned opening book: $($_.Exception.Message)"
     }
 
     $downloadedBook = Get-Item -LiteralPath $temporaryDownloadPath -Force -ErrorAction Stop
