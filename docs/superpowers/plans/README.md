@@ -30,3 +30,4 @@ stable because plans and verification records link to each other.
 | `2026-09-16-strength-program.md` | Strength program: hot-path speedups and an end-to-end NNUE pipeline. |
 | `2026-09-17-test-suite-hardening.md` | Test-suite reliability, determinism, parallel CTest, and CI hardening. |
 | `2026-09-17-nnue-studio.md` | NNUE Studio: GUI, headless training, validation, and install. |
+| `2026-09-17-nnue-evaluation-overhaul.md` | King-bucketed NNUE, incremental inference, container v4, and classical evaluation modernization. |
