@@ -29,3 +29,4 @@ stable because plans and verification records link to each other.
 | `2026-09-16-uci-controller-improvement.md` | UCI controller robustness, option registry, and ponder continuation. |
 | `2026-09-16-strength-program.md` | Strength program: hot-path speedups and an end-to-end NNUE pipeline. |
 | `2026-09-17-test-suite-hardening.md` | Test-suite reliability, determinism, parallel CTest, and CI hardening. |
+| `2026-09-17-nnue-studio.md` | NNUE Studio: GUI, headless training, validation, and install. |

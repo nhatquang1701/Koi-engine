@@ -256,6 +256,31 @@ boundary tests, runs at about 65k nodes/s against about 87k for the classical
 evaluator on the same single-thread probe, and lost the equal-node A/B match
 that finished, so the classical evaluator remains the default.
 
+### Training a network with the NNUE Studio
+
+`Koi NNUE Studio.cmd` in the repository root opens a small tkinter GUI (Train,
+Validate and install, and Runs tabs) so a training run does not require
+remembering any command lines. The same pipeline is available headlessly:
+
+```powershell
+pwsh -NoProfile -File .\tools\nnue\train.ps1 -Preset quick              # wait for it
+pwsh -NoProfile -File .\tools\nnue\train.ps1 -Preset thorough -Detach   # background
+python .\tools\nnue\koi_nnue_studio.py --list-backends
+python .\tools\nnue\koi_nnue_studio.py --selftest --rows 2000 --epochs 1
+pwsh -NoProfile -File .\tools\nnue\ab_match.ps1 -NnueNet .\artifacts\training\koi.nnue -Games 20
+```
+
+Every run keeps its configuration, command line, log, progress history and
+artifacts under `artifacts/training/runs/<stamp>-<kind>-<backend>/`, so runs are
+comparable and resumable. Training uses the existing CPU PyTorch backend;
+`tools/nnue/backends/bullet_backend.py` documents the Rust (bullet) backend
+scaffold and reports why it is not available yet. After a run completes the
+studio can validate it with the 64-position `koi-bench --nnue` gate and with a
+node-limited A/B match against the classical evaluator
+(`tools/nnue/ab_match.ps1`, schema `koi-nnue-studio-ab-match-v1`), then offer to
+install the network as `koi.nnue` beside the engine, backing up any previous
+file. Validation output is a local report, not an Elo claim or a CI threshold.
+
 For a reproducible local match against Stockfish or another UCI engine, use the
 optional PowerShell harness:
 
@@ -410,7 +435,7 @@ continues to evaluate standard FIDE chess.
 
 ### Test inventory and known gaps
 
-The full local configuration registers 53 CTest tests (python-chess installed,
+The full local configuration registers 54 CTest tests (python-chess installed,
 `KOI_BUILD_SHADOW_DIFF=ON`, cutechess-cli present); the count drops when those
 optional pieces are absent. `koi_search_tests`, the heaviest suite, is
 registered as four shards, every test carries labels (`unit`, `integration`,

@@ -662,10 +662,14 @@ if(Python3_Interpreter_FOUND)
         NAME strength_report_python
         COMMAND "${Python3_EXECUTABLE}" -m unittest tests/python/evaluation/strength_report_test.py -v
     )
+    add_test(
+        NAME nnue_studio_python
+        COMMAND "${Python3_EXECUTABLE}" -m unittest tests/python/nnue/studio_test.py -v
+    )
     set_tests_properties(
         tune_eval_python
         nnue_training_python nnue_wrapper_python measurement_phase_python measurement_forensics_python
-        strength_report_python
+        strength_report_python nnue_studio_python
         PROPERTIES
             WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
             ENVIRONMENT "PYTHONDONTWRITEBYTECODE=1"
@@ -737,6 +741,7 @@ if(Python3_Interpreter_FOUND)
         elo_estimate_python stockfish_match_python elo_openings_python
         tune_eval_python nnue_training_python nnue_wrapper_python
         measurement_phase_python measurement_forensics_python strength_report_python
+        nnue_studio_python
         PROPERTIES LABELS "python"
     )
     if(TEST elo_oracle_python)

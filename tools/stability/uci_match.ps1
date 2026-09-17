@@ -41,6 +41,10 @@ param(
     [ValidateSet('true', 'false', '1', '0')]
     [string]$KoiBookRandom = 'false',
 
+    # Additional Koi setoption lines, e.g. @{ EvalFile = 'C:\nets\koi.nnue' }.
+    # Keys are sent sorted so transcripts stay reproducible.
+    [hashtable]$KoiOptions = @{},
+
     [ValidateRange(1, 64)]
     [int]$Threads = 1,
 
@@ -291,6 +295,11 @@ function Initialize-UciEngine($Engine) {
             "setoption name BookDepth value $KoiBookDepth",
             "setoption name BookRandom value $($KoiBookRandomEnabled.ToString().ToLowerInvariant())"
         )) {
+            Send-UciLine $Engine $option
+            $Engine.SentOptions.Add($option)
+        }
+        foreach ($name in @($KoiOptions.Keys | Sort-Object)) {
+            $option = "setoption name $name value $($KoiOptions[$name])"
             Send-UciLine $Engine $option
             $Engine.SentOptions.Add($option)
         }

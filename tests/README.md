@@ -45,7 +45,7 @@ ctest --test-dir build\release -N
 ctest --test-dir build\release -C Release -R koi_strength_tests --output-on-failure
 ```
 
-The local full configuration registers **53 tests** (Release, python-chess
+The local full configuration registers **54 tests** (Release, python-chess
 installed, `KOI_BUILD_SHADOW_DIFF=ON`, cutechess-cli present). The count varies
 with optional dependencies: `elo_oracle_python` requires python-chess,
 `koi_shadow_diff_tests` requires `-DKOI_BUILD_SHADOW_DIFF=ON`, and
@@ -121,7 +121,8 @@ the repository root as the working directory:
 - Measurement: `elo_oracle_python`, `elo_estimate_python`, `stockfish_match_python`,
   `elo_openings_python`, `measurement_phase_python`, `measurement_forensics_python`.
 - Evaluation/NNUE: `tune_eval_python`, `nnue_training_python`, `nnue_wrapper_python`,
-  `strength_report_python`.
+  `strength_report_python`, `nnue_studio_python` (progress parser, backend CLI
+  contract, GUI smoke, and a torch-gated tiny training selftest).
 
 ## Labels and scheduling
 

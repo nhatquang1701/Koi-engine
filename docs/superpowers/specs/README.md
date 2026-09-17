@@ -15,3 +15,4 @@ intentionally stable because plans and verification records link to them.
 | `2026-09-12-koi-architecture-stage4-design.md` | Stage 4 evaluation state and NNUE seam. |
 | `2026-09-12-koi-architecture-stage5-design.md` | Stage 5 TT, budget, and parallel runtime seams. |
 | `2026-09-12-search-strength-pass-design.md` | Search strength pass design. |
+| `2026-09-17-nnue-studio-design.md` | NNUE Studio: GUI, headless trainers, validation and install. |
