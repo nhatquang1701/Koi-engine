@@ -330,9 +330,72 @@ update is not part of this phase. `evaluate(const EvaluationFeatures&, ...)`
 still recomputes from scratch for tests and direct callers, and the v1/v2/v3
 formats keep their previous full-recompute behavior.
 
-## Phase 5 — trainer overhaul
+## Phase 5 - trainer overhaul
 
-Pending.
+### Trainer (`tools/measurement/train_nnue_koi.py`)
+
+The new trainer consumes either the resumable binary `koi-dataset-v1` corpus
+(written by `koi_dataset.py`) or the legacy `FEN;cp;best_move` text corpus. The
+model is a 9216-input `EmbeddingBag` with a bias, clipped to `[0, 1]`, whose
+first and second halves form CReLU pair products feeding one linear head per
+piece-count bucket; outputs are in units of 100 cp. Defaults are hidden 1024,
+batch 8192, AdamW (weight decay 1e-4) with a cosine schedule, SmoothL1 on
+`cp / 100`, and a seeded-permutation 5% validation split. Quantization searches
+`s1 in {6, 7, 8}` and `k3 in {12, 14, 16, 18, 20}` on up to 4000 validation
+samples, prints `quantization v4 ...` per candidate and `selected v4 ...`, and
+reports the W1/W2 saturation fractions. Export is deterministic and
+byte-identical across runs; `--float-out` writes a checkpoint and `--float-in`
+re-quantizes one without training. Metadata uses schema
+`koi-nnue-training-metadata-v2` (architecture, activation `crelu-pair`,
+shifts, corpus sizes, validation MAEs, saturation, payload/network SHA-256 and
+the exact command).
+
+Quantization follows the design exactly with `S1 = 1 << s1`:
+
+- `W1_q = clamp(round(W1f * S1), +/-32767)` int16, feature-major.
+- `b1_q = round(b1f * S1)` int32.
+- `W2_q = clamp(round(W2f * 100 * 2^k3 / S1^2), +/-127)` int8, bucket-major.
+- `b2_q = round(b2f * 100 * 2^k3)` int32.
+
+### Cross-language parity
+
+- `nnue_boundary_tests --emit-v4-fixture <path>` serializes a deterministic
+  wide-weight v4 network and prints one JSON line with the hidden width, both
+  shifts and, for three reference positions, the FEN, the integer score and the
+  sparse index list.
+- `tests/python/nnue/koi_trainer_test.py` (5 cases) checks that the Python
+  encoder reproduces the C++ sparse indices and integer scores for those
+  positions, that the integer reference clips and shifts as specified, that the
+  binary dataset reader round-trips and rejects malformed headers, and (with
+  torch present) that a toy export is byte-deterministic, carries the documented
+  metadata, and that `--float-in` reuses a checkpoint unchanged.
+- CMake registers `koi_trainer_python` with
+  `KOI_NNUE_BOUNDARY_EXE=$<TARGET_FILE:nnue_boundary_tests>`, so the
+  cross-language check runs wherever the boundary executable is built.
+
+### Studio wiring
+
+`tools/nnue/backends/koi_backend.py` wraps the new trainer and is the first
+entry in the backend registry; `studio_core.default_config()`, the studio CLI
+and `tools/nnue/train.ps1` now default to it. The legacy
+`train_nnue_sf.py` v2/v3 trainer remains available as the `torch` backend and
+its tests stay green. The studio selftest caps the v4 hidden width at 64 so the
+wiring check stays fast.
+
+### Tests and verification
+
+- `tests/python/nnue/koi_trainer_test.py`: 5/5.
+- `tests/python/nnue/studio_test.py`: 11/11 (registry order, v4 dry-run,
+  legacy dry-run, bullet rejection, GUI smoke, torch-gated selftest).
+- Release CTest: 57/57 passed (`ctest-release-phase5.log`, 275.49 s).
+- Debug smoke (`-LE heavy`): 49/49 passed (`ctest-debug-phase5.log`).
+
+### Deferred within Phase 5
+
+No network is trained, installed or strength-tested here; the campaign and its
+gates belong to Phase 6. The fixture network is a parity instrument with wide
+deterministic weights, not a candidate evaluator. CPU-only training still
+applies (no usable CUDA path on this host).
 
 ## Phase 6 — training campaign and strength gates
 

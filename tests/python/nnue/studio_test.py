@@ -98,14 +98,24 @@ class ProgressParserTests(unittest.TestCase):
 
 
 class StudioCliTests(unittest.TestCase):
-    def test_list_backends_reports_torch(self):
+    def test_list_backends_reports_the_trainers(self):
         result = run_studio("--list-backends", timeout=120)
         self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("koi", result.stdout)
         self.assertIn("torch", result.stdout)
         self.assertIn("available", result.stdout)
 
-    def test_dry_run_builds_a_v3_trainer_command(self):
+    def test_dry_run_builds_a_v4_trainer_command(self):
         result = run_studio("--dry-run", "--preset", "quick", timeout=120)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("train_nnue_koi.py", result.stdout)
+        self.assertIn("--hidden-units", result.stdout)
+        self.assertIn("--output-shifts", result.stdout)
+
+    def test_dry_run_can_target_the_legacy_v3_trainer(self):
+        result = run_studio(
+            "--dry-run", "--preset", "quick", "--backend", "torch", timeout=120
+        )
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("train_nnue_sf.py", result.stdout)
         self.assertIn("--format v3", result.stdout)

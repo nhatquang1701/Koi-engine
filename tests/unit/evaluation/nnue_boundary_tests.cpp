@@ -3,7 +3,10 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <cstdio>
+#include <cstdlib>
 #include <limits>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -901,7 +904,84 @@ void test_v4_incremental_recovers_from_skipped_hooks() {
 
 } // namespace
 
+// Test-only seam: serialize a deterministic v4 fixture network and print the
+// C++ sparse indices and integer scores for three reference positions.  The
+// Python trainer tests invoke this through KOI_NNUE_BOUNDARY_EXE so both
+// implementations are compared against the same fixture.
+void emit_v4_fixture(const std::filesystem::path& output_path) {
+    koi::NnueNetwork network = koi::NnueNetwork::synthetic_v4();
+    const std::size_t input_units = network.manifest.layer_sizes[0];
+    const std::size_t hidden_units = network.manifest.layer_sizes[1];
+    const std::size_t output_buckets = network.manifest.layer_sizes[2];
+    network.hidden_shift = 7;
+    network.output_shift = 12;
+    network.feature_weights.resize(input_units * hidden_units);
+    for (std::size_t index = 0; index < network.feature_weights.size(); ++index) {
+        network.feature_weights[index] =
+            static_cast<std::int16_t>(static_cast<std::int32_t>(index * 37 % 2001) - 1000);
+    }
+    network.hidden_bias.resize(hidden_units);
+    for (std::size_t h = 0; h < hidden_units; ++h) {
+        network.hidden_bias[h] = static_cast<std::int32_t>(h * 97 % 251) - 125;
+    }
+    network.bottleneck_weights.resize(output_buckets * (hidden_units / 2));
+    for (std::size_t index = 0; index < network.bottleneck_weights.size(); ++index) {
+        network.bottleneck_weights[index] =
+            static_cast<std::int8_t>(static_cast<std::int32_t>(index * 29 % 255) - 127);
+    }
+    network.bottleneck_bias.resize(output_buckets);
+    for (std::size_t bucket = 0; bucket < output_buckets; ++bucket) {
+        network.bottleneck_bias[bucket] = static_cast<std::int32_t>(bucket * 13) - 50;
+    }
+    const auto encoded = koi::NnueLoader::serialize(network);
+    if (!encoded.has_value()) {
+        std::fputs("v4 fixture serialization failed\n", stderr);
+        std::exit(2);
+    }
+    std::ofstream output(output_path, std::ios::binary | std::ios::trunc);
+    output.write(reinterpret_cast<const char*>(encoded->data()),
+                 static_cast<std::streamsize>(encoded->size()));
+    if (!output.good()) {
+        std::fputs("v4 fixture container could not be written\n", stderr);
+        std::exit(2);
+    }
+    output.close();
+
+    const std::array<std::string_view, 3> fens{{
+        "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+        "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1",
+        "r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 4 4",
+    }};
+    const auto weights = std::make_shared<const koi::NnueNetwork>(network);
+    koi::NnueWorker worker(weights);
+    std::printf("{\"hidden_units\":%u,\"hidden_shift\":%u,\"output_shift\":%u,\"positions\":[",
+                network.manifest.layer_sizes[1], unsigned(network.hidden_shift),
+                unsigned(network.output_shift));
+    bool first = true;
+    for (const std::string_view fen : fens) {
+        const koi::GameState state = require_state(fen);
+        const koi::EvaluationFeatures features =
+            koi::EvaluationFeatureExtractor::extract(state);
+        const koi::NnueSparseFeaturesV4 sparse =
+            koi::EvaluationFeatureExtractor::encode_sparse_v4(features);
+        const int score = worker.evaluate(features, features.position.side_to_move);
+        std::printf("%s{\"fen\":\"%s\",\"score\":%d,\"indices\":[", first ? "" : ",",
+                    std::string(fen).c_str(), score);
+        first = false;
+        for (std::size_t index = 0; index < sparse.count; ++index) {
+            std::printf("%s%u", index == 0 ? "" : ",", unsigned(sparse.indices[index]));
+        }
+        std::printf("]}");
+    }
+    std::printf("]}\n");
+}
+
 int main(int argc, char** argv) {
+    if (argc > 2 && argv[1] != nullptr &&
+        std::string_view(argv[1]) == "--emit-v4-fixture") {
+        emit_v4_fixture(std::filesystem::path(argv[2]));
+        return 0;
+    }
     if (argc > 1 && argv[1] != nullptr) {
         external_container_path = std::filesystem::path(argv[1]);
     }

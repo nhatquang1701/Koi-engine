@@ -67,7 +67,7 @@ def presets() -> dict[str, dict[str, Any]]:
 
 def default_config() -> dict[str, Any]:
     return {
-        "backend": "torch",
+        "backend": "koi",
         "corpus": str(DEFAULT_CORPUS),
         "epochs": 10,
         "batch_size": 4096,
@@ -80,6 +80,9 @@ def default_config() -> dict[str, Any]:
         "hidden_shift": 7,
         "bottleneck_shift": 7,
         "output_shifts": [3, 4, 5, 6],
+        "koi_hidden_units": 1024,
+        "koi_hidden_shifts": [6, 7, 8],
+        "koi_output_shifts": [12, 14, 16, 18, 20],
         "net_name": "koi.nnue",
         "float_out": True,
     }

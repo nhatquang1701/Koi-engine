@@ -121,8 +121,10 @@ the repository root as the working directory:
 - Measurement: `elo_oracle_python`, `elo_estimate_python`, `stockfish_match_python`,
   `elo_openings_python`, `measurement_phase_python`, `measurement_forensics_python`.
 - Evaluation/NNUE: `tune_eval_python`, `nnue_training_python`, `nnue_wrapper_python`,
-  `strength_report_python`, `nnue_studio_python` (progress parser, backend CLI
-  contract, GUI smoke, and a torch-gated tiny training selftest).
+  `strength_report_python`, `koi_dataset_python`, `gen_training_data_python`,
+  `koi_trainer_python` (cross-language v4 parity against the boundary executable),
+  `nnue_studio_python` (progress parser, backend CLI contract, GUI smoke, and a
+  torch-gated tiny training selftest).
 
 ## Labels and scheduling
 

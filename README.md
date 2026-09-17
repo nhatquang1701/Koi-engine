@@ -237,15 +237,20 @@ the Koi loader and strength gates before any network is considered for runtime u
 
 A complete Stockfish-labeled training pipeline lives next to the boundary. Positions
 come from Stockfish self-play (with tactical noise games), labels are fixed-depth
-centipawn scores (the example below asks for depth 10; the generator default is 9),
-and the trainer quantizes the float network into the explicit-shift version 3
-container so small weights survive rounding:
+centipawn scores (the example below asks for depth 10; the generator default is 9).
+The version 4 trainer (`train_nnue_koi.py`) trains the `halfka-king-bucket-v1`
+network with CReLU pair products and quantizes it into the explicit-shift version 4
+container; the earlier version 3 trainer (`train_nnue_sf.py`) remains available and
+its networks still load:
 
 ```powershell
 python .\tools\measurement\gen_training_data.py all --games 30000 --workers 3 --label-depth 10
-python .\tools\measurement\train_nnue_sf.py --epochs 20 --float-out .\artifacts\training\koi.pt `
-  --net-out .\artifacts\training\koi.nnue --meta-out .\artifacts\training\koi.metadata.json
-.\build\release\koi-bench.exe --nnue .\artifacts\training\koi.nnue
+python .\tools\measurement\koi_dataset.py encode --input .\artifacts\training\labels.txt `
+  --output .\artifacts\training\koi-dataset.bin
+python .\tools\measurement\train_nnue_koi.py --dataset .\artifacts\training\koi-dataset.bin `
+  --epochs 20 --float-out .\artifacts\training\koi-v4.pt `
+  --net-out .\artifacts\training\koi-v4.nnue --meta-out .\artifacts\training\koi-v4.metadata.json
+.\build\release\koi-bench.exe --nnue .\artifacts\training\koi-v4.nnue
 ```
 
 Load a trained network with the UCI `EvalFile` option, or place `koi.nnue` beside
@@ -273,7 +278,9 @@ pwsh -NoProfile -File .\tools\nnue\ab_match.ps1 -NnueNet .\artifacts\training\ko
 
 Every run keeps its configuration, command line, log, progress history and
 artifacts under `artifacts/training/runs/<stamp>-<kind>-<backend>/`, so runs are
-comparable and resumable. Training uses the existing CPU PyTorch backend;
+comparable and resumable. Training uses the CPU PyTorch backend: the default
+`koi` backend trains the `halfka-king-bucket-v1` version 4 network, and
+`--backend torch` still drives the legacy `train_nnue_sf.py` version 3 trainer.
 `tools/nnue/backends/bullet_backend.py` documents the Rust (bullet) backend
 scaffold and reports why it is not available yet. After a run completes the
 studio can validate it with the 64-position `koi-bench --nnue` gate and with a

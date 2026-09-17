@@ -674,6 +674,18 @@ if(Python3_Interpreter_FOUND)
         NAME nnue_studio_python
         COMMAND "${Python3_EXECUTABLE}" -m unittest tests/python/nnue/studio_test.py -v
     )
+    add_test(
+        NAME koi_trainer_python
+        COMMAND "${Python3_EXECUTABLE}" -m unittest tests/python/nnue/koi_trainer_test.py -v
+    )
+    # The trainer parity test shells out to the built boundary executable to
+    # compare the Python encoder and integer reference against C++ scores.
+    set_tests_properties(
+        koi_trainer_python
+        PROPERTIES
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+            ENVIRONMENT "PYTHONDONTWRITEBYTECODE=1;KOI_NNUE_BOUNDARY_EXE=$<TARGET_FILE:nnue_boundary_tests>"
+    )
     set_tests_properties(
         tune_eval_python
         nnue_training_python nnue_wrapper_python koi_dataset_python gen_training_data_python
@@ -751,7 +763,7 @@ if(Python3_Interpreter_FOUND)
         tune_eval_python nnue_training_python nnue_wrapper_python
         koi_dataset_python gen_training_data_python
         measurement_phase_python measurement_forensics_python strength_report_python
-        nnue_studio_python
+        nnue_studio_python koi_trainer_python
         PROPERTIES LABELS "python"
     )
     if(TEST elo_oracle_python)

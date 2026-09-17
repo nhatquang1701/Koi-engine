@@ -7,9 +7,10 @@ Two stages, both parallelised across worker threads:
   2. label     - score each FEN with Stockfish at a fixed depth and write
                  ``FEN;cp;best_move`` rows (cp is from the side to move).
 
-The output is consumed by ``train_nnue_sf.py``.  Everything is resumable:
-position dumps are appended and the labeler skips already-labeled FENs when
-``--resume`` is given.
+The output is consumed by ``train_nnue_koi.py`` (version 4) directly or through
+``koi_dataset.py``, and by the legacy ``train_nnue_sf.py`` (version 3).
+Everything is resumable: position dumps are appended and the labeler skips
+already-labeled FENs when ``--resume`` is given.
 
 Usage:
   python tools/measurement/gen_training_data.py all --positions artifacts/training/positions.txt

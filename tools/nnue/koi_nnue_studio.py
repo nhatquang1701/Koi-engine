@@ -124,6 +124,9 @@ def selftest(args: argparse.Namespace) -> int:
     if not backend.available():
         print(f"selftest cannot run: {backend.unavailable_reason()}", file=sys.stderr)
         return 2
+    if backend.name == "koi":
+        # A tiny hidden layer keeps the wiring selftest fast; real runs use the preset width.
+        config["koi_hidden_units"] = min(int(config.get("koi_hidden_units", 1024)), 64)
     run = core.create_run("selftest", config, backend.name)
     command = backend.build_command(run.directory, config)
     core.build_command_file(run, command)
@@ -894,7 +897,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--selftest", action="store_true", help="train a tiny network and check the engine can load it")
     parser.add_argument("--gui-selftest", action="store_true", help="construct the GUI and exit")
     parser.add_argument("--preset", choices=list(core.presets()), help="preset used by --dry-run/--run/--selftest")
-    parser.add_argument("--backend", default="torch", help="trainer backend name")
+    parser.add_argument("--backend", default=core.default_config()["backend"], help="trainer backend name")
     parser.add_argument("--corpus", help="training corpus (FEN;cp;bestmove rows)")
     parser.add_argument("--epochs", type=int, help="override the epoch count")
     parser.add_argument("--batch-size", type=int, help="override the batch size")

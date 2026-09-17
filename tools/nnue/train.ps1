@@ -24,7 +24,7 @@ param(
 
     [switch]$Detach,
 
-    [string]$Backend = 'torch',
+    [string]$Backend = 'koi',
 
     [string]$Corpus,
 

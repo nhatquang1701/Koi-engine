@@ -80,7 +80,7 @@ UCI handshake byte-identical, and v1/v2/v3 containers loadable.
   refresh, hooks from `SearchContext`, and parity tests that compare
   incremental results against full refresh over random game trees
   (including quiescence, null moves, and fallback paths). Commit.
-- [ ] **Phase 5 — Trainer overhaul.** New `train_nnue_koi.py` (encoder
+- [x] **Phase 5 — Trainer overhaul.** New `train_nnue_koi.py` (encoder
   parity with C++, binary dataset loader, AdamW with schedule, integer
   quantization with shift search, v4 export, metadata schema v2,
   determinism tests), legacy v2/v3 training kept green, studio backend and

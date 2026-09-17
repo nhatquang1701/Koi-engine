@@ -10,9 +10,10 @@ adding one module here and nothing else.
 from __future__ import annotations
 
 from .bullet_backend import BulletBackend
+from .koi_backend import KoiBackend
 from .torch_backend import TorchBackend
 
-_BACKENDS = (TorchBackend(), BulletBackend())
+_BACKENDS = (KoiBackend(), TorchBackend(), BulletBackend())
 
 
 def available_backends():
