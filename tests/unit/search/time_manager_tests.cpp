@@ -265,15 +265,10 @@ void test_synthetic_games_never_reach_the_flag() {
     }
 }
 
-struct TestCase {
-    const char* name;
-    void (*run)();
-};
-
 } // namespace
 
-int main() {
-    const TestCase tests[] = {
+int main(int argc, char** argv) {
+    const std::vector<koi::test::TestCase> tests{
         {"clock budget safety invariants", test_clock_budget_never_breaks_the_safety_invariants},
         {"fast control keeps the clock", test_fast_control_move_leaves_most_of_the_clock},
         {"emergency pacing", test_low_clock_engages_emergency_pacing},
@@ -281,15 +276,5 @@ int main() {
         {"frozen deadline", test_deadline_is_fixed_at_construction_and_cannot_be_extended},
         {"synthetic games never flag", test_synthetic_games_never_reach_the_flag},
     };
-    int failures = 0;
-    for (const TestCase& test : tests) {
-        try {
-            test.run();
-            std::cout << "PASS " << test.name << '\n';
-        } catch (const std::exception& error) {
-            std::cerr << "FAIL " << test.name << ": " << error.what() << '\n';
-            ++failures;
-        }
-    }
-    return failures == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
+    return koi::test::run_tests(tests, argc, argv);
 }

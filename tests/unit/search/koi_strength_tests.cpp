@@ -10,6 +10,7 @@
 #include <string>
 #include <string_view>
 #include <type_traits>
+#include <vector>
 
 #include "koi/classical_evaluator.hpp"
 #include "koi/search_service.hpp"
@@ -415,19 +416,15 @@ void test_strength_corpora_are_cross_distinct_and_standard_legal() {
 
 } // namespace
 
-int main() {
-    try {
-        test_strength_suite_has_the_required_hard_gate_coverage();
-        test_optional_strength_corpus_has_required_categories_and_metadata();
-        test_optional_strength_positions_are_not_rule_draws();
-        test_strength_corpora_are_cross_distinct_and_standard_legal();
-        test_strength_position_preserves_legacy_and_id_first_initialization();
-        test_legacy_strength_rows_are_exact();
-        test_strength_positions_are_valid_and_tactical_moves_are_found();
-        std::cout << "PASS strength suite\n";
-    } catch (const std::exception& error) {
-        std::cerr << "FAIL strength suite: " << error.what() << '\n';
-        return 1;
-    }
-    return 0;
+int main(int argc, char** argv) {
+    const std::vector<koi::test::TestCase> tests{
+        {"strength suite hard gate", test_strength_suite_has_the_required_hard_gate_coverage},
+        {"optional strength fixture contract", test_optional_strength_corpus_has_required_categories_and_metadata},
+        {"optional strength rule draws", test_optional_strength_positions_are_not_rule_draws},
+        {"strength corpora cross-distinct and legal", test_strength_corpora_are_cross_distinct_and_standard_legal},
+        {"strength position legacy initialization", test_strength_position_preserves_legacy_and_id_first_initialization},
+        {"legacy strength rows exact", test_legacy_strength_rows_are_exact},
+        {"strength positions valid and tactical", test_strength_positions_are_valid_and_tactical_moves_are_found},
+    };
+    return koi::test::run_tests(tests, argc, argv);
 }

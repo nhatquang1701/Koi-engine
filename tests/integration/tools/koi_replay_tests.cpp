@@ -9,7 +9,11 @@
 #include <string_view>
 #include <vector>
 
+#include "koi_test_support.hpp"
+
 namespace {
+
+std::filesystem::path replay_path;
 
 std::string quote_argument(std::string_view argument) {
     return '"' + std::string(argument) + '"';
@@ -68,96 +72,90 @@ int run_replay_exit_code(const std::filesystem::path& replay, std::string_view a
 void require_field(const std::map<std::string, std::string>& fields, std::string_view field,
                    std::string_view expected) {
     const auto iterator = fields.find(std::string(field));
-    if (iterator == fields.end() || iterator->second != expected) {
-        throw std::runtime_error("expected " + std::string(field) + " " + std::string(expected));
-    }
+    koi::test::require(iterator != fields.end() && iterator->second == expected,
+                       "expected " + std::string(field) + " " + std::string(expected));
 }
 
-void test_startpos_replay(const std::filesystem::path& replay) {
-    const auto fields = run_replay(replay, "startpos moves e2e4 e7e5 g1f3");
+void test_startpos_replay() {
+    const auto fields = run_replay(replay_path, "startpos moves e2e4 e7e5 g1f3");
     require_field(fields, "legal", "1");
     require_field(fields, "result", "*");
     require_field(fields, "termination", "ongoing");
     require_field(fields, "fen", "rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2");
 }
 
-void test_castling_replay(const std::filesystem::path& replay) {
+void test_castling_replay() {
     const auto fields = run_replay(
-        replay, "fen \"r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1\" moves e1g1");
+        replay_path, "fen \"r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1\" moves e1g1");
     require_field(fields, "legal", "1");
     require_field(fields, "fen", "r3k2r/8/8/8/8/8/8/R4RK1 b kq - 1 1");
 }
 
-void test_en_passant_replay(const std::filesystem::path& replay) {
+void test_en_passant_replay() {
     const auto fields = run_replay(
-        replay, "fen \"rnbqkbnr/pppp1ppp/8/3Pp3/8/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 2\" moves d5e6");
+        replay_path, "fen \"rnbqkbnr/pppp1ppp/8/3Pp3/8/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 2\" moves d5e6");
     require_field(fields, "legal", "1");
     require_field(fields, "fen", "rnbqkbnr/pppp1ppp/4P3/8/8/8/PPP1PPPP/RNBQKBNR b KQkq - 0 2");
 }
 
-void test_promotion_replay(const std::filesystem::path& replay) {
-    const auto fields = run_replay(replay, "fen \"4k3/P7/8/8/8/8/8/4K3 w - - 0 1\" moves a7a8q");
+void test_promotion_replay() {
+    const auto fields = run_replay(replay_path, "fen \"4k3/P7/8/8/8/8/8/4K3 w - - 0 1\" moves a7a8q");
     require_field(fields, "legal", "1");
     require_field(fields, "fen", "Q3k3/8/8/8/8/8/8/4K3 b - - 0 1");
 }
 
-void test_illegal_move_does_not_corrupt_state(const std::filesystem::path& replay) {
-    const auto fields = run_replay(replay, "startpos moves e2e4 e2e5");
+void test_illegal_move_does_not_corrupt_state() {
+    const auto fields = run_replay(replay_path, "startpos moves e2e4 e2e5");
     require_field(fields, "legal", "0");
     require_field(fields, "termination", "illegal move");
     require_field(fields, "fen", "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1");
 }
 
-void test_checkmate_classification(const std::filesystem::path& replay) {
-    const auto fields = run_replay(replay, "fen \"7k/6Q1/5K2/8/8/8/8/8 b - - 0 1\"");
+void test_checkmate_classification() {
+    const auto fields = run_replay(replay_path, "fen \"7k/6Q1/5K2/8/8/8/8/8 b - - 0 1\"");
     require_field(fields, "legal", "1");
     require_field(fields, "result", "1-0");
     require_field(fields, "termination", "checkmate");
 }
 
-void test_stalemate_classification(const std::filesystem::path& replay) {
-    const auto fields = run_replay(replay, "fen \"7k/5Q2/6K1/8/8/8/8/8 b - - 0 1\"");
+void test_stalemate_classification() {
+    const auto fields = run_replay(replay_path, "fen \"7k/5Q2/6K1/8/8/8/8/8 b - - 0 1\"");
     require_field(fields, "legal", "1");
     require_field(fields, "result", "1/2-1/2");
     require_field(fields, "termination", "stalemate");
 }
 
-void test_rule_draw_classification(const std::filesystem::path& replay) {
-    const auto fields = run_replay(replay, "fen \"4k3/8/8/8/8/8/8/4K3 w - - 0 1\"");
+void test_rule_draw_classification() {
+    const auto fields = run_replay(replay_path, "fen \"4k3/8/8/8/8/8/8/4K3 w - - 0 1\"");
     require_field(fields, "legal", "1");
     require_field(fields, "result", "1/2-1/2");
     require_field(fields, "termination", "rule draw");
 }
 
-void test_repetition_draw_classification(const std::filesystem::path& replay) {
+void test_repetition_draw_classification() {
     const auto fields = run_replay(
-        replay, "startpos moves g1f3 g8f6 f3g1 f6g8 g1f3 g8f6 f3g1 f6g8");
+        replay_path, "startpos moves g1f3 g8f6 f3g1 f6g8 g1f3 g8f6 f3g1 f6g8");
     require_field(fields, "legal", "1");
     require_field(fields, "result", "1/2-1/2");
     require_field(fields, "termination", "rule draw");
 }
 
-void test_stray_move_is_rejected_without_moves_marker(const std::filesystem::path& replay) {
-    if (run_replay_exit_code(replay, "startpos e2e4") == 0) {
+void test_stray_move_is_rejected_without_moves_marker() {
+    if (run_replay_exit_code(replay_path, "startpos e2e4") == 0) {
         throw std::runtime_error("stray coordinate argument must be rejected without the moves marker");
     }
 }
 
-struct TestCase {
-    std::string_view name;
-    void (*run)(const std::filesystem::path&);
-};
-
 } // namespace
 
-int main(int argument_count, char* arguments[]) {
-    if (argument_count != 2) {
+int main(int argc, char** argv) {
+    if (argc < 2 || argv[1] == nullptr) {
         std::cerr << "usage: koi_replay_tests <koi-replay-path>\n";
         return 2;
     }
+    replay_path = std::filesystem::path(argv[1]);
 
-    const std::filesystem::path replay = arguments[1];
-    const std::vector<TestCase> tests{
+    const std::vector<koi::test::TestCase> tests{
         {"startpos replay", test_startpos_replay},
         {"castling replay", test_castling_replay},
         {"en passant replay", test_en_passant_replay},
@@ -169,16 +167,5 @@ int main(int argument_count, char* arguments[]) {
         {"repetition draw classification", test_repetition_draw_classification},
         {"stray move rejection", test_stray_move_is_rejected_without_moves_marker},
     };
-
-    for (const TestCase& test : tests) {
-        try {
-            test.run(replay);
-            std::cout << "PASS " << test.name << '\n';
-        } catch (const std::exception& error) {
-            std::cerr << "FAIL " << test.name << ": " << error.what() << '\n';
-            return 1;
-        }
-    }
-
-    return 0;
+    return koi::test::run_tests(tests, argc, argv);
 }

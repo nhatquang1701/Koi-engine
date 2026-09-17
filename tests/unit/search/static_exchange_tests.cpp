@@ -2,6 +2,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "koi/detail/static_exchange.hpp"
 
@@ -12,15 +13,12 @@ namespace {
 using koi::test::require;
 
 koi::GameState require_state(std::string_view fen) {
-    const auto state = koi::GameState::from_fen(fen);
-    require(state.has_value(), "SEE fixture must construct a game state");
-    return *state;
+    return koi::test::require_value(koi::GameState::from_fen(fen),
+                                    "test FEN must construct a game state");
 }
 
 koi::Move require_move(std::string_view uci) {
-    const auto move = koi::Move::parse_uci(uci);
-    require(move.has_value(), "SEE fixture move must parse");
-    return *move;
+    return koi::test::require_value(koi::Move::parse_uci(uci), "test move must parse");
 }
 
 void test_winning_capture_has_positive_exchange_gain() {
@@ -106,33 +104,20 @@ void test_tactical_metadata_does_not_build_evaluation_features_for_exchange_scor
 
 } // namespace
 
-int main() {
-    try {
-        test_winning_capture_has_positive_exchange_gain();
-        std::cout << "PASS winning capture\n";
-        test_poisoned_capture_has_negative_exchange_gain();
-        std::cout << "PASS poisoned capture\n";
-        test_non_capture_has_zero_exchange_gain();
-        std::cout << "PASS non-capture\n";
-        test_quiet_promotions_have_zero_exchange_gain();
-        std::cout << "PASS quiet promotions\n";
-        test_metadata_exchange_path_matches_move_exchange_path();
-        std::cout << "PASS metadata exchange\n";
-        test_en_passant_capture_keeps_the_captured_pawn_value();
-        std::cout << "PASS en passant capture\n";
-        test_capturing_promotion_counts_capture_and_promotion_gain();
-        std::cout << "PASS capturing promotion\n";
-        test_promotion_recapture_uses_the_promoted_piece_value();
-        std::cout << "PASS promotion recapture\n";
-        test_pinned_recapturer_does_not_reduce_exchange_gain();
-        std::cout << "PASS pinned recapturer\n";
-        test_unsafe_king_recapture_does_not_reduce_exchange_gain();
-        std::cout << "PASS unsafe king recapture\n";
-        test_tactical_metadata_does_not_build_evaluation_features_for_exchange_scoring();
-        std::cout << "PASS tactical SEE without feature snapshots\n";
-    } catch (const std::exception& error) {
-        std::cerr << "FAIL static exchange: " << error.what() << '\n';
-        return 1;
-    }
-    return 0;
+int main(int argc, char** argv) {
+    const std::vector<koi::test::TestCase> tests{
+        {"winning capture", test_winning_capture_has_positive_exchange_gain},
+        {"poisoned capture", test_poisoned_capture_has_negative_exchange_gain},
+        {"non-capture", test_non_capture_has_zero_exchange_gain},
+        {"quiet promotions", test_quiet_promotions_have_zero_exchange_gain},
+        {"metadata exchange", test_metadata_exchange_path_matches_move_exchange_path},
+        {"en passant capture", test_en_passant_capture_keeps_the_captured_pawn_value},
+        {"capturing promotion", test_capturing_promotion_counts_capture_and_promotion_gain},
+        {"promotion recapture", test_promotion_recapture_uses_the_promoted_piece_value},
+        {"pinned recapturer", test_pinned_recapturer_does_not_reduce_exchange_gain},
+        {"unsafe king recapture", test_unsafe_king_recapture_does_not_reduce_exchange_gain},
+        {"tactical SEE without feature snapshots",
+         test_tactical_metadata_does_not_build_evaluation_features_for_exchange_scoring},
+    };
+    return koi::test::run_tests(tests, argc, argv);
 }

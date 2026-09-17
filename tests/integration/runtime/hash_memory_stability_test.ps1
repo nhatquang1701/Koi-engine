@@ -6,8 +6,14 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\..'))
-$outputDirectory = Join-Path $repositoryRoot 'artifacts\stability\hash-memory-test'
 $soakScript = Join-Path $repositoryRoot 'tools\stability\hash_memory_soak.ps1'
+
+# A per-run scratch directory keeps this test independent of any other soak run
+# and removes the previous "newest manifest wins" race under parallel CTest.
+# It must stay under the repository artifact directory because the soak script
+# enforces that policy; the GUID suffix is what makes parallel runs safe.
+$outputDirectory = Join-Path $repositoryRoot ("artifacts\stability\hash-memory-" + [System.Guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $outputDirectory -Force | Out-Null
 
 & $soakScript -EnginePath $EnginePath -HashValues '1,2' -Cycles 1 -OutputDirectory $outputDirectory
 if (-not $?) {

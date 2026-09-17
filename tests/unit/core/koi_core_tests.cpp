@@ -758,15 +758,10 @@ void test_fast_quiet_check_flags_match_exhaustive_move_descriptions() {
     }
 }
 
-struct TestCase {
-    std::string_view name;
-    void (*run)();
-};
-
 } // namespace
 
-int main() {
-    const std::vector<TestCase> tests{
+int main(int argc, char** argv) {
+    const std::vector<koi::test::TestCase> tests{
         {"default position", test_default_position_has_initial_fen_and_twenty_moves},
         {"legal UCI sequence", test_legal_uci_sequence_updates_position},
         {"native position undo and key", test_native_position_undo_restores_state_and_key},
@@ -796,15 +791,5 @@ int main() {
         {"fast quiet-check differential", test_fast_quiet_check_flags_match_exhaustive_move_descriptions},
     };
 
-    for (const TestCase& test : tests) {
-        try {
-            test.run();
-            std::cout << "PASS " << test.name << '\n';
-        } catch (const std::exception& error) {
-            std::cerr << "FAIL " << test.name << ": " << error.what() << '\n';
-            return 1;
-        }
-    }
-
-    return 0;
+    return koi::test::run_tests(tests, argc, argv);
 }

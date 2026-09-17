@@ -1,10 +1,9 @@
 #include <filesystem>
 #include <fstream>
-#include <iostream>
 #include <algorithm>
 #include <array>
 #include <limits>
-#include <stdexcept>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -18,10 +17,11 @@ namespace {
 
 using koi::test::require;
 
+std::optional<std::filesystem::path> external_container_path;
+
 koi::GameState require_state(std::string_view fen) {
-    const auto state = koi::GameState::from_fen(fen);
-    require(state.has_value(), "NNUE fixture must be valid: " + std::string(fen));
-    return *state;
+    return koi::test::require_value(koi::GameState::from_fen(fen),
+                                    "test FEN must construct a game state");
 }
 
 void test_container_round_trip_and_validation() {
@@ -67,6 +67,7 @@ void test_container_rejects_nonstandard_layer_shape() {
 void test_malformed_or_absent_network_uses_classical_fallback() {
     const koi::GameState state = require_state("4k3/8/8/8/8/8/8/4K3 w - - 0 1");
     const koi::ClassicalEvaluator classical;
+    const koi::test::TempDirectory scratch;
 
     const koi::EvaluatorSelection absent = koi::make_evaluator(std::nullopt);
     require(!absent.nnue_enabled && absent.evaluator &&
@@ -74,8 +75,7 @@ void test_malformed_or_absent_network_uses_classical_fallback() {
                     classical.evaluate(state, koi::Color::white),
             "absent NNUE must select the classical evaluator");
 
-    const std::filesystem::path malformed_path =
-        std::filesystem::temp_directory_path() / "koi-task4-malformed.nnue";
+    const std::filesystem::path malformed_path = scratch.file("koi-task4-malformed.nnue");
     {
         std::ofstream output(malformed_path, std::ios::binary | std::ios::trunc);
         output << "not a Koi NNUE";
@@ -87,8 +87,7 @@ void test_malformed_or_absent_network_uses_classical_fallback() {
                     classical.evaluate(state, koi::Color::white),
             "malformed NNUE must preserve the classical fallback");
 
-    const std::filesystem::path valid_path =
-        std::filesystem::temp_directory_path() / "koi-v2-opt-in.nnue";
+    const std::filesystem::path valid_path = scratch.file("koi-v2-opt-in.nnue");
     const auto encoded = koi::NnueLoader::serialize(koi::NnueNetwork::synthetic_v2());
     require(encoded.has_value(), "valid NNUE opt-in fixture must serialize");
     {
@@ -176,8 +175,11 @@ void test_v2_container_round_trip_is_deterministic() {
             "v2 manifest and checksum must survive a deterministic round trip");
 }
 
-void test_external_v2_container(const std::filesystem::path& path) {
-    const auto decoded = koi::NnueLoader::load_file(path);
+void test_external_v2_container() {
+    if (!external_container_path.has_value()) {
+        koi::test::skip("no external container path provided");
+    }
+    const auto decoded = koi::NnueLoader::load_file(*external_container_path);
     require(decoded.has_value(), "external NNUE exporter output must load in Koi");
     require(decoded->manifest.feature_set == koi::kKoiNnuePieceSquareKingPawnV2FeatureSet &&
                 decoded->manifest.layer_sizes == koi::kKoiNnuePieceSquareKingPawnV2LayerSizes,
@@ -359,36 +361,23 @@ void test_v3_shift_explicit_inference_and_container() {
 } // namespace
 
 int main(int argc, char** argv) {
-    try {
-        test_container_round_trip_and_validation();
-        std::cout << "PASS NNUE container\n";
-        test_container_rejects_nonstandard_layer_shape();
-        std::cout << "PASS NNUE layer shape\n";
-        test_malformed_or_absent_network_uses_classical_fallback();
-        std::cout << "PASS NNUE fallback\n";
-        test_workers_keep_immutable_weights_and_private_accumulators();
-        std::cout << "PASS NNUE worker isolation\n";
-        test_v2_feature_vector_has_stable_king_and_pawn_context();
-        std::cout << "PASS NNUE v2 features\n";
-        test_v2_container_round_trip_is_deterministic();
-        std::cout << "PASS NNUE v2 container\n";
-        test_v2_manifest_validation_rejects_mismatches();
-        std::cout << "PASS NNUE v2 validation\n";
-        test_v2_golden_vector_and_inference_paths();
-        std::cout << "PASS NNUE v2 inference\n";
-        test_avx2_compatible_path_preserves_wide_accumulation();
-        std::cout << "PASS NNUE AVX2 wide accumulation\n";
-        test_invalid_network_does_not_allocate_worker_accumulators();
-        std::cout << "PASS NNUE invalid worker guard\n";
-        test_v3_shift_explicit_inference_and_container();
-        std::cout << "PASS NNUE v3 shifts\n";
-        if (argc > 1) {
-            test_external_v2_container(argv[1]);
-            std::cout << "PASS external NNUE container\n";
-        }
-        return 0;
-    } catch (const std::exception& error) {
-        std::cerr << "FAIL " << error.what() << '\n';
-        return 1;
+    if (argc > 1 && argv[1] != nullptr) {
+        external_container_path = std::filesystem::path(argv[1]);
     }
+
+    const std::vector<koi::test::TestCase> tests{
+        {"NNUE container", test_container_round_trip_and_validation},
+        {"NNUE layer shape", test_container_rejects_nonstandard_layer_shape},
+        {"NNUE fallback", test_malformed_or_absent_network_uses_classical_fallback},
+        {"NNUE worker isolation", test_workers_keep_immutable_weights_and_private_accumulators},
+        {"NNUE v2 features", test_v2_feature_vector_has_stable_king_and_pawn_context},
+        {"NNUE v2 container", test_v2_container_round_trip_is_deterministic},
+        {"NNUE v2 validation", test_v2_manifest_validation_rejects_mismatches},
+        {"NNUE v2 inference", test_v2_golden_vector_and_inference_paths},
+        {"NNUE AVX2 wide accumulation", test_avx2_compatible_path_preserves_wide_accumulation},
+        {"NNUE invalid worker guard", test_invalid_network_does_not_allocate_worker_accumulators},
+        {"NNUE v3 shifts", test_v3_shift_explicit_inference_and_container},
+        {"external NNUE container", test_external_v2_container},
+    };
+    return koi::test::run_tests(tests, argc, argv);
 }

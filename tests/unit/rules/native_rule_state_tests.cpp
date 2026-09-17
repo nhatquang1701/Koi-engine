@@ -20,15 +20,12 @@ using koi::Square;
 using koi::test::require;
 
 Move require_move(std::string_view uci) {
-    const auto move = Move::parse_uci(uci);
-    require(move.has_value(), "test move must parse");
-    return *move;
+    return koi::test::require_value(Move::parse_uci(uci), "test move must parse");
 }
 
 GameState require_state(std::string_view fen) {
-    const auto state = GameState::from_fen(fen);
-    require(state.has_value(), "test FEN must parse");
-    return *state;
+    return koi::test::require_value(koi::GameState::from_fen(fen),
+                                    "test FEN must construct a game state");
 }
 
 void test_fen_rule_state_and_position_facade() {
@@ -280,12 +277,10 @@ void test_fixed_buffer_legal_generation_matches_vector_api() {
     }
 }
 
-struct TestCase { std::string_view name; void (*run)(); };
-
 } // namespace
 
-int main() {
-    const std::vector<TestCase> tests{
+int main(int argc, char** argv) {
+    const std::vector<koi::test::TestCase> tests{
         {"compatibility mirror ownership", test_compatibility_mirror_owns_only_shadow_state_and_history},
         {"feature state ownership", test_feature_state_owns_cache_publication_and_invalidation},
         {"FEN rule state and Position facade", test_fen_rule_state_and_position_facade},
@@ -297,14 +292,5 @@ int main() {
         {"search move transaction", test_search_move_transaction_preserves_shadow_consistency},
         {"fixed-buffer legal generation", test_fixed_buffer_legal_generation_matches_vector_api},
     };
-    for (const TestCase& test : tests) {
-        try {
-            test.run();
-            std::cout << "PASS " << test.name << '\n';
-        } catch (const std::exception& error) {
-            std::cerr << "FAIL " << test.name << ": " << error.what() << '\n';
-            return 1;
-        }
-    }
-    return 0;
+    return koi::test::run_tests(tests, argc, argv);
 }

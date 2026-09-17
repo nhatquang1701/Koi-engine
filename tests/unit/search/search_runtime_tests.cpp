@@ -4,6 +4,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "koi/detail/search_budget.hpp"
 #include "koi/detail/search_table_access.hpp"
@@ -17,9 +18,7 @@ namespace {
 using koi::test::require;
 
 koi::Move require_move(std::string_view uci) {
-    const auto parsed = koi::Move::parse_uci(uci);
-    require(parsed.has_value(), "test move must parse");
-    return *parsed;
+    return koi::test::require_value(koi::Move::parse_uci(uci), "test move must parse");
 }
 
 koi::TimeManager node_manager(std::uint64_t limit) {
@@ -118,30 +117,15 @@ void test_table_access_owns_the_generation_advance() {
             "a disabled view must not advance the shared generation");
 }
 
-struct TestCase {
-    const char* name;
-    void (*run)();
-};
-
 } // namespace
 
-int main() {
-    const TestCase tests[] = {
+int main(int argc, char** argv) {
+    const std::vector<koi::test::TestCase> tests{
         {"enabled table access", test_enabled_table_access_delegates_probe_and_store},
         {"disabled table access", test_disabled_table_access_is_a_noop_and_does_not_hide_existing_storage},
         {"table access generation", test_table_access_owns_the_generation_advance},
         {"local node budget", test_local_budget_rejects_the_first_node_at_the_limit},
         {"shared node budget", test_shared_budget_reservation_is_capped_by_the_global_limit},
     };
-    int failures = 0;
-    for (const TestCase& test : tests) {
-        try {
-            test.run();
-            std::cout << "PASS " << test.name << '\n';
-        } catch (const std::exception& error) {
-            std::cerr << "FAIL " << test.name << ": " << error.what() << '\n';
-            ++failures;
-        }
-    }
-    return failures == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
+    return koi::test::run_tests(tests, argc, argv);
 }

@@ -15,9 +15,7 @@ namespace {
 using koi::test::require;
 
 koi::Move require_move(const std::string_view uci) {
-    const auto parsed = koi::Move::parse_uci(uci);
-    require(parsed.has_value(), "test move must parse");
-    return *parsed;
+    return koi::test::require_value(koi::Move::parse_uci(uci), "test move must parse");
 }
 
 void test_null_move_policy_owns_window_and_reduction_rules() {
@@ -137,15 +135,10 @@ void test_ordering_tables_own_mutation_and_reset() {
             "clearing ordering tables must remove adaptive state");
 }
 
-struct TestCase {
-    std::string_view name;
-    void (*run)();
-};
-
 } // namespace
 
-int main() {
-    const std::vector<TestCase> tests{
+int main(int argc, char** argv) {
+    const std::vector<koi::test::TestCase> tests{
         {"null move policy", test_null_move_policy_owns_window_and_reduction_rules},
         {"check extension policy", test_check_extension_policy_owns_timing_and_budget_rules},
         {"late move policy", test_late_move_policy_owns_gating_history_and_reduction},
@@ -154,15 +147,5 @@ int main() {
         {"ordering table ownership", test_ordering_tables_own_mutation_and_reset},
     };
 
-    int failures = 0;
-    for (const TestCase& test : tests) {
-        try {
-            test.run();
-            std::cout << "PASS " << test.name << '\n';
-        } catch (const std::exception& error) {
-            std::cerr << "FAIL " << test.name << ": " << error.what() << '\n';
-            ++failures;
-        }
-    }
-    return failures == 0 ? 0 : 1;
+    return koi::test::run_tests(tests, argc, argv);
 }

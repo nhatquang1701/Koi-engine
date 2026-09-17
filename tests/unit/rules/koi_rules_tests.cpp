@@ -26,9 +26,7 @@ constexpr std::string_view kInitialFen =
 using koi::test::require;
 
 Move require_move(std::string_view uci) {
-    const auto move = Move::parse_uci(uci);
-    require(move.has_value(), "test fixture must be valid coordinate UCI");
-    return *move;
+    return koi::test::require_value(Move::parse_uci(uci), "test move must parse");
 }
 
 void test_move_uses_koi_coordinates_and_formats_uci() {
@@ -350,15 +348,10 @@ void test_start_position_has_twenty_legal_moves() {
     require(state.legal_moves().size() == 20, "startpos must expose exactly twenty legal moves");
 }
 
-struct TestCase {
-    std::string_view name;
-    void (*run)();
-};
-
 } // namespace
 
-int main() {
-    const std::vector<TestCase> tests{
+int main(int argc, char** argv) {
+    const std::vector<koi::test::TestCase> tests{
         {"Koi-owned move coordinates", test_move_uses_koi_coordinates_and_formats_uci},
         {"FEN construction", test_fen_constructs_a_game_state},
         {"strict FEN legality", test_strict_fen_rejects_impossible_material_and_check_state},
@@ -379,15 +372,5 @@ int main() {
         {"start-position move count", test_start_position_has_twenty_legal_moves},
     };
 
-    for (const TestCase& test : tests) {
-        try {
-            test.run();
-            std::cout << "PASS " << test.name << '\n';
-        } catch (const std::exception& error) {
-            std::cerr << "FAIL " << test.name << ": " << error.what() << '\n';
-            return 1;
-        }
-    }
-
-    return 0;
+    return koi::test::run_tests(tests, argc, argv);
 }

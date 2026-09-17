@@ -1,6 +1,6 @@
-#include <iostream>
 #include <array>
 #include <string>
+#include <vector>
 
 #include "koi/classical_evaluator.hpp"
 #include "koi/evaluation_features.hpp"
@@ -14,9 +14,8 @@ namespace {
 using koi::test::require;
 
 koi::GameState require_state(std::string_view fen) {
-    const auto state = koi::GameState::from_fen(fen);
-    require(state.has_value(), "evaluation fixture must be valid: " + std::string(fen));
-    return *state;
+    return koi::test::require_value(koi::GameState::from_fen(fen),
+                                    "test FEN must construct a game state");
 }
 
 void test_castling_rights_improve_development_readiness() {
@@ -182,35 +181,20 @@ void test_feature_extractor_preserves_cached_king_and_pawn_context() {
 
 } // namespace
 
-int main() {
-    try {
-        test_castling_rights_improve_development_readiness();
-        std::cout << "PASS castling readiness\n";
-        test_early_queen_development_is_tempered();
-        std::cout << "PASS early queen development\n";
-        test_central_early_queen_development_is_tempered();
-        std::cout << "PASS central early queen development\n";
-        test_late_central_queen_is_not_charged_opening_penalty();
-        std::cout << "PASS late central queen taper\n";
-        test_pawn_break_potential_improves_center_term();
-        std::cout << "PASS pawn break potential\n";
-        test_compiled_parameter_metadata_is_versioned();
-        std::cout << "PASS parameter metadata\n";
-        test_trapped_piece_is_penalized_in_initiative();
-        std::cout << "PASS trapped piece\n";
-        test_hanging_piece_is_penalized_in_initiative();
-        std::cout << "PASS hanging piece\n";
-        test_major_attackers_are_more_dangerous_in_king_ring();
-        std::cout << "PASS weighted king-ring attackers\n";
-        test_castle_ready_king_ring_pressure_is_deferred();
-        std::cout << "PASS castle-ready king-ring deferral\n";
-        test_sparse_endgame_king_ring_pressure_is_tapered();
-        std::cout << "PASS sparse king-ring taper\n";
-        test_feature_extractor_preserves_cached_king_and_pawn_context();
-        std::cout << "PASS feature extraction context\n";
-        return 0;
-    } catch (const std::exception& error) {
-        std::cerr << "FAIL " << error.what() << '\n';
-        return 1;
-    }
+int main(int argc, char** argv) {
+    const std::vector<koi::test::TestCase> tests{
+        {"castling readiness", test_castling_rights_improve_development_readiness},
+        {"early queen development", test_early_queen_development_is_tempered},
+        {"central early queen development", test_central_early_queen_development_is_tempered},
+        {"late central queen taper", test_late_central_queen_is_not_charged_opening_penalty},
+        {"pawn break potential", test_pawn_break_potential_improves_center_term},
+        {"parameter metadata", test_compiled_parameter_metadata_is_versioned},
+        {"trapped piece", test_trapped_piece_is_penalized_in_initiative},
+        {"hanging piece", test_hanging_piece_is_penalized_in_initiative},
+        {"weighted king-ring attackers", test_major_attackers_are_more_dangerous_in_king_ring},
+        {"castle-ready king-ring deferral", test_castle_ready_king_ring_pressure_is_deferred},
+        {"sparse king-ring taper", test_sparse_endgame_king_ring_pressure_is_tapered},
+        {"feature extraction context", test_feature_extractor_preserves_cached_king_and_pawn_context},
+    };
+    return koi::test::run_tests(tests, argc, argv);
 }

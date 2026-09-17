@@ -1,7 +1,5 @@
 #include <algorithm>
 #include <cstdint>
-#include <iostream>
-#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -226,19 +224,18 @@ void test_repetition_and_rejected_generated_metadata_preserve_consistency() {
 
 } // namespace
 
-int main() {
-    try {
-        test_fixture_differential();
-        test_sequential_differential();
-        test_game_state_consistency_snapshot();
-        test_fixed_seed_generated_move_replay_stays_consistent();
-        test_special_generated_moves_are_transactional();
-        test_fixed_seed_make_unmake_restores_diagnostic_snapshots();
-        test_repetition_and_rejected_generated_metadata_preserve_consistency();
-        std::cout << "PASS native shadow differential tests\n";
-        return 0;
-    } catch (const std::exception& error) {
-        std::cerr << "FAIL native shadow differential tests: " << error.what() << '\n';
-        return 1;
-    }
+int main(int argc, char** argv) {
+    const std::vector<koi::test::TestCase> tests{
+        {"fixture differential", test_fixture_differential},
+        {"sequential differential", test_sequential_differential},
+        {"game state consistency snapshot", test_game_state_consistency_snapshot},
+        {"fixed-seed generated move replay stays consistent",
+         test_fixed_seed_generated_move_replay_stays_consistent},
+        {"special generated moves are transactional", test_special_generated_moves_are_transactional},
+        {"fixed-seed make/unmake restores diagnostic snapshots",
+         test_fixed_seed_make_unmake_restores_diagnostic_snapshots},
+        {"repetition and rejected generated metadata preserve consistency",
+         test_repetition_and_rejected_generated_metadata_preserve_consistency},
+    };
+    return koi::test::run_tests(tests, argc, argv);
 }

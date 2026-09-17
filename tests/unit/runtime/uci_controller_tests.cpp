@@ -3,10 +3,8 @@
 #include <chrono>
 #include <condition_variable>
 #include <cstdint>
-#include <cstdlib>
 #include <filesystem>
 #include <fstream>
-#include <iostream>
 #include <iterator>
 #include <limits>
 #include <mutex>
@@ -24,18 +22,15 @@
 #include "koi/uci_controller.hpp"
 
 #include "koi_test_support.hpp"
+#include "polyglot_book_support.hpp"
 
 namespace {
 
 using koi::Position;
 using koi::UciController;
-
-struct BookRecord {
-    std::uint64_t key;
-    std::uint16_t move;
-    std::uint16_t weight;
-    std::uint32_t learn;
-};
+using koi::test::book::BookRecord;
+using koi::test::book::polyglot_move;
+using koi::test::book::write_book;
 
 struct ControllerResult {
     int exit_code;
@@ -68,37 +63,6 @@ ControllerResult run_controller_in_directory(std::string_view transcript,
     return {controller.run(), output.str(), diagnostics.str()};
 }
 
-template <class UInt>
-void append_big_endian(std::vector<char>& bytes, UInt value) {
-    for (int shift = static_cast<int>(sizeof(UInt) * 8) - 8; shift >= 0; shift -= 8) {
-        bytes.push_back(static_cast<char>((value >> shift) & 0xff));
-    }
-}
-
-void write_book(const std::filesystem::path& path, const std::vector<BookRecord>& records) {
-    std::vector<char> bytes;
-    bytes.reserve(records.size() * 16);
-    for (const BookRecord& record : records) {
-        append_big_endian(bytes, record.key);
-        append_big_endian(bytes, record.move);
-        append_big_endian(bytes, record.weight);
-        append_big_endian(bytes, record.learn);
-    }
-    std::ofstream stream(path, std::ios::binary | std::ios::trunc);
-    require(stream.good(), "test book must be writable");
-    stream.write(bytes.data(), static_cast<std::streamsize>(bytes.size()));
-    require(stream.good(), "test book must be completely written");
-}
-
-std::uint16_t polyglot_move(std::string_view from, std::string_view to) {
-    const auto source = koi::Square::parse(from);
-    const auto target = koi::Square::parse(to);
-    require(source.has_value() && target.has_value(), "Polyglot coordinates must be valid");
-    // Polyglot stores the destination in bits 0..5 and the origin in
-    // bits 6..11.
-    return static_cast<std::uint16_t>(target->index() | (source->index() << 6));
-}
-
 koi::GameState position_after(const std::vector<std::string_view>& moves) {
     koi::GameState state = koi::GameState::startpos();
     for (const std::string_view uci : moves) {
@@ -118,26 +82,6 @@ std::string join_moves(const std::vector<std::string_view>& moves) {
     }
     return joined;
 }
-
-class TestDirectory {
-public:
-    TestDirectory()
-        : path_(std::filesystem::temp_directory_path() /
-                ("koi-uci-controller-tests-" +
-                 std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()))) {
-        std::filesystem::create_directories(path_);
-    }
-
-    ~TestDirectory() {
-        std::error_code ignored;
-        std::filesystem::remove_all(path_, ignored);
-    }
-
-    [[nodiscard]] const std::filesystem::path& path() const noexcept { return path_; }
-
-private:
-    std::filesystem::path path_;
-};
 
 std::vector<std::string> output_lines(std::string_view output) {
     std::vector<std::string> lines;
@@ -477,7 +421,7 @@ void test_task1_public_options_accept_valid_and_ignore_invalid_values() {
 }
 
 void test_en_croissant_option_names_are_case_insensitive() {
-    TestDirectory files;
+    koi::test::TempDirectory files;
     const std::filesystem::path book = files.path() / "en-croissant-book.bin";
     write_book(book, {{koi::GameState::startpos().polyglot_key(),
                        polyglot_move("e2", "e4"), 100, 0}});
@@ -567,7 +511,7 @@ void test_task1_wdl_output_is_optional_and_mate_scores_are_converted() {
 }
 
 void test_task1_hidden_debug_file_is_relative_rotated_and_off_stdio() {
-    TestDirectory files;
+    koi::test::TempDirectory files;
     const std::filesystem::path log = files.path() / "koi-debug.log";
     {
         std::ofstream existing(log, std::ios::binary | std::ios::trunc);
@@ -662,7 +606,7 @@ void test_task6_strength_mode_is_case_insensitive_and_cancels_active_search() {
 }
 
 void test_book_options_emit_one_seeded_marker_and_bestmove_for_normal_play() {
-    TestDirectory files;
+    koi::test::TempDirectory files;
     const std::filesystem::path book = files.path() / "controller-book.bin";
     const koi::GameState start = koi::GameState::startpos();
     write_book(book, {
@@ -702,7 +646,7 @@ void test_book_options_emit_one_seeded_marker_and_bestmove_for_normal_play() {
 }
 
 void test_book_random_option_accepts_valid_values_and_ignores_invalid_values() {
-    TestDirectory files;
+    koi::test::TempDirectory files;
     const std::filesystem::path book = files.path() / "deterministic-controller-book.bin";
     const koi::GameState start = koi::GameState::startpos();
     write_book(book, {
@@ -730,7 +674,7 @@ void test_book_random_option_accepts_valid_values_and_ignores_invalid_values() {
 }
 
 void test_book_safety_options_reject_poisoned_moves_and_fallback_to_search() {
-    TestDirectory files;
+    koi::test::TempDirectory files;
     const auto unsafe_position = koi::GameState::from_fen(
         "k3r3/8/8/8/4Q3/8/8/K7 w - - 0 1");
     require(unsafe_position.has_value(), "the book-safety fixture FEN must be valid");
@@ -764,7 +708,7 @@ void test_book_safety_options_reject_poisoned_moves_and_fallback_to_search() {
 }
 
 void test_book_fallback_and_analysis_style_commands_search_without_markers() {
-    TestDirectory files;
+    koi::test::TempDirectory files;
     const std::filesystem::path book = files.path() / "controller-book.bin";
     const koi::GameState start = koi::GameState::startpos();
     write_book(book, {{start.polyglot_key(), polyglot_move("e2", "e4"), 1, 0}});
@@ -823,7 +767,7 @@ void test_book_fallback_and_analysis_style_commands_search_without_markers() {
 }
 
 void test_multipv_search_bypasses_a_matching_book_without_analysis_mode() {
-    TestDirectory files;
+    koi::test::TempDirectory files;
     const std::filesystem::path book = files.path() / "multipv-book.bin";
     const koi::GameState start = koi::GameState::startpos();
     write_book(book, {{start.polyglot_key(), polyglot_move("e2", "e4"), 1, 0}});
@@ -874,7 +818,7 @@ void test_multipv_search_bypasses_a_matching_book_without_analysis_mode() {
 }
 
 void test_ponderhit_keeps_the_entire_ponder_workflow_out_of_the_book() {
-    TestDirectory files;
+    koi::test::TempDirectory files;
     const std::filesystem::path book = files.path() / "ponder-book.bin";
     const koi::GameState start = koi::GameState::startpos();
     write_book(book, {{start.polyglot_key(), polyglot_move("e2", "e4"), 1, 0}});
@@ -938,7 +882,7 @@ void test_ponderhit_keeps_the_entire_ponder_workflow_out_of_the_book() {
 }
 
 void test_book_depth_boundaries_and_invalid_values_preserve_the_previous_limit() {
-    TestDirectory files;
+    koi::test::TempDirectory files;
     const std::filesystem::path book = files.path() / "depth-book.bin";
     const std::vector<std::string_view> first_fifteen{
         "g1f3", "g8f6", "f3g1", "f6g8", "g1f3", "g8f6", "f3g1", "f6g8",
@@ -1145,7 +1089,7 @@ void test_lucas_analysis_option_changes_suppress_the_active_generation() {
 }
 
 void test_ponderhit_continues_the_ponder_search_in_place() {
-    TestDirectory files;
+    koi::test::TempDirectory files;
     const std::filesystem::path log_path = files.path() / "ponderhit-continuation.log";
     GatedInputBuffer input(
         "setoption name Debug value true\n"
@@ -1653,7 +1597,7 @@ void test_ucinewgame_and_hash_changes_suppress_active_generations() {
 }
 
 void test_ucinewgame_clears_the_transposition_table_and_records_it() {
-    TestDirectory files;
+    koi::test::TempDirectory files;
     const ControllerResult result = run_controller_in_directory(
         "setoption name Debug value true\n"
         "setoption name DebugFile value ucinewgame-debug.log\n"
@@ -1671,7 +1615,7 @@ void test_ucinewgame_clears_the_transposition_table_and_records_it() {
 }
 
 void test_debug_command_toggles_hidden_diagnostics() {
-    TestDirectory files;
+    koi::test::TempDirectory files;
     const ControllerResult result = run_controller_in_directory(
         "setoption name DebugFile value debug-command.log\n"
         "debug on\n"
@@ -1800,15 +1744,10 @@ void test_protocol_responses_flush_promptly() {
             "handshake, readyok, position error, and bestmove must each flush promptly");
 }
 
-struct TestCase {
-    std::string_view name;
-    void (*run)();
-};
-
 } // namespace
 
-int main() {
-    const std::vector<TestCase> tests{
+int main(int argc, char** argv) {
+    const std::vector<koi::test::TestCase> tests{
         {"uci handshake and options", test_uci_handshake_has_identity_and_supported_options_in_order},
         {"Syzygy option values", test_syzygy_options_accept_valid_values_and_ignore_invalid_values},
         {"Task 1 handshake", test_task1_handshake_appends_exact_compatibility_options},
@@ -1865,20 +1804,5 @@ int main() {
         {"promptly flushed responses", test_protocol_responses_flush_promptly},
     };
 
-    const char* filter = std::getenv("KOI_TEST_FILTER");
-    int failures = 0;
-    for (const TestCase& test : tests) {
-        if (filter != nullptr && std::string_view(test.name).find(filter) == std::string_view::npos) {
-            continue;
-        }
-        try {
-            test.run();
-            std::cout << "PASS " << test.name << '\n';
-        } catch (const std::exception& error) {
-            std::cerr << "FAIL " << test.name << ": " << error.what() << '\n';
-            ++failures;
-        }
-    }
-
-    return failures == 0 ? 0 : 1;
+    return koi::test::run_tests(tests, argc, argv);
 }

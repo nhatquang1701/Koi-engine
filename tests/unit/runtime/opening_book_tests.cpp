@@ -1,8 +1,6 @@
-#include <chrono>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
-#include <iostream>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -12,6 +10,7 @@
 #include "koi/opening_book.hpp"
 
 #include "koi_test_support.hpp"
+#include "polyglot_book_support.hpp"
 
 #ifdef CHESS_HPP
 #error "Public Koi opening-book headers must not include chess.hpp"
@@ -22,79 +21,19 @@ namespace {
 using koi::GameState;
 using koi::Move;
 using koi::OpeningBook;
-
-struct BookRecord {
-    std::uint64_t key;
-    std::uint16_t move;
-    std::uint16_t weight;
-    std::uint32_t learn;
-};
-
+using koi::test::book::BookRecord;
+using koi::test::book::polyglot_move;
+using koi::test::book::write_book;
 using koi::test::require;
 
 Move require_move(std::string_view uci) {
-    const auto move = Move::parse_uci(uci);
-    require(move.has_value(), "test fixture must be valid coordinate UCI");
-    return *move;
+    return koi::test::require_value(Move::parse_uci(uci), "test move must parse");
 }
 
 GameState require_state(std::string_view fen) {
-    const auto state = GameState::from_fen(fen);
-    require(state.has_value(), "test fixture FEN must be valid");
-    return *state;
+    return koi::test::require_value(GameState::from_fen(fen),
+                                    "test FEN must construct a game state");
 }
-
-std::uint16_t polyglot_move(std::string_view from, std::string_view to,
-                            std::uint8_t promotion = 0) {
-    const auto source = koi::Square::parse(from);
-    const auto target = koi::Square::parse(to);
-    require(source.has_value() && target.has_value(), "Polyglot coordinate fixture must be valid");
-    // Polyglot stores the destination in bits 0..5 and the origin in
-    // bits 6..11.  Keep the test writer aligned with real .bin books.
-    return static_cast<std::uint16_t>(target->index() | (source->index() << 6) | (promotion << 12));
-}
-
-template <class UInt>
-void append_big_endian(std::vector<char>& bytes, UInt value) {
-    for (int shift = static_cast<int>(sizeof(UInt) * 8) - 8; shift >= 0; shift -= 8) {
-        bytes.push_back(static_cast<char>((value >> shift) & 0xff));
-    }
-}
-
-void write_book(const std::filesystem::path& path, const std::vector<BookRecord>& records) {
-    std::vector<char> bytes;
-    bytes.reserve(records.size() * 16);
-    for (const BookRecord& record : records) {
-        append_big_endian(bytes, record.key);
-        append_big_endian(bytes, record.move);
-        append_big_endian(bytes, record.weight);
-        append_big_endian(bytes, record.learn);
-    }
-    std::ofstream stream(path, std::ios::binary | std::ios::trunc);
-    require(stream.good(), "test book must be writable");
-    stream.write(bytes.data(), static_cast<std::streamsize>(bytes.size()));
-    require(stream.good(), "test book must be completely written");
-}
-
-class TestDirectory {
-public:
-    TestDirectory()
-        : path_(std::filesystem::temp_directory_path() /
-                ("koi-opening-book-tests-" +
-                 std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()))) {
-        std::filesystem::create_directories(path_);
-    }
-
-    ~TestDirectory() {
-        std::error_code ignored;
-        std::filesystem::remove_all(path_, ignored);
-    }
-
-    [[nodiscard]] const std::filesystem::path& path() const noexcept { return path_; }
-
-private:
-    std::filesystem::path path_;
-};
 
 void test_polyglot_keys_match_reference_positions() {
     GameState start = GameState::startpos();
@@ -122,7 +61,7 @@ void test_polyglot_keys_match_reference_positions() {
 }
 
 void test_book_decodes_castling_en_passant_and_promotions() {
-    TestDirectory files;
+    koi::test::TempDirectory files;
     const auto book_path = files.path() / "special.bin";
     const GameState castling = require_state("r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1");
     const GameState en_passant = require_state(
@@ -152,7 +91,7 @@ void test_book_decodes_castling_en_passant_and_promotions() {
 }
 
 void test_book_filters_illegal_and_zero_weight_entries_and_is_seeded() {
-    TestDirectory files;
+    koi::test::TempDirectory files;
     const auto book_path = files.path() / "weighted.bin";
     const GameState state = GameState::startpos();
     write_book(book_path, {
@@ -189,7 +128,7 @@ void test_book_filters_illegal_and_zero_weight_entries_and_is_seeded() {
 }
 
 void test_book_defaults_to_highest_weight_and_coordinate_tie_breaking() {
-    TestDirectory files;
+    koi::test::TempDirectory files;
     const GameState state = GameState::startpos();
     const auto weighted = files.path() / "deterministic.bin";
     write_book(weighted, {
@@ -219,7 +158,7 @@ void test_book_defaults_to_highest_weight_and_coordinate_tie_breaking() {
 }
 
 void test_book_falls_back_for_unavailable_or_unusable_inputs() {
-    TestDirectory files;
+    koi::test::TempDirectory files;
     const GameState state = GameState::startpos();
     OpeningBook book(files.path());
     book.set_file("missing.bin");
@@ -247,7 +186,7 @@ void test_book_falls_back_for_unavailable_or_unusable_inputs() {
 }
 
 void test_book_rejects_oversized_record_aligned_input_without_throwing() {
-    TestDirectory files;
+    koi::test::TempDirectory files;
     const GameState state = GameState::startpos();
     const auto oversized = files.path() / "oversized.bin";
     write_book(oversized, {{state.polyglot_key(), polyglot_move("e2", "e4"), 1, 0}});
@@ -271,7 +210,7 @@ void test_book_rejects_oversized_record_aligned_input_without_throwing() {
 }
 
 void test_book_safety_rejects_an_immediate_hanging_piece() {
-    TestDirectory files;
+    koi::test::TempDirectory files;
     const GameState state = require_state("k3r3/8/8/8/4Q3/8/8/K7 w - - 0 1");
     const auto book_path = files.path() / "unsafe.bin";
     write_book(book_path, {
@@ -290,15 +229,10 @@ void test_book_safety_rejects_an_immediate_hanging_piece() {
             "disabling book safety must preserve the highest-weight legal book move");
 }
 
-struct TestCase {
-    std::string_view name;
-    void (*run)();
-};
-
 } // namespace
 
-int main() {
-    const std::vector<TestCase> tests{
+int main(int argc, char** argv) {
+    const std::vector<koi::test::TestCase> tests{
         {"reference Polyglot keys", test_polyglot_keys_match_reference_positions},
         {"special Polyglot moves", test_book_decodes_castling_en_passant_and_promotions},
         {"weighted legal selection", test_book_filters_illegal_and_zero_weight_entries_and_is_seeded},
@@ -308,15 +242,5 @@ int main() {
         {"book safety", test_book_safety_rejects_an_immediate_hanging_piece},
     };
 
-    for (const TestCase& test : tests) {
-        try {
-            test.run();
-            std::cout << "PASS " << test.name << '\n';
-        } catch (const std::exception& error) {
-            std::cerr << "FAIL " << test.name << ": " << error.what() << '\n';
-            return 1;
-        }
-    }
-
-    return 0;
+    return koi::test::run_tests(tests, argc, argv);
 }

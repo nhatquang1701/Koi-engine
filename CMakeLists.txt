@@ -131,6 +131,28 @@ target_compile_definitions(koi_core PUBLIC
 option(KOI_BUILD_SHADOW_DIFF
     "Build the optional chess-library differential oracle tests" OFF)
 
+# Release and Debug binaries do not deserve the same budgets: the Debug build is
+# several times slower and the process tests launch real searches. The scale
+# defaults to 3 for Debug trees (and 1 otherwise) so that only genuine hangs
+# trip the limits instead of expected slowness; set -DKOI_TIMEOUT_SCALE=N to
+# override it explicitly.
+set(KOI_TEST_TIMEOUT_SECONDS "600" CACHE STRING
+    "Default timeout in seconds for tests without an explicit budget")
+set(KOI_TIMEOUT_SCALE "auto" CACHE STRING
+    "Multiplier applied to explicit process-test and default timeouts (auto: 3 for Debug, else 1)")
+if(KOI_TIMEOUT_SCALE STREQUAL "auto")
+    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+        set(KOI_TIMEOUT_SCALE "3")
+    else()
+        set(KOI_TIMEOUT_SCALE "1")
+    endif()
+endif()
+
+function(koi_set_timeout test_name release_seconds)
+    math(EXPR KOI_SCALED_TIMEOUT "${release_seconds} * ${KOI_TIMEOUT_SCALE}")
+    set_tests_properties(${test_name} PROPERTIES TIMEOUT ${KOI_SCALED_TIMEOUT})
+endfunction()
+
 if(KOI_BUILD_SHADOW_DIFF)
     add_executable(koi_shadow_diff_tests
         tests/integration/rules/native_shadow_diff_tests.cpp
@@ -247,7 +269,16 @@ add_executable(koi_search_tests
 
 target_link_libraries(koi_search_tests PRIVATE koi_core)
 
-add_test(NAME koi_search_tests COMMAND koi_search_tests)
+# The search suite is by far the largest target. Run it as independent shards so
+# a multi-core host finishes it in parallel, and so each shard stays well inside
+# the per-test timeout even in the slower Debug configuration.
+foreach(KOI_SEARCH_SHARD_INDEX RANGE 0 3)
+    math(EXPR KOI_SEARCH_SHARD_LABEL "${KOI_SEARCH_SHARD_INDEX} + 1")
+    add_test(
+        NAME koi_search_tests_${KOI_SEARCH_SHARD_LABEL}of4
+        COMMAND koi_search_tests --shard=${KOI_SEARCH_SHARD_INDEX}/4
+    )
+endforeach()
 
 add_executable(search_ordering_tests
     tests/unit/search/search_ordering_tests.cpp
@@ -363,6 +394,7 @@ set(KOI_TEST_SUPPORT_TARGETS
     evaluation_boundary_tests
     evaluation_architecture_tests
     nnue_boundary_tests
+    koi_cpu_features_tests
     koi_module_tests
     syzygy_tablebase_tests
     koi_rules_tests
@@ -379,6 +411,7 @@ set(KOI_TEST_SUPPORT_TARGETS
     time_manager_tests
     koi_strength_tests
     perft_tests
+    koi_replay_tests
 )
 
 if(TARGET koi_shadow_diff_tests)
@@ -398,7 +431,7 @@ add_test(
             -EnginePath "$<TARGET_FILE:koi_engine>"
 )
 
-set_tests_properties(koi_engine_process PROPERTIES TIMEOUT 60)
+koi_set_timeout(koi_engine_process 60)
 
 add_test(
     NAME koi_engine_en_croissant_process
@@ -407,7 +440,7 @@ add_test(
             -EnginePath "$<TARGET_FILE:koi_engine>"
 )
 
-set_tests_properties(koi_engine_en_croissant_process PROPERTIES TIMEOUT 30)
+koi_set_timeout(koi_engine_en_croissant_process 30)
 
 add_test(
     NAME koi_engine_time_safety_process
@@ -416,7 +449,7 @@ add_test(
             -EnginePath "$<TARGET_FILE:koi_engine>"
 )
 
-set_tests_properties(koi_engine_time_safety_process PROPERTIES TIMEOUT 180)
+koi_set_timeout(koi_engine_time_safety_process 180)
 
 add_test(
     NAME koi_benchmark_process
@@ -425,7 +458,7 @@ add_test(
             -BenchPath "$<TARGET_FILE:koi_bench>"
 )
 
-set_tests_properties(koi_benchmark_process PROPERTIES TIMEOUT 300)
+koi_set_timeout(koi_benchmark_process 300)
 
 add_test(
     NAME koi_uci_match_process
@@ -434,7 +467,7 @@ add_test(
             -EnginePath "$<TARGET_FILE:koi_engine>"
 )
 
-set_tests_properties(koi_uci_match_process PROPERTIES TIMEOUT 120)
+koi_set_timeout(koi_uci_match_process 120)
 
 add_test(
     NAME koi_stockfish_strength_option
@@ -443,7 +476,7 @@ add_test(
             -EnginePath "$<TARGET_FILE:koi_engine>"
 )
 
-set_tests_properties(koi_stockfish_strength_option PROPERTIES TIMEOUT 60)
+koi_set_timeout(koi_stockfish_strength_option 60)
 
 add_test(
     NAME koi_uci_match_clock
@@ -452,7 +485,7 @@ add_test(
             -EnginePath "$<TARGET_FILE:koi_engine>"
 )
 
-set_tests_properties(koi_uci_match_clock PROPERTIES TIMEOUT 120)
+koi_set_timeout(koi_uci_match_clock 120)
 
 add_test(
     NAME cutechess_stability_smoke
@@ -461,7 +494,7 @@ add_test(
             -EnginePath "$<TARGET_FILE:koi_engine>"
 )
 
-set_tests_properties(cutechess_stability_smoke PROPERTIES TIMEOUT 180)
+koi_set_timeout(cutechess_stability_smoke 180)
 
 add_test(
     NAME hash_memory_stability
@@ -470,7 +503,7 @@ add_test(
             -EnginePath "$<TARGET_FILE:koi_engine>"
 )
 
-set_tests_properties(hash_memory_stability PROPERTIES TIMEOUT 60)
+koi_set_timeout(hash_memory_stability 60)
 
 add_test(
     NAME windows_ci_configuration
@@ -484,7 +517,7 @@ add_test(
             "${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/packaging/install_book_test.ps1"
 )
 
-set_tests_properties(install_book_script PROPERTIES TIMEOUT 30)
+koi_set_timeout(install_book_script 30)
 
 add_test(
     NAME package_release_layout
@@ -494,7 +527,7 @@ add_test(
             -PackageScript "${CMAKE_CURRENT_SOURCE_DIR}/tools/build/package_release.ps1"
 )
 
-set_tests_properties(package_release_layout PROPERTIES TIMEOUT 60)
+koi_set_timeout(package_release_layout 60)
 
 find_package(Python3 COMPONENTS Interpreter QUIET)
 if(Python3_Interpreter_FOUND)
@@ -583,6 +616,64 @@ else()
     )
 endif()
 
+# --- Labels and scheduling hints ---------------------------------------------
+# Labels let a developer (and CI) select focused subsets with `ctest -L`; the
+# PROCESSORS hints keep the heavy search/process tests from oversubscribing a
+# `ctest -j` run, and RUN_SERIAL protects the one test that writes into the
+# build tree next to the engine binary.
+set_tests_properties(
+    koi_core_tests evaluation_boundary_tests evaluation_architecture_tests
+    nnue_boundary_tests koi_cpu_features_tests koi_module_tests syzygy_tablebase_tests
+    koi_rules_tests native_rule_state_tests opening_book_tests completion_gate_tests
+    search_ordering_tests search_architecture_tests search_policy_tests
+    search_runtime_tests static_exchange_tests time_manager_tests perft_tests
+    PROPERTIES LABELS "unit"
+)
+set_tests_properties(uci_controller_tests PROPERTIES LABELS "unit;runtime")
+set_tests_properties(
+    koi_search_tests_1of4 koi_search_tests_2of4 koi_search_tests_3of4 koi_search_tests_4of4
+    PROPERTIES LABELS "unit;search;heavy"
+)
+set_tests_properties(
+    koi_search_tests_1of4 koi_search_tests_2of4 koi_search_tests_3of4 koi_search_tests_4of4
+    koi_strength_tests
+    PROPERTIES PROCESSORS 2
+)
+set_tests_properties(koi_strength_tests PROPERTIES LABELS "unit;search;heavy")
+set_tests_properties(koi_replay_tests PROPERTIES LABELS "integration;tools")
+set_tests_properties(koi_engine_process koi_engine_en_croissant_process
+    PROPERTIES LABELS "process;uci")
+set_tests_properties(koi_engine_process PROPERTIES RUN_SERIAL TRUE)
+set_tests_properties(koi_engine_time_safety_process
+    PROPERTIES LABELS "process;uci;heavy" PROCESSORS 2)
+set_tests_properties(koi_benchmark_process
+    PROPERTIES LABELS "process;tools;heavy" PROCESSORS 2)
+set_tests_properties(koi_uci_match_process koi_uci_match_clock
+    PROPERTIES LABELS "process;matches")
+set_tests_properties(koi_uci_match_clock PROPERTIES PROCESSORS 2)
+set_tests_properties(koi_stockfish_strength_option PROPERTIES LABELS "process;matches")
+set_tests_properties(cutechess_stability_smoke
+    PROPERTIES LABELS "process;matches;heavy" PROCESSORS 2)
+set_tests_properties(hash_memory_stability PROPERTIES LABELS "process;runtime")
+set_tests_properties(windows_ci_configuration install_book_script package_release_layout
+    PROPERTIES LABELS "process;packaging")
+
+if(TARGET koi_shadow_diff_tests)
+    set_tests_properties(koi_shadow_diff_tests PROPERTIES LABELS "integration;rules")
+endif()
+
+if(Python3_Interpreter_FOUND)
+    set_tests_properties(
+        elo_estimate_python stockfish_match_python elo_openings_python
+        tune_eval_python nnue_training_python nnue_wrapper_python
+        measurement_phase_python measurement_forensics_python strength_report_python
+        PROPERTIES LABELS "python"
+    )
+    if(TEST elo_oracle_python)
+        set_tests_properties(elo_oracle_python PROPERTIES LABELS "python;measurement")
+    endif()
+endif()
+
 # Bound every registered test. A pathological search, an unresponsive child
 # process, or a stalled network call must fail the test instead of hanging the
 # whole suite. Tests that need a different budget set an explicit TIMEOUT above;
@@ -591,6 +682,7 @@ get_property(KOI_REGISTERED_TESTS DIRECTORY PROPERTY TESTS)
 foreach(KOI_TEST_NAME IN LISTS KOI_REGISTERED_TESTS)
     get_test_property(${KOI_TEST_NAME} TIMEOUT KOI_TEST_TIMEOUT)
     if(KOI_TEST_TIMEOUT STREQUAL "NOTFOUND")
-        set_tests_properties(${KOI_TEST_NAME} PROPERTIES TIMEOUT 600)
+        math(EXPR KOI_DEFAULT_TIMEOUT "${KOI_TEST_TIMEOUT_SECONDS} * ${KOI_TIMEOUT_SCALE}")
+        set_tests_properties(${KOI_TEST_NAME} PROPERTIES TIMEOUT ${KOI_DEFAULT_TIMEOUT})
     endif()
 endforeach()

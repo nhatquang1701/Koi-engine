@@ -46,29 +46,14 @@ void test_endgame_perft_counts_cover_pins_and_en_passant_legality() {
     require(koi::perft(state, 3) == 2812, "position three depth 3 must have 2812 nodes");
 }
 
-struct TestCase {
-    std::string_view name;
-    void (*run)();
-};
-
 } // namespace
 
-int main() {
-    const std::vector<TestCase> tests{
+int main(int argc, char** argv) {
+    const std::vector<koi::test::TestCase> tests{
         {"start-position perft", test_start_position_perft_counts},
         {"Kiwipete perft", test_kiwipete_perft_counts},
         {"endgame pin perft", test_endgame_perft_counts_cover_pins_and_en_passant_legality},
     };
 
-    for (const TestCase& test : tests) {
-        try {
-            test.run();
-            std::cout << "PASS " << test.name << '\n';
-        } catch (const std::exception& error) {
-            std::cerr << "FAIL " << test.name << ": " << error.what() << '\n';
-            return 1;
-        }
-    }
-
-    return 0;
+    return koi::test::run_tests(tests, argc, argv);
 }

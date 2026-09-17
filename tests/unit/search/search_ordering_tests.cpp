@@ -15,15 +15,12 @@ namespace {
 using koi::test::require;
 
 koi::GameState require_state(std::string_view fen) {
-    const auto state = koi::GameState::from_fen(fen);
-    require(state.has_value(), "test FEN must construct a game state");
-    return *state;
+    return koi::test::require_value(koi::GameState::from_fen(fen),
+                                    "test FEN must construct a game state");
 }
 
 koi::Move require_move(std::string_view uci) {
-    const auto move = koi::Move::parse_uci(uci);
-    require(move.has_value(), "test move must parse");
-    return *move;
+    return koi::test::require_value(koi::Move::parse_uci(uci), "test move must parse");
 }
 
 std::vector<koi::Move> quiet_moves(const koi::GameState& state, std::vector<koi::Move> moves) {
@@ -366,15 +363,10 @@ void test_ordering_resolves_deferred_see_for_search_moves() {
             "ordering must resolve deferred SEE before ranking a capture");
 }
 
-struct TestCase {
-    std::string_view name;
-    void (*run)();
-};
-
 } // namespace
 
-int main() {
-    const std::vector<TestCase> tests{
+int main(int argc, char** argv) {
+    const std::vector<koi::test::TestCase> tests{
         {"TT and MVV-LVA ordering", test_tt_move_and_mvv_lva_capture_preference},
         {"SEE capture ordering", test_static_exchange_orders_safe_captures_ahead_of_poisoned_captures},
         {"killer history stable ordering", test_killer_history_and_tie_breaking_are_deterministic},
@@ -392,13 +384,5 @@ int main() {
         {"deferred SEE ordering", test_ordering_resolves_deferred_see_for_search_moves},
     };
 
-    for (const TestCase& test : tests) {
-        try {
-            test.run();
-        } catch (const std::exception& error) {
-            std::cerr << "FAIL " << test.name << ": " << error.what() << '\n';
-            return 1;
-        }
-    }
-    return 0;
+    return koi::test::run_tests(tests, argc, argv);
 }

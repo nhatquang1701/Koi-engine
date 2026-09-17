@@ -9,6 +9,12 @@ if (-not (Test-Path -LiteralPath $BenchPath -PathType Leaf)) {
     throw "koi-bench executable is missing: $BenchPath"
 }
 
+# Profile JSON scratch files must be unique per run: this test may execute in
+# parallel with another test invocation (or another build tree), so fixed names
+# in the shared temp directory would let one run read another run's file.
+$scratchDirectory = Join-Path ([System.IO.Path]::GetTempPath()) ("koi-bench-" + [System.Guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $scratchDirectory -Force | Out-Null
+
 function Invoke-Benchmark([string]$Executable, [string]$Arguments = '', [string]$Label = 'benchmark') {
     $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
     $startInfo.FileName = $Executable
@@ -89,8 +95,7 @@ if ($first.Stdout -cne $second.Stdout) {
 $maximumThreads = [Math]::Max(1, [Math]::Min(64, [Environment]::ProcessorCount))
 $benchmarkThreads = [Math]::Max(1, [Math]::Min(2, $maximumThreads))
 $threadedVerificationThreads = if ($maximumThreads -ge 4) { 4 } else { $maximumThreads }
-$threadedVerificationProfile = Join-Path $env:TEMP 'koi-bench-threads4-profile.json'
-Remove-Item -LiteralPath $threadedVerificationProfile -ErrorAction SilentlyContinue
+$threadedVerificationProfile = Join-Path $scratchDirectory 'threads4-profile.json'
 $threadedVerification = Invoke-Benchmark $BenchPath "--threads $threadedVerificationThreads --speed 100 --profile-json `"$threadedVerificationProfile`"" 'threaded-profile'
 $threadedVerificationRepeat = Invoke-Benchmark $BenchPath "--threads $threadedVerificationThreads --speed 100" 'threaded-repeat'
 Assert-BenchmarkOutput $threadedVerification
@@ -137,12 +142,11 @@ foreach ($line in $timedLines[2..($timedLines.Count - 1)]) {
     }
 }
 
-$coldProfile = Join-Path $env:TEMP 'koi-bench-cold-profile.json'
-$coldReplayProfile = Join-Path $env:TEMP 'koi-bench-cold-replay-profile.json'
-$warmProfile = Join-Path $env:TEMP 'koi-bench-warm-profile.json'
-$timedProfile = Join-Path $env:TEMP 'koi-bench-timed-profile.json'
-$optionalProfile = Join-Path $env:TEMP 'koi-bench-optional-profile.json'
-Remove-Item -LiteralPath $coldProfile, $coldReplayProfile, $warmProfile, $timedProfile, $optionalProfile -ErrorAction SilentlyContinue
+$coldProfile = Join-Path $scratchDirectory 'cold-profile.json'
+$coldReplayProfile = Join-Path $scratchDirectory 'cold-replay-profile.json'
+$warmProfile = Join-Path $scratchDirectory 'warm-profile.json'
+$timedProfile = Join-Path $scratchDirectory 'timed-profile.json'
+$optionalProfile = Join-Path $scratchDirectory 'optional-profile.json'
 $cold = Invoke-Benchmark $BenchPath "--profile-json `"$coldProfile`"" 'cold-profile'
 $coldReplay = Invoke-Benchmark $BenchPath "--profile-json `"$coldReplayProfile`"" 'cold-replay-profile'
 $warm = Invoke-Benchmark $BenchPath "--warm-hash --profile-json `"$warmProfile`"" 'warm-profile'

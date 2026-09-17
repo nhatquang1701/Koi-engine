@@ -1,10 +1,8 @@
 #include <atomic>
-#include <chrono>
 #include <cstdint>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
-#include <iostream>
 #include <optional>
 #include <stdexcept>
 #include <string_view>
@@ -23,9 +21,8 @@ namespace {
 using koi::test::require;
 
 koi::GameState state_from_fen(std::string_view fen) {
-    const auto state = koi::GameState::from_fen(fen);
-    require(state.has_value(), std::string("test FEN must be accepted: ") + std::string(fen));
-    return *state;
+    return koi::test::require_value(koi::GameState::from_fen(fen),
+                                    "test FEN must construct a game state");
 }
 
 void test_snapshot_converts_rule_metadata_and_piece_bitboards() {
@@ -80,11 +77,9 @@ void test_absent_and_malformed_paths_disable_probing_safely() {
 }
 
 void test_empty_and_valid_paths_preserve_optional_fallback() {
-    const std::filesystem::path root = std::filesystem::temp_directory_path() /
-        ("koi-task-2-syzygy-" + std::to_string(
-            std::chrono::steady_clock::now().time_since_epoch().count()));
-    const std::filesystem::path empty = root / "empty";
-    const std::filesystem::path valid = root / "valid";
+    const koi::test::TempDirectory root;
+    const std::filesystem::path empty = root.file("empty");
+    const std::filesystem::path valid = root.file("valid");
     std::filesystem::create_directories(empty);
     std::filesystem::create_directories(valid);
     {
@@ -102,45 +97,35 @@ void test_empty_and_valid_paths_preserve_optional_fallback() {
     const koi::SyzygyTablebase valid_tablebase(valid, 5, 1, true);
     require(valid_tablebase.enabled(), "a readable tablebase path must acquire Fathom ownership");
     require(TB_LARGEST > 0, "Fathom must report the registered valid-path table");
-
-    std::filesystem::remove_all(root);
 }
 
 void test_wrong_sized_fixture_disables_probing_safely() {
-    const std::filesystem::path root = std::filesystem::temp_directory_path() /
-        ("koi-task-2-syzygy-malformed-" + std::to_string(
-            std::chrono::steady_clock::now().time_since_epoch().count()));
-    std::filesystem::create_directories(root);
+    const koi::test::TempDirectory root;
     {
-        std::ofstream tablebase(root / "KQvK.rtbw", std::ios::binary);
+        std::ofstream tablebase(root.file("KQvK.rtbw"), std::ios::binary);
         tablebase.write(std::string(79, '\0').data(), 79);
     }
 
     const koi::GameState state = state_from_fen(
         "4k3/8/8/8/8/8/8/3QK3 w - - 0 1");
-    const koi::SyzygyTablebase tablebase(root, 5, 1, true);
+    const koi::SyzygyTablebase tablebase(root.path(), 5, 1, true);
     require(!tablebase.enabled(), "a wrong-sized Syzygy file must disable probing");
     require(!tablebase.probe_wdl(state.tablebase_snapshot()).has_value(),
             "a wrong-sized Syzygy file must fall back from WDL probing");
     require(!tablebase.probe_root(state).has_value(),
             "a wrong-sized Syzygy file must fall back from root probing");
-
-    std::filesystem::remove_all(root);
 }
 
 void test_tablebase_instances_share_fathom_lifetime_in_both_clear_orders() {
-    const std::filesystem::path root = std::filesystem::temp_directory_path() /
-        ("koi-task-2-syzygy-lifetime-" + std::to_string(
-            std::chrono::steady_clock::now().time_since_epoch().count()));
-    std::filesystem::create_directories(root);
+    const koi::test::TempDirectory root;
     {
-        std::ofstream tablebase(root / "KQvK.rtbw", std::ios::binary);
+        std::ofstream tablebase(root.file("KQvK.rtbw"), std::ios::binary);
         tablebase.write(std::string(80, '\0').data(), 80);
     }
 
     {
-        auto first = std::make_unique<koi::SyzygyTablebase>(root, 5, 1, true);
-        auto second = std::make_unique<koi::SyzygyTablebase>(root, 5, 1, true);
+        auto first = std::make_unique<koi::SyzygyTablebase>(root.path(), 5, 1, true);
+        auto second = std::make_unique<koi::SyzygyTablebase>(root.path(), 5, 1, true);
         require(first->enabled() && second->enabled(),
                 "two users of one valid tablebase path must both be enabled");
         second.reset();
@@ -151,8 +136,8 @@ void test_tablebase_instances_share_fathom_lifetime_in_both_clear_orders() {
     }
 
     {
-        auto first = std::make_unique<koi::SyzygyTablebase>(root, 5, 1, true);
-        auto second = std::make_unique<koi::SyzygyTablebase>(root, 5, 1, true);
+        auto first = std::make_unique<koi::SyzygyTablebase>(root.path(), 5, 1, true);
+        auto second = std::make_unique<koi::SyzygyTablebase>(root.path(), 5, 1, true);
         require(first->enabled() && second->enabled(),
                 "Fathom must be reacquirable after the final user is cleared");
         first.reset();
@@ -161,8 +146,6 @@ void test_tablebase_instances_share_fathom_lifetime_in_both_clear_orders() {
         second.reset();
         require(TB_LARGEST == 0, "the second clear order must release Fathom at the end");
     }
-
-    std::filesystem::remove_all(root);
 }
 
 void test_piece_count_and_castling_gate_probing() {
@@ -259,23 +242,28 @@ void test_seven_piece_probe_limit_is_preserved() {
 
 } // namespace
 
-int main() {
-    try {
-        test_snapshot_converts_rule_metadata_and_piece_bitboards();
-        test_snapshot_uses_native_rule_state_after_a_pinned_double_push();
-        test_absent_and_malformed_paths_disable_probing_safely();
-        test_empty_and_valid_paths_preserve_optional_fallback();
-        test_wrong_sized_fixture_disables_probing_safely();
-        test_tablebase_instances_share_fathom_lifetime_in_both_clear_orders();
-        test_piece_count_and_castling_gate_probing();
-        test_malformed_snapshots_are_rejected_before_probing();
-        test_wdl_conversion_and_concurrent_disabled_probes();
-        test_50_move_rule_selects_clock_aware_root_probe();
-        test_seven_piece_probe_limit_is_preserved();
-        std::cout << "PASS syzygy tablebase tests\n";
-        return 0;
-    } catch (const std::exception& error) {
-        std::cerr << "FAIL syzygy tablebase tests: " << error.what() << '\n';
-        return 1;
-    }
+int main(int argc, char** argv) {
+    const std::vector<koi::test::TestCase> tests{
+        {"snapshot rule metadata and piece bitboards",
+         test_snapshot_converts_rule_metadata_and_piece_bitboards},
+        {"snapshot native rule state after pinned double push",
+         test_snapshot_uses_native_rule_state_after_a_pinned_double_push},
+        {"absent and malformed paths disable probing safely",
+         test_absent_and_malformed_paths_disable_probing_safely},
+        {"empty and valid paths preserve optional fallback",
+         test_empty_and_valid_paths_preserve_optional_fallback},
+        {"wrong-sized fixture disables probing safely",
+         test_wrong_sized_fixture_disables_probing_safely},
+        {"tablebase instances share Fathom lifetime in both clear orders",
+         test_tablebase_instances_share_fathom_lifetime_in_both_clear_orders},
+        {"piece count and castling gate probing", test_piece_count_and_castling_gate_probing},
+        {"malformed snapshots are rejected before probing",
+         test_malformed_snapshots_are_rejected_before_probing},
+        {"WDL conversion and concurrent disabled probes",
+         test_wdl_conversion_and_concurrent_disabled_probes},
+        {"50-move rule selects clock-aware root probe",
+         test_50_move_rule_selects_clock_aware_root_probe},
+        {"seven-piece probe limit is preserved", test_seven_piece_probe_limit_is_preserved},
+    };
+    return koi::test::run_tests(tests, argc, argv);
 }

@@ -18,9 +18,7 @@ namespace {
 using koi::test::require;
 
 koi::Move require_move(std::string_view uci) {
-    const auto parsed = koi::Move::parse_uci(uci);
-    require(parsed.has_value(), "test move must parse");
-    return *parsed;
+    return koi::test::require_value(koi::Move::parse_uci(uci), "test move must parse");
 }
 
 void test_stack_is_fixed_capacity_and_restores_frames() {
@@ -82,29 +80,14 @@ void test_search_context_exposes_fixed_stack_boundary() {
             "search context must own the fixed-capacity search stack");
 }
 
-struct TestCase {
-    const char* name;
-    void (*run)();
-};
-
 } // namespace
 
-int main() {
-    const std::vector<TestCase> tests{
+int main(int argc, char** argv) {
+    const std::vector<koi::test::TestCase> tests{
         {"fixed search stack", test_stack_is_fixed_capacity_and_restores_frames},
         {"deterministic root ranking", test_root_ranking_is_score_then_stable_index},
         {"session ownership", test_session_snapshot_and_completion_are_single_owner_operations},
         {"context stack boundary", test_search_context_exposes_fixed_stack_boundary},
     };
-    int failures = 0;
-    for (const TestCase& test : tests) {
-        try {
-            test.run();
-            std::cout << "PASS " << test.name << '\n';
-        } catch (const std::exception& error) {
-            std::cerr << "FAIL " << test.name << ": " << error.what() << '\n';
-            ++failures;
-        }
-    }
-    return failures == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
+    return koi::test::run_tests(tests, argc, argv);
 }

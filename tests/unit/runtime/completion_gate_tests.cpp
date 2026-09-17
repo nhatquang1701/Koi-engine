@@ -23,9 +23,7 @@ using koi::SearchRequestIdentity;
 using koi::test::require;
 
 Move move(std::string_view uci) {
-    const auto parsed = Move::parse_uci(uci);
-    require(parsed.has_value(), "invalid test move: " + std::string(uci));
-    return *parsed;
+    return koi::test::require_value(Move::parse_uci(uci), "test move must parse");
 }
 
 SearchRequestIdentity identity(const GameState& root, std::uint64_t generation = 1) {
@@ -158,15 +156,10 @@ void test_request_identity_helper_builds_and_matches() {
     require(!built.matches(same), "a different root fen must not match");
 }
 
-struct TestCase {
-    const char* name;
-    void (*run)();
-};
-
 } // namespace
 
-int main() {
-    const std::vector<TestCase> tests{
+int main(int argc, char** argv) {
+    const std::vector<koi::test::TestCase> tests{
         {"current root move", test_current_root_move_is_emitted},
         {"stale generation", test_stale_generation_is_suppressed},
         {"mismatched root key", test_mismatched_root_key_is_suppressed_even_for_a_legal_looking_move},
@@ -177,15 +170,5 @@ int main() {
         {"completion once", test_completion_once_accepts_only_one_claim},
         {"request identity helper", test_request_identity_helper_builds_and_matches},
     };
-    int failures = 0;
-    for (const TestCase& test : tests) {
-        try {
-            test.run();
-            std::cout << "PASS " << test.name << '\n';
-        } catch (const std::exception& error) {
-            std::cerr << "FAIL " << test.name << ": " << error.what() << '\n';
-            ++failures;
-        }
-    }
-    return failures == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
+    return koi::test::run_tests(tests, argc, argv);
 }

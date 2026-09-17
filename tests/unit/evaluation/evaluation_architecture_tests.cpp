@@ -3,6 +3,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "koi/detail/evaluation_context.hpp"
 #include "koi/detail/search_context.hpp"
@@ -76,29 +77,14 @@ void test_search_context_owns_evaluation_execution_boundary() {
             "search context must expose a private evaluation-context boundary");
 }
 
-struct TestCase {
-    std::string_view name;
-    void (*run)();
-};
-
 } // namespace
 
-int main() {
-    const TestCase tests[]{
+int main(int argc, char** argv) {
+    const std::vector<koi::test::TestCase> tests{
         {"worker ownership", test_worker_context_owns_one_private_worker_per_search_context},
         {"base fallback", test_worker_context_preserves_base_evaluator_fallback},
         {"search evaluation boundary", test_search_context_owns_evaluation_execution_boundary},
     };
 
-    int failures = 0;
-    for (const TestCase& test : tests) {
-        try {
-            test.run();
-            std::cout << "PASS " << test.name << '\n';
-        } catch (const std::exception& error) {
-            std::cerr << "FAIL " << test.name << ": " << error.what() << '\n';
-            ++failures;
-        }
-    }
-    return failures == 0 ? 0 : 1;
+    return koi::test::run_tests(tests, argc, argv);
 }
