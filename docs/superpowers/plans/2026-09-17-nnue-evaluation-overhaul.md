@@ -65,7 +65,7 @@ UCI handshake byte-identical, and v1/v2/v3 containers loadable.
   add pure-Python unit tests for the generator/encoder, and launch
   detached corpus expansion (three Stockfish workers) in the background.
   Commit.
-- [ ] **Phase 2 — Feature set and container v4 (C++).** Implement
+- [x] **Phase 2 — Feature set and container v4 (C++).** Implement
   `halfka-king-bucket-v1` in `evaluation_features.*` with exact golden
   vectors, and container v4 in `nnue.hpp`/`nnue.cpp` (manifest, payload,
   validation, deterministic serialization) with v2/v3 back-compat and

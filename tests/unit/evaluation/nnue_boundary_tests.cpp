@@ -358,6 +358,182 @@ void test_v3_shift_explicit_inference_and_container() {
             "v3 shifts must survive the container round trip");
 }
 
+void test_v4_container_round_trip_and_validation() {
+    const koi::NnueNetwork network = koi::NnueNetwork::synthetic_v4();
+    const auto encoded = koi::NnueLoader::serialize(network);
+    require(encoded.has_value(), "synthetic v4 NNUE network must serialize");
+    const auto repeated = koi::NnueLoader::serialize(network);
+    require(repeated.has_value() && *encoded == *repeated,
+            "v4 NNUE serialization must be byte deterministic");
+
+    constexpr std::size_t kInputUnits = 9216;
+    constexpr std::size_t kHiddenUnits = 32;
+    constexpr std::size_t kOutputBuckets = 8;
+    constexpr std::size_t kPayloadSize = kInputUnits * kHiddenUnits * 2 +
+        kHiddenUnits * 4 + kOutputBuckets * (kHiddenUnits / 2) + kOutputBuckets * 4;
+    const std::size_t strings = koi::kKoiNnueQuantization.size() +
+        koi::kKoiNnueHalfkaKingBucketV1FeatureSet.size();
+    require(encoded->size() == 76 + strings + kPayloadSize,
+            "v4 container size must match the manifest, strings and payload formula");
+
+    const auto decoded = koi::NnueLoader::load(*encoded);
+    require(decoded.has_value(), "serialized v4 NNUE network must load");
+    require(decoded->manifest.version == koi::kKoiNnueHalfkaKingBucketV1FormatVersion &&
+                decoded->manifest.layer_sizes == koi::NnueLayerSizes{9216, 32, 8, 0} &&
+                decoded->manifest.feature_set == "halfka-king-bucket-v1" &&
+                decoded->manifest.quantization == "int16/int8" &&
+                decoded->hidden_shift == 7 && decoded->output_shift == 15 &&
+                decoded->bottleneck_shift == 0 &&
+                decoded->feature_weights.size() == kInputUnits * kHiddenUnits &&
+                decoded->bottleneck_weights.size() == kOutputBuckets * (kHiddenUnits / 2) &&
+                decoded->bottleneck_bias.size() == kOutputBuckets &&
+                decoded->output_weights.empty(),
+            "v4 manifest, shifts and per-bucket arrays must survive a round trip");
+    require(decoded->manifest.network_sha256 == std::array<std::uint8_t, 32>{
+                0x7d, 0x60, 0x17, 0x21, 0xc6, 0xaf, 0xb8, 0xcf,
+                0xaf, 0x31, 0xb7, 0xb6, 0x8b, 0xd8, 0xa0, 0x57,
+                0x78, 0xdb, 0x38, 0xfa, 0x33, 0x4e, 0x0a, 0x58,
+                0x34, 0x35, 0xba, 0x5a, 0x66, 0x83, 0x00, 0xe8},
+            "v4 payload checksum must be stable");
+}
+
+void test_v4_manifest_validation_rejects_mismatches() {
+    koi::NnueNetwork legacy_features = koi::NnueNetwork::synthetic_v4();
+    legacy_features.manifest.feature_set = "piece-square-king-pawn-v2";
+    const auto legacy_features_result = koi::NnueLoader::serialize(legacy_features);
+    require(!legacy_features_result.has_value() &&
+                legacy_features_result.error().code ==
+                    koi::NnueErrorCode::unsupported_feature_set,
+            "v4 networks must reject the legacy feature sets");
+
+    koi::NnueNetwork unknown = koi::NnueNetwork::synthetic_v4();
+    unknown.manifest.feature_set = "unknown-feature-set";
+    const auto unknown_result = koi::NnueLoader::serialize(unknown);
+    require(!unknown_result.has_value() &&
+                unknown_result.error().code == koi::NnueErrorCode::unsupported_feature_set,
+            "v4 networks must reject unknown feature sets");
+
+    koi::NnueNetwork odd_hidden = koi::NnueNetwork::synthetic_v4();
+    odd_hidden.manifest.layer_sizes[1] = 31;
+    const auto odd_hidden_result = koi::NnueLoader::serialize(odd_hidden);
+    require(!odd_hidden_result.has_value() &&
+                odd_hidden_result.error().code == koi::NnueErrorCode::invalid_dimensions,
+            "v4 networks must reject odd hidden widths");
+
+    koi::NnueNetwork narrow_hidden = koi::NnueNetwork::synthetic_v4();
+    narrow_hidden.manifest.layer_sizes[1] = 16;
+    const auto narrow_hidden_result = koi::NnueLoader::serialize(narrow_hidden);
+    require(!narrow_hidden_result.has_value() &&
+                narrow_hidden_result.error().code == koi::NnueErrorCode::invalid_dimensions,
+            "v4 networks must reject hidden widths below the named minimum");
+
+    koi::NnueNetwork wide_hidden = koi::NnueNetwork::synthetic_v4();
+    wide_hidden.manifest.layer_sizes[1] = 8194;
+    const auto wide_hidden_result = koi::NnueLoader::serialize(wide_hidden);
+    require(!wide_hidden_result.has_value() &&
+                wide_hidden_result.error().code == koi::NnueErrorCode::invalid_dimensions,
+            "v4 networks must reject hidden widths above the named maximum");
+
+    koi::NnueNetwork wrong_buckets = koi::NnueNetwork::synthetic_v4();
+    wrong_buckets.manifest.layer_sizes[2] = 4;
+    const auto wrong_buckets_result = koi::NnueLoader::serialize(wrong_buckets);
+    require(!wrong_buckets_result.has_value() &&
+                wrong_buckets_result.error().code == koi::NnueErrorCode::invalid_dimensions,
+            "v4 networks must use exactly eight output buckets");
+
+    koi::NnueNetwork reserved_word = koi::NnueNetwork::synthetic_v4();
+    reserved_word.manifest.layer_sizes[3] = 1;
+    const auto reserved_word_result = koi::NnueLoader::serialize(reserved_word);
+    require(!reserved_word_result.has_value() &&
+                reserved_word_result.error().code == koi::NnueErrorCode::invalid_dimensions,
+            "v4 networks must keep the reserved layer word zero");
+
+    koi::NnueNetwork bad_shift = koi::NnueNetwork::synthetic_v4();
+    bad_shift.hidden_shift = 21;
+    const auto bad_shift_result = koi::NnueLoader::serialize(bad_shift);
+    require(!bad_shift_result.has_value() &&
+                bad_shift_result.error().code == koi::NnueErrorCode::malformed_manifest,
+            "v4 serialization must reject shifts above the named limit");
+
+    koi::NnueNetwork bad_bottleneck = koi::NnueNetwork::synthetic_v4();
+    bad_bottleneck.bottleneck_shift = 1;
+    const auto bad_bottleneck_result = koi::NnueLoader::serialize(bad_bottleneck);
+    require(!bad_bottleneck_result.has_value() &&
+                bad_bottleneck_result.error().code == koi::NnueErrorCode::malformed_manifest,
+            "v4 serialization must reject a nonzero bottleneck shift");
+}
+
+void test_v4_container_rejects_corruption_and_legacy_versions() {
+    const auto encoded = koi::NnueLoader::serialize(koi::NnueNetwork::synthetic_v4());
+    require(encoded.has_value(), "v4 corruption fixture must serialize");
+
+    std::vector<std::uint8_t> reserved_bytes = *encoded;
+    reserved_bytes[30] = 1;
+    const auto reserved_bytes_result = koi::NnueLoader::load(reserved_bytes);
+    require(!reserved_bytes_result.has_value() &&
+                reserved_bytes_result.error().code == koi::NnueErrorCode::malformed_manifest,
+            "nonzero v4 reserved scale bytes must be rejected");
+
+    std::vector<std::uint8_t> reserved_layer = *encoded;
+    reserved_layer[24] = 1;
+    const auto reserved_layer_result = koi::NnueLoader::load(reserved_layer);
+    require(!reserved_layer_result.has_value() &&
+                reserved_layer_result.error().code == koi::NnueErrorCode::invalid_dimensions,
+            "a nonzero v4 reserved layer word must be rejected");
+
+    std::vector<std::uint8_t> corrupt_shift = *encoded;
+    corrupt_shift[28] = 21;
+    const auto corrupt_shift_result = koi::NnueLoader::load(corrupt_shift);
+    require(!corrupt_shift_result.has_value() &&
+                corrupt_shift_result.error().code == koi::NnueErrorCode::malformed_manifest,
+            "v4 shifts above the named limit must be rejected before inference");
+
+    std::vector<std::uint8_t> truncated = *encoded;
+    truncated.pop_back();
+    const auto truncated_result = koi::NnueLoader::load(truncated);
+    require(!truncated_result.has_value() &&
+                truncated_result.error().code == koi::NnueErrorCode::invalid_file_size,
+            "truncated v4 payloads must be rejected");
+
+    const std::vector<std::uint8_t> empty;
+    const auto empty_result = koi::NnueLoader::load(empty);
+    require(!empty_result.has_value() &&
+                empty_result.error().code == koi::NnueErrorCode::empty_container,
+            "an empty v4 container must be rejected");
+
+    const std::vector<std::uint8_t> tiny(4, 0);
+    const auto tiny_result = koi::NnueLoader::load(tiny);
+    require(!tiny_result.has_value() &&
+                tiny_result.error().code == koi::NnueErrorCode::invalid_file_size,
+            "a container below the header minimum must be rejected");
+
+    koi::NnueNetwork future = koi::NnueNetwork::synthetic_v2();
+    future.manifest.version = 5;
+    const auto future_result = koi::NnueLoader::serialize(future);
+    require(!future_result.has_value() &&
+                future_result.error().code == koi::NnueErrorCode::unsupported_version,
+            "future container versions must be rejected");
+
+    koi::NnueNetwork v3 = koi::NnueNetwork::synthetic_v2();
+    v3.manifest.version = koi::kKoiNnuePerspectiveV3FormatVersion;
+    v3.hidden_shift = 7;
+    v3.bottleneck_shift = 7;
+    v3.output_shift = 7;
+    const auto v3_encoded = koi::NnueLoader::serialize(v3);
+    require(v3_encoded.has_value(), "v3 corruption fixture must serialize");
+    std::vector<std::uint8_t> v3_corrupt_shift = *v3_encoded;
+    v3_corrupt_shift[28] = 21;
+    const auto v3_corrupt_shift_result = koi::NnueLoader::load(v3_corrupt_shift);
+    require(!v3_corrupt_shift_result.has_value() &&
+                v3_corrupt_shift_result.error().code == koi::NnueErrorCode::malformed_manifest,
+            "v3 shifts above the named limit must be rejected");
+
+    const koi::test::TempDirectory scratch;
+    const auto missing = koi::NnueLoader::load_file(scratch.file("koi-missing.nnue"));
+    require(!missing.has_value() && missing.error().code == koi::NnueErrorCode::io_error,
+            "a missing NNUE file must report an IO error");
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -377,6 +553,9 @@ int main(int argc, char** argv) {
         {"NNUE AVX2 wide accumulation", test_avx2_compatible_path_preserves_wide_accumulation},
         {"NNUE invalid worker guard", test_invalid_network_does_not_allocate_worker_accumulators},
         {"NNUE v3 shifts", test_v3_shift_explicit_inference_and_container},
+        {"NNUE v4 container", test_v4_container_round_trip_and_validation},
+        {"NNUE v4 validation", test_v4_manifest_validation_rejects_mismatches},
+        {"NNUE v4 corruption", test_v4_container_rejects_corruption_and_legacy_versions},
         {"external NNUE container", test_external_v2_container},
     };
     return koi::test::run_tests(tests, argc, argv);

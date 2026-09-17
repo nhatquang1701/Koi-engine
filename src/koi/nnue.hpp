@@ -24,6 +24,22 @@ inline constexpr std::uint32_t kKoiNnueFormatVersion = 2;
 // magnitudes are far from the activation range can then be quantized without
 // collapsing to zero, which the single-scale v2 chain cannot avoid.
 inline constexpr std::uint32_t kKoiNnuePerspectiveV3FormatVersion = 3;
+// Version 4 replaces the 960-input piece-square features with
+// halfka-king-bucket-v1 (9216 inputs), CReLU pair products, and eight
+// piece-count output buckets.  It keeps the explicit fixed-point shift idea
+// from v3 but stores only the first-layer and output shifts.
+inline constexpr std::uint32_t kKoiNnueHalfkaKingBucketV1FormatVersion = 4;
+inline constexpr std::uint32_t kKoiNnueHalfkaKingBucketV1FeatureCount =
+    static_cast<std::uint32_t>(kNnueHalfkaKingBucketV1FeatureCount);
+inline constexpr std::uint32_t kKoiNnueOutputBucketCount = 8;
+inline constexpr std::uint32_t kKoiNnueMinimumHiddenUnits = 32;
+inline constexpr std::uint32_t kKoiNnueMaximumHiddenUnits = 8192;
+// Upper bound for every explicit fixed-point right shift stored in a v3/v4
+// header.  Values beyond this cannot be expressed meaningfully by the integer
+// pipelines the containers target.
+inline constexpr std::uint8_t kKoiNnueMaximumShift = 20;
+inline constexpr std::string_view kKoiNnueHalfkaKingBucketV1FeatureSet =
+    kNnueHalfkaKingBucketV1FeatureSet;
 inline constexpr std::uint32_t kKoiNnueFeatureCount =
     static_cast<std::uint32_t>(kNnuePieceSquareV1FeatureCount);
 inline constexpr std::uint32_t kKoiNnuePieceSquareKingPawnV2FeatureCount =
@@ -89,6 +105,10 @@ struct NnueNetwork {
 
     [[nodiscard]] static NnueNetwork synthetic();
     [[nodiscard]] static NnueNetwork synthetic_v2();
+    // Minimal-width v4 network for container and inference fixtures.  Trained
+    // networks default to 1024 hidden units; the fixture keeps the payload
+    // small while still exercising the pair-product and per-bucket layout.
+    [[nodiscard]] static NnueNetwork synthetic_v4();
 };
 
 class NnueLoader final {

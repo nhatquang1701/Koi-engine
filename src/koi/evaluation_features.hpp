@@ -13,6 +13,8 @@ inline constexpr std::string_view kClassicalEvaluationFeatureSet = "koi-classica
 inline constexpr std::string_view kNnuePieceSquareV1FeatureSet = "piece-square-v1";
 inline constexpr std::string_view kNnuePieceSquareKingPawnV2FeatureSet =
     "piece-square-king-pawn-v2";
+inline constexpr std::string_view kNnueHalfkaKingBucketV1FeatureSet =
+    "halfka-king-bucket-v1";
 
 inline constexpr std::size_t kNnuePieceSquareV1FeatureCount = 768;
 inline constexpr std::size_t kNnueKingContextFeatureCount = 128;
@@ -21,9 +23,20 @@ inline constexpr std::size_t kNnuePieceSquareKingPawnV2FeatureCount =
     kNnuePieceSquareV1FeatureCount + kNnueKingContextFeatureCount +
     kNnuePawnFileContextFeatureCount;
 
+// halfka-king-bucket-v1: one 768-input half-king plane block per own-king
+// bucket, so 12 buckets times 12 piece planes times 64 squares.  The plane
+// order is own pawn..king followed by the opponent pawn..king, relative to the
+// side to move.
+inline constexpr std::size_t kNnueKingBucketCount = 12;
+inline constexpr std::size_t kNnueHalfkaKingBucketPiecePlaneCount = 12;
+inline constexpr std::size_t kNnueHalfkaKingBucketV1FeatureCount =
+    kNnueKingBucketCount * kNnueHalfkaKingBucketPiecePlaneCount * 64;
+
 using NnueFeatureVectorV1 = std::array<std::int8_t, kNnuePieceSquareV1FeatureCount>;
 using NnueFeatureVectorV2 =
     std::array<std::int8_t, kNnuePieceSquareKingPawnV2FeatureCount>;
+using NnueFeatureVectorV4 =
+    std::array<std::int8_t, kNnueHalfkaKingBucketV1FeatureCount>;
 
 // Sparse form of the v2 input vector: the indices whose dense value is one.
 // Inference only has to visit these (about 30 for a typical position) instead
@@ -34,6 +47,16 @@ inline constexpr std::size_t kNnueSparseFeatureCapacity = 128;
 
 struct NnueSparseFeatures {
     std::array<std::uint16_t, kNnueSparseFeatureCapacity> indices{};
+    std::size_t count = 0;
+};
+
+// Sparse form of the halfka-king-bucket-v1 input vector.  A legal position has
+// at most 32 active inputs, so 64 entries leave room for unusual positions
+// while keeping the per-call structure small.
+inline constexpr std::size_t kNnueSparseFeatureCapacityV4 = 64;
+
+struct NnueSparseFeaturesV4 {
+    std::array<std::uint16_t, kNnueSparseFeatureCapacityV4> indices{};
     std::size_t count = 0;
 };
 
@@ -50,6 +73,10 @@ public:
     [[nodiscard]] static NnueFeatureVectorV2 encode_piece_square_king_pawn_v2(
         const EvaluationFeatures&) noexcept;
     [[nodiscard]] static NnueSparseFeatures encode_sparse_v2(
+        const EvaluationFeatures&) noexcept;
+    [[nodiscard]] static NnueFeatureVectorV4 encode_halfka_king_bucket_v1(
+        const EvaluationFeatures&) noexcept;
+    [[nodiscard]] static NnueSparseFeaturesV4 encode_sparse_v4(
         const EvaluationFeatures&) noexcept;
 };
 

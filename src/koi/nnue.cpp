@@ -183,7 +183,24 @@ template <typename Integer>
     return true;
 }
 
+[[nodiscard]] constexpr bool is_halfka_king_bucket_v1(
+    const NnueManifest& manifest) noexcept {
+    return manifest.version == kKoiNnueHalfkaKingBucketV1FormatVersion;
+}
+
 [[nodiscard]] std::optional<std::size_t> payload_size_for(const NnueManifest& manifest) noexcept {
+    if (is_halfka_king_bucket_v1(manifest)) {
+        if (manifest.feature_set != kKoiNnueHalfkaKingBucketV1FeatureSet) {
+            return std::nullopt;
+        }
+        const std::size_t input_units = manifest.layer_sizes[0];
+        const std::size_t hidden_units = manifest.layer_sizes[1];
+        const std::size_t output_buckets = manifest.layer_sizes[2];
+        return input_units * hidden_units * sizeof(std::int16_t) +
+            hidden_units * sizeof(std::int32_t) +
+            output_buckets * (hidden_units / 2U) * sizeof(std::int8_t) +
+            output_buckets * sizeof(std::int32_t);
+    }
     if (manifest.feature_set == kKoiNnueFeatureSet &&
         manifest.layer_sizes != kKoiNnueLayerSizes) {
         return std::nullopt;
@@ -211,8 +228,31 @@ template <typename Integer>
         return make_error(NnueErrorCode::bad_magic, "NNUE container magic is not KOI-NNUE");
     }
     if (manifest.version != kKoiNnueFormatVersion &&
-        manifest.version != kKoiNnuePerspectiveV3FormatVersion) {
+        manifest.version != kKoiNnuePerspectiveV3FormatVersion &&
+        manifest.version != kKoiNnueHalfkaKingBucketV1FormatVersion) {
         return make_error(NnueErrorCode::unsupported_version, "unsupported Koi NNUE container version");
+    }
+    if (is_halfka_king_bucket_v1(manifest)) {
+        if (manifest.feature_set != kKoiNnueHalfkaKingBucketV1FeatureSet) {
+            return make_error(NnueErrorCode::unsupported_feature_set,
+                              "NNUE v4 requires the halfka-king-bucket-v1 feature set");
+        }
+        const std::uint32_t hidden_units = manifest.layer_sizes[1];
+        if (manifest.layer_sizes[0] != kKoiNnueHalfkaKingBucketV1FeatureCount ||
+            manifest.layer_sizes[2] != kKoiNnueOutputBucketCount ||
+            manifest.layer_sizes[3] != 0 ||
+            hidden_units < kKoiNnueMinimumHiddenUnits ||
+            hidden_units > kKoiNnueMaximumHiddenUnits || hidden_units % 2U != 0) {
+            return make_error(
+                NnueErrorCode::invalid_dimensions,
+                "NNUE v4 layer manifest must be 9216 inputs, even hidden units in [32, 8192], "
+                "8 output buckets, and a zero reserved word");
+        }
+        if (manifest.quantization != kKoiNnueQuantization) {
+            return make_error(NnueErrorCode::unsupported_quantization,
+                              "only int16/int8 Koi NNUE quantization is supported");
+        }
+        return std::nullopt;
     }
     if (manifest.version == kKoiNnuePerspectiveV3FormatVersion &&
         manifest.feature_set != kKoiNnuePieceSquareKingPawnV2FeatureSet) {
@@ -250,6 +290,15 @@ template <typename Integer>
 
 [[nodiscard]] bool arrays_match_manifest(const NnueNetwork& network) noexcept {
     const auto& sizes = network.manifest.layer_sizes;
+    if (is_halfka_king_bucket_v1(network.manifest)) {
+        return network.feature_weights.size() ==
+                static_cast<std::size_t>(sizes[0]) * sizes[1] &&
+            network.hidden_bias.size() == sizes[1] &&
+            network.bottleneck_weights.size() ==
+                static_cast<std::size_t>(sizes[2]) * (sizes[1] / 2U) &&
+            network.bottleneck_bias.size() == sizes[2] &&
+            network.output_weights.empty();
+    }
     return network.feature_weights.size() == static_cast<std::size_t>(sizes[0]) * sizes[1] &&
         network.hidden_bias.size() == sizes[1] &&
         network.bottleneck_weights.size() == static_cast<std::size_t>(sizes[1]) * sizes[2] &&
@@ -555,14 +604,54 @@ NnueNetwork NnueNetwork::synthetic_v2() {
     return network;
 }
 
+NnueNetwork NnueNetwork::synthetic_v4() {
+    NnueNetwork network;
+    network.manifest.magic = std::string(kKoiNnueMagic);
+    network.manifest.version = kKoiNnueHalfkaKingBucketV1FormatVersion;
+    network.manifest.layer_sizes = {
+        kKoiNnueHalfkaKingBucketV1FeatureCount, 32, kKoiNnueOutputBucketCount, 0};
+    network.manifest.feature_set = std::string(kKoiNnueHalfkaKingBucketV1FeatureSet);
+    network.manifest.quantization = std::string(kKoiNnueQuantization);
+    network.hidden_shift = 7;
+    network.output_shift = 15;
+    const std::size_t input_units = network.manifest.layer_sizes[0];
+    const std::size_t hidden_units = network.manifest.layer_sizes[1];
+    const std::size_t output_buckets = network.manifest.layer_sizes[2];
+    network.feature_weights.resize(input_units * hidden_units);
+    network.hidden_bias.resize(hidden_units);
+    network.bottleneck_weights.resize(output_buckets * (hidden_units / 2U));
+    network.bottleneck_bias.resize(output_buckets);
+    for (std::size_t index = 0; index < network.feature_weights.size(); ++index) {
+        network.feature_weights[index] = static_cast<std::int16_t>(static_cast<int>(index % 5U) - 2);
+    }
+    for (std::size_t index = 0; index < network.hidden_bias.size(); ++index) {
+        network.hidden_bias[index] = static_cast<std::int32_t>(index) - 1;
+    }
+    for (std::size_t index = 0; index < network.bottleneck_weights.size(); ++index) {
+        network.bottleneck_weights[index] = static_cast<std::int8_t>(static_cast<int>(index % 3U) - 1);
+    }
+    for (std::size_t index = 0; index < network.bottleneck_bias.size(); ++index) {
+        network.bottleneck_bias[index] = static_cast<std::int32_t>(index) - 1;
+    }
+    return network;
+}
+
 std::expected<std::vector<std::uint8_t>, NnueError> NnueLoader::serialize(
     const NnueNetwork& network) {
     if (const auto error = validate_manifest(network.manifest); error.has_value()) {
         return std::unexpected(*error);
     }
-    if (network.manifest.version >= kKoiNnuePerspectiveV3FormatVersion &&
-        (network.hidden_shift > 20 || network.bottleneck_shift > 20 ||
-         network.output_shift > 20)) {
+    if (is_halfka_king_bucket_v1(network.manifest)) {
+        if (network.hidden_shift > kKoiNnueMaximumShift ||
+            network.output_shift > kKoiNnueMaximumShift ||
+            network.bottleneck_shift != 0) {
+            return std::unexpected(make_error(NnueErrorCode::malformed_manifest,
+                                              "NNUE v4 shift is out of range"));
+        }
+    } else if (network.manifest.version >= kKoiNnuePerspectiveV3FormatVersion &&
+               (network.hidden_shift > kKoiNnueMaximumShift ||
+                network.bottleneck_shift > kKoiNnueMaximumShift ||
+                network.output_shift > kKoiNnueMaximumShift)) {
         return std::unexpected(make_error(NnueErrorCode::malformed_manifest,
                                           "NNUE v3 shift is out of range"));
     }
@@ -591,10 +680,12 @@ std::expected<std::vector<std::uint8_t>, NnueError> NnueLoader::serialize(
     for (const std::int32_t bias : network.bottleneck_bias) {
         append_little_endian(payload, bias);
     }
-    for (const std::int8_t weight : network.output_weights) {
-        payload.push_back(static_cast<std::uint8_t>(weight));
+    if (!is_halfka_king_bucket_v1(network.manifest)) {
+        for (const std::int8_t weight : network.output_weights) {
+            payload.push_back(static_cast<std::uint8_t>(weight));
+        }
+        append_little_endian(payload, network.output_bias);
     }
-    append_little_endian(payload, network.output_bias);
     if (payload.size() != *expected_payload_size) {
         return std::unexpected(invalid_file_size_error());
     }
@@ -608,7 +699,12 @@ std::expected<std::vector<std::uint8_t>, NnueError> NnueLoader::serialize(
     for (const std::uint32_t layer_size : network.manifest.layer_sizes) {
         append_little_endian(container, layer_size);
     }
-    if (network.manifest.version >= kKoiNnuePerspectiveV3FormatVersion) {
+    if (is_halfka_king_bucket_v1(network.manifest)) {
+        container.push_back(network.hidden_shift);
+        container.push_back(network.output_shift);
+        container.push_back(0);
+        container.push_back(0);
+    } else if (network.manifest.version >= kKoiNnuePerspectiveV3FormatVersion) {
         container.push_back(network.hidden_shift);
         container.push_back(network.bottleneck_shift);
         container.push_back(network.output_shift);
@@ -648,7 +744,24 @@ std::expected<NnueNetwork, NnueError> NnueLoader::load(
     std::uint8_t hidden_shift = 0;
     std::uint8_t bottleneck_shift = 0;
     std::uint8_t output_shift = 0;
-    if (manifest.version >= kKoiNnuePerspectiveV3FormatVersion) {
+    if (manifest.version == kKoiNnueHalfkaKingBucketV1FormatVersion) {
+        if (container.size() - offset < 4) {
+            return std::unexpected(make_error(NnueErrorCode::malformed_manifest,
+                                               "NNUE v4 scale metadata is truncated"));
+        }
+        hidden_shift = container[offset++];
+        output_shift = container[offset++];
+        const std::uint8_t reserved_low = container[offset++];
+        const std::uint8_t reserved_high = container[offset++];
+        if (reserved_low != 0 || reserved_high != 0) {
+            return std::unexpected(make_error(NnueErrorCode::malformed_manifest,
+                                               "NNUE v4 reserved header bytes must be zero"));
+        }
+        if (hidden_shift > kKoiNnueMaximumShift || output_shift > kKoiNnueMaximumShift) {
+            return std::unexpected(make_error(NnueErrorCode::malformed_manifest,
+                                               "NNUE v4 shift is out of range"));
+        }
+    } else if (manifest.version >= kKoiNnuePerspectiveV3FormatVersion) {
         if (container.size() - offset < 4) {
             return std::unexpected(make_error(NnueErrorCode::malformed_manifest,
                                                "NNUE v3 scale metadata is truncated"));
@@ -657,7 +770,9 @@ std::expected<NnueNetwork, NnueError> NnueLoader::load(
         bottleneck_shift = container[offset++];
         output_shift = container[offset++];
         ++offset;
-        if (hidden_shift > 20 || bottleneck_shift > 20 || output_shift > 20) {
+        if (hidden_shift > kKoiNnueMaximumShift ||
+            bottleneck_shift > kKoiNnueMaximumShift ||
+            output_shift > kKoiNnueMaximumShift) {
             return std::unexpected(make_error(NnueErrorCode::malformed_manifest,
                                                "NNUE v3 shift is out of range"));
         }
@@ -705,7 +820,8 @@ std::expected<NnueNetwork, NnueError> NnueLoader::load(
     network.output_shift = output_shift;
     const std::size_t input_units = network.manifest.layer_sizes[0];
     const std::size_t hidden_units = network.manifest.layer_sizes[1];
-    const std::size_t bottleneck_units = network.manifest.layer_sizes[2];
+    const std::size_t output_units = network.manifest.layer_sizes[2];
+    const bool halfka_v4 = is_halfka_king_bucket_v1(network.manifest);
     const std::size_t feature_weight_count = input_units * hidden_units;
     std::size_t payload_offset = 0;
     network.feature_weights.resize(feature_weight_count);
@@ -722,14 +838,15 @@ std::expected<NnueNetwork, NnueError> NnueLoader::load(
         }
         bias = static_cast<std::int32_t>(encoded);
     }
-    network.bottleneck_weights.resize(hidden_units * bottleneck_units);
+    network.bottleneck_weights.resize(
+        halfka_v4 ? output_units * (hidden_units / 2U) : hidden_units * output_units);
     for (std::int8_t& weight : network.bottleneck_weights) {
         if (payload_offset >= payload.size()) {
             return std::unexpected(invalid_file_size_error());
         }
         weight = static_cast<std::int8_t>(payload[payload_offset++]);
     }
-    network.bottleneck_bias.resize(bottleneck_units);
+    network.bottleneck_bias.resize(output_units);
     for (std::int32_t& bias : network.bottleneck_bias) {
         std::uint32_t encoded = 0;
         if (!read_little_endian(payload, payload_offset, encoded)) {
@@ -737,18 +854,20 @@ std::expected<NnueNetwork, NnueError> NnueLoader::load(
         }
         bias = static_cast<std::int32_t>(encoded);
     }
-    network.output_weights.resize(bottleneck_units);
-    for (std::int8_t& weight : network.output_weights) {
-        if (payload_offset >= payload.size()) {
+    if (!halfka_v4) {
+        network.output_weights.resize(output_units);
+        for (std::int8_t& weight : network.output_weights) {
+            if (payload_offset >= payload.size()) {
+                return std::unexpected(invalid_file_size_error());
+            }
+            weight = static_cast<std::int8_t>(payload[payload_offset++]);
+        }
+        std::uint32_t output_bias = 0;
+        if (!read_little_endian(payload, payload_offset, output_bias)) {
             return std::unexpected(invalid_file_size_error());
         }
-        weight = static_cast<std::int8_t>(payload[payload_offset++]);
+        network.output_bias = static_cast<std::int32_t>(output_bias);
     }
-    std::uint32_t output_bias = 0;
-    if (!read_little_endian(payload, payload_offset, output_bias)) {
-        return std::unexpected(invalid_file_size_error());
-    }
-    network.output_bias = static_cast<std::int32_t>(output_bias);
     if (payload_offset != payload.size()) {
         return std::unexpected(invalid_file_size_error());
     }
@@ -785,6 +904,12 @@ int NnueWorker::evaluate(const EvaluationFeatures& features, const Color perspec
                          const NnueInferencePath path) {
     if (!weights_ || validate_manifest(weights_->manifest).has_value() ||
         !arrays_match_manifest(*weights_)) {
+        return 0;
+    }
+    if (weights_->manifest.version == kKoiNnueHalfkaKingBucketV1FormatVersion) {
+        // The v4 container and feature encoder land ahead of their pair-product
+        // inference path; v4 evaluation reports a neutral score until the
+        // dedicated scalar/AVX2 implementation replaces this guard.
         return 0;
     }
     const bool use_v2 = weights_->manifest.feature_set ==

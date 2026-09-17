@@ -120,7 +120,64 @@ workers.
 
 ## Phase 2 — feature set and container v4
 
-Pending.
+### Feature set (`src/koi/evaluation_features.hpp/.cpp`)
+
+- Added `kNnueHalfkaKingBucketV1FeatureSet = "halfka-king-bucket-v1"` (21
+  bytes), `kNnueKingBucketCount = 12`,
+  `kNnueHalfkaKingBucketV1FeatureCount = 9216`, `NnueFeatureVectorV4`.
+- `king_bucket()`: file `k % 8`, rank `k / 8`, rank zone (≤2, ≤5, else),
+  mirrored file (`file < 4 ? file + 4 : file`), `zone * 4 + (file - 4)`.
+- `encode_halfka_king_bucket_v1` and `encode_sparse_v4` share
+  `halfka_king_bucket_indices`: own-king bucket base `bucket * 768`, plane
+  `own ? type - 1 : type + 5`, index `base + plane * 64 + perspective_square`.
+  The sparse path (`kNnueSparseFeatureCapacityV4 = 64`) emits sorted
+  increasing indices without materializing the dense 9216 vector; the dense
+  path remains available for parity tests.
+- Golden vectors pinned in `evaluation_features_tests.cpp`: startpos index
+  list (same for white and black to move, 32 active), a midgame FEN list,
+  king-bucket boundaries (a1, a5, e4 white / e5 black), and sparse/dense
+  equality across positions.
+
+### Container v4 (`src/koi/nnue.hpp/.cpp`)
+
+- New constants: `kKoiNnueHalfkaKingBucketV1FormatVersion = 4`,
+  `kKoiNnueOutputBucketCount = 8`, `kKoiNnueMinimumHiddenUnits = 32`,
+  `kKoiNnueMaximumHiddenUnits = 8192`, and the named
+  `kKoiNnueMaximumShift = 20` that replaces the duplicated literal cap for
+  v3 and v4.
+- v4 header: 76 bytes before the strings (magic, version, input 9216, even
+  hidden 32..8192, 8 output buckets, zero reserved word, `hidden_shift`,
+  `output_shift`, two zero reserved bytes, string lengths, payload length,
+  payload SHA-256). Payload: feature-major int16 W1, int32 b1, bucket-major
+  int8 W2 (`bucket * (hidden / 2) + j`), int32 b2; no output-layer arrays.
+- Loader accepts versions 2, 3, and 4. v2/v3 serialization and validation are
+  unchanged apart from the named shift cap; v4 rejects anything but
+  `halfka-king-bucket-v1`, non-zero reserved fields, shifts above 20, and
+  shape mismatches, and falls back to the existing `NnueErrorCode` values.
+- `NnueNetwork::synthetic_v4()` provides the minimal-width (hidden 32)
+  deterministic fixture used by the boundary tests.
+- v4 inference itself is still a guard that returns 0; Phase 3 replaces it
+  with the CReLU pair-product scalar and AVX2 paths.
+
+### Tests
+
+- `evaluation_features_tests.cpp`: 4 new cases (startpos golden vector
+  ignores the turn, midgame golden vector, king bucket tracks the own king,
+  sparse view matches the dense encoding); 10/10 pass.
+- `nnue_boundary_tests.cpp`: 3 new cases (v4 container round trip with a
+  pinned payload SHA-256 and 590,219-byte container, manifest validation
+  rejections, corruption and legacy-version rejection); 14 pass, 1 skip
+  (external container path), 0 fail.
+- Full Release suite after the change: 56/56 passed in 287.76 s (log
+  `ctest-release-phase2.log`); Debug tree built clean and the Debug smoke
+  suite is re-run in Phase 8.
+
+### Deferred within Phase 2
+
+- Behavioral v4 evaluation (pair products, buckets) and SIMD live in Phase 3;
+  `NnueWorker::evaluate` temporarily returns 0 for v4 networks until then.
+  Only synthetic fixtures load v4 at this point; no v4 network is installed
+  or shipped, so the classical default is untouched.
 
 ## Phase 3 — inference and SIMD
 

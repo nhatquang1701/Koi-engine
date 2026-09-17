@@ -121,6 +121,60 @@ struct PawnFileState {
     return result;
 }
 
+// King-bucket index of a perspective own-king square: rank zones of three,
+// three and two ranks, and four mirrored files.  Mirroring the file keeps the
+// buckets symmetric for kings on the e-h files.
+[[nodiscard]] constexpr std::size_t king_bucket(
+    const std::size_t perspective_king_square) noexcept {
+    const std::size_t file = perspective_king_square % 8U;
+    const std::size_t rank = perspective_king_square / 8U;
+    const std::size_t zone = rank <= 2U ? 0U : (rank <= 5U ? 1U : 2U);
+    const std::size_t mirrored_file = file < 4U ? file + 4U : file;
+    return zone * 4U + (mirrored_file - 4U);
+}
+
+// Collects the active halfka-king-bucket-v1 indices for one position into a
+// strictly increasing list capped at the sparse capacity.  When `dense` is
+// non-null the same indices are also marked in the dense vector, so both
+// encoders are guaranteed to agree.
+[[nodiscard]] std::size_t halfka_king_bucket_indices(
+    const EvaluationFeatures& features, std::uint16_t* output, const std::size_t capacity,
+    NnueFeatureVectorV4* dense = nullptr) noexcept {
+    const Color mover = features.position.side_to_move;
+    const std::uint8_t king_square =
+        features.position.king_squares[color_index(mover)].index();
+    const std::size_t bucket = king_square < Square::kInvalid ?
+        king_bucket(perspective_square(king_square, mover)) : 0U;
+    const std::size_t base = bucket * kNnuePieceSquareV1FeatureCount;
+    std::size_t count = 0;
+    for (std::size_t square = 0; square < features.position.board.size(); ++square) {
+        const Piece piece = features.position.board[square];
+        if (piece.empty()) {
+            continue;
+        }
+        const std::size_t color = perspective_color(piece.color, mover);
+        const std::size_t type = static_cast<std::size_t>(piece.type);
+        const std::size_t plane = color == kWhite ? type - 1U : type + 5U;
+        const std::size_t index = base + plane * 64U + perspective_square(square, mover);
+        if (dense != nullptr) {
+            (*dense)[index] = 1;
+        }
+        if (count < capacity) {
+            output[count++] = static_cast<std::uint16_t>(index);
+        }
+    }
+    std::sort(output, output + count);
+    return count;
+}
+
+[[nodiscard]] NnueFeatureVectorV4 encode_halfka_king_bucket(
+    const EvaluationFeatures& features) noexcept {
+    NnueFeatureVectorV4 encoded{};
+    std::array<std::uint16_t, kNnueSparseFeatureCapacityV4> scratch{};
+    (void)halfka_king_bucket_indices(features, scratch.data(), scratch.size(), &encoded);
+    return encoded;
+}
+
 } // namespace
 
 EvaluationFeatures EvaluationFeatureExtractor::extract(const GameState& state) noexcept {
@@ -179,6 +233,19 @@ NnueSparseFeatures EvaluationFeatureExtractor::encode_sparse_v2(
         }
         sparse.indices[sparse.count++] = static_cast<std::uint16_t>(index);
     }
+    return sparse;
+}
+
+NnueFeatureVectorV4 EvaluationFeatureExtractor::encode_halfka_king_bucket_v1(
+    const EvaluationFeatures& features) noexcept {
+    return encode_halfka_king_bucket(features);
+}
+
+NnueSparseFeaturesV4 EvaluationFeatureExtractor::encode_sparse_v4(
+    const EvaluationFeatures& features) noexcept {
+    NnueSparseFeaturesV4 sparse;
+    sparse.count = halfka_king_bucket_indices(
+        features, sparse.indices.data(), sparse.indices.size());
     return sparse;
 }
 
