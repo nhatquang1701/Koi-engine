@@ -15,6 +15,7 @@
 #include <span>
 #include <utility>
 
+#include "koi/detail/attack_tables.hpp"
 #include "koi/detail/compatibility_mirror.hpp"
 #include "koi/detail/feature_state.hpp"
 #include "koi/position.hpp"
@@ -1164,32 +1165,63 @@ bool native_move_gives_check(const Position& position, const Move& move) noexcep
         occupied |= std::uint64_t{1} << rook_destination;
     }
 
-    NativeFeatureBitboards empty_pieces{};
     const PieceType moved_type = move.promotion() == Promotion::none ? moving_piece.type :
         promotion_piece_type(move.promotion());
-    if ((native_feature_attacks(empty_pieces, occupied, destination, moved_type, moving_color) &
-         enemy_king) != 0) {
+
+    // Direct check: the moving piece attacks the king from its destination.
+    std::uint64_t direct_attacks = 0;
+    switch (moved_type) {
+        case PieceType::pawn:
+            direct_attacks = detail::pawn_attacks(destination, moving_color == Color::white);
+            break;
+        case PieceType::knight:
+            direct_attacks = detail::knight_attacks(destination);
+            break;
+        case PieceType::king:
+            direct_attacks = detail::king_attacks(destination);
+            break;
+        case PieceType::bishop:
+            direct_attacks = detail::bishop_attacks(destination, occupied);
+            break;
+        case PieceType::rook:
+            direct_attacks = detail::rook_attacks(destination, occupied);
+            break;
+        case PieceType::queen:
+            direct_attacks = detail::queen_attacks(destination, occupied);
+            break;
+        default:
+            break;
+    }
+    if ((direct_attacks & enemy_king) != 0) {
         return true;
     }
 
-    for (const PieceType type : {PieceType::pawn, PieceType::knight, PieceType::bishop,
-                                 PieceType::rook, PieceType::queen, PieceType::king}) {
-        std::uint64_t remaining = position.piece_bitboard(type, moving_color);
-        while (remaining != 0) {
-            const int square = static_cast<int>(std::countr_zero(remaining));
-            remaining &= remaining - 1;
-            if (square == source || (castling && square == rook_source)) {
-                continue;
-            }
-            if ((native_feature_attacks(empty_pieces, occupied, square, type, moving_color) &
-                 enemy_king) != 0) {
-                return true;
-            }
-        }
+    // Discovered check: an unmoved friendly slider now sees the king.  The
+    // rays are traced from the enemy king through the post-move occupancy, so
+    // any line opened by the move (source square, en-passant capture square,
+    // castling rook square) is handled in O(1) without rescanning the board.
+    // The vacated squares are masked out of the friendly slider bitboards so
+    // the moved piece is never counted at its old square.
+    const int king_square = static_cast<int>(std::countr_zero(enemy_king));
+    std::uint64_t friendly_rook_queen = position.piece_bitboard(PieceType::rook, moving_color) |
+        position.piece_bitboard(PieceType::queen, moving_color);
+    std::uint64_t friendly_bishop_queen = position.piece_bitboard(PieceType::bishop, moving_color) |
+        position.piece_bitboard(PieceType::queen, moving_color);
+    friendly_rook_queen &= ~source_bit;
+    friendly_bishop_queen &= ~source_bit;
+    if (castling) {
+        friendly_rook_queen &= ~(std::uint64_t{1} << rook_source);
+        friendly_bishop_queen &= ~(std::uint64_t{1} << rook_source);
+    }
+    if ((detail::rook_attacks(king_square, occupied) & friendly_rook_queen) != 0) {
+        return true;
+    }
+    if ((detail::bishop_attacks(king_square, occupied) & friendly_bishop_queen) != 0) {
+        return true;
     }
 
-    if (castling && (native_feature_attacks(empty_pieces, occupied, rook_destination,
-                                            PieceType::rook, moving_color) & enemy_king) != 0) {
+    if (castling &&
+        (detail::rook_attacks(rook_destination, occupied) & enemy_king) != 0) {
         return true;
     }
     return false;
