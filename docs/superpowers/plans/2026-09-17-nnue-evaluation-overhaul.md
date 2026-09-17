@@ -97,7 +97,7 @@ UCI handshake byte-identical, and v1/v2/v3 containers loadable.
   real generated parameter header. Tuned values are adopted only through
   the tactical/A-B/adoption gates, otherwise reverted with evidence.
   Commit.
-- [ ] **Phase 8 — Verification and documentation.** Run
+- [x] **Phase 8 — Verification and documentation.** Run
   `tools/build/release_verify.ps1` end to end, resolve the documented
   harness gap with evidence, update README/tests README/tools README and
   the verification record, and confirm all index rows. Commit.

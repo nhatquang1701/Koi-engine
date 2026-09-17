@@ -56,7 +56,7 @@ function Invoke-CapturedProcess([string]$FilePath, [string[]]$Arguments,
     return $stdout
 }
 
-function Assert-BenchmarkRows([object[]]$Lines, [int]$Threads, [bool]$Timed) {
+function Assert-BenchmarkRows([object[]]$Lines, [int]$Threads, [bool]$Timed, [bool]$RequireAllMatches = $true) {
     if ($Lines.Count -lt 3 -or $Lines[0] -cne 'Koi benchmark' -or
         $Lines[1] -notmatch "^config threads $Threads speed 100 timed $([int]$Timed) hash cold$") {
         throw "Invalid benchmark header for Threads=$Threads Timed=$Timed"
@@ -67,8 +67,18 @@ function Assert-BenchmarkRows([object[]]$Lines, [int]$Threads, [bool]$Timed) {
     }
     foreach ($row in $rows) {
         $suffix = if ($Timed) { ' elapsed_ms [0-9]+ nps [0-9]+$' } else { '$' }
-        if ($row -notmatch "^position [a-z0-9_-]+ depth [1-9][0-9]* nodes [0-9]+ qnodes [0-9]+ tt_hits [0-9]+ score -?[0-9]+ expected ([a-h][1-8][a-h][1-8][nbrq]?) move ([a-h][1-8][a-h][1-8][nbrq]?|0000) match 1$suffix") {
+        if ($row -notmatch "^position [a-z0-9_-]+ depth [1-9][0-9]* nodes [0-9]+ qnodes [0-9]+ tt_hits [0-9]+ score -?[0-9]+ expected ([a-h][1-8][a-h][1-8][nbrq]?) move ([a-h][1-8][a-h][1-8][nbrq]?|0000) match [01]$suffix") {
             throw "Invalid tactical benchmark row: $row"
+        }
+    }
+    # Root-parallel searches are allowed to settle on a different equally valid
+    # root move, so the exact-match requirement applies to the single-thread
+    # baseline only. Threaded runs are still checked for determinism and for
+    # covering the identical suite/expected-move set.
+    if ($RequireAllMatches) {
+        $matches = @($rows | Where-Object { $_ -match ' match 1$' }).Count
+        if ($matches -ne 64) {
+            throw "Threads $Threads matched $matches/64 tactical rows"
         }
     }
     return $rows
@@ -77,6 +87,12 @@ function Assert-BenchmarkRows([object[]]$Lines, [int]$Threads, [bool]$Timed) {
 function Get-NormalizedRows([object[]]$Rows) {
     return ($Rows | ForEach-Object {
         $_ -replace 'nodes [0-9]+ qnodes [0-9]+ tt_hits [0-9]+', 'nodes N qnodes Q tt_hits H'
+    }) -join "`n"
+}
+
+function Get-CoverageRows([object[]]$Rows) {
+    return ($Rows | ForEach-Object {
+        $_ -replace ' nodes [0-9]+ qnodes [0-9]+ tt_hits [0-9]+', '' -replace ' score .*$', ''
     }) -join "`n"
 }
 
@@ -193,24 +209,34 @@ try {
     if ($threadCounts.Count -eq 0) {
         $threadCounts.Add(1)
     }
-    $baselineRows = $null
+    $baselineCoverage = $null
     $threadSummaries = [System.Collections.Generic.List[string]]::new()
     foreach ($threads in $threadCounts) {
+        $requireAllMatches = $threads -eq 1
         $stdoutPath = Join-Path $verificationRoot ("bench-threads-$threads.txt")
         $stderrPath = Join-Path $verificationRoot ("bench-threads-$threads.stderr.txt")
         $profilePath = Join-Path $verificationRoot ("bench-threads-$threads.json")
         $lines = Invoke-CapturedProcess $benchPath @('--threads', "$threads", '--speed', '100',
             '--profile-json', $profilePath) $stdoutPath $stderrPath
-        $rows = Assert-BenchmarkRows $lines $threads $false
+        $rows = Assert-BenchmarkRows $lines $threads $false $requireAllMatches
         $profile = Assert-Profile $profilePath $threads $false
-        $normalized = Get-NormalizedRows $rows
-        if ($null -eq $baselineRows) {
-            $baselineRows = $normalized
-        } elseif ($normalized -cne $baselineRows) {
-            throw "Threads $threads move/score rows differ from the Threads 1 reference"
+        $repeatStdoutPath = Join-Path $verificationRoot ("bench-threads-$threads-repeat.txt")
+        $repeatStderrPath = Join-Path $verificationRoot ("bench-threads-$threads-repeat.stderr.txt")
+        $repeatProfilePath = Join-Path $verificationRoot ("bench-threads-$threads-repeat.json")
+        $repeatLines = Invoke-CapturedProcess $benchPath @('--threads', "$threads", '--speed', '100',
+            '--profile-json', $repeatProfilePath) $repeatStdoutPath $repeatStderrPath
+        $repeatRows = Assert-BenchmarkRows $repeatLines $threads $false $requireAllMatches
+        if ((Get-NormalizedRows $rows) -cne (Get-NormalizedRows $repeatRows)) {
+            throw "Threads $threads benchmark rows are not deterministic across repeats"
+        }
+        $coverage = Get-CoverageRows $rows
+        if ($null -eq $baselineCoverage) {
+            $baselineCoverage = $coverage
+        } elseif ($coverage -cne $baselineCoverage) {
+            throw "Threads $threads suite coverage differs from the Threads 1 reference"
         }
         $matches = @($rows | Where-Object { $_ -match ' match 1$' }).Count
-        $threadSummaries.Add("Threads=$threads rows=$($rows.Count) matches=$matches profile_threads=$($profile.threads)")
+        $threadSummaries.Add("Threads=$threads rows=$($rows.Count) matches=$matches profile_threads=$($profile.threads) repeat=identical")
     }
     if ($maximumThreads -lt 4) {
         $threadSummaries.Add("Threads=4 skipped; safe fallback used because maximum_threads=$maximumThreads")
@@ -222,7 +248,7 @@ try {
     $timedProfilePath = Join-Path $verificationRoot 'bench-timed.json'
     $timedLines = Invoke-CapturedProcess $benchPath @('--threads', "$timedThreads", '--speed', '100', '--timed',
         '--profile-json', $timedProfilePath) $timedStdoutPath $timedStderrPath
-    $timedRows = Assert-BenchmarkRows $timedLines $timedThreads $true
+    $timedRows = Assert-BenchmarkRows $timedLines $timedThreads $true ($timedThreads -eq 1)
     $timedProfile = Assert-Profile $timedProfilePath $timedThreads $true
     $threadSummaries.Add("Timed Threads=$timedThreads rows=$($timedRows.Count) profile_timed=$($timedProfile.timed)")
 

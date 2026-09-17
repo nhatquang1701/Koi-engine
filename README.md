@@ -449,9 +449,10 @@ continues to evaluate standard FIDE chess.
 
 ### Test inventory and known gaps
 
-The full local configuration registers 54 CTest tests (python-chess installed,
-`KOI_BUILD_SHADOW_DIFF=ON`, cutechess-cli present); the count drops when those
-optional pieces are absent. `koi_search_tests`, the heaviest suite, is
+The default local configuration registers 57 CTest tests (python-chess
+installed, `KOI_BUILD_SHADOW_DIFF=OFF`); enabling the shadow-diff oracle adds
+`koi_shadow_diff_tests`, and a local `cutechess-cli.exe` adds the optional
+stability smoke, so the count varies with those optional pieces. `koi_search_tests`, the heaviest suite, is
 registered as four shards, every test carries labels (`unit`, `integration`,
 `process`, `python`, `heavy`, and focused sub-labels), and the whole suite runs
 in parallel (`ctest -j`; `tools/test/run_tests.ps1` builds, runs it with JUnit
@@ -516,11 +517,24 @@ lookups. A startpos `go depth 6` probe still visits exactly 406,067 nodes,
 while single-thread throughput on that probe rose from 58,697 to 86,989 nps.
 The same program added the Stockfish-labeled NNUE pipeline described above:
 1,200,002 depth-10 labels produced a 960-256-32-1 network that round-trips
-through the version 3 container, passes the 64/64 tactical gate when loaded,
-and runs at about 65k nps against about 87k for the classical evaluator. It
-lost the equal-node A/B match that finished, so the classical evaluator
-remains the default and NNUE stays opt-in. Full Release CTest stayed green.
-No Elo or CPL claim is made.
+through the version 3 container and runs at about 65k nps against about 87k
+for the classical evaluator. It lost the equal-node A/B match that finished,
+so the classical evaluator remains the default and NNUE stays opt-in.
+
+The 2026-09-17/18 NNUE and evaluation overhaul replaced that model with the
+`halfka-king-bucket-v1` feature set (9,216 inputs, 12 king buckets, CReLU pair
+products, and eight piece-count output buckets), the version 4 container,
+dual-perspective incremental accumulators, and scalar plus AVX2 inference.
+Trained on 2,249,171 depth-10 labels with the new `train_nnue_koi.py` trainer,
+the first v4 candidate reached a quantized round-trip validation MAE of about
+142 cp, scored 61/64 on the 64-position tactical suite, and ran at about 76k
+nps against about 144k for the classical evaluator. It lost the equal-node
+color-balanced A/B to classical and drew every game against the earlier v3
+network, so the classical evaluator remains the default and NNUE stays
+opt-in. The same overhaul deduplicated the classical evaluator's material and
+attack logic without changing its fixed-depth benchmark rows, and added a
+classical term tuner whose first candidate was not adopted. Version 2 and
+version 3 containers still load. No Elo or CPL claim is made.
 
 ## UCI smoke test
 

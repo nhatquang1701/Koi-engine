@@ -11,6 +11,7 @@ durable navigation or provenance documentation tracked.
 | `manifests/` | hashes, provenance, and migration inventories |
 | `packages/` | locally built release packages |
 | `stability/` | Cutechess runs and incident bundles |
+| `training/` | corpora, encoded datasets, trained networks, and studio run directories |
 | `verification/` | release, performance, and compatibility reports |
 
 Tools create these directories automatically. Do not place build trees or

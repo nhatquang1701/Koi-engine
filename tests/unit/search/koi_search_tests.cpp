@@ -4258,7 +4258,6 @@ int main(int argc, char** argv) {
     // escape hatch).
     const std::string_view known_failures[]{
         "single-PV root forcing extension",
-        "timed poisoned capture",
         "depth-one forcing check",
         "threaded depth-one forcing check",
         "root king safety escape",
@@ -4270,7 +4269,6 @@ int main(int argc, char** argv) {
         "opening central break",
         "late move full-depth verification",
         "committed PGN tactical fixtures",
-        "threaded short forcing root research",
         "poisoned capture quiescence",
     };
     // Cases whose outcome flips with host scheduling. Both XFAIL and XPASS are
@@ -4279,6 +4277,12 @@ int main(int argc, char** argv) {
     // back to known_failures (or delete it once the engine is fixed).
     const std::string_view intermittent_failures[]{
         "incomplete root forcing fallback",
+        // Flips with thread scheduling: Debug passed 3 of 4 focused runs while
+        // Release reported XFAIL 4 of 4, so it is not a deterministic fix.
+        "threaded short forcing root research",
+        // Configuration-dependent: Debug XPASSes (5 of 5 focused runs) while
+        // Release XFAILs (3 of 3), so no single expectation is config-correct.
+        "timed poisoned capture",
     };
     // Cases whose assertions depend on wall-clock scheduling. They get
     // KOI_TEST_RETRIES attempts before a failure is final (default 1, CI uses

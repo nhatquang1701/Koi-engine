@@ -45,8 +45,8 @@ ctest --test-dir build\release -N
 ctest --test-dir build\release -C Release -R koi_strength_tests --output-on-failure
 ```
 
-The local full configuration registers **54 tests** (Release, python-chess
-installed, `KOI_BUILD_SHADOW_DIFF=ON`, cutechess-cli present). The count varies
+The default Release configuration registers **57 tests** (python-chess
+installed, `KOI_BUILD_SHADOW_DIFF=OFF`). The count varies
 with optional dependencies: `elo_oracle_python` requires python-chess,
 `koi_shadow_diff_tests` requires `-DKOI_BUILD_SHADOW_DIFF=ON`, and
 `cutechess_stability_smoke` is only registered when `cutechess-cli.exe` is
