@@ -257,10 +257,12 @@ Load a trained network with the UCI `EvalFile` option, or place `koi.nnue` besid
 the executable (or point the `KOI_NNUE_PATH` environment variable at it) to select it
 at startup. A missing or rejected file falls back to the classical evaluator and
 writes one explanatory line to stderr. Trained networks are local artifacts and are
-not committed. Koi's own trained net passes the 64/64 tactical gate and the loader
-boundary tests, runs at about 65k nodes/s against about 87k for the classical
-evaluator on the same single-thread probe, and lost the equal-node A/B match
-that finished, so the classical evaluator remains the default.
+not committed. On the local single-thread probe the version 4 `halfka-king-bucket-v1`
+network runs at about 76k nodes/s against about 144k for the classical evaluator, it
+matches 61 of the 64 positions in the tactical gate (the classical evaluator stays at
+64/64), and it lost the color-balanced equal-node A/B against the classical evaluator
+(0 wins, 10 draws, 10 losses); the version 4 versus version 3 net match drew all 20
+games. The classical evaluator therefore remains the default and NNUE stays opt-in.
 
 ### Training a network with the NNUE Studio
 
@@ -274,6 +276,8 @@ pwsh -NoProfile -File .\tools\nnue\train.ps1 -Preset thorough -Detach   # backgr
 python .\tools\nnue\koi_nnue_studio.py --list-backends
 python .\tools\nnue\koi_nnue_studio.py --selftest --rows 2000 --epochs 1
 pwsh -NoProfile -File .\tools\nnue\ab_match.ps1 -NnueNet .\artifacts\training\koi.nnue -Games 20
+pwsh -NoProfile -File .\tools\nnue\net_match.ps1 -NnueNet .\artifacts\training\koi-v4-1024.nnue `
+  -OpponentNet .\artifacts\training\koi-sf-v1.nnue -Games 20
 ```
 
 Every run keeps its configuration, command line, log, progress history and
@@ -285,7 +289,9 @@ comparable and resumable. Training uses the CPU PyTorch backend: the default
 scaffold and reports why it is not available yet. After a run completes the
 studio can validate it with the 64-position `koi-bench --nnue` gate and with a
 node-limited A/B match against the classical evaluator
-(`tools/nnue/ab_match.ps1`, schema `koi-nnue-studio-ab-match-v1`), then offer to
+(`tools/nnue/ab_match.ps1`, schema `koi-nnue-studio-ab-match-v1`) or against an
+earlier network (`tools/nnue/net_match.ps1`, schema `koi-nnue-net-match-v1`), then
+offer to
 install the network as `koi.nnue` beside the engine, backing up any previous
 file. Validation output is a local report, not an Elo claim or a CI threshold.
 

@@ -45,6 +45,10 @@ param(
     # Keys are sent sorted so transcripts stay reproducible.
     [hashtable]$KoiOptions = @{},
 
+    # Additional opponent setoption lines, e.g. @{ EvalFile = 'C:\nets\koi.nnue' }.
+    # Keys are sent sorted so transcripts stay reproducible.
+    [hashtable]$OpponentOptions = @{},
+
     [ValidateRange(1, 64)]
     [int]$Threads = 1,
 
@@ -309,6 +313,13 @@ function Initialize-UciEngine($Engine) {
             'setoption name UCI_LimitStrength value true',
             "setoption name UCI_Elo value $OpponentEloAnchor"
         )) {
+            Send-UciLine $Engine $option
+            $Engine.SentOptions.Add($option)
+        }
+    }
+    if ($Engine.Label -ceq 'Opponent') {
+        foreach ($name in @($OpponentOptions.Keys | Sort-Object)) {
+            $option = "setoption name $name value $($OpponentOptions[$name])"
             Send-UciLine $Engine $option
             $Engine.SentOptions.Add($option)
         }

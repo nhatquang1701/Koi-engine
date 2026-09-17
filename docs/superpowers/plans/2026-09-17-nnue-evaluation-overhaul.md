@@ -85,7 +85,7 @@ UCI handshake byte-identical, and v1/v2/v3 containers loadable.
   quantization with shift search, v4 export, metadata schema v2,
   determinism tests), legacy v2/v3 training kept green, studio backend and
   presets wired to the new trainer. Commit.
-- [ ] **Phase 6 — Training campaign and strength gates.** Train candidates
+- [x] **Phase 6 — Training campaign and strength gates.** Train candidates
   on the existing corpus first and the expanded corpus when ready; gates:
   64-position match count, equal-node color-balanced A/B versus classical
   and versus `koi-sf-v1`, NPS, and fixed-depth classical non-regression.

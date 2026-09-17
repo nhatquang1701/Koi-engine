@@ -399,7 +399,73 @@ applies (no usable CUDA path on this host).
 
 ## Phase 6 — training campaign and strength gates
 
-Pending.
+### Corpus and candidates
+
+The Phase 1 expansion finished before the campaign: `artifacts/training/labels.txt`
+holds 2,249,171 labeled rows and `positions.txt` 2,341,934 positions. Two dataset
+snapshots were encoded with `koi_dataset.py`:
+
+- `artifacts/training/koi-dataset.bin` — 2,172,420 records, 92,185,963 bytes
+  (captured while the expansion was still labeling).
+- `artifacts/training/koi-dataset-full.bin` — 2,249,171 records, 95,181,393 bytes
+  (after the expansion finished).
+
+Candidate A (`artifacts/training/koi-v4-1024.nnue`) is the recorded deliverable:
+10 epochs, hidden 1024, batch 8192, learning rate 0.002, AdamW weight decay 1e-4,
+6 threads, seeded 5% validation split, trained on `koi-dataset.bin`. Float
+validation MAE 141.9 cp; the quantization grid selected `s1=7 k3=14` with
+round-trip validation MAE 142.1 cp; container 18,882,699 bytes. Log
+`artifacts/training/train-v4-20260917-231547.out.log`.
+
+Candidate B (`artifacts/training/koi-v4-1024-full.nnue`) used the same settings on
+the full snapshot: float 143.3 cp, selected `s1=7 k3=14` at 144.7 cp
+(`train-v4-full-20260917-233831.out.log`). Candidate A stays the deliverable because
+it has the lower round-trip error.
+
+The shift grid reproduces the v2/v3 lesson at the new architecture: `s1=6` rows
+land at 256–445 cp and `s1=8` at 353–419 cp, while `s1=7` with `k3=12`/`k3=14`
+reaches 142–145 cp. The trainer reports W1/W2 saturation in the metadata.
+
+### Gates (candidate A unless noted; all local reports, no Elo claim)
+
+| Gate | Result | Evidence |
+| --- | --- | --- |
+| Classical fixed-depth non-regression | 64 rows byte-identical to the Phase 0 baseline | `bench-classical-phase6.log` |
+| Tactical 64-position suite with the net loaded | 61 match / 3 mismatch (`check_05`, `fork_04`, `pin_03`); classical stays 64/64 | `bench-v4-1024-hard.log` |
+| Candidate B tactical suite | 59 match / 5 mismatch | `bench-v4-1024-full-hard.log` |
+| Timed single-thread throughput | classical 143,948 nps; v4 76,523 nps (6,741 nodes + 481,627 qnodes in 6,382 ms) | `bench-classical-timed-phase6.log`, `bench-v4-1024-timed-clean.log` |
+| Color-balanced equal-node A/B vs classical (20 games, 20,000 nodes, 1 thread, hash 64, own book off) | +0 =10 -10, 25%, `classical-stronger` | `ab-v4-classical.json` |
+| Color-balanced equal-node A/B vs `koi-sf-v1` (version 3) | +0 =20 -0, 50%, `inconclusive` (all draws) | `net-v4-vs-v3.json` |
+
+### Harness
+
+- `tools/stability/uci_match.ps1` gained an `-OpponentOptions` parameter that sends
+  additional `setoption` lines to the opponent only. The net-match leg reports show
+  the candidate received `EvalFile` through `-KoiOptions` and the reference through
+  `-OpponentOptions`.
+- New `tools/nnue/net_match.ps1` (schema `koi-nnue-net-match-v1`) runs two color legs
+  at an equal node limit and reports a candidate/reference verdict; `ab_match.ps1`
+  remains the classical comparison.
+- `README.md` now points the pipeline and studio sections at the v4 trainer and
+  records the measured gate numbers; the stale claim that the trained net passes the
+  64/64 tactical gate was corrected.
+
+### Verification
+
+- Release full CTest after the harness change: 57/57 in 227.16 s
+  (`ctest-release-phase6.log`).
+- Debug smoke (`-LE heavy`): 49/49 in 72.53 s (`ctest-debug-phase6.log`).
+
+### Interpretation and deferred within Phase 6
+
+The version 4 architecture, incremental accumulators, container and trainer run end
+to end from `FEN;cp;best_move` to an installable network. The network is still
+weaker than the classical evaluator at equal nodes, so the classical evaluator stays
+the default and NNUE stays opt-in. Deferred: campaigns longer than 10 epochs or
+larger than the current corpus, king-bucket/threat feature variants, hidden sizes
+other than 1024 (for example 512 or 1536 speed/strength trade-offs), GPU training,
+and an Elo-scale campaign with external anchors. No further training was run after
+candidate B; the shortfall is recorded rather than tuned around.
 
 ## Phase 7 — classical evaluation modernization
 
