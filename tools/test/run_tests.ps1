@@ -6,8 +6,8 @@
 # Examples:
 #   .\tools\test\run_tests.ps1                                  # full Release suite, parallel
 #   .\tools\test\run_tests.ps1 -Label unit                      # fast unit subset
-#   .\tools\test\run_tests.ps1 -Label timing -Repeats 3         # repeated timing subset
 #   .\tools\test\run_tests.ps1 -Filter koi_search_tests -NoBuild
+#   .\tools\test\run_tests.ps1 -RepeatUntilPass 1               # disable transient retries
 [CmdletBinding()]
 param(
     [string]$BuildDirectory = "build/release",
@@ -16,6 +16,12 @@ param(
     [string[]]$ExcludeLabel = @(),
     [string]$Filter = "",
     [int]$Parallel = 0,
+    # CTest retries a failed test until it passes this many attempts.  One
+    # retry guards against transient OS/runtime crashes in the process tests
+    # (for example the observed pwsh 7 TaskbarJumpList internal CLR error)
+    # while a genuine assertion failure still fails every attempt.  Set 1 to
+    # disable retries.
+    [int]$RepeatUntilPass = 2,
     [string]$OutputDirectory = "",
     [switch]$NoBuild,
     [switch]$NoJUnit,
@@ -89,6 +95,9 @@ if (-not $OutputDirectory) {
 New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
 
 $arguments = @("--test-dir", $BuildDirectory, "-C", $Configuration, "--output-on-failure", "-j", "$Parallel")
+if ($RepeatUntilPass -gt 1) {
+    $arguments += @("--repeat", "until-pass:$RepeatUntilPass")
+}
 if ($Filter) {
     $arguments += @("-R", $Filter)
 }

@@ -326,41 +326,42 @@ private:
     mutable bool released_ = false;
 };
 
+// The handshake contract lives in tests/data/uci/handshake.txt so the unit
+// test and the PowerShell process test assert the same bytes.  {max_threads}
+// is host dependent and {empty} keeps the trailing space of an empty string
+// default visible instead of relying on editors to preserve it.
+std::string expected_handshake() {
+    std::ifstream input(koi::test::fixture_path("uci/handshake.txt"));
+    require(input.good(), "the handshake fixture must exist");
+    std::string text((std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>());
+
+    std::string normalized;
+    normalized.reserve(text.size());
+    for (const char character : text) {
+        if (character != '\r') {
+            normalized.push_back(character);
+        }
+    }
+
+    const auto replace_all = [&normalized](std::string_view needle, std::string_view value) {
+        std::size_t position = normalized.find(needle);
+        while (position != std::string::npos) {
+            normalized.replace(position, needle.size(), value);
+            position = normalized.find(needle, position + value.size());
+        }
+    };
+    replace_all("{max_threads}", std::to_string(maximum_threads()));
+    replace_all("{empty}", "");
+    return normalized;
+}
+
 void test_uci_handshake_has_identity_and_supported_options_in_order() {
     const ControllerResult result = run_controller("uci\nquit\n");
-    const std::string expected =
-        "id name Koi Engine\n"
-        "id author Koi Engine contributors\n"
-        "option name RandomSeed type spin default 0 min 0 max 2147483647\n"
-        "option name Hash type spin default 512 min 1 max 4096\n"
-        "option name Threads type spin default 1 min 1 max " + std::to_string(maximum_threads()) + "\n"
-        "option name Speed type spin default 100 min 1 max 100\n"
-        "option name UCI_AnalyseMode type check default false\n"
-        "option name MultiPV type spin default 1 min 1 max 16\n"
-        "option name Ponder type check default false\n"
-        "option name OwnBook type check default true\n"
-        "option name BookFile type string default book.bin\n"
-        "option name BookDepth type spin default 16 min 0 max 40\n"
-        "option name BookRandom type check default false\n"
-        "option name BookSafety type check default true\n"
-        "option name BookSafetyDepth type spin default 2 min 0 max 3\n"
-        "option name Clear Hash type button\n"
-        "option name UCI_ShowWDL type check default false\n"
-                    "option name Move Overhead type spin default 30 min 0 max 5000\n"
-        "option name Slow Mover type spin default 100 min 10 max 1000\n"
-        "option name UCI_LimitStrength type check default false\n"
-        "option name UCI_Elo type spin default 1320 min 1320 max 3190\n"
-        "option name StrengthMode type check default false\n"
-        "option name SyzygyPath type string default \n"
-        "option name SyzygyProbeDepth type spin default 1 min 1 max 100\n"
-        "option name SyzygyProbeLimit type spin default 5 min 0 max 7\n"
-        "option name Syzygy50MoveRule type check default true\n"
-        "option name EvalFile type string default \n"
-        "uciok\n";
+    const std::string expected = expected_handshake();
 
     require(result.exit_code == 0, "quit must cause a normal shutdown");
     require(result.output == expected,
-            "uci response must advertise the identity, hash, thread, speed, and clear-hash options");
+            "uci response must match tests/data/uci/handshake.txt");
 }
 
 void test_syzygy_options_accept_valid_values_and_ignore_invalid_values() {

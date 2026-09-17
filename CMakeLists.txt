@@ -320,6 +320,38 @@ target_link_libraries(static_exchange_tests PRIVATE koi_core)
 
 add_test(NAME static_exchange_tests COMMAND static_exchange_tests)
 
+add_executable(transposition_table_tests
+    tests/unit/runtime/transposition_table_tests.cpp
+)
+
+target_link_libraries(transposition_table_tests PRIVATE koi_core)
+
+add_test(NAME transposition_table_tests COMMAND transposition_table_tests)
+
+add_executable(search_service_tests
+    tests/unit/runtime/search_service_tests.cpp
+)
+
+target_link_libraries(search_service_tests PRIVATE koi_core)
+
+add_test(NAME search_service_tests COMMAND search_service_tests)
+
+add_executable(classical_evaluator_tests
+    tests/unit/evaluation/classical_evaluator_tests.cpp
+)
+
+target_link_libraries(classical_evaluator_tests PRIVATE koi_core)
+
+add_test(NAME classical_evaluator_tests COMMAND classical_evaluator_tests)
+
+add_executable(evaluation_features_tests
+    tests/unit/evaluation/evaluation_features_tests.cpp
+)
+
+target_link_libraries(evaluation_features_tests PRIVATE koi_core)
+
+add_test(NAME evaluation_features_tests COMMAND evaluation_features_tests)
+
 add_executable(time_manager_tests
     tests/unit/search/time_manager_tests.cpp
 )
@@ -408,6 +440,10 @@ set(KOI_TEST_SUPPORT_TARGETS
     search_policy_tests
     search_runtime_tests
     static_exchange_tests
+    transposition_table_tests
+    search_service_tests
+    classical_evaluator_tests
+    evaluation_features_tests
     time_manager_tests
     koi_strength_tests
     perft_tests
@@ -622,13 +658,19 @@ endif()
 # `ctest -j` run, and RUN_SERIAL protects the one test that writes into the
 # build tree next to the engine binary.
 set_tests_properties(
-    koi_core_tests evaluation_boundary_tests evaluation_architecture_tests
-    nnue_boundary_tests koi_cpu_features_tests koi_module_tests syzygy_tablebase_tests
+    koi_core_tests koi_cpu_features_tests koi_module_tests syzygy_tablebase_tests
     koi_rules_tests native_rule_state_tests opening_book_tests completion_gate_tests
     search_ordering_tests search_architecture_tests search_policy_tests
     search_runtime_tests static_exchange_tests time_manager_tests perft_tests
     PROPERTIES LABELS "unit"
 )
+set_tests_properties(
+    evaluation_boundary_tests evaluation_architecture_tests nnue_boundary_tests
+    classical_evaluator_tests evaluation_features_tests
+    PROPERTIES LABELS "unit;evaluation"
+)
+set_tests_properties(transposition_table_tests PROPERTIES LABELS "unit;runtime")
+set_tests_properties(search_service_tests PROPERTIES LABELS "unit;search")
 set_tests_properties(uci_controller_tests PROPERTIES LABELS "unit;runtime")
 set_tests_properties(
     koi_search_tests_1of4 koi_search_tests_2of4 koi_search_tests_3of4 koi_search_tests_4of4
