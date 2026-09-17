@@ -181,7 +181,78 @@ workers.
 
 ## Phase 3 — inference and SIMD
 
-Pending.
+### Scalar reference (`src/koi/nnue.cpp`)
+
+- `piece_count_bucket()` selects the output head from the non-empty piece
+  count: `min(7, (32 - pieces) / 4)`; both kings count toward the total.
+- `finish_inference_v4_scalar()` reuses the sparse first-layer accumulation
+  (int64 sum clamped to int32), clips the activations to `[0, 127]`, forms
+  `p[j] = a[j] * a[j + hidden/2]` in int16 (values are at most 127, so the
+  product is exact), accumulates `b2[bucket] + Σ W2[bucket][j] * p[j]` in
+  int64, applies the arithmetic `output_shift`, and clamps the centipawn
+  result to `int`.
+- `NnueWorker` sizes `bottleneck_values` to `hidden/2` for v4 (the pair
+  products) and `NnueWorker::evaluate` now encodes the sparse v4 inputs,
+  selects the piece-count bucket, and returns the score relative to the
+  mover; the temporary v4 guard that returned 0 is gone.
+
+### AVX2 paths
+
+- The first layer reuses the existing sparse AVX2 accumulation (16 hidden
+  units per iteration) with its int32 overflow guard, which falls back to the
+  scalar sum when a bias cannot absorb the worst-case weight delta.
+- `compute_pair_products_avx2()` multiplies 16 activation pairs per iteration
+  with `_mm256_mullo_epi16` and handles the remainder scalar.
+- `bucket_dot_avx2()` uses `_mm256_cvtepi8_epi16` + `_mm256_madd_epi16` into
+  int32 lanes; when `pair_count * 127 * 16129` cannot fit an int32 it falls
+  back to the int64 scalar dot, so the vector path is always equivalent to
+  the reference.
+- AVX2 remains Release-only (`KOI_NNUE_COMPILED_AVX2` plus the runtime CPU
+  check); the scalar path is the correctness boundary, and Debug exercises
+  the same golden vectors through the scalar path.
+
+### Tests (`tests/unit/evaluation/nnue_boundary_tests.cpp`)
+
+- `NNUE v4 golden score`: a hand-crafted hidden-32 network (10 startpos
+  inputs at hidden 0 → activation 100, 7 inputs at hidden 16 → 127, every
+  output head weight 127) scores exactly 49 with `p[0] = 12700`; the AVX2
+  path must reproduce it.
+- `NNUE v4 reference`: four positions (startpos, the golden midgame FEN, a
+  three-piece position, bare kings) match an independent int64 reference
+  implementation written in the test; the opposite perspective is the exact
+  negation.
+- `NNUE v4 path parity`: a deterministic wide-weight network
+  (`output_shift = 12`) matches the reference on both the scalar and
+  `avx2_compatible` paths, and both accumulators are identical.
+- `NNUE v4 piece bucket`: with only the first output head populated, the full
+  board scores non-zero while a three-piece position (bucket 7) scores 0.
+- `NNUE v4 wide accumulation`: `INT32_MAX` / `INT32_MIN` biases plus weight
+  deltas clamp before the pair products (activations 127 and 0), and both
+  paths return 9.
+- 19 pass, 1 skip (external container), 0 fail in both Release and Debug.
+
+### Throughput baseline
+
+No trained v4 network exists yet, so the baseline uses a deterministic
+full-size synthetic network. `make_synthetic_v4.py` (evidence scaffolding,
+not a product tool) writes `artifacts/training/synthetic-v4-1024.nnue`
+(18,882,699 bytes; hidden 1024, seed 20260917). Same hard-suite probe:
+
+| Probe | Nodes + qnodes | Elapsed | Aggregate NPS |
+| --- | --- | --- | --- |
+| Timed Threads=1 classical (Phase 0) | 754,289 | 5,238 ms | 144,003 |
+| Timed Threads=1 `koi-sf-v1` v3 (Phase 0) | 445,257 | 3,784 ms | 117,668 |
+| Timed Threads=1 synthetic v4 1024-wide | 1,798,332 | 14,774 ms | 121,723 |
+
+Log: `bench-v4-synthetic-timed.log`. The synthetic weights change the search
+tree (and therefore the node mix), so this is an inference-throughput
+baseline only, not a strength or speed claim; the trained network's gate and
+throughput are measured in Phase 6.
+
+### Verification
+
+- Release CTest: 56/56 passed (`ctest-release-phase3.log`).
+- Debug smoke (`-LE heavy`): 48/48 passed (`ctest-debug-phase3.log`).
 
 ## Phase 4 — incremental accumulators
 

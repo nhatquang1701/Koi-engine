@@ -70,7 +70,7 @@ UCI handshake byte-identical, and v1/v2/v3 containers loadable.
   vectors, and container v4 in `nnue.hpp`/`nnue.cpp` (manifest, payload,
   validation, deterministic serialization) with v2/v3 back-compat and
   complete loader error-path tests. Commit.
-- [ ] **Phase 3 — Inference and SIMD.** Scalar reference inference for v4
+- [x] **Phase 3 — Inference and SIMD.** Scalar reference inference for v4
   (CReLU pairs, output buckets, output shift) with golden integer scores;
   AVX2 accumulator and second-layer fast paths behind overflow guards;
   scalar↔AVX2 parity property tests; NPS measurement against the Phase 0

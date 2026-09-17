@@ -543,6 +543,149 @@ void accumulate_hidden_sparse_avx2(const NnueNetwork& network,
     return complete_inference(network, hidden_sums, accumulator);
 }
 
+// v4 inference: the hidden layer is still a sum of binary feature rows, then
+// the clipped activations feed pair products p[j] = a[j] * a[j + hidden/2]
+// and one linear head selected by the piece-count bucket.
+[[nodiscard]] std::size_t piece_count_bucket(const EvaluationFeatures& features) noexcept {
+    std::size_t pieces = 0;
+    for (const Piece& piece : features.position.board) {
+        if (!piece.empty()) {
+            ++pieces;
+        }
+    }
+    const std::size_t missing = 32U - std::min<std::size_t>(32U, pieces);
+    return std::min<std::size_t>(7U, missing / 4U);
+}
+
+void fill_v4_activations(std::span<const std::int32_t> hidden_sums,
+                         NnueAccumulator& accumulator) noexcept {
+    for (std::size_t hidden = 0; hidden < hidden_sums.size(); ++hidden) {
+        accumulator.values[hidden] = static_cast<std::int16_t>(std::clamp<std::int32_t>(
+            hidden_sums[hidden], 0, kKoiNnueClippedReluMaximum));
+    }
+}
+
+[[nodiscard]] int finish_inference_v4_scalar(const NnueNetwork& network,
+                                             std::span<const std::int32_t> hidden_sums,
+                                             const std::size_t bucket,
+                                             NnueAccumulator& accumulator) noexcept {
+    const std::size_t pair_count = network.manifest.layer_sizes[1] / 2U;
+    fill_v4_activations(hidden_sums, accumulator);
+    const auto* weights = network.bottleneck_weights.data() + bucket * pair_count;
+    std::int64_t output = network.bottleneck_bias[bucket];
+    for (std::size_t pair = 0; pair < pair_count; ++pair) {
+        const std::int16_t pair_product = static_cast<std::int16_t>(
+            accumulator.values[pair] * accumulator.values[pair + pair_count]);
+        accumulator.bottleneck_values[pair] = pair_product;
+        output += static_cast<std::int64_t>(weights[pair]) * pair_product;
+    }
+    if (network.output_shift > 0) {
+        output >>= network.output_shift;
+    }
+    return clamp_score(output);
+}
+
+#if KOI_NNUE_COMPILED_AVX2
+void compute_pair_products_avx2(std::span<const std::int16_t> activations,
+                                std::span<std::int16_t> pairs) noexcept {
+    const std::size_t pair_count = pairs.size();
+    std::size_t pair = 0;
+    for (; pair + 16U <= pair_count; pair += 16U) {
+        const __m256i low = _mm256_loadu_si256(
+            reinterpret_cast<const __m256i*>(activations.data() + pair));
+        const __m256i high = _mm256_loadu_si256(
+            reinterpret_cast<const __m256i*>(activations.data() + pair + pair_count));
+        _mm256_storeu_si256(reinterpret_cast<__m256i*>(pairs.data() + pair),
+                            _mm256_mullo_epi16(low, high));
+    }
+    for (; pair < pair_count; ++pair) {
+        pairs[pair] = static_cast<std::int16_t>(
+            activations[pair] * activations[pair + pair_count]);
+    }
+}
+
+[[nodiscard]] std::int64_t bucket_dot_avx2(const NnueNetwork& network,
+                                           const std::size_t bucket,
+                                           std::span<const std::int16_t> pairs) noexcept {
+    const std::size_t pair_count = pairs.size();
+    const auto* weights = network.bottleneck_weights.data() + bucket * pair_count;
+    // Every int32 lane accumulates at most pair_count products of a weight
+    // bounded by 127 and a pair product bounded by 127 * 127.  Fall back to the
+    // scalar int64 sum when that worst case cannot fit, so the vector path is
+    // always equivalent to the scalar reference.
+    constexpr std::int64_t kMaximumPairProduct = 127 * 127;
+    if (static_cast<std::int64_t>(pair_count) * 127 * kMaximumPairProduct >
+        std::numeric_limits<std::int32_t>::max()) {
+        std::int64_t output = 0;
+        for (std::size_t pair = 0; pair < pair_count; ++pair) {
+            output += static_cast<std::int64_t>(weights[pair]) * pairs[pair];
+        }
+        return output;
+    }
+    __m256i accumulator = _mm256_setzero_si256();
+    std::size_t pair = 0;
+    for (; pair + 16U <= pair_count; pair += 16U) {
+        const __m256i pair_values = _mm256_loadu_si256(
+            reinterpret_cast<const __m256i*>(pairs.data() + pair));
+        const __m128i weight_bytes = _mm_loadu_si128(
+            reinterpret_cast<const __m128i*>(weights + pair));
+        const __m256i weight_values = _mm256_cvtepi8_epi16(weight_bytes);
+        accumulator = _mm256_add_epi32(
+            accumulator, _mm256_madd_epi16(pair_values, weight_values));
+    }
+    alignas(32) std::array<std::int32_t, 8> lanes{};
+    _mm256_store_si256(reinterpret_cast<__m256i*>(lanes.data()), accumulator);
+    std::int64_t output = 0;
+    for (const std::int32_t lane : lanes) {
+        output += lane;
+    }
+    for (; pair < pair_count; ++pair) {
+        output += static_cast<std::int64_t>(weights[pair]) * pairs[pair];
+    }
+    return output;
+}
+
+[[nodiscard]] int finish_inference_v4_avx2(const NnueNetwork& network,
+                                           std::span<const std::int32_t> hidden_sums,
+                                           const std::size_t bucket,
+                                           NnueAccumulator& accumulator) noexcept {
+    fill_v4_activations(hidden_sums, accumulator);
+    compute_pair_products_avx2(accumulator.values, accumulator.bottleneck_values);
+    std::int64_t output = network.bottleneck_bias[bucket] +
+        bucket_dot_avx2(network, bucket, accumulator.bottleneck_values);
+    if (network.output_shift > 0) {
+        output >>= network.output_shift;
+    }
+    return clamp_score(output);
+}
+#endif
+
+[[nodiscard]] int infer_network_sparse_v4(const NnueNetwork& network,
+                                          std::span<const std::uint16_t> active,
+                                          const std::size_t bucket,
+                                          NnueAccumulator& accumulator,
+                                          const bool use_avx2) noexcept {
+    const std::size_t hidden_units = network.manifest.layer_sizes[1];
+    if (!arrays_match_manifest(network) || bucket >= network.manifest.layer_sizes[2]) {
+        accumulator.values.clear();
+        accumulator.bottleneck_values.clear();
+        return 0;
+    }
+    accumulator.values.assign(hidden_units, 0);
+    accumulator.bottleneck_values.assign(hidden_units / 2U, 0);
+    std::vector<std::int32_t> hidden_sums(hidden_units, 0);
+#if KOI_NNUE_COMPILED_AVX2
+    if (use_avx2) {
+        accumulate_hidden_sparse_avx2(network, active, hidden_sums);
+        return finish_inference_v4_avx2(network, hidden_sums, bucket, accumulator);
+    }
+#else
+    (void)use_avx2;
+#endif
+    accumulate_hidden_sparse_scalar(network, active, hidden_sums);
+    return finish_inference_v4_scalar(network, hidden_sums, bucket, accumulator);
+}
+
 } // namespace
 
 NnueNetwork NnueNetwork::synthetic() {
@@ -895,8 +1038,10 @@ NnueWorker::NnueWorker(std::shared_ptr<const NnueNetwork> weights)
     : weights_(std::move(weights)) {
     if (weights_ && !validate_manifest(weights_->manifest).has_value() &&
         arrays_match_manifest(*weights_)) {
-        accumulator_.values.resize(weights_->manifest.layer_sizes[1]);
-        accumulator_.bottleneck_values.resize(weights_->manifest.layer_sizes[2]);
+        const std::size_t hidden_units = weights_->manifest.layer_sizes[1];
+        accumulator_.values.resize(hidden_units);
+        accumulator_.bottleneck_values.resize(is_halfka_king_bucket_v1(weights_->manifest) ?
+            hidden_units / 2U : weights_->manifest.layer_sizes[2]);
     }
 }
 
@@ -906,18 +1051,19 @@ int NnueWorker::evaluate(const EvaluationFeatures& features, const Color perspec
         !arrays_match_manifest(*weights_)) {
         return 0;
     }
-    if (weights_->manifest.version == kKoiNnueHalfkaKingBucketV1FormatVersion) {
-        // The v4 container and feature encoder land ahead of their pair-product
-        // inference path; v4 evaluation reports a neutral score until the
-        // dedicated scalar/AVX2 implementation replaces this guard.
-        return 0;
-    }
+    const bool use_halfka = is_halfka_king_bucket_v1(weights_->manifest);
     const bool use_v2 = weights_->manifest.feature_set ==
         kKoiNnuePieceSquareKingPawnV2FeatureSet;
     const bool use_avx2 = path == NnueInferencePath::avx2_compatible ? avx2_available() :
         (path == NnueInferencePath::automatic && avx2_available());
     int score = 0;
-    if (use_v2) {
+    if (use_halfka) {
+        const NnueSparseFeaturesV4 sparse =
+            EvaluationFeatureExtractor::encode_sparse_v4(features);
+        score = infer_network_sparse_v4(
+            *weights_, std::span<const std::uint16_t>(sparse.indices.data(), sparse.count),
+            piece_count_bucket(features), accumulator_, use_avx2);
+    } else if (use_v2) {
         const NnueSparseFeatures sparse =
             EvaluationFeatureExtractor::encode_sparse_v2(features);
         score = infer_network_sparse(

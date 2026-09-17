@@ -358,6 +358,226 @@ void test_v3_shift_explicit_inference_and_container() {
             "v3 shifts must survive the container round trip");
 }
 
+std::size_t reference_v4_bucket(const koi::EvaluationFeatures& features) {
+    std::size_t pieces = 0;
+    for (const koi::Piece& piece : features.position.board) {
+        if (!piece.empty()) {
+            ++pieces;
+        }
+    }
+    return std::min<std::size_t>(7U, (32U - std::min<std::size_t>(32U, pieces)) / 4U);
+}
+
+int reference_v4_score(const koi::NnueNetwork& network,
+                       const koi::NnueSparseFeaturesV4& sparse,
+                       std::size_t bucket) {
+    const std::size_t hidden = network.manifest.layer_sizes[1];
+    const std::size_t pair_count = hidden / 2U;
+    std::vector<int> activations(hidden, 0);
+    for (std::size_t hidden_index = 0; hidden_index < hidden; ++hidden_index) {
+        std::int64_t value = network.hidden_bias[hidden_index];
+        for (std::size_t index = 0; index < sparse.count; ++index) {
+            value += network.feature_weights[
+                static_cast<std::size_t>(sparse.indices[index]) * hidden + hidden_index];
+        }
+        value = std::clamp<std::int64_t>(value, std::numeric_limits<std::int32_t>::min(),
+                                         std::numeric_limits<std::int32_t>::max());
+        activations[hidden_index] = std::clamp<int>(static_cast<int>(value), 0,
+                                                    koi::kKoiNnueClippedReluMaximum);
+    }
+    std::int64_t output = network.bottleneck_bias[bucket];
+    for (std::size_t pair = 0; pair < pair_count; ++pair) {
+        output += static_cast<std::int64_t>(
+                      network.bottleneck_weights[bucket * pair_count + pair]) *
+            activations[pair] * activations[pair + pair_count];
+    }
+    if (network.output_shift > 0) {
+        output >>= network.output_shift;
+    }
+    return static_cast<int>(std::clamp<std::int64_t>(
+        output, std::numeric_limits<int>::min(), std::numeric_limits<int>::max()));
+}
+
+void test_v4_golden_pair_product_score() {
+    koi::NnueNetwork network = koi::NnueNetwork::synthetic_v4();
+    std::fill(network.feature_weights.begin(), network.feature_weights.end(), 0);
+    std::fill(network.hidden_bias.begin(), network.hidden_bias.end(), 0);
+    std::fill(network.bottleneck_weights.begin(), network.bottleneck_weights.end(), 0);
+    std::fill(network.bottleneck_bias.begin(), network.bottleneck_bias.end(), 0);
+    const koi::EvaluationFeatures features =
+        koi::EvaluationFeatureExtractor::extract(koi::GameState::startpos());
+    const koi::NnueSparseFeaturesV4 sparse =
+        koi::EvaluationFeatureExtractor::encode_sparse_v4(features);
+    require(sparse.count == 32, "the v4 golden fixture must use the thirty-two startpos inputs");
+
+    constexpr std::size_t kHidden = 32;
+    for (std::size_t index = 0; index < 10; ++index) {
+        network.feature_weights[static_cast<std::size_t>(sparse.indices[index]) * kHidden] = 10;
+    }
+    for (std::size_t index = 10; index < 17; ++index) {
+        network.feature_weights[
+            static_cast<std::size_t>(sparse.indices[index]) * kHidden + kHidden / 2U] = 20;
+    }
+    for (std::size_t bucket = 0; bucket < network.bottleneck_bias.size(); ++bucket) {
+        network.bottleneck_weights[bucket * (kHidden / 2U)] = 127;
+    }
+
+    const auto weights = std::make_shared<const koi::NnueNetwork>(std::move(network));
+    koi::NnueWorker worker(weights);
+    const int scalar = worker.evaluate(features, koi::Color::white,
+                                       koi::NnueInferencePath::scalar);
+    require(scalar == 49 && worker.accumulator().values[0] == 100 &&
+                worker.accumulator().values[16] == 127 &&
+                worker.accumulator().bottleneck_values[0] == 12700,
+            "v4 golden pair-product inference must apply clipping and shifts exactly: score=" +
+                std::to_string(scalar) + " hidden0=" +
+                std::to_string(worker.accumulator().values[0]) + " hidden16=" +
+                std::to_string(worker.accumulator().values[16]) + " pair0=" +
+                std::to_string(worker.accumulator().bottleneck_values[0]));
+    const int avx2 = worker.evaluate(features, koi::Color::white,
+                                     koi::NnueInferencePath::avx2_compatible);
+    require(avx2 == scalar, "v4 AVX2 pair products must reproduce the golden scalar score");
+}
+
+void test_v4_scalar_matches_independent_reference() {
+    const auto weights =
+        std::make_shared<const koi::NnueNetwork>(koi::NnueNetwork::synthetic_v4());
+    koi::NnueWorker worker(weights);
+    const std::vector<koi::GameState> states{
+        koi::GameState::startpos(),
+        require_state("r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 4 4"),
+        require_state("4k3/8/8/8/8/8/P7/4K3 w - - 0 1"),
+        require_state("4k3/8/8/8/8/8/8/4K3 w - - 0 1"),
+    };
+    for (const koi::GameState& state : states) {
+        const koi::EvaluationFeatures features =
+            koi::EvaluationFeatureExtractor::extract(state);
+        const koi::NnueSparseFeaturesV4 sparse =
+            koi::EvaluationFeatureExtractor::encode_sparse_v4(features);
+        const int expected = reference_v4_score(*weights, sparse, reference_v4_bucket(features));
+        const koi::Color mover = features.position.side_to_move;
+        const int scalar = worker.evaluate(features, mover, koi::NnueInferencePath::scalar);
+        require(scalar == expected,
+                "v4 scalar inference must match the independent reference: " +
+                    std::to_string(scalar) + " != " + std::to_string(expected));
+        require(worker.evaluate(features, koi::opposite(mover),
+                                koi::NnueInferencePath::scalar) == -scalar,
+                "v4 perspective sign must mirror the caller's perspective");
+    }
+}
+
+void test_v4_inference_paths_agree_on_random_weights() {
+    koi::NnueNetwork network = koi::NnueNetwork::synthetic_v4();
+    for (std::size_t index = 0; index < network.feature_weights.size(); ++index) {
+        network.feature_weights[index] =
+            static_cast<std::int16_t>(static_cast<int>(index * 37U % 2001U) - 1000);
+    }
+    for (std::size_t index = 0; index < network.hidden_bias.size(); ++index) {
+        network.hidden_bias[index] =
+            static_cast<std::int32_t>(static_cast<int>(index * 97U % 251U) - 125);
+    }
+    for (std::size_t index = 0; index < network.bottleneck_weights.size(); ++index) {
+        network.bottleneck_weights[index] =
+            static_cast<std::int8_t>(static_cast<int>(index * 29U % 255U) - 127);
+    }
+    for (std::size_t index = 0; index < network.bottleneck_bias.size(); ++index) {
+        network.bottleneck_bias[index] =
+            static_cast<std::int32_t>(static_cast<int>(index * 13U) - 50);
+    }
+    network.output_shift = 12;
+
+    const auto weights = std::make_shared<const koi::NnueNetwork>(std::move(network));
+    koi::NnueWorker scalar_worker(weights);
+    koi::NnueWorker avx2_worker(weights);
+    const std::vector<koi::GameState> states{
+        koi::GameState::startpos(),
+        require_state("r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 4 4"),
+        require_state("4k3/8/8/8/8/8/P7/4K3 w - - 0 1"),
+    };
+    for (const koi::GameState& state : states) {
+        const koi::EvaluationFeatures features =
+            koi::EvaluationFeatureExtractor::extract(state);
+        const koi::NnueSparseFeaturesV4 sparse =
+            koi::EvaluationFeatureExtractor::encode_sparse_v4(features);
+        const int expected = reference_v4_score(*weights, sparse, reference_v4_bucket(features));
+        const koi::Color mover = features.position.side_to_move;
+        const int scalar = scalar_worker.evaluate(features, mover,
+                                                  koi::NnueInferencePath::scalar);
+        const int avx2 = avx2_worker.evaluate(features, mover,
+                                              koi::NnueInferencePath::avx2_compatible);
+        require(scalar == expected && avx2 == expected &&
+                    avx2_worker.accumulator().values == scalar_worker.accumulator().values &&
+                    avx2_worker.accumulator().bottleneck_values ==
+                        scalar_worker.accumulator().bottleneck_values,
+                "v4 scalar and AVX2 paths must agree on wide random weights: " +
+                    std::to_string(scalar) + "/" + std::to_string(avx2) + " != " +
+                    std::to_string(expected));
+    }
+}
+
+void test_v4_piece_count_bucket_selects_the_head() {
+    koi::NnueNetwork network = koi::NnueNetwork::synthetic_v4();
+    std::fill(network.feature_weights.begin(), network.feature_weights.end(), 0);
+    std::fill(network.hidden_bias.begin(), network.hidden_bias.end(), 0);
+    std::fill(network.bottleneck_weights.begin(), network.bottleneck_weights.end(), 0);
+    std::fill(network.bottleneck_bias.begin(), network.bottleneck_bias.end(), 0);
+    constexpr std::size_t kHidden = 32;
+    network.hidden_bias[0] = 100;
+    network.hidden_bias[kHidden / 2U] = 100;
+    network.bottleneck_weights[0] = 127;
+
+    const auto weights = std::make_shared<const koi::NnueNetwork>(std::move(network));
+    koi::NnueWorker worker(weights);
+    const koi::EvaluationFeatures startpos =
+        koi::EvaluationFeatureExtractor::extract(koi::GameState::startpos());
+    require(reference_v4_bucket(startpos) == 0, "a full board must select the first v4 head");
+    const int full_board = worker.evaluate(startpos, koi::Color::white,
+                                           koi::NnueInferencePath::scalar);
+    require(full_board == (127 * 100 * 100) >> 15,
+            "the first v4 head must produce the pair-product score");
+
+    const koi::EvaluationFeatures sparse_board = koi::EvaluationFeatureExtractor::extract(
+        require_state("4k3/8/8/8/8/8/P7/4K3 w - - 0 1"));
+    require(reference_v4_bucket(sparse_board) == 7,
+            "a three-piece board must select the last v4 head");
+    require(worker.evaluate(sparse_board, koi::Color::white,
+                            koi::NnueInferencePath::scalar) == 0,
+            "an empty piece-count head must score zero regardless of the hidden layer");
+}
+
+void test_v4_wide_accumulation_preserves_clipping() {
+    koi::NnueNetwork network = koi::NnueNetwork::synthetic_v4();
+    std::fill(network.feature_weights.begin(), network.feature_weights.end(), 0);
+    std::fill(network.hidden_bias.begin(), network.hidden_bias.end(), 0);
+    std::fill(network.bottleneck_weights.begin(), network.bottleneck_weights.end(), 0);
+    std::fill(network.bottleneck_bias.begin(), network.bottleneck_bias.end(), 0);
+    constexpr std::size_t kHidden = 32;
+    network.hidden_bias[0] = std::numeric_limits<std::int32_t>::max();
+    network.hidden_bias[1] = std::numeric_limits<std::int32_t>::min();
+    network.hidden_bias[kHidden / 2U] = 20;
+    network.bottleneck_weights[0] = 127;
+
+    const koi::EvaluationFeatures features =
+        koi::EvaluationFeatureExtractor::extract(koi::GameState::startpos());
+    const koi::NnueSparseFeaturesV4 sparse =
+        koi::EvaluationFeatureExtractor::encode_sparse_v4(features);
+    const std::size_t first = sparse.indices[0];
+    network.feature_weights[first * kHidden] = 32767;
+    network.feature_weights[first * kHidden + 1] = -5;
+
+    const auto weights = std::make_shared<const koi::NnueNetwork>(std::move(network));
+    koi::NnueWorker scalar_worker(weights);
+    koi::NnueWorker avx2_worker(weights);
+    const int scalar = scalar_worker.evaluate(features, koi::Color::white,
+                                              koi::NnueInferencePath::scalar);
+    const int avx2 = avx2_worker.evaluate(features, koi::Color::white,
+                                          koi::NnueInferencePath::avx2_compatible);
+    require(scalar == avx2 && scalar == 9 && scalar_worker.accumulator().values[0] == 127 &&
+                scalar_worker.accumulator().values[1] == 0 &&
+                scalar_worker.accumulator().values[kHidden / 2U] == 20,
+            "v4 inference must clamp wide hidden sums before the pair products");
+}
+
 void test_v4_container_round_trip_and_validation() {
     const koi::NnueNetwork network = koi::NnueNetwork::synthetic_v4();
     const auto encoded = koi::NnueLoader::serialize(network);
@@ -553,6 +773,11 @@ int main(int argc, char** argv) {
         {"NNUE AVX2 wide accumulation", test_avx2_compatible_path_preserves_wide_accumulation},
         {"NNUE invalid worker guard", test_invalid_network_does_not_allocate_worker_accumulators},
         {"NNUE v3 shifts", test_v3_shift_explicit_inference_and_container},
+        {"NNUE v4 golden score", test_v4_golden_pair_product_score},
+        {"NNUE v4 reference", test_v4_scalar_matches_independent_reference},
+        {"NNUE v4 path parity", test_v4_inference_paths_agree_on_random_weights},
+        {"NNUE v4 piece bucket", test_v4_piece_count_bucket_selects_the_head},
+        {"NNUE v4 wide accumulation", test_v4_wide_accumulation_preserves_clipping},
         {"NNUE v4 container", test_v4_container_round_trip_and_validation},
         {"NNUE v4 validation", test_v4_manifest_validation_rejects_mismatches},
         {"NNUE v4 corruption", test_v4_container_rejects_corruption_and_legacy_versions},
