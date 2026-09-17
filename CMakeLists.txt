@@ -651,6 +651,14 @@ if(Python3_Interpreter_FOUND)
         COMMAND "${Python3_EXECUTABLE}" -m unittest tests/python/evaluation/nnue_wrapper_test.py -v
     )
     add_test(
+        NAME koi_dataset_python
+        COMMAND "${Python3_EXECUTABLE}" -m unittest tests/python/evaluation/koi_dataset_test.py -v
+    )
+    add_test(
+        NAME gen_training_data_python
+        COMMAND "${Python3_EXECUTABLE}" -m unittest tests/python/evaluation/gen_training_data_test.py -v
+    )
+    add_test(
         NAME measurement_phase_python
         COMMAND "${Python3_EXECUTABLE}" -m unittest tests/python/measurement/measurement_phase_test.py -v
     )
@@ -668,7 +676,8 @@ if(Python3_Interpreter_FOUND)
     )
     set_tests_properties(
         tune_eval_python
-        nnue_training_python nnue_wrapper_python measurement_phase_python measurement_forensics_python
+        nnue_training_python nnue_wrapper_python koi_dataset_python gen_training_data_python
+        measurement_phase_python measurement_forensics_python
         strength_report_python nnue_studio_python
         PROPERTIES
             WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
@@ -740,6 +749,7 @@ if(Python3_Interpreter_FOUND)
     set_tests_properties(
         elo_estimate_python stockfish_match_python elo_openings_python
         tune_eval_python nnue_training_python nnue_wrapper_python
+        koi_dataset_python gen_training_data_python
         measurement_phase_python measurement_forensics_python strength_report_python
         nnue_studio_python
         PROPERTIES LABELS "python"

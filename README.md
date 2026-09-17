@@ -236,9 +236,10 @@ PyTorch backend is offline-only, records corpus and network provenance, and must
 the Koi loader and strength gates before any network is considered for runtime use.
 
 A complete Stockfish-labeled training pipeline lives next to the boundary. Positions
-come from Stockfish self-play (with tactical noise games), labels are depth-10
-centipawn scores, and the trainer quantizes the float network into the explicit-shift
-version 3 container so small weights survive rounding:
+come from Stockfish self-play (with tactical noise games), labels are fixed-depth
+centipawn scores (the example below asks for depth 10; the generator default is 9),
+and the trainer quantizes the float network into the explicit-shift version 3
+container so small weights survive rounding:
 
 ```powershell
 python .\tools\measurement\gen_training_data.py all --games 30000 --workers 3 --label-depth 10

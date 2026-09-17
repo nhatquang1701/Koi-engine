@@ -57,7 +57,66 @@ Baseline findings recorded for later phases:
 
 ## Phase 1 — dataset pipeline
 
-Pending.
+### Generator fixes (`tools/measurement/gen_training_data.py`)
+
+- `--resume` now seeds the position-dedup set from an existing positions
+  file (`load_seen_hashes`), so re-running `games` no longer appends FENs
+  that are already present.
+- The label-resume reader moved into `load_labeled_fens` and strips blank
+  lines (previously a blank line could be recorded as a labeled FEN).
+- The noisy-playout weighting moved into `move_weight` with unchanged
+  weights (capture +3, check +2, promotion +4).
+- CLI construction moved into `build_parser()` so tests can pin defaults
+  without running a stage.
+- Label-depth hint reconciled with the code default (9): the studio
+  generation note no longer claims depth 10, and the README pipeline
+  paragraph now states the example uses depth 10 while the generator
+  default is 9.
+
+### Binary encoder (`tools/measurement/koi_dataset.py`)
+
+- Implements `halfka-king-bucket-v1` sparse encoding (12 own-king buckets ×
+  12 planes × 64 squares, perspective `sq ^ 56` for black, piece-count
+  output bucket) with the golden start-position index list pinned in tests.
+- Writes `koi-dataset-v1`: magic `KOI-DATA`, version 1, feature-set length
+  and string, u64 position count, then per record `u16 count`,
+  `u16 indices[count]`, `i32 score_cp`.
+- Streaming and resumable: records plus a `<output>.state.json`
+  checkpoint (input byte offset, record count, record bytes) let
+  `--limit N` stop after N records and `--resume` continue; finishing
+  patches the header count in place and removes the state file. Existing
+  output without `--resume` is refused; `--resume` on a complete dataset is
+  a no-op. Invalid FENs, missing scores, and `|cp| > 4000` rows are skipped.
+- `info` prints the header as JSON.
+
+### Tests
+
+- `tests/python/evaluation/koi_dataset_test.py` (9 cases): startpos golden
+  indices, black-startpos mirror symmetry, king-bucket boundaries,
+  output-bucket piece counts, deterministic byte-identical round trip,
+  malformed-row skipping, checkpoint/resume byte equality, existing-output
+  refusal, `info` output.
+- `tests/python/evaluation/gen_training_data_test.py` (4 cases): parser
+  defaults, resume-seeded dedup, label-resume reader, noisy weighting.
+- Registered in CMake as `koi_dataset_python` and
+  `gen_training_data_python` (label `python`); the local Release suite is
+  now 56 tests. Both pass (2.82 s / 0.49 s under CTest).
+
+### Detached corpus expansion
+
+Launched 2026-09-17 21:46 local (pid 9732) with three Stockfish workers:
+
+```powershell
+python tools/measurement/gen_training_data.py all --games 8000 --workers 3 --resume `
+    --label-depth 10 --positions artifacts/training/positions.txt `
+    --output artifacts/training/labels.txt
+```
+
+Logs and pid: `artifacts/training/expansion/expansion-20260917-214650.*`.
+The run appends new positions and labels to the existing corpus (dedup
+seeded from the 1.4M-position file, labels resume-skips already-written
+FENs). Observed throughput at start: ~960 positions/s across three
+workers.
 
 ## Phase 2 — feature set and container v4
 

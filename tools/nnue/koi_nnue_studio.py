@@ -292,7 +292,7 @@ class StudioApp:
             text=(
                 "Generation uses the bundled Stockfish 19 and runs detached, so it continues while "
                 "the studio is closed. Labeling roughly processes 200-250 positions per second on "
-                "this machine at depth 10."
+                "this machine at the configured label depth (the field defaults to 9)."
             ),
         ).grid(row=5, column=0, columnspan=4, sticky="w")
         frame.columnconfigure(1, weight=1)

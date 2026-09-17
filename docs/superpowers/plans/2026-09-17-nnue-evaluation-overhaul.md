@@ -59,7 +59,7 @@ UCI handshake byte-identical, and v1/v2/v3 containers loadable.
   the pre-existing `release_verify.ps1` thread-parity gap; write this plan,
   the design spec, the verification record, and the three README index
   rows. Commit.
-- [ ] **Phase 1 — Dataset pipeline v2.** Fix generator defects (position
+- [x] **Phase 1 — Dataset pipeline v2.** Fix generator defects (position
   dedup seeded from an existing file, label-depth hint mismatch), add a
   resumable `koi-dataset-v1` binary encoder with sparse feature indices,
   add pure-Python unit tests for the generator/encoder, and launch

@@ -50,6 +50,48 @@ def log(message: str) -> None:
     print(f"[{time.strftime('%H:%M:%S')}] {message}", flush=True)
 
 
+def move_weight(board: chess.Board, move: chess.Move) -> int:
+    """Weight a noisy playout choice towards captures, checks, and promotions."""
+    weight = 1
+    if board.is_capture(move):
+        weight += 3
+    if board.gives_check(move):
+        weight += 2
+    if move.promotion:
+        weight += 4
+    return weight
+
+
+def load_seen_hashes(path: Path) -> set[int]:
+    """Seed the position-dedup set from an existing positions file (--resume)."""
+    seen: set[int] = set()
+    if not path.exists():
+        return seen
+    with open(path, encoding="utf-8") as handle:
+        for line in handle:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                seen.add(chess.polyglot.zobrist_hash(chess.Board(line)))
+            except ValueError:
+                continue
+    return seen
+
+
+def load_labeled_fens(path: Path) -> set[str]:
+    """Read FENs already present in a labels file (--resume)."""
+    done: set[str] = set()
+    if not path.exists():
+        return done
+    with open(path, encoding="utf-8") as handle:
+        for line in handle:
+            parts = line.strip().split(";")
+            if parts and parts[0]:
+                done.add(parts[0])
+    return done
+
+
 class Labeler:
     """One Stockfish process owned by one worker thread."""
 
@@ -149,14 +191,7 @@ def noise_games(args: argparse.Namespace, positions_fh, seen: set[int], counters
                 break
             weighted: list[chess.Move] = []
             for move in moves:
-                weight = 1
-                if board.is_capture(move):
-                    weight += 3
-                if board.gives_check(move):
-                    weight += 2
-                if move.promotion:
-                    weight += 4
-                weighted.extend([move] * weight)
+                weighted.extend([move] * move_weight(board, move))
             board.push(rng.choice(weighted))
             plies += 1
             if plies >= MIN_PLIES and not board.is_game_over(claim_draw=False):
@@ -173,6 +208,10 @@ def run_games_stage(args: argparse.Namespace) -> int:
     path = Path(args.positions)
     path.parent.mkdir(parents=True, exist_ok=True)
     seen: set[int] = set()
+    if args.resume:
+        seen = load_seen_hashes(path)
+        if seen:
+            log(f"resume: seeded {len(seen)} existing positions")
     counters = {
         "games_done": 0,
         "games_target": 0,
@@ -223,13 +262,10 @@ def run_label_stage(args: argparse.Namespace) -> int:
     log(f"loaded {len(fens)} positions")
 
     done: set[str] = set()
-    if args.resume and output_path.exists():
-        with open(output_path, encoding="utf-8") as handle:
-            for line in handle:
-                parts = line.split(";")
-                if parts:
-                    done.add(parts[0])
-        log(f"resume: {len(done)} positions already labeled")
+    if args.resume:
+        done = load_labeled_fens(output_path)
+        if done:
+            log(f"resume: {len(done)} positions already labeled")
 
     work: queue.Queue[str | None] = queue.Queue()
     for fen in fens:
@@ -286,7 +322,7 @@ def run_label_stage(args: argparse.Namespace) -> int:
     return 0
 
 
-def main(argv: list[str]) -> int:
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("stage", choices=("games", "label", "all"))
     parser.add_argument("--stockfish", type=Path, default=DEFAULT_STOCKFISH)
@@ -302,7 +338,11 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--label-hash", type=int, default=64)
     parser.add_argument("--limit", type=int, default=0)
     parser.add_argument("--resume", action="store_true")
-    args = parser.parse_args(argv)
+    return parser
+
+
+def main(argv: list[str]) -> int:
+    args = build_parser().parse_args(argv)
     if not args.stockfish.exists():
         print(f"Stockfish binary not found: {args.stockfish}", file=sys.stderr)
         return 2
