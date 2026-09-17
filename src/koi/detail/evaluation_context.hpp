@@ -23,6 +23,30 @@ public:
         return static_cast<bool>(worker_);
     }
 
+    // Advisory lifecycle notifications forwarded to the private worker, if any.
+    void notify_make_move(const GameState& state, const MoveMetadata& metadata,
+                          int ply, std::uint64_t parent_key) {
+        if (worker_) {
+            worker_->on_make_move(state, metadata, ply, parent_key);
+        }
+    }
+    void notify_unmake_move(int child_ply) {
+        if (worker_) {
+            worker_->on_unmake_move(child_ply);
+        }
+    }
+    void notify_make_null_move(const GameState& state, int ply,
+                               std::uint64_t parent_key) {
+        if (worker_) {
+            worker_->on_make_null_move(state, ply, parent_key);
+        }
+    }
+    void notify_unmake_null_move(int child_ply) {
+        if (worker_) {
+            worker_->on_unmake_null_move(child_ply);
+        }
+    }
+
 private:
     const Evaluator& evaluator_;
     std::mutex* evaluator_mutex_ = nullptr;

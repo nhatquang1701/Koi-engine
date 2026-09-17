@@ -75,7 +75,7 @@ UCI handshake byte-identical, and v1/v2/v3 containers loadable.
   AVX2 accumulator and second-layer fast paths behind overflow guards;
   scalar↔AVX2 parity property tests; NPS measurement against the Phase 0
   baseline. Commit.
-- [ ] **Phase 4 — Incremental accumulators.** Dual-perspective accumulator
+- [x] **Phase 4 — Incremental accumulators.** Dual-perspective accumulator
   slots per ply, restart-free updates on make/unmake with king-bucket
   refresh, hooks from `SearchContext`, and parity tests that compare
   incremental results against full refresh over random game trees

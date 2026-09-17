@@ -50,6 +50,59 @@ private:
     mutable std::atomic<std::uint64_t> evaluations_{0};
 };
 
+// Records the advisory make/unmake notifications the search forwards to each
+// private evaluation worker so hook wiring can be asserted end to end.
+struct HookCounters {
+    std::atomic<int> makes{0};
+    std::atomic<int> unmakes{0};
+    std::atomic<int> null_makes{0};
+    std::atomic<int> null_unmakes{0};
+};
+
+class HookCountingWorker final : public koi::EvaluatorWorker {
+public:
+    explicit HookCountingWorker(std::shared_ptr<HookCounters> counters)
+        : counters_(std::move(counters)) {}
+
+    int evaluate(const GameState&, Color) override {
+        return 0;
+    }
+
+    void on_make_move(const GameState&, const koi::MoveMetadata&, int, std::uint64_t) override {
+        counters_->makes.fetch_add(1, std::memory_order_relaxed);
+    }
+
+    void on_unmake_move(int) override {
+        counters_->unmakes.fetch_add(1, std::memory_order_relaxed);
+    }
+
+    void on_make_null_move(const GameState&, int, std::uint64_t) override {
+        counters_->null_makes.fetch_add(1, std::memory_order_relaxed);
+    }
+
+    void on_unmake_null_move(int) override {
+        counters_->null_unmakes.fetch_add(1, std::memory_order_relaxed);
+    }
+
+private:
+    std::shared_ptr<HookCounters> counters_;
+};
+
+class HookCountingEvaluator final : public Evaluator {
+public:
+    int evaluate(const GameState&, Color) const override {
+        return 0;
+    }
+
+    std::unique_ptr<koi::EvaluatorWorker> create_worker() const override {
+        return std::make_unique<HookCountingWorker>(counters_);
+    }
+
+    [[nodiscard]] bool supports_concurrent_evaluation() const noexcept override { return true; }
+
+    std::shared_ptr<HookCounters> counters_ = std::make_shared<HookCounters>();
+};
+
 [[nodiscard]] bool wait_for(const std::function<bool()>& predicate,
                             const std::chrono::milliseconds timeout) {
     const auto deadline = std::chrono::steady_clock::now() + timeout;
@@ -218,6 +271,32 @@ void test_request_ponderhit_converts_a_running_ponder_search() {
     require(completions.load() == 1, "the converted search must publish exactly one completion");
 }
 
+void test_search_forwards_advisory_incremental_hooks() {
+    auto evaluator = std::make_shared<HookCountingEvaluator>();
+    SearchService service(evaluator, {}, 16);
+    GameState root = GameState::startpos();
+
+    SearchEventSink sink;
+    SearchLimits limits;
+    limits.depth = 4;
+    auto handle = service.start(root, limits, sink);
+    handle.wait();
+
+    require(evaluator->counters_->makes.load(std::memory_order_relaxed) > 0,
+            "a search must notify move makes to the private worker: makes=" +
+                std::to_string(evaluator->counters_->makes.load(std::memory_order_relaxed)) +
+                " unmakes=" +
+                std::to_string(evaluator->counters_->unmakes.load(std::memory_order_relaxed)) +
+                " nulls=" +
+                std::to_string(evaluator->counters_->null_makes.load(std::memory_order_relaxed)));
+    require(evaluator->counters_->makes.load(std::memory_order_relaxed) ==
+                evaluator->counters_->unmakes.load(std::memory_order_relaxed),
+            "search make and unmake notifications must balance");
+    require(evaluator->counters_->null_makes.load(std::memory_order_relaxed) ==
+                evaluator->counters_->null_unmakes.load(std::memory_order_relaxed),
+            "search null-move notifications must balance");
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -229,6 +308,7 @@ int main(int argc, char** argv) {
         {"search service hash controls", test_hash_controls_are_observable},
         {"search service sinkless search", test_search_without_a_sink_still_completes},
         {"search service ponderhit conversion", test_request_ponderhit_converts_a_running_ponder_search},
+        {"search service incremental hooks", test_search_forwards_advisory_incremental_hooks},
     };
     return koi::test::run_tests(tests, argc, argv);
 }

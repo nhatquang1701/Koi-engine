@@ -133,18 +133,17 @@ struct PawnFileState {
     return zone * 4U + (mirrored_file - 4U);
 }
 
-// Collects the active halfka-king-bucket-v1 indices for one position into a
-// strictly increasing list capped at the sparse capacity.  When `dense` is
-// non-null the same indices are also marked in the dense vector, so both
-// encoders are guaranteed to agree.
+// Collects the active halfka-king-bucket-v1 indices for one position under an
+// explicit real-color perspective into a strictly increasing list capped at
+// the sparse capacity.  When `dense` is non-null the same indices are also
+// marked in the dense vector, so both encoders are guaranteed to agree.
 [[nodiscard]] std::size_t halfka_king_bucket_indices(
-    const EvaluationFeatures& features, std::uint16_t* output, const std::size_t capacity,
-    NnueFeatureVectorV4* dense = nullptr) noexcept {
-    const Color mover = features.position.side_to_move;
+    const EvaluationFeatures& features, const Color perspective, std::uint16_t* output,
+    const std::size_t capacity, NnueFeatureVectorV4* dense = nullptr) noexcept {
     const std::uint8_t king_square =
-        features.position.king_squares[color_index(mover)].index();
+        features.position.king_squares[color_index(perspective)].index();
     const std::size_t bucket = king_square < Square::kInvalid ?
-        king_bucket(perspective_square(king_square, mover)) : 0U;
+        king_bucket(perspective_square(king_square, perspective)) : 0U;
     const std::size_t base = bucket * kNnuePieceSquareV1FeatureCount;
     std::size_t count = 0;
     for (std::size_t square = 0; square < features.position.board.size(); ++square) {
@@ -152,10 +151,11 @@ struct PawnFileState {
         if (piece.empty()) {
             continue;
         }
-        const std::size_t color = perspective_color(piece.color, mover);
+        const std::size_t color = perspective_color(piece.color, perspective);
         const std::size_t type = static_cast<std::size_t>(piece.type);
         const std::size_t plane = color == kWhite ? type - 1U : type + 5U;
-        const std::size_t index = base + plane * 64U + perspective_square(square, mover);
+        const std::size_t index =
+            base + plane * 64U + perspective_square(square, perspective);
         if (dense != nullptr) {
             (*dense)[index] = 1;
         }
@@ -171,7 +171,8 @@ struct PawnFileState {
     const EvaluationFeatures& features) noexcept {
     NnueFeatureVectorV4 encoded{};
     std::array<std::uint16_t, kNnueSparseFeatureCapacityV4> scratch{};
-    (void)halfka_king_bucket_indices(features, scratch.data(), scratch.size(), &encoded);
+    (void)halfka_king_bucket_indices(features, features.position.side_to_move,
+                                     scratch.data(), scratch.size(), &encoded);
     return encoded;
 }
 
@@ -241,11 +242,35 @@ NnueFeatureVectorV4 EvaluationFeatureExtractor::encode_halfka_king_bucket_v1(
     return encode_halfka_king_bucket(features);
 }
 
+std::size_t EvaluationFeatureExtractor::halfka_king_bucket_for(
+    const EvaluationFeatures& features, const Color perspective) noexcept {
+    const std::uint8_t king_square =
+        features.position.king_squares[color_index(perspective)].index();
+    return king_square < Square::kInvalid ?
+        king_bucket(perspective_square(king_square, perspective)) : 0U;
+}
+
+std::uint16_t EvaluationFeatureExtractor::halfka_king_bucket_feature_index(
+    const std::size_t bucket, const Color perspective, const Piece piece,
+    const Square square) noexcept {
+    const std::size_t color = perspective_color(piece.color, perspective);
+    const std::size_t type = static_cast<std::size_t>(piece.type);
+    const std::size_t plane = color == kWhite ? type - 1U : type + 5U;
+    return static_cast<std::uint16_t>(
+        bucket * kNnuePieceSquareV1FeatureCount + plane * 64U +
+        perspective_square(square.index(), perspective));
+}
+
 NnueSparseFeaturesV4 EvaluationFeatureExtractor::encode_sparse_v4(
     const EvaluationFeatures& features) noexcept {
+    return encode_sparse_v4(features, features.position.side_to_move);
+}
+
+NnueSparseFeaturesV4 EvaluationFeatureExtractor::encode_sparse_v4(
+    const EvaluationFeatures& features, const Color perspective) noexcept {
     NnueSparseFeaturesV4 sparse;
     sparse.count = halfka_king_bucket_indices(
-        features, sparse.indices.data(), sparse.indices.size());
+        features, perspective, sparse.indices.data(), sparse.indices.size());
     return sparse;
 }
 

@@ -142,9 +142,57 @@ public:
                                NnueInferencePath path = NnueInferencePath::automatic);
     [[nodiscard]] const NnueAccumulator& accumulator() const noexcept { return accumulator_; }
 
+    // Advisory lifecycle hooks.  For v4 networks the worker keeps one hidden
+    // accumulator per perspective and updates it with feature deltas instead
+    // of recomputing.  Every hook and every evaluation verifies the position
+    // key before trusting cached state, so a skipped notification can only
+    // force a full refresh, never an incorrect score.
+    void on_make_move(const GameState&, const MoveMetadata&, int ply,
+                      std::uint64_t parent_key);
+    void on_unmake_move(int child_ply);
+    void on_make_null_move(const GameState&, int ply, std::uint64_t parent_key);
+    void on_unmake_null_move(int child_ply);
+
+    [[nodiscard]] std::size_t incremental_make_count() const noexcept {
+        return incremental_make_count_;
+    }
+    [[nodiscard]] std::size_t incremental_fallback_count() const noexcept {
+        return incremental_fallback_count_;
+    }
+
 private:
+    // Root slot plus the deepest search line the engine can reach.  Slots past
+    // the cursor are never trusted, so an overrun only costs a refresh.
+    static constexpr std::size_t kIncrementalSlotCount = 132;
+    static constexpr std::size_t kIncrementalPerspectives = 2;
+
+    [[nodiscard]] bool supports_incremental() const noexcept;
+    void ensure_incremental_storage();
+    [[nodiscard]] bool prepare_child_slot(int ply, int child_slot,
+                                          std::uint64_t parent_key);
+    void copy_slot_forward(std::size_t from_slot, std::size_t to_slot);
+    void refresh_slot_perspective(const EvaluationFeatures&, Color perspective,
+                                  std::size_t slot);
+    void apply_feature_delta(std::size_t perspective, std::size_t slot,
+                             std::uint16_t index, int sign);
+    void apply_move_deltas(const GameState&, const MoveMetadata&, std::size_t slot);
+
     std::shared_ptr<const NnueNetwork> weights_;
     NnueAccumulator accumulator_;
+
+    std::size_t hidden_units_ = 0;
+    std::array<std::vector<std::int32_t>, kIncrementalPerspectives> slot_values_;
+    std::array<std::vector<std::uint8_t>, kIncrementalPerspectives> slot_buckets_;
+    std::vector<std::uint64_t> slot_keys_;
+    std::vector<std::uint8_t> slot_valid_;
+    int slot_cursor_ = -1;
+    std::array<std::vector<std::int32_t>, kIncrementalPerspectives> scratch_values_;
+    std::array<std::uint8_t, kIncrementalPerspectives> scratch_buckets_{};
+    std::uint64_t scratch_key_ = 0;
+    bool scratch_valid_ = false;
+    bool storage_ready_ = false;
+    std::size_t incremental_make_count_ = 0;
+    std::size_t incremental_fallback_count_ = 0;
 };
 
 class NnueEvaluator final : public Evaluator {

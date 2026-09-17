@@ -428,6 +428,39 @@ struct SearchContext {
         return score;
     }
 
+    // Make/unmake wrappers that report the move to the evaluator worker, if it
+    // has one.  The notifications are advisory: the worker validates the
+    // position key before trusting any cached accumulator, so a missing call
+    // here can only cost a refresh, never a wrong score.
+    [[nodiscard]] bool make_observed(GameState& state, const MoveMetadata& metadata,
+                                     const int ply) {
+        const std::uint64_t parent_key = state.position_key();
+        if (!state.make_search_move(metadata)) {
+            return false;
+        }
+        evaluation.notify_make_move(state, metadata, ply, parent_key);
+        return true;
+    }
+
+    void unmake_observed(GameState& state, const int child_ply) {
+        evaluation.notify_unmake_move(child_ply);
+        state.unmake_move();
+    }
+
+    [[nodiscard]] bool make_null_observed(GameState& state, const int ply) {
+        const std::uint64_t parent_key = state.position_key();
+        if (!state.make_null_move()) {
+            return false;
+        }
+        evaluation.notify_make_null_move(state, ply, parent_key);
+        return true;
+    }
+
+    void unmake_null_observed(GameState& state, const int child_ply) {
+        evaluation.notify_unmake_null_move(child_ply);
+        state.unmake_null_move();
+    }
+
     [[nodiscard]] static std::uint64_t qsearch_move_key(const Move move) noexcept {
         if (move.is_no_move()) {
             return 0;

@@ -256,7 +256,79 @@ throughput are measured in Phase 6.
 
 ## Phase 4 — incremental accumulators
 
-Pending.
+### Advisory hook seam
+
+`EvaluatorWorker` gained four default no-op hooks — `on_make_move(child,
+metadata, ply, parent_key)`, `on_unmake_move(child_ply)`,
+`on_make_null_move(child, ply, parent_key)` and `on_unmake_null_move(child_ply)`
+— documented as hints only: an implementation that receives no notifications
+must still score correctly. `EvaluationContext` forwards them through
+`notify_make_move`, `notify_unmake_move`, `notify_make_null_move` and
+`notify_unmake_null_move`, and only when a private worker exists; workerless
+evaluators see a complete no-op. `SearchContext` observed every make and
+unmake in `search_context.cpp` through `make_observed` / `unmake_observed` /
+`make_null_observed` / `unmake_null_observed` (quiescence, null move, ProbCut,
+the main negamax loop, and all four early-exit/final unmakes). Root moves in
+`search_runner.cpp` and the fallback scanners are deliberately not hooked; the
+worker's key check treats every missed notification as a refresh request.
+
+### Dual-perspective accumulators (`src/koi/nnue.cpp`)
+
+`NnueWorker` keeps two int32 accumulator sets indexed by slot
+(`kIncrementalSlotCount = 132`, sized for the search stack plus root), a
+per-perspective piece-count bucket per slot, slot keys and validity flags, a
+cursor for the current ply, and a one-position scratch rebuild used when no
+valid parent is available. `on_make_move` prepares the child slot from the
+scratch parent or the cursor's parent slot only when the stored key matches
+the caller's `parent_key`; otherwise the child slot is invalidated, the cursor
+is cleared and `incremental_fallback_count()` increments. Deltas are applied to
+both perspectives: the moving piece leaves `from` and arrives at `to` (capture
+removes the captured piece at its square, with the en-passant target offset by
+rank), promotions replace the pawn with the promoted piece, and a king move
+refreshes that perspective outright, which also covers castling's rook. On
+unmake the cursor steps back to the parent slot when it is still valid, so
+parent evaluations never invert deltas. Evaluations use the cursor slot or the
+scratch when their key equals `state.position_key()`; the side-to-move
+perspective is finished through the existing v4 inference paths and the
+caller's perspective sign is unchanged. `NnueEvaluatorWorker` delegates the
+hooks to its worker, and `incremental_make_count()` / `incremental_fallback_count()`
+expose the counters. Making the encoder perspective-aware added
+`encode_sparse_v4(features, perspective)`, `halfka_king_bucket_for(features,
+perspective)` and `halfka_king_bucket_feature_index(bucket, perspective,
+piece, square)`; the single-argument overloads keep their Phase 3 behavior.
+
+### Tests
+
+- `nnue_boundary_tests` (23 cases: 22 pass, 1 environment skip): the
+  incremental walk verifies scores, hidden activations and pair products
+  against a fresh recompute worker at every node and after every unmake over
+  four fixtures — startpos (28 plies), an en-passant position, a
+  promotion-heavy ending and a castling position — and requires the fallback
+  counter to stay put while hooks are provided; the king-bucket test scripts
+  `Kd2`/`Kd3` (white) and `Kd6` (black) across bucket boundaries and unwinds
+  them; the recovery test makes a move without notifying the worker, proves the
+  score still matches a full recompute, and asserts the fallback counter rises
+  once per un-hooked position.
+- `evaluation_architecture_tests` (4/4): a counting worker proves
+  `EvaluationContext` forwards each notification to the private worker and
+  that a workerless evaluator ignores them.
+- `search_service_tests` (8/8): a hooked evaluator over a depth-4 search
+  proves the engine notifies makes to the private worker, that makes and
+  unmakes balance, and that null-move notifications balance.
+
+### Verification
+
+- Release CTest: 56/56 passed (`ctest-release-phase4.log`, 257.70 s).
+- Debug smoke (`-LE heavy`): 48/48 passed (`ctest-debug-phase4.log`).
+
+### Deferred within Phase 4
+
+No strength claim is made: no trained v4 network exists yet, so the
+incremental path is exercised with synthetic weights and reference
+comparisons only. Accumulator deltas stay scalar int32 adds; a SIMD delta
+update is not part of this phase. `evaluate(const EvaluationFeatures&, ...)`
+still recomputes from scratch for tests and direct callers, and the v1/v2/v3
+formats keep their previous full-recompute behavior.
 
 ## Phase 5 — trainer overhaul
 

@@ -557,6 +557,16 @@ void accumulate_hidden_sparse_avx2(const NnueNetwork& network,
     return std::min<std::size_t>(7U, missing / 4U);
 }
 
+[[nodiscard]] constexpr PieceType promotion_piece_type(const Promotion promotion) noexcept {
+    switch (promotion) {
+        case Promotion::knight: return PieceType::knight;
+        case Promotion::bishop: return PieceType::bishop;
+        case Promotion::rook: return PieceType::rook;
+        case Promotion::queen: return PieceType::queen;
+        default: return PieceType::pawn;
+    }
+}
+
 void fill_v4_activations(std::span<const std::int32_t> hidden_sums,
                          NnueAccumulator& accumulator) noexcept {
     for (std::size_t hidden = 0; hidden < hidden_sums.size(); ++hidden) {
@@ -1082,7 +1092,259 @@ int NnueWorker::evaluate(const EvaluationFeatures& features, const Color perspec
 
 int NnueWorker::evaluate(const GameState& state, const Color perspective,
                          const NnueInferencePath path) {
-    return evaluate(EvaluationFeatureExtractor::extract(state), perspective, path);
+    if (!supports_incremental()) {
+        return evaluate(EvaluationFeatureExtractor::extract(state), perspective, path);
+    }
+    ensure_incremental_storage();
+    const EvaluationFeatures features = EvaluationFeatureExtractor::extract(state);
+    const Color mover = features.position.side_to_move;
+    const std::size_t mover_index = mover == Color::white ? 0U : 1U;
+    const std::uint64_t key = state.position_key();
+    std::span<const std::int32_t> hidden_sums;
+    if (slot_cursor_ >= 0 &&
+        slot_valid_[static_cast<std::size_t>(slot_cursor_)] != 0 &&
+        slot_keys_[static_cast<std::size_t>(slot_cursor_)] == key) {
+        hidden_sums = std::span<const std::int32_t>(
+            slot_values_[mover_index].data() +
+                static_cast<std::size_t>(slot_cursor_) * hidden_units_,
+            hidden_units_);
+    } else if (scratch_valid_ && scratch_key_ == key) {
+        hidden_sums = std::span<const std::int32_t>(scratch_values_[mover_index]);
+    } else {
+        for (std::size_t index = 0; index < kIncrementalPerspectives; ++index) {
+            const Color real = index == 0U ? Color::white : Color::black;
+            const NnueSparseFeaturesV4 sparse =
+                EvaluationFeatureExtractor::encode_sparse_v4(features, real);
+            accumulate_hidden_sparse_scalar(
+                *weights_,
+                std::span<const std::uint16_t>(sparse.indices.data(), sparse.count),
+                scratch_values_[index]);
+            scratch_buckets_[index] = static_cast<std::uint8_t>(
+                EvaluationFeatureExtractor::halfka_king_bucket_for(features, real));
+        }
+        scratch_key_ = key;
+        scratch_valid_ = true;
+        ++incremental_fallback_count_;
+        hidden_sums = std::span<const std::int32_t>(scratch_values_[mover_index]);
+    }
+    const bool use_avx2 = path == NnueInferencePath::avx2_compatible ? avx2_available() :
+        (path == NnueInferencePath::automatic && avx2_available());
+    (void)use_avx2;
+    const std::size_t bucket = piece_count_bucket(features);
+    int score = 0;
+#if KOI_NNUE_COMPILED_AVX2
+    if (use_avx2) {
+        score = finish_inference_v4_avx2(*weights_, hidden_sums, bucket, accumulator_);
+    } else
+#endif
+    {
+        score = finish_inference_v4_scalar(*weights_, hidden_sums, bucket, accumulator_);
+    }
+    return perspective == mover ? score : -score;
+}
+
+bool NnueWorker::supports_incremental() const noexcept {
+    return weights_ && is_halfka_king_bucket_v1(weights_->manifest) &&
+        !validate_manifest(weights_->manifest).has_value() &&
+        arrays_match_manifest(*weights_);
+}
+
+void NnueWorker::ensure_incremental_storage() {
+    if (storage_ready_) {
+        return;
+    }
+    hidden_units_ = weights_->manifest.layer_sizes[1];
+    const std::size_t slot_entries = kIncrementalSlotCount * hidden_units_;
+    for (std::size_t index = 0; index < kIncrementalPerspectives; ++index) {
+        slot_values_[index].assign(slot_entries, 0);
+        slot_buckets_[index].assign(kIncrementalSlotCount, 0);
+        scratch_values_[index].assign(hidden_units_, 0);
+    }
+    slot_keys_.assign(kIncrementalSlotCount, 0);
+    slot_valid_.assign(kIncrementalSlotCount, 0);
+    storage_ready_ = true;
+}
+
+void NnueWorker::copy_slot_forward(const std::size_t from_slot,
+                                   const std::size_t to_slot) {
+    for (std::size_t index = 0; index < kIncrementalPerspectives; ++index) {
+        std::copy_n(slot_values_[index].data() + from_slot * hidden_units_,
+                    hidden_units_,
+                    slot_values_[index].data() + to_slot * hidden_units_);
+        slot_buckets_[index][to_slot] = slot_buckets_[index][from_slot];
+    }
+}
+
+void NnueWorker::refresh_slot_perspective(const EvaluationFeatures& features,
+                                          const Color perspective,
+                                          const std::size_t slot) {
+    const std::size_t index = perspective == Color::white ? 0U : 1U;
+    const NnueSparseFeaturesV4 sparse =
+        EvaluationFeatureExtractor::encode_sparse_v4(features, perspective);
+    std::vector<std::int32_t> sums(hidden_units_, 0);
+    accumulate_hidden_sparse_scalar(
+        *weights_,
+        std::span<const std::uint16_t>(sparse.indices.data(), sparse.count), sums);
+    std::copy(sums.begin(), sums.end(),
+              slot_values_[index].data() + slot * hidden_units_);
+    slot_buckets_[index][slot] = static_cast<std::uint8_t>(
+        EvaluationFeatureExtractor::halfka_king_bucket_for(features, perspective));
+}
+
+void NnueWorker::apply_feature_delta(const std::size_t perspective,
+                                     const std::size_t slot,
+                                     const std::uint16_t index, const int sign) {
+    std::int32_t* values = slot_values_[perspective].data() + slot * hidden_units_;
+    const std::int16_t* weights =
+        weights_->feature_weights.data() +
+        static_cast<std::size_t>(index) * hidden_units_;
+    for (std::size_t hidden = 0; hidden < hidden_units_; ++hidden) {
+        const std::int64_t updated = static_cast<std::int64_t>(values[hidden]) +
+            static_cast<std::int64_t>(sign) * static_cast<std::int64_t>(weights[hidden]);
+        values[hidden] = static_cast<std::int32_t>(std::clamp<std::int64_t>(
+            updated, std::numeric_limits<std::int32_t>::min(),
+            std::numeric_limits<std::int32_t>::max()));
+    }
+}
+
+void NnueWorker::apply_move_deltas(const GameState& child,
+                                   const MoveMetadata& metadata,
+                                   const std::size_t slot) {
+    const EvaluationFeatures features = EvaluationFeatureExtractor::extract(child);
+    const Color mover = opposite(child.side_to_move());
+    const Square from = metadata.move.from();
+    const Square to = metadata.move.to();
+    const MoveKind kind = metadata.kind;
+    const PieceType moving = metadata.moving_piece;
+    for (std::size_t index = 0; index < kIncrementalPerspectives; ++index) {
+        const Color real = index == 0U ? Color::white : Color::black;
+        if (moving == PieceType::king && mover == real) {
+            // The perspective's own king may have crossed a bucket boundary, so
+            // rebuild this perspective from the child position.  The rebuild
+            // covers the king move and, for castling, the rook as well.
+            refresh_slot_perspective(features, real, slot);
+            continue;
+        }
+        const std::size_t bucket = slot_buckets_[index][slot];
+        apply_feature_delta(index, slot,
+            EvaluationFeatureExtractor::halfka_king_bucket_feature_index(
+                bucket, real, Piece{moving, mover}, from), -1);
+        if (metadata.captured_piece != PieceType::none) {
+            Square captured = to;
+            if (kind == MoveKind::en_passant) {
+                captured = mover == Color::white ?
+                    Square::from_index(static_cast<std::uint8_t>(to.index() - 8U)) :
+                    Square::from_index(static_cast<std::uint8_t>(to.index() + 8U));
+            }
+            apply_feature_delta(index, slot,
+                EvaluationFeatureExtractor::halfka_king_bucket_feature_index(
+                    bucket, real, Piece{metadata.captured_piece, opposite(mover)},
+                    captured), -1);
+        }
+        const PieceType placed = kind == MoveKind::promotion ?
+            promotion_piece_type(metadata.move.promotion()) : moving;
+        apply_feature_delta(index, slot,
+            EvaluationFeatureExtractor::halfka_king_bucket_feature_index(
+                bucket, real, Piece{placed, mover}, to), 1);
+        if (kind == MoveKind::castling) {
+            const bool king_side = mover == Color::white ? to.index() == 6U :
+                                                           to.index() == 62U;
+            const std::uint8_t rook_from = mover == Color::white ?
+                (king_side ? 7U : 0U) : (king_side ? 63U : 56U);
+            const std::uint8_t rook_to = mover == Color::white ?
+                (king_side ? 5U : 3U) : (king_side ? 61U : 59U);
+            apply_feature_delta(index, slot,
+                EvaluationFeatureExtractor::halfka_king_bucket_feature_index(
+                    bucket, real, Piece{PieceType::rook, mover},
+                    Square::from_index(rook_from)), -1);
+            apply_feature_delta(index, slot,
+                EvaluationFeatureExtractor::halfka_king_bucket_feature_index(
+                    bucket, real, Piece{PieceType::rook, mover},
+                    Square::from_index(rook_to)), 1);
+        }
+    }
+}
+
+bool NnueWorker::prepare_child_slot(const int ply, const int child_slot,
+                                    const std::uint64_t parent_key) {
+    const std::size_t child = static_cast<std::size_t>(child_slot);
+    if (scratch_valid_ && scratch_key_ == parent_key) {
+        for (std::size_t index = 0; index < kIncrementalPerspectives; ++index) {
+            std::copy_n(scratch_values_[index].data(), hidden_units_,
+                        slot_values_[index].data() + child * hidden_units_);
+            slot_buckets_[index][child] = scratch_buckets_[index];
+        }
+        return true;
+    }
+    if (slot_cursor_ == ply && slot_valid_[static_cast<std::size_t>(ply)] != 0 &&
+        slot_keys_[static_cast<std::size_t>(ply)] == parent_key) {
+        copy_slot_forward(static_cast<std::size_t>(ply), child);
+        return true;
+    }
+    slot_valid_[child] = 0;
+    slot_cursor_ = -1;
+    scratch_valid_ = false;
+    ++incremental_fallback_count_;
+    return false;
+}
+
+void NnueWorker::on_make_move(const GameState& child, const MoveMetadata& metadata,
+                              const int ply, const std::uint64_t parent_key) {
+    if (!supports_incremental()) {
+        return;
+    }
+    ensure_incremental_storage();
+    const int child_slot = ply + 1;
+    if (ply < 0 || static_cast<std::size_t>(child_slot) >= kIncrementalSlotCount) {
+        slot_cursor_ = -1;
+        scratch_valid_ = false;
+        ++incremental_fallback_count_;
+        return;
+    }
+    if (!prepare_child_slot(ply, child_slot, parent_key)) {
+        return;
+    }
+    apply_move_deltas(child, metadata, static_cast<std::size_t>(child_slot));
+    slot_keys_[static_cast<std::size_t>(child_slot)] = child.position_key();
+    slot_valid_[static_cast<std::size_t>(child_slot)] = 1;
+    slot_cursor_ = child_slot;
+    ++incremental_make_count_;
+}
+
+void NnueWorker::on_unmake_move(const int child_ply) {
+    if (!supports_incremental()) {
+        return;
+    }
+    const int parent = child_ply - 1;
+    slot_cursor_ = (parent >= 0 &&
+                    static_cast<std::size_t>(parent) < kIncrementalSlotCount &&
+                    slot_valid_[static_cast<std::size_t>(parent)] != 0) ? parent : -1;
+}
+
+void NnueWorker::on_make_null_move(const GameState& child, const int ply,
+                                   const std::uint64_t parent_key) {
+    if (!supports_incremental()) {
+        return;
+    }
+    ensure_incremental_storage();
+    const int child_slot = ply + 1;
+    if (ply < 0 || static_cast<std::size_t>(child_slot) >= kIncrementalSlotCount) {
+        slot_cursor_ = -1;
+        scratch_valid_ = false;
+        ++incremental_fallback_count_;
+        return;
+    }
+    if (!prepare_child_slot(ply, child_slot, parent_key)) {
+        return;
+    }
+    slot_keys_[static_cast<std::size_t>(child_slot)] = child.position_key();
+    slot_valid_[static_cast<std::size_t>(child_slot)] = 1;
+    slot_cursor_ = child_slot;
+    ++incremental_make_count_;
+}
+
+void NnueWorker::on_unmake_null_move(const int child_ply) {
+    on_unmake_move(child_ply);
 }
 
 namespace {
@@ -1094,6 +1356,21 @@ public:
 
     [[nodiscard]] int evaluate(const GameState& state, const Color perspective) override {
         return worker_.evaluate(state, perspective);
+    }
+
+    void on_make_move(const GameState& state, const MoveMetadata& metadata, const int ply,
+                      const std::uint64_t parent_key) override {
+        worker_.on_make_move(state, metadata, ply, parent_key);
+    }
+    void on_unmake_move(const int child_ply) override {
+        worker_.on_unmake_move(child_ply);
+    }
+    void on_make_null_move(const GameState& state, const int ply,
+                           const std::uint64_t parent_key) override {
+        worker_.on_make_null_move(state, ply, parent_key);
+    }
+    void on_unmake_null_move(const int child_ply) override {
+        worker_.on_unmake_null_move(child_ply);
     }
 
 private:

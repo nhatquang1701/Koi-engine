@@ -352,7 +352,7 @@ int SearchContext::quiescence(GameState& state, int alpha, int beta, int ply,
                 (checked || qdepth < quiescence_check_depth_limit)) {
                 ++stats.qchecks;
             }
-            if (!state.make_search_move(metadata)) {
+            if (!make_observed(state, metadata, ply)) {
                 // A current-position metadata record should always apply. If
                 // the defensive make path rejects it, the generated frontier
                 // was not searched completely and cannot be reported as an
@@ -366,7 +366,7 @@ int SearchContext::quiescence(GameState& state, int alpha, int beta, int ply,
             const int score = -quiescence(state, -beta, -alpha, ply + 1, qdepth + 1,
                                           metadata.move, &child_repetition_sensitive,
                                           &child_selective_bound, &child_lower_bound);
-            state.unmake_move();
+            unmake_observed(state, ply + 1);
             if (aborted) {
                 return 0;
             }
@@ -823,7 +823,7 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
             null_move_allowed,
             improving, pawn_endgame);
         if (null_move_decision.eligible && null_move_is_safe(state, ensure_features())) {
-            if (state.make_null_move()) {
+            if (make_null_observed(state, ply)) {
                 PrincipalVariation null_pv;
                 const int null_depth = std::max(
                     0, depth - null_move_decision.reduction);
@@ -836,7 +836,7 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
                     &null_repetition_sensitive, &null_selective_bound);
                 path_repetition_sensitive = path_repetition_sensitive ||
                     null_repetition_sensitive;
-                state.unmake_null_move();
+                unmake_null_observed(state, ply + 1);
                 if (aborted) {
                     return 0;
                 }
@@ -986,7 +986,7 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
                     !candidate_gives_check) {
                     continue;
                 }
-                if (!state.make_search_move(candidate)) {
+                if (!make_observed(state, candidate, ply)) {
                     continue;
                 }
                 PrincipalVariation probcut_pv;
@@ -1018,7 +1018,7 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
                         probcut_score = -kInfinity;
                     }
                 }
-                state.unmake_move();
+                unmake_observed(state, ply + 1);
                 if (aborted) {
                     return 0;
                 }
@@ -1304,7 +1304,7 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
                     singular_extension = -3;
                 }
             }
-            if (!state.make_search_move(metadata)) {
+            if (!make_observed(state, metadata, ply)) {
                 // A failed metadata application should be impossible for a
                 // generator-owned candidate, but it still consumed one move
                 // slot. Keep move-number-dependent pruning deterministic if a
@@ -1428,7 +1428,7 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
                     if (capture_see) {
                         ++stats.see_prunes;
                     }
-                    state.unmake_move();
+                    unmake_observed(state, ply + 1);
                     ++move_number;
                     frame.move_count = move_number;
                     continue;
@@ -1446,7 +1446,7 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
             if (child_futility) {
                 selective_pruning = true;
                 ++stats.quiet_futility_prunes;
-                state.unmake_move();
+                unmake_observed(state, ply + 1);
                 ++move_number;
                 frame.move_count = move_number;
                 continue;
@@ -1457,7 +1457,7 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
                     move.promotion() != Promotion::none, move_number, static_eval, depth, alpha)) {
                 selective_pruning = true;
                 ++stats.quiet_futility_prunes;
-                state.unmake_move();
+                unmake_observed(state, ply + 1);
                 ++move_number;
                 frame.move_count = move_number;
                 continue;
@@ -1552,7 +1552,7 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
             // repetition-sensitive alternative from the path contract.
             path_repetition_sensitive = path_repetition_sensitive ||
                 child_repetition_sensitive;
-            state.unmake_move();
+            unmake_observed(state, ply + 1);
             if (aborted) {
                 return 0;
             }

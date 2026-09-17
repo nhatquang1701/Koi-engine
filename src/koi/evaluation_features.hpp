@@ -78,6 +78,14 @@ public:
         const EvaluationFeatures&) noexcept;
     [[nodiscard]] static NnueSparseFeaturesV4 encode_sparse_v4(
         const EvaluationFeatures&) noexcept;
+    // Perspective-aware variants used by the incremental accumulator: the
+    // perspective is a real color, not necessarily the side to move.
+    [[nodiscard]] static NnueSparseFeaturesV4 encode_sparse_v4(
+        const EvaluationFeatures&, Color perspective) noexcept;
+    [[nodiscard]] static std::size_t halfka_king_bucket_for(
+        const EvaluationFeatures&, Color perspective) noexcept;
+    [[nodiscard]] static std::uint16_t halfka_king_bucket_feature_index(
+        std::size_t bucket, Color perspective, Piece piece, Square square) noexcept;
 };
 
 } // namespace koi

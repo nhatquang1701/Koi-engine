@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <memory>
 
 #include "koi/game_state.hpp"
@@ -10,6 +11,20 @@ class EvaluatorWorker {
 public:
     virtual ~EvaluatorWorker() = default;
     [[nodiscard]] virtual int evaluate(const GameState&, Color) = 0;
+
+    // Advisory search-lifecycle notifications. Stateful evaluators can use
+    // them to maintain incremental state instead of recomputing from scratch.
+    // They are hints only: an evaluator must still produce a correct result
+    // when any notification is skipped, so implementations may treat them as
+    // "maybe update" and verify against the position key before trusting any
+    // cached state. `parent_key` is the position key before the move; `ply`
+    // is the ply of the parent position, and the child ply is `ply + 1`.
+    virtual void on_make_move(const GameState&, const MoveMetadata&, int /*ply*/,
+                              std::uint64_t /*parent_key*/) {}
+    virtual void on_unmake_move(int /*child_ply*/) {}
+    virtual void on_make_null_move(const GameState&, int /*ply*/,
+                                   std::uint64_t /*parent_key*/) {}
+    virtual void on_unmake_null_move(int /*child_ply*/) {}
 };
 
 class Evaluator {

@@ -2,9 +2,11 @@
 #include <fstream>
 #include <algorithm>
 #include <array>
+#include <cstdint>
 #include <limits>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "koi/classical_evaluator.hpp"
@@ -754,6 +756,149 @@ void test_v4_container_rejects_corruption_and_legacy_versions() {
             "a missing NNUE file must report an IO error");
 }
 
+void verify_incremental_against_reference(koi::NnueWorker& incremental,
+                                          koi::NnueWorker& reference,
+                                          const koi::GameState& state) {
+    const koi::Color mover = state.side_to_move();
+    const int incremental_score = incremental.evaluate(state, mover);
+    const int reference_score = reference.evaluate(state, mover);
+    require(incremental_score == reference_score,
+            "incremental v4 score must match a full recompute: " +
+                std::to_string(incremental_score) + " != " +
+                std::to_string(reference_score));
+    require(incremental.accumulator().values == reference.accumulator().values &&
+                incremental.accumulator().bottleneck_values ==
+                    reference.accumulator().bottleneck_values,
+            "incremental v4 accumulators must match a full recompute");
+    require(incremental.evaluate(state, koi::opposite(mover)) == -incremental_score,
+            "incremental v4 evaluation must mirror the requested perspective");
+}
+
+void walk_incremental_game(const std::string_view fen, const int plies,
+                           const std::uint64_t seed) {
+    const auto parsed = koi::GameState::from_fen(fen);
+    require(parsed.has_value(), "incremental fixture FEN must parse");
+    koi::GameState state = *parsed;
+    const auto weights =
+        std::make_shared<const koi::NnueNetwork>(koi::NnueNetwork::synthetic_v4());
+    koi::NnueWorker incremental(weights);
+    koi::NnueWorker reference(weights);
+    std::uint64_t rng = seed;
+    const auto next = [&rng]() {
+        rng = rng * 6364136223846793005ULL + 1442695040888963407ULL;
+        return rng;
+    };
+
+    verify_incremental_against_reference(incremental, reference, state);
+    const std::uint64_t fallbacks = incremental.incremental_fallback_count();
+
+    std::vector<bool> null_steps;
+    for (int ply = 0; ply < plies; ++ply) {
+        if ((next() % 7U) == 0U) {
+            const std::uint64_t parent_key = state.position_key();
+            if (!state.make_null_move()) {
+                break;
+            }
+            incremental.on_make_null_move(state, ply, parent_key);
+            null_steps.push_back(true);
+            verify_incremental_against_reference(incremental, reference, state);
+            continue;
+        }
+        const std::vector<koi::MoveMetadata> moves = state.legal_moves_with_metadata();
+        if (moves.empty()) {
+            break;
+        }
+        const koi::MoveMetadata& metadata =
+            moves[static_cast<std::size_t>(next() % moves.size())];
+        const std::uint64_t parent_key = state.position_key();
+        require(state.make_search_move(metadata), "incremental fixture move must be legal");
+        incremental.on_make_move(state, metadata, ply, parent_key);
+        null_steps.push_back(false);
+        verify_incremental_against_reference(incremental, reference, state);
+    }
+
+    for (int index = static_cast<int>(null_steps.size()) - 1; index >= 0; --index) {
+        const int child_ply = index + 1;
+        if (null_steps[static_cast<std::size_t>(index)]) {
+            incremental.on_unmake_null_move(child_ply);
+            require(state.unmake_null_move(), "incremental fixture null move must unmake");
+        } else {
+            incremental.on_unmake_move(child_ply);
+            state.unmake_move();
+        }
+        verify_incremental_against_reference(incremental, reference, state);
+    }
+
+    require(incremental.incremental_fallback_count() == fallbacks,
+            "provided hooks must never force a full incremental fallback");
+}
+
+void test_v4_incremental_matches_full_recompute() {
+    walk_incremental_game("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", 28,
+                          0xA5A5A5A5ULL);
+    walk_incremental_game("rnbqkbnr/ppp1p1pp/8/3pPp2/8/8/PPPP1PPP/RNBQKBNR w KQkq f6 0 3", 20,
+                          0x123456789ULL);
+    walk_incremental_game("4k3/P6p/8/8/8/8/7P/4K3 w - - 0 1", 16, 0xDEADBEEFULL);
+    walk_incremental_game("r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1", 12, 0xC0FFEEULL);
+}
+
+void test_v4_incremental_handles_king_bucket_crossing() {
+    const auto weights =
+        std::make_shared<const koi::NnueNetwork>(koi::NnueNetwork::synthetic_v4());
+    koi::GameState state = koi::GameState::startpos();
+    koi::NnueWorker incremental(weights);
+    koi::NnueWorker reference(weights);
+    verify_incremental_against_reference(incremental, reference, state);
+    const std::uint64_t fallbacks = incremental.incremental_fallback_count();
+
+    int ply = 0;
+    for (const std::string_view move_text :
+         {"d2d4", "e7e5", "e1d2", "e8e7", "d2d3", "e7d6"}) {
+        const auto move = koi::Move::parse_uci(move_text);
+        require(move.has_value(), "king-bucket fixture move must parse");
+        const auto metadata = state.describe_move(*move);
+        require(metadata.has_value(), "king-bucket fixture move must describe");
+        const std::uint64_t parent_key = state.position_key();
+        require(state.make_search_move(*metadata), "king-bucket fixture move must be legal");
+        incremental.on_make_move(state, *metadata, ply, parent_key);
+        ++ply;
+        verify_incremental_against_reference(incremental, reference, state);
+    }
+
+    for (int index = ply - 1; index >= 0; --index) {
+        incremental.on_unmake_move(index + 1);
+        state.unmake_move();
+        verify_incremental_against_reference(incremental, reference, state);
+    }
+
+    require(incremental.incremental_fallback_count() == fallbacks,
+            "a king-bucket crossing must refresh in place without a full fallback");
+}
+
+void test_v4_incremental_recovers_from_skipped_hooks() {
+    const auto weights =
+        std::make_shared<const koi::NnueNetwork>(koi::NnueNetwork::synthetic_v4());
+    koi::GameState state = koi::GameState::startpos();
+    koi::NnueWorker incremental(weights);
+    koi::NnueWorker reference(weights);
+    verify_incremental_against_reference(incremental, reference, state);
+    const std::uint64_t after_root = incremental.incremental_fallback_count();
+
+    const auto move = koi::Move::parse_uci("e2e4");
+    require(move.has_value(), "recovery fixture move must parse");
+    const auto metadata = state.describe_move(*move);
+    require(metadata.has_value(), "recovery fixture move must describe");
+    require(state.make_search_move(*metadata), "recovery fixture move must be legal");
+    verify_incremental_against_reference(incremental, reference, state);
+    require(incremental.incremental_fallback_count() == after_root + 1,
+            "a skipped make hook must fall back to a full recompute");
+
+    state.unmake_move();
+    verify_incremental_against_reference(incremental, reference, state);
+    require(incremental.incremental_fallback_count() == after_root + 2,
+            "a skipped make hook must also fall back after unmaking");
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -781,6 +926,9 @@ int main(int argc, char** argv) {
         {"NNUE v4 container", test_v4_container_round_trip_and_validation},
         {"NNUE v4 validation", test_v4_manifest_validation_rejects_mismatches},
         {"NNUE v4 corruption", test_v4_container_rejects_corruption_and_legacy_versions},
+        {"NNUE v4 incremental walk", test_v4_incremental_matches_full_recompute},
+        {"NNUE v4 incremental king bucket", test_v4_incremental_handles_king_bucket_crossing},
+        {"NNUE v4 incremental recovery", test_v4_incremental_recovers_from_skipped_hooks},
         {"external NNUE container", test_external_v2_container},
     };
     return koi::test::run_tests(tests, argc, argv);

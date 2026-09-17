@@ -1,4 +1,5 @@
 #include <iostream>
+#include <cstdint>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -8,6 +9,7 @@
 #include "koi/detail/evaluation_context.hpp"
 #include "koi/detail/search_context.hpp"
 #include "koi/evaluator.hpp"
+#include "koi/move.hpp"
 
 #include "koi_test_support.hpp"
 
@@ -23,6 +25,28 @@ public:
         return value_;
     }
 
+    void on_make_move(const koi::GameState&, const koi::MoveMetadata&, const int,
+                      const std::uint64_t) override {
+        ++make_moves;
+    }
+
+    void on_unmake_move(const int) override {
+        ++unmake_moves;
+    }
+
+    void on_make_null_move(const koi::GameState&, const int, const std::uint64_t) override {
+        ++make_nulls;
+    }
+
+    void on_unmake_null_move(const int) override {
+        ++unmake_nulls;
+    }
+
+    int make_moves = 0;
+    int unmake_moves = 0;
+    int make_nulls = 0;
+    int unmake_nulls = 0;
+
 private:
     int value_;
 };
@@ -35,10 +59,13 @@ public:
 
     std::unique_ptr<koi::EvaluatorWorker> create_worker() const override {
         ++worker_creations;
-        return std::make_unique<CountingWorker>(17);
+        auto worker = std::make_unique<CountingWorker>(17);
+        last_worker = worker.get();
+        return worker;
     }
 
     mutable int worker_creations = 0;
+    mutable CountingWorker* last_worker = nullptr;
 };
 
 class BaseOnlyEvaluator final : public koi::Evaluator {
@@ -77,6 +104,36 @@ void test_search_context_owns_evaluation_execution_boundary() {
             "search context must expose a private evaluation-context boundary");
 }
 
+void test_evaluation_context_forwards_advisory_notifications() {
+    WorkerEvaluator evaluator;
+    koi::detail::EvaluationContext context(evaluator, nullptr);
+    require(evaluator.last_worker != nullptr,
+            "notification forwarding requires a private worker");
+
+    koi::GameState state = koi::GameState::startpos();
+    const auto move = koi::Move::parse_uci("e2e4");
+    require(move.has_value(), "notification fixture move must parse");
+    const auto metadata = state.describe_move(*move);
+    require(metadata.has_value(), "notification fixture move must describe");
+
+    context.notify_make_move(state, *metadata, 0, state.position_key());
+    context.notify_unmake_move(1);
+    context.notify_make_null_move(state, 1, state.position_key());
+    context.notify_unmake_null_move(2);
+    require(evaluator.last_worker->make_moves == 1 &&
+                evaluator.last_worker->unmake_moves == 1 &&
+                evaluator.last_worker->make_nulls == 1 &&
+                evaluator.last_worker->unmake_nulls == 1,
+            "evaluation context must forward every advisory notification");
+
+    BaseOnlyEvaluator base_only;
+    koi::detail::EvaluationContext base_context(base_only, nullptr);
+    base_context.notify_make_move(state, *metadata, 0, state.position_key());
+    base_context.notify_unmake_move(1);
+    base_context.notify_make_null_move(state, 1, state.position_key());
+    base_context.notify_unmake_null_move(2);
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -84,6 +141,8 @@ int main(int argc, char** argv) {
         {"worker ownership", test_worker_context_owns_one_private_worker_per_search_context},
         {"base fallback", test_worker_context_preserves_base_evaluator_fallback},
         {"search evaluation boundary", test_search_context_owns_evaluation_execution_boundary},
+        {"advisory notification forwarding",
+         test_evaluation_context_forwards_advisory_notifications},
     };
 
     return koi::test::run_tests(tests, argc, argv);
