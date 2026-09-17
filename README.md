@@ -116,7 +116,7 @@ From an x64 Visual Studio developer shell in the repository root:
 ```powershell
 cmake -S . -B build\release -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=cl
 cmake --build build\release --config Release
-ctest --test-dir build\release -C Release --output-on-failure
+ctest --test-dir build\release -C Release -j 8 --output-on-failure
 ```
 
 For a Debug build, substitute `build\debug` and `Debug` in those commands. The
@@ -410,17 +410,24 @@ continues to evaluate standard FIDE chess.
 
 ### Test inventory and known gaps
 
-The checkout registers 45 CTest tests: 44 by default when python-chess is
-available (43 without the python-chess-gated oracle test), plus one more when
-the opt-in `KOI_BUILD_SHADOW_DIFF` target is enabled (CI enables it).
+The full local configuration registers 53 CTest tests (python-chess installed,
+`KOI_BUILD_SHADOW_DIFF=ON`, cutechess-cli present); the count drops when those
+optional pieces are absent. `koi_search_tests`, the heaviest suite, is
+registered as four shards, every test carries labels (`unit`, `integration`,
+`process`, `python`, `heavy`, and focused sub-labels), and the whole suite runs
+in parallel (`ctest -j`; `tools/test/run_tests.ps1` builds, runs it with JUnit
+and `LastTest.log` capture, and retries transient host crashes).
 `tests/README.md` documents the
-full inventory, how to run the whole suite or a single test (`KOI_TEST_FILTER`),
-the environment variables (`KOI_UCI_TIMEOUT_MS`, `KOI_REPLAY_PATH`,
-`PYTHONDONTWRITEBYTECODE`, `KOI_NNUE_BOUNDARY_EXE`), optional-dependency skips,
-and per-test timeouts. `koi_search_tests` keeps a `known_failures` list for
-behavior expectations that the in-progress search rewrite does not meet yet;
-those are reported as `XFAIL` so the suite stays deterministic and green while
-the gaps remain visible (see `tests/README.md`). The dated counts in the
+full inventory, how to run the whole suite or a single test (`KOI_TEST_FILTER`,
+`--filter`, `--shard`), the environment variables (`KOI_TEST_RETRIES`,
+`KOI_ALLOW_XPASS`, `KOI_TEST_TIMEOUT_SECONDS`, `KOI_UCI_TIMEOUT_MS`,
+`KOI_REPLAY_PATH`, `PYTHONDONTWRITEBYTECODE`, `KOI_NNUE_BOUNDARY_EXE`),
+optional-dependency skips, and per-test timeouts. `koi_search_tests` keeps a
+`known_failures` list for behavior expectations that the in-progress search
+rewrite does not meet yet; those are reported as `XFAIL` so the suite stays
+deterministic and green while the gaps remain visible, and an unexpected pass
+(`XPASS`) now fails the run so the list cannot go stale (see
+`tests/README.md`). The dated counts in the
 verification snapshots below ("17 targets", "26 tests") are historical records
 from the 2026-09-05 and 2026-09-06 runs, not the current inventory.
 

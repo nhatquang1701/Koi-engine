@@ -86,6 +86,19 @@ if (Test-Path -LiteralPath $evidenceManifestPath -PathType Leaf) {
 
 $cache = Get-Content -LiteralPath (Join-Path $releaseDirectory 'CMakeCache.txt') -ErrorAction SilentlyContinue
 $compiler = $cache | Where-Object { $_ -like 'CMAKE_CXX_COMPILER:*=*' } | Select-Object -First 1
+
+# Report the summary of the most recent CTest run instead of a frozen count,
+# so the manifest cannot drift from the suite inventory.
+$releaseCtestSummary = 'not recorded'
+$lastTestLog = Join-Path $releaseDirectory 'Testing\Temporary\LastTest.log'
+if (Test-Path -LiteralPath $lastTestLog -PathType Leaf) {
+    $summaryMatch = Select-String -LiteralPath $lastTestLog -Pattern 'tests passed, .*tests failed out of' -ErrorAction SilentlyContinue |
+        Select-Object -Last 1
+    if ($null -ne $summaryMatch) {
+        $releaseCtestSummary = $summaryMatch.Line.Trim()
+    }
+}
+
 $organization = [ordered]@{
     schema = 'koi-organization-manifest-v1'
     generated_utc = (Get-Date).ToUniversalTime().ToString('o')
@@ -102,7 +115,7 @@ $organization = [ordered]@{
     verification = [ordered]@{
         release_build = 'passed'
         debug_build = 'passed'
-        release_ctest = '100% tests passed, 0 tests failed out of 36'
+        release_ctest = $releaseCtestSummary
         canonical_output_root = 'build/'
         canonical_artifact_root = 'artifacts/'
     }

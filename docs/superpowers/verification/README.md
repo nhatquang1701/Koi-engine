@@ -14,3 +14,4 @@ strength pass. Paths are intentionally stable because plans link to them.
 | `2026-09-12-search-strength-pass-working-summary.md` | Search strength pass working summary. |
 | `2026-09-16-uci-controller-improvement.md` | UCI controller improvement verification. |
 | `2026-09-16-strength-program.md` | Strength program verification (speedups, NNUE pipeline, CTest). |
+| `2026-09-17-test-suite-hardening.md` | Test-suite hardening verification (harness, parallel runs, CI). |
