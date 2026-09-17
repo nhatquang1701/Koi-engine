@@ -56,11 +56,13 @@ run=7 pass=7, `search_service_tests` run=7 pass=7 (includes the in-place
 ponderhit conversion), `classical_evaluator_tests` run=7 pass=7,
 `evaluation_features_tests` run=6 pass=6.
 
-Debug smoke (unit, heavy excluded, `KOI_TIMEOUT_SCALE` auto = 3):
-**23/23 passed, total 9.49 s** (results in
-`artifacts/verification/2026-09-17-test-suite-hardening/debug-smoke`),
-including the four new suites and `uci_controller_tests` (9.20 s). This is the
-same subset the CI `debug-smoke` job runs.
+Debug smoke (Debug tree, heavy label excluded,
+`tools/test/run_tests.ps1 -NoBuild -Configuration Debug -Parallel 4 -ExcludeLabel heavy`):
+**45/45 passed, total 71.25 s** (results in
+`artifacts/verification/2026-09-17-test-suite-hardening/debug-smoke-final`).
+An earlier focused Debug run of the fast unit suites was 23/23 in 9.49 s
+(`.../debug-smoke`). The 45-test set is the same subset the CI `debug-smoke`
+job runs, and it includes the four new suites and `uci_controller_tests`.
 
 ## Flake probes
 
