@@ -48,6 +48,10 @@ result honestly.
       enemy king through the post-move occupancy. Vacated squares (source,
       en-passant square, castling rook square) are removed from the friendly
       slider masks.
+- [x] B6: static exchange evaluation no longer builds or reuses the evaluation
+      feature snapshot; `direct_static_exchange_gain` and `finalize_metadata`
+      use a lightweight `ExchangeContext` (piece scan plus king squares). The
+      static exchange test now asserts the new contract.
 - Deferred: bitboard move generation, fully incremental legality (pins and
   checkers instead of apply/undo), power-of-two TT indexing and prefetch,
   parallel-root `GameState` copy elimination, persistent worker pool and lazy
@@ -95,4 +99,4 @@ interior probing and book auditing cannot be validated here.
 - [x] Plan and verification records added under `docs/superpowers/`.
 - [x] Full Release CTest run recorded in the verification record.
 - [x] Phase commits: `7e9d96c`, `16c8ce7`, `e46e4c0`, `d21da4d`, `03db674`,
-      `0b7cdb4`.
+      `0b7cdb4`, `4828f30`, `5258065`.

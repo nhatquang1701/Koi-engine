@@ -23,6 +23,7 @@ measured on this checkout; nothing is projected.
 | Attack tables | `src/koi/detail/attack_tables.{hpp,cpp}`, `src/koi/position.cpp` | `d21da4d` |
 | NNUE v3 container | `src/koi/nnue.{hpp,cpp}`, `tools/measurement/train_nnue_sf.py`, `tests/unit/evaluation/nnue_boundary_tests.cpp`, `tools/engine/koi_bench.cpp` | `03db674` |
 | O(1) check flags | `src/koi/game_state.cpp` | `0b7cdb4` |
+| Lightweight SEE context | `src/koi/game_state.{hpp,cpp}`, `tests/unit/search/static_exchange_tests.cpp` | `5258065` |
 
 ## Speed
 
@@ -31,7 +32,9 @@ measured on this checkout; nothing is projected.
 - Raw stdin/stdout probe, startpos, `Threads=1`, `Hash=256`, `go depth 6`:
   - before the hot-path series: 406,067 nodes in 6,918 ms, 58,697 nps;
   - after the attack tables and the O(1) check flags: 406,067 nodes in
-    4,668 ms, 86,989 nps (about +48% throughput, a third less time).
+    4,668 ms, 86,989 nps (about +48% throughput, a third less time);
+  - after the lightweight SEE context: 406,067 nodes in 4,578 ms,
+    88,699 nps.
   The identical node count proves the search tree did not change.
 - NNUE probe (same command, `KOI_NNUE_PATH` set): depth 6 covers
   1,175,585 nodes at 64,624 nps. The bigger tree is an eval/ordering effect,
