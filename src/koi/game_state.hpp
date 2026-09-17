@@ -303,8 +303,7 @@ private:
     bool apply_generated_move(const MoveMetadata&, bool verify_shadow_legality,
                               bool verify_mirror) noexcept;
     void finalize_metadata(MoveMetadataList&, std::uint64_t position_key,
-                           bool include_see,
-                           const PositionFeatures* exchange_features = nullptr) const noexcept;
+                           bool include_see) const noexcept;
     void invalidate_feature_cache() noexcept;
 
     friend int detail::static_exchange_gain(const GameState&, const MoveMetadata&) noexcept;

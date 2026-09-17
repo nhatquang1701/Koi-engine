@@ -1478,7 +1478,34 @@ bool exchange_recapture_is_legal(std::array<Piece, 64>& board, std::array<int, 2
     return legal;
 }
 
-int static_exchange_gain_from_features(const PositionFeatures& features,
+// Lightweight board view for static exchange evaluation.  SEE only needs the
+// mailbox layout, the king squares, and the side to move; building the full
+// evaluation feature set (attack maps, pawn structure, phase, and so on) for
+// every node that contains a capture was wasted work.
+struct ExchangeContext {
+    std::array<Piece, 64> board{};
+    std::array<int, 2> king_squares{-1, -1};
+    Color side_to_move = Color::white;
+};
+
+ExchangeContext exchange_context_from(const Position& position) noexcept {
+    ExchangeContext context;
+    for (int square = 0; square < 64; ++square) {
+        context.board[static_cast<std::size_t>(square)] =
+            position.piece_at(Square::from_index(square));
+    }
+    for (const Color color : {Color::white, Color::black}) {
+        const std::uint64_t king = position.piece_bitboard(PieceType::king, color);
+        if (king != 0) {
+            context.king_squares[color == Color::white ? 0 : 1] =
+                static_cast<int>(std::countr_zero(king));
+        }
+    }
+    context.side_to_move = position.side_to_move();
+    return context;
+}
+
+int static_exchange_gain_from_features(const ExchangeContext& context,
                                        const MoveMetadata& initial) noexcept {
     const Move move = initial.move;
     if (move.is_no_move() || move.from().index() == Square::kInvalid ||
@@ -1487,11 +1514,8 @@ int static_exchange_gain_from_features(const PositionFeatures& features,
         return 0;
     }
 
-    std::array<Piece, 64> board = features.board;
-    std::array<int, 2> king_squares{
-        static_cast<int>(features.king_squares[0].index()),
-        static_cast<int>(features.king_squares[1].index()),
-    };
+    std::array<Piece, 64> board = context.board;
+    std::array<int, 2> king_squares = context.king_squares;
     const int source = move.from().index();
     const int target = move.to().index();
     if (!exchange_square_valid(source) || !exchange_square_valid(target)) {
@@ -1499,7 +1523,7 @@ int static_exchange_gain_from_features(const PositionFeatures& features,
     }
 
     const Piece moving_piece = board[static_cast<std::size_t>(source)];
-    if (moving_piece.empty() || moving_piece.color != features.side_to_move ||
+    if (moving_piece.empty() || moving_piece.color != context.side_to_move ||
         moving_piece.type != initial.moving_piece || king_squares[0] < 0 || king_squares[1] < 0) {
         return 0;
     }
@@ -1660,8 +1684,8 @@ Piece GameState::piece_at(Square square) const noexcept {
 }
 
 int GameState::direct_static_exchange_gain(const MoveMetadata& initial) const noexcept {
-    const PositionFeatures features = position_features();
-    return static_exchange_gain_from_features(features, initial);
+    const ExchangeContext context = exchange_context_from(impl_->native_position);
+    return static_exchange_gain_from_features(context, initial);
 }
 
 std::vector<Move> GameState::legal_moves() const {
@@ -1850,15 +1874,13 @@ std::optional<MoveMetadata> GameState::metadata_for_native_move(
 }
 
 void GameState::finalize_metadata(MoveMetadataList& moves, const std::uint64_t key,
-                                  const bool include_see,
-                                  const PositionFeatures* exchange_features) const noexcept {
-    std::optional<PositionFeatures> owned_features;
-    if (include_see && exchange_features == nullptr) {
+                                  const bool include_see) const noexcept {
+    std::optional<ExchangeContext> exchange_context;
+    if (include_see) {
         const bool has_capture = std::any_of(moves.begin(), moves.end(),
             [](const MoveMetadata& metadata) { return metadata.is_capture(); });
         if (has_capture) {
-            owned_features = position_features();
-            exchange_features = &*owned_features;
+            exchange_context = exchange_context_from(impl_->native_position);
         }
     }
 
@@ -1866,9 +1888,9 @@ void GameState::finalize_metadata(MoveMetadataList& moves, const std::uint64_t k
         metadata.position_key = key;
         metadata.validation_token = metadata_validation_token(key, metadata);
         if (include_see && (metadata.is_capture() || metadata.move.promotion() != Promotion::none)) {
-            metadata.see_score = metadata.is_capture() && exchange_features != nullptr ?
+            metadata.see_score = metadata.is_capture() && exchange_context.has_value() ?
                 static_cast<std::int16_t>(std::clamp(
-                    static_exchange_gain_from_features(*exchange_features, metadata),
+                    static_exchange_gain_from_features(*exchange_context, metadata),
                     static_cast<int>(std::numeric_limits<std::int16_t>::min()),
                     static_cast<int>(std::numeric_limits<std::int16_t>::max()))) : 0;
             metadata.see_computed = true;
