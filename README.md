@@ -449,7 +449,7 @@ continues to evaluate standard FIDE chess.
 
 ### Test inventory and known gaps
 
-The default local configuration registers 57 CTest tests (python-chess
+The default local configuration registers 58 CTest tests (python-chess
 installed, `KOI_BUILD_SHADOW_DIFF=OFF`); enabling the shadow-diff oracle adds
 `koi_shadow_diff_tests`, and a local `cutechess-cli.exe` adds the optional
 stability smoke, so the count varies with those optional pieces. `koi_search_tests`, the heaviest suite, is

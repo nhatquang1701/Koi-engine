@@ -8,8 +8,8 @@ Scope: the correctness, telemetry and run-list work described in
 - Windows x64, MSVC 14.44.35207, CMake 3.31.6 (MSVC build tools), Ninja
   generator, `build/release` and `build/debug` trees.
 - Python 3.14.5 with torch 2.14.0+cpu, python-chess 1.11.2, numpy, tkinter.
-- CTest default configuration: 57 tests (`KOI_BUILD_SHADOW_DIFF=OFF`); this pass
-  adds one Python test target.
+- CTest default configuration after this pass: 58 tests
+  (`KOI_BUILD_SHADOW_DIFF=OFF`); 8 of them carry the `heavy` label.
 
 ## Phase 0 — documentation scaffolding
 
@@ -189,8 +189,36 @@ tests/python/nnue/studio_test.py` → 33/33 pass in 5.296 s (21 UI + 12 studio).
 
 ## Phase 4 — verification
 
-Pending.
+Both build trees were rebuilt after the CMake change; `nnue_studio_ui_python` is
+test 56 of 58 in each tree and 8 tests carry the `heavy` label.
+
+| Configuration | Command | Result |
+| --- | --- | --- |
+| Release, full | `ctest --test-dir build/release -j 4 --output-on-failure` | 58/58 passed, 1180.91 s (`ctest-release.log`) |
+| Debug, non-heavy | `ctest --test-dir build/debug -LE heavy -j 4 --output-on-failure` | 50/50 passed, 73.91 s (`ctest-debug.log`) |
+
+`nnue_studio_ui_python` passed in 0.39 s inside the Release run. Direct runs:
+`tests/python/nnue/studio_ui_test.py` 21/21, `tests/python/nnue/studio_test.py`
+12/12 (33/33 combined in 5.296 s), `--gui-selftest` → `PASS gui construction`.
+
+Documentation synchronization: the README and `tests/README.md` test-inventory
+sentences now state 58 default tests, this record's environment line was
+updated, and the plan's Phase 4 checkbox is marked. No engine, UCI, or trainer
+behavior changed in this pass, so the release-verification gates from the
+previous pass remain the authoritative engine evidence.
 
 ## Limitations
 
-Pending.
+- The Studio remains a local tool: no GUI automation beyond widget construction,
+  no CI runner for the Tk flows, and no validation outside Windows.
+- Telemetry depends on the trainer log contract; a trainer that changes its
+  wording drops the new series while the older fields still parse. The `loaded`
+  throughput event is only emitted by the two Python trainers.
+- `net_name` sanitizes to a basename inside the run directory; a name containing
+  a path separator is flattened rather than creating subdirectories.
+- The run-list helpers read `state.json` and `train.err` opportunistically; a run
+  removed outside the Studio simply disappears on the next refresh.
+- Deferred by design: data-run attach/encode, advanced per-backend config,
+  preset save/load, validation cancellation and report links, net-vs-net
+  controls, run deletion and continue-from-checkpoint, CLI/JSON parity.
+- No Elo or CPL claim; engine strength evidence is unchanged by this pass.
