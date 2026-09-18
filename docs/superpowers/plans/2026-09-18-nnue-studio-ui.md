@@ -51,7 +51,7 @@ turns the run list into a filterable, sortable view with failure details.
   `seconds`, rows loaded and throughput; ETA and summary helpers; a multi-series
   validation chart with axes and a legend; log filtering with pause-on-scroll;
   tests; commit.
-- [ ] **Phase 3 — Run list UX and failure surfacing.** Run filtering, sortable
+- [x] **Phase 3 — Run list UX and failure surfacing.** Run filtering, sortable
   columns, duration, a detail pane, an auto-refresh timer, and a failed-run
   report that includes the exit code and the tail of `train.err`; tests; commit.
 - [ ] **Phase 4 — Verification.** Full release and debug CTest runs, the final

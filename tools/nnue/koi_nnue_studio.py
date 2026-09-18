@@ -455,25 +455,41 @@ class StudioApp:
         frame = tk.ttk.Frame(notebook, padding=12)
         notebook.add(frame, text="Runs")
 
-        columns = ("run", "kind", "status", "val_mae", "net")
-        self.runs_tree = tk.ttk.Treeview(frame, columns=columns, show="headings", height=16)
+        filters = tk.ttk.Frame(frame)
+        filters.grid(row=0, column=0, columnspan=6, sticky="we")
+        tk.ttk.Label(filters, text="Filter").pack(side="left")
+        self.runs_filter_var = tk.StringVar(value="")
+        tk.ttk.Entry(filters, textvariable=self.runs_filter_var, width=28).pack(side="left", padx=(4, 0))
+        self.runs_filter_var.trace_add("write", lambda *_args: self._refresh_runs())
+
+        columns = ("run", "kind", "status", "val_mae", "duration", "net")
+        self.runs_tree = tk.ttk.Treeview(frame, columns=columns, show="headings", height=14)
         for column, heading, width in [
-            ("run", "Run", 260),
-            ("kind", "Kind", 80),
+            ("run", "Run", 240),
+            ("kind", "Kind", 70),
             ("status", "Status", 90),
             ("val_mae", "Val MAE (cp)", 100),
-            ("net", "Network", 240),
+            ("duration", "Duration", 90),
+            ("net", "Network", 220),
         ]:
-            self.runs_tree.heading(column, text=heading)
+            self.runs_tree.heading(column, text=heading, command=lambda name=column: self._sort_runs(name))
             self.runs_tree.column(column, width=width, anchor="w")
-        self.runs_tree.grid(row=0, column=0, columnspan=6, sticky="nsew")
-        frame.rowconfigure(0, weight=1)
+        self.runs_tree.grid(row=1, column=0, columnspan=6, sticky="nsew")
+        self.runs_tree.bind("<<TreeviewSelect>>", lambda _event: self._show_run_detail())
+        frame.rowconfigure(1, weight=1)
 
-        tk.ttk.Button(frame, text="Refresh", command=self._refresh_runs).grid(row=1, column=0, sticky="w", pady=8)
-        tk.ttk.Button(frame, text="Attach to selected", command=self._attach_selected).grid(row=1, column=1, padx=4)
-        tk.ttk.Button(frame, text="Use network", command=self._use_selected_net).grid(row=1, column=2, padx=4)
-        tk.ttk.Button(frame, text="Open folder", command=self._open_selected_run).grid(row=1, column=3, padx=4)
-        tk.ttk.Button(frame, text="Stop selected", command=self._stop_selected).grid(row=1, column=4, padx=4)
+        buttons = tk.ttk.Frame(frame)
+        buttons.grid(row=2, column=0, columnspan=6, sticky="we", pady=8)
+        tk.ttk.Button(buttons, text="Refresh", command=self._refresh_runs).pack(side="left")
+        tk.ttk.Button(buttons, text="Attach to selected", command=self._attach_selected).pack(side="left", padx=4)
+        tk.ttk.Button(buttons, text="Use network", command=self._use_selected_net).pack(side="left", padx=4)
+        tk.ttk.Button(buttons, text="Open folder", command=self._open_selected_run).pack(side="left", padx=4)
+        tk.ttk.Button(buttons, text="Stop selected", command=self._stop_selected).pack(side="left", padx=4)
+
+        self.runs_detail = tk.Text(frame, height=9, wrap="word", background="#f7f7f7", foreground="#333333")
+        self.runs_detail.grid(row=3, column=0, columnspan=6, sticky="nsew")
+        self.runs_detail.configure(state="disabled")
+        self.runs_sort = ("run", True)
 
     # -- helpers ------------------------------------------------------------
 
@@ -744,31 +760,58 @@ class StudioApp:
     # -- runs list ----------------------------------------------------------
 
     def _refresh_runs(self) -> None:
+        selected = self._selected_name()
         self.runs_tree.delete(*self.runs_tree.get_children())
-        for run in core.list_runs():
+        runs = core.filter_runs(core.list_runs(), self.runs_filter_var.get())
+        key, descending = self.runs_sort
+        runs = core.sort_runs(runs, key, descending)
+        for run in runs:
             state = core.refresh_state(run)
             progress = state.get("progress", {})
             backend = self._run_backend(run)
             net = backend.net_path(run.directory, run.config) if backend else run.net_path
+            duration = core.run_duration_seconds(state)
             self.runs_tree.insert(
                 "",
                 "end",
+                iid=run.directory.name,
                 values=(
                     run.directory.name,
                     state.get("kind", "?"),
                     state.get("status", "unknown"),
                     progress.get("val_mae_cp", ""),
+                    core.format_duration(duration) if duration is not None else "",
                     str(net) if net.exists() else "",
                 ),
             )
+        if selected and self.runs_tree.exists(selected):
+            self.runs_tree.selection_set(selected)
+        self._show_run_detail()
         self.status_var.set(f"{len(self.runs_tree.get_children())} runs")
 
-    def _selected_run(self) -> core.Run | None:
+    def _sort_runs(self, key: str) -> None:
+        current_key, descending = self.runs_sort
+        self.runs_sort = (key, not descending if key == current_key else False)
+        self._refresh_runs()
+
+    def _show_run_detail(self) -> None:
+        run = self._selected_run()
+        self.runs_detail.configure(state="normal")
+        self.runs_detail.delete("1.0", "end")
+        if run:
+            self.runs_detail.insert("1.0", "\n".join(core.run_detail_lines(run)))
+        self.runs_detail.configure(state="disabled")
+
+    def _selected_name(self) -> str | None:
         selection = self.runs_tree.selection()
-        if not selection:
+        return selection[0] if selection else None
+
+    def _selected_run(self) -> core.Run | None:
+        name = self._selected_name()
+        if not name:
             return None
-        name = self.runs_tree.item(selection[0], "values")[0]
-        return core.load_run(core.RUNS_DIR / name)
+        directory = core.RUNS_DIR / name
+        return core.load_run(directory) if directory.exists() else None
 
     def _attach_selected(self) -> None:
         run = self._selected_run()
@@ -918,6 +961,17 @@ class StudioApp:
                     state = core.refresh_state(run)
                     self.stop_button.configure(state="disabled")
                     self._append_log(f"\n[studio] run finished with status {state.get('status')}\n")
+                    if state.get("status") == "failed":
+                        failures = core.failure_lines(run)
+                        if failures:
+                            self._append_log("[studio] train.err tail:\n")
+                            for line in failures:
+                                self._append_log(f"  {line}\n")
+                        prompt = f"Run {run.directory.name} failed"
+                        if state.get("exit_code") is not None:
+                            prompt += f" (exit code {state['exit_code']})"
+                        if self.messagebox.askyesno(APP_TITLE, prompt + ".\n\nOpen the run folder?"):
+                            subprocess.Popen(["explorer", str(run.directory)])
                     backend = self._run_backend(run)
                     net = backend.net_path(run.directory, run.config) if backend else run.net_path
                     if net.exists():
@@ -964,8 +1018,13 @@ class StudioApp:
 
     def run(self) -> int:
         self._refresh_runs()
+        self._schedule_auto_refresh()
         self.root.mainloop()
         return 0
+
+    def _schedule_auto_refresh(self) -> None:
+        self._refresh_runs()
+        self.root.after(5000, self._schedule_auto_refresh)
 
 
 def gui_selftest() -> int:

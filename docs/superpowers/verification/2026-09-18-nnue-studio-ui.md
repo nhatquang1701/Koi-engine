@@ -141,7 +141,51 @@ tests/python/nnue/studio_test.py` → 29/29 pass in 5.336 s (17 UI + 12 studio).
 
 ## Phase 3 — run list UX and failure surfacing
 
-Pending.
+### Run list helpers
+
+`studio_core` gained pure helpers over `Run` objects:
+
+- `run_duration_seconds(state)` parses the `created`/`finished` timestamps and
+  returns the elapsed seconds, or `None` while a run is unfinished or its
+  timestamps are malformed.
+- `filter_runs(runs, text)` matches case-insensitively against the run directory
+  name, kind and status.
+- `sort_runs(runs, key, descending)` sorts by `run`, `kind`, `status`, `val_mae`
+  or `duration`; a missing validation MAE or duration sorts last.
+- `failure_lines(run, limit)` returns the tail of `train.err` (empty when the
+  file is absent), and `run_detail_lines(run)` renders the detail pane: name,
+  kind/backend, status and exit code, timestamps, duration and epochs, validation
+  MAE, network path (or "not written"), and an `errors:` block when the run
+  failed.
+
+### Runs tab
+
+- The tab now has a filter entry above the tree, a `duration` column, clickable
+  column headings (toggling ascending/descending), a selection-driven detail
+  pane below the tree, and a five-second auto-refresh timer. Selection is
+  preserved across refreshes by run name, and the status bar reports how many
+  runs the filter matched.
+- The old `_selected_run` that read a tree cell now resolves the selected
+  directory name, so Attach/Use network/Open folder/Stop keep working with the
+  new columns.
+
+### Failed-run surfacing
+
+When a detached run finishes with status `failed`, the Studio appends the
+`train.err` tail to the log and shows a dialog with the run name and exit code
+offering to open the run folder. Previously a failure was a single status line.
+
+### Tests and results
+
+`RunListTests` (4 cases) were added to `tests/python/nnue/studio_ui_test.py`:
+filtering by name/kind/status, sorting by run/status/validation MAE (missing
+last), duration parsing and `failure_lines` tail limits, and the detail-pane
+contents including status, exit code, duration, MAE, unwritten network and the
+error tail.
+
+Results: `python -m unittest tests/python/nnue/studio_ui_test.py
+tests/python/nnue/studio_test.py` → 33/33 pass in 5.296 s (21 UI + 12 studio).
+`--gui-selftest` → `PASS gui construction`.
 
 ## Phase 4 — verification
 

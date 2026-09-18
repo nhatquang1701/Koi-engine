@@ -287,5 +287,89 @@ class TelemetryTests(unittest.TestCase):
         self.assertTrue(self.core.log_line_matches("run failed with exit code 1", "", True))
 
 
+class RunListTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.core = load_studio_core()
+
+    @staticmethod
+    def _run(root: Path, name: str, **state):
+        directory = root / name
+        directory.mkdir()
+        return RunListTests.core.Run(directory=directory, config={}, state=state)
+
+    def test_filter_runs_matches_name_kind_and_status(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            runs = [
+                self._run(root, "20260918-train-koi", kind="train", status="completed"),
+                self._run(root, "20260918-data-datagen", kind="data", status="running"),
+                self._run(root, "20260918-train-torch", kind="train", status="failed"),
+            ]
+            self.assertEqual(len(self.core.filter_runs(runs)), 3)
+            self.assertEqual(len(self.core.filter_runs(runs, "train")), 2)
+            self.assertEqual(len(self.core.filter_runs(runs, "FAILED")), 1)
+            self.assertEqual(len(self.core.filter_runs(runs, "datagen")), 1)
+            self.assertEqual(self.core.filter_runs(runs, "missing"), [])
+
+    def test_sort_runs_by_columns(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            runs = [
+                self._run(root, "b-run", status="failed", progress={"val_mae_cp": 150.0}),
+                self._run(root, "a-run", status="completed", progress={"val_mae_cp": 120.0}),
+                self._run(root, "c-run", status="running"),
+            ]
+            self.assertEqual([run.directory.name for run in self.core.sort_runs(runs, "run")],
+                             ["a-run", "b-run", "c-run"])
+            self.assertEqual([run.directory.name for run in self.core.sort_runs(runs, "run", True)],
+                             ["c-run", "b-run", "a-run"])
+            self.assertEqual([run.directory.name for run in self.core.sort_runs(runs, "status")],
+                             ["a-run", "b-run", "c-run"])
+            # A run without a validation MAE sorts last.
+            self.assertEqual([run.directory.name for run in self.core.sort_runs(runs, "val_mae")],
+                             ["a-run", "b-run", "c-run"])
+
+    def test_duration_and_failure_lines(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            run = self._run(
+                root,
+                "timed-run",
+                created="2026-09-18T00:00:00Z",
+                finished="2026-09-18T00:01:30Z",
+            )
+            self.assertEqual(self.core.run_duration_seconds(run.state), 90.0)
+            self.assertIsNone(self.core.run_duration_seconds({"created": "2026-09-18T00:00:00Z"}))
+            self.assertIsNone(self.core.run_duration_seconds({"created": "not-a-date", "finished": "x"}))
+            self.assertEqual(self.core.failure_lines(run), [])
+            (run.directory / "train.err").write_text("first\n\nsecond\nthird\n", encoding="utf-8")
+            self.assertEqual(self.core.failure_lines(run), ["first", "second", "third"])
+            self.assertEqual(self.core.failure_lines(run, limit=2), ["second", "third"])
+
+    def test_run_detail_lines_include_status_and_errors(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            run = self._run(
+                root,
+                "20260918-train-koi",
+                kind="train",
+                backend="koi",
+                status="failed",
+                exit_code=1,
+                created="2026-09-18T00:00:00Z",
+                finished="2026-09-18T00:01:30Z",
+                progress={"epoch": 3, "epochs": 10, "val_mae_cp": 141.9},
+            )
+            (run.directory / "train.err").write_text("Traceback: boom\n", encoding="utf-8")
+            detail = "\n".join(self.core.run_detail_lines(run))
+            self.assertIn("status: failed", detail)
+            self.assertIn("exit code: 1", detail)
+            self.assertIn("duration: 1m 30s", detail)
+            self.assertIn("val MAE: 141.9 cp", detail)
+            self.assertIn("network: not written", detail)
+            self.assertIn("Traceback: boom", detail)
+
+
 if __name__ == "__main__":
     unittest.main()

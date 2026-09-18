@@ -29,6 +29,7 @@ import sys
 import threading
 import time
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -461,6 +462,87 @@ def list_runs() -> list[Run]:
         return []
     runs = [load_run(path) for path in RUNS_DIR.iterdir() if path.is_dir()]
     return sorted(runs, key=lambda run: run.directory.name, reverse=True)
+
+
+def run_duration_seconds(state: dict[str, Any]) -> float | None:
+    """Wall-clock seconds between the ``created`` and ``finished`` stamps."""
+    created = state.get("created")
+    finished = state.get("finished")
+    if not created or not finished:
+        return None
+    try:
+        start = datetime.strptime(str(created), "%Y-%m-%dT%H:%M:%SZ")
+        end = datetime.strptime(str(finished), "%Y-%m-%dT%H:%M:%SZ")
+    except ValueError:
+        return None
+    return max(0.0, (end - start).total_seconds())
+
+
+def filter_runs(runs: Iterable[Run], text: str = "") -> list[Run]:
+    """Runs whose name, kind or status contains ``text`` (case-insensitive)."""
+    needle = (text or "").strip().lower()
+    if not needle:
+        return list(runs)
+    return [
+        run
+        for run in runs
+        if needle in run.directory.name.lower()
+        or needle in str(run.state.get("kind", "")).lower()
+        or needle in str(run.state.get("status", "")).lower()
+    ]
+
+
+def sort_runs(runs: Iterable[Run], key: str = "run", descending: bool = False) -> list[Run]:
+    """Sort runs by ``run``, ``kind``, ``status``, ``val_mae`` or ``duration``."""
+    def sort_value(run: Run):
+        if key == "kind":
+            return str(run.state.get("kind", ""))
+        if key == "status":
+            return str(run.state.get("status", ""))
+        if key == "val_mae":
+            value = run.state.get("progress", {}).get("val_mae_cp")
+            return float(value) if value is not None else float("inf")
+        if key == "duration":
+            seconds = run_duration_seconds(run.state)
+            return seconds if seconds is not None else float("inf")
+        return run.directory.name
+
+    return sorted(runs, key=sort_value, reverse=descending)
+
+
+def failure_lines(run: Run, limit: int = 20) -> list[str]:
+    """Last non-empty lines of ``train.err`` for a failed run."""
+    error_path = run.directory / "train.err"
+    if not error_path.exists():
+        return []
+    try:
+        text = error_path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return []
+    lines = [line for line in text.splitlines() if line.strip()]
+    return lines[-limit:] if limit > 0 else lines
+
+
+def run_detail_lines(run: Run) -> list[str]:
+    """Human-readable summary for the Runs-tab detail pane."""
+    state = run.state
+    progress = state.get("progress", {})
+    duration = run_duration_seconds(state)
+    net = run.net_path
+    lines = [
+        f"run: {run.directory.name}",
+        f"kind: {state.get('kind', '?')}   backend: {state.get('backend', '?')}",
+        f"status: {state.get('status', 'unknown')}   exit code: {state.get('exit_code', '-')}",
+        f"created: {state.get('created', '?')}   finished: {state.get('finished', '-')}",
+        f"duration: {format_duration(duration)}   epochs: {progress.get('epoch', 0)}/{progress.get('epochs', 0)}",
+        f"val MAE: {progress.get('val_mae_cp', '-')} cp",
+        f"network: {net if net.exists() else 'not written'}",
+    ]
+    errors = failure_lines(run)
+    if errors:
+        lines.append("errors:")
+        lines.extend(f"  {line}" for line in errors)
+    return lines
 
 
 # ---------------------------------------------------------------------------
