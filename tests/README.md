@@ -126,7 +126,10 @@ the repository root as the working directory:
   `tune_classical_python` (ridge-fit recovery plus a `koi-eval-features` CSV
   round trip when the Release tool is built),
   `nnue_studio_python` (progress parser, backend CLI contract, GUI smoke, and a
-  torch-gated tiny training selftest).
+  torch-gated tiny training selftest), `nnue_studio_ui_python` (run-list and
+  telemetry helpers, validation gating, network naming, numeric guards), and
+  `bullet_data_python` (bulletformat conversion, exporter weight layout, and
+  wrapper line parsing).
 
 ## Labels and scheduling
 
@@ -141,8 +144,8 @@ Every test carries CTest labels; combine them with `-L`/`-LE`, for example
   `matches`, `tools`, `runtime`, `packaging`.
 - `python` — Python unittest suites (`elo_oracle_python` is also `measurement`).
 - `heavy` — long-running tests. `koi_search_tests_*of4`, `koi_strength_tests`,
-  `koi_engine_time_safety_process`, `koi_benchmark_process`,
-  `cutechess_stability_smoke`, and `koi_uci_match_clock` declare
+  `koi_engine_time_safety_process`, `koi_benchmark_process`, and
+  `cutechess_stability_smoke`. `koi_uci_match_clock` and the heavy tests declare
   `PROCESSORS 2` so an oversubscribed `ctest -j` still schedules them sanely.
 - `koi_engine_process` declares `RUN_SERIAL TRUE` because it installs a
   temporary `book.bin` next to the engine binary.
@@ -163,20 +166,20 @@ suite stays green:
   filter; it is only fatal on an unfiltered, unsharded run.
 - Any other failure prints `FAIL` and fails the run.
 
-Current entries: `single-PV root forcing extension`, `timed poisoned capture`,
-`depth-one forcing check`, `threaded depth-one forcing check`, `root king
-safety escape`, `threaded root-in-check parity`, `threaded multipv ordered root
-ties`, `threaded multipv warmed hash`, `sparse phase-rich null safety`,
-`king-zone LMR exclusion`, `opening central break`, `late move full-depth
-verification`, `committed PGN tactical fixtures`, `threaded short forcing root
-research`, `poisoned capture quiescence`.
+Current entries: `single-PV root forcing extension`, `depth-one forcing check`,
+`threaded depth-one forcing check`, `root king safety escape`, `threaded
+root-in-check parity`, `threaded multipv ordered root ties`, `threaded multipv
+warmed hash`, `sparse phase-rich null safety`, `king-zone LMR exclusion`,
+`opening central break`, `late move full-depth verification`, `committed PGN
+tactical fixtures`, `poisoned capture quiescence`.
 
 A second, deliberately tiny list (`intermittent`) holds cases whose outcome
 flips with host scheduling. Both their `XFAIL` and `XPASS` are reported but
 neither is fatal, so the suite stays deterministic while the gap stays visible;
 the goal is to make each deterministic and move it back to `known_failures`
-(or delete it once the engine is fixed). Current entry: `incomplete root
-forcing fallback`.
+(or delete it once the engine is fixed). Current entries: `incomplete root
+forcing fallback`, `threaded short forcing root research` (scheduling-dependent),
+and `timed poisoned capture` (configuration-dependent).
 
 Remove an entry once the corresponding engine behavior is reliably fixed.
 
@@ -210,6 +213,7 @@ Remove an entry once the corresponding engine behavior is reliably fixed.
   tests (`uci_process_test.ps1`, `en_croissant_uci_test.ps1`). Defaults to 15000 ms.
 - `KOI_REPLAY_PATH` — path to `koi-replay` passed by CMake to `elo_openings_python`.
 - `KOI_NNUE_BOUNDARY_EXE` — optional boundary executable used by
+  `koi_trainer_test.py` (wired by CMake) and optionally by
   `nnue_training_test.py`.
 - `PYTHONDONTWRITEBYTECODE=1` — set by CMake for all Python tests so no
   `__pycache__` directories are produced.

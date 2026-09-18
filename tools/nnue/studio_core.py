@@ -14,8 +14,9 @@ Design notes
   code.  That makes runs survive a GUI close and lets the GUI re-attach by
   tailing ``train.log``.
 * Backends (``tools/nnue/backends``) only provide the command line and the
-  file locations; everything else is backend agnostic so a future bullet/Rust
-  backend needs no GUI changes.
+  file locations; everything else is backend agnostic, so the PyTorch CPU
+  trainers and the bullet GPU trainer share the same GUI, progress parsing and
+  validation flow.
 """
 
 from __future__ import annotations

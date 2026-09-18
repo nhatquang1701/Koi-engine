@@ -179,6 +179,9 @@ if ($coldJson.schema -ne 'koi-bench-profile-v1' -or $coldJson.warm_hash -ne $fal
     $coldJson.positions.Count -lt 1) {
     throw 'cold profile JSON must identify its schema, cold table state, and positions.'
 }
+if ($coldJson.evaluator -cne 'classical' -or $null -ne $coldJson.nnue) {
+    throw 'the default profile must identify the classical evaluator and carry no NNUE identity.'
+}
 if ($warmJson.schema -ne 'koi-bench-profile-v1' -or $warmJson.warm_hash -ne $true -or
     $warmJson.hash_state -cne 'warm' -or $warmJson.timed -ne $false -or
     $warmJson.positions.Count -ne $coldJson.positions.Count) {

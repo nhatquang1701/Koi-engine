@@ -74,9 +74,10 @@ selects that worker path or the existing evaluator-plus-mutex fallback, so
 `SearchContext` no longer owns evaluator synchronization or a particular NNUE
 representation. The classical evaluator remains the default and malformed or
 absent NNUE input still falls back as before. `EvaluatorSelection` and
-`make_evaluator` remain a library-only selection seam: the engine entry points
-construct `ClassicalEvaluator` directly, and the advertised UCI option list
-intentionally exposes no network-path setting.
+`make_evaluator` are the selection seam used by the engine entry points: at boot
+`main.cpp` resolves `KOI_NNUE_PATH` or `koi.nnue` beside the executable, and the
+advertised `EvalFile` option swaps the evaluator at runtime. The classical
+evaluator remains the default and the fallback.
 
 Search runtime resources have the same ownership boundary. The private
 `detail::SearchTableAccess` view is the only TT boundary used by search code:
@@ -266,8 +267,8 @@ games. The classical evaluator therefore remains the default and NNUE stays opt-
 
 ### Training a network with the NNUE Studio
 
-`Koi NNUE Studio.cmd` in the repository root opens a small tkinter GUI (Train,
-Validate and install, and Runs tabs) so a training run does not require
+`Koi NNUE Studio.cmd` in the repository root opens a small tkinter GUI (Data,
+Train, Validate and install, and Runs tabs) so a training run does not require
 remembering any command lines. The same pipeline is available headlessly:
 
 ```powershell
@@ -282,11 +283,12 @@ pwsh -NoProfile -File .\tools\nnue\net_match.ps1 -NnueNet .\artifacts\training\k
 
 Every run keeps its configuration, command line, log, progress history and
 artifacts under `artifacts/training/runs/<stamp>-<kind>-<backend>/`, so runs are
-comparable and resumable. Training uses the CPU PyTorch backend: the default
-`koi` backend trains the `halfka-king-bucket-v1` version 4 network, and
-`--backend torch` still drives the legacy `train_nnue_sf.py` version 3 trainer.
-`tools/nnue/backends/bullet_backend.py` documents the Rust (bullet) backend
-scaffold and reports why it is not available yet. After a run completes the
+comparable and resumable. The default `koi` backend trains the
+`halfka-king-bucket-v1` version 4 network on CPU PyTorch, and `--backend torch`
+still drives the legacy `train_nnue_sf.py` version 3 trainer. `--backend bullet`
+drives the pinned Rust/CUDA trainer through `tools/nnue/run_bullet.py` when cargo
+and a CUDA 12.x toolkit are present; bullet run length is controlled by
+`bullet_superbatches` rather than the preset `epochs` value. After a run completes the
 studio can validate it with the 64-position `koi-bench --nnue` gate and with a
 node-limited A/B match against the classical evaluator
 (`tools/nnue/ab_match.ps1`, schema `koi-nnue-studio-ab-match-v1`) or against an

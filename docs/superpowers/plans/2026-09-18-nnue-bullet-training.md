@@ -123,7 +123,7 @@ versions; commit at every phase boundary and push when the suites pass.
 
 ## Phase 7 — documentation mismatch audit
 
-- [ ] Sweep `README.md`, `tools/README.md`, `tests/README.md`, the studio and
+- [x] Sweep `README.md`, `tools/README.md`, `tests/README.md`, the studio and
   overhaul specs/verification records, and source comments for drift; produce
   a table of mismatches and fix them. Commit.
 

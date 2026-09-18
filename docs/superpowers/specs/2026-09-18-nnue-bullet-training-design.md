@@ -38,17 +38,20 @@ Exact C++ contract (`src/koi/evaluation_features.cpp:124-168`):
 Bullet's `ChessBucketsMirrored` pairs files `{a,h}{b,g}{c,f}{d,e}` and cannot
 express Koi's `{a,e}{b,f}{c,g}{d,h}` pairing, so the crate implements a local
 `SparseInputType` (or `ChessBuckets` with an explicit 64-entry table) that
-reproduces the mapping above. The Rust test module pins the three golden sparse
-index lists from `tests/unit/evaluation/evaluation_features_tests.cpp`:
+reproduces the mapping above. The Rust test module pins the two golden sparse
+index lists from `tests/unit/evaluation/evaluation_features_tests.cpp` plus the
+index range/capacity and the king-bucket table:
 
 - startpos (white and black to move): `8,9,10,11,12,13,14,15,65,70,130,133,
   192,199,259,324,432,433,434,435,436,437,438,439,505,510,570,573,632,639,
   699,764`;
 - midgame `r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 4 4`:
   `8,9,10,11,13,14,15,28,70,82,130,133,192,199,259,324,420,432,433,434,435,
-  437,438,439,493,505,546,570,632,639,699,764`;
-- bucket probes: e4 white and e5 black → `{3420, 3836}`; a1 white → `{320, 764}`;
-  a5 white → `{3424, 3836}`.
+  437,438,439,493,505,546,570,632,639,699,764`.
+
+The C++ encoder tests additionally pin the bucket probes (e4 white and e5 black
+→ `{3420, 3836}`; a1 white → `{320, 764}`; a5 white → `{3424, 3836}`); the Rust
+crate covers the same ground through its scalar `king_bucket` unit tests.
 
 ## 3. Data conversion
 
@@ -59,9 +62,12 @@ index lists from `tests/unit/evaluation/evaluation_features_tests.cpp`:
   written as `0.5` (ignored because the WDL blend is 0.0).
 - Conversion runs through `bulletformat::convert_from_text` in the crate's
   `convert` bin, so no separate `bullet-utils` install is required.
-- `to_bullet.py` supports `--input`, `--output`, `--limit`, `--resume`
-  (skip already-converted rows via a state file), and prints progress every
-  N rows. Malformed rows are skipped and counted.
+- `to_bullet.py` supports `--input`, `--output-dir`, `--val-fraction`,
+  `--limit`, `--convert-exe`, and `--text-only`. It splits rows with a
+  deterministic validation stride, writes `train.txt`/`validation.txt`, then
+  runs the crate's `convert` binary (`bulletformat::convert_from_text`) on each.
+  Malformed rows are skipped and counted (resume/state-file behavior belongs to
+  `koi_dataset.py`, not this converter).
 
 ## 4. Training
 
@@ -79,11 +85,14 @@ index lists from `tests/unit/evaluation/evaluation_features_tests.cpp`:
 - Optimizer AdamW; cosine decay from the configured initial LR to a final LR;
   schedule/batch sizes are CLI options with defaults hidden 1024, batch 8192
   (fallbacks 4096/2048 on VRAM pressure).
-- Validation: a held-out `.data` file (`TestDataset { path, freq }`); the
-  wrapper reports its loss. Optional weight decay, seed, and thread options
-  mirror `train_nnue_koi.py` naming.
-- Checkpoint layout: bullet writes `<out>/<net_id>/raw.bin` (f32 values in
-  `SavedFormat` order) and `quantised.bin`. The raw format must be declared so
+- Validation: the wrapper measures float MAE from each saved checkpoint's
+  `raw.bin` through the exporter's loader. The pinned bullet revision has no
+  validation pass (`TestDataset` output is a no-op) and the wrapper never passes
+  `--test`. Optional weight decay, seed, and thread options mirror
+  `train_nnue_koi.py` naming.
+- Checkpoint layout: bullet writes flat `<checkpoint-dir>/<net_id>-N/raw.bin`
+  (f32 values; `save_unquantised` ignores `SavedFormat` transforms) and
+  `quantised.bin`. The raw format must be declared so
   the payload order is exactly: l0 weights feature-major (hidden × 9216,
   column-major affine = feature-major), l0 bias (hidden), l1 weights
   bucket-major (8 × H/2), l1 bias (8).
@@ -99,33 +108,36 @@ index lists from `tests/unit/evaluation/evaluation_features_tests.cpp`:
   integer round-trip MAE on a validation sample; saturation fractions reported.
 - Output: standard `KOI-NNUE` v4 container (76-byte header, payload W1 int16
   feature-major, b1 int32, W2 int8 bucket-major, b2 int32) plus
-  `koi-nnue-training-metadata-v2` metadata with a `backend` block
-  (`name: bullet`, crate revision, CUDA version, batch/hidden/LR/seed) and the
-  existing fields (val MAE, round-trip MAE, payload/network SHA-256, command).
+  `koi-nnue-training-metadata-v2` metadata with a `backend: \"bullet\"` marker,
+  the checkpoint path, architecture, shifts, validation MAE, saturation
+  fractions, and payload/network SHA-256 fields.
 - The container must load in the C++ engine and pass `koi-bench --nnue`.
 
 ## 6. Progress contract
 
 - `run_bullet.py` tails the trainer output and emits studio lines:
-  - `epoch <i>/<n> train_loss <f> val_loss <f> time <f>s` (no `val_mae_cp`;
-    the parser's `val_mae_cp` becomes optional);
+  - `epoch <i>/<n> train_loss <f> val_loss <f> val_mae_cp <f> time <f>s`
+    (`val_mae_cp` is measured from each saved checkpoint and the studio parser
+    requires the field);
   - after export: `quantization v4 s1=<s> k3=<k> val_mae_cp <f>`,
     `selected v4 s1=<s> k3=<k> val_mae_cp <f>`,
     `wrote <net> (<bytes> bytes) and <meta>`.
 - Bullet's `superbatch N | time Xs | running loss E` lines map to the epoch
-  line; `TestDataset` loss maps to `val_loss`. The wrapper prints the exact
-  command it runs so the studio `command.txt` stays truthful.
+  line and the running loss is reused as `val_loss`. The studio `command.txt`
+  records the wrapper invocation; `run_bullet.py --dry-run` prints the resolved
+  convert/train/export commands.
 
 ## 7. Studio backend
 
-- `bullet_backend.py` availability requires: cargo resolvable, CUDA path
-  present, `tools/nnue/bullet_train/Cargo.toml` present, dataset path exists.
-  `unavailable_reason()` distinguishes each missing piece.
-- `build_command` runs `python tools/nnue/run_bullet.py` with dataset, output
-  directory, hidden/batch/LR/seed/thread options and `--net-out`/`--meta-out`
-  under the run directory (network naming from `studio_core.network_file_name`).
-- `planned_layout()` is removed or updated to the real paths; the legacy
-  `train_nnue_sf.py` torch backend is untouched.
+- `bullet_backend.py` availability requires: the wrapper exists, a CUDA 12.x
+  `bin` directory is present, and the release trainer is built or cargo is
+  resolvable. `unavailable_reason()` names the missing piece.
+- `build_command` runs `python tools/nnue/run_bullet.py` with the corpus/output
+  directory, hidden/batch/superbatches/LR/seed/thread options, and the v4 shift
+  grids; the wrapper derives `--net-out`/`--meta-out` from the run directory
+  (network naming from `studio_core.network_file_name`).
+- `planned_layout()` reports the real converter/crate/runner/data paths; the
+  legacy `train_nnue_sf.py` torch backend is untouched.
 
 ## 8. Bug hunt and documentation audit
 

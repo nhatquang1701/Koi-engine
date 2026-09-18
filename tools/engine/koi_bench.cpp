@@ -177,7 +177,15 @@ void write_profile_json(const std::string& path, const BenchmarkConfig& config,
            << "  \"hash_mb\": 512,\n"
            << "  \"threads\": " << config.threads << ",\n"
            << "  \"speed\": " << static_cast<unsigned>(config.speed_percent) << ",\n"
-           << "  \"positions\": [\n";
+           << "  \"evaluator\": \"" << (config.nnue_path ? "nnue" : "classical") << "\",\n";
+    if (config.nnue_path) {
+        std::error_code file_error;
+        const auto network_bytes = std::filesystem::file_size(*config.nnue_path, file_error);
+        output << "  \"nnue\": {\"path\": ";
+        write_json_string(output, *config.nnue_path);
+        output << ", \"bytes\": " << (file_error ? 0 : network_bytes) << "},\n";
+    }
+    output << "  \"positions\": [\n";
     for (std::size_t index = 0; index < runs.size(); ++index) {
         const auto& [benchmark, run] = runs[index];
         const koi::SearchResult& result = run.result;
@@ -249,7 +257,7 @@ void write_profile_json(const std::string& path, const BenchmarkConfig& config,
 int main(int argc, char** argv) {
     const auto config = parse_arguments(argc, argv);
     if (!config.has_value()) {
-        std::cerr << "usage: koi-bench [--threads N] [--speed 1-100] [--timed] [--warm-hash] [--optional] [--profile-json path]\n";
+        std::cerr << "usage: koi-bench [--threads N] [--speed 1-100] [--timed] [--warm-hash] [--optional] [--nnue path] [--profile-json path]\n";
         return 2;
     }
 

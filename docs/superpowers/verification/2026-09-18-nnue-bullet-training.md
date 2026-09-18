@@ -184,7 +184,47 @@ skip=1` (the skip is the external-container environment case), and
 
 ## Phase 7 — documentation mismatch audit
 
-Pending.
+The audit compared the READMEs, the bullet/studio/overhaul specs, and source
+comments against the shipped code. Every mismatch below was fixed in this
+phase; the two implementation gaps (benchmark evaluator identity, exact option
+parsing) were closed in code and covered by tests rather than reworded.
+
+| # | Mismatch | Fix |
+| --- | --- | --- |
+| F1 | `README.md` called the bullet backend an unavailable scaffold. | Rewrote the Studio paragraph: `--backend bullet` drives the pinned Rust/CUDA trainer through `tools/nnue/run_bullet.py` when cargo and a CUDA 12.x toolkit are present. |
+| F2 | `src/koi/nnue.hpp` claimed no network-path UCI option exists. | Replaced the stale comment with the actual `KOI_NNUE_PATH`/`koi.nnue`/`EvalFile` selection seam. |
+| F3 | `README.md` repeated the same "library-only seam" claim. | Same correction in the architecture paragraph. |
+| F4 | `tests/README.md` listed two names in `known_failures` that live in `intermittent` (now three entries). | Updated both lists to the code state. |
+| F5 | `tests/README.md` omitted `nnue_studio_ui_python` and `bullet_data_python`. | Added both to the Python inventory. |
+| F6 | `KOI_NNUE_BOUNDARY_EXE` was attributed only to `nnue_training_test.py`. | Now says it is wired by CMake to `koi_trainer_test.py` and optional for the older test. |
+| F7 | Bullet design described `to_bullet.py --output/--resume` with a state file. | Documented the real flags (`--output-dir`, `--val-fraction`, `--limit`, `--convert-exe`, `--text-only`) and the deterministic validation stride. |
+| F8 | Bullet design claimed a `TestDataset` validation pass. | Documented per-checkpoint MAE measurement; the pinned revision has no validation pass. |
+| F9 | Bullet design said the epoch line omits `val_mae_cp`. | Documented the wrapper's line, which the studio parser requires. |
+| F10 | Bullet design promised a metadata `backend` block with crate/CUDA/batch fields. | Documented the actual `backend: "bullet"` marker plus checkpoint/architecture/shift/MAE/hash fields. |
+| F11 | Bullet design described cargo/Cargo.toml/dataset availability checks and `--net-out` passing. | Documented runner + CUDA `bin` + trainer-or-cargo availability and the wrapper-derived outputs. |
+| F12 | Bullet design said the wrapper always prints its inner commands. | Documented that only `--dry-run` prints them; `command.txt` records the wrapper. |
+| F13 | Bullet design claimed "three golden sparse index lists" in Rust. | Two sparse lists plus range/capacity and the king-bucket table; the probe lists stay in the C++ encoder tests. |
+| F14 | Overhaul design promised benchmark evaluator/network identity. | Implemented: `koi-bench --profile-json` now writes `"evaluator": "classical|nnue"` and, when `--nnue` is given, an `"nnue": {"path", "bytes"}` block; `koi_bench_process_test.ps1` asserts the classical case. |
+| F15 | `train.ps1` presets implied bullet epoch counts. | README and design state bullet run length is controlled by `bullet_superbatches`. |
+| F16 | Checkpoint path was documented as `<out>/<net_id>/raw.bin`. | Corrected to flat `<checkpoint-dir>/<net_id>-N/raw.bin`. |
+| F17 | Overhaul design promised metadata "byte-for-byte" determinism. | Clarified: container bytes are deterministic; metadata records a timestamp and command. |
+| F18 | `tools/README.md` had no `tools/nnue/`/`tools/test/` rows and no Studio section. | Added both rows and a new "NNUE training and the Studio" section. |
+| F19 | Studio design still described the v3 trainer default, `net.nnue` names, v3 progress lines, and a planned bullet backend. | Updated the status line, trainer/backend descriptions, network naming, progress contract, launcher list, and replaced the "planned" bullet section with the live pipeline. |
+| F20 | README listed three Studio tabs. | Added the Data tab. |
+| F21 | `koi-bench` usage string omitted `--nnue`. | Added `[--nnue path]`. |
+
+Stylistic fixes: `studio_core.py` and `backends/__init__.py` docstrings no
+longer call the bullet backend "future"; `tests/README.md` no longer implies
+`koi_uci_match_clock` is heavy.
+
+Evidence: rebuilt `koi-bench` and ran it with and without a network. The
+classical profile records `"evaluator": "classical"` (64/64 matches), and the
+bullet net profile records `"evaluator": "nnue"` with
+`"nnue": {"path": "...koi-v4-bullet-long\\koi.nnue", "bytes": 18882699}` (62/64
+matches, unchanged from Phase 5). `ctest -R koi_benchmark_process` passes with
+the new identity assertion. Logs:
+`artifacts/verification/nnue-bullet-training/profile-classical-check.json`,
+`profile-nnue-check.json`, `bench-classical-phase7.txt`, `bench-nnue-phase7.txt`.
 
 ## Phase 8 — verification and CI refresh
 

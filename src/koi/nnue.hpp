@@ -212,10 +212,11 @@ private:
     std::shared_ptr<const Evaluator> fallback_;
 };
 
-// Library-only selection seam. The engine entry points (main.cpp and
-// uci_controller.cpp) construct ClassicalEvaluator directly, and the
-// advertised UCI option list deliberately exposes no network-path setting;
-// this helper remains for library consumers and tests.
+// Selection seam used by the engine entry points and by the advertised
+// `EvalFile` option. At boot `main.cpp` resolves `KOI_NNUE_PATH` or `koi.nnue`
+// beside the executable through `make_evaluator`; at runtime
+// `uci_controller.cpp` swaps the evaluator when `EvalFile` is set. The
+// classical evaluator remains the default and the fallback.
 struct EvaluatorSelection {
     std::shared_ptr<const Evaluator> evaluator;
     bool nnue_enabled = false;

@@ -201,7 +201,8 @@ SIMD (AVX2, optional fast path, Release only as today):
     one linear head per piece-count bucket, float output in cp/100;
   - default hidden 1024, batch 8192, AdamW, learning-rate schedule,
     SmoothL1 against `cp/100`, validation split by seeded permutation,
-    deterministic export byte-for-byte for identical inputs;
+    deterministic container bytes for identical weights (the metadata file
+    records a timestamp and the command, so it may differ between runs);
   - `--float-out` writes the torch checkpoint, `--float-in` quantizes
     without training;
   - export writes the v4 container plus metadata schema

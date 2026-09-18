@@ -1,16 +1,20 @@
 # Koi NNUE Studio design
 
-Status: implemented on 2026-09-17. The studio is a local convenience front end
-over the existing training pipeline; it adds no new engine behavior.
+Status: implemented on 2026-09-17, extended on 2026-09-18 by the UI pass
+(`2026-09-18-nnue-studio-ui-design.md`) and the bullet training program
+(`2026-09-18-nnue-bullet-training-design.md`). The studio is a local
+convenience front end over the existing training pipeline; it adds no new
+engine behavior.
 
 ## Problem
 
 Training a Koi network required remembering the corpus path, the trainer
 flags, the quantization format, the validation commands and the install step.
 The goal is a one-click, always-available pipeline: open the GUI, press Train,
-and let the studio run the existing `tools/measurement/train_nnue_sf.py`
-trainer, watch progress, validate the result and offer to install it beside
-the engine.
+and let the studio run the configured trainer backend, watch progress, validate
+the result and offer to install it beside the engine. The default `koi` backend
+drives `tools/measurement/train_nnue_koi.py`; `--backend torch` still drives the
+legacy `tools/measurement/train_nnue_sf.py`.
 
 ## Shape
 
@@ -19,15 +23,16 @@ Three layers, all under `tools/nnue/`:
 1. `studio_core.py` — framework-free logic: run directories, detached process
    launch, log tailing, progress parsing, gate/AB validation, install.
 2. `backends/` — one module per trainer backend implementing a small protocol
-   (`name`, `available()`, `build_command()`, `net_path()`). The torch backend
-   wraps the existing CPU trainer; a bullet backend is scaffolded for the
-   future Rust trainer.
+   (`name`, `available()`, `build_command()`, `net_path()`). The default `koi`
+   backend wraps the CPU v4 trainer, `torch` wraps the legacy v3 trainer, and
+   `bullet` drives the Rust/CUDA trainer.
 3. `koi_nnue_studio.py` — headless entry points plus the tkinter GUI, which is
    a thin event pump over the core.
 
 Launchers: `Koi NNUE Studio.cmd` (double-click GUI), `tools/nnue/train.ps1`
 (headless preset run), `tools/nnue/create-shortcut.ps1` (Desktop/Start Menu
-shortcut), `tools/nnue/ab_match.ps1` (A/B validation match).
+shortcut), `tools/nnue/ab_match.ps1` (network vs classical match) and
+`tools/nnue/net_match.ps1` (network vs network match).
 
 ## Run directory contract
 
@@ -41,7 +46,7 @@ contains:
 | `command.txt` / `command.json` | Exact command line (reproducibility). |
 | `train.log` / `train.err` | Combined output and errors. |
 | `exit_code.txt`, `running.lock`, `pid.txt` | Liveness and completion markers. |
-| `net.nnue`, `net.metadata.json`, `net.pt` | Backend artifacts. |
+| `net.nnue`, `net.metadata.json`, `net.pt` | Backend artifacts. The network and metadata names follow the configured `net_name` (default `koi.nnue` / `koi.metadata.json`), with a legacy `net.nnue` fallback for older runs. |
 
 Runs are launched detached through a generated `run.cmd`, so closing the GUI
 does not stop training. `--detach` on the CLI behaves the same; the default
@@ -50,8 +55,8 @@ headless mode streams to the console.
 ## Progress contract
 
 `studio_core.parse_progress()` translates the trainer's stable log lines:
-`epoch i/n train_loss .. val_loss .. val_mae_cp .. time ..s`,
-`quantization v3 ...`, `selected v3 ...`, and
+`loaded N rows ... in T s`, `epoch i/n train_loss .. val_loss .. val_mae_cp ..
+time ..s`, `quantization v4 ...`, `selected v4 ...`, and
 `wrote <net> (<bytes> bytes) and <metadata>`. If the trainer's wording changes,
 only this parser needs to change; the GUI and tests consume events.
 
@@ -79,14 +84,15 @@ picks up `koi.nnue` on the next start (`KOI_NNUE_PATH` overrides), and the UCI
 `EvalFile` option can switch networks without a restart. Classical evaluation
 remains the default whenever no network is installed.
 
-## Bullet backend (planned)
+## Bullet backend
 
-`backends/bullet_backend.py` documents the three pieces the Rust trainer
-needs: a `to_binpack.py` corpus converter, a `bullet_train` Cargo crate with a
-CLI compatible with the studio's config, and a log adapter matching the
-progress contract. The backend reports `available() == False` with that
-reason, and `--dry-run --backend bullet` exits 2 rather than pretending to
-work.
+`backends/bullet_backend.py` drives `tools/nnue/run_bullet.py`, which converts
+the label corpus with `tools/nnue/to_bullet.py`, trains the pinned Rust/CUDA
+`bullet_train` crate, measures validation MAE per saved checkpoint and exports
+the v4 container through `tools/measurement/export_bullet_v4.py`. The backend
+reports `available()` only when the wrapper, a CUDA 12.x `bin` directory, and
+the release trainer (or cargo) are present; otherwise `--dry-run --backend
+bullet` exits 2 with the named missing piece.
 
 ## Constraints
 

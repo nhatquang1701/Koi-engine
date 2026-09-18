@@ -13,7 +13,9 @@ Directory map:
 | `tools/build/` | build, package, book-install, and verification scripts |
 | `tools/engine/` | small C++ command-line tools built with Koi |
 | `tools/measurement/` | PGN, oracle, corpus, tuning, and NNUE tooling |
+| `tools/nnue/` | NNUE Studio GUI, trainer backends, and the bullet/Rust crate and wrapper |
 | `tools/stability/` | UCI, Stockfish, and Cutechess process harnesses |
+| `tools/test/` | CTest wrapper that captures JUnit and LastTest logs |
 | `build/` | ignored canonical Debug/Release build trees |
 | `artifacts/` | ignored reports, matches, manifests, packages, and evidence |
 
@@ -355,3 +357,34 @@ recorded hardware, engine options, external executables, and time control. Any
 reported value must be labeled “local Stockfish-equivalent Elo at recorded
 hardware/options/time control” and must not be presented as a universal Elo
 claim.
+
+## NNUE training and the Studio
+
+The Studio (`tools/nnue/`) is the training front end. `tools/nnue/koi_nnue_studio.py`
+is a tkinter GUI with Data, Train, Validate and install, and Runs tabs; the same
+file exposes a headless CLI (`--list-backends`, `--dry-run`, `--run`, `--selftest`).
+`tools/nnue/studio_core.py` owns run directories under `artifacts/training/runs/`,
+progress parsing, validation and install helpers, and the detached run launcher.
+
+Backends live under `tools/nnue/backends/`: `koi` trains the
+`halfka-king-bucket-v1` v4 network with `tools/measurement/train_nnue_koi.py` on
+CPU PyTorch, `torch` drives the legacy `train_nnue_sf.py` v3 trainer, and
+`bullet` drives the pinned Rust/CUDA crate under `tools/nnue/bullet_train/`
+through `tools/nnue/run_bullet.py` when cargo and a CUDA 12.x toolkit are
+installed. The bullet path converts text labels with `tools/nnue/to_bullet.py`,
+trains, measures validation MAE from each saved checkpoint, and exports a v4
+container with `tools/measurement/export_bullet_v4.py`.
+
+Typical commands:
+
+```powershell
+python .\tools\nnue\koi_nnue_studio.py --list-backends
+python .\tools\nnue\koi_nnue_studio.py --dry-run --preset quick
+python .\tools\nnue\koi_nnue_studio.py --run standard --detach
+```
+
+Validation runs the 64-position gate (`koi-bench --nnue`) and a node-limited,
+colour-split A/B match (`tools/nnue/ab_match.ps1` versus the classical evaluator;
+`tools/nnue/net_match.ps1` for network versus network). Those results are local
+reports: the classical evaluator remains the engine default and no reported
+number is an Elo claim.
