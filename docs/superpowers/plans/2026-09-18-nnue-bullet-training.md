@@ -52,8 +52,9 @@ versions; commit at every phase boundary and push when the suites pass.
   backend block).
 - Progress: `run_bullet.py` parses bullet's logger and emits the studio's
   line contract (`epoch ...`, `quantization v4 ...`, `selected v4 ...`,
-  `wrote ...`); the epoch regex gains an optional `val_mae_cp` so genuine
-  train/val loss can be reported without a fabricated MAE.
+  `wrote ...`). Because the pinned bullet revision does not implement a
+  validation pass, the wrapper measures validation MAE from each saved
+  checkpoint through the exporter instead of fabricating one.
 - If CUDA/bullet cannot run after the retry chain, keep the integration
   compile-tested and continue with the CPU PyTorch trainer; record the blocker
   and do not claim bullet training results.
@@ -69,7 +70,7 @@ versions; commit at every phase boundary and push when the suites pass.
 
 ## Phase 1 — dependencies
 
-- [ ] Install CUDA 12.9 with the fallback chain; verify `nvcc --version` and
+- [x] Install CUDA 12.9 with the fallback chain; verify `nvcc --version` and
   `CUDA_PATH`; add cargo to the session PATH; fetch the pinned bullet revision
   and compile-check it (`cargo build --release` on a trivial crate).
   Record logs under `artifacts/verification/nnue-bullet-training/`. Commit the
@@ -77,24 +78,24 @@ versions; commit at every phase boundary and push when the suites pass.
 
 ## Phase 2 — dataset conversion
 
-- [ ] `tools/nnue/to_bullet.py`: read `FEN;cp;best_move` labels, flip to
+- [x] `tools/nnue/to_bullet.py`: read `FEN;cp;best_move` labels, flip to
   white-relative, write `FEN | cp | 0.5` text, and convert to bulletformat
   `.data` through the crate's `convert` bin (bulletformat
-  `convert_from_text`). `tests/python/nnue/to_bullet_test.py` covers the
+  `convert_from_text`). `tests/python/nnue/bullet_data_test.py` covers the
   side-to-move flip, malformed rows, resume/limits, and converter invocation
   with a stub. Commit.
 
 ## Phase 3 — training crate, exporter, progress wrapper
 
-- [ ] `tools/nnue/bullet_train/` Cargo crate: local `SparseInputType` with the
+- [x] `tools/nnue/bullet_train/` Cargo crate: local `SparseInputType` with the
   exact 9,216-index mapping, CReLU activation and the
   `p[j] = a[j] * a[j + H/2]` pair product, `KoiOutputBuckets`, AdamW + cosine
   decay, raw-f32 save format in KOI payload order. Rust tests pin the three
   C++ golden sparse index lists and the output-bucket formula.
-- [ ] `tools/measurement/export_bullet_v4.py`: quantize raw weights with the
+- [x] `tools/measurement/export_bullet_v4.py`: quantize raw weights with the
   `train_nnue_koi.py` formulas and shift grid, write the v4 container and
   metadata, report round-trip MAE on a validation sample.
-- [ ] `tools/nnue/run_bullet.py`: invoke the crate, tail its logger, emit the
+- [x] `tools/nnue/run_bullet.py`: invoke the crate, tail its logger, emit the
   studio progress contract; tests cover log translation. Commit.
 
 ## Phase 4 — studio backend

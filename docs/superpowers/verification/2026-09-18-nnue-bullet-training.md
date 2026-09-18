@@ -31,15 +31,86 @@ record, and one index row in each of the three
 
 ## Phase 1 — dependencies
 
-Pending.
+The winget step of the fallback chain succeeded on the first attempt, so the
+NVIDIA-archive and pip-wheel fallbacks were not needed:
+
+- `winget install Nvidia.CUDA --version 12.9 --silent --accept-package-agreements
+  --accept-source-agreements --disable-interactivity` installed CUDA 12.9.1
+  (installer `cuda_12.9.1_576.57_windows.exe`); log
+  `artifacts/verification/nnue-bullet-training/cuda-install-winget.out.log`.
+- `nvcc --version` reports release 12.9, V12.9.86 at
+  `C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.9`; `cuda.lib`,
+  `cudart.lib`, `nvrtc.lib`, `cublas.lib`, and `cublasLt.lib` are present under
+  `lib\x64`; `CUDA_PATH` is set at machine scope. Command wrappers set it
+  explicitly because the long-lived shell predates the install.
+- Rust 1.98.1 (`cargo`/`rustc`) lives at `%USERPROFILE%\.cargo\bin`; wrappers
+  prepend it to `PATH`.
+- The pinned bullet revision
+  (`2ea3d2d0f7e597b0d645f6e8040cf37818f51bce`) is consumed as a git dependency.
+  `cargo check --lib --bin convert` compiled `bullet_lib` without the `cuda`
+  feature in 28.50 s (`cargo-check.log.err`), and the CUDA release build of the
+  training binary finished later in this phase
+  (`cargo-build-cuda.log`). The runtime needs the CUDA `bin` directory on
+  `PATH`: without it the binary exits `0xC0000135` (DLL not found).
 
 ## Phase 2 — dataset conversion
 
-Pending.
+`tools/nnue/to_bullet.py` converts the `FEN;cp;best_move` label corpus into
+bulletformat data:
+
+- Labels are side-to-move relative, so the converter flips the score to
+  white-relative and appends the pseudo-result `0.5` (ignored with the zero WDL
+  blend) as `FEN | cp | 0.5`.
+- A deterministic stride selects the validation split (`--val-fraction`,
+  default 0.05); `--limit` caps the rows, malformed rows are skipped and
+  counted, and `--text-only` stops after the text stage.
+- The bulletformat conversion shells out to the crate's `convert` binary
+  (`bulletformat::convert_from_text::<ChessBoard>`), which is auto-discovered in
+  the crate's `target/release`/`target/debug` trees.
+- Tests: `tests/python/nnue/bullet_data_test.py` (registered as
+  `bullet_data_python` in CMake with the `python` label) covers the
+  white-relative flip, split/limit/malformed handling, the missing-input error,
+  the text-only path, and (when the binary exists) the `.data` record size.
+- Smoke: `python tools/nnue/to_bullet.py --limit 500` wrote 475 train rows and
+  25 validation rows; `train.data` was 15,200 bytes.
 
 ## Phase 3 — training crate, exporter, progress wrapper
 
-Pending.
+`tools/nnue/bullet_train/` is a Cargo crate pinned to the bullet revision:
+
+- `KoiHalfkaKingBucket` implements `SparseInputType` with Koi's exact formula
+  (`bucket = zone*4 + (mirrored_file - 4)` from the side-to-move king, index
+  `bucket*768 + (color*6 + kind)*64 + square`, 9,216 inputs). Rust tests pin the
+  two C++ golden sparse index lists (startpos, midgame) plus range/capacity and
+  the king-bucket table; all four pass.
+- `KoiOutputBuckets` implements `OutputBuckets<ChessBoard>` with
+  `min(7, (32 - pieces)/4)`; the model is
+  `l0.crelu()` halves multiplied pairwise (`p[j] = a[j] * a[j + H/2]`) into a
+  per-bucket linear head, matching the C++ pair-product inference.
+- `src/bin/train.rs` trains with `eval_scale = 100`, `ConstantWDL 0.0`, AdamW,
+  cosine decay, and saves raw f32 weights in `l0w, l0b, l1w, l1b` order.
+- Weight layout was proven experimentally: `save_unquantised` writes the
+  internal column-major buffers without applying `SavedFormat` transforms, and
+  comparing the `quantised.bin` (which does apply transforms) against the
+  internal buffer showed `l0w` is feature-major. `read_raw_weights` therefore
+  reads `l0w` as `(9216, hidden)`; the earlier permuted reading is invalid and
+  its smoke exports are stale.
+- `tools/measurement/export_bullet_v4.py` parses `raw.bin`, runs the v4 shift
+  grid on the validation text, and writes the `KOI-NNUE` v4 container plus
+  `koi-nnue-training-metadata-v2` metadata (with a `bullet` backend block).
+- `tools/nnue/run_bullet.py` chains convert → train → per-checkpoint validation
+  MAE → export and emits the studio progress contract. Bullet's superbatch
+  summary arrives after a cursor-up escape, so the parser strips ANSI codes and
+  matches without anchors; `--test`/`TestDataset` is a no-op in the pinned
+  revision (`Validation data not currently implemented!`), so validation MAE is
+  measured by the exporter instead.
+- Tests: `bullet_data_test.py` grew to 13 cases (parser incl. cursor-up prefix
+  and ANSI, epoch formatting, command builders, raw-weight layout round trip,
+  hidden-unit inference); all pass.
+- Smoke on the GTX 1060 (`sm_61`): a 2-superbatch run printed genuine epoch
+  lines (`train_loss 0.18612` / `0.25063`), the exporter selected
+  `s1=6 k3=12` and wrote a 1,180,299-byte v4 container, and
+  `koi-bench --nnue` loaded it and produced all 64 rows.
 
 ## Phase 4 — studio backend
 
