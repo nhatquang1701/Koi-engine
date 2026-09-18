@@ -138,7 +138,49 @@ Pending.
 
 ## Phase 6 — NNUE bug hunt
 
-Pending.
+An independent audit of the v4 loader, serializer, inference, incremental
+accumulators, and the Python tooling against the design spec and the Python
+reference found the following defects, each fixed with a regression test:
+
+- **v1/v2 serialization silently dropped nonzero shifts.** Inference applies
+  `bottleneck_shift`/`output_shift` for every container version, but
+  `NnueLoader::serialize` only validated and wrote shift bytes for v3/v4, so a
+  hand-built v2 network with `output_shift = 5` scored differently after a
+  serialize/load round trip. Serialize now rejects nonzero shifts for
+  `version < kKoiNnuePerspectiveV3FormatVersion` with `malformed_manifest`;
+  valid v2 containers still round trip byte-identically.
+- **`NnueEvaluator` returned 0 for a non-null invalid network instead of the
+  classical fallback.** A shared `network_is_usable()` helper (manifest plus
+  array validation) now gates `evaluate` and `create_worker`, matching the
+  load path's safe-fallback contract.
+- **One-shot `NnueEvaluator::evaluate` allocated ~1 MB of incremental slot
+  storage per call.** The temporary worker now uses the stateless
+  `EvaluationFeatureExtractor` overload, which is what the search fallback
+  scanners need.
+- **`run_bullet.py` passed `--hidden` to an exporter that had no such option**
+  (argparse's abbreviation rule silently bound it to `--hidden-shifts`). The
+  exporter now has a real `--hidden` and rejects a mismatch with the width
+  inferred from `raw.bin` (exit 2).
+- **Python error paths:** `train_nnue_koi.load_binary_dataset` guards the
+  record-count offset (truncated `koi-dataset-v1` now raises `TrainerError`
+  instead of `struct.error`), and `export_bullet_v4.load_validation` catches
+  `ValueError`, `OverflowError`, and `TypeError` so `inf`/`nan` rows are
+  skipped instead of aborting an export.
+- **Scripted incremental coverage** for the riskiest deltas: castling for both
+  colors and sides, en passant, and a promotion capture now assert accumulator
+  equality against a fresh recompute with an unchanged fallback count. (The
+  castles use separate side-to-move fixtures because a castled white rook on
+  f1/d1 attacks black's castling squares.)
+
+Everything else audited clean: v4 container validation, reserved bytes, shift
+cap, payload and SHA-256 parity, pair-product overflow bounds, AVX2 fallbacks,
+clamping order, perspective signs, bucket formulas across C++/Python/Rust, and
+the advisory hook wiring.
+
+Verification: `build\release\nnue_boundary_tests.exe` and
+`build\debug\nnue_boundary_tests.exe` both report `run=27 pass=26 fail=0
+skip=1` (the skip is the external-container environment case), and
+`python -m unittest tests/python/nnue/bullet_data_test.py` runs 17 tests OK.
 
 ## Phase 7 — documentation mismatch audit
 

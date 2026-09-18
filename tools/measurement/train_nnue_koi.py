@@ -132,6 +132,9 @@ def load_binary_dataset(path: pathlib.Path, limit: int) -> tuple[np.ndarray, np.
     feature_set = data[14 : 14 + feature_length].decode("utf-8", errors="replace")
     if feature_set != FEATURE_SET.decode():
         raise TrainerError(f"{path} uses feature set {feature_set!r}; expected {FEATURE_SET.decode()!r}")
+    header_end = 14 + feature_length + 8
+    if header_end > len(data):
+        raise TrainerError(f"{path} is truncated before the record count")
     count = struct.unpack_from("<Q", data, 14 + feature_length)[0]
     if count > len(data):
         raise TrainerError(f"{path} claims {count} records but is only {len(data)} bytes")

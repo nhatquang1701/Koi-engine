@@ -116,7 +116,7 @@ versions; commit at every phase boundary and push when the suites pass.
 
 ## Phase 6 — NNUE bug hunt
 
-- [ ] Audit the v4 loader/inference/accumulator paths against the design spec
+- [x] Audit the v4 loader/inference/accumulator paths against the design spec
   and the Python reference; add regression tests for any defect (incremental
   accumulator recovery, quantization boundaries, loader error paths, AVX2
   parity, stale comments). Fix each with a test that fails first. Commit.

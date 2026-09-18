@@ -231,6 +231,79 @@ class ExporterTests(unittest.TestCase):
         self.assertEqual(weights["feature_weights"].shape, (9216, hidden))
         self.assertEqual(weights["output_weights"].shape, (8, half))
 
+    def test_export_command_parses_with_exact_options(self) -> None:
+        command = run_bullet.build_export_command(
+            Path("checkpoints"),
+            Path("validation.txt"),
+            Path("net.nnue"),
+            Path("net.metadata.json"),
+            1024,
+            [6, 7, 8],
+            [12, 14, 16, 18, 20],
+            4000,
+        )
+        option_strings = export_bullet_v4.build_parser()._option_string_actions
+        for token in command[2:]:
+            if token.startswith("--"):
+                self.assertIn(token, option_strings, f"{token} is not an exact exporter option")
+        args = export_bullet_v4.build_parser().parse_args(command[2:])
+        self.assertEqual(args.hidden, 1024)
+        self.assertEqual(args.hidden_shifts, [6, 7, 8])
+        self.assertEqual(args.output_shifts, [12, 14, 16, 18, 20])
+        self.assertEqual(args.tune_samples, 4000)
+
+    def test_exporter_rejects_a_hidden_mismatch(self) -> None:
+        hidden = 32
+        half = hidden // 2
+        with tempfile.TemporaryDirectory() as temp:
+            raw = Path(temp) / "raw.bin"
+            raw.write_bytes(
+                np.zeros(export_bullet_v4.train_nnue_koi.INPUT_UNITS * hidden, dtype="<f4").tobytes()
+                + np.zeros(hidden, dtype="<f4").tobytes()
+                + np.zeros(8 * half, dtype="<f4").tobytes()
+                + np.zeros(8, dtype="<f4").tobytes()
+            )
+            exit_code = export_bullet_v4.main([
+                "--checkpoint", str(raw),
+                "--hidden", "64",
+                "--net-out", str(Path(temp) / "net.nnue"),
+                "--meta-out", str(Path(temp) / "net.metadata.json"),
+            ])
+        self.assertEqual(exit_code, 2)
+
+    def test_validation_rows_with_inf_or_nan_are_skipped(self) -> None:
+        valid = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 | 17 | 0.5"
+        midgame = "r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 4 4 | -31 | 0.5"
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "validation.txt"
+            path.write_text(
+                "\n".join([
+                    valid,
+                    "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 | inf | 0.5",
+                    midgame,
+                    "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 | nan | 0.5",
+                    "",
+                ]),
+                encoding="utf-8",
+            )
+            indices, offsets, scores, buckets = export_bullet_v4.load_validation(path, 0, 0)
+        self.assertEqual(scores.size, 2)
+        self.assertEqual(buckets.size, 2)
+        self.assertEqual(int(scores[0]), 17)
+        self.assertEqual(int(scores[1]), 31)  # black to move: white-relative -31 flips sign
+
+    def test_truncated_dataset_header_raises_trainer_error(self) -> None:
+        import struct
+
+        feature_set = b"halfka-king-bucket-v1"
+        blob = struct.pack("<8sIH", b"KOI-DATA", 1, len(feature_set)) + feature_set + struct.pack("<Q", 0)
+        self.assertEqual(len(blob), 43)
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "dataset.bin"
+            path.write_bytes(blob[:-1])
+            with self.assertRaises(export_bullet_v4.train_nnue_koi.TrainerError):
+                export_bullet_v4.train_nnue_koi.load_binary_dataset(path, 0)
+
 
 if __name__ == "__main__":
     unittest.main()

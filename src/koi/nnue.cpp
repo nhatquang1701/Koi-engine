@@ -794,6 +794,13 @@ std::expected<std::vector<std::uint8_t>, NnueError> NnueLoader::serialize(
     if (const auto error = validate_manifest(network.manifest); error.has_value()) {
         return std::unexpected(*error);
     }
+    if (network.manifest.version < kKoiNnuePerspectiveV3FormatVersion &&
+        (network.hidden_shift != 0 || network.bottleneck_shift != 0 ||
+         network.output_shift != 0)) {
+        return std::unexpected(make_error(
+            NnueErrorCode::malformed_manifest,
+            "NNUE v1/v2 containers cannot carry nonzero shifts"));
+    }
     if (is_halfka_king_bucket_v1(network.manifest)) {
         if (network.hidden_shift > kKoiNnueMaximumShift ||
             network.output_shift > kKoiNnueMaximumShift ||
@@ -1379,6 +1386,18 @@ private:
 
 } // namespace
 
+namespace {
+
+// A network is only usable when its manifest and arrays still validate. The
+// public library seam must treat an invalid in-memory network the same way the
+// load path treats a rejected file: fall back to the classical evaluator
+// instead of returning silent zero scores.
+bool network_is_usable(const NnueNetwork& network) {
+    return !validate_manifest(network.manifest).has_value() && arrays_match_manifest(network);
+}
+
+} // namespace
+
 NnueEvaluator::NnueEvaluator(std::shared_ptr<const NnueNetwork> weights)
     : NnueEvaluator(std::move(weights), std::make_shared<ClassicalEvaluator>()) {}
 
@@ -1387,15 +1406,18 @@ NnueEvaluator::NnueEvaluator(std::shared_ptr<const NnueNetwork> weights,
     : weights_(std::move(weights)), fallback_(std::move(fallback)) {}
 
 int NnueEvaluator::evaluate(const GameState& state, const Color perspective) const {
-    if (!weights_) {
+    if (!weights_ || !network_is_usable(*weights_)) {
         return fallback_ ? fallback_->evaluate(state, perspective) : 0;
     }
+    // One-shot evaluation uses the stateless feature overload: the worker is a
+    // temporary, so allocating and zeroing the per-ply incremental slots would
+    // only add ~1 MB of pointless work to every fallback evaluation.
     NnueWorker worker(weights_);
-    return worker.evaluate(state, perspective);
+    return worker.evaluate(EvaluationFeatureExtractor::extract(state), perspective);
 }
 
 std::unique_ptr<EvaluatorWorker> NnueEvaluator::create_worker() const {
-    if (!weights_) {
+    if (!weights_ || !network_is_usable(*weights_)) {
         return {};
     }
     return std::make_unique<NnueEvaluatorWorker>(weights_);

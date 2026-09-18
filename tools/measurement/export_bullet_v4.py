@@ -137,7 +137,7 @@ def load_validation(path: Path, limit: int, seed: int) -> tuple[np.ndarray, np.n
             try:
                 white_cp = int(round(float(parts[1].strip())))
                 board = chess.Board(fen)
-            except ValueError:
+            except (ValueError, OverflowError, TypeError):
                 skipped += 1
                 continue
             stm_cp = white_cp if board.turn == chess.WHITE else -white_cp
@@ -236,6 +236,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--net-out", type=Path, default=DEFAULT_NET_OUT)
     parser.add_argument("--meta-out", type=Path, default=DEFAULT_META_OUT)
+    parser.add_argument(
+        "--hidden",
+        type=int,
+        default=0,
+        help="expected hidden width from the training run (0 = infer from raw.bin)",
+    )
     parser.add_argument("--hidden-shifts", type=int, nargs="+", default=[6, 7, 8])
     parser.add_argument("--output-shifts", type=int, nargs="+", default=[12, 14, 16, 18, 20])
     parser.add_argument("--tune-samples", type=int, default=4000)
@@ -251,6 +257,14 @@ def main(argv: list[str] | None = None) -> int:
         hidden, weights = read_raw_weights(checkpoint / "raw.bin")
     except (ExportError, OSError) as error:
         print(f"export_bullet_v4: {error}", file=sys.stderr)
+        return 2
+
+    if args.hidden and args.hidden != hidden:
+        print(
+            f"export_bullet_v4: checkpoint hidden width {hidden} does not match "
+            f"--hidden {args.hidden}",
+            file=sys.stderr,
+        )
         return 2
 
     log(f"export: checkpoint {checkpoint} hidden={hidden}")

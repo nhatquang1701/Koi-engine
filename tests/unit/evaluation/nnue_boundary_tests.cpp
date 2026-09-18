@@ -902,6 +902,102 @@ void test_v4_incremental_recovers_from_skipped_hooks() {
             "a skipped make hook must also fall back after unmaking");
 }
 
+void test_v1_v2_serialization_rejects_nonzero_shifts() {
+    koi::NnueNetwork shifted = koi::NnueNetwork::synthetic_v2();
+    shifted.output_shift = 5;
+    const auto rejected = koi::NnueLoader::serialize(shifted);
+    require(!rejected.has_value() &&
+                rejected.error().code == koi::NnueErrorCode::malformed_manifest,
+            "v1/v2 serialization must reject nonzero shifts instead of dropping them");
+
+    const auto encoded = koi::NnueLoader::serialize(koi::NnueNetwork::synthetic_v2());
+    require(encoded.has_value(), "valid v2 networks still serialize");
+    const auto decoded = koi::NnueLoader::load(*encoded);
+    require(decoded.has_value(), "valid v2 containers still load");
+    const auto repeated = koi::NnueLoader::serialize(*decoded);
+    require(repeated.has_value() && *repeated == *encoded,
+            "v2 round trips must stay byte-identical");
+}
+
+void test_invalid_in_memory_network_uses_the_classical_fallback() {
+    koi::NnueNetwork broken = koi::NnueNetwork::synthetic_v4();
+    broken.manifest.layer_sizes[1] = 31;
+    const auto weights = std::make_shared<const koi::NnueNetwork>(std::move(broken));
+    const koi::NnueEvaluator evaluator(weights);
+    const koi::GameState state = require_state("4k3/8/8/8/8/8/P7/4K3 w - - 0 1");
+    const koi::ClassicalEvaluator classical;
+    require(evaluator.evaluate(state, state.side_to_move()) ==
+                classical.evaluate(state, state.side_to_move()),
+            "invalid in-memory networks must fall back to classical evaluation");
+    require(evaluator.create_worker() == nullptr,
+            "invalid in-memory networks must not create worker state");
+}
+
+void test_one_shot_evaluation_matches_stateless_inference() {
+    const auto weights =
+        std::make_shared<const koi::NnueNetwork>(koi::NnueNetwork::synthetic_v4());
+    const koi::NnueEvaluator evaluator(weights);
+    const koi::GameState state =
+        require_state("r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 4 4");
+    koi::NnueWorker worker(weights);
+    const koi::EvaluationFeatures features = koi::EvaluationFeatureExtractor::extract(state);
+    require(evaluator.evaluate(state, state.side_to_move()) ==
+                worker.evaluate(features, state.side_to_move()),
+            "one-shot NnueEvaluator::evaluate must match stateless feature inference");
+}
+
+void play_scripted_incremental(const std::string& fen,
+                               std::initializer_list<std::string_view> moves) {
+    const auto weights =
+        std::make_shared<const koi::NnueNetwork>(koi::NnueNetwork::synthetic_v4());
+    koi::GameState state = require_state(fen);
+    koi::NnueWorker incremental(weights);
+    koi::NnueWorker reference(weights);
+    verify_incremental_against_reference(incremental, reference, state);
+    const std::uint64_t fallbacks = incremental.incremental_fallback_count();
+
+    int ply = 0;
+    for (const std::string_view move_text : moves) {
+        const auto move = koi::Move::parse_uci(move_text);
+        require(move.has_value(),
+                std::string("scripted incremental move must parse: ") + std::string(move_text));
+        const auto metadata = state.describe_move(*move);
+        require(metadata.has_value(),
+                std::string("scripted incremental move must describe: ") + std::string(move_text) +
+                    " in " + fen);
+        const std::uint64_t parent_key = state.position_key();
+        require(state.make_search_move(*metadata),
+                std::string("scripted incremental move must be legal: ") + std::string(move_text) +
+                    " in " + fen);
+        incremental.on_make_move(state, *metadata, ply, parent_key);
+        ++ply;
+        verify_incremental_against_reference(incremental, reference, state);
+    }
+
+    for (int index = ply - 1; index >= 0; --index) {
+        incremental.on_unmake_move(index + 1);
+        state.unmake_move();
+        verify_incremental_against_reference(incremental, reference, state);
+    }
+
+    require(incremental.incremental_fallback_count() == fallbacks,
+            "scripted special moves must not need a full refresh");
+}
+
+void test_v4_incremental_scripted_special_moves() {
+    // A castled white rook lands on f1/d1 and attacks the black castling
+    // squares, so each side's castles are scripted from its own fixture.
+    play_scripted_incremental("r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1", {"e1g1"});
+    play_scripted_incremental("r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1", {"e1c1"});
+    play_scripted_incremental("r3k2r/8/8/8/8/8/8/R3K2R b KQkq - 0 1", {"e8g8"});
+    play_scripted_incremental("r3k2r/8/8/8/8/8/8/R3K2R b KQkq - 0 1", {"e8c8"});
+    play_scripted_incremental("rnbqkbnr/ppp1p1pp/8/3pPp2/8/8/PPPP1PPP/RNBQKBNR w KQkq f6 0 3",
+                              {"e5f6"});
+    play_scripted_incremental("rnbqkbnr/pppp1ppp/8/8/3Pp3/8/PPP1PPPP/RNBQKBNR b KQkq d3 0 3",
+                              {"e4d3"});
+    play_scripted_incremental("n3k3/1P6/8/8/8/8/8/4K3 w - - 0 1", {"b7a8q"});
+}
+
 } // namespace
 
 // Test-only seam: serialize a deterministic v4 fixture network and print the
@@ -1009,6 +1105,10 @@ int main(int argc, char** argv) {
         {"NNUE v4 incremental walk", test_v4_incremental_matches_full_recompute},
         {"NNUE v4 incremental king bucket", test_v4_incremental_handles_king_bucket_crossing},
         {"NNUE v4 incremental recovery", test_v4_incremental_recovers_from_skipped_hooks},
+        {"NNUE v4 incremental special moves", test_v4_incremental_scripted_special_moves},
+        {"NNUE v2 shifts rejected", test_v1_v2_serialization_rejects_nonzero_shifts},
+        {"NNUE invalid fallback", test_invalid_in_memory_network_uses_the_classical_fallback},
+        {"NNUE one-shot stateless", test_one_shot_evaluation_matches_stateless_inference},
         {"external NNUE container", test_external_v2_container},
     };
     return koi::test::run_tests(tests, argc, argv);
