@@ -201,5 +201,91 @@ class BackendCommandTests(unittest.TestCase):
         self.assertIn("custom.metadata.json", result.stdout)
 
 
+class TelemetryTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.core = load_studio_core()
+
+    def test_loaded_lines_are_parsed_for_both_trainers(self):
+        event = self.core.parse_progress("loaded 2172420 rows (18.2 active, pad 32) in 4.9s")
+        self.assertEqual(event["kind"], "loaded")
+        self.assertEqual(event["rows"], 2172420)
+        self.assertAlmostEqual(event["seconds"], 4.9)
+        self.assertAlmostEqual(event["rows_per_second"], 2172420 / 4.9, places=1)
+        legacy = self.core.parse_progress("loaded 400 rows in 0.4s")
+        self.assertEqual(legacy["kind"], "loaded")
+        self.assertEqual(legacy["rows"], 400)
+
+    def test_update_from_log_events_persists_the_histories(self):
+        with tempfile.TemporaryDirectory() as directory:
+            run = self.core.Run(directory=Path(directory))
+            events = [
+                self.core.parse_progress(
+                    "epoch 1/10 train_loss 2.18769 val_loss 1.83720 val_mae_cp 183.7 time 138.9s"
+                ),
+                self.core.parse_progress(
+                    "epoch 2/10 train_loss 2.00000 val_loss 1.70000 val_mae_cp 170.2 time 140.1s"
+                ),
+                self.core.parse_progress("loaded 2172420 rows (18.2 active, pad 32) in 4.9s"),
+            ]
+            run.update_from_log_events(events)
+            progress = run.state["progress"]
+            self.assertEqual(progress["history"], [183.7, 170.2])
+            self.assertEqual(progress["train_loss_history"], [2.18769, 2.0])
+            self.assertEqual(progress["val_loss_history"], [1.8372, 1.7])
+            self.assertEqual(progress["seconds_history"], [138.9, 140.1])
+            self.assertEqual(progress["rows_loaded"], 2172420)
+            self.assertAlmostEqual(progress["rows_per_second"], 2172420 / 4.9, places=1)
+
+    def test_eta_summary_and_duration_formatting(self):
+        progress = {
+            "epoch": 2,
+            "epochs": 10,
+            "val_mae_cp": 142.1,
+            "seconds_history": [100.0, 110.0],
+            "rows_per_second": 15000.0,
+        }
+        self.assertAlmostEqual(self.core.estimate_eta(progress), 840.0)
+        summary = self.core.progress_summary(progress)
+        self.assertIn("epoch 2/10", summary)
+        self.assertIn("val MAE 142.1 cp", summary)
+        self.assertIn("ETA 14m 00s", summary)
+        self.assertIn("15,000 rows/s", summary)
+        self.assertIsNone(self.core.estimate_eta({"epoch": 1, "epochs": 5}))
+        self.assertEqual(self.core.estimate_eta({"epoch": 5, "epochs": 5}), 0.0)
+        self.assertEqual(self.core.format_duration(45), "45s")
+        self.assertEqual(self.core.format_duration(272), "4m 32s")
+        self.assertEqual(self.core.format_duration(3900), "1h 05m")
+
+    def test_chart_series_and_bounds(self):
+        progress = {
+            "train_loss_history": [2.0, 1.5],
+            "val_loss_history": [1.8, 1.4],
+            "history": [180.0, 140.0],
+        }
+        series = self.core.chart_series(progress)
+        self.assertEqual([item["name"] for item in series], ["Train loss", "Val loss", "Val MAE"])
+        self.assertEqual([item["axis"] for item in series], ["loss", "loss", "mae"])
+        self.assertEqual(series[0]["values"], [2.0, 1.5])
+        # Losses and centipawn error are drawn against separate scales.
+        self.assertEqual(self.core.chart_bounds(series, "loss"), (1.4, 2.0))
+        self.assertEqual(self.core.chart_bounds(series, "mae"), (140.0, 180.0))
+        self.assertEqual(self.core.chart_bounds(series), (1.4, 180.0))
+        flat = [{"name": "flat", "color": "#000000", "axis": "mae", "values": [5.0, 5.0]}]
+        self.assertEqual(self.core.chart_bounds(flat), (4.0, 6.0))
+        self.assertIsNone(self.core.chart_bounds([]))
+        self.assertIsNone(self.core.chart_bounds(series, "missing"))
+        self.assertEqual(self.core.chart_series({}), [])
+
+    def test_log_line_matches_filters(self):
+        line = "epoch 1/10 train_loss 2.18769 val_loss 1.83720 val_mae_cp 183.7 time 138.9s"
+        self.assertTrue(self.core.log_line_matches(line, "", False))
+        self.assertTrue(self.core.log_line_matches(line, "EPOCH", False))
+        self.assertFalse(self.core.log_line_matches(line, "traceback", False))
+        self.assertFalse(self.core.log_line_matches(line, "", True))
+        self.assertTrue(self.core.log_line_matches("ValueError: bad network", "", True))
+        self.assertTrue(self.core.log_line_matches("run failed with exit code 1", "", True))
+
+
 if __name__ == "__main__":
     unittest.main()

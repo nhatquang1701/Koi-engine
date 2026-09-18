@@ -85,7 +85,6 @@ def stream_command(command: list[str], run: core.Run, echo: bool = True) -> int:
         bufsize=1,
     )
     assert process.stdout is not None
-    history: list[float] = []
     with open(run.log_path, "w", encoding="utf-8") as log:
         for line in process.stdout:
             log.write(line)
@@ -93,16 +92,8 @@ def stream_command(command: list[str], run: core.Run, echo: bool = True) -> int:
             if echo:
                 print(line, end="", flush=True)
             event = core.parse_progress(line)
-            if event and event.get("kind") == "epoch":
-                history.append(event["val_mae_cp"])
-                run.write_state(
-                    progress={
-                        "epoch": event["epoch"],
-                        "epochs": event["epochs"],
-                        "val_mae_cp": event["val_mae_cp"],
-                        "history": history,
-                    }
-                )
+            if event:
+                run.update_from_log_events([event])
     code = process.wait()
     run.write_state(
         status="completed" if code == 0 else "failed",
@@ -380,14 +371,24 @@ class StudioApp:
         self.progress_var = tk.StringVar(value="idle")
         tk.ttk.Label(frame, textvariable=self.progress_var).grid(row=6, column=0, columnspan=6, sticky="w")
 
-        tk.ttk.Label(frame, text="Validation MAE per epoch (cp)", style="Heading.TLabel").grid(
+        tk.ttk.Label(frame, text="Training progress", style="Heading.TLabel").grid(
             row=7, column=0, columnspan=6, sticky="w", pady=(8, 0)
         )
-        self.chart = tk.Canvas(frame, height=110, background="#fdfdfd", highlightthickness=1, highlightbackground="#cccccc")
+        self.chart = tk.Canvas(frame, height=130, background="#fdfdfd", highlightthickness=1, highlightbackground="#cccccc")
         self.chart.grid(row=8, column=0, columnspan=6, sticky="we", pady=(2, 8))
         self.chart.bind("<Configure>", lambda _event: self._draw_chart())
 
-        tk.ttk.Label(frame, text="Log", style="Heading.TLabel").grid(row=9, column=0, sticky="w")
+        log_header = tk.ttk.Frame(frame)
+        log_header.grid(row=9, column=0, columnspan=6, sticky="we")
+        tk.ttk.Label(log_header, text="Log", style="Heading.TLabel").pack(side="left")
+        tk.ttk.Label(log_header, text="Filter").pack(side="left", padx=(12, 4))
+        self.log_filter_var = tk.StringVar(value="")
+        tk.ttk.Entry(log_header, textvariable=self.log_filter_var, width=24).pack(side="left")
+        self.log_filter_var.trace_add("write", lambda *_args: self._render_log())
+        self.log_errors_var = tk.BooleanVar(value=False)
+        tk.ttk.Checkbutton(
+            log_header, text="Errors only", variable=self.log_errors_var, command=self._render_log
+        ).pack(side="left", padx=8)
         self.log_text = tk.Text(frame, height=14, wrap="none", background="#111111", foreground="#d8d8d8")
         self.log_text.grid(row=10, column=0, columnspan=6, sticky="nsew")
         scrollbar = tk.ttk.Scrollbar(frame, command=self.log_text.yview)
@@ -395,7 +396,8 @@ class StudioApp:
         self.log_text.configure(yscrollcommand=scrollbar.set)
         frame.rowconfigure(10, weight=1)
         frame.columnconfigure(5, weight=1)
-        self.chart_history: list[float] = []
+        self.chart_progress: dict = {}
+        self.log_lines: list[str] = []
         self._backend_changed()
 
     def _build_validate_tab(self, notebook) -> None:
@@ -559,16 +561,21 @@ class StudioApp:
         self.tail_stop.set()
         self.active_run = run
         self.log_offset = 0
-        self.chart_history = []
+        self.log_lines = []
         self.log_text.delete("1.0", "end")
+        self.chart_progress = dict(run.state.get("progress", {}))
+        self._draw_chart()
         self.progress.configure(maximum=max(1, int(run.config.get("epochs", 1))))
-        self.progress["value"] = 0
+        self.progress["value"] = int(self.chart_progress.get("epoch", 0) or 0)
         self.stop_button.configure(state="normal")
         self.open_run_button.configure(state="normal")
         self.tail_stop = threading.Event()
         thread = threading.Thread(target=self._tail_loop, args=(run, self.tail_stop), daemon=True)
         thread.start()
-        self.progress_var.set(f"run {run.directory.name}")
+        if self.chart_progress.get("epoch"):
+            self.progress_var.set(core.progress_summary(self.chart_progress))
+        else:
+            self.progress_var.set(f"run {run.directory.name}")
 
     def _tail_loop(self, run: core.Run, stop: threading.Event) -> None:
         offset = 0
@@ -793,34 +800,102 @@ class StudioApp:
     # -- event pump ---------------------------------------------------------
 
     def _append_log(self, text: str) -> None:
-        self.log_text.insert("end", text)
-        lines = int(self.log_text.index("end-1c").split(".")[0])
-        if lines > 6000:
-            self.log_text.delete("1.0", f"{lines - 5000}.0")
+        at_bottom = self.log_text.yview()[1] >= 0.999
+        needle = self.log_filter_var.get()
+        errors_only = self.log_errors_var.get()
+        for line in text.splitlines(keepends=True):
+            self.log_lines.append(line)
+            if core.log_line_matches(line, needle, errors_only):
+                self.log_text.insert("end", line)
+        if len(self.log_lines) > 6000:
+            self.log_lines = self.log_lines[-5000:]
+            self._render_log()
+            return
+        if at_bottom:
+            self.log_text.see("end")
+
+    def _render_log(self) -> None:
+        self.log_text.delete("1.0", "end")
+        needle = self.log_filter_var.get()
+        errors_only = self.log_errors_var.get()
+        for line in self.log_lines:
+            if core.log_line_matches(line, needle, errors_only):
+                self.log_text.insert("end", line)
         self.log_text.see("end")
 
     def _draw_chart(self) -> None:
         self.chart.delete("all")
-        if not self.chart_history:
+        series = core.chart_series(self.chart_progress)
+        loss_bounds = core.chart_bounds(series, "loss")
+        mae_bounds = core.chart_bounds(series, "mae")
+        primary = loss_bounds or mae_bounds
+        if primary is None:
+            self.chart.create_text(12, 12, anchor="nw", text="no epochs yet", fill="#666666")
             return
         width = max(int(self.chart.winfo_width()), 100)
         height = max(int(self.chart.winfo_height()), 60)
-        margin = 12
-        low = min(self.chart_history)
-        high = max(self.chart_history)
-        span = max(high - low, 1.0)
-        count = len(self.chart_history)
-        points = []
-        for index, value in enumerate(self.chart_history):
-            x = margin + (width - 2 * margin) * (index / max(count - 1, 1))
-            y = height - margin - (height - 2 * margin) * ((value - low) / span)
-            points.append((x, y))
-        if len(points) > 1:
-            self.chart.create_line(*[coordinate for point in points for coordinate in point], fill="#1f6fb2", width=2)
-        for x, y in points:
-            self.chart.create_oval(x - 2, y - 2, x + 2, y + 2, fill="#1f6fb2", outline="")
-        self.chart.create_text(margin, margin, anchor="nw", text=f"min {low:.0f}", fill="#666666")
-        self.chart.create_text(margin, height - margin, anchor="sw", text=f"max {high:.0f}", fill="#666666")
+        margin_left = 46
+        margin_right = 52 if (loss_bounds and mae_bounds) else 12
+        margin_top = 24
+        margin_bottom = 22
+        low, high = primary
+        span = max(high - low, 1e-9)
+        count = max((len(item["values"]) for item in series), default=0)
+        plot_width = max(width - margin_left - margin_right, 10)
+        plot_height = max(height - margin_top - margin_bottom, 10)
+
+        self.chart.create_line(margin_left, margin_top, margin_left, height - margin_bottom, fill="#999999")
+        self.chart.create_line(
+            margin_left, height - margin_bottom, width - margin_right, height - margin_bottom, fill="#999999"
+        )
+        for step in range(3):
+            y = height - margin_bottom - plot_height * step / 2
+            self.chart.create_line(margin_left, y, width - margin_right, y, fill="#eeeeee")
+            self.chart.create_text(
+                margin_left - 4, y, anchor="e", text=f"{low + span * step / 2:.0f}", fill="#666666"
+            )
+        if loss_bounds and mae_bounds:
+            mae_span = max(mae_bounds[1] - mae_bounds[0], 1e-9)
+            for step in range(3):
+                y = height - margin_bottom - plot_height * step / 2
+                self.chart.create_text(
+                    width - margin_right + 4,
+                    y,
+                    anchor="w",
+                    text=f"{mae_bounds[0] + mae_span * step / 2:.0f}",
+                    fill="#1f6fb2",
+                )
+        if count > 1:
+            tick_step = max(1, count // 6)
+            for index in range(0, count, tick_step):
+                x = margin_left + plot_width * (index / max(count - 1, 1))
+                self.chart.create_text(
+                    x, height - margin_bottom + 4, anchor="n", text=str(index + 1), fill="#666666"
+                )
+
+        legend_x = margin_left
+        for item in series:
+            bounds = loss_bounds if item["axis"] == "loss" else mae_bounds
+            if bounds is None:
+                continue
+            item_low, item_high = bounds
+            item_span = max(item_high - item_low, 1e-9)
+            points = []
+            for index, value in enumerate(item["values"]):
+                x = margin_left + plot_width * (index / max(count - 1, 1))
+                y = height - margin_bottom - plot_height * ((value - item_low) / item_span)
+                points.append((x, y))
+            if len(points) > 1:
+                self.chart.create_line(
+                    *[coordinate for point in points for coordinate in point],
+                    fill=item["color"],
+                    width=2,
+                )
+            for x, y in points:
+                self.chart.create_oval(x - 2, y - 2, x + 2, y + 2, fill=item["color"], outline="")
+            self.chart.create_rectangle(legend_x, 6, legend_x + 8, 14, fill=item["color"], outline="")
+            self.chart.create_text(legend_x + 12, 10, anchor="w", text=item["name"], fill="#444444")
+            legend_x += 36 + 7 * len(item["name"])
 
     def _pump(self) -> None:
         try:
@@ -833,13 +908,9 @@ class StudioApp:
                     epochs = max(1, int(progress.get("epochs", 1)))
                     self.progress.configure(maximum=epochs)
                     self.progress["value"] = int(progress.get("epoch", 0))
-                    self.chart_history = [float(value) for value in progress.get("history", [])]
+                    self.chart_progress = progress
                     self._draw_chart()
-                    if progress.get("val_mae_cp") is not None:
-                        self.progress_var.set(
-                            f"epoch {progress.get('epoch', 0)}/{epochs} - val MAE "
-                            f"{progress['val_mae_cp']:.1f} cp"
-                        )
+                    self.progress_var.set(core.progress_summary(progress))
                 elif kind == "status":
                     self.status_var.set(f"training: {payload}")
                 elif kind == "finished":

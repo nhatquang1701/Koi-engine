@@ -60,6 +60,8 @@ _EPOCH_RE = re.compile(
 _QUANT_RE = re.compile(r"^quantization\s+.*val_mae_cp\s+(?P<val_mae>[\d.]+)")
 _SELECTED_RE = re.compile(r"^selected\s+.*val_mae_cp\s+(?P<val_mae>[\d.]+)")
 _WROTE_RE = re.compile(r"^wrote\s+(?P<net>\S+)\s+\((?P<bytes>\d+)\s+bytes\)\s+and\s+(?P<meta>\S+)")
+_LOADED_RE = re.compile(r"^loaded\s+(?P<rows>\d+)\s+rows?\b.*?\bin\s+(?P<seconds>[\d.]+)s")
+_ERROR_RE = re.compile(r"error|traceback|failed|reject", re.IGNORECASE)
 
 
 def presets() -> dict[str, dict[str, Any]]:
@@ -180,7 +182,113 @@ def parse_progress(line: str) -> dict[str, Any] | None:
             "bytes": int(match["bytes"]),
             "metadata": match["meta"],
         }
+    match = _LOADED_RE.match(line)
+    if match:
+        seconds = float(match["seconds"])
+        return {
+            "kind": "loaded",
+            "rows": int(match["rows"]),
+            "seconds": seconds,
+            "rows_per_second": int(match["rows"]) / seconds if seconds > 0 else None,
+        }
     return None
+
+
+# ---------------------------------------------------------------------------
+# Progress telemetry
+# ---------------------------------------------------------------------------
+# ``update_from_log_events`` persists the per-epoch histories the trainer
+# prints; the helpers below turn that state into display strings and chart
+# series.  They are pure functions so the headless tests can cover them.
+
+
+def format_duration(seconds: float | None) -> str:
+    """Human-readable duration such as ``12s``, ``4m 32s`` or ``1h 05m``."""
+    if seconds is None:
+        return "unknown"
+    total = max(0, int(round(seconds)))
+    if total < 60:
+        return f"{total}s"
+    if total < 3600:
+        return f"{total // 60}m {total % 60:02d}s"
+    return f"{total // 3600}h {(total % 3600) // 60:02d}m"
+
+
+def estimate_eta(progress: dict[str, Any]) -> float | None:
+    """Seconds until the configured epochs finish (``None`` without timings)."""
+    epochs = int(progress.get("epochs", 0) or 0)
+    epoch = int(progress.get("epoch", 0) or 0)
+    if epochs <= 0:
+        return None
+    if epoch >= epochs:
+        return 0.0
+    seconds = [float(value) for value in progress.get("seconds_history", []) if value is not None]
+    if not seconds:
+        return None
+    return (sum(seconds) / len(seconds)) * (epochs - epoch)
+
+
+def progress_summary(progress: dict[str, Any]) -> str:
+    """One-line progress text for the Train tab (epoch, MAE, ETA, throughput)."""
+    epochs = int(progress.get("epochs", 0) or 0) or 1
+    epoch = int(progress.get("epoch", 0) or 0)
+    parts = [f"epoch {epoch}/{epochs}"]
+    if progress.get("val_mae_cp") is not None:
+        parts.append(f"val MAE {float(progress['val_mae_cp']):.1f} cp")
+    eta = estimate_eta(progress)
+    if eta:
+        parts.append(f"ETA {format_duration(eta)}")
+    rows_per_second = progress.get("rows_per_second")
+    if rows_per_second:
+        parts.append(f"{float(rows_per_second):,.0f} rows/s")
+    return " - ".join(parts)
+
+
+def chart_series(progress: dict[str, Any]) -> list[dict[str, Any]]:
+    """Named, colored series for the validation chart (empty series dropped).
+
+    Losses and centipawn error live on different numeric scales, so each series
+    carries the axis it belongs to ("loss" or "mae").
+    """
+    candidates = [
+        ("Train loss", "#c0504d", "loss", progress.get("train_loss_history", [])),
+        ("Val loss", "#9bbb59", "loss", progress.get("val_loss_history", [])),
+        ("Val MAE", "#1f6fb2", "mae", progress.get("history", [])),
+    ]
+    series = []
+    for name, color, axis, values in candidates:
+        numbers = [float(value) for value in values if value is not None]
+        if numbers:
+            series.append({"name": name, "color": color, "axis": axis, "values": numbers})
+    return series
+
+
+def chart_bounds(
+    series: list[dict[str, Any]], axis: str | None = None
+) -> tuple[float, float] | None:
+    """Low/high bounds across the selected series, padded when flat.
+
+    ``axis`` filters to one scale (``"loss"`` or ``"mae"``); ``None`` uses every
+    series.  Returns ``None`` when there are no values.
+    """
+    items = series if axis is None else [item for item in series if item.get("axis") == axis]
+    values = [value for item in items for value in item.get("values", [])]
+    if not values:
+        return None
+    low = min(values)
+    high = max(values)
+    if high - low < 1e-9:
+        return low - 1.0, high + 1.0
+    return low, high
+
+
+def log_line_matches(line: str, needle: str = "", errors_only: bool = False) -> bool:
+    """Whether a log line passes the Train-tab filter."""
+    if errors_only and not _ERROR_RE.search(line):
+        return False
+    if needle and needle.lower() not in line.lower():
+        return False
+    return True
 
 
 # ---------------------------------------------------------------------------
@@ -288,17 +396,30 @@ class Run:
         for event in events:
             kind = event.get("kind")
             if kind == "epoch":
+                seconds = event.get("seconds")
                 progress.update(
                     epoch=event["epoch"],
                     epochs=event["epochs"],
                     val_mae_cp=event["val_mae_cp"],
                     history=progress.get("history", [])
                     + [event["val_mae_cp"]],
+                    train_loss_history=progress.get("train_loss_history", [])
+                    + [event["train_loss"]],
+                    val_loss_history=progress.get("val_loss_history", [])
+                    + [event["val_loss"]],
                 )
+                if seconds is not None:
+                    progress["seconds_history"] = progress.get("seconds_history", []) + [
+                        float(seconds)
+                    ]
             elif kind in {"quantization", "selected"}:
                 progress["quantized_val_mae_cp"] = event["val_mae_cp"]
             elif kind == "wrote":
                 progress["net_bytes"] = event["bytes"]
+            elif kind == "loaded":
+                progress["rows_loaded"] = event["rows"]
+                if event.get("rows_per_second"):
+                    progress["rows_per_second"] = event["rows_per_second"]
         if progress:
             self.write_state(progress=progress)
 

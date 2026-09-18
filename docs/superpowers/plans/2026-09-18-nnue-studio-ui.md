@@ -47,7 +47,7 @@ turns the run list into a filterable, sortable view with failure details.
   validation; `net_name` threaded through backends and run path resolution;
   install gated on a successful gate; shared numeric input guards; a lock around
   run-state writes; headless tests for each; commit.
-- [ ] **Phase 2 — Training telemetry.** Persist `train_loss`, `val_loss`,
+- [x] **Phase 2 — Training telemetry.** Persist `train_loss`, `val_loss`,
   `seconds`, rows loaded and throughput; ETA and summary helpers; a multi-series
   validation chart with axes and a legend; log filtering with pause-on-scroll;
   tests; commit.

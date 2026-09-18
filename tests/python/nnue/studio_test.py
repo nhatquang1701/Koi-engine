@@ -85,7 +85,13 @@ class ProgressParserTests(unittest.TestCase):
         self.assertTrue(str(event["net"]).endswith("net.nnue"))
 
     def test_unrelated_lines_are_ignored(self):
-        self.assertIsNone(self.core.parse_progress("loaded 1200002 rows in 4.2s"))
+        self.assertIsNone(self.core.parse_progress("opening artifacts/training/labels.txt"))
+
+    def test_loaded_line_reports_throughput(self):
+        event = self.core.parse_progress("loaded 1200002 rows in 4.2s")
+        self.assertEqual(event["kind"], "loaded")
+        self.assertEqual(event["rows"], 1200002)
+        self.assertAlmostEqual(event["rows_per_second"], 1200002 / 4.2, places=1)
 
     def test_presets_have_ordered_effort(self):
         presets = self.core.presets()
