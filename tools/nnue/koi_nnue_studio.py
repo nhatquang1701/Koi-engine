@@ -136,7 +136,7 @@ def selftest(args: argparse.Namespace) -> int:
     if code != 0:
         print(f"[selftest] trainer exited with {code}", file=sys.stderr)
         return code
-    net = backend.net_path(run.directory)
+    net = backend.net_path(run.directory, run.config)
     if not net.exists() or net.stat().st_size == 0:
         print(f"[selftest] trainer did not produce {net}", file=sys.stderr)
         return 1
@@ -514,13 +514,15 @@ class StudioApp:
         config = core.default_config()
         config["backend"] = self.backend_var.get()
         config["corpus"] = str(Path(self.labels_var.get()))
-        config["epochs"] = int(self.epochs_var.get())
-        config["batch_size"] = int(self.batch_var.get())
-        config["learning_rate"] = float(self.lr_var.get())
-        config["threads"] = int(self.threads_var.get())
-        config["rows"] = int(self.rows_var.get())
-        config["val_fraction"] = float(self.val_fraction_var.get())
-        config["net_name"] = self.net_name_var.get()
+        config["epochs"] = core.parse_int(self.epochs_var.get(), "Epochs", 1)
+        config["batch_size"] = core.parse_int(self.batch_var.get(), "Batch size", 1)
+        config["learning_rate"] = core.parse_float(self.lr_var.get(), "Learning rate", 0.0)
+        config["threads"] = core.parse_int(self.threads_var.get(), "Threads", 1)
+        config["rows"] = core.parse_int(self.rows_var.get(), "Row cap", 0)
+        config["val_fraction"] = core.parse_float(
+            self.val_fraction_var.get(), "Val fraction", 0.0, 1.0
+        )
+        config["net_name"] = core.network_file_name({"net_name": self.net_name_var.get()})
         return config
 
     # -- training -----------------------------------------------------------
@@ -596,7 +598,7 @@ class StudioApp:
             backend = self._run_backend(run)
             if backend is None:
                 continue
-            net = backend.net_path(run.directory)
+            net = backend.net_path(run.directory, run.config)
             if net.exists():
                 self.validate_net_var.set(str(net))
                 return
@@ -628,7 +630,7 @@ class StudioApp:
         if not net.exists():
             self.messagebox.showerror(APP_TITLE, "Choose a network first")
             return
-        self._validation_worker(net, games=0, nodes=0)
+        self._validation_worker(net, games=0, nodes=0, gate_only=True)
 
     def _start_validation(self, auto: bool) -> None:
         net = Path(self.validate_net_var.get())
@@ -638,17 +640,26 @@ class StudioApp:
                 return
             self.messagebox.showerror(APP_TITLE, "Choose a network first")
             return
-        games = int(self.games_ab_var.get())
-        nodes = int(self.nodes_ab_var.get())
+        try:
+            games = core.parse_int(self.games_ab_var.get(), "A/B games", 2, 2000)
+            nodes = core.parse_int(self.nodes_ab_var.get(), "A/B nodes", 1)
+        except ValueError as error:
+            self.messagebox.showerror(APP_TITLE, str(error))
+            return
         self._validation_worker(net, games=games, nodes=nodes)
 
-    def _validation_worker(self, net: Path, games: int, nodes: int) -> None:
+    def _validation_worker(self, net: Path, games: int, nodes: int, gate_only: bool = False) -> None:
         active = self.active_run
 
         def worker() -> None:
             run = active if active is not None and net == active.net_path else None
             result = core.validate_net(
-                net, run=run, games=games, nodes=nodes, report_path=net.parent / "ab-match.json"
+                net,
+                run=run,
+                games=games,
+                nodes=nodes,
+                report_path=net.parent / "ab-match.json",
+                gate_only=gate_only,
             )
             self.queue.put(("validation", {"net": str(net), "result": result}))
 
@@ -731,7 +742,7 @@ class StudioApp:
             state = core.refresh_state(run)
             progress = state.get("progress", {})
             backend = self._run_backend(run)
-            net = backend.net_path(run.directory) if backend else run.directory / "net.nnue"
+            net = backend.net_path(run.directory, run.config) if backend else run.net_path
             self.runs_tree.insert(
                 "",
                 "end",
@@ -762,7 +773,7 @@ class StudioApp:
         if not run:
             return
         backend = self._run_backend(run)
-        net = backend.net_path(run.directory) if backend else run.directory / "net.nnue"
+        net = backend.net_path(run.directory, run.config) if backend else run.net_path
         if net.exists():
             self.validate_net_var.set(str(net))
         else:
@@ -837,7 +848,7 @@ class StudioApp:
                     self.stop_button.configure(state="disabled")
                     self._append_log(f"\n[studio] run finished with status {state.get('status')}\n")
                     backend = self._run_backend(run)
-                    net = backend.net_path(run.directory) if backend else run.directory / "net.nnue"
+                    net = backend.net_path(run.directory, run.config) if backend else run.net_path
                     if net.exists():
                         self.validate_net_var.set(str(net))
                     if (
@@ -852,18 +863,30 @@ class StudioApp:
                     net = payload["net"]
                     result = payload["result"]
                     gate = result.get("gate", {})
-                    ab = result.get("ab_match", {})
+                    ab = result.get("ab_match")
                     self.validation_text.insert("end", self._gate_report(gate) + "\n")
-                    self.validation_text.insert("end", self._ab_report(ab) + "\n")
-                    self.validation_text.see("end")
-                    self.status_var.set("validation complete")
-                    if not gate.get("rejected"):
+                    if ab is not None:
+                        self.validation_text.insert("end", self._ab_report(ab) + "\n")
+                    if core.gate_allows_install(gate):
+                        self.validation_text.see("end")
+                        self.status_var.set("validation complete")
                         self.install_button.configure(state="normal")
+                        prompt = f"{self._gate_report(gate)}\n"
+                        if ab is not None:
+                            prompt += f"{self._ab_report(ab)}\n"
                         if self.messagebox.askyesno(
                             APP_TITLE,
-                            f"{self._gate_report(gate)}\n{self._ab_report(ab)}\n\nInstall {net} as the engine network?",
+                            f"{prompt}\nInstall {net} as the engine network?",
                         ):
                             self._install_net()
+                    else:
+                        self.install_button.configure(state="disabled")
+                        self.validation_text.insert(
+                            "end",
+                            "install stays disabled until a 64-position gate passes\n",
+                        )
+                        self.validation_text.see("end")
+                        self.status_var.set("validation incomplete - install disabled")
         except queue.Empty:
             pass
         self.root.after(120, self._pump)

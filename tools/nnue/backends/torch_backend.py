@@ -15,7 +15,14 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 
-from studio_core import REPO_ROOT, python_executable
+from studio_core import (
+    REPO_ROOT,
+    metadata_file_name,
+    metadata_path,
+    network_file_name,
+    network_path,
+    python_executable,
+)
 
 TRAINER = REPO_ROOT / "tools" / "measurement" / "train_nnue_sf.py"
 
@@ -34,22 +41,24 @@ class TorchBackend:
             return "PyTorch is not installed for this interpreter (pip install torch)"
         return None
 
-    def net_path(self, run_dir: Path) -> Path:
-        return Path(run_dir) / "net.nnue"
+    def net_path(self, run_dir: Path, config: dict | None = None) -> Path:
+        return network_path(run_dir, config)
 
-    def metadata_path(self, run_dir: Path) -> Path:
-        return Path(run_dir) / "net.metadata.json"
+    def metadata_path(self, run_dir: Path, config: dict | None = None) -> Path:
+        return metadata_path(run_dir, config)
 
     def build_command(self, run_dir: Path, config: dict) -> list[str]:
         run_dir = Path(run_dir)
+        net_name = network_file_name(config)
+        meta_name = metadata_file_name(config)
         argv = [
             str(TRAINER),
             "--corpus",
             str(config["corpus"]),
             "--net-out",
-            str(run_dir / "net.nnue"),
+            str(run_dir / net_name),
             "--meta-out",
-            str(run_dir / "net.metadata.json"),
+            str(run_dir / meta_name),
             "--epochs",
             str(config["epochs"]),
             "--batch-size",

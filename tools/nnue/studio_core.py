@@ -9,9 +9,10 @@ Design notes
 * A "run" is a self-contained directory under ``artifacts/training/runs/``
   holding ``config.json``, ``command.json``, ``train.log``, ``pid.txt``,
   ``exit_code.txt`` and the produced network/metadata/validation files.
-* Training is launched through ``tools/nnue/run_training.ps1`` which starts the
-  real command detached, records its pid and writes the exit code.  That makes
-  runs survive a GUI close and lets the GUI re-attach by tailing ``train.log``.
+* Training is launched through a generated ``run.cmd`` inside the run directory
+  which starts the real command detached, records its pid and writes the exit
+  code.  That makes runs survive a GUI close and lets the GUI re-attach by
+  tailing ``train.log``.
 * Backends (``tools/nnue/backends``) only provide the command line and the
   file locations; everything else is backend agnostic so a future bullet/Rust
   backend needs no GUI changes.
@@ -25,6 +26,7 @@ import re
 import shutil
 import subprocess
 import sys
+import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -42,6 +44,10 @@ DEFAULT_BENCH = DEFAULT_BUILD_DIR / "koi-bench.exe"
 DEFAULT_ENGINE = DEFAULT_BUILD_DIR / "koi-engine.exe"
 RUN_SCHEMA = "koi-nnue-studio-run-v1"
 STUDIO_VERSION = "1.0.0"
+
+# The tail thread and the Tk thread both persist run state; serialize the
+# read-modify-write so a progress update cannot clobber a finished marker.
+_STATE_LOCK = threading.Lock()
 
 # The trainer prints one of these lines per epoch; the GUI parses them to drive
 # the progress bar and the validation-MAE chart.  A new backend must emit the
@@ -120,6 +126,32 @@ def count_rows(path: Path | str) -> int:
         return 0
 
 
+def parse_int(text: str, name: str, minimum: int | None = None, maximum: int | None = None) -> int:
+    """Parse a GUI/CLI integer with a field-named error message."""
+    try:
+        value = int(str(text).strip())
+    except (TypeError, ValueError):
+        raise ValueError(f"{name} must be a whole number") from None
+    if minimum is not None and value < minimum:
+        raise ValueError(f"{name} must be at least {minimum}")
+    if maximum is not None and value > maximum:
+        raise ValueError(f"{name} must be at most {maximum}")
+    return value
+
+
+def parse_float(text: str, name: str, minimum: float | None = None, maximum: float | None = None) -> float:
+    """Parse a GUI/CLI float with a field-named error message."""
+    try:
+        value = float(str(text).strip())
+    except (TypeError, ValueError):
+        raise ValueError(f"{name} must be a number") from None
+    if minimum is not None and value < minimum:
+        raise ValueError(f"{name} must be at least {minimum}")
+    if maximum is not None and value > maximum:
+        raise ValueError(f"{name} must be at most {maximum}")
+    return value
+
+
 def parse_progress(line: str) -> dict[str, Any] | None:
     """Translate one trainer log line into a progress event (or ``None``)."""
     line = line.rstrip("\r\n")
@@ -152,6 +184,41 @@ def parse_progress(line: str) -> dict[str, Any] | None:
 
 
 # ---------------------------------------------------------------------------
+# Network file naming
+# ---------------------------------------------------------------------------
+# ``net_name`` is the name the trainer writes inside the run directory.  Early
+# studio runs ignored it and always wrote ``net.nnue``; the helpers below prefer
+# the configured name but fall back to the legacy file when that is what exists,
+# so old run directories keep resolving.
+
+
+def network_file_name(config: dict[str, Any] | None) -> str:
+    raw = str((config or {}).get("net_name") or "").strip()
+    name = Path(raw).name if raw else ""
+    return name or "net.nnue"
+
+
+def network_path(directory: Path | str, config: dict[str, Any] | None = None) -> Path:
+    directory = Path(directory)
+    configured = directory / network_file_name(config)
+    if configured.exists():
+        return configured
+    legacy = directory / "net.nnue"
+    if legacy.exists() and legacy != configured:
+        return legacy
+    return configured
+
+
+def metadata_file_name(config: dict[str, Any] | None) -> str:
+    return f"{Path(network_file_name(config)).stem}.metadata.json"
+
+
+def metadata_path(directory: Path | str, config: dict[str, Any] | None = None) -> Path:
+    net = network_path(directory, config)
+    return net.with_name(f"{net.stem}.metadata.json")
+
+
+# ---------------------------------------------------------------------------
 # Run directories
 # ---------------------------------------------------------------------------
 
@@ -170,11 +237,11 @@ class Run:
 
     @property
     def net_path(self) -> Path:
-        return self.directory / "net.nnue"
+        return network_path(self.directory, self.config)
 
     @property
     def metadata_path(self) -> Path:
-        return self.directory / "net.metadata.json"
+        return metadata_path(self.directory, self.config)
 
     @property
     def log_path(self) -> Path:
@@ -211,9 +278,10 @@ class Run:
         return tail_lines(self.log_path, offset)
 
     def write_state(self, **updates: Any) -> None:
-        self.state.update(updates)
-        self.state["schema"] = RUN_SCHEMA
-        write_json(self.directory / "state.json", self.state)
+        with _STATE_LOCK:
+            self.state.update(updates)
+            self.state["schema"] = RUN_SCHEMA
+            write_json(self.directory / "state.json", self.state)
 
     def update_from_log_events(self, events: Iterable[dict[str, Any]]) -> None:
         progress = dict(self.state.get("progress", {}))
@@ -462,6 +530,16 @@ def run_gate(net: Path, bench: Path | None = None, timeout: int = 900) -> dict[s
     }
 
 
+def gate_allows_install(gate: dict[str, Any] | None) -> bool:
+    """True only when the 64-position gate actually ran and accepted the net."""
+    if not gate or gate.get("error") or gate.get("rejected"):
+        return False
+    try:
+        return int(gate.get("positions", 0)) > 0
+    except (TypeError, ValueError):
+        return False
+
+
 def run_ab_match(
     net: Path,
     games: int = 20,
@@ -519,19 +597,25 @@ def validate_net(
     games: int = 20,
     nodes: int = 20_000,
     report_path: Path | None = None,
+    gate_only: bool = False,
 ) -> dict[str, Any]:
-    """Gate + A/B match, persisted next to the network."""
+    """Gate + A/B match, persisted next to the network.
+
+    ``gate_only`` runs just the 64-position gate; the A/B match is skipped
+    entirely (it requires at least two games and is a separate action).
+    """
     validation: dict[str, Any] = {"schema": "koi-nnue-studio-validation-v1"}
     try:
         validation["gate"] = run_gate(net)
     except Exception as error:  # noqa: BLE001 - surfaced in the report
         validation["gate"] = {"kind": "gate", "error": str(error)}
-    try:
-        validation["ab_match"] = run_ab_match(
-            net, games=games, nodes=nodes, output_directory=report_path
-        )
-    except Exception as error:  # noqa: BLE001 - surfaced in the report
-        validation["ab_match"] = {"kind": "ab-match", "error": str(error)}
+    if not gate_only:
+        try:
+            validation["ab_match"] = run_ab_match(
+                net, games=games, nodes=nodes, output_directory=report_path
+            )
+        except Exception as error:  # noqa: BLE001 - surfaced in the report
+            validation["ab_match"] = {"kind": "ab-match", "error": str(error)}
     if run is not None:
         run.write_state(validation=validation)
     return validation

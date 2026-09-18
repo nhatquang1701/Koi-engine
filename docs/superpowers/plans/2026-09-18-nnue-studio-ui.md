@@ -40,10 +40,10 @@ turns the run list into a filterable, sortable view with failure details.
 
 ## Phases
 
-- [ ] **Phase 0 — Documentation scaffolding.** Plan, design specification, and
+- [x] **Phase 0 — Documentation scaffolding.** Plan, design specification, and
   verification record, plus one index row in each of the three
   `docs/superpowers/*/README.md` tables. Commit.
-- [ ] **Phase 1 — Correctness and configuration plumbing.** Gate-only
+- [x] **Phase 1 — Correctness and configuration plumbing.** Gate-only
   validation; `net_name` threaded through backends and run path resolution;
   install gated on a successful gate; shared numeric input guards; a lock around
   run-state writes; headless tests for each; commit.

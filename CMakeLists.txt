@@ -682,6 +682,10 @@ if(Python3_Interpreter_FOUND)
         COMMAND "${Python3_EXECUTABLE}" -m unittest tests/python/nnue/studio_test.py -v
     )
     add_test(
+        NAME nnue_studio_ui_python
+        COMMAND "${Python3_EXECUTABLE}" -m unittest tests/python/nnue/studio_ui_test.py -v
+    )
+    add_test(
         NAME koi_trainer_python
         COMMAND "${Python3_EXECUTABLE}" -m unittest tests/python/nnue/koi_trainer_test.py -v
     )
@@ -701,7 +705,7 @@ if(Python3_Interpreter_FOUND)
         tune_eval_python
         nnue_training_python nnue_wrapper_python koi_dataset_python gen_training_data_python
         measurement_phase_python measurement_forensics_python
-        strength_report_python nnue_studio_python tune_classical_python
+        strength_report_python nnue_studio_python nnue_studio_ui_python tune_classical_python
         PROPERTIES
             WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
             ENVIRONMENT "PYTHONDONTWRITEBYTECODE=1"
@@ -774,7 +778,7 @@ if(Python3_Interpreter_FOUND)
         tune_eval_python nnue_training_python nnue_wrapper_python
         koi_dataset_python gen_training_data_python
         measurement_phase_python measurement_forensics_python strength_report_python
-        nnue_studio_python koi_trainer_python tune_classical_python
+        nnue_studio_python koi_trainer_python tune_classical_python nnue_studio_ui_python
         PROPERTIES LABELS "python"
     )
     if(TEST elo_oracle_python)

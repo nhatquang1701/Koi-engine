@@ -28,7 +28,7 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
-from studio_core import REPO_ROOT
+from studio_core import REPO_ROOT, metadata_path, network_path
 
 
 def _cargo() -> str | None:
@@ -59,11 +59,11 @@ class BulletBackend:
     def cargo(self) -> str | None:
         return _cargo()
 
-    def net_path(self, run_dir: Path) -> Path:
-        return Path(run_dir) / "net.nnue"
+    def net_path(self, run_dir: Path, config: dict | None = None) -> Path:
+        return network_path(run_dir, config)
 
-    def metadata_path(self, run_dir: Path) -> Path:
-        return Path(run_dir) / "net.metadata.json"
+    def metadata_path(self, run_dir: Path, config: dict | None = None) -> Path:
+        return metadata_path(run_dir, config)
 
     def build_command(self, run_dir: Path, config: dict) -> list[str]:
         raise RuntimeError(self.unavailable_reason())
