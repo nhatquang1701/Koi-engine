@@ -92,6 +92,10 @@ def default_config() -> dict[str, Any]:
         "koi_hidden_units": 1024,
         "koi_hidden_shifts": [6, 7, 8],
         "koi_output_shifts": [12, 14, 16, 18, 20],
+        "bullet_hidden_units": 1024,
+        "bullet_superbatches": 100,
+        "bullet_save_rate": 10,
+        "bullet_final_learning_rate": 0.0002,
         "net_name": "koi.nnue",
         "float_out": True,
     }

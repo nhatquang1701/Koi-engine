@@ -99,12 +99,12 @@ versions; commit at every phase boundary and push when the suites pass.
   studio progress contract; tests cover log translation. Commit.
 
 ## Phase 4 — studio backend
-
-- [ ] `tools/nnue/backends/bullet_backend.py` becomes available when cargo,
+- [x] `tools/nnue/backends/bullet_backend.py` becomes
+  available when cargo,
   CUDA, the crate, and the dataset are present; `build_command` targets
-  `run_bullet.py`; `planned_layout()` is replaced by real paths. Extend
+  `run_bullet.py`; `planned_layout()` is replaced by
+  real paths. Extend
   `tests/python/nnue/studio_test.py`/`studio_ui_test.py`. Commit.
-
 ## Phase 5 — training campaign and gates
 
 - [ ] Train with hidden 1024 (batch 8192, falling back to 4096/2048 on VRAM

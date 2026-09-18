@@ -48,6 +48,15 @@ def load_studio_core():
     return module
 
 
+def load_bullet_backend():
+    for path in (TOOLS_NNUE, TOOLS_NNUE / "backends"):
+        if str(path) not in sys.path:
+            sys.path.insert(0, str(path))
+    import bullet_backend  # noqa: PLC0415  (needs the sys.path entries above)
+
+    return bullet_backend
+
+
 def run_studio(*arguments: str, timeout: int = 900) -> subprocess.CompletedProcess:
     return subprocess.run(
         [sys.executable, str(STUDIO), *arguments],
@@ -126,16 +135,45 @@ class StudioCliTests(unittest.TestCase):
         self.assertIn("train_nnue_sf.py", result.stdout)
         self.assertIn("--format v3", result.stdout)
 
-    def test_dry_run_rejects_the_unimplemented_bullet_backend(self):
+    def test_dry_run_targets_the_bullet_gpu_trainer(self):
         result = run_studio("--dry-run", "--preset", "quick", "--backend", "bullet", timeout=120)
-        self.assertEqual(result.returncode, 2)
-        self.assertIn("bullet", result.stderr)
+        backend = load_bullet_backend().BulletBackend()
+        if backend.available():
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("run_bullet.py", result.stdout)
+        else:
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("bullet", result.stderr)
 
     @unittest.skipUnless(TK_AVAILABLE, "tkinter is unavailable")
     def test_gui_selftest_constructs_the_window(self):
         result = run_studio("--gui-selftest", timeout=120)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("PASS gui construction", result.stdout)
+
+
+class BulletBackendTests(unittest.TestCase):
+    def test_build_command_targets_the_wrapper(self):
+        bullet = load_bullet_backend()
+        backend = bullet.BulletBackend()
+        if not backend.available():
+            self.skipTest(backend.unavailable_reason() or "bullet backend is unavailable")
+        command = backend.build_command(
+            Path("run"),
+            {
+                "net_name": "custom.nnue",
+                "corpus": "labels.txt",
+                "bullet_superbatches": 5,
+                "batch_size": 4096,
+                "threads": 2,
+            },
+        )
+        self.assertIn("run_bullet.py", command[1])
+        self.assertIn("custom.nnue", command)
+        self.assertIn("--superbatches", command)
+        self.assertIn("5", command)
+        self.assertIn("--batch", command)
+        self.assertIn("4096", command)
 
 
 @unittest.skipUnless(TORCH_AVAILABLE, "PyTorch is required for the training selftest")

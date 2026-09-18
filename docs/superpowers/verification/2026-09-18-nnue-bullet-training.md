@@ -114,7 +114,23 @@ bulletformat data:
 
 ## Phase 4 — studio backend
 
-Pending.
+- `tools/nnue/backends/bullet_backend.py` is a live backend instead of a
+  placeholder. It is available when `tools/nnue/run_bullet.py` exists, a CUDA
+  12.x toolkit directory is present, and either the release `bullet_train.exe`
+  is built or cargo is on the machine; otherwise `unavailable_reason()` names
+  the missing piece. `build_command` drives the wrapper (corpus, network name,
+  hidden units, batch size, superbatches, learning rates, seed, threads, save
+  rate, validation fraction, data directory, shift grids), and `net_path` /
+  `metadata_path` resolve through the same `studio_core` naming helpers as the
+  other backends.
+- `studio_core.default_config()` carries the bullet tuning keys
+  (`bullet_hidden_units`, `bullet_superbatches`, `bullet_save_rate`,
+  `bullet_final_learning_rate`), so presets and the GUI inherit them.
+- Tests: `tests/python/nnue/studio_test.py` gained an availability-aware
+  `--dry-run --backend bullet` contract test and a `BulletBackendTests` command
+  test; the old "unimplemented backend" expectation was replaced. Combined run
+  `python -m unittest tests/python/nnue/studio_test.py
+  tests/python/nnue/bullet_data_test.py` → 26 tests, OK in 6.4 s.
 
 ## Phase 5 — training campaign and gates
 
