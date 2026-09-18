@@ -8,6 +8,8 @@
 *.py[cod]
 .pytest_cache/
 
+tools/nnue/bullet_train/target/
+
 *.user
 *.suo
 *.pdb

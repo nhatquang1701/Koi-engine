@@ -1,0 +1,26 @@
+[package]
+name = "koi-bullet-train"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Bullet training crate matching Koi's halfka-king-bucket-v1 encoder"
+
+[dependencies]
+bulletformat = "1.8"
+bullet_lib = { git = "https://github.com/jw1912/bullet", rev = "2ea3d2d0f7e597b0d645f6e8040cf37818f51bce", package = "bullet_lib" }
+
+[features]
+cuda = ["bullet_lib/cuda"]
+
+[[bin]]
+name = "convert"
+path = "src/bin/convert.rs"
+
+[[bin]]
+name = "bullet_train"
+path = "src/bin/train.rs"
+required-features = ["cuda"]
+
+[[test]]
+name = "parity"
+path = "tests/parity.rs"

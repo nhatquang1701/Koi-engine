@@ -693,6 +693,10 @@ if(Python3_Interpreter_FOUND)
         NAME tune_classical_python
         COMMAND "${Python3_EXECUTABLE}" -m unittest tests/python/evaluation/tune_classical_test.py -v
     )
+    add_test(
+        NAME bullet_data_python
+        COMMAND "${Python3_EXECUTABLE}" -m unittest tests/python/nnue/bullet_data_test.py -v
+    )
     # The trainer parity test shells out to the built boundary executable to
     # compare the Python encoder and integer reference against C++ scores.
     set_tests_properties(
@@ -706,6 +710,7 @@ if(Python3_Interpreter_FOUND)
         nnue_training_python nnue_wrapper_python koi_dataset_python gen_training_data_python
         measurement_phase_python measurement_forensics_python
         strength_report_python nnue_studio_python nnue_studio_ui_python tune_classical_python
+        bullet_data_python
         PROPERTIES
             WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
             ENVIRONMENT "PYTHONDONTWRITEBYTECODE=1"
@@ -779,6 +784,7 @@ if(Python3_Interpreter_FOUND)
         koi_dataset_python gen_training_data_python
         measurement_phase_python measurement_forensics_python strength_report_python
         nnue_studio_python koi_trainer_python tune_classical_python nnue_studio_ui_python
+        bullet_data_python
         PROPERTIES LABELS "python"
     )
     if(TEST elo_oracle_python)
