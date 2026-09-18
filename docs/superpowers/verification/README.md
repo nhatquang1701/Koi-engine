@@ -17,3 +17,4 @@ strength pass. Paths are intentionally stable because plans link to them.
 | `2026-09-17-test-suite-hardening.md` | Test-suite hardening verification (harness, parallel runs, CI). |
 | `2026-09-17-nnue-studio.md` | NNUE Studio verification (selftest, A/B match, CTest). |
 | `2026-09-17-nnue-evaluation-overhaul.md` | NNUE and evaluation overhaul verification (baseline, gates, release). |
+| `2026-09-18-nnue-studio-ui.md` | NNUE Studio UI verification (headless tests, GUI smoke, CTest). |
