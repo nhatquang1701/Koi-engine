@@ -107,7 +107,7 @@ versions; commit at every phase boundary and push when the suites pass.
   `tests/python/nnue/studio_test.py`/`studio_ui_test.py`. Commit.
 ## Phase 5 — training campaign and gates
 
-- [ ] Train with hidden 1024 (batch 8192, falling back to 4096/2048 on VRAM
+- [x] Train with hidden 1024 (batch 8192, falling back to 4096/2048 on VRAM
   pressure) on the bullet dataset; export a v4 candidate; run the 64-position
   tactical gate, timed NPS, equal-node color-balanced A/B versus classical and
   versus `koi-v4-1024`, and classical fixed-depth non-regression. Record nets,
@@ -129,7 +129,7 @@ versions; commit at every phase boundary and push when the suites pass.
 
 ## Phase 8 — verification and CI refresh
 
-- [ ] Full Release CTest and Debug non-heavy CTest at the final HEAD; refresh
+- [x] Full Release CTest and Debug non-heavy CTest at the final HEAD; refresh
   `.github/workflows/windows.yml` to current action versions
   (`actions/checkout@v5`, `actions/setup-python@v6`,
   `actions/upload-artifact@v5`), keep

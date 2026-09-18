@@ -134,7 +134,55 @@ bulletformat data:
 
 ## Phase 5 — training campaign and gates
 
-Pending.
+The full label corpus (2,249,171 rows) was converted with
+`tools/nnue/to_bullet.py --val-fraction 0.05`: 2,138,346 training rows and
+112,545 validation rows, written as `train.data` (68,427,072 bytes) and
+`validation.data` (3,601,440 bytes) beside `train.txt` / `validation.txt`. The
+conversion and the training runs are recorded under `artifacts/training/bullet/`
+and `artifacts/verification/nnue-bullet-training/`.
+
+Two campaigns were run on the GTX 1060 (6 GB) through
+`tools/nnue/run_bullet.py` (hidden 1024, batch 8192, 261 batches per
+superbatch, AdamW with cosine decay, `ConstantWDL 0.0`, `eval_scale 100`):
+
+| Run | Superbatches | Validation MAE (last epochs) | Export (float / selected) | Container |
+| --- | --- | --- | --- | --- |
+| `koi-v4-bullet` | 10 | 290.4 → 210.1 cp | 212.2 / 199.4 cp (`s1=6`, `k3=12`) | 18,882,699 bytes |
+| `koi-v4-bullet-long` | 200 | plateau ≈ 193 cp | 199.1 / 198.7 cp (`s1=7`, `k3=14`) | 18,882,699 bytes |
+
+The long run was selected as the candidate. Its validation MAE is higher than
+the PyTorch v4 candidate (≈ 142 cp) partly because bullet trains
+`sigmoid(output).squared_error(sigmoid(cp/100))` in probability space while the
+PyTorch trainer minimizes SmoothL1 on `cp/100`; MAE is not the strength gate.
+
+Gates (all local reports; no Elo or CPL claim):
+
+| Gate | Result | Evidence |
+| --- | --- | --- |
+| Classical fixed-depth non-regression | 64 rows byte-identical to the Phase 0 baseline | `bench-classical-phase5.log` |
+| Tactical 64-position suite, bullet candidate | 62 match / 64 | `bench-bullet-hard.log` |
+| Tactical 64-position suite, classical | 64 match / 64 (unchanged) | `bench-classical-phase7.txt` |
+| Equal-node A/B vs classical (20 games, 20k nodes, 1 thread, hash 64, own book off) | `+0 =10 -10` (25%) → `classical-stronger` | `ab-bullet-classical-2/ab-match.json` |
+| Equal-node A/B vs the PyTorch v4 candidate `koi-v4-1024` (20 games, 20k nodes) | `+0 =0 -20` (0%) → `candidate-weaker` | `net-bullet-pytorch-2/et-match.json` |
+| Timed single-thread throughput | ≈ 3,960 nps aggregate | `bench-bullet-timed.log` |
+
+The first A/B attempt timed out two games at the 20-second move limit while the
+full build was competing for the machine; it was retried with a 60-second
+timeout and finished with zero aborted games. The throughput figure is not
+comparable to the historical 76.5k / 144k nps numbers: the machine was carrying
+heavy external load during the timed runs (a game process and several editors),
+and back-to-back reruns of the same binaries took 99 s and 194 s where they
+previously took 6.4 s. Node-limited matches are unaffected by wall-clock load,
+which is why only those are used as evidence.
+
+Interpretation: the bullet path is functional end to end (convert → GPU
+training → per-checkpoint validation MAE → v4 export → engine load), and it is
+the fastest iteration loop for this feature set on this machine. The first
+candidate is weaker than both the classical evaluator and the PyTorch v4
+candidate, so no network is installed and the classical evaluator remains the
+engine default. Deferred: longer campaigns with LR restarts, WDL blending,
+bullet-side validation support, wider hidden sizes, and NPS measurements on an
+idle host.
 
 ## Phase 6 — NNUE bug hunt
 
@@ -228,8 +276,69 @@ the new identity assertion. Logs:
 
 ## Phase 8 — verification and CI refresh
 
-Pending.
+Both build trees were reconfigured so the new tests register, then the full
+suites were rerun at the final HEAD:
+
+| Configuration | Command | Result | Log |
+| --- | --- | --- | --- |
+| Release full | `ctest --test-dir build/release -j 4 --output-on-failure` | `100% tests passed, 0 tests failed out of 59` (323.90 s) | `ctest-release-phase8.log` |
+| Debug non-heavy | `ctest --test-dir build/debug -LE heavy -j 4 --output-on-failure` | `100% tests passed, 0 tests failed out of 51` (113.12 s) | `ctest-debug-phase8.log` |
+
+The four heavy `koi_search_tests` shards are excluded from the Debug smoke run,
+which is why it registers eight fewer tests. With cutechess-cli absent the
+counts are 58 and 50; the extra `cutechess_stability_smoke` test is labeled
+heavy and only appears when cutechess-cli is installed (it is on this machine).
+
+Focused evidence for this program's changes:
+
+- `build/release/nnue_boundary_tests.exe` and the Debug build both report
+  `koi-test-summary run=27 pass=26 fail=0 xfail=0 xpass=0 skip=1` (the skip is
+  the external-container case, which needs a container path argument).
+- `python -m unittest tests/python/nnue/bullet_data_test.py` passes 17 tests
+  (converter, exporter layout, wrapper parsing, parser round trip, hidden
+  mismatch, inf/nan rows, truncated dataset header).
+- `ctest -R koi_benchmark_process` passes (450.91 s real) with the new
+  classical-evaluator identity assertion in the profile JSON.
+
+### CI refresh
+
+`.github/workflows/windows.yml` was updated to the current action versions:
+`actions/checkout@v5`, `actions/setup-python@v6`, and
+`actions/upload-artifact@v5` (three checkout sites, two upload sites). The
+Release job's dependency line now installs `python-chess` and `numpy`; the
+trainer imports guard torch, so CI stays on the CPU-only Python surface and the
+bullet tooling tests skip when numpy is missing. Build and test commands are
+unchanged (VsDevCmd + Ninja + `cl`, Release `ctest -j 4 --output-junit`, Debug
+`-LE heavy`, shadow-diff with `-DKOI_BUILD_SHADOW_DIFF=ON`).
+
+`tests/integration/packaging/ci_configuration_test.ps1` was kept in sync: it now
+asserts `actions/checkout@v5`, `actions/setup-python@v6`,
+`actions/upload-artifact@v5`, and the `numpy` install line in addition to the
+existing job-name and command regexes. Running it directly exits 0, and it also
+runs inside the Release suite.
+
+The shadow-diff job is unchanged and remains opt-in; local trees keep
+`KOI_BUILD_SHADOW_DIFF=OFF`.
+
 
 ## Limitations
 
-Pending.
+- The pinned bullet revision has no validation pass (`TestDataset` output is a
+  no-op), so validation MAE is measured by re-reading each saved checkpoint's
+  `raw.bin` through the exporter. Long runs therefore validate only at save
+  points.
+- Only the last saved checkpoint of each run is exported; intermediate
+  checkpoints stay on disk but are not turned into containers.
+- Absolute NPS numbers from this campaign are unusable: the host was running
+  heavy external load during the timed benchmarks, and repeated runs of the same
+  binaries varied by more than an order of magnitude. Node-limited matches are
+  the only timing-independent evidence recorded here.
+- The candidate is a local artifact (`artifacts/training/bullet/`) and is not
+  committed or installed. The classical evaluator remains the engine default,
+  and no Elo or CPL claim is made from any of the matches.
+- The training corpus was built from Stockfish depth-10 labels with synthesized
+  pseudo-results (`0.5`) because the A/B objective uses a pure evaluation blend;
+  result-based blending would need real game outcomes.
+- CI installs only `python-chess` and `numpy`; the bullet tooling tests skip when
+  their dependencies are missing, and the Rust crate itself is not built in CI
+  (no CUDA runner).

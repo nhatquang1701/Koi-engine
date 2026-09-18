@@ -9,7 +9,13 @@ import tempfile
 import unittest
 from pathlib import Path
 
-import numpy as np
+try:
+    import numpy as np  # noqa: F401
+
+    BULLET_TOOLING_AVAILABLE = True
+except ImportError:  # pragma: no cover - environment dependent
+    np = None  # type: ignore[assignment]
+    BULLET_TOOLING_AVAILABLE = False
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 NNUE_DIR = REPO_ROOT / "tools" / "nnue"
@@ -23,14 +29,18 @@ try:
 except ImportError:  # pragma: no cover - environment dependent
     CHESS_AVAILABLE = False
 
-import run_bullet  # noqa: E402  (also puts tools/measurement on sys.path)
-import export_bullet_v4  # noqa: E402
-import to_bullet  # noqa: E402
+try:
+    import run_bullet  # noqa: E402  (also puts tools/measurement on sys.path)
+    import export_bullet_v4  # noqa: E402
+    import to_bullet  # noqa: E402
+except ImportError:  # pragma: no cover - environment dependent
+    BULLET_TOOLING_AVAILABLE = False
 
 STARTPOS = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 BLACK_TO_MOVE = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1"
 
 
+@unittest.skipUnless(BULLET_TOOLING_AVAILABLE, "numpy and the bullet tooling are required")
 @unittest.skipUnless(CHESS_AVAILABLE, "python-chess is required for the converter")
 class TextConversionTests(unittest.TestCase):
     def test_scores_are_converted_to_white_relative(self) -> None:
@@ -84,6 +94,7 @@ class TextConversionTests(unittest.TestCase):
                 to_bullet.convert_labels(Path(temp) / "absent.txt", Path(temp) / "out")
 
 
+@unittest.skipUnless(BULLET_TOOLING_AVAILABLE, "numpy and the bullet tooling are required")
 @unittest.skipUnless(CHESS_AVAILABLE, "python-chess is required for the converter")
 class CliTests(unittest.TestCase):
     def test_text_only_does_not_need_the_convert_binary(self) -> None:
@@ -132,6 +143,7 @@ class CliTests(unittest.TestCase):
             self.assertNotEqual(occupancy, 0)
 
 
+@unittest.skipUnless(BULLET_TOOLING_AVAILABLE, "numpy and the bullet tooling are required")
 class RunBulletTests(unittest.TestCase):
     """Pure parsing and command building for the bullet wrapper."""
 
@@ -192,6 +204,7 @@ class RunBulletTests(unittest.TestCase):
         self.assertEqual(convert[convert.index("--val-fraction") + 1], repr(0.05))
 
 
+@unittest.skipUnless(BULLET_TOOLING_AVAILABLE, "numpy and the bullet tooling are required")
 class ExporterTests(unittest.TestCase):
     """Pins the bullet raw.bin layout read by export_bullet_v4."""
 
