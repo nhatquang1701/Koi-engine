@@ -30,7 +30,7 @@ import sys
 import threading
 import time
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -46,6 +46,11 @@ DEFAULT_BENCH = DEFAULT_BUILD_DIR / "koi-bench.exe"
 DEFAULT_ENGINE = DEFAULT_BUILD_DIR / "koi-engine.exe"
 RUN_SCHEMA = "koi-nnue-studio-run-v1"
 STUDIO_VERSION = "1.0.0"
+STUDIO_STATE_DIR = REPO_ROOT / "artifacts" / "studio"
+SETTINGS_PATH = STUDIO_STATE_DIR / "settings.json"
+ADOPTIONS_PATH = STUDIO_STATE_DIR / "adoptions.json"
+SETTINGS_SCHEMA = "koi-studio-settings-v1"
+ADOPTION_SCHEMA = "koi-nnue-adoption-registry-v1"
 
 # The tail thread and the Tk thread both persist run state; serialize the
 # read-modify-write so a progress update cannot clobber a finished marker.
@@ -848,6 +853,238 @@ def install_net(net: Path, engine_dir: Path | None = None) -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
+# Adoption: settings, net comparison, registry, and revert
+# ---------------------------------------------------------------------------
+
+
+def default_settings() -> dict[str, Any]:
+    """Studio settings with a default for every key."""
+    return {
+        "engine_directory": str(DEFAULT_BUILD_DIR),
+        "auto_adopt": False,
+        "theme": "light",
+        "geometry": "1000x780",
+        "ab_games": 20,
+        "ab_nodes": 20_000,
+        "gate_games": 20,
+        "net_match_nodes": 20_000,
+    }
+
+
+def read_settings(path: Path | None = None) -> dict[str, Any]:
+    """Load settings over the defaults; malformed files fall back silently."""
+    settings = default_settings()
+    payload = read_json(path or SETTINGS_PATH, {})
+    if isinstance(payload, dict):
+        for key in settings:
+            if key in payload:
+                settings[key] = payload[key]
+    return settings
+
+
+def write_settings(settings: dict[str, Any], path: Path | None = None) -> None:
+    merged = default_settings()
+    if isinstance(settings, dict):
+        for key in merged:
+            if key in settings:
+                merged[key] = settings[key]
+    merged["schema"] = SETTINGS_SCHEMA
+    write_json(path or SETTINGS_PATH, merged)
+
+
+def net_match_command(
+    candidate: Path,
+    opponent: Path,
+    games: int = 20,
+    nodes: int = 20_000,
+    threads: int = 1,
+    report: Path | None = None,
+) -> list[str]:
+    """Argument vector for ``net_match.ps1`` (candidate against a reference)."""
+    script = STUDIO_DIR / "net_match.ps1"
+    if not script.exists():
+        raise FileNotFoundError(f"missing match script: {script}")
+    report = report or (candidate.parent / "net-match.json")
+    return [
+        powershell_executable(),
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        str(script),
+        "-NnueNet",
+        str(candidate),
+        "-OpponentNet",
+        str(opponent),
+        "-Games",
+        str(games),
+        "-Nodes",
+        str(nodes),
+        "-Threads",
+        str(threads),
+        "-ReportPath",
+        str(report),
+    ]
+
+
+def run_net_match(
+    candidate: Path,
+    opponent: Path,
+    games: int = 20,
+    nodes: int = 20_000,
+    threads: int = 1,
+    timeout: int = 3_600,
+    output_directory: Path | None = None,
+) -> dict[str, Any]:
+    """Compare a candidate network against a reference through ``net_match.ps1``."""
+    report = output_directory or (candidate.parent / "net-match.json")
+    command = net_match_command(candidate, opponent, games, nodes, threads, report)
+    result = subprocess.run(
+        command,
+        cwd=str(REPO_ROOT),
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=timeout,
+    )
+    if report.exists():
+        parsed = read_json(report, {})
+        parsed["exit_code"] = result.returncode
+        return parsed
+    return {
+        "kind": "net-match",
+        "error": "the match harness produced no report",
+        "exit_code": result.returncode,
+        "stdout": result.stdout[-4000:],
+        "stderr": result.stderr[-4000:],
+    }
+
+
+def adoption_decision(
+    gate: dict[str, Any] | None,
+    net_match: dict[str, Any] | None = None,
+    installed: Path | None = None,
+) -> dict[str, Any]:
+    """Decide whether a validated network should replace the installed one.
+
+    The candidate is adopted only when the 64-position gate passed, and when a
+    network is already installed the candidate must not be weaker than it
+    (``candidate-stronger`` or ``inconclusive``; ``candidate-weaker`` skips).
+    """
+    if not gate_allows_install(gate):
+        return {"decision": "skip", "reason": "the 64-position gate did not pass"}
+    if installed is None:
+        return {"decision": "adopt", "reason": "gate passed and no network is installed"}
+    if not net_match or net_match.get("error"):
+        return {"decision": "skip", "reason": "the candidate comparison did not run"}
+    verdict = net_match.get("verdict")
+    if verdict == "candidate-weaker":
+        return {
+            "decision": "skip",
+            "reason": "the candidate is weaker than the installed network",
+        }
+    if verdict not in ("candidate-stronger", "inconclusive"):
+        return {"decision": "skip", "reason": f"unexpected comparison verdict: {verdict}"}
+    return {
+        "decision": "adopt",
+        "reason": f"gate passed and the candidate is {verdict} against the installed network",
+    }
+
+
+def load_adoptions(path: Path | None = None) -> list[dict[str, Any]]:
+    payload = read_json(path or ADOPTIONS_PATH, {})
+    if isinstance(payload, dict) and isinstance(payload.get("adoptions"), list):
+        return payload["adoptions"]
+    return []
+
+
+def adopt_net(
+    net: Path,
+    engine_dir: Path | None = None,
+    evidence: dict[str, Any] | None = None,
+    registry_path: Path | None = None,
+) -> dict[str, Any]:
+    """Install a validated network and record the adoption for rollback."""
+    info = install_net(net, engine_dir)
+    evidence = evidence or {}
+    record = {
+        "installed_utc": utc_stamp(),
+        "source_run": evidence.get("source_run"),
+        "source_net": str(net),
+        "installed_path": info["installed"],
+        "backup_path": info.get("backup"),
+        "bytes": info["bytes"],
+        "gate": evidence.get("gate"),
+        "ab_verdict": evidence.get("ab_verdict"),
+        "net_match_verdict": evidence.get("net_match_verdict"),
+        "reverted_utc": None,
+    }
+    path = registry_path or ADOPTIONS_PATH
+    payload = read_json(path, {})
+    if not isinstance(payload, dict) or payload.get("schema") != ADOPTION_SCHEMA:
+        payload = {"schema": ADOPTION_SCHEMA, "adoptions": []}
+    payload.setdefault("adoptions", []).append(record)
+    write_json(path, payload)
+    info["record"] = record
+    return info
+
+
+def revert_adoption(
+    record_index: int | None = None,
+    registry_path: Path | None = None,
+) -> dict[str, Any]:
+    """Restore the backup of the latest (or chosen) adoption record."""
+    path = registry_path or ADOPTIONS_PATH
+    records = load_adoptions(path)
+    index = record_index
+    if index is None:
+        index = next(
+            (i for i in range(len(records) - 1, -1, -1) if not records[i].get("reverted_utc")),
+            None,
+        )
+    if index is None or index < 0 or index >= len(records):
+        return {"error": "no adoption is available to revert"}
+    record = records[index]
+    backup = Path(record.get("backup_path") or "")
+    installed = Path(record.get("installed_path") or "")
+    if not backup.exists():
+        return {"error": f"the backup is missing: {backup}"}
+    if installed.exists():
+        safety = installed.with_name(
+            f"{installed.name}.{time.strftime('%Y%m%d-%H%M%S')}.revert.bak"
+        )
+        shutil.copy2(installed, safety)
+    installed.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(backup, installed)
+    record["reverted_utc"] = utc_stamp()
+    write_json(path, {"schema": ADOPTION_SCHEMA, "adoptions": records})
+    return {"reverted": str(installed), "restored_from": str(backup)}
+
+
+def running_engines() -> list[int]:
+    """PIDs of running ``koi-engine`` processes (empty when unknown)."""
+    try:
+        result = subprocess.run(
+            ["tasklist", "/FI", "IMAGENAME eq koi-engine.exe", "/FO", "CSV", "/NH"],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return []
+    pids: list[int] = []
+    for line in result.stdout.splitlines():
+        parts = [part.strip().strip('"') for part in line.strip().split('","')]
+        if len(parts) >= 2 and parts[0].lower().startswith("koi-engine"):
+            try:
+                pids.append(int(parts[1]))
+            except ValueError:
+                continue
+    return pids
+
+
+# ---------------------------------------------------------------------------
 # Small helpers
 # ---------------------------------------------------------------------------
 
@@ -857,6 +1094,10 @@ def read_json(path: Path, default: Any) -> Any:
         return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return default
+
+
+def utc_stamp() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def write_json(path: Path, payload: Any) -> None:

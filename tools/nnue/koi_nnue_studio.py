@@ -183,8 +183,10 @@ class StudioApp:
         self.messagebox = messagebox
         self.root = tk.Tk()
         self.root.title(f"{APP_TITLE} {core.STUDIO_VERSION}")
-        self.root.geometry("1000x780")
+        self.settings = core.read_settings()
+        self.root.geometry(str(self.settings.get("geometry") or "1000x780"))
         self.root.minsize(820, 620)
+        self.root.protocol("WM_DELETE_WINDOW", self._on_close)
         self.queue: queue.Queue = queue.Queue()
         self.active_run: core.Run | None = None
         self.log_offset = 0
@@ -361,6 +363,10 @@ class StudioApp:
         tk.ttk.Checkbutton(
             buttons, text="Validate when finished", variable=self.auto_validate_var
         ).pack(side="left", padx=12)
+        self.auto_adopt_var = tk.BooleanVar(value=bool(self.settings.get("auto_adopt", False)))
+        tk.ttk.Checkbutton(buttons, text="Auto-adopt", variable=self.auto_adopt_var).pack(
+            side="left", padx=(0, 12)
+        )
         tk.ttk.Label(buttons, text="A/B games").pack(side="left")
         tk.ttk.Entry(buttons, textvariable=self.games_ab_var, width=5).pack(side="left", padx=(4, 10))
         tk.ttk.Label(buttons, text="A/B nodes").pack(side="left")
@@ -434,7 +440,9 @@ class StudioApp:
 
         install = tk.ttk.LabelFrame(frame, text="Install", padding=10)
         install.grid(row=4, column=0, columnspan=5, sticky="we", pady=10)
-        self.engine_dir_var = tk.StringVar(value=str(core.DEFAULT_BUILD_DIR))
+        self.engine_dir_var = tk.StringVar(
+            value=str(self.settings.get("engine_directory") or core.DEFAULT_BUILD_DIR)
+        )
         tk.ttk.Label(install, text="Engine directory").grid(row=0, column=0, sticky="w")
         tk.ttk.Entry(install, textvariable=self.engine_dir_var, width=60).grid(
             row=0, column=1, columnspan=3, sticky="we", padx=6
@@ -443,6 +451,9 @@ class StudioApp:
             install, text="Install as koi.nnue", command=self._install_net, state="disabled"
         )
         self.install_button.grid(row=1, column=1, sticky="w", pady=(8, 0))
+        tk.ttk.Button(install, text="Revert last adoption", command=self._revert_adoption).grid(
+            row=1, column=2, sticky="w", padx=8, pady=(8, 0)
+        )
         tk.ttk.Label(
             install,
             text="Installing copies the network beside the engine (backing up any previous koi.nnue).",
@@ -485,6 +496,9 @@ class StudioApp:
         tk.ttk.Button(buttons, text="Use network", command=self._use_selected_net).pack(side="left", padx=4)
         tk.ttk.Button(buttons, text="Open folder", command=self._open_selected_run).pack(side="left", padx=4)
         tk.ttk.Button(buttons, text="Stop selected", command=self._stop_selected).pack(side="left", padx=4)
+        tk.ttk.Button(buttons, text="Adopt best run", command=self._adopt_best_run).pack(
+            side="left", padx=4
+        )
 
         self.runs_detail = tk.Text(frame, height=9, wrap="word", background="#f7f7f7", foreground="#333333")
         self.runs_detail.grid(row=3, column=0, columnspan=6, sticky="nsew")
@@ -671,7 +685,14 @@ class StudioApp:
             return
         self._validation_worker(net, games=games, nodes=nodes)
 
-    def _validation_worker(self, net: Path, games: int, nodes: int, gate_only: bool = False) -> None:
+    def _validation_worker(
+        self,
+        net: Path,
+        games: int,
+        nodes: int,
+        gate_only: bool = False,
+        adopt: bool | None = None,
+    ) -> None:
         active = self.active_run
 
         def worker() -> None:
@@ -684,12 +705,137 @@ class StudioApp:
                 report_path=net.parent / "ab-match.json",
                 gate_only=gate_only,
             )
+            wants_adopt = self.auto_adopt_var.get() if adopt is None else adopt
+            if wants_adopt and not gate_only:
+                result["adoption"] = self._adoption_worker(net, result)
             self.queue.put(("validation", {"net": str(net), "result": result}))
 
         self.validation_text.delete("1.0", "end")
         self.validation_text.insert("end", f"Validating {net}\n")
         self.status_var.set("validating")
         threading.Thread(target=worker, daemon=True).start()
+
+    def _adoption_worker(self, net: Path, result: dict) -> dict:
+        """Compare against the installed network and adopt per policy (worker thread)."""
+        engine_dir = Path(self.engine_dir_var.get())
+        installed = engine_dir / "koi.nnue"
+        try:
+            games = core.parse_int(self.games_ab_var.get(), "A/B games", 2, 2000)
+            nodes = core.parse_int(self.nodes_ab_var.get(), "A/B nodes", 1)
+        except ValueError:
+            games, nodes = 20, 20_000
+        comparison: dict | None = None
+        if installed.exists() and installed.resolve() != net.resolve():
+            try:
+                comparison = core.run_net_match(net, installed, games=games, nodes=nodes)
+            except Exception as error:  # noqa: BLE001 - surfaced as evidence
+                comparison = {"error": str(error)}
+        decision = core.adoption_decision(
+            result.get("gate"), comparison, installed if installed.exists() else None
+        )
+        adoption: dict = {"decision": decision, "net_match": comparison}
+        if decision["decision"] == "adopt":
+            try:
+                ab = result.get("ab_match") or {}
+                adoption["install"] = core.adopt_net(
+                    net,
+                    engine_dir,
+                    evidence={
+                        "source_run": self.active_run.directory.name if self.active_run else None,
+                        "gate": result.get("gate"),
+                        "ab_verdict": ab.get("verdict"),
+                        "net_match_verdict": (comparison or {}).get("verdict"),
+                    },
+                )
+                adoption["running_engines"] = core.running_engines()
+            except Exception as error:  # noqa: BLE001 - surfaced as evidence
+                adoption["error"] = str(error)
+        return adoption
+
+    def _net_match_report(self, comparison: dict) -> str:
+        if comparison.get("error"):
+            return f"net match: unavailable ({comparison['error']})"
+        return (
+            f"net match: {comparison.get('games', 0)} games "
+            f"+{comparison.get('wins', 0)} ={comparison.get('draws', 0)} "
+            f"-{comparison.get('losses', 0)} ({comparison.get('percent', 0)}%) "
+            f"{comparison.get('verdict', 'inconclusive')}"
+        )
+
+    def _adoption_report(self, adoption: dict) -> str:
+        decision = adoption.get("decision") or {}
+        lines = [f"auto-adopt: {decision.get('decision')} - {decision.get('reason')}"]
+        comparison = adoption.get("net_match")
+        if comparison:
+            lines.append(self._net_match_report(comparison))
+        install = adoption.get("install")
+        if install:
+            lines.append(f"installed {install['installed']}")
+            if install.get("backup"):
+                lines.append(f"previous network backed up to {install['backup']}")
+            engines = adoption.get("running_engines") or []
+            if engines:
+                pids = ", ".join(str(pid) for pid in engines)
+                lines.append(
+                    f"koi-engine is running (pid {pids}); restart it or send "
+                    f"'setoption name EvalFile {install['installed']}' to load the new network"
+                )
+        if adoption.get("error"):
+            lines.append(f"adoption error: {adoption['error']}")
+        return "\n".join(lines)
+
+    def _finish_adoption(self, net: str, gate: dict, adoption: dict) -> None:
+        self.validation_text.see("end")
+        decision = (adoption.get("decision") or {}).get("decision")
+        if decision == "adopt" and adoption.get("install"):
+            self.install_button.configure(state="normal")
+            self.status_var.set(f"auto-adopted {net}")
+            self._save_settings()
+            self._refresh_runs()
+        elif decision == "adopt":
+            self.install_button.configure(state="disabled")
+            self.status_var.set("adoption failed")
+        else:
+            self.install_button.configure(
+                state="normal" if core.gate_allows_install(gate) else "disabled"
+            )
+            self.status_var.set("auto-adopt skipped - manual install stays available")
+
+    def _revert_adoption(self) -> None:
+        """Restore the backup recorded by the most recent auto-adoption."""
+        try:
+            result = core.revert_adoption()
+        except Exception as error:  # noqa: BLE001 - reported in the dialog
+            self.messagebox.showerror(APP_TITLE, str(error))
+            return
+        if result.get("error"):
+            self.messagebox.showinfo(APP_TITLE, result["error"])
+            return
+        self.messagebox.showinfo(
+            APP_TITLE,
+            f"Restored {result['restored_from']}\nover {result['reverted']}",
+        )
+        self.status_var.set("reverted the last adoption")
+
+    def _save_settings(self) -> None:
+        settings = dict(self.settings)
+        settings["engine_directory"] = self.engine_dir_var.get()
+        settings["auto_adopt"] = bool(self.auto_adopt_var.get())
+        try:
+            settings["geometry"] = self.root.geometry()
+        except Exception:  # noqa: BLE001 - geometry is best-effort
+            pass
+        try:
+            settings["ab_games"] = core.parse_int(self.games_ab_var.get(), "A/B games", 2, 2000)
+            settings["ab_nodes"] = core.parse_int(self.nodes_ab_var.get(), "A/B nodes", 1)
+        except ValueError:
+            pass
+        self.settings = settings
+        core.write_settings(settings)
+
+    def _on_close(self) -> None:
+        self._save_settings()
+        self.root.destroy()
 
     def _install_net(self) -> None:
         net = Path(self.validate_net_var.get())
@@ -840,6 +986,27 @@ class StudioApp:
             core.stop_run(run)
             self._refresh_runs()
 
+    def _adopt_best_run(self) -> None:
+        """Gate, compare, and adopt the completed run with the lowest val MAE."""
+        candidates = [
+            run
+            for run in core.list_runs()
+            if run.state.get("status") == "completed" and run.net_path.exists()
+        ]
+        if not candidates:
+            self.messagebox.showinfo(APP_TITLE, "No completed run has a network yet")
+            return
+        best = core.sort_runs(candidates, "val_mae")[0]
+        self.validate_net_var.set(str(best.net_path))
+        try:
+            games = core.parse_int(self.games_ab_var.get(), "A/B games", 2, 2000)
+            nodes = core.parse_int(self.nodes_ab_var.get(), "A/B nodes", 1)
+        except ValueError as error:
+            self.messagebox.showerror(APP_TITLE, str(error))
+            return
+        self.status_var.set(f"adopting best run {best.directory.name}")
+        self._validation_worker(best.net_path, games=games, nodes=nodes, adopt=True)
+
     # -- event pump ---------------------------------------------------------
 
     def _append_log(self, text: str) -> None:
@@ -989,10 +1156,16 @@ class StudioApp:
                     result = payload["result"]
                     gate = result.get("gate", {})
                     ab = result.get("ab_match")
+                    adoption = result.get("adoption")
                     self.validation_text.insert("end", self._gate_report(gate) + "\n")
                     if ab is not None:
                         self.validation_text.insert("end", self._ab_report(ab) + "\n")
-                    if core.gate_allows_install(gate):
+                    if adoption is not None:
+                        self.validation_text.insert(
+                            "end", self._adoption_report(adoption) + "\n"
+                        )
+                        self._finish_adoption(net, gate, adoption)
+                    elif core.gate_allows_install(gate):
                         self.validation_text.see("end")
                         self.status_var.set("validation complete")
                         self.install_button.configure(state="normal")

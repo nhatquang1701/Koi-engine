@@ -371,5 +371,162 @@ class RunListTests(unittest.TestCase):
             self.assertIn("Traceback: boom", detail)
 
 
+class SettingsTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.core = load_studio_core()
+
+    def test_defaults_and_round_trip(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "settings.json"
+            defaults = self.core.read_settings(path)
+            self.assertEqual(defaults["theme"], "light")
+            self.assertFalse(defaults["auto_adopt"])
+            self.assertEqual(defaults["ab_games"], 20)
+            settings = dict(defaults)
+            settings.update({"engine_directory": "D:/eng", "auto_adopt": True, "theme": "dark"})
+            self.core.write_settings(settings, path)
+            loaded = self.core.read_settings(path)
+            self.assertEqual(loaded["engine_directory"], "D:/eng")
+            self.assertTrue(loaded["auto_adopt"])
+            self.assertEqual(loaded["theme"], "dark")
+            raw = json.loads(path.read_text(encoding="utf-8"))
+            self.assertEqual(raw["schema"], self.core.SETTINGS_SCHEMA)
+
+    def test_malformed_settings_fall_back(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "settings.json"
+            path.write_text("{not json", encoding="utf-8")
+            self.assertEqual(self.core.read_settings(path), self.core.default_settings())
+
+
+class AdoptionPolicyTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.core = load_studio_core()
+
+    def test_gate_failure_skips(self):
+        for gate in (None, {}, {"error": "boom"}, {"rejected": True}, {"positions": 0}):
+            decision = self.core.adoption_decision(gate, None, None)
+            self.assertEqual(decision["decision"], "skip")
+
+    def test_no_installed_network_adopts_after_gate(self):
+        decision = self.core.adoption_decision({"positions": 64, "matches": 64}, None, None)
+        self.assertEqual(decision["decision"], "adopt")
+
+    def test_installed_network_requires_a_comparison(self):
+        installed = Path("D:/eng/koi.nnue")
+        gate = {"positions": 64}
+        self.assertEqual(self.core.adoption_decision(gate, None, installed)["decision"], "skip")
+        self.assertEqual(
+            self.core.adoption_decision(gate, {"error": "no report"}, installed)["decision"],
+            "skip",
+        )
+        self.assertEqual(
+            self.core.adoption_decision(
+                gate, {"verdict": "candidate-weaker"}, installed
+            )["decision"],
+            "skip",
+        )
+        for verdict in ("candidate-stronger", "inconclusive"):
+            self.assertEqual(
+                self.core.adoption_decision(gate, {"verdict": verdict}, installed)["decision"],
+                "adopt",
+            )
+        self.assertEqual(
+            self.core.adoption_decision(gate, {"verdict": "surprising"}, installed)["decision"],
+            "skip",
+        )
+
+
+class AdoptionRegistryTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.core = load_studio_core()
+
+    def test_adopt_records_and_reverts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            engine = root / "engine"
+            engine.mkdir()
+            old = engine / "koi.nnue"
+            old.write_bytes(b"old-net")
+            new = root / "candidate.nnue"
+            new.write_bytes(b"new-net")
+            registry = root / "adoptions.json"
+            info = self.core.adopt_net(
+                new,
+                engine,
+                evidence={"gate": {"positions": 64}, "net_match_verdict": "candidate-stronger"},
+                registry_path=registry,
+            )
+            self.assertEqual(Path(info["installed"]).read_bytes(), b"new-net")
+            self.assertIsNotNone(info["backup"])
+            records = self.core.load_adoptions(registry)
+            self.assertEqual(len(records), 1)
+            self.assertEqual(records[0]["net_match_verdict"], "candidate-stronger")
+            self.assertIsNone(records[0]["reverted_utc"])
+            reverted = self.core.revert_adoption(registry_path=registry)
+            self.assertEqual(Path(reverted["reverted"]).read_bytes(), b"old-net")
+            self.assertIsNotNone(self.core.load_adoptions(registry)[0]["reverted_utc"])
+            self.assertEqual(
+                self.core.revert_adoption(registry_path=registry)["error"],
+                "no adoption is available to revert",
+            )
+
+    def test_missing_backup_is_reported(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            registry = root / "adoptions.json"
+            self.core.write_json(
+                registry,
+                {
+                    "schema": self.core.ADOPTION_SCHEMA,
+                    "adoptions": [
+                        {
+                            "installed_path": str(root / "engine" / "koi.nnue"),
+                            "backup_path": str(root / "missing.bak"),
+                            "reverted_utc": None,
+                        }
+                    ],
+                },
+            )
+            result = self.core.revert_adoption(registry_path=registry)
+            self.assertIn("missing", result["error"])
+
+
+class NetMatchCommandTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.core = load_studio_core()
+
+    def test_command_uses_the_reference_wrapper(self):
+        candidate = Path("D:/runs/a/net.nnue")
+        opponent = Path("D:/engine/koi.nnue")
+        command = self.core.net_match_command(candidate, opponent, games=12, nodes=5000, threads=2)
+        text = " ".join(command)
+        self.assertIn("net_match.ps1", text)
+        self.assertIn("-NnueNet", command)
+        self.assertIn("-OpponentNet", command)
+        self.assertEqual(command[command.index("-Games") + 1], "12")
+        self.assertEqual(command[command.index("-Nodes") + 1], "5000")
+        self.assertEqual(command[command.index("-Threads") + 1], "2")
+        self.assertTrue(command[command.index("-ReportPath") + 1].endswith("net-match.json"))
+
+    def test_running_engines_returns_a_list(self):
+        self.assertIsInstance(self.core.running_engines(), list)
+
+
+class GuiAdoptionWiringTests(unittest.TestCase):
+    def test_gui_exposes_the_auto_adopt_controls(self):
+        source = (TOOLS_NNUE / "koi_nnue_studio.py").read_text(encoding="utf-8")
+        self.assertIn("Auto-adopt", source)
+        self.assertIn("Adopt best run", source)
+        self.assertIn("_adoption_worker", source)
+        self.assertIn("running_engines", source)
+        self.assertIn("_save_settings", source)
+        self.assertIn("Revert last adoption", source)
+
+
 if __name__ == "__main__":
     unittest.main()
