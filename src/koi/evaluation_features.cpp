@@ -250,6 +250,12 @@ std::size_t EvaluationFeatureExtractor::halfka_king_bucket_for(
         king_bucket(perspective_square(king_square, perspective)) : 0U;
 }
 
+std::size_t EvaluationFeatureExtractor::halfka_king_bucket_for_square(
+    const Square king_square, const Color perspective) noexcept {
+    return king_square.index() < Square::kInvalid ?
+        king_bucket(perspective_square(king_square.index(), perspective)) : 0U;
+}
+
 std::uint16_t EvaluationFeatureExtractor::halfka_king_bucket_feature_index(
     const std::size_t bucket, const Color perspective, const Piece piece,
     const Square square) noexcept {

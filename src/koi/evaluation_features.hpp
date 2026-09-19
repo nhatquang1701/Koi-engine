@@ -84,6 +84,11 @@ public:
         const EvaluationFeatures&, Color perspective) noexcept;
     [[nodiscard]] static std::size_t halfka_king_bucket_for(
         const EvaluationFeatures&, Color perspective) noexcept;
+    // Bucket of an explicit own-king square under a real-color perspective.
+    // Used by the incremental accumulator, which must know the bucket a king
+    // move lands in without rebuilding the whole feature view.
+    [[nodiscard]] static std::size_t halfka_king_bucket_for_square(
+        Square king_square, Color perspective) noexcept;
     [[nodiscard]] static std::uint16_t halfka_king_bucket_feature_index(
         std::size_t bucket, Color perspective, Piece piece, Square square) noexcept;
 };

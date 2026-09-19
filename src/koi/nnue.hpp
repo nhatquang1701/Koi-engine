@@ -185,9 +185,13 @@ private:
     std::array<std::vector<std::uint8_t>, kIncrementalPerspectives> slot_buckets_;
     std::vector<std::uint64_t> slot_keys_;
     std::vector<std::uint8_t> slot_valid_;
+    // Piece count per slot (capped at 32).  Cached so an incremental
+    // evaluation can pick the output bucket without rescanning the board.
+    std::vector<std::uint8_t> slot_pieces_;
     int slot_cursor_ = -1;
     std::array<std::vector<std::int32_t>, kIncrementalPerspectives> scratch_values_;
     std::array<std::uint8_t, kIncrementalPerspectives> scratch_buckets_{};
+    std::uint8_t scratch_pieces_ = 0;
     std::uint64_t scratch_key_ = 0;
     bool scratch_valid_ = false;
     bool storage_ready_ = false;

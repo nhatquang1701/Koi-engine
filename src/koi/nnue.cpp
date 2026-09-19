@@ -546,15 +546,23 @@ void accumulate_hidden_sparse_avx2(const NnueNetwork& network,
 // v4 inference: the hidden layer is still a sum of binary feature rows, then
 // the clipped activations feed pair products p[j] = a[j] * a[j + hidden/2]
 // and one linear head selected by the piece-count bucket.
-[[nodiscard]] std::size_t piece_count_bucket(const EvaluationFeatures& features) noexcept {
+[[nodiscard]] std::size_t output_bucket_for_pieces(const std::size_t pieces) noexcept {
+    const std::size_t missing = 32U - std::min<std::size_t>(32U, pieces);
+    return std::min<std::size_t>(7U, missing / 4U);
+}
+
+[[nodiscard]] std::size_t piece_count_of(const EvaluationFeatures& features) noexcept {
     std::size_t pieces = 0;
     for (const Piece& piece : features.position.board) {
         if (!piece.empty()) {
             ++pieces;
         }
     }
-    const std::size_t missing = 32U - std::min<std::size_t>(32U, pieces);
-    return std::min<std::size_t>(7U, missing / 4U);
+    return pieces;
+}
+
+[[nodiscard]] std::size_t piece_count_bucket(const EvaluationFeatures& features) noexcept {
+    return output_bucket_for_pieces(piece_count_of(features));
 }
 
 [[nodiscard]] constexpr PieceType promotion_piece_type(const Promotion promotion) noexcept {
@@ -695,6 +703,51 @@ void compute_pair_products_avx2(std::span<const std::int16_t> activations,
     accumulate_hidden_sparse_scalar(network, active, hidden_sums);
     return finish_inference_v4_scalar(network, hidden_sums, bucket, accumulator);
 }
+
+#if KOI_NNUE_COMPILED_AVX2
+// Applies one feature row to a perspective accumulator with 8 int32 lanes.
+// The scalar path accumulates in int64 and clamps to int32; the vector path
+// uses int32 lanes and redoes an 8-lane block scalar only when the addition
+// would have overflowed (same-sign operands with a changed result sign).
+void apply_delta_avx2(std::int32_t* values, const std::int16_t* weights,
+                      const std::size_t count, const int sign) noexcept {
+    const __m256i zero = _mm256_setzero_si256();
+    std::size_t index = 0;
+    for (; index + 8U <= count; index += 8U) {
+        const __m256i current =
+            _mm256_loadu_si256(reinterpret_cast<const __m256i*>(values + index));
+        __m256i delta = _mm256_cvtepi16_epi32(
+            _mm_loadu_si128(reinterpret_cast<const __m128i*>(weights + index)));
+        if (sign < 0) {
+            delta = _mm256_sub_epi32(zero, delta);
+        }
+        const __m256i sum = _mm256_add_epi32(current, delta);
+        const __m256i differing_operands =
+            _mm256_cmpgt_epi32(zero, _mm256_xor_si256(current, delta));
+        const __m256i differing_result =
+            _mm256_cmpgt_epi32(zero, _mm256_xor_si256(current, sum));
+        const __m256i overflow = _mm256_andnot_si256(differing_operands, differing_result);
+        if (_mm256_movemask_epi8(overflow) != 0) {
+            for (std::size_t lane = index; lane < index + 8U; ++lane) {
+                const std::int64_t updated = static_cast<std::int64_t>(values[lane]) +
+                    static_cast<std::int64_t>(sign) * static_cast<std::int64_t>(weights[lane]);
+                values[lane] = static_cast<std::int32_t>(std::clamp<std::int64_t>(
+                    updated, std::numeric_limits<std::int32_t>::min(),
+                    std::numeric_limits<std::int32_t>::max()));
+            }
+            continue;
+        }
+        _mm256_storeu_si256(reinterpret_cast<__m256i*>(values + index), sum);
+    }
+    for (; index < count; ++index) {
+        const std::int64_t updated = static_cast<std::int64_t>(values[index]) +
+            static_cast<std::int64_t>(sign) * static_cast<std::int64_t>(weights[index]);
+        values[index] = static_cast<std::int32_t>(std::clamp<std::int64_t>(
+            updated, std::numeric_limits<std::int32_t>::min(),
+            std::numeric_limits<std::int32_t>::max()));
+    }
+}
+#endif
 
 } // namespace
 
@@ -1103,11 +1156,11 @@ int NnueWorker::evaluate(const GameState& state, const Color perspective,
         return evaluate(EvaluationFeatureExtractor::extract(state), perspective, path);
     }
     ensure_incremental_storage();
-    const EvaluationFeatures features = EvaluationFeatureExtractor::extract(state);
-    const Color mover = features.position.side_to_move;
+    const Color mover = state.side_to_move();
     const std::size_t mover_index = mover == Color::white ? 0U : 1U;
     const std::uint64_t key = state.position_key();
     std::span<const std::int32_t> hidden_sums;
+    std::size_t pieces = 0;
     if (slot_cursor_ >= 0 &&
         slot_valid_[static_cast<std::size_t>(slot_cursor_)] != 0 &&
         slot_keys_[static_cast<std::size_t>(slot_cursor_)] == key) {
@@ -1115,9 +1168,13 @@ int NnueWorker::evaluate(const GameState& state, const Color perspective,
             slot_values_[mover_index].data() +
                 static_cast<std::size_t>(slot_cursor_) * hidden_units_,
             hidden_units_);
+        pieces = slot_pieces_[static_cast<std::size_t>(slot_cursor_)];
     } else if (scratch_valid_ && scratch_key_ == key) {
         hidden_sums = std::span<const std::int32_t>(scratch_values_[mover_index]);
+        pieces = scratch_pieces_;
     } else {
+        // Full rebuild: the only path that materializes the feature view.
+        const EvaluationFeatures features = EvaluationFeatureExtractor::extract(state);
         for (std::size_t index = 0; index < kIncrementalPerspectives; ++index) {
             const Color real = index == 0U ? Color::white : Color::black;
             const NnueSparseFeaturesV4 sparse =
@@ -1131,13 +1188,15 @@ int NnueWorker::evaluate(const GameState& state, const Color perspective,
         }
         scratch_key_ = key;
         scratch_valid_ = true;
+        scratch_pieces_ = static_cast<std::uint8_t>(piece_count_of(features));
         ++incremental_fallback_count_;
         hidden_sums = std::span<const std::int32_t>(scratch_values_[mover_index]);
+        pieces = scratch_pieces_;
     }
     const bool use_avx2 = path == NnueInferencePath::avx2_compatible ? avx2_available() :
         (path == NnueInferencePath::automatic && avx2_available());
     (void)use_avx2;
-    const std::size_t bucket = piece_count_bucket(features);
+    const std::size_t bucket = output_bucket_for_pieces(pieces);
     int score = 0;
 #if KOI_NNUE_COMPILED_AVX2
     if (use_avx2) {
@@ -1169,6 +1228,7 @@ void NnueWorker::ensure_incremental_storage() {
     }
     slot_keys_.assign(kIncrementalSlotCount, 0);
     slot_valid_.assign(kIncrementalSlotCount, 0);
+    slot_pieces_.assign(kIncrementalSlotCount, 0);
     storage_ready_ = true;
 }
 
@@ -1180,6 +1240,7 @@ void NnueWorker::copy_slot_forward(const std::size_t from_slot,
                     slot_values_[index].data() + to_slot * hidden_units_);
         slot_buckets_[index][to_slot] = slot_buckets_[index][from_slot];
     }
+    slot_pieces_[to_slot] = slot_pieces_[from_slot];
 }
 
 void NnueWorker::refresh_slot_perspective(const EvaluationFeatures& features,
@@ -1196,6 +1257,7 @@ void NnueWorker::refresh_slot_perspective(const EvaluationFeatures& features,
               slot_values_[index].data() + slot * hidden_units_);
     slot_buckets_[index][slot] = static_cast<std::uint8_t>(
         EvaluationFeatureExtractor::halfka_king_bucket_for(features, perspective));
+    slot_pieces_[slot] = static_cast<std::uint8_t>(piece_count_of(features));
 }
 
 void NnueWorker::apply_feature_delta(const std::size_t perspective,
@@ -1205,6 +1267,15 @@ void NnueWorker::apply_feature_delta(const std::size_t perspective,
     const std::int16_t* weights =
         weights_->feature_weights.data() +
         static_cast<std::size_t>(index) * hidden_units_;
+#if KOI_NNUE_COMPILED_AVX2
+    // The vector path reproduces the scalar int64-accumulate/int32-clamp
+    // semantics exactly, including the per-block overflow fallback, so both
+    // paths agree on every input.
+    if (avx2_available() && hidden_units_ % 16U == 0U) {
+        apply_delta_avx2(values, weights, hidden_units_, sign);
+        return;
+    }
+#endif
     for (std::size_t hidden = 0; hidden < hidden_units_; ++hidden) {
         const std::int64_t updated = static_cast<std::int64_t>(values[hidden]) +
             static_cast<std::int64_t>(sign) * static_cast<std::int64_t>(weights[hidden]);
@@ -1217,20 +1288,34 @@ void NnueWorker::apply_feature_delta(const std::size_t perspective,
 void NnueWorker::apply_move_deltas(const GameState& child,
                                    const MoveMetadata& metadata,
                                    const std::size_t slot) {
-    const EvaluationFeatures features = EvaluationFeatureExtractor::extract(child);
+    // The child's feature view is only needed when a perspective's own king
+    // crosses a bucket boundary.  Everything else is derived from the move
+    // metadata, which keeps the hot make path allocation- and scan-free.
     const Color mover = opposite(child.side_to_move());
     const Square from = metadata.move.from();
     const Square to = metadata.move.to();
     const MoveKind kind = metadata.kind;
     const PieceType moving = metadata.moving_piece;
+    // The slot was copied forward from the parent, so its piece count is the
+    // parent count.  A refresh stores the exact child count, so the decrement
+    // below is skipped in that case.
+    const std::uint8_t parent_pieces = slot_pieces_[slot];
+    bool refreshed = false;
     for (std::size_t index = 0; index < kIncrementalPerspectives; ++index) {
         const Color real = index == 0U ? Color::white : Color::black;
         if (moving == PieceType::king && mover == real) {
-            // The perspective's own king may have crossed a bucket boundary, so
-            // rebuild this perspective from the child position.  The rebuild
-            // covers the king move and, for castling, the rook as well.
-            refresh_slot_perspective(features, real, slot);
-            continue;
+            // Only a bucket crossing needs a rebuild; a king step inside one
+            // bucket is a plain remove/add pair and castling's rook delta is
+            // applied below.  The rebuild covers the king and the castling
+            // rook together.
+            const std::size_t child_bucket =
+                EvaluationFeatureExtractor::halfka_king_bucket_for_square(to, real);
+            if (child_bucket != slot_buckets_[index][slot]) {
+                refresh_slot_perspective(
+                    EvaluationFeatureExtractor::extract(child), real, slot);
+                refreshed = true;
+                continue;
+            }
         }
         const std::size_t bucket = slot_buckets_[index][slot];
         apply_feature_delta(index, slot,
@@ -1270,6 +1355,10 @@ void NnueWorker::apply_move_deltas(const GameState& child,
                     Square::from_index(rook_to)), 1);
         }
     }
+    if (!refreshed) {
+        slot_pieces_[slot] = static_cast<std::uint8_t>(
+            parent_pieces - (metadata.captured_piece != PieceType::none ? 1U : 0U));
+    }
 }
 
 bool NnueWorker::prepare_child_slot(const int ply, const int child_slot,
@@ -1281,6 +1370,7 @@ bool NnueWorker::prepare_child_slot(const int ply, const int child_slot,
                         slot_values_[index].data() + child * hidden_units_);
             slot_buckets_[index][child] = scratch_buckets_[index];
         }
+        slot_pieces_[child] = scratch_pieces_;
         return true;
     }
     if (slot_cursor_ == ply && slot_valid_[static_cast<std::size_t>(ply)] != 0 &&
