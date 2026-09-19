@@ -1,10 +1,13 @@
-//! Trains a Koi v4 network with bullet.
+//! Trains a Koi NNUE network with bullet.
 //!
-//! The architecture mirrors the C++ inference path: a 9216-input sparse affine
-//! first layer, CReLU, pairwise products of the two hidden halves, and one
-//! linear output per piece-count bucket. Targets are centipawns divided by 100
+//! `--arch v5` (the default) mirrors the C++ v5 inference path: one shared
+//! 36864-input sparse affine feature transformer over both perspectives,
+//! CReLU, full-width cross-perspective pair products, one 32-unit CReLU hidden
+//! layer, and one linear output per piece-count bucket. `--arch v4` keeps the
+//! original 9216-input network with within-perspective pair products so the
+//! existing export path stays available. Targets are centipawns divided by 100
 //! (`eval_scale = 100`), so the raw network output is directly quantizable to
-//! the `KOI-NNUE` version 4 container.
+//! the matching `KOI-NNUE` container version.
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -15,14 +18,19 @@ use bullet_lib::trainer::schedule::{lr, wdl, TrainingSchedule, TrainingSteps};
 use bullet_lib::trainer::settings::LocalSettings;
 use bullet_lib::value::loader::DirectSequentialDataLoader;
 use bullet_lib::value::ValueTrainerBuilder;
-use koi_bullet_train::{KoiHalfkaKingBucket, KoiOutputBuckets, KOI_INPUTS, KOI_OUTPUT_BUCKETS};
+use koi_bullet_train::{
+    KoiHalfkaKingBucket, KoiHalfkaThreat, KoiOutputBuckets, KOI_INPUTS, KOI_OUTPUT_BUCKETS,
+    KOI_V5_INPUTS,
+};
 
 struct Config {
     data: PathBuf,
     test: Option<PathBuf>,
     out: PathBuf,
     net_id: String,
+    arch: String,
     hidden: usize,
+    l1_units: usize,
     batch: usize,
     batches_per_superbatch: usize,
     superbatches: usize,
@@ -39,8 +47,10 @@ fn usage() -> String {
         "",
         "options:",
         "  --test <file.data>            validation dataset (optional)",
-        "  --net-id <name>               checkpoint name (default koi-v4)",
-        "  --hidden <n>                  hidden units, even (default 1024)",
+        "  --arch <v4|v5>                architecture (default v5)",
+        "  --net-id <name>               checkpoint name (default koi-v5)",
+        "  --hidden <n>                  hidden units, even (default 1536 for v5, 1024 for v4)",
+        "  --l1-units <n>                v5 hidden layer units (default 32)",
         "  --batch <n>                   batch size (default 8192)",
         "  --batches-per-superbatch <n>  batches per superbatch (default 610)",
         "  --superbatches <n>            total superbatches (default 100)",
@@ -57,8 +67,12 @@ fn parse_args() -> Result<Config, String> {
     let mut data = None;
     let mut test = None;
     let mut out = None;
-    let mut net_id = String::from("koi-v4");
-    let mut hidden = 1024usize;
+    let mut arch = String::from("v5");
+    let mut net_id = String::from("koi-v5");
+    let mut net_id_set = false;
+    let mut hidden = 1536usize;
+    let mut hidden_set = false;
+    let mut l1_units = 32usize;
     let mut batch = 8192usize;
     let mut batches_per_superbatch = 610usize;
     let mut superbatches = 100usize;
@@ -82,8 +96,18 @@ fn parse_args() -> Result<Config, String> {
             "--data" => data = Some(PathBuf::from(value)),
             "--test" => test = Some(PathBuf::from(value)),
             "--out" => out = Some(PathBuf::from(value)),
-            "--net-id" => net_id = value.clone(),
-            "--hidden" => hidden = value.parse().map_err(|_| "bad --hidden".to_string())?,
+            "--arch" => arch = value.clone(),
+            "--net-id" => {
+                net_id = value.clone();
+                net_id_set = true;
+            }
+            "--hidden" => {
+                hidden = value.parse().map_err(|_| "bad --hidden".to_string())?;
+                hidden_set = true;
+            }
+            "--l1-units" => {
+                l1_units = value.parse().map_err(|_| "bad --l1-units".to_string())?
+            }
             "--batch" => batch = value.parse().map_err(|_| "bad --batch".to_string())?,
             "--batches-per-superbatch" => {
                 batches_per_superbatch = value
@@ -107,8 +131,22 @@ fn parse_args() -> Result<Config, String> {
         index += 2;
     }
 
+    if arch != "v4" && arch != "v5" {
+        return Err("--arch must be v4 or v5".to_string());
+    }
+    if arch == "v4" {
+        if !hidden_set {
+            hidden = 1024;
+        }
+        if !net_id_set {
+            net_id = String::from("koi-v4");
+        }
+    }
     if hidden < 32 || hidden % 2 != 0 || hidden > 8192 {
         return Err("--hidden must be an even number between 32 and 8192".to_string());
+    }
+    if l1_units < 8 || l1_units > 128 {
+        return Err("--l1-units must be between 8 and 128".to_string());
     }
     if batch == 0 || superbatches == 0 || batches_per_superbatch == 0 || save_rate == 0 {
         return Err("--batch, --batches-per-superbatch, --superbatches and --save-rate must be positive".to_string());
@@ -119,7 +157,9 @@ fn parse_args() -> Result<Config, String> {
         test,
         out: out.ok_or_else(|| format!("--out is required\n\n{}", usage()))?,
         net_id,
+        arch,
         hidden,
+        l1_units,
         batch,
         batches_per_superbatch,
         superbatches,
@@ -182,31 +222,64 @@ fn main() -> ExitCode {
     let data_path = config.data.to_string_lossy().into_owned();
     let loader = DirectSequentialDataLoader::new(&[data_path.as_str()]);
 
-    let save_format = [
-        SavedFormat::id("l0w"),
-        SavedFormat::id("l0b"),
-        SavedFormat::id("l1w"),
-        SavedFormat::id("l1b"),
-    ];
+    if config.arch == "v5" {
+        let save_format = [
+            SavedFormat::id("l0w"),
+            SavedFormat::id("l0b"),
+            SavedFormat::id("l1w"),
+            SavedFormat::id("l1b"),
+            SavedFormat::id("l2w"),
+            SavedFormat::id("l2b"),
+        ];
 
-    let mut trainer = ValueTrainerBuilder::default()
-        .optimiser(AdamW)
-        .inputs(KoiHalfkaKingBucket)
-        .output_buckets(KoiOutputBuckets)
-        .save_format(&save_format)
-        .loss_fn(|output, target| output.sigmoid().squared_error(target))
-        .seed(config.seed)
-        .build(|builder, stm_inputs, output_buckets| {
-            let l0 = builder.new_affine("l0", KOI_INPUTS, config.hidden);
-            let l1 = builder.new_affine("l1", config.hidden / 2, KOI_OUTPUT_BUCKETS);
-            let first_half = |start: usize, end: usize| {
-                l0.slice(start, end).forward(stm_inputs).crelu()
-            };
-            let pairs = first_half(0, config.hidden / 2) * first_half(config.hidden / 2, config.hidden);
-            l1.forward(pairs).select(output_buckets)
-        });
+        let mut trainer = ValueTrainerBuilder::default()
+            .optimiser(AdamW)
+            .inputs(KoiHalfkaThreat)
+            .dual_perspective()
+            .output_buckets(KoiOutputBuckets)
+            .save_format(&save_format)
+            .loss_fn(|output, target| output.sigmoid().squared_error(target))
+            .seed(config.seed)
+            .build(|builder, stm_inputs, ntm_inputs, output_buckets| {
+                let l0 = builder.new_affine("l0", KOI_V5_INPUTS, config.hidden);
+                let stm_hidden = l0.forward(stm_inputs).crelu();
+                let ntm_hidden = l0.forward(ntm_inputs).crelu();
+                let pairs = stm_hidden * ntm_hidden;
+                let l1 = builder.new_affine("l1", config.hidden, config.l1_units);
+                let l1_act = l1.forward(pairs).crelu();
+                let l2 = builder.new_affine("l2", config.l1_units, KOI_OUTPUT_BUCKETS);
+                l2.forward(l1_act).select(output_buckets)
+            });
 
-    trainer.run(&schedule, &settings, &loader);
+        trainer.run(&schedule, &settings, &loader);
+    } else {
+        let save_format = [
+            SavedFormat::id("l0w"),
+            SavedFormat::id("l0b"),
+            SavedFormat::id("l1w"),
+            SavedFormat::id("l1b"),
+        ];
+
+        let mut trainer = ValueTrainerBuilder::default()
+            .optimiser(AdamW)
+            .inputs(KoiHalfkaKingBucket)
+            .output_buckets(KoiOutputBuckets)
+            .save_format(&save_format)
+            .loss_fn(|output, target| output.sigmoid().squared_error(target))
+            .seed(config.seed)
+            .build(|builder, stm_inputs, output_buckets| {
+                let l0 = builder.new_affine("l0", KOI_INPUTS, config.hidden);
+                let l1 = builder.new_affine("l1", config.hidden / 2, KOI_OUTPUT_BUCKETS);
+                let first_half = |start: usize, end: usize| {
+                    l0.slice(start, end).forward(stm_inputs).crelu()
+                };
+                let pairs = first_half(0, config.hidden / 2)
+                    * first_half(config.hidden / 2, config.hidden);
+                l1.forward(pairs).select(output_buckets)
+            });
+
+        trainer.run(&schedule, &settings, &loader);
+    }
 
     println!("bullet training finished net={}", config.net_id);
     ExitCode::SUCCESS

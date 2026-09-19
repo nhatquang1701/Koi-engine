@@ -80,13 +80,23 @@ class KoiBackend:
             repr(float(config["val_fraction"])),
             "--seed",
             str(config["seed"]),
+            "--arch",
+            str(config.get("arch", "v5")),
             "--hidden-units",
-            str(config.get("koi_hidden_units", DEFAULT_HIDDEN_UNITS)),
+            str(config.get("koi_hidden_units",
+                           1536 if str(config.get("arch", "v5")) == "v5" else DEFAULT_HIDDEN_UNITS)),
             "--hidden-shifts",
             *[str(shift) for shift in config.get("koi_hidden_shifts", DEFAULT_HIDDEN_SHIFTS)],
             "--output-shifts",
             *[str(shift) for shift in config.get("koi_output_shifts", DEFAULT_OUTPUT_SHIFTS)],
         ]
+        if str(config.get("arch", "v5")) == "v5":
+            argv += [
+                "--l1-units",
+                str(config.get("koi_l1_units", 32)),
+                "--l1-shifts",
+                *[str(shift) for shift in config.get("koi_l1_shifts", [6, 7, 8])],
+            ]
         if int(config.get("rows", 0)) > 0:
             argv += ["--rows", str(config["rows"])]
         if config.get("float_out", True):

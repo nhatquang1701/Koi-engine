@@ -86,13 +86,16 @@ class BulletBackend:
         if reason is not None:
             raise RuntimeError(reason)
         corpus = Path(config.get("corpus", REPO_ROOT / "artifacts" / "training" / "labels.txt"))
+        arch = str(config.get("arch", "v5"))
+        default_hidden = 1536 if arch == "v5" else 1024
         command = [
             python_executable(),
             str(RUNNER),
             "--corpus", str(corpus),
             "--out", str(run_dir),
             "--net-name", network_file_name(config),
-            "--hidden", str(config.get("bullet_hidden_units", config.get("koi_hidden_units", 1024))),
+            "--arch", arch,
+            "--hidden", str(config.get("bullet_hidden_units", config.get("koi_hidden_units", default_hidden))),
             "--batch", str(config.get("batch_size", 8192)),
             "--superbatches", str(config.get("bullet_superbatches", config.get("epochs", 10))),
             "--lr", repr(config.get("learning_rate", 0.002)),
@@ -105,6 +108,11 @@ class BulletBackend:
             "--hidden-shifts", *[str(value) for value in config.get("koi_hidden_shifts", [6, 7, 8])],
             "--output-shifts", *[str(value) for value in config.get("koi_output_shifts", [12, 14, 16, 18, 20])],
         ]
+        if arch == "v5":
+            command += [
+                "--l1-units", str(config.get("bullet_l1_units", 32)),
+                "--l1-shifts", *[str(value) for value in config.get("bullet_l1_shifts", [6, 7, 8])],
+            ]
         rows = int(config.get("rows", 0))
         if rows > 0:
             command += ["--rows", str(rows)]

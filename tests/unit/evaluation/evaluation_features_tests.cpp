@@ -14,6 +14,7 @@
 
 namespace {
 
+using koi::Color;
 using koi::EvaluationFeatureExtractor;
 using koi::EvaluationFeatures;
 using koi::GameState;
@@ -262,6 +263,163 @@ void test_v4_sparse_view_matches_the_dense_encoding() {
     }
 }
 
+[[nodiscard]] std::size_t count_active(const koi::NnueFeatureVectorV5& encoded) {
+    std::size_t active = 0;
+    for (const std::int8_t value : encoded) {
+        require(value == 0 || value == 1, "v5 inputs must be binary");
+        active += value != 0 ? 1U : 0U;
+    }
+    return active;
+}
+
+[[nodiscard]] std::vector<std::size_t> sparse_indices(
+    const koi::NnueSparseFeaturesThreatV1& sparse) {
+    std::vector<std::size_t> indices;
+    indices.reserve(sparse.count);
+    for (std::size_t index = 0; index < sparse.count; ++index) {
+        if (index > 0) {
+            require(sparse.indices[index - 1] < sparse.indices[index],
+                    "threat sparse indices must be strictly increasing");
+        }
+        indices.push_back(sparse.indices[index]);
+    }
+    return indices;
+}
+
+[[nodiscard]] std::vector<std::size_t> sparse_indices(const koi::NnueSparseFeaturesV5& sparse) {
+    std::vector<std::size_t> indices;
+    indices.reserve(sparse.count);
+    for (std::size_t index = 0; index < sparse.count; ++index) {
+        if (index > 0) {
+            require(sparse.indices[index - 1] < sparse.indices[index],
+                    "v5 sparse indices must be strictly increasing");
+        }
+        indices.push_back(sparse.indices[index]);
+    }
+    return indices;
+}
+
+// The Italian midgame owns two attack relations: the knight on f3 attacks the
+// e5 pawn and the bishop on c4 attacks the f7 pawn.  Both land in bucket 0,
+// with the knight on the victim-type/victim-square layout (384 + 0 * 64 + 36)
+// and the bishop on the slider layout (768 + 0 * 384 + 26 * 6 + 0).
+const std::vector<std::size_t> kMidgameWhiteThreats = {9636, 10140};
+// The symmetric view from black's perspective mirrors those same relations.
+const std::vector<std::size_t> kMidgameBlackThreats = {9628, 10188};
+
+// The two-knights variation adds black's own attacks, so with symmetric threat
+// pairs both perspectives encode all four relations.
+const std::vector<std::size_t> kMidgameSymmetricThreats = {9628, 9636, 10140, 10188};
+
+// The same midgame with white to move after 2.Nc3 Nf6 and 3.Bc5 in the
+// two-knights variation: the halfka group is the midgame golden list of the v4
+// tests, and the four symmetric threat inputs are appended.
+const std::vector<std::size_t> kMidgameV5Indices = {
+    8, 9, 10, 13, 14, 15, 19, 28, 82, 85, 130, 154, 192, 199, 259, 324,
+    420, 432, 433, 434, 435, 437, 438, 439, 490, 493, 546, 570, 632, 639, 699, 764,
+    9628, 9636, 10140, 10188,
+};
+
+void test_threat_v1_startpos_has_no_attacks() {
+    const EvaluationFeatures features = features_from(kStartpos);
+    require(sparse_indices(EvaluationFeatureExtractor::encode_sparse_threat_v1(
+                features, Color::white)).empty(),
+            "the start position has no attacks on enemy pieces");
+    require(sparse_indices(EvaluationFeatureExtractor::encode_sparse_threat_v1(
+                features, Color::black)).empty(),
+            "the start position has no attacks on enemy pieces for either side");
+
+    require(sparse_indices(EvaluationFeatureExtractor::encode_sparse_v5(features)) ==
+                kStartposV4Indices,
+            "with an empty threat group the combined v5 list must equal the halfka list");
+}
+
+void test_threat_v1_golden_midgame_vectors() {
+    const EvaluationFeatures black_to_move = features_from(
+        "r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 4 4");
+    require(sparse_indices(EvaluationFeatureExtractor::encode_sparse_threat_v1(
+                black_to_move, Color::black)) == kMidgameBlackThreats,
+            "the symmetric black view must mirror the white attack relations");
+    require(sparse_indices(EvaluationFeatureExtractor::encode_sparse_threat_v1(
+                black_to_move, Color::white)) == kMidgameWhiteThreats,
+            "the white knight and bishop attacks must match the golden threat list");
+
+    const EvaluationFeatures white_to_move = features_from(
+        "r1bqk2r/pppp1ppp/2n2n2/2b1p3/2B1P3/2NP1N2/PPP2PPP/R1BQK2R w KQkq - 0 1");
+    require(sparse_indices(EvaluationFeatureExtractor::encode_sparse_threat_v1(
+                white_to_move, Color::white)) == kMidgameSymmetricThreats,
+            "both sides' attacks must match the symmetric golden list");
+    require(sparse_indices(EvaluationFeatureExtractor::encode_sparse_threat_v1(
+                white_to_move, Color::black)) == kMidgameSymmetricThreats,
+            "the mirrored black view must reuse the symmetric golden list");
+}
+
+void test_threat_v1_deduplicates_shared_attackers() {
+    // Both white pawns (c5 and e5) attack the black d6 pawn, which must
+    // collapse into one victim input instead of being counted twice; the
+    // symmetric view also encodes the black pawn's attacks on both white pawns.
+    const EvaluationFeatures features = features_from("4k3/8/3p4/2P1P3/8/8/8/4K3 w - - 0 1");
+    require(sparse_indices(EvaluationFeatureExtractor::encode_sparse_threat_v1(
+                features, Color::white)) == std::vector<std::size_t>({9250, 9252, 9259}),
+            "two pawns attacking one victim must collapse into one threat input");
+    require(sparse_indices(EvaluationFeatureExtractor::encode_sparse_threat_v1(
+                features, Color::black)) == std::vector<std::size_t>({9235, 9242, 9244}),
+            "the black pawn must pin both of its attacked white pawns");
+}
+
+void test_threat_v1_covers_every_attack_family() {
+    // Knight, bishop and rook families: the knight hits the d4 pawn
+    // (384 + 27) and the rook hits the b8 rook (768 + 384 + 6 + 3); black
+    // answers with the bishop on the f3 knight (768 + 18 * 6 + 1) and the
+    // rook on the b1 rook (768 + 384 + 6 + 3).
+    const EvaluationFeatures families =
+        features_from("1r2k3/8/2b5/8/3p4/5N2/8/1R2K3 w - - 0 1");
+    require(sparse_indices(EvaluationFeatureExtractor::encode_sparse_threat_v1(
+                families, Color::white)) == std::vector<std::size_t>({9627, 10237, 10377, 10713}),
+            "the knight and rook attacks must match the family golden list");
+    require(sparse_indices(EvaluationFeatureExtractor::encode_sparse_threat_v1(
+                families, Color::black)) == std::vector<std::size_t>({9635, 10093, 10377, 10713}),
+            "the black bishop and rook attacks must match the family golden list");
+
+    // King family: the white king attacks the black knight on d2
+    // (1920 + 1 * 64 + 11); the black knight answers on the b1 rook
+    // (384 + 3 * 64 + 57).
+    const EvaluationFeatures king_attacks =
+        features_from("1r2k3/8/2b5/8/3p4/8/3n4/1R2K3 w - - 0 1");
+    require(sparse_indices(EvaluationFeatureExtractor::encode_sparse_threat_v1(
+                king_attacks, Color::white)) == std::vector<std::size_t>({9793, 10377, 10713, 11211}),
+            "the king attack must use the king family offsets");
+    require(sparse_indices(EvaluationFeatureExtractor::encode_sparse_threat_v1(
+                king_attacks, Color::black)) == std::vector<std::size_t>({9849, 10377, 10713, 11251}),
+            "the knight answer must use the knight family offsets");
+
+    // Queen family: the queen slider index is two, so Qd1 on Qd8 is
+    // 768 + 2 * 384 + 3 * 6 + 4.
+    const EvaluationFeatures queens = features_from("3qk3/8/8/8/8/8/8/3QK3 w - - 0 1");
+    require(sparse_indices(EvaluationFeatureExtractor::encode_sparse_threat_v1(
+                queens, Color::white)) == std::vector<std::size_t>({10774, 11110}),
+            "the queen attack must use slider index two");
+    require(sparse_indices(EvaluationFeatureExtractor::encode_sparse_threat_v1(
+                queens, Color::black)) == std::vector<std::size_t>({10774, 11110}),
+            "the mirrored queen attack must reuse the same index");
+}
+
+void test_v5_sparse_merges_halfka_and_threats() {
+    const EvaluationFeatures features = features_from(
+        "r1bqk2r/pppp1ppp/2n2n2/2b1p3/2B1P3/2NP1N2/PPP2PPP/R1BQK2R w KQkq - 0 1");
+    const auto sparse = EvaluationFeatureExtractor::encode_sparse_v5(features, Color::white);
+    require(sparse_indices(sparse) == kMidgameV5Indices,
+            "the combined v5 list must be the sorted merge of both groups");
+
+    const auto dense = EvaluationFeatureExtractor::encode_halfka_threat_v5(features, Color::white);
+    require(dense.size() == 36864, "the combined v5 vector must contain 36864 inputs");
+    require(count_active(dense) == kMidgameV5Indices.size(),
+            "the dense v5 vector must mark exactly the sparse inputs");
+    for (const std::size_t index : kMidgameV5Indices) {
+        require(dense[index] == 1, "every golden v5 index must be active in the dense vector");
+    }
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -276,6 +434,11 @@ int main(int argc, char** argv) {
         {"evaluation features v4 midgame", test_v4_midgame_golden_vector},
         {"evaluation features v4 king buckets", test_v4_king_bucket_tracks_the_own_king},
         {"evaluation features v4 sparse view", test_v4_sparse_view_matches_the_dense_encoding},
+        {"evaluation features threat startpos", test_threat_v1_startpos_has_no_attacks},
+        {"evaluation features threat golden", test_threat_v1_golden_midgame_vectors},
+        {"evaluation features threat dedupe", test_threat_v1_deduplicates_shared_attackers},
+        {"evaluation features threat families", test_threat_v1_covers_every_attack_family},
+        {"evaluation features v5 merge", test_v5_sparse_merges_halfka_and_threats},
     };
     return koi::test::run_tests(tests, argc, argv);
 }

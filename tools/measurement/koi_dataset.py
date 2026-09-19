@@ -1,22 +1,27 @@
-"""Binary training corpus encoder for Koi NNUE (``koi-dataset-v1``).
+"""Binary training corpus encoder for Koi NNUE (``koi-dataset-v2``).
 
 Converts the text corpus written by ``gen_training_data.py``
 (``FEN;cp;best_move`` rows) into the sparse binary dataset consumed by the
-``halfka-king-bucket-v1`` trainer.  Rows whose FEN is invalid, whose score is
-missing, or whose score exceeds the corpus score limit are skipped, matching
-the label filters.
+v5 trainers.  Rows whose FEN is invalid, whose score is missing, or whose
+score exceeds the corpus score limit are skipped, matching the label filters.
 
 Format (little-endian):
 
     magic "KOI-DATA" (8 bytes)
-    u32 version (1)
-    u16 feature-set length
-    feature-set string
+    u32 version (2)
+    u16 group count (2)
+    per group: u16 feature-set length, feature-set string
+        (group A ``halfka-king-bucket-v1``, group B ``threat-pairs-v1``)
     u64 position count
     per record:
-        u16 count
-        u16 indices[count]   (strictly increasing)
-        i32 score_cp
+        u16 counts[4]        (A side to move, B side to move, A opponent,
+                              B opponent)
+        u16 indices[...]     (strictly increasing inside each block)
+        i32 score_cp         (side-to-move relative)
+
+Both perspectives are stored because the opponent's perspective-normalized
+features cannot be derived from the side-to-move list alone.  The version 1
+reader is retained for ``info`` and regression tests.
 
 Writing is streaming and resumable.  A checkpoint state file
 (``<output>.state.json``) records the input byte offset, the record count, and
@@ -28,8 +33,8 @@ the state file.
 
 Usage:
   python tools/measurement/koi_dataset.py encode `
-      --input artifacts/training/labels.txt --output artifacts/training/koi-dataset-v1.bin
-  python tools/measurement/koi_dataset.py info --input artifacts/training/koi-dataset-v1.bin
+      --input artifacts/training/labels.txt --output artifacts/training/koi-dataset-v2.bin
+  python tools/measurement/koi_dataset.py info --input artifacts/training/koi-dataset-v2.bin
 """
 
 from __future__ import annotations
@@ -45,15 +50,33 @@ from pathlib import Path
 import chess
 
 FEATURE_SET = "halfka-king-bucket-v1"
+THREAT_FEATURE_SET = "threat-pairs-v1"
+GROUP_FEATURE_SETS = (FEATURE_SET, THREAT_FEATURE_SET)
+COMBINED_FEATURE_SET = "halfka-king-bucket-v1+threat-pairs-v1"
 MAGIC = b"KOI-DATA"
-VERSION = 1
-STATE_SCHEMA = "koi-dataset-v1-state"
+VERSION = 2
+STATE_SCHEMA = "koi-dataset-v2-state"
 INPUT_UNITS = 12 * 12 * 64
+THREAT_BUCKET_UNITS = 2304
+THREAT_INPUT_UNITS = 12 * THREAT_BUCKET_UNITS
+TOTAL_INPUT_UNITS = INPUT_UNITS + THREAT_INPUT_UNITS
 SPARSE_CAPACITY = 64
+THREAT_SPARSE_CAPACITY = 128
+V5_SPARSE_CAPACITY = 160
 MAX_ABS_CP = 4000
 FLUSH_RECORDS = 4096
 FEATURE_SET_BYTES = FEATURE_SET.encode("utf-8")
-HEADER_BYTES = 8 + 4 + 2 + len(FEATURE_SET_BYTES) + 8
+THREAT_FEATURE_SET_BYTES = THREAT_FEATURE_SET.encode("utf-8")
+
+
+def header_bytes() -> int:
+    payload = 8 + 4 + 2 + 8
+    for name in (FEATURE_SET_BYTES, THREAT_FEATURE_SET_BYTES):
+        payload += 2 + len(name)
+    return payload
+
+
+HEADER_BYTES = header_bytes()
 
 
 class DatasetError(Exception):
@@ -64,15 +87,19 @@ def log(message: str) -> None:
     print(f"[{time.strftime('%H:%M:%S')}] {message}", flush=True)
 
 
-def king_bucket(board: chess.Board) -> int:
-    """Own-king bucket 0..11 in the side-to-move perspective (0 when absent)."""
-    king_square = board.king(board.turn)
+def perspective_square(square: int, perspective: chess.Color) -> int:
+    """Square in the given real-color perspective (black mirrors vertically)."""
+    return square if perspective == chess.WHITE else square ^ 56
+
+
+def king_bucket_for(board: chess.Board, perspective: chess.Color) -> int:
+    """Own-king bucket 0..11 for a real-color perspective (0 when absent)."""
+    king_square = board.king(perspective)
     if king_square is None:
         return 0
-    if board.turn == chess.BLACK:
-        king_square ^= 56
-    file = king_square & 7
-    rank = king_square >> 3
+    square = perspective_square(king_square, perspective)
+    file = square & 7
+    rank = square >> 3
     mirrored_file = file + 4 if file < 4 else file
     if rank <= 2:
         zone = 0
@@ -83,19 +110,109 @@ def king_bucket(board: chess.Board) -> int:
     return zone * 4 + (mirrored_file - 4)
 
 
-def halfka_king_bucket_indices(board: chess.Board) -> list[int]:
-    """Active sparse indices of ``halfka-king-bucket-v1`` for one position."""
-    turn = board.turn
-    mirror = turn == chess.BLACK
-    base = king_bucket(board) * 768
+def king_bucket(board: chess.Board) -> int:
+    """Own-king bucket 0..11 in the side-to-move perspective (0 when absent)."""
+    return king_bucket_for(board, board.turn)
+
+
+def halfka_king_bucket_indices_for(
+    board: chess.Board, perspective: chess.Color
+) -> list[int]:
+    """Active sparse indices of ``halfka-king-bucket-v1`` in one perspective."""
+    mirror = perspective == chess.BLACK
+    base = king_bucket_for(board, perspective) * 768
     indices: list[int] = []
     for square, piece in board.piece_map().items():
-        own = piece.color == turn
+        own = piece.color == perspective
         plane = piece.piece_type - 1 if own else piece.piece_type + 5
-        perspective_square = (square ^ 56) if mirror else square
-        indices.append(base + plane * 64 + perspective_square)
+        indices.append(base + plane * 64 + (square ^ 56 if mirror else square))
     indices.sort()
     return indices
+
+
+def halfka_king_bucket_indices(board: chess.Board) -> list[int]:
+    """Active sparse indices of ``halfka-king-bucket-v1`` for one position."""
+    return halfka_king_bucket_indices_for(board, board.turn)
+
+
+def attacks_mask(board: chess.Board, square: int) -> int:
+    """Pseudo-legal attack bitboard of the piece on ``square``."""
+    try:
+        return board.attacks_mask(square)
+    except AttributeError:  # pragma: no cover - older python-chess
+        mask = 0
+        for target in board.attacks(square):
+            mask |= 1 << target
+        return mask
+
+
+def threat_pairs_indices(
+    board: chess.Board, perspective: chess.Color | None = None
+) -> list[int]:
+    """Sorted, deduplicated ``threat-pairs-v1`` indices for one perspective.
+
+    Every attack relation in the position (either colour attacking the other)
+    contributes one input, expressed in the requested perspective's
+    coordinates, so both perspectives see the same relations.  Non-slider
+    families index the victim type and perspective victim square; sliders
+    additionally index the perspective attacker square.
+    """
+    if perspective is None:
+        perspective = board.turn
+    if not board.occupied_co[chess.WHITE] or not board.occupied_co[chess.BLACK]:
+        return []
+    base = INPUT_UNITS + king_bucket_for(board, perspective) * THREAT_BUCKET_UNITS
+    indices: set[int] = set()
+    for square, piece in board.piece_map().items():
+        victims = attacks_mask(board, square) & board.occupied_co[not piece.color]
+        if not victims:
+            continue
+        attacker_square = perspective_square(square, perspective)
+        while victims:
+            lsb = victims & -victims
+            victim_square = lsb.bit_length() - 1
+            victims ^= lsb
+            victim = board.piece_at(victim_square)
+            victim_type = victim.piece_type - 1
+            victim_perspective = perspective_square(victim_square, perspective)
+            if piece.piece_type == chess.PAWN:
+                offset = victim_type * 64 + victim_perspective
+            elif piece.piece_type == chess.KNIGHT:
+                offset = 384 + victim_type * 64 + victim_perspective
+            elif piece.piece_type == chess.KING:
+                offset = 1920 + victim_type * 64 + victim_perspective
+            else:
+                slider_index = {
+                    chess.BISHOP: 0,
+                    chess.ROOK: 1,
+                    chess.QUEEN: 2,
+                }[piece.piece_type]
+                offset = 768 + slider_index * 384 + attacker_square * 6 + victim_type
+            indices.add(base + offset)
+    return sorted(indices)
+
+
+def halfka_threat_v5_indices(
+    board: chess.Board, perspective: chess.Color | None = None
+) -> list[int]:
+    """Sorted combined v5 indices (group A then group B) for one perspective."""
+    if perspective is None:
+        perspective = board.turn
+    merged = set(halfka_king_bucket_indices_for(board, perspective))
+    merged.update(threat_pairs_indices(board, perspective))
+    return sorted(merged)[:V5_SPARSE_CAPACITY]
+
+
+def encode_record(board: chess.Board) -> tuple[list[int], list[int], list[int], list[int]]:
+    """The four index blocks for one record: A/B for side to move and opponent."""
+    stm = board.turn
+    opponent = not stm
+    return (
+        halfka_king_bucket_indices_for(board, stm),
+        threat_pairs_indices(board, stm),
+        halfka_king_bucket_indices_for(board, opponent),
+        threat_pairs_indices(board, opponent),
+    )
 
 
 def output_bucket(board: chess.Board) -> int:
@@ -128,13 +245,13 @@ def parse_row(raw: bytes) -> tuple[chess.Board, int] | None:
 
 
 class DatasetEncoder:
-    """Streaming, resumable writer for ``koi-dataset-v1``."""
+    """Streaming, resumable writer for ``koi-dataset-v2``."""
 
     def __init__(self, output: Path, input_path: Path) -> None:
         self.output = output
         self.input_path = input_path
         self.state_path = output.parent / (output.name + ".state.json")
-        self.count_offset = 14 + len(FEATURE_SET_BYTES)
+        self.count_offset = HEADER_BYTES - 8
         self.data_start = HEADER_BYTES
         self.offset = 0
         self.records = 0
@@ -155,7 +272,10 @@ class DatasetEncoder:
             state = json.loads(self.state_path.read_text(encoding="utf-8"))
             if state.get("schema") != STATE_SCHEMA:
                 raise DatasetError(f"{self.state_path} has an unknown schema")
-            if state.get("input") != str(self.input_path) or state.get("feature_set") != FEATURE_SET:
+            if (
+                state.get("input") != str(self.input_path)
+                or list(state.get("groups", ())) != list(GROUP_FEATURE_SETS)
+            ):
                 raise DatasetError(
                     f"{self.state_path} belongs to a different input; delete it to start over"
                 )
@@ -178,8 +298,11 @@ class DatasetEncoder:
                 self.state_path.unlink()
             self.output.parent.mkdir(parents=True, exist_ok=True)
             self.handle = open(self.output, "w+b")
-            self.handle.write(struct.pack("<8sIH", MAGIC, VERSION, len(FEATURE_SET_BYTES)))
-            self.handle.write(FEATURE_SET_BYTES)
+            self.handle.write(struct.pack("<8sIH", MAGIC, VERSION, len(GROUP_FEATURE_SETS)))
+            for name in GROUP_FEATURE_SETS:
+                encoded = name.encode("utf-8")
+                self.handle.write(struct.pack("<H", len(encoded)))
+                self.handle.write(encoded)
             self.handle.write(struct.pack("<Q", 0))
             self.handle.flush()
             log(f"created {self.output}")
@@ -194,10 +317,21 @@ class DatasetEncoder:
                 self.handle = None
 
     # -- writing -----------------------------------------------------------
-    def add(self, indices: list[int], cp: int) -> None:
-        if len(indices) > SPARSE_CAPACITY:
-            raise DatasetError(f"record has {len(indices)} active features; capacity is {SPARSE_CAPACITY}")
-        record = struct.pack(f"<H{len(indices)}H", len(indices), *indices)
+    def add(self, groups: tuple[list[int], list[int], list[int], list[int]], cp: int) -> None:
+        counts = [len(block) for block in groups]
+        if counts[0] > SPARSE_CAPACITY or counts[2] > SPARSE_CAPACITY:
+            raise DatasetError(
+                f"group A record has {max(counts[0], counts[2])} active features; "
+                f"capacity is {SPARSE_CAPACITY}"
+            )
+        if counts[1] > THREAT_SPARSE_CAPACITY or counts[3] > THREAT_SPARSE_CAPACITY:
+            raise DatasetError(
+                f"group B record has {max(counts[1], counts[3])} active features; "
+                f"capacity is {THREAT_SPARSE_CAPACITY}"
+            )
+        record = struct.pack("<4H", *counts)
+        for block in groups:
+            record += struct.pack(f"<{len(block)}H", *block)
         record += struct.pack("<i", cp)
         self._pending.append(record)
         self.records += 1
@@ -227,7 +361,7 @@ class DatasetEncoder:
                 if parsed is None:
                     continue
                 board, cp = parsed
-                self.add(halfka_king_bucket_indices(board), cp)
+                self.add(encode_record(board), cp)
                 processed += 1
                 if progress_every and self.records % progress_every == 0:
                     self._flush()
@@ -247,7 +381,7 @@ class DatasetEncoder:
         state = {
             "schema": STATE_SCHEMA,
             "input": str(self.input_path),
-            "feature_set": FEATURE_SET,
+            "groups": list(GROUP_FEATURE_SETS),
             "offset": self.offset,
             "records": self.records,
             "data_bytes": self.data_bytes,
@@ -267,15 +401,34 @@ class DatasetEncoder:
     # -- inspection --------------------------------------------------------
     @staticmethod
     def read_header_bytes(data: bytes) -> dict:
-        magic, version, feature_length = struct.unpack_from("<8sIH", data, 0)
-        feature_set = data[14 : 14 + feature_length].decode("utf-8", errors="replace")
-        count = struct.unpack_from("<Q", data, 14 + feature_length)[0]
-        return {
-            "magic": magic.decode("ascii", errors="replace"),
-            "version": version,
-            "feature_set": feature_set,
-            "records": count,
-        }
+        magic, version = struct.unpack_from("<8sI", data, 0)
+        if version == 1:
+            feature_length = struct.unpack_from("<H", data, 12)[0]
+            feature_set = data[14 : 14 + feature_length].decode("utf-8", errors="replace")
+            count = struct.unpack_from("<Q", data, 14 + feature_length)[0]
+            return {
+                "magic": magic.decode("ascii", errors="replace"),
+                "version": version,
+                "feature_set": feature_set,
+                "records": count,
+            }
+        if version == 2:
+            group_count = struct.unpack_from("<H", data, 12)[0]
+            offset = 14
+            groups = []
+            for _ in range(group_count):
+                length = struct.unpack_from("<H", data, offset)[0]
+                offset += 2
+                groups.append(data[offset : offset + length].decode("utf-8", errors="replace"))
+                offset += length
+            count = struct.unpack_from("<Q", data, offset)[0]
+            return {
+                "magic": magic.decode("ascii", errors="replace"),
+                "version": version,
+                "groups": groups,
+                "records": count,
+            }
+        raise struct.error(f"unsupported dataset version {version}")
 
     @staticmethod
     def read_header(path: Path) -> dict:

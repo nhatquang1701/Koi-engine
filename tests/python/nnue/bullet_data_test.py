@@ -32,6 +32,7 @@ except ImportError:  # pragma: no cover - environment dependent
 try:
     import run_bullet  # noqa: E402  (also puts tools/measurement on sys.path)
     import export_bullet_v4  # noqa: E402
+    import export_bullet_v5  # noqa: E402
     import to_bullet  # noqa: E402
 except ImportError:  # pragma: no cover - environment dependent
     BULLET_TOOLING_AVAILABLE = False
@@ -316,6 +317,143 @@ class ExporterTests(unittest.TestCase):
             path.write_bytes(blob[:-1])
             with self.assertRaises(export_bullet_v4.train_nnue_koi.TrainerError):
                 export_bullet_v4.train_nnue_koi.load_binary_dataset(path, 0)
+
+
+@unittest.skipUnless(BULLET_TOOLING_AVAILABLE, "numpy and the bullet tooling are required")
+@unittest.skipUnless(CHESS_AVAILABLE, "python-chess is required for the exporter")
+class ExporterV5Tests(unittest.TestCase):
+    def test_infer_hidden_units_v5(self) -> None:
+        l1 = 8
+        size = 32 * export_bullet_v5.bytes_per_hidden(l1) + export_bullet_v5.tail_bytes(l1)
+        self.assertEqual(export_bullet_v5.infer_hidden_units(size, l1), 32)
+        with self.assertRaises(export_bullet_v5.ExportError):
+            export_bullet_v5.infer_hidden_units(size + 4, l1)
+        with self.assertRaises(export_bullet_v5.ExportError):
+            export_bullet_v5.infer_hidden_units(size, l1 + 1)
+
+    def test_read_raw_weights_v5_layout(self) -> None:
+        hidden = 32
+        l1 = 8
+        feature_major = np.arange(36864 * hidden, dtype=np.float32).reshape(36864, hidden) / 1000.0
+        hidden_bias = np.linspace(-1.0, 1.0, hidden, dtype=np.float32)
+        l1_unit = np.arange(l1 * hidden, dtype=np.float32).reshape(l1, hidden) / 100.0
+        l1_bias = np.linspace(-0.5, 0.5, l1, dtype=np.float32)
+        output_bucket = np.arange(8 * l1, dtype=np.float32).reshape(8, l1) / 100.0
+        output_bias = np.linspace(-0.25, 0.25, 8, dtype=np.float32)
+        with tempfile.TemporaryDirectory() as temp:
+            raw = Path(temp) / "raw.bin"
+            raw.write_bytes(
+                feature_major.astype("<f4").tobytes()
+                + hidden_bias.astype("<f4").tobytes()
+                + l1_unit.T.astype("<f4").tobytes()
+                + l1_bias.astype("<f4").tobytes()
+                + output_bucket.T.astype("<f4").tobytes()
+                + output_bias.astype("<f4").tobytes()
+            )
+            weights = export_bullet_v5.read_raw_weights(raw, hidden, l1)
+        self.assertEqual(weights["feature_weights"].shape, (36864, hidden))
+        self.assertEqual(weights["l1_weights"].shape, (l1, hidden))
+        self.assertEqual(weights["output_weights"].shape, (8, l1))
+        np.testing.assert_allclose(weights["feature_weights"], feature_major, rtol=0, atol=1e-3)
+        np.testing.assert_allclose(weights["hidden_bias"], hidden_bias, rtol=0, atol=1e-6)
+        np.testing.assert_allclose(weights["l1_weights"], l1_unit, rtol=0, atol=1e-6)
+        np.testing.assert_allclose(weights["l1_bias"], l1_bias, rtol=0, atol=1e-6)
+        np.testing.assert_allclose(weights["output_weights"], output_bucket, rtol=0, atol=1e-6)
+        np.testing.assert_allclose(weights["output_bias"], output_bias, rtol=0, atol=1e-6)
+
+    def test_exporter_writes_a_v5_container(self) -> None:
+        import json
+
+        hidden = 32
+        l1 = 8
+        with tempfile.TemporaryDirectory() as temp:
+            raw = Path(temp) / "raw.bin"
+            raw.write_bytes(
+                b"\x00"
+                * (hidden * export_bullet_v5.bytes_per_hidden(l1) + export_bullet_v5.tail_bytes(l1))
+            )
+            validation = Path(temp) / "validation.txt"
+            validation.write_text(
+                f"{STARTPOS} | 17 | 0.5\n{BLACK_TO_MOVE} | -31 | 0.5\n",
+                encoding="utf-8",
+            )
+            net = Path(temp) / "koi-v5.nnue"
+            meta = Path(temp) / "koi-v5.metadata.json"
+            exit_code = export_bullet_v5.main([
+                "--checkpoint", str(raw),
+                "--validation", str(validation),
+                "--net-out", str(net),
+                "--meta-out", str(meta),
+                "--hidden", str(hidden),
+                "--l1-units", str(l1),
+                "--hidden-shifts", "7",
+                "--l1-shifts", "6",
+                "--output-shifts", "12",
+                "--tune-samples", "2",
+            ])
+            self.assertEqual(exit_code, 0)
+            data = net.read_bytes()
+            header = struct.Struct("<8sIIIIIBBBBHHQ")
+            (magic, version, input_units, hidden_units, buckets, l1_units,
+             hidden_shift, output_shift, l1_shift, reserved, qlen, flen, payload_len) = header.unpack_from(data, 0)
+            self.assertEqual(magic, b"KOI-NNUE")
+            self.assertEqual((version, input_units, hidden_units, buckets, l1_units), (5, 36864, 32, 8, 8))
+            self.assertEqual((hidden_shift, output_shift, l1_shift, reserved), (7, 12, 6, 0))
+            self.assertEqual(qlen, 10)
+            self.assertEqual(flen, 37)
+            expected_payload = 36864 * hidden * 2 + hidden * 4 + l1 * hidden + l1 * 4 + 8 * l1 + 8 * 4
+            self.assertEqual(payload_len, expected_payload)
+            self.assertEqual(len(data), 44 + 32 + qlen + flen + expected_payload)
+            metadata = json.loads(meta.read_text(encoding="utf-8"))
+            self.assertEqual(metadata["schema"], "koi-nnue-training-metadata-v3")
+            self.assertEqual(metadata["backend"], "bullet")
+            self.assertEqual(metadata["architecture"], {
+                "input": 36864,
+                "hidden": 32,
+                "l1": 8,
+                "output_buckets": 8,
+                "groups": ["halfka-king-bucket-v1", "threat-pairs-v1"],
+            })
+
+    def test_exporter_rejects_a_hidden_mismatch_v5(self) -> None:
+        l1 = 8
+        with tempfile.TemporaryDirectory() as temp:
+            raw = Path(temp) / "raw.bin"
+            raw.write_bytes(
+                b"\x00"
+                * (32 * export_bullet_v5.bytes_per_hidden(l1) + export_bullet_v5.tail_bytes(l1))
+            )
+            exit_code = export_bullet_v5.main([
+                "--checkpoint", str(raw),
+                "--hidden", "64",
+                "--l1-units", str(l1),
+                "--net-out", str(Path(temp) / "net.nnue"),
+                "--meta-out", str(Path(temp) / "net.metadata.json"),
+            ])
+        self.assertEqual(exit_code, 2)
+
+    def test_exporter_without_validation_selects_the_first_shifts(self) -> None:
+        hidden = 32
+        l1 = 8
+        with tempfile.TemporaryDirectory() as temp:
+            raw = Path(temp) / "raw.bin"
+            raw.write_bytes(
+                b"\x00"
+                * (hidden * export_bullet_v5.bytes_per_hidden(l1) + export_bullet_v5.tail_bytes(l1))
+            )
+            net = Path(temp) / "koi-v5.nnue"
+            exit_code = export_bullet_v5.main([
+                "--checkpoint", str(raw),
+                "--net-out", str(net),
+                "--meta-out", str(Path(temp) / "koi-v5.metadata.json"),
+                "--hidden", str(hidden),
+                "--l1-units", str(l1),
+                "--hidden-shifts", "7",
+                "--l1-shifts", "6",
+                "--output-shifts", "12",
+            ])
+            self.assertEqual(exit_code, 0)
+            self.assertTrue(net.exists())
 
 
 if __name__ == "__main__":

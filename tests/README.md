@@ -100,7 +100,8 @@ C++ unit / integration tests (27 executables under `tests/unit/` and
 - Search: `koi_search_tests` (four CTest shards), `search_ordering_tests`,
   `search_architecture_tests`, `search_policy_tests`, `search_runtime_tests`,
   `search_service_tests`, `static_exchange_tests`, `time_manager_tests`,
-  `transposition_table_tests`, `completion_gate_tests`, `koi_strength_tests`.
+  `transposition_table_tests`, `completion_gate_tests`, `koi_strength_tests`,
+  `gpu_nnue_tests` (GPU NNUE bit-exact parity; skips without a CUDA device).
 - Runtime and boundaries: `koi_cpu_features_tests`, `koi_module_tests`,
   `syzygy_tablebase_tests`, `opening_book_tests`, `uci_controller_tests`,
   `koi_replay_tests`.
@@ -121,15 +122,17 @@ the repository root as the working directory:
 - Measurement: `elo_oracle_python`, `elo_estimate_python`, `stockfish_match_python`,
   `elo_openings_python`, `measurement_phase_python`, `measurement_forensics_python`.
 - Evaluation/NNUE: `tune_eval_python`, `nnue_training_python`, `nnue_wrapper_python`,
-  `strength_report_python`, `koi_dataset_python`, `gen_training_data_python`,
-  `koi_trainer_python` (cross-language v4 parity against the boundary executable),
+  `strength_report_python`, `koi_dataset_python` (koi-dataset-v1 and v2 encoders
+  with four-group records), `gen_training_data_python`,
+  `koi_trainer_python` (cross-language v4 and v5 parity against the boundary
+  executable),
   `tune_classical_python` (ridge-fit recovery plus a `koi-eval-features` CSV
   round trip when the Release tool is built),
   `nnue_studio_python` (progress parser, backend CLI contract, GUI smoke, and a
   torch-gated tiny training selftest), `nnue_studio_ui_python` (run-list and
   telemetry helpers, validation gating, network naming, numeric guards), and
-  `bullet_data_python` (bulletformat conversion, exporter weight layout, and
-  wrapper line parsing).
+  `bullet_data_python` (bulletformat conversion, exporter weight layouts for v4
+  and v5, and wrapper line parsing).
 
 ## Labels and scheduling
 

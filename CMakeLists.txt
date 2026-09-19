@@ -153,6 +153,71 @@ function(koi_set_timeout test_name release_seconds)
     set_tests_properties(${test_name} PROPERTIES TIMEOUT ${KOI_SCALED_TIMEOUT})
 endfunction()
 
+# --- Optional GPU NNUE inference -------------------------------------------------
+# The v5 evaluation kernel is compiled to PTX by nvcc at build time and embedded
+# as a string; at runtime the engine binds nvcuda.dll dynamically, so a machine
+# without a CUDA driver (or a build without nvcc) simply stays on the CPU path.
+option(KOI_ENABLE_GPU_NNUE "Build GPU NNUE inference (requires nvcc)" ON)
+set(KOI_GPU_PTX "${CMAKE_BINARY_DIR}/generated/koi_nnue_v5.ptx")
+set(KOI_GPU_PTX_HEADER "${CMAKE_BINARY_DIR}/generated/koi_nnue_v5_ptx.hpp")
+if(KOI_ENABLE_GPU_NNUE)
+    find_program(KOI_NVCC nvcc
+        HINTS "$ENV{CUDA_PATH}/bin"
+              "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.9/bin")
+endif()
+if(KOI_NVCC)
+    add_custom_command(
+        OUTPUT "${KOI_GPU_PTX}"
+        COMMAND "${KOI_NVCC}" -ptx -arch=compute_61 -o "${KOI_GPU_PTX}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/src/koi/gpu/koi_nnue_v5.cu"
+        DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/koi/gpu/koi_nnue_v5.cu"
+        COMMENT "Compiling koi_nnue_v5.cu to PTX")
+    add_custom_command(
+        OUTPUT "${KOI_GPU_PTX_HEADER}"
+        COMMAND "${CMAKE_COMMAND}" -DINPUT="${KOI_GPU_PTX}"
+                -DOUTPUT="${KOI_GPU_PTX_HEADER}"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/embed_ptx.cmake"
+        DEPENDS "${KOI_GPU_PTX}" "${CMAKE_CURRENT_SOURCE_DIR}/cmake/embed_ptx.cmake"
+        COMMENT "Embedding the Koi NNUE v5 PTX")
+    add_custom_target(koi_gpu_ptx DEPENDS "${KOI_GPU_PTX_HEADER}")
+endif()
+
+target_sources(koi_core PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/koi/gpu/cuda_driver.cpp"
+                                "${CMAKE_CURRENT_SOURCE_DIR}/src/koi/gpu/gpu_nnue_service.cpp"
+                                "${CMAKE_CURRENT_SOURCE_DIR}/src/koi/gpu/nnue_gpu_evaluator.cpp")
+if(KOI_NVCC)
+    target_include_directories(koi_core PRIVATE "${CMAKE_BINARY_DIR}/generated")
+    add_dependencies(koi_core koi_gpu_ptx)
+    target_compile_definitions(koi_core PRIVATE KOI_GPU_INFERENCE_AVAILABLE=1)
+else()
+    target_compile_definitions(koi_core PRIVATE KOI_GPU_INFERENCE_AVAILABLE=0)
+endif()
+
+add_executable(koi_gpu_probe "${CMAKE_CURRENT_SOURCE_DIR}/tools/engine/koi_gpu_probe.cpp")
+target_link_libraries(koi_gpu_probe PRIVATE koi_core)
+if(KOI_NVCC)
+    target_include_directories(koi_gpu_probe PRIVATE "${CMAKE_BINARY_DIR}/generated")
+    add_dependencies(koi_gpu_probe koi_gpu_ptx)
+    target_compile_definitions(koi_gpu_probe PRIVATE KOI_GPU_INFERENCE_AVAILABLE=1)
+else()
+    target_compile_definitions(koi_gpu_probe PRIVATE KOI_GPU_INFERENCE_AVAILABLE=0)
+endif()
+add_test(NAME koi_gpu_probe COMMAND koi_gpu_probe)
+koi_set_timeout(koi_gpu_probe 60)
+set_tests_properties(koi_gpu_probe PROPERTIES LABELS "runtime")
+
+add_executable(gpu_nnue_tests "${CMAKE_CURRENT_SOURCE_DIR}/tests/unit/runtime/gpu_nnue_tests.cpp")
+target_link_libraries(gpu_nnue_tests PRIVATE koi_core koi_test_support)
+if(KOI_NVCC)
+    target_include_directories(gpu_nnue_tests PRIVATE "${CMAKE_BINARY_DIR}/generated")
+    target_compile_definitions(gpu_nnue_tests PRIVATE KOI_GPU_INFERENCE_AVAILABLE=1)
+else()
+    target_compile_definitions(gpu_nnue_tests PRIVATE KOI_GPU_INFERENCE_AVAILABLE=0)
+endif()
+add_test(NAME gpu_nnue_tests COMMAND gpu_nnue_tests)
+koi_set_timeout(gpu_nnue_tests 60)
+set_tests_properties(gpu_nnue_tests PROPERTIES LABELS "unit;runtime")
+
 if(KOI_BUILD_SHADOW_DIFF)
     add_executable(koi_shadow_diff_tests
         tests/integration/rules/native_shadow_diff_tests.cpp

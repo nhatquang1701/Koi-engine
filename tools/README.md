@@ -366,14 +366,23 @@ file exposes a headless CLI (`--list-backends`, `--dry-run`, `--run`, `--selftes
 `tools/nnue/studio_core.py` owns run directories under `artifacts/training/runs/`,
 progress parsing, validation and install helpers, and the detached run launcher.
 
-Backends live under `tools/nnue/backends/`: `koi` trains the
-`halfka-king-bucket-v1` v4 network with `tools/measurement/train_nnue_koi.py` on
-CPU PyTorch, `torch` drives the legacy `train_nnue_sf.py` v3 trainer, and
-`bullet` drives the pinned Rust/CUDA crate under `tools/nnue/bullet_train/`
-through `tools/nnue/run_bullet.py` when cargo and a CUDA 12.x toolkit are
-installed. The bullet path converts text labels with `tools/nnue/to_bullet.py`,
-trains, measures validation MAE from each saved checkpoint, and exports a v4
-container with `tools/measurement/export_bullet_v4.py`.
+Backends live under `tools/nnue/backends/`: `koi` trains the version 5 network
+by default with `tools/measurement/train_nnue_koi.py --arch v5` on CPU PyTorch
+(group A `halfka-king-bucket-v1` with 9216 inputs plus symmetric group B
+`threat-pairs-v1` with 27648 inputs, one shared feature transformer forwarded
+from both perspectives into full-width cross pairs `p[j] = own[j] * opp[j]`, a
+32-unit CReLU layer, and eight piece-count buckets; hidden 1536 and l1 32 are
+the defaults), while `--arch v4` trains the earlier within-perspective
+`halfka-king-bucket-v1` version 4 network (hidden 1024). `torch` drives the
+legacy `train_nnue_sf.py` v3 trainer, and `bullet` drives the pinned Rust/CUDA
+crate under `tools/nnue/bullet_train/` through `tools/nnue/run_bullet.py` when
+cargo and a CUDA 12.x toolkit are installed, defaulting to version 5 with
+`--arch v4` keeping the earlier pair-product network. The bullet path converts
+text labels with `tools/nnue/to_bullet.py`, trains, measures validation MAE from
+each saved checkpoint, and exports the matching container with
+`tools/measurement/export_bullet_v5.py` (v5) or `export_bullet_v4.py` (v4).
+`koi-dataset-v2` encodes four index groups (`A_stm`, `B_stm`, `A_opp`, `B_opp`)
+per record.
 
 Typical commands:
 
@@ -388,3 +397,23 @@ colour-split A/B match (`tools/nnue/ab_match.ps1` versus the classical evaluator
 `tools/nnue/net_match.ps1` for network versus network). Those results are local
 reports: the classical evaluator remains the engine default and no reported
 number is an Elo claim.
+
+GPU NNUE inference is optional and off by default. When `nvcc` is available
+(CMake option `KOI_ENABLE_GPU_NNUE`, on by default), the build compiles
+`src/koi/gpu/koi_nnue_v5.cu` to PTX and embeds it; at runtime the engine loads
+`nvcuda.dll` dynamically and uses the driver API only, so a CPU-only build or a
+missing GPU simply stays on the CPU path. Set `KOI_GPU_NNUE=1` to use the GPU
+for `Threads > 1`; `KOI_GPU_FORCE_FAIL=1` forces the CPU fallback for testing.
+`tools/engine/koi_gpu_probe.cpp` verifies the device path and
+`tests/unit/runtime/gpu_nnue_tests.cpp` checks bit-exact parity against the CPU
+scalar evaluation. No strength or speed claim is attached to this first pass.
+
+GPU NNUE inference is optional and off by default. When `nvcc` is available
+(CMake option `KOI_ENABLE_GPU_NNUE`, on by default), the build compiles
+`src/koi/gpu/koi_nnue_v5.cu` to PTX and embeds it; at runtime the engine loads
+`nvcuda.dll` dynamically and uses the driver API only, so a CPU-only build or a
+missing GPU simply stays on the CPU path. Set `KOI_GPU_NNUE=1` to use the GPU
+for `Threads > 1`; `KOI_GPU_FORCE_FAIL=1` forces the CPU fallback for testing.
+`tools/engine/koi_gpu_probe.cpp` verifies the device path and
+`tests/unit/runtime/gpu_nnue_tests.cpp` checks bit-exact parity against the CPU
+scalar evaluation. No strength or speed claim is attached to this first pass.

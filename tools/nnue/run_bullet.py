@@ -4,14 +4,14 @@ The wrapper chains the whole pipeline:
 
 1. ``to_bullet.py`` converts the text corpus into bulletformat ``.data`` files
    (unless ``--train-data``/``--skip-convert`` is given).
-2. ``bullet_train.exe`` (built from ``tools/nnue/bullet_train``) trains the v4
-   architecture on the GPU.
+2. ``bullet_train.exe`` (built from ``tools/nnue/bullet_train``) trains the
+   configured architecture (v4 or v5) on the GPU.
 3. After each saved checkpoint the wrapper measures validation MAE and prints an
    ``epoch i/n train_loss ... val_loss ... val_mae_cp ... time ...s`` line so the
    studio can chart progress.
-4. ``export_bullet_v4.py`` quantizes the final checkpoint into a ``KOI-NNUE``
-   version 4 container and prints the ``quantization``/``selected``/``wrote``
-   contract lines.
+4. The matching exporter (``export_bullet_v4.py`` or ``export_bullet_v5.py``)
+   quantizes the final checkpoint into a ``KOI-NNUE`` container and prints the
+   ``quantization``/``selected``/``wrote`` contract lines.
 
 Use ``--dry-run`` to print the resolved commands without running anything.
 """
@@ -33,6 +33,7 @@ if str(TOOLS_MEASUREMENT) not in sys.path:
     sys.path.insert(0, str(TOOLS_MEASUREMENT))
 
 import export_bullet_v4  # noqa: E402
+import export_bullet_v5  # noqa: E402
 import to_bullet  # noqa: E402
 
 DEFAULT_TRAINER = REPO_ROOT / "tools" / "nnue" / "bullet_train" / "target" / "release" / "bullet_train.exe"
@@ -118,13 +119,17 @@ def build_train_command(
     seed: int,
     threads: int,
     save_rate: int,
+    arch: str = "v4",
+    l1_units: int = 32,
 ) -> list[str]:
     return [
         str(trainer),
         "--data", str(data),
         "--out", str(out),
         "--net-id", net_id,
+        "--arch", arch,
         "--hidden", str(hidden),
+        "--l1-units", str(l1_units),
         "--batch", str(batch),
         "--batches-per-superbatch", str(batches_per_superbatch),
         "--superbatches", str(superbatches),
@@ -145,7 +150,26 @@ def build_export_command(
     hidden_shifts: list[int],
     output_shifts: list[int],
     tune_samples: int,
+    arch: str = "v4",
+    l1_units: int = 32,
+    l1_shifts: list[int] | None = None,
 ) -> list[str]:
+    if arch == "v5":
+        command = [
+            sys.executable,
+            str(TOOLS_MEASUREMENT / "export_bullet_v5.py"),
+            "--checkpoint", str(checkpoint),
+            "--validation", str(validation),
+            "--net-out", str(net_out),
+            "--meta-out", str(meta_out),
+            "--hidden", str(hidden),
+            "--l1-units", str(l1_units),
+            "--hidden-shifts", *[str(shift) for shift in hidden_shifts],
+            "--l1-shifts", *[str(shift) for shift in (l1_shifts or [6, 7, 8])],
+            "--output-shifts", *[str(shift) for shift in output_shifts],
+            "--tune-samples", str(tune_samples),
+        ]
+        return command
     return [
         sys.executable,
         str(TOOLS_MEASUREMENT / "export_bullet_v4.py"),
@@ -171,8 +195,11 @@ def build_convert_command(corpus: Path, data_dir: Path, val_fraction: float, lim
     ]
 
 
-def measure_val_mae(raw_path: Path, validation: Path, hidden: int, limit: int = 2000) -> float | None:
+def measure_val_mae(raw_path: Path, validation: Path, hidden: int, limit: int = 2000,
+                    arch: str = "v4", l1_units: int = 32) -> float | None:
     """Float validation MAE for one checkpoint, or None when unmeasurable."""
+    if arch == "v5":
+        return export_bullet_v5.measure_val_mae(raw_path, validation, hidden, l1_units, limit=limit)
     try:
         stored_hidden, weights = export_bullet_v4.read_raw_weights(raw_path)
         indices, offsets, scores, buckets = export_bullet_v4.load_validation(validation, limit, 0)
@@ -201,6 +228,10 @@ def run_pipeline(args: argparse.Namespace) -> int:
     checkpoint_dir = args.checkpoint_dir or (out_dir / "checkpoints")
     net_name = args.net_name
     meta_name = Path(net_name).with_suffix(".metadata.json").name
+    arch = args.arch
+    hidden = args.hidden if args.hidden > 0 else (1536 if arch == "v5" else 1024)
+    l1_units = args.l1_units
+    net_id = args.net_id or ("koi-v5" if arch == "v5" else "koi-v4")
 
     trainer = find_trainer(args.trainer)
     data = args.train_data
@@ -218,13 +249,14 @@ def run_pipeline(args: argparse.Namespace) -> int:
         validation_text = validation_text or (data_dir / "validation.txt")
 
     train_command = build_train_command(
-        trainer, data, checkpoint_dir, args.net_id, args.hidden, args.batch,
+        trainer, data, checkpoint_dir, net_id, hidden, args.batch,
         args.batches_per_superbatch, args.superbatches, args.lr, args.final_lr,
-        args.seed, args.threads, args.save_rate,
+        args.seed, args.threads, args.save_rate, arch, l1_units,
     )
     export_command = build_export_command(
         checkpoint_dir, validation_text, out_dir / net_name, out_dir / meta_name,
-        args.hidden, args.hidden_shifts, args.output_shifts, args.tune_samples,
+        hidden, args.hidden_shifts, args.output_shifts, args.tune_samples,
+        arch, l1_units, args.l1_shifts,
     )
 
     if args.dry_run:
@@ -267,7 +299,7 @@ def run_pipeline(args: argparse.Namespace) -> int:
             continue
         latest_raw = candidate
         if validation_text is not None and validation_text.is_file():
-            mae = measure_val_mae(candidate, validation_text, args.hidden)
+            mae = measure_val_mae(candidate, validation_text, hidden, arch=arch, l1_units=l1_units)
             if mae is not None:
                 loss = last_superbatch["loss"] if last_superbatch else 0.0
                 seconds = last_superbatch["seconds"] if last_superbatch else 0.0
@@ -288,7 +320,8 @@ def run_pipeline(args: argparse.Namespace) -> int:
     print(f"run_bullet: exporting {latest_raw}")
     export_command = build_export_command(
         checkpoint_dir, validation_text, out_dir / net_name, out_dir / meta_name,
-        args.hidden, args.hidden_shifts, args.output_shifts, args.tune_samples,
+        hidden, args.hidden_shifts, args.output_shifts, args.tune_samples,
+        arch, l1_units, args.l1_shifts,
     )
     code = _stream(export_command, env)
     if code != 0:
@@ -305,7 +338,7 @@ def _saved_index(name: str, fallback: int) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Train a Koi v4 network with bullet.")
+    parser = argparse.ArgumentParser(description="Train a Koi v4/v5 network with bullet.")
     parser.add_argument("--corpus", type=Path, default=REPO_ROOT / "artifacts" / "training" / "labels.txt")
     parser.add_argument("--out", type=Path, required=True, help="run directory for the network and metadata")
     parser.add_argument("--data-dir", type=Path, default=DEFAULT_DATA_DIR)
@@ -313,8 +346,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--train-data", type=Path, help="skip conversion and use this .data file")
     parser.add_argument("--validation", type=Path, help="validation text file for MAE reporting")
     parser.add_argument("--net-name", default="koi.nnue")
-    parser.add_argument("--net-id", default="koi-v4")
-    parser.add_argument("--hidden", type=int, default=1024)
+    parser.add_argument("--net-id", default=None)
+    parser.add_argument("--hidden", type=int, default=0, help="0 selects 1536 for v5 and 1024 for v4")
     parser.add_argument("--batch", type=int, default=8192)
     parser.add_argument("--batches-per-superbatch", type=int, default=610)
     parser.add_argument("--superbatches", type=int, default=100)
@@ -328,6 +361,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--tune-samples", type=int, default=4000)
     parser.add_argument("--hidden-shifts", type=int, nargs="+", default=[6, 7, 8])
     parser.add_argument("--output-shifts", type=int, nargs="+", default=[12, 14, 16, 18, 20])
+    parser.add_argument("--arch", choices=["v4", "v5"], default="v5")
+    parser.add_argument("--l1-units", type=int, default=32)
+    parser.add_argument("--l1-shifts", type=int, nargs="+", default=[6, 7, 8])
     parser.add_argument("--trainer", help="explicit path to bullet_train.exe")
     parser.add_argument("--dry-run", action="store_true")
     return parser
@@ -337,7 +373,8 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         return run_pipeline(args)
-    except (BulletRunError, to_bullet.ConversionError, export_bullet_v4.ExportError) as error:
+    except (BulletRunError, to_bullet.ConversionError, export_bullet_v4.ExportError,
+            export_bullet_v5.ExportError) as error:
         print(f"run_bullet: {error}", file=sys.stderr)
         return 2
 

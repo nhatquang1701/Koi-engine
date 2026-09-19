@@ -29,17 +29,29 @@ inline constexpr std::uint32_t kKoiNnuePerspectiveV3FormatVersion = 3;
 // piece-count output buckets.  It keeps the explicit fixed-point shift idea
 // from v3 but stores only the first-layer and output shifts.
 inline constexpr std::uint32_t kKoiNnueHalfkaKingBucketV1FormatVersion = 4;
+// Version 5 adds the threat-pairs-v1 feature group (36864 inputs total) and a
+// two-layer integer head: the two perspective accumulators are paired cross-
+// wise, one hidden CReLU layer of `l1_units` units follows, and the eight
+// piece-count buckets finish the chain.  It stores three explicit shifts
+// (hidden metadata, L1, output) in the same 76-byte header skeleton.
+inline constexpr std::uint32_t kKoiNnueHalfkaThreatV5FormatVersion = 5;
 inline constexpr std::uint32_t kKoiNnueHalfkaKingBucketV1FeatureCount =
     static_cast<std::uint32_t>(kNnueHalfkaKingBucketV1FeatureCount);
+inline constexpr std::uint32_t kKoiNnueHalfkaThreatV5FeatureCount =
+    static_cast<std::uint32_t>(kNnueHalfkaThreatV5FeatureCount);
 inline constexpr std::uint32_t kKoiNnueOutputBucketCount = 8;
 inline constexpr std::uint32_t kKoiNnueMinimumHiddenUnits = 32;
 inline constexpr std::uint32_t kKoiNnueMaximumHiddenUnits = 8192;
+inline constexpr std::uint32_t kKoiNnueMinimumL1Units = 8;
+inline constexpr std::uint32_t kKoiNnueMaximumL1Units = 128;
 // Upper bound for every explicit fixed-point right shift stored in a v3/v4
 // header.  Values beyond this cannot be expressed meaningfully by the integer
 // pipelines the containers target.
 inline constexpr std::uint8_t kKoiNnueMaximumShift = 20;
 inline constexpr std::string_view kKoiNnueHalfkaKingBucketV1FeatureSet =
     kNnueHalfkaKingBucketV1FeatureSet;
+inline constexpr std::string_view kKoiNnueHalfkaThreatV5FeatureSet =
+    kNnueHalfkaThreatV5FeatureSet;
 inline constexpr std::uint32_t kKoiNnueFeatureCount =
     static_cast<std::uint32_t>(kNnuePieceSquareV1FeatureCount);
 inline constexpr std::uint32_t kKoiNnuePieceSquareKingPawnV2FeatureCount =
@@ -95,13 +107,21 @@ struct NnueNetwork {
     std::vector<std::int32_t> bottleneck_bias;
     std::vector<std::int8_t> output_weights;
     std::int32_t output_bias = 0;
+    // Version 5 hidden head layer.  `l1_weights` is unit-major
+    // (l1_units x hidden/2) and `l1_bias` holds one int32 per unit; versions
+    // 2-4 leave both empty.
+    std::vector<std::int8_t> l1_weights;
+    std::vector<std::int32_t> l1_bias;
 
-    // Fixed-point right shifts used by the v3 integer pipeline.  Version 1 and
-    // version 2 containers leave them at zero, which reproduces the original
-    // v2 activation-only quantization exactly.
+    // Fixed-point right shifts used by the v3+ integer pipelines.  Version 1
+    // and version 2 containers leave them at zero, which reproduces the
+    // original v2 activation-only quantization exactly.  Version 5 adds
+    // `l1_shift` for the hidden head layer; `hidden_shift` stays a
+    // quantization-side hint that inference never applies.
     std::uint8_t hidden_shift = 0;
     std::uint8_t bottleneck_shift = 0;
     std::uint8_t output_shift = 0;
+    std::uint8_t l1_shift = 0;
 
     [[nodiscard]] static NnueNetwork synthetic();
     [[nodiscard]] static NnueNetwork synthetic_v2();
@@ -109,6 +129,9 @@ struct NnueNetwork {
     // networks default to 1024 hidden units; the fixture keeps the payload
     // small while still exercising the pair-product and per-bucket layout.
     [[nodiscard]] static NnueNetwork synthetic_v4();
+    // Minimal-width v5 network: 36864 inputs, 32 hidden units, 8 output
+    // buckets, and 8 L1 units, with shifts 7/12 and a 6-bit L1 shift.
+    [[nodiscard]] static NnueNetwork synthetic_v5();
 };
 
 class NnueLoader final {
@@ -176,6 +199,13 @@ private:
     void apply_feature_delta(std::size_t perspective, std::size_t slot,
                              std::uint16_t index, int sign);
     void apply_move_deltas(const GameState&, const MoveMetadata&, std::size_t slot);
+    // v5 only: stores one perspective's sorted group B set for a slot.
+    void store_threat_list(std::size_t perspective, std::size_t slot,
+                           const NnueSparseFeaturesThreatV1& list);
+    // v5 only: recomputes the child's group B set and applies the sorted-list
+    // difference against the slot's stored set.
+    void apply_threat_deltas(const EvaluationFeatures&, Color perspective,
+                             std::size_t slot);
 
     std::shared_ptr<const NnueNetwork> weights_;
     NnueAccumulator accumulator_;
@@ -194,6 +224,12 @@ private:
     std::uint8_t scratch_pieces_ = 0;
     std::uint64_t scratch_key_ = 0;
     bool scratch_valid_ = false;
+    // v5 group B sets, flattened per perspective as slot * capacity entries.
+    static constexpr std::size_t kThreatListCapacity = 128;
+    std::array<std::vector<std::uint16_t>, kIncrementalPerspectives> slot_threats_;
+    std::array<std::vector<std::uint8_t>, kIncrementalPerspectives> slot_threat_counts_;
+    std::array<std::vector<std::uint16_t>, kIncrementalPerspectives> scratch_threats_;
+    std::array<std::uint8_t, kIncrementalPerspectives> scratch_threat_counts_{};
     bool storage_ready_ = false;
     std::size_t incremental_make_count_ = 0;
     std::size_t incremental_fallback_count_ = 0;
@@ -226,6 +262,12 @@ struct EvaluatorSelection {
     bool nnue_enabled = false;
     std::optional<NnueError> nnue_error;
 };
+
+// Wraps a loaded network in the GPU inference adapter when `KOI_GPU_NNUE` is
+// set and the CUDA service can be created; otherwise returns the CPU evaluator.
+[[nodiscard]] std::shared_ptr<const Evaluator> maybe_wrap_gpu_nnue(
+    const std::shared_ptr<const NnueNetwork>& network,
+    std::shared_ptr<const Evaluator> cpu_evaluator);
 
 [[nodiscard]] EvaluatorSelection make_evaluator(
     std::optional<std::filesystem::path> nnue_path = std::nullopt);

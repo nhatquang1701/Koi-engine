@@ -35,3 +35,5 @@ stable because plans and verification records link to each other.
 | `2026-09-18-nnue-bullet-training.md` | Bullet GPU trainer: dependencies, dataset conversion, exact feature parity, campaign, bug and docs audits. |
 | `2026-09-19-engine-v2.md` | Koi Engine v2: SPRT harness, Studio adoption and redesign, NNUE/TT/SMP/search/movegen modernization. |
 | `2026-09-19-syzygy-endgames.md` | Endgame evaluation scaling and opt-in Syzygy interior WDL probing. |
+| `2026-09-19-nnue-v5-threat-architecture.md` | NNUE v5: threat features, dual-perspective head, container v5, dataset v2, trainers, and Studio. |
+| `2026-09-20-gpu-nnue-inference.md` | GPU NNUE inference (sm_61 PTX pipeline, driver API, batched evaluator, verification). |

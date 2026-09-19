@@ -244,19 +244,23 @@ the Koi loader and strength gates before any network is considered for runtime u
 A complete Stockfish-labeled training pipeline lives next to the boundary. Positions
 come from Stockfish self-play (with tactical noise games), labels are fixed-depth
 centipawn scores (the example below asks for depth 10; the generator default is 9).
-The version 4 trainer (`train_nnue_koi.py`) trains the `halfka-king-bucket-v1`
-network with CReLU pair products and quantizes it into the explicit-shift version 4
-container; the earlier version 3 trainer (`train_nnue_sf.py`) remains available and
-its networks still load:
+The PyTorch trainer (`train_nnue_koi.py`) defaults to the version 5 architecture:
+group A `halfka-king-bucket-v1` (9216 inputs) plus the symmetric group B
+`threat-pairs-v1` attack relations (27648 inputs) for 36864 inputs total, both
+perspectives feeding full-width cross pair products (`p[j] = own[j] * opp[j]`) and a
+32-unit CReLU hidden layer into the eight piece-count output buckets. Pass
+`--arch v4` for the earlier version 4 `halfka-king-bucket-v1` network with CReLU
+pair products; the version 3 trainer (`train_nnue_sf.py`) remains available, and
+version 2, 3, and 4 containers still load:
 
 ```powershell
 python .\tools\measurement\gen_training_data.py all --games 30000 --workers 3 --label-depth 10
 python .\tools\measurement\koi_dataset.py encode --input .\artifacts\training\labels.txt `
   --output .\artifacts\training\koi-dataset.bin
 python .\tools\measurement\train_nnue_koi.py --dataset .\artifacts\training\koi-dataset.bin `
-  --epochs 20 --float-out .\artifacts\training\koi-v4.pt `
-  --net-out .\artifacts\training\koi-v4.nnue --meta-out .\artifacts\training\koi-v4.metadata.json
-.\build\release\koi-bench.exe --nnue .\artifacts\training\koi-v4.nnue
+  --epochs 20 --float-out .\artifacts\training\koi-v5.pt `
+  --net-out .\artifacts\training\koi-v5.nnue --meta-out .\artifacts\training\koi-v5.metadata.json
+.\build\release\koi-bench.exe --nnue .\artifacts\training\koi-v5.nnue
 ```
 
 Load a trained network with the UCI `EvalFile` option, or place `koi.nnue` beside
@@ -269,6 +273,9 @@ matches 61 of the 64 positions in the tactical gate (the classical evaluator sta
 64/64), and it lost the color-balanced equal-node A/B against the classical evaluator
 (0 wins, 10 draws, 10 losses); the version 4 versus version 3 net match drew all 20
 games. The classical evaluator therefore remains the default and NNUE stays opt-in.
+The version 5 architecture ships with loader, inference, incremental, dataset, and
+trainer support only: no version 5 network has been trained or strength-validated, so
+every probe number above still describes version 4 networks.
 
 ### Training a network with the NNUE Studio
 
@@ -288,11 +295,15 @@ pwsh -NoProfile -File .\tools\nnue\net_match.ps1 -NnueNet .\artifacts\training\k
 
 Every run keeps its configuration, command line, log, progress history and
 artifacts under `artifacts/training/runs/<stamp>-<kind>-<backend>/`, so runs are
-comparable and resumable. The default `koi` backend trains the
-`halfka-king-bucket-v1` version 4 network on CPU PyTorch, and `--backend torch`
-still drives the legacy `train_nnue_sf.py` version 3 trainer. `--backend bullet`
+comparable and resumable. The default `koi` backend trains the version 5
+`halfka-king-bucket-v1` plus `threat-pairs-v1` network (36864 inputs,
+dual-perspective cross pairs, 32-unit L1) on CPU PyTorch; pass `--arch v4` for the
+earlier version 4 network, and `--backend torch` still drives the legacy
+`train_nnue_sf.py` version 3 trainer. `--backend bullet`
 drives the pinned Rust/CUDA trainer through `tools/nnue/run_bullet.py` when cargo
-and a CUDA 12.x toolkit are present; bullet run length is controlled by
+and a CUDA 12.x toolkit are present; its default architecture is version 5 with the
+same shared feature transformer over both perspectives, and `--arch v4` keeps the
+earlier within-perspective pair-product network. Bullet run length is controlled by
 `bullet_superbatches` rather than the preset `epochs` value. After a run completes the
 studio can validate it with the 64-position `koi-bench --nnue` gate and with a
 node-limited A/B match against the classical evaluator
@@ -301,6 +312,19 @@ earlier network (`tools/nnue/net_match.ps1`, schema `koi-nnue-net-match-v1`), th
 offer to
 install the network as `koi.nnue` beside the engine, backing up any previous
 file. Validation output is a local report, not an Elo claim or a CI threshold.
+
+### Optional GPU NNUE inference
+
+On a machine with an NVIDIA GPU and a CUDA 12.x toolkit, the engine can evaluate
+the version 5 network on the GPU. Set `KOI_GPU_NNUE=1` in the environment and
+run with `Threads` greater than one; Threads=1 keeps the deterministic CPU path.
+The feature is opt-in and never changes the advertised UCI surface or
+`EvalFile` semantics: any driver, device, or kernel failure silently falls back
+to the CPU network. The build compiles `src/koi/gpu/koi_nnue_v5.cu` to PTX with
+`nvcc` (compute capability 6.1, the local GTX 1060) and embeds it; at runtime
+only `nvcuda.dll` is loaded dynamically, so builds without `nvcc` stay CPU-only.
+The GPU result is bit-exact with the CPU scalar evaluation, but this first pass
+does not promise a speedup and makes no strength or Elo claims.
 
 For a reproducible local match against Stockfish or another UCI engine, use the
 optional PowerShell harness:

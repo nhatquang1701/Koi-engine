@@ -981,7 +981,8 @@ void UciController::handle_setoption(std::istream& command) {
             break;
         }
         auto weights = std::make_shared<const NnueNetwork>(std::move(*network));
-        search_service_.set_evaluator(std::make_shared<NnueEvaluator>(std::move(weights)));
+        search_service_.set_evaluator(koi::maybe_wrap_gpu_nnue(
+            weights, std::make_shared<NnueEvaluator>(weights)));
         eval_file_ = value;
         debug_json_event("eval_file", "\"path\":" + debug_quoted(resolved.string()) +
                                            ",\"enabled\":true");

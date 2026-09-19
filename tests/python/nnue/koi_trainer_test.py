@@ -60,6 +60,7 @@ except Exception:  # pragma: no cover - optional dependency
     CHESS_AVAILABLE = False
 
 HEADER = struct.Struct("<8sIIIIIBB2xHHQ")
+HEADER_V5 = struct.Struct("<8sIIIIIBBBBHHQ")
 HIDDEN_UNITS = 32
 OUTPUT_BUCKETS = 8
 QUANTIZATION = b"int16/int8"
@@ -132,6 +133,89 @@ def parse_v4_container(path: pathlib.Path) -> dict:
     }
 
 
+def parse_v5_container(path: pathlib.Path) -> dict:
+    data = path.read_bytes()
+    (
+        magic,
+        version,
+        input_units,
+        hidden_units,
+        output_buckets,
+        l1_units,
+        hidden_shift,
+        output_shift,
+        l1_shift,
+        reserved,
+        quantization_length,
+        feature_length,
+        payload_length,
+    ) = HEADER_V5.unpack_from(data, 0)
+    payload_hash = data[44:76].hex()
+    quantization = data[76 : 76 + quantization_length]
+    feature_set = data[
+        76 + quantization_length : 76 + quantization_length + feature_length
+    ]
+    payload = data[76 + quantization_length + feature_length :]
+    feature_bytes = input_units * hidden_units * 2
+    hidden_bias_bytes = hidden_units * 4
+    l1_weight_bytes = l1_units * hidden_units
+    l1_bias_bytes = l1_units * 4
+    output_weight_bytes = output_buckets * l1_units
+    output_bias_bytes = output_buckets * 4
+    assert len(payload) == payload_length
+    split = feature_bytes
+    feature_weights = np.frombuffer(payload[:split], dtype="<i2").reshape(
+        input_units, hidden_units
+    )
+    split += hidden_bias_bytes
+    hidden_bias = np.frombuffer(payload[feature_bytes:split], dtype="<i4")
+    l1_weights = np.frombuffer(
+        payload[split : split + l1_weight_bytes], dtype="<i1"
+    ).reshape(l1_units, hidden_units)
+    split += l1_weight_bytes
+    l1_bias = np.frombuffer(payload[split : split + l1_bias_bytes], dtype="<i4")
+    split += l1_bias_bytes
+    output_weights = np.frombuffer(
+        payload[split : split + output_weight_bytes], dtype="<i1"
+    ).reshape(output_buckets, l1_units)
+    split += output_weight_bytes
+    output_bias = np.frombuffer(payload[split : split + output_bias_bytes], dtype="<i4")
+    return {
+        "magic": magic,
+        "version": version,
+        "input_units": input_units,
+        "hidden_units": hidden_units,
+        "output_buckets": output_buckets,
+        "l1_units": l1_units,
+        "reserved": reserved,
+        "hidden_shift": hidden_shift,
+        "output_shift": output_shift,
+        "l1_shift": l1_shift,
+        "quantization": quantization,
+        "feature_set": feature_set,
+        "payload_length": payload_length,
+        "payload_hash": payload_hash,
+        "network_hash": hashlib.sha256(data).hexdigest(),
+        "feature_weights": feature_weights,
+        "hidden_bias": hidden_bias,
+        "l1_weights": l1_weights,
+        "l1_bias": l1_bias,
+        "output_weights": output_weights,
+        "output_bias": output_bias,
+        "params": {
+            "feature_weights": feature_weights,
+            "hidden_bias": hidden_bias,
+            "l1_weights": l1_weights,
+            "l1_bias": l1_bias,
+            "output_weights": output_weights,
+            "output_bias": output_bias,
+            "hidden_shift": hidden_shift,
+            "l1_shift": l1_shift,
+            "output_shift": output_shift,
+        },
+    }
+
+
 class EncoderParityTests(unittest.TestCase):
     def test_python_encoder_matches_cpp_fixture(self):
         executable = os.environ.get("KOI_NNUE_BOUNDARY_EXE")
@@ -171,6 +255,59 @@ class EncoderParityTests(unittest.TestCase):
                 buckets = np.asarray([koi_dataset.output_bucket(board)], dtype=np.int64)
                 score = train_nnue_koi.integer_scores(
                     container["params"], hidden, buckets, container["hidden_units"]
+                )
+                self.assertEqual(int(score[0]), int(position["score"]))
+
+    def test_python_encoder_matches_cpp_v5_fixture(self):
+        executable = os.environ.get("KOI_NNUE_BOUNDARY_EXE")
+        if not executable or not pathlib.Path(executable).is_file():
+            self.skipTest("KOI_NNUE_BOUNDARY_EXE is not set to a built boundary test")
+        self.assertIsNotNone(koi_dataset, "koi_dataset requires python-chess")
+        self.assertTrue(CHESS_AVAILABLE, "python-chess is required for the encoder parity test")
+        with tempfile.TemporaryDirectory() as directory:
+            container_path = pathlib.Path(directory) / "fixture-v5.nnue"
+            completed = subprocess.run(
+                [executable, "--emit-v5-fixture", str(container_path)],
+                capture_output=True,
+                text=True,
+                timeout=120,
+                check=False,
+            )
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertTrue(container_path.is_file())
+            fixture = json.loads(completed.stdout.strip().splitlines()[-1])
+            container = parse_v5_container(container_path)
+            self.assertEqual(container["magic"], b"KOI-NNUE")
+            self.assertEqual(container["version"], 5)
+            self.assertEqual(container["input_units"], 36864)
+            self.assertEqual(container["hidden_units"], fixture["hidden_units"])
+            self.assertEqual(container["l1_units"], fixture["l1_units"])
+            self.assertEqual(container["hidden_shift"], fixture["hidden_shift"])
+            self.assertEqual(container["l1_shift"], fixture["l1_shift"])
+            self.assertEqual(container["output_shift"], fixture["output_shift"])
+            for position in fixture["positions"]:
+                board = chess.Board(position["fen"])
+                a_stm, b_stm, a_opp, b_opp = koi_dataset.encode_record(board)
+                self.assertEqual(
+                    list(a_stm) + list(b_stm), position["own"], position["fen"]
+                )
+                self.assertEqual(
+                    list(a_opp) + list(b_opp), position["opp"], position["fen"]
+                )
+                own = np.asarray(position["own"], dtype=np.int32)
+                opp = np.asarray(position["opp"], dtype=np.int32)
+                own_hidden, opp_hidden = train_nnue_koi.hidden_activations_dual(
+                    container["params"],
+                    own,
+                    np.asarray([0, len(own)], dtype=np.int64),
+                    opp,
+                    np.asarray([0, len(opp)], dtype=np.int64),
+                    np.asarray([0], dtype=np.int64),
+                    container["hidden_units"],
+                )
+                buckets = np.asarray([koi_dataset.output_bucket(board)], dtype=np.int64)
+                score = train_nnue_koi.integer_scores_v5(
+                    container["params"], own_hidden, opp_hidden, buckets
                 )
                 self.assertEqual(int(score[0]), int(position["score"]))
 
@@ -292,6 +429,8 @@ class TrainerPipelineTests(unittest.TestCase):
                 "16",
                 "--threads",
                 "1",
+                "--arch",
+                "v4",
                 "--hidden-shifts",
                 "7",
                 "--output-shifts",
@@ -399,6 +538,73 @@ class TrainerPipelineTests(unittest.TestCase):
         self.assertEqual(metadata["hidden_shift"], 7)
         self.assertEqual(metadata["output_shift"], 12)
         self.assertEqual(first_net.read_bytes(), requantized_net.read_bytes())
+
+    def test_v5_export_metadata_and_determinism(self):
+        first_net = self.directory / "first-v5.nnue"
+        first_meta = self.directory / "first-v5.metadata.json"
+        completed = self.run_trainer(
+            "--arch",
+            "v5",
+            "--l1-units",
+            "8",
+            "--l1-shifts",
+            "6",
+            "--net-out",
+            str(first_net),
+            "--meta-out",
+            str(first_meta),
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("selected v5", completed.stdout)
+        metadata = json.loads(first_meta.read_text(encoding="utf-8"))
+        self.assertEqual(metadata["schema"], "koi-nnue-training-metadata-v3")
+        self.assertEqual(metadata["feature_set"], "halfka-king-bucket-v1+threat-pairs-v1")
+        self.assertEqual(
+            metadata["architecture"],
+            {
+                "input": 36864,
+                "hidden": HIDDEN_UNITS,
+                "l1": 8,
+                "output_buckets": OUTPUT_BUCKETS,
+                "groups": ["halfka-king-bucket-v1", "threat-pairs-v1"],
+            },
+        )
+        self.assertEqual(metadata["activation"], "crelu-pair-l1")
+        self.assertEqual(metadata["l1_shift"], 6)
+        container = parse_v5_container(first_net)
+        self.assertEqual(container["version"], 5)
+        self.assertEqual(container["input_units"], 36864)
+        self.assertEqual(container["l1_units"], 8)
+        expected_payload = (
+            36864 * HIDDEN_UNITS * 2
+            + HIDDEN_UNITS * 4
+            + 8 * HIDDEN_UNITS
+            + 8 * 4
+            + OUTPUT_BUCKETS * 8
+            + OUTPUT_BUCKETS * 4
+        )
+        self.assertEqual(container["payload_length"], expected_payload)
+        self.assertEqual(container["payload_hash"], metadata["payload_sha256"])
+        self.assertEqual(container["network_hash"], metadata["network_sha256"])
+        self.assertEqual(hashlib.sha256(first_net.read_bytes()).hexdigest(),
+                         metadata["network_sha256"])
+
+        second_net = self.directory / "second-v5.nnue"
+        second_meta = self.directory / "second-v5.metadata.json"
+        completed = self.run_trainer(
+            "--arch",
+            "v5",
+            "--l1-units",
+            "8",
+            "--l1-shifts",
+            "6",
+            "--net-out",
+            str(second_net),
+            "--meta-out",
+            str(second_meta),
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(first_net.read_bytes(), second_net.read_bytes())
 
 
 if __name__ == "__main__":  # pragma: no cover - manual runs

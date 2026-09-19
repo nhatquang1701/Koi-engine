@@ -23,6 +23,7 @@
 #include "koi/evaluator.hpp"
 #include "koi/game_state.hpp"
 #include "koi/syzygy_tablebase.hpp"
+#include "koi/gpu/nnue_gpu_evaluator.hpp"
 #include "koi/time_manager.hpp"
 #include "koi/transposition_table.hpp"
 
@@ -2354,6 +2355,7 @@ void SearchRunner::run() {
     // re-arms timing at the top of the next iteration.
     SearchLimits limits = session->limits();
     const SearchOptions& options = session->options();
+    gpu::set_gpu_nnue_threaded(options.threads > 1);
     SearchResult result;
     result.identity = session->identity();
     // The orchestrator uses the same table seam as the recursive search layer;

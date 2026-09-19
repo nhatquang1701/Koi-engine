@@ -2,7 +2,10 @@
 
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <cmath>
+
+#include "koi/detail/attack_tables.hpp"
 
 namespace koi {
 
@@ -176,6 +179,143 @@ struct PawnFileState {
     return encoded;
 }
 
+constexpr std::size_t kThreatPawnOffset = 0;
+constexpr std::size_t kThreatKnightOffset = 384;
+constexpr std::size_t kThreatSliderOffset = 768;
+constexpr std::size_t kThreatKingOffset = 1920;
+constexpr std::size_t kThreatSliderStride = 384;
+
+// Collects the active threat-pairs-v1 indices for one position under an
+// explicit real-color perspective.  Every attack relation in the position is
+// encoded (either colour attacking the other), expressed in the requested
+// perspective's coordinates, so both perspectives see the same relations.  The
+// result is sorted and deduplicated because two attackers of the same
+// non-slider type can produce the same feature.
+[[nodiscard]] std::size_t threat_pairs_indices(
+    const EvaluationFeatures& features, const Color perspective,
+    std::uint16_t* output, const std::size_t capacity,
+    NnueFeatureVectorV5* dense = nullptr) noexcept {
+    const auto& position = features.position;
+    const std::size_t bucket =
+        EvaluationFeatureExtractor::halfka_king_bucket_for(features, perspective);
+    const std::size_t base =
+        kNnueHalfkaKingBucketV1FeatureCount + bucket * kNnueThreatPairsBucketFeatureCount;
+
+    std::uint64_t white_occupancy = 0;
+    std::uint64_t black_occupancy = 0;
+    for (std::size_t square = 0; square < position.board.size(); ++square) {
+        const Piece piece = position.board[square];
+        if (piece.empty()) {
+            continue;
+        }
+        const std::uint64_t bit = std::uint64_t{1} << square;
+        if (piece.color == Color::white) {
+            white_occupancy |= bit;
+        } else {
+            black_occupancy |= bit;
+        }
+    }
+    // Symmetric threats: the feature set records every attack relation in the
+    // position (either colour attacking the other), encoded in the requested
+    // perspective's coordinates.  Both perspectives therefore see the same
+    // relation set, which keeps the dual-perspective pairing exact.
+    if (white_occupancy == 0 || black_occupancy == 0) {
+        return 0;
+    }
+
+    // Upper bound on emitted entries: both colours together can produce at most
+    // 256 attacker/victim pairs (16 pieces per side).
+    std::array<std::uint16_t, 256> scratch{};
+    std::size_t scratch_count = 0;
+    const std::uint64_t occupied = white_occupancy | black_occupancy;
+
+    for (std::size_t square = 0; square < position.board.size(); ++square) {
+        const Piece piece = position.board[square];
+        if (piece.empty()) {
+            continue;
+        }
+        const std::uint64_t targets =
+            piece.color == Color::white ? black_occupancy : white_occupancy;
+        std::uint64_t attacks = 0;
+        switch (piece.type) {
+        case PieceType::pawn:
+            attacks = detail::pawn_attacks(static_cast<int>(square), piece.color == Color::white);
+            break;
+        case PieceType::knight:
+            attacks = detail::knight_attacks(static_cast<int>(square));
+            break;
+        case PieceType::bishop:
+            attacks = detail::bishop_attacks(static_cast<int>(square), occupied);
+            break;
+        case PieceType::rook:
+            attacks = detail::rook_attacks(static_cast<int>(square), occupied);
+            break;
+        case PieceType::queen:
+            attacks = detail::queen_attacks(static_cast<int>(square), occupied);
+            break;
+        case PieceType::king:
+            attacks = detail::king_attacks(static_cast<int>(square));
+            break;
+        case PieceType::none:
+            break;
+        }
+
+        std::uint64_t victims = attacks & targets;
+        if (victims == 0) {
+            continue;
+        }
+        const std::size_t attacker_square = perspective_square(square, perspective);
+        while (victims != 0) {
+            const std::size_t victim_square = std::countr_zero(victims);
+            victims &= victims - 1;
+            const Piece victim = position.board[victim_square];
+            const std::size_t victim_type = static_cast<std::size_t>(victim.type) - 1U;
+            const std::size_t victim_perspective = perspective_square(victim_square, perspective);
+            std::size_t offset = 0;
+            switch (piece.type) {
+            case PieceType::pawn:
+                offset = kThreatPawnOffset + victim_type * 64U + victim_perspective;
+                break;
+            case PieceType::knight:
+                offset = kThreatKnightOffset + victim_type * 64U + victim_perspective;
+                break;
+            case PieceType::bishop:
+                offset = kThreatSliderOffset + attacker_square * 6U + victim_type;
+                break;
+            case PieceType::rook:
+                offset = kThreatSliderOffset + kThreatSliderStride +
+                    attacker_square * 6U + victim_type;
+                break;
+            case PieceType::queen:
+                offset = kThreatSliderOffset + 2U * kThreatSliderStride +
+                    attacker_square * 6U + victim_type;
+                break;
+            case PieceType::king:
+                offset = kThreatKingOffset + victim_type * 64U + victim_perspective;
+                break;
+            case PieceType::none:
+                continue;
+            }
+            const std::size_t index = base + offset;
+            if (dense != nullptr) {
+                (*dense)[index] = 1;
+            }
+            if (scratch_count < scratch.size()) {
+                scratch[scratch_count++] = static_cast<std::uint16_t>(index);
+            }
+        }
+    }
+
+    std::sort(scratch.begin(), scratch.begin() + static_cast<std::ptrdiff_t>(scratch_count));
+    const auto unique_end =
+        std::unique(scratch.begin(), scratch.begin() + static_cast<std::ptrdiff_t>(scratch_count));
+    const std::size_t unique_count =
+        static_cast<std::size_t>(std::distance(scratch.begin(), unique_end));
+    const std::size_t count = std::min(unique_count, capacity);
+    std::copy_n(scratch.begin(), count, output);
+    return count;
+}
+
 } // namespace
 
 EvaluationFeatures EvaluationFeatureExtractor::extract(const GameState& state) noexcept {
@@ -278,6 +418,56 @@ NnueSparseFeaturesV4 EvaluationFeatureExtractor::encode_sparse_v4(
     sparse.count = halfka_king_bucket_indices(
         features, perspective, sparse.indices.data(), sparse.indices.size());
     return sparse;
+}
+
+NnueSparseFeaturesThreatV1 EvaluationFeatureExtractor::encode_sparse_threat_v1(
+    const EvaluationFeatures& features, const Color perspective) noexcept {
+    NnueSparseFeaturesThreatV1 sparse;
+    sparse.count = threat_pairs_indices(
+        features, perspective, sparse.indices.data(), sparse.indices.size());
+    return sparse;
+}
+
+NnueSparseFeaturesV5 EvaluationFeatureExtractor::encode_sparse_v5(
+    const EvaluationFeatures& features, const Color perspective) noexcept {
+    NnueSparseFeaturesV5 sparse;
+    const NnueSparseFeaturesV4 group_a = encode_sparse_v4(features, perspective);
+    const NnueSparseFeaturesThreatV1 group_b =
+        encode_sparse_threat_v1(features, perspective);
+    std::size_t count = 0;
+    for (std::size_t i = 0; i < group_a.count; ++i) {
+        sparse.indices[count++] = group_a.indices[i];
+    }
+    for (std::size_t i = 0; i < group_b.count; ++i) {
+        sparse.indices[count++] = group_b.indices[i];
+    }
+    std::sort(sparse.indices.begin(),
+              sparse.indices.begin() + static_cast<std::ptrdiff_t>(count));
+    const auto unique_end =
+        std::unique(sparse.indices.begin(),
+                    sparse.indices.begin() + static_cast<std::ptrdiff_t>(count));
+    sparse.count = std::min<std::size_t>(
+        static_cast<std::size_t>(std::distance(sparse.indices.begin(), unique_end)),
+        sparse.indices.size());
+    return sparse;
+}
+
+NnueSparseFeaturesV5 EvaluationFeatureExtractor::encode_sparse_v5(
+    const EvaluationFeatures& features) noexcept {
+    return encode_sparse_v5(features, features.position.side_to_move);
+}
+
+NnueFeatureVectorV5 EvaluationFeatureExtractor::encode_halfka_threat_v5(
+    const EvaluationFeatures& features, const Color perspective) noexcept {
+    NnueFeatureVectorV5 encoded{};
+    const NnueSparseFeaturesV4 group_a = encode_sparse_v4(features, perspective);
+    for (std::size_t i = 0; i < group_a.count; ++i) {
+        encoded[group_a.indices[i]] = 1;
+    }
+    std::array<std::uint16_t, kNnueSparseFeatureCapacityThreatV1> scratch{};
+    (void)threat_pairs_indices(features, perspective, scratch.data(), scratch.size(),
+                               &encoded);
+    return encoded;
 }
 
 } // namespace koi
