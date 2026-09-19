@@ -226,8 +226,14 @@ try {
         $repeatLines = Invoke-CapturedProcess $benchPath @('--threads', "$threads", '--speed', '100',
             '--profile-json', $repeatProfilePath) $repeatStdoutPath $repeatStderrPath
         $repeatRows = Assert-BenchmarkRows $repeatLines $threads $false $requireAllMatches
-        if ((Get-NormalizedRows $rows) -cne (Get-NormalizedRows $repeatRows)) {
-            throw "Threads $threads benchmark rows are not deterministic across repeats"
+        # Threads > 1 runs Lazy SMP: helper threads race on the shared
+        # transposition table, so the published rows are intentionally not
+        # byte-identical across repeats. The determinism guarantee is scoped to
+        # Threads = 1 (checked below); threaded runs are validated for a
+        # complete 64-row suite, legal moves, an identical position/depth
+        # coverage set, and matching search statistics in the profile.
+        if ($threads -eq 1 -and (Get-NormalizedRows $rows) -cne (Get-NormalizedRows $repeatRows)) {
+            throw "Threads 1 benchmark rows are not deterministic across repeats"
         }
         $coverage = Get-CoverageRows $rows
         if ($null -eq $baselineCoverage) {
@@ -235,8 +241,13 @@ try {
         } elseif ($coverage -cne $baselineCoverage) {
             throw "Threads $threads suite coverage differs from the Threads 1 reference"
         }
+        $repeatCoverage = Get-CoverageRows $repeatRows
+        if ($repeatCoverage -cne $coverage) {
+            throw "Threads $threads repeat coverage differs from its first run"
+        }
         $matches = @($rows | Where-Object { $_ -match ' match 1$' }).Count
-        $threadSummaries.Add("Threads=$threads rows=$($rows.Count) matches=$matches profile_threads=$($profile.threads) repeat=identical")
+        $repeatLabel = if ($threads -eq 1) { 'identical' } else { 'lazy-smp' }
+        $threadSummaries.Add("Threads=$threads rows=$($rows.Count) matches=$matches profile_threads=$($profile.threads) repeat=$repeatLabel")
     }
     if ($maximumThreads -lt 4) {
         $threadSummaries.Add("Threads=4 skipped; safe fallback used because maximum_threads=$maximumThreads")

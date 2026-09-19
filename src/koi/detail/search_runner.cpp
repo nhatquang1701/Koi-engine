@@ -1868,6 +1868,102 @@ struct RootScheduleRecord {
     bool previous_exact = false;
 };
 
+// Lazy SMP helper pool. The main thread keeps running the authoritative
+// iterative deepening; each helper searches the same root with a depth offset
+// so it can deposit lines into the shared transposition table that the main
+// thread has not reached yet. Helper results are never published -- only their
+// statistics are merged once the search finishes. The pool only exists for
+// Threads > 1 without a node limit, so the single-threaded path stays
+// bit-for-bit deterministic.
+class LazySmpPool {
+public:
+    LazySmpPool(std::size_t helper_count, const GameState& root, const MoveMetadataList& root_moves,
+                const Evaluator& evaluator, TranspositionTable& table, TimeManager& time_manager,
+                std::atomic_bool& stop_requested, std::mutex* evaluator_mutex,
+                bool use_transposition_table,
+                SearchOptions::QuietHistorySideHook quiet_history_side_hook)
+        : root_(root), root_moves_(&root_moves), evaluator_(evaluator), table_(table),
+          time_manager_(time_manager), stop_requested_(stop_requested),
+          evaluator_mutex_(evaluator_mutex), use_transposition_table_(use_transposition_table),
+          quiet_history_side_hook_(std::move(quiet_history_side_hook)),
+          helper_stats_(std::max<std::size_t>(1, helper_count)) {
+        helpers_.reserve(helper_stats_.size());
+        try {
+            for (std::size_t index = 0; index < helper_stats_.size(); ++index) {
+                helpers_.emplace_back(&LazySmpPool::helper_loop, this, index);
+            }
+        } catch (...) {
+            stop();
+            throw;
+        }
+    }
+
+    LazySmpPool(const LazySmpPool&) = delete;
+    LazySmpPool& operator=(const LazySmpPool&) = delete;
+
+    ~LazySmpPool() {
+        stop();
+    }
+
+    void stop() noexcept {
+        stopping_.store(true, std::memory_order_relaxed);
+        helper_abort_.store(true, std::memory_order_relaxed);
+        for (std::thread& helper : helpers_) {
+            if (helper.joinable()) {
+                helper.join();
+            }
+        }
+    }
+
+    [[nodiscard]] SearchStats stats() const noexcept {
+        SearchStats total{};
+        for (const SearchStats& helper : helper_stats_) {
+            accumulate_stats(total, helper);
+        }
+        return total;
+    }
+
+private:
+    void helper_loop(std::size_t helper_index) {
+        // A helper owns its own position copy, ordering tables and evaluator
+        // worker; only the transposition table and the time budget are shared.
+        // Staggered starting depths keep the helpers from duplicating each
+        // other's trees.
+        GameState state = root_;
+        auto context_storage = std::make_unique<SearchContext>(
+            evaluator_, table_, time_manager_, stop_requested_, nullptr, evaluator_mutex_,
+            root_moves_, use_transposition_table_, quiet_history_side_hook_);
+        SearchContext& context = *context_storage;
+        int depth = 1 + static_cast<int>(helper_index % 3);
+        while (!stopping_.load(std::memory_order_relaxed) &&
+               !stop_requested_.load(std::memory_order_relaxed) &&
+               !time_manager_.should_stop(0) && depth <= kMaximumSearchDepth) {
+            PrincipalVariation pv;
+            context.begin_iteration(&helper_abort_);
+            context.negamax(state, depth, -kInfinity, kInfinity, 0, pv);
+            accumulate_stats(helper_stats_[helper_index], context.stats);
+            if (stopping_.load(std::memory_order_relaxed) || context.aborted) {
+                break;
+            }
+            ++depth;
+        }
+    }
+
+    GameState root_;
+    const MoveMetadataList* root_moves_ = nullptr;
+    const Evaluator& evaluator_;
+    TranspositionTable& table_;
+    TimeManager& time_manager_;
+    std::atomic_bool& stop_requested_;
+    std::mutex* evaluator_mutex_ = nullptr;
+    bool use_transposition_table_ = true;
+    SearchOptions::QuietHistorySideHook quiet_history_side_hook_;
+    std::vector<std::thread> helpers_;
+    std::vector<SearchStats> helper_stats_;
+    std::atomic_bool stopping_{false};
+    std::atomic_bool helper_abort_{false};
+};
+
 class RootWorkerPool {
 public:
     RootWorkerPool(std::size_t worker_count, const Evaluator& evaluator, TranspositionTable& table,
@@ -2396,6 +2492,23 @@ void SearchRunner::run() {
         const bool ultra_short_nonchecking_parallel = limits.movetime.has_value() &&
             *limits.movetime < kShortTimedFallbackMinimum && !timing_context.in_check;
 
+        // Lazy SMP replaces the root-splitting pool for the common
+        // Threads > 1 configuration: the main thread keeps the deterministic
+        // root driver and publishes the result, while helpers search the same
+        // root against the shared transposition table. Node-limited, MultiPV,
+        // forced-draw and short-tactical searches keep the existing
+        // root-parallel path because their accounting must stay exact.
+        const bool use_lazy_smp = options.threads > 1 && options.multi_pv == 1 &&
+            !time_manager.node_limit().has_value() && !short_tactical_budget &&
+            !root_is_claimable_draw && !root_is_forced_draw && legal_moves.size() >= 2;
+        std::unique_ptr<LazySmpPool> lazy_pool;
+        if (use_lazy_smp) {
+            lazy_pool = std::make_unique<LazySmpPool>(
+                options.threads - 1, root, legal_moves, *evaluator, *table, time_manager,
+                session->stop_requested(), evaluator_mutex_ptr, true,
+                options.quiet_history_side_hook);
+        }
+
         if (legal_moves.empty()) {
             result.score_cp = root.in_check() ? -kMateScore : 0;
             result.mate = mate_from_score(result.score_cp);
@@ -2411,7 +2524,7 @@ void SearchRunner::run() {
             SearchInfo info{1, result.score_cp, result.mate, 0, 0, elapsed,
                             {result.best_move.value()}, 0, 0, 0, 1, 1};
             safely_report_info(sink, info);
-        } else if (root_is_claimable_draw || root_is_forced_draw ||
+        } else if (root_is_claimable_draw || root_is_forced_draw || use_lazy_smp ||
                    (options.threads == 1 && options.multi_pv == 1) || legal_moves.size() < 2 ||
                    (time_manager.node_limit().has_value() && options.multi_pv == 1) ||
                    (short_tactical_budget && !ultra_short_nonchecking_parallel)) {
@@ -4419,6 +4532,13 @@ void SearchRunner::run() {
             info.qnodes = result.stats.qnodes;
             info.tt_hits = result.stats.tt_hits;
             safely_report_info(sink, info);
+        }
+        if (lazy_pool != nullptr) {
+            // Helpers never publish a result; their only contribution is the
+            // transposition-table traffic they generated and the node counts
+            // merged here.
+            lazy_pool->stop();
+            accumulate_stats(result.stats, lazy_pool->stats());
         }
         result.timing = time_manager.diagnostics();
     } catch (...) {

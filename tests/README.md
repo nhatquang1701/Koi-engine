@@ -185,6 +185,12 @@ Remove an entry once the corresponding engine behavior is reliably fixed.
 
 ## Determinism
 
+- `Threads = 1` is the deterministic configuration. `Threads > 1` runs Lazy
+  SMP: helper threads search the same root against the shared transposition
+  table, so threaded results are intentionally nondeterministic. Threaded
+  cases therefore either pin thread-count-independent invariants (legality,
+  coverage, completed depth) or live in the `known_failures`/`intermittent`
+  lists when they assert a specific move or score.
 - Timing-sensitive cases are declared via `TestRunOptions::timing_sensitive`.
   With `KOI_TEST_RETRIES=2` (or `tools/test/run_tests.ps1`'s
   `-RepeatUntilPass`, which adds `--repeat until-pass:2` at the CTest level)

@@ -5,9 +5,13 @@ written in C++26 and is documented and process-tested against En Croissant as
 the primary GUI workflow. It uses deterministic iterative-deepening alpha-beta search
 with a classical evaluator, an opt-in Koi-native NNUE pipeline (training
 tooling, a versioned container, and runtime `EvalFile` loading), and a persistent
-transposition table. Search runs on a cancellable outer worker; `Threads > 1`
-enables deterministic authoritative root-parallel work while the UCI command loop
-remains responsive.
+transposition table. Search runs on a cancellable outer worker; `Threads = 1`
+runs the deterministic serial search, while `Threads > 1` starts Lazy SMP
+helper threads that search the same root against the shared transposition table
+while the main thread publishes the result. Lazy SMP is intentionally
+nondeterministic: the deterministic guarantee is scoped to `Threads = 1`, and
+threaded runs are validated for legality and coverage instead of byte
+equality. The UCI command loop remains responsive in both configurations.
 
 ## Architecture
 
@@ -100,7 +104,8 @@ Debug evidence, Stockfish-informed self-review, future-change test, and the
 known short-clock/Debug limitations:
 [final architecture review](docs/superpowers/verification/2026-09-12-koi-architecture-stage6-final-review.md).
 The architecture is accepted as the baseline for future strength work. Lazy
-SMP and shared histories remain deliberately future work.
+SMP has since landed for `Threads > 1` (see the search section above); shared
+histories across helper threads remain deliberately future work.
 
 ## Build prerequisites
 
@@ -580,11 +585,15 @@ from the starting position (for example, `bestmove e2e4`).
 - `setoption name Hash value <MB>` resizes the persistent search hash, and
   `setoption name Clear Hash` clears it. Either command stops and joins an
   active search before changing the table.
-- `setoption name Threads value <N>` selects the deterministic root worker
-  count. `setoption name Speed value <1..100>` scales only movetime and
-  clock-derived budgets; explicit depth, node, and infinite searches are
-  unchanged. Changing either option stops and joins the active search before
-  the new snapshot is used by the next `go` command.
+- `setoption name Threads value <N>` selects the worker count. `Threads 1`
+  keeps the deterministic serial search; `Threads > 1` adds Lazy SMP helper
+  threads and is intentionally nondeterministic (helpers share the
+  transposition table, so repeated searches at the same thread count may
+  publish different equally valid moves or scores). `setoption name Speed value
+  <1..100>` scales only movetime and clock-derived budgets; explicit depth,
+  node, and infinite searches are unchanged. Changing either option stops and
+  joins the active search before the new snapshot is used by the next `go`
+  command.
 - `setoption name EvalFile value <path>` loads a Koi NNUE network for the next
   search (an empty value keeps the boot-time evaluator, so replaying defaults
   never triggers a load). A rejected or missing file leaves the current
