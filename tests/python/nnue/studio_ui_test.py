@@ -92,7 +92,7 @@ class ValidationGatingTests(unittest.TestCase):
         core = self.core
         original_gate, original_ab = core.run_gate, core.run_ab_match
 
-        def fake_gate(net):
+        def fake_gate(net, **kwargs):
             calls["gate"] += 1
             return {"kind": "gate", "positions": 64, "matches": 64}
 
@@ -114,7 +114,7 @@ class ValidationGatingTests(unittest.TestCase):
         core = self.core
         original_gate, original_ab = core.run_gate, core.run_ab_match
 
-        def fake_gate(net):
+        def fake_gate(net, **kwargs):
             calls["gate"] += 1
             return {"kind": "gate", "positions": 64, "matches": 64}
 
@@ -526,6 +526,153 @@ class GuiAdoptionWiringTests(unittest.TestCase):
         self.assertIn("running_engines", source)
         self.assertIn("_save_settings", source)
         self.assertIn("Revert last adoption", source)
+
+
+class ThemeTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.core = load_studio_core()
+
+    def test_palettes_expose_the_contract_keys(self):
+        keys = {
+            "bg",
+            "surface",
+            "border",
+            "text",
+            "muted",
+            "accent",
+            "danger",
+            "chart_bg",
+            "chart_grid",
+            "series",
+        }
+        for name in ("light", "dark"):
+            colors = self.core.palette(name)
+            self.assertTrue(keys <= set(colors), f"{name} palette is missing keys")
+            self.assertGreaterEqual(len(colors["series"]), 3)
+            self.assertTrue(all(isinstance(color, str) and color.startswith("#") for color in colors["series"]))
+
+    def test_unknown_theme_falls_back_to_light(self):
+        self.assertEqual(self.core.palette("neon"), self.core.palette("light"))
+        self.assertEqual(self.core.palette(None), self.core.palette("light"))
+
+    def test_theme_round_trips_through_settings(self):
+        with tempfile.TemporaryDirectory() as scratch:
+            path = Path(scratch) / "settings.json"
+            self.assertEqual(self.core.read_settings(path)["theme"], "light")
+            self.core.write_settings({"theme": "dark"}, path)
+            self.assertEqual(self.core.read_settings(path)["theme"], "dark")
+
+    def test_configure_styles_applies_the_palette(self):
+        if importlib.util.find_spec("tkinter") is None:
+            self.skipTest("tkinter is unavailable")
+        import tkinter as tk
+        import tkinter.ttk as ttk
+
+        try:
+            root = tk.Tk()
+        except tk.TclError:
+            self.skipTest("no display available")
+        try:
+            style = ttk.Style(root)
+            colors = self.core.palette("dark")
+            self.core.configure_styles(style, colors)
+            self.assertEqual(style.lookup("TFrame", "background"), colors["bg"])
+            self.assertEqual(style.lookup("Muted.TLabel", "foreground"), colors["muted"])
+            self.assertEqual(style.lookup("Accent.TButton", "foreground"), colors["accent"])
+            self.assertEqual(style.lookup("Danger.TButton", "foreground"), colors["danger"])
+            self.assertEqual(style.lookup("Treeview", "fieldbackground"), colors["surface"])
+            self.assertEqual(style.lookup("TProgressbar", "background"), colors["accent"])
+        finally:
+            root.destroy()
+
+
+class ChartHoverTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.core = load_studio_core()
+
+    def test_hover_index_maps_x_to_the_nearest_epoch(self):
+        # Plot from x=50, width 100, five epochs: the nearest epoch changes at
+        # ratio 0.125, 0.375, 0.625 and 0.875 of the plot width.
+        self.assertEqual(self.core.chart_hover_index(50, 50, 100, 5), 0)
+        self.assertEqual(self.core.chart_hover_index(62, 50, 100, 5), 0)
+        self.assertEqual(self.core.chart_hover_index(63, 50, 100, 5), 1)
+        self.assertEqual(self.core.chart_hover_index(150, 50, 100, 5), 4)
+
+    def test_hover_index_rejects_coordinates_outside_the_plot(self):
+        self.assertIsNone(self.core.chart_hover_index(20, 50, 100, 5))
+        self.assertIsNone(self.core.chart_hover_index(400, 50, 100, 5))
+        self.assertIsNone(self.core.chart_hover_index(50, 50, 100, 0))
+        self.assertIsNone(self.core.chart_hover_index(50, 50, 0, 5))
+
+    def test_single_epoch_hover_always_hits_index_zero(self):
+        self.assertEqual(self.core.chart_hover_index(50, 50, 100, 1), 0)
+        self.assertEqual(self.core.chart_hover_index(150, 50, 100, 1), 0)
+
+
+class CancelTokenTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.core = load_studio_core()
+
+    def test_token_starts_clear_and_cancels_once(self):
+        token = self.core.CancelToken()
+        self.assertFalse(token.is_cancelled())
+        token.cancel()
+        self.assertTrue(token.is_cancelled())
+        token.cancel()  # idempotent
+
+    def test_run_process_stops_a_cancelled_command(self):
+        token = self.core.CancelToken()
+        token.cancel()
+        result = self.core.run_process(
+            [sys.executable, "-c", "import time; time.sleep(30)"], timeout=60, cancel=token
+        )
+        self.assertTrue(result["cancelled"])
+        self.assertNotEqual(result["returncode"], 0)
+
+    def test_run_process_streams_lines_and_reports_success(self):
+        lines: list[str] = []
+        result = self.core.run_process(
+            [sys.executable, "-c", "print('hello'); print('world')"],
+            timeout=60,
+            on_line=lines.append,
+        )
+        self.assertEqual(result["returncode"], 0)
+        self.assertFalse(result["cancelled"])
+        self.assertFalse(result["timed_out"])
+        self.assertTrue(any("hello" in line for line in lines))
+        self.assertTrue(any("world" in line for line in lines))
+
+    def test_terminate_process_tree_ignores_missing_pids(self):
+        self.core.terminate_process_tree(999_999_999)  # must not raise
+
+
+class GuiPhaseThreeWiringTests(unittest.TestCase):
+    def test_gui_exposes_the_presentation_controls(self):
+        source = (TOOLS_NNUE / "koi_nnue_studio.py").read_text(encoding="utf-8")
+        for marker in (
+            "_apply_dpi_awareness",
+            "_scrollable_tab",
+            "_apply_theme",
+            "_on_chart_motion",
+            "_export_chart",
+            "_cancel_validation",
+            "_apply_runs",
+            "install_error",
+            "Ctrl+T",
+            "Ctrl+R",
+            "F5",
+            "Escape",
+        ):
+            self.assertIn(marker, source, f"{marker} is missing from the GUI")
+
+    def test_gui_selftest_applies_both_themes(self):
+        source = (TOOLS_NNUE / "koi_nnue_studio.py").read_text(encoding="utf-8")
+        selftest = source.split("def gui_selftest", 1)[1]
+        self.assertIn('_apply_theme("dark")', selftest)
+        self.assertIn('_apply_theme("light")', selftest)
 
 
 if __name__ == "__main__":

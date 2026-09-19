@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import json
 import os
+import queue
 import re
 import shutil
 import subprocess
@@ -291,6 +292,20 @@ def chart_bounds(
     if high - low < 1e-9:
         return low - 1.0, high + 1.0
     return low, high
+
+
+def chart_hover_index(
+    x: float, plot_left: float, plot_width: float, count: int
+) -> int | None:
+    """Nearest epoch index for a canvas x coordinate, or ``None`` outside."""
+    if count <= 0 or plot_width <= 0:
+        return None
+    if x < plot_left or x > plot_left + plot_width:
+        return None
+    if count == 1:
+        return 0
+    ratio = (x - plot_left) / plot_width
+    return max(0, min(count - 1, round(ratio * (count - 1))))
 
 
 def log_line_matches(line: str, needle: str = "", errors_only: bool = False) -> bool:
@@ -700,25 +715,128 @@ def refresh_state(run: Run) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-def run_gate(net: Path, bench: Path | None = None, timeout: int = 900) -> dict[str, Any]:
+class CancelToken:
+    """Cooperative cancellation flag shared between the GUI and a worker."""
+
+    def __init__(self) -> None:
+        self._event = threading.Event()
+
+    def cancel(self) -> None:
+        self._event.set()
+
+    def is_cancelled(self) -> bool:
+        return self._event.is_set()
+
+
+def terminate_process_tree(pid: int) -> None:
+    """Best-effort termination of a process and its children."""
+    try:
+        subprocess.run(
+            ["taskkill", "/PID", str(pid), "/T", "/F"],
+            capture_output=True,
+            check=False,
+            timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError):
+        pass
+
+
+def run_process(
+    command: list[str],
+    timeout: int = 900,
+    cancel: CancelToken | None = None,
+    on_line: Any = None,
+    cwd: Path | None = None,
+) -> dict[str, Any]:
+    """Run a command, streaming output lines and honouring a cancel token.
+
+    Output is read on a reader thread so the poll loop can react to
+    cancellation and timeouts without blocking on ``communicate``.  ``on_line``
+    receives each line as it arrives; the merged output is also returned.
+    """
+    process = subprocess.Popen(
+        command,
+        cwd=str(cwd or REPO_ROOT),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+    )
+    lines: list[str] = []
+    line_queue: queue.Queue = queue.Queue()
+    if process.stdout is not None:
+
+        def reader() -> None:
+            for line in process.stdout:
+                line_queue.put(line)
+
+        threading.Thread(target=reader, daemon=True).start()
+    start = time.monotonic()
+    cancelled = False
+    timed_out = False
+    while True:
+        try:
+            line = line_queue.get(timeout=0.2)
+            lines.append(line)
+            if on_line is not None:
+                on_line(line.rstrip("\n"))
+            continue
+        except queue.Empty:
+            pass
+        if cancel is not None and cancel.is_cancelled():
+            cancelled = True
+            terminate_process_tree(process.pid)
+            break
+        if process.poll() is not None:
+            break
+        if time.monotonic() - start > timeout:
+            timed_out = True
+            terminate_process_tree(process.pid)
+            break
+    try:
+        process.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        process.kill()
+    while True:
+        try:
+            line = line_queue.get_nowait()
+        except queue.Empty:
+            break
+        lines.append(line)
+        if on_line is not None:
+            on_line(line.rstrip("\n"))
+    return {
+        "returncode": process.returncode,
+        "stdout": "".join(lines),
+        "cancelled": cancelled,
+        "timed_out": timed_out,
+    }
+
+
+def run_gate(
+    net: Path,
+    bench: Path | None = None,
+    timeout: int = 900,
+    cancel: CancelToken | None = None,
+    on_line: Any = None,
+) -> dict[str, Any]:
     """Run ``koi-bench --nnue <net>`` and summarise the 64-position gate."""
     bench = bench or DEFAULT_BENCH
     if not bench.exists():
         raise FileNotFoundError(f"koi-bench not found at {bench}")
     if not net.exists():
         raise FileNotFoundError(f"network not found at {net}")
-    result = subprocess.run(
+    result = run_process(
         [str(bench), "--nnue", str(net)],
-        cwd=str(REPO_ROOT),
-        capture_output=True,
-        text=True,
-        check=False,
         timeout=timeout,
+        cancel=cancel,
+        on_line=on_line,
     )
+    output = result["stdout"]
     matches = 0
     total = 0
     failed: list[str] = []
-    for line in result.stdout.splitlines():
+    for line in output.splitlines():
         fields = line.split()
         if not fields or fields[0] != "position":
             continue
@@ -729,7 +847,7 @@ def run_gate(net: Path, bench: Path | None = None, timeout: int = 900) -> dict[s
             matches += 1
         else:
             failed.append(identifier)
-    rejected = "rejected" in result.stderr.lower()
+    rejected = "rejected" in output.lower()
     return {
         "kind": "gate",
         "net": str(net),
@@ -738,8 +856,10 @@ def run_gate(net: Path, bench: Path | None = None, timeout: int = 900) -> dict[s
         "matches": matches,
         "failed": failed,
         "rejected": rejected,
-        "exit_code": result.returncode,
-        "stderr": result.stderr.strip(),
+        "exit_code": result["returncode"],
+        "cancelled": result["cancelled"],
+        "timed_out": result["timed_out"],
+        "stderr": output.strip()[-2000:] if rejected else "",
     }
 
 
@@ -760,13 +880,15 @@ def run_ab_match(
     threads: int = 1,
     timeout: int = 3_600,
     output_directory: Path | None = None,
+    cancel: CancelToken | None = None,
+    on_line: Any = None,
 ) -> dict[str, Any]:
     """Play NNUE-Koi against classical-Koi through ``ab_match.ps1``."""
     script = STUDIO_DIR / "ab_match.ps1"
     if not script.exists():
         raise FileNotFoundError(f"missing match script: {script}")
     report = output_directory or (net.parent / "ab-match.json")
-    result = subprocess.run(
+    result = run_process(
         [
             powershell_executable(),
             "-NoProfile",
@@ -785,22 +907,23 @@ def run_ab_match(
             "-ReportPath",
             str(report),
         ],
-        cwd=str(REPO_ROOT),
-        capture_output=True,
-        text=True,
-        check=False,
         timeout=timeout,
+        cancel=cancel,
+        on_line=on_line,
     )
     if report.exists():
         parsed = read_json(report, {})
-        parsed["exit_code"] = result.returncode
+        parsed["exit_code"] = result["returncode"]
+        parsed["cancelled"] = result["cancelled"]
         return parsed
     return {
         "kind": "ab-match",
         "error": "the match harness produced no report",
-        "exit_code": result.returncode,
-        "stdout": result.stdout[-4000:],
-        "stderr": result.stderr[-4000:],
+        "exit_code": result["returncode"],
+        "cancelled": result["cancelled"],
+        "timed_out": result["timed_out"],
+        "stdout": result["stdout"][-4000:],
+        "stderr": "",
     }
 
 
@@ -811,24 +934,37 @@ def validate_net(
     nodes: int = 20_000,
     report_path: Path | None = None,
     gate_only: bool = False,
+    cancel: CancelToken | None = None,
+    on_line: Any = None,
 ) -> dict[str, Any]:
     """Gate + A/B match, persisted next to the network.
 
     ``gate_only`` runs just the 64-position gate; the A/B match is skipped
-    entirely (it requires at least two games and is a separate action).
+    entirely (it requires at least two games and is a separate action).  A
+    ``cancel`` token aborts the running step and skips the rest.
     """
     validation: dict[str, Any] = {"schema": "koi-nnue-studio-validation-v1"}
     try:
-        validation["gate"] = run_gate(net)
+        validation["gate"] = run_gate(net, cancel=cancel, on_line=on_line)
     except Exception as error:  # noqa: BLE001 - surfaced in the report
         validation["gate"] = {"kind": "gate", "error": str(error)}
-    if not gate_only:
+    gate = validation.get("gate") or {}
+    if gate.get("cancelled") or (cancel is not None and cancel.is_cancelled()):
+        validation["cancelled"] = True
+    elif not gate_only:
         try:
             validation["ab_match"] = run_ab_match(
-                net, games=games, nodes=nodes, output_directory=report_path
+                net,
+                games=games,
+                nodes=nodes,
+                output_directory=report_path,
+                cancel=cancel,
+                on_line=on_line,
             )
         except Exception as error:  # noqa: BLE001 - surfaced in the report
             validation["ab_match"] = {"kind": "ab-match", "error": str(error)}
+        if (validation.get("ab_match") or {}).get("cancelled"):
+            validation["cancelled"] = True
     if run is not None:
         run.write_state(validation=validation)
     return validation
@@ -892,6 +1028,77 @@ def write_settings(settings: dict[str, Any], path: Path | None = None) -> None:
     write_json(path or SETTINGS_PATH, merged)
 
 
+PALETTES: dict[str, dict[str, Any]] = {
+    "light": {
+        "bg": "#f4f5f7",
+        "surface": "#ffffff",
+        "border": "#c8ccd4",
+        "text": "#1f2328",
+        "muted": "#5b6470",
+        "accent": "#1f6fb2",
+        "danger": "#b23a48",
+        "chart_bg": "#fdfdfd",
+        "chart_grid": "#d9dde3",
+        "series": ["#c0504d", "#9bbb59", "#1f6fb2"],
+    },
+    "dark": {
+        "bg": "#1e2227",
+        "surface": "#262b31",
+        "border": "#3a4048",
+        "text": "#e6e8eb",
+        "muted": "#9aa4b0",
+        "accent": "#5aa9e6",
+        "danger": "#e06c75",
+        "chart_bg": "#22272d",
+        "chart_grid": "#394049",
+        "series": ["#e06c75", "#98c379", "#61afef"],
+    },
+}
+
+
+def palette(theme: str | None) -> dict[str, Any]:
+    """Palette for a theme name, falling back to the light palette."""
+    return PALETTES.get(theme or "", PALETTES["light"])
+
+
+def configure_styles(style: Any, colors: dict[str, Any]) -> None:
+    """Assign the named ttk styles the Studio uses for one theme."""
+    style.configure("TFrame", background=colors["bg"])
+    style.configure("TLabel", background=colors["bg"], foreground=colors["text"])
+    style.configure(
+        "Heading.TLabel",
+        background=colors["bg"],
+        foreground=colors["text"],
+        font=("Segoe UI", 10, "bold"),
+    )
+    style.configure("Muted.TLabel", background=colors["bg"], foreground=colors["muted"])
+    style.configure("Status.TLabel", background=colors["bg"], foreground=colors["muted"])
+    style.configure("TButton", padding=3)
+    style.configure("Accent.TButton", foreground=colors["accent"])
+    style.configure("Danger.TButton", foreground=colors["danger"])
+    style.configure("TCheckbutton", background=colors["bg"], foreground=colors["text"])
+    style.configure("TNotebook", background=colors["bg"], borderwidth=0)
+    style.configure("TNotebook.Tab", padding=(12, 5))
+    style.configure(
+        "Treeview",
+        background=colors["surface"],
+        fieldbackground=colors["surface"],
+        foreground=colors["text"],
+        bordercolor=colors["border"],
+    )
+    style.configure("Treeview.Heading", background=colors["bg"], foreground=colors["text"])
+    style.configure("TEntry", fieldbackground=colors["surface"], foreground=colors["text"])
+    style.configure("TCombobox", fieldbackground=colors["surface"], foreground=colors["text"])
+    style.configure("TProgressbar", background=colors["accent"])
+    style.configure(
+        "TLabelframe",
+        background=colors["bg"],
+        foreground=colors["text"],
+        bordercolor=colors["border"],
+    )
+    style.configure("TLabelframe.Label", background=colors["bg"], foreground=colors["text"])
+
+
 def net_match_command(
     candidate: Path,
     opponent: Path,
@@ -935,28 +1142,26 @@ def run_net_match(
     threads: int = 1,
     timeout: int = 3_600,
     output_directory: Path | None = None,
+    cancel: CancelToken | None = None,
+    on_line: Any = None,
 ) -> dict[str, Any]:
     """Compare a candidate network against a reference through ``net_match.ps1``."""
     report = output_directory or (candidate.parent / "net-match.json")
     command = net_match_command(candidate, opponent, games, nodes, threads, report)
-    result = subprocess.run(
-        command,
-        cwd=str(REPO_ROOT),
-        capture_output=True,
-        text=True,
-        check=False,
-        timeout=timeout,
-    )
+    result = run_process(command, timeout=timeout, cancel=cancel, on_line=on_line)
     if report.exists():
         parsed = read_json(report, {})
-        parsed["exit_code"] = result.returncode
+        parsed["exit_code"] = result["returncode"]
+        parsed["cancelled"] = result["cancelled"]
         return parsed
     return {
         "kind": "net-match",
         "error": "the match harness produced no report",
-        "exit_code": result.returncode,
-        "stdout": result.stdout[-4000:],
-        "stderr": result.stderr[-4000:],
+        "exit_code": result["returncode"],
+        "cancelled": result["cancelled"],
+        "timed_out": result["timed_out"],
+        "stdout": result["stdout"][-4000:],
+        "stderr": "",
     }
 
 

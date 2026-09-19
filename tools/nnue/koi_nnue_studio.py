@@ -181,35 +181,116 @@ class StudioApp:
         self.ttk = ttk
         self.filedialog = filedialog
         self.messagebox = messagebox
+        self._apply_dpi_awareness()
         self.root = tk.Tk()
         self.root.title(f"{APP_TITLE} {core.STUDIO_VERSION}")
         self.settings = core.read_settings()
         self.root.geometry(str(self.settings.get("geometry") or "1000x780"))
         self.root.minsize(820, 620)
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
+        try:
+            pixels_per_inch = self.root.winfo_fpixels("1i")
+            if pixels_per_inch > 0:
+                self.root.tk.call("tk", "scaling", pixels_per_inch / 72.0)
+        except Exception:  # noqa: BLE001 - DPI scaling is best-effort
+            pass
         self.queue: queue.Queue = queue.Queue()
         self.active_run: core.Run | None = None
         self.log_offset = 0
         self.tail_stop = threading.Event()
         self.busy = False
+        self.validation_cancel: core.CancelToken | None = None
+        self.runs_refreshing = False
+        self._chart_geometry: tuple | None = None
+        self.theme_var = tk.StringVar(value=str(self.settings.get("theme") or "light"))
 
         self.backends = available_backends()
         self.backend_names = [backend.name for backend in self.backends]
         self.preset_names = list(core.presets())
         self._build_style()
         self._build_layout()
+        self._apply_theme(self.theme_var.get())
         self._pump()
 
     # -- construction -------------------------------------------------------
 
+    def _apply_dpi_awareness(self) -> None:
+        """Best-effort per-monitor DPI awareness before Tk creates windows."""
+        try:
+            import ctypes
+        except Exception:  # noqa: BLE001 - not on Windows
+            return
+        try:
+            ctypes.windll.shcore.SetProcessDpiAwareness(1)
+        except Exception:  # noqa: BLE001 - older Windows
+            try:
+                ctypes.windll.user32.SetProcessDPIAware()
+            except Exception:  # noqa: BLE001 - best effort
+                pass
+
     def _build_style(self) -> None:
-        style = self.ttk.Style(self.root)
-        if "vista" in style.theme_names():
-            style.theme_use("vista")
-        style.configure("Heading.TLabel", font=("Segoe UI", 10, "bold"))
-        style.configure("Status.TLabel", foreground="#333333")
+        self.style = self.ttk.Style(self.root)
+        if "vista" in self.style.theme_names():
+            self.style.theme_use("vista")
+        self.style.configure("Heading.TLabel", font=("Segoe UI", 10, "bold"))
+
+    def _apply_theme(self, theme: str) -> None:
+        """Reconfigure ttk styles and text colors for the chosen palette."""
+        theme = "dark" if str(theme).lower() == "dark" else "light"
+        self.theme_var.set(theme)
+        colors = core.palette(theme)
+        core.configure_styles(self.style, colors)
+        for widget in (getattr(self, "log_text", None), getattr(self, "runs_detail", None)):
+            if widget is None:
+                continue
+            background = colors["chart_bg"] if widget is self.log_text else colors["surface"]
+            foreground = colors["text"] if widget is self.runs_detail else colors["text"]
+            widget.configure(background=background, foreground=foreground, insertbackground=colors["text"])
+        if getattr(self, "chart", None) is not None:
+            self.chart.configure(background=colors["chart_bg"], highlightbackground=colors["border"])
+            self._draw_chart()
+        if getattr(self, "validation_text", None) is not None:
+            self.validation_text.configure(
+                background=colors["surface"], foreground=colors["text"], insertbackground=colors["text"]
+            )
+
+    def _scrollable_tab(self, notebook, text: str):
+        """Create a tab whose content scrolls when the window is short."""
+        tk = self.tk
+        outer = tk.ttk.Frame(notebook)
+        notebook.add(outer, text=text)
+        canvas = tk.Canvas(outer, highlightthickness=0)
+        scrollbar = tk.ttk.Scrollbar(outer, orient="vertical", command=canvas.yview)
+        inner = tk.ttk.Frame(canvas, padding=12)
+        window = canvas.create_window((0, 0), window=inner, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+        inner.bind("<Configure>", lambda _event: canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas.bind("<Configure>", lambda event: canvas.itemconfigure(window, width=event.width))
+
+        def on_wheel(event) -> None:
+            canvas.yview_scroll(-1 if event.delta > 0 else 1, "units")
+
+        canvas.bind("<Enter>", lambda _event: canvas.bind_all("<MouseWheel>", on_wheel))
+        canvas.bind("<Leave>", lambda _event: canvas.unbind_all("<MouseWheel>"))
+        return inner
 
     def _build_layout(self) -> None:
+        toolbar = self.ttk.Frame(self.root)
+        toolbar.pack(fill="x", padx=8, pady=(8, 0))
+        self.ttk.Label(toolbar, text="Theme").pack(side="left")
+        theme_box = self.ttk.Combobox(
+            toolbar, textvariable=self.theme_var, values=("light", "dark"), state="readonly", width=8
+        )
+        theme_box.pack(side="left", padx=(4, 0))
+        theme_box.bind("<<ComboboxSelected>>", lambda _event: self._apply_theme(self.theme_var.get()))
+        self.ttk.Label(
+            toolbar,
+            text="Ctrl+T train   Ctrl+R refresh runs   F5 validate   Esc stop/cancel",
+            style="Muted.TLabel",
+        ).pack(side="right")
+
         notebook = self.ttk.Notebook(self.root)
         notebook.pack(fill="both", expand=True, padx=8, pady=(8, 4))
         self._build_data_tab(notebook)
@@ -220,11 +301,21 @@ class StudioApp:
         self.ttk.Label(self.root, textvariable=self.status_var, style="Status.TLabel").pack(
             fill="x", padx=10, pady=(0, 8)
         )
+        self.root.bind_all("<Control-t>", lambda _event: self._start_training())
+        self.root.bind_all("<Control-r>", lambda _event: self._refresh_runs())
+        self.root.bind_all("<F5>", lambda _event: self._start_validation(auto=False))
+        self.root.bind_all("<Escape>", lambda _event: self._escape())
+
+    def _escape(self) -> None:
+        """Esc stops a training run or cancels a validation."""
+        if self.validation_cancel is not None:
+            self._cancel_validation()
+        else:
+            self._stop_training()
 
     def _build_data_tab(self, notebook) -> None:
         tk = self.tk
-        frame = tk.ttk.Frame(notebook, padding=12)
-        notebook.add(frame, text="Data")
+        frame = self._scrollable_tab(notebook, "Data")
 
         tk.ttk.Label(frame, text="Corpus and labeling", style="Heading.TLabel").grid(
             row=0, column=0, columnspan=4, sticky="w", pady=(0, 8)
@@ -295,8 +386,7 @@ class StudioApp:
 
     def _build_train_tab(self, notebook) -> None:
         tk = self.tk
-        frame = tk.ttk.Frame(notebook, padding=12)
-        notebook.add(frame, text="Train")
+        frame = self._scrollable_tab(notebook, "Train")
 
         tk.ttk.Label(frame, text="Run configuration", style="Heading.TLabel").grid(
             row=0, column=0, columnspan=6, sticky="w", pady=(0, 6)
@@ -377,12 +467,14 @@ class StudioApp:
         self.progress_var = tk.StringVar(value="idle")
         tk.ttk.Label(frame, textvariable=self.progress_var).grid(row=6, column=0, columnspan=6, sticky="w")
 
-        tk.ttk.Label(frame, text="Training progress", style="Heading.TLabel").grid(
-            row=7, column=0, columnspan=6, sticky="w", pady=(8, 0)
-        )
+        chart_header = tk.ttk.Frame(frame)
+        chart_header.grid(row=7, column=0, columnspan=6, sticky="we", pady=(8, 0))
+        tk.ttk.Label(chart_header, text="Training progress", style="Heading.TLabel").pack(side="left")
+        tk.ttk.Button(chart_header, text="Export chart", command=self._export_chart).pack(side="right")
         self.chart = tk.Canvas(frame, height=130, background="#fdfdfd", highlightthickness=1, highlightbackground="#cccccc")
         self.chart.grid(row=8, column=0, columnspan=6, sticky="we", pady=(2, 8))
         self.chart.bind("<Configure>", lambda _event: self._draw_chart())
+        self.chart.bind("<Motion>", self._on_chart_motion)
 
         log_header = tk.ttk.Frame(frame)
         log_header.grid(row=9, column=0, columnspan=6, sticky="we")
@@ -408,8 +500,7 @@ class StudioApp:
 
     def _build_validate_tab(self, notebook) -> None:
         tk = self.tk
-        frame = tk.ttk.Frame(notebook, padding=12)
-        notebook.add(frame, text="Validate and install")
+        frame = self._scrollable_tab(notebook, "Validate and install")
 
         tk.ttk.Label(frame, text="Network", style="Heading.TLabel").grid(row=0, column=0, sticky="w")
         self.validate_net_var = tk.StringVar(value="")
@@ -433,6 +524,10 @@ class StudioApp:
         tk.ttk.Entry(actions, textvariable=self.games_ab_var, width=5).grid(row=0, column=3)
         tk.ttk.Label(actions, text="A/B nodes").grid(row=0, column=4, padx=(12, 4))
         tk.ttk.Entry(actions, textvariable=self.nodes_ab_var, width=8).grid(row=0, column=5)
+        self.cancel_validation_button = tk.ttk.Button(
+            actions, text="Cancel", command=self._cancel_validation, state="disabled"
+        )
+        self.cancel_validation_button.grid(row=0, column=6, sticky="w", padx=(12, 0))
 
         self.validation_text = tk.Text(frame, height=16, wrap="word")
         self.validation_text.grid(row=3, column=0, columnspan=5, sticky="nsew")
@@ -463,8 +558,7 @@ class StudioApp:
 
     def _build_runs_tab(self, notebook) -> None:
         tk = self.tk
-        frame = tk.ttk.Frame(notebook, padding=12)
-        notebook.add(frame, text="Runs")
+        frame = self._scrollable_tab(notebook, "Runs")
 
         filters = tk.ttk.Frame(frame)
         filters.grid(row=0, column=0, columnspan=6, sticky="we")
@@ -532,10 +626,14 @@ class StudioApp:
         self.rows_var.set(str(preset["rows"]))
 
     def _count_rows(self) -> None:
-        positions = core.count_rows(self.positions_var.get())
-        labels = core.count_rows(self.labels_var.get())
-        self.data_counts_var.set(f"positions: {positions:,} lines   labels: {labels:,} rows")
-        self.status_var.set("Counted corpus rows")
+        positions = self.positions_var.get()
+        labels = self.labels_var.get()
+        self.status_var.set("counting corpus rows")
+
+        def worker() -> None:
+            self.queue.put(("counts", (core.count_rows(positions), core.count_rows(labels))))
+
+        threading.Thread(target=worker, daemon=True).start()
 
     def _open_path(self, path: Path) -> None:
         if path.exists():
@@ -694,6 +792,9 @@ class StudioApp:
         adopt: bool | None = None,
     ) -> None:
         active = self.active_run
+        token = core.CancelToken()
+        self.validation_cancel = token
+        started = time.monotonic()
 
         def worker() -> None:
             run = active if active is not None and net == active.net_path else None
@@ -704,16 +805,28 @@ class StudioApp:
                 nodes=nodes,
                 report_path=net.parent / "ab-match.json",
                 gate_only=gate_only,
+                cancel=token,
+                on_line=lambda line: self.queue.put(("log", line + "\n")),
             )
+            result["elapsed_seconds"] = time.monotonic() - started
             wants_adopt = self.auto_adopt_var.get() if adopt is None else adopt
             if wants_adopt and not gate_only:
                 result["adoption"] = self._adoption_worker(net, result)
             self.queue.put(("validation", {"net": str(net), "result": result}))
+            self.validation_cancel = None
 
         self.validation_text.delete("1.0", "end")
         self.validation_text.insert("end", f"Validating {net}\n")
+        self.cancel_validation_button.configure(state="normal")
         self.status_var.set("validating")
         threading.Thread(target=worker, daemon=True).start()
+
+    def _cancel_validation(self) -> None:
+        """Ask the running gate/match process tree to stop."""
+        if self.validation_cancel is not None:
+            self.validation_cancel.cancel()
+            self.status_var.set("cancelling validation")
+            self._append_log("\n[studio] validation cancel requested\n")
 
     def _adoption_worker(self, net: Path, result: dict) -> dict:
         """Compare against the installed network and adopt per policy (worker thread)."""
@@ -821,6 +934,7 @@ class StudioApp:
         settings = dict(self.settings)
         settings["engine_directory"] = self.engine_dir_var.get()
         settings["auto_adopt"] = bool(self.auto_adopt_var.get())
+        settings["theme"] = self.theme_var.get()
         try:
             settings["geometry"] = self.root.geometry()
         except Exception:  # noqa: BLE001 - geometry is best-effort
@@ -842,16 +956,19 @@ class StudioApp:
         if not net.exists():
             self.messagebox.showerror(APP_TITLE, "Choose a network first")
             return
-        try:
-            info = core.install_net(net, Path(self.engine_dir_var.get()))
-        except Exception as error:  # noqa: BLE001 - reported in the dialog
-            self.messagebox.showerror(APP_TITLE, str(error))
-            return
-        message = f"Installed {info['installed']}"
-        if info.get("backup"):
-            message += f"\nPrevious network backed up to {info['backup']}"
-        self.messagebox.showinfo(APP_TITLE, message)
-        self.status_var.set(f"installed {info['installed']}")
+        engine_dir = Path(self.engine_dir_var.get())
+        self.install_button.configure(state="disabled")
+        self.status_var.set("installing network")
+
+        def worker() -> None:
+            try:
+                info = core.install_net(net, engine_dir)
+            except Exception as error:  # noqa: BLE001 - reported in the dialog
+                self.queue.put(("install_error", str(error)))
+                return
+            self.queue.put(("installed", info))
+
+        threading.Thread(target=worker, daemon=True).start()
 
     # -- data generation ----------------------------------------------------
 
@@ -906,34 +1023,50 @@ class StudioApp:
     # -- runs list ----------------------------------------------------------
 
     def _refresh_runs(self) -> None:
+        if self.runs_refreshing:
+            return
+        self.runs_refreshing = True
         selected = self._selected_name()
-        self.runs_tree.delete(*self.runs_tree.get_children())
-        runs = core.filter_runs(core.list_runs(), self.runs_filter_var.get())
+        needle = self.runs_filter_var.get()
         key, descending = self.runs_sort
-        runs = core.sort_runs(runs, key, descending)
-        for run in runs:
-            state = core.refresh_state(run)
-            progress = state.get("progress", {})
-            backend = self._run_backend(run)
-            net = backend.net_path(run.directory, run.config) if backend else run.net_path
-            duration = core.run_duration_seconds(state)
-            self.runs_tree.insert(
-                "",
-                "end",
-                iid=run.directory.name,
-                values=(
-                    run.directory.name,
-                    state.get("kind", "?"),
-                    state.get("status", "unknown"),
-                    progress.get("val_mae_cp", ""),
-                    core.format_duration(duration) if duration is not None else "",
-                    str(net) if net.exists() else "",
-                ),
-            )
+
+        def worker() -> None:
+            rows: list[tuple] = []
+            try:
+                runs = core.filter_runs(core.list_runs(), needle)
+                runs = core.sort_runs(runs, key, descending)
+                for run in runs:
+                    state = core.refresh_state(run)
+                    progress = state.get("progress", {})
+                    backend = self._run_backend(run)
+                    net = backend.net_path(run.directory, run.config) if backend else run.net_path
+                    duration = core.run_duration_seconds(state)
+                    rows.append(
+                        (
+                            run.directory.name,
+                            state.get("kind", "?"),
+                            state.get("status", "unknown"),
+                            progress.get("val_mae_cp", ""),
+                            core.format_duration(duration) if duration is not None else "",
+                            str(net) if net.exists() else "",
+                        )
+                    )
+            finally:
+                self.queue.put(("runs", {"rows": rows, "selected": selected}))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _apply_runs(self, payload: dict) -> None:
+        rows = payload.get("rows", [])
+        selected = payload.get("selected")
+        self.runs_tree.delete(*self.runs_tree.get_children())
+        for row in rows:
+            self.runs_tree.insert("", "end", iid=row[0], values=row)
         if selected and self.runs_tree.exists(selected):
             self.runs_tree.selection_set(selected)
         self._show_run_detail()
-        self.status_var.set(f"{len(self.runs_tree.get_children())} runs")
+        self.status_var.set(f"{len(rows)} runs")
+        self.runs_refreshing = False
 
     def _sort_runs(self, key: str) -> None:
         current_key, descending = self.runs_sort
@@ -1035,6 +1168,8 @@ class StudioApp:
 
     def _draw_chart(self) -> None:
         self.chart.delete("all")
+        self._chart_hover = None
+        self._chart_geometry = None
         series = core.chart_series(self.chart_progress)
         loss_bounds = core.chart_bounds(series, "loss")
         mae_bounds = core.chart_bounds(series, "mae")
@@ -1106,6 +1241,64 @@ class StudioApp:
             self.chart.create_rectangle(legend_x, 6, legend_x + 8, 14, fill=item["color"], outline="")
             self.chart.create_text(legend_x + 12, 10, anchor="w", text=item["name"], fill="#444444")
             legend_x += 36 + 7 * len(item["name"])
+        self._chart_geometry = (margin_left, plot_width, count, height, margin_bottom, plot_height, series)
+
+    def _on_chart_motion(self, event) -> None:
+        """Show the nearest epoch's values while hovering the chart."""
+        if self._chart_geometry is None:
+            return
+        margin_left, plot_width, count, height, margin_bottom, plot_height, series = self._chart_geometry
+        index = core.chart_hover_index(event.x, margin_left, plot_width, count)
+        if index == self._chart_hover:
+            return
+        self.chart.delete("hover")
+        self._chart_hover = index
+        if index is None:
+            return
+        colors = core.palette(self.theme_var.get())
+        lines = []
+        for item in series:
+            values = item["values"]
+            if index < len(values):
+                lines.append(f"{item['name']}: {values[index]:.4f}")
+        x = margin_left + plot_width * (index / max(count - 1, 1))
+        self.chart.create_line(x, 24, x, height - margin_bottom, fill=colors["muted"], tags="hover")
+        self.chart.create_text(
+            x + 6,
+            26,
+            anchor="nw",
+            text=f"epoch {index + 1}\n" + "\n".join(lines),
+            fill=colors["text"],
+            tags="hover",
+        )
+
+    def _export_chart(self) -> None:
+        path = self.filedialog.asksaveasfilename(
+            title="Export chart",
+            defaultextension=".ps",
+            filetypes=[("PostScript", "*.ps"), ("PNG (requires Pillow)", "*.png")],
+        )
+        if not path:
+            return
+        target = Path(path)
+        try:
+            self.chart.postscript(file=str(target), colormode="color")
+        except Exception as error:  # noqa: BLE001 - reported in the dialog
+            self.messagebox.showerror(APP_TITLE, f"chart export failed: {error}")
+            return
+        if target.suffix.lower() == ".png":
+            try:
+                from PIL import Image
+
+                with Image.open(str(target)) as image:
+                    image.save(str(target))
+            except Exception:  # noqa: BLE001 - Pillow/Ghostscript are optional
+                fallback = target.with_suffix(".ps")
+                target.replace(fallback)
+                self.messagebox.showinfo(APP_TITLE, f"Pillow is unavailable; wrote {fallback}")
+                self.status_var.set(f"exported chart to {fallback}")
+                return
+        self.status_var.set(f"exported chart to {target}")
 
     def _pump(self) -> None:
         try:
@@ -1113,6 +1306,24 @@ class StudioApp:
                 kind, payload = self.queue.get_nowait()
                 if kind == "log":
                     self._append_log(payload)
+                elif kind == "counts":
+                    positions, labels = payload
+                    self.data_counts_var.set(
+                        f"positions: {positions:,} lines   labels: {labels:,} rows"
+                    )
+                    self.status_var.set("Counted corpus rows")
+                elif kind == "runs":
+                    self._apply_runs(payload)
+                elif kind == "installed":
+                    message = f"Installed {payload['installed']}"
+                    if payload.get("backup"):
+                        message += f"\nPrevious network backed up to {payload['backup']}"
+                    self.messagebox.showinfo(APP_TITLE, message)
+                    self.install_button.configure(state="normal")
+                    self.status_var.set(f"installed {payload['installed']}")
+                elif kind == "install_error":
+                    self.messagebox.showerror(APP_TITLE, str(payload))
+                    self.install_button.configure(state="normal")
                 elif kind == "progress":
                     progress = payload
                     epochs = max(1, int(progress.get("epochs", 1)))
@@ -1157,6 +1368,14 @@ class StudioApp:
                     gate = result.get("gate", {})
                     ab = result.get("ab_match")
                     adoption = result.get("adoption")
+                    self.cancel_validation_button.configure(state="disabled")
+                    if result.get("cancelled"):
+                        self.validation_text.insert("end", "validation cancelled\n")
+                    elapsed = result.get("elapsed_seconds")
+                    if elapsed:
+                        self.validation_text.insert(
+                            "end", f"elapsed {core.format_duration(elapsed)}\n"
+                        )
                     self.validation_text.insert("end", self._gate_report(gate) + "\n")
                     if ab is not None:
                         self.validation_text.insert("end", self._ab_report(ab) + "\n")
@@ -1201,8 +1420,10 @@ class StudioApp:
 
 
 def gui_selftest() -> int:
-    """Construct the GUI, pump one frame, and exit (widget smoke test)."""
+    """Construct the GUI, apply both themes, pump one frame, and exit."""
     app = StudioApp()
+    app._apply_theme("dark")
+    app._apply_theme("light")
     app.root.after(400, app.root.destroy)
     app.root.mainloop()
     print("PASS gui construction")
