@@ -19,3 +19,4 @@ intentionally stable because plans and verification records link to them.
 | `2026-09-17-nnue-evaluation-overhaul-design.md` | HalfKA king-bucket features, container v4, incremental inference, and evaluation tuner design. |
 | `2026-09-18-nnue-studio-ui-design.md` | NNUE Studio UI design: validation gating, network naming, telemetry, and run-list behavior. |
 | `2026-09-18-nnue-bullet-training-design.md` | Bullet trainer contract: dependencies, feature parity, quantization export, progress, CI refresh. |
+| `2026-09-19-engine-v2-design.md` | Engine v2 contracts: SPRT, adoption policy, themes, NNUE hot path, Lazy SMP, search and movegen gates. |
