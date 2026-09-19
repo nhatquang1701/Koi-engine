@@ -2082,6 +2082,10 @@ std::uint64_t GameState::pawn_key() const noexcept {
     return impl_->native_position.pawn_key();
 }
 
+std::uint64_t GameState::piece_bitboard(const PieceType type, const Color color) const noexcept {
+    return impl_->native_position.piece_bitboard(type, color);
+}
+
 std::uint64_t GameState::polyglot_key() const noexcept {
     std::uint64_t key = 0;
     for (std::uint8_t index = 0; index < 64; ++index) {

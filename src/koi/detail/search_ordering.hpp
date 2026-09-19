@@ -58,6 +58,10 @@ public:
     [[nodiscard]] int capture_history_score(const MoveMetadata& metadata) const noexcept;
     [[nodiscard]] bool is_proven_counter_move(
         Color side, Move previous_move, Move move) const noexcept;
+    [[nodiscard]] int correction_value(std::uint64_t pawn_key, std::uint64_t material_key,
+                                       std::uint64_t king_key) const noexcept;
+    void update_correction(std::uint64_t pawn_key, std::uint64_t material_key,
+                           std::uint64_t king_key, int bonus) noexcept;
 
 private:
     friend class SearchMovePicker;

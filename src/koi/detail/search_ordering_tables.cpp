@@ -51,7 +51,10 @@ std::uint64_t mix64(std::uint64_t value) noexcept {
 SearchOrderingTables::SearchOrderingTables()
     : multi_ply_continuation_history_(std::make_unique<int[]>(
           kSearchContinuationPlies * kContinuationHistorySize)),
-      pawn_history_(std::make_unique<int[]>(kPawnHistorySize)) {
+      pawn_history_(std::make_unique<int[]>(kPawnHistorySize)),
+      pawn_correction_(std::make_unique<int[]>(kPawnCorrectionHistorySize)),
+      material_correction_(std::make_unique<int[]>(kMaterialCorrectionHistorySize)),
+      king_correction_(std::make_unique<int[]>(kKingCorrectionHistorySize)) {
     // `clear()` intentionally retains its historical zeroed-reset contract
     // for diagnostics.  A newly created worker, however, should begin with
     // the calibrated Stockfish-style priors rather than indeterminate heap
@@ -64,6 +67,11 @@ SearchOrderingTables::SearchOrderingTables()
                 kSearchContinuationPlies * kContinuationHistorySize,
                 kInitialContinuationHistory);
     std::fill_n(pawn_history_.get(), kPawnHistorySize, kInitialPawnHistory);
+    // Correction tables start neutral: the first visit to a key sees the raw
+    // evaluator score until the search itself supplies evidence.
+    std::fill_n(pawn_correction_.get(), kPawnCorrectionHistorySize, 0);
+    std::fill_n(material_correction_.get(), kMaterialCorrectionHistorySize, 0);
+    std::fill_n(king_correction_.get(), kKingCorrectionHistorySize, 0);
 }
 
 SearchOrderingTables::~SearchOrderingTables() = default;
@@ -139,6 +147,15 @@ void SearchOrderingTables::clear() noexcept {
     }
     if (pawn_history_ != nullptr) {
         std::fill_n(pawn_history_.get(), kPawnHistorySize, 0);
+    }
+    if (pawn_correction_ != nullptr) {
+        std::fill_n(pawn_correction_.get(), kPawnCorrectionHistorySize, 0);
+    }
+    if (material_correction_ != nullptr) {
+        std::fill_n(material_correction_.get(), kMaterialCorrectionHistorySize, 0);
+    }
+    if (king_correction_ != nullptr) {
+        std::fill_n(king_correction_.get(), kKingCorrectionHistorySize, 0);
     }
 }
 
@@ -248,6 +265,39 @@ bool SearchOrderingTables::is_proven_counter_move(
     const std::size_t previous_index = move_index(previous_move);
     return counter_moves_[side_index][previous_index] == move &&
         counter_confidence_[side_index][previous_index] >= kCounterMoveMinimumConfidence;
+}
+
+int SearchOrderingTables::correction_value(const std::uint64_t pawn_key,
+                                           const std::uint64_t material_key,
+                                           const std::uint64_t king_key) const noexcept {
+    const std::size_t pawn_slot = static_cast<std::size_t>(
+        mix64(pawn_key) & (kPawnCorrectionHistorySize - 1));
+    const std::size_t material_slot = static_cast<std::size_t>(
+        mix64(material_key) & (kMaterialCorrectionHistorySize - 1));
+    const std::size_t king_slot = static_cast<std::size_t>(
+        mix64(king_key) & (kKingCorrectionHistorySize - 1));
+    const std::int64_t total = static_cast<std::int64_t>(pawn_correction_[pawn_slot]) +
+        material_correction_[material_slot] + king_correction_[king_slot];
+    return static_cast<int>(std::clamp<std::int64_t>(
+        total, -kCorrectionTotalLimit, kCorrectionTotalLimit));
+}
+
+void SearchOrderingTables::update_correction(const std::uint64_t pawn_key,
+                                             const std::uint64_t material_key,
+                                             const std::uint64_t king_key,
+                                             const int bonus) noexcept {
+    if (bonus == 0) {
+        return;
+    }
+    update_history(pawn_correction_[static_cast<std::size_t>(
+                       mix64(pawn_key) & (kPawnCorrectionHistorySize - 1))],
+                   bonus, kCorrectionEntryLimit);
+    update_history(material_correction_[static_cast<std::size_t>(
+                       mix64(material_key) & (kMaterialCorrectionHistorySize - 1))],
+                   bonus, kCorrectionEntryLimit);
+    update_history(king_correction_[static_cast<std::size_t>(
+                       mix64(king_key) & (kKingCorrectionHistorySize - 1))],
+                   bonus, kCorrectionEntryLimit);
 }
 
 void SearchOrderingTables::record_quiet_cutoff(

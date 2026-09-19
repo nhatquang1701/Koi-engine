@@ -363,6 +363,34 @@ void test_ordering_resolves_deferred_see_for_search_moves() {
             "ordering must resolve deferred SEE before ranking a capture");
 }
 
+void test_correction_history_saturates_and_resets() {
+    koi::detail::SearchMoveOrdering ordering;
+    constexpr std::uint64_t pawn_key = 0x0123456789ABCDEFULL;
+    constexpr std::uint64_t material_key = 0xFEDCBA9876543210ULL;
+    constexpr std::uint64_t king_key = 0x1111222233334444ULL;
+
+    require(ordering.correction_value(pawn_key, material_key, king_key) == 0,
+            "correction history must start neutral");
+
+    for (int index = 0; index < 64; ++index) {
+        ordering.update_correction(pawn_key, material_key, king_key, 48);
+    }
+    const int raised = ordering.correction_value(pawn_key, material_key, king_key);
+    require(raised > 0, "positive correction updates must raise the correction");
+    require(raised <= 192, "the summed correction must stay bounded");
+
+    for (int index = 0; index < 128; ++index) {
+        ordering.update_correction(pawn_key, material_key, king_key, -48);
+    }
+    const int lowered = ordering.correction_value(pawn_key, material_key, king_key);
+    require(lowered < 0, "negative correction updates must lower the correction");
+    require(lowered >= -192, "the summed correction must stay bounded in both directions");
+
+    ordering.clear();
+    require(ordering.correction_value(pawn_key, material_key, king_key) == 0,
+            "clear must reset the correction tables");
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -382,6 +410,7 @@ int main(int argc, char** argv) {
         {"deferred SEE generation", test_search_move_generation_can_defer_see},
         {"quiet-only check metadata", test_search_move_generation_can_skip_capture_check_analysis},
         {"deferred SEE ordering", test_ordering_resolves_deferred_see_for_search_moves},
+        {"correction history saturation", test_correction_history_saturates_and_resets},
     };
 
     return koi::test::run_tests(tests, argc, argv);

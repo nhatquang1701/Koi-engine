@@ -311,6 +311,10 @@ public:
     [[nodiscard]] bool repetition_history_suppressed() const noexcept;
     // Search-only structural key for the adaptive pawn-history table.
     [[nodiscard]] std::uint64_t pawn_key() const noexcept;
+    // Incrementally maintained occupancy for one piece type and color. The
+    // search uses it for cheap material and king correction-history keys
+    // without rebuilding a feature snapshot.
+    [[nodiscard]] std::uint64_t piece_bitboard(PieceType type, Color color) const noexcept;
     [[nodiscard]] std::uint64_t polyglot_key() const noexcept;
     [[nodiscard]] std::uint8_t castling_rights() const noexcept;
     [[nodiscard]] Square en_passant_square() const noexcept;

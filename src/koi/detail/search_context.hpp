@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <bit>
 #include <cstddef>
 #include <cstdint>
 #include <cmath>
@@ -426,6 +427,42 @@ struct SearchContext {
         const int score = evaluation.evaluate(state, perspective);
         entry = EvaluationCacheEntry{key, score, true};
         return score;
+    }
+
+    // Bounded static-eval correction history.  The keys are cheap structural
+    // fingerprints (pawn structure, material counts, side-to-move king square)
+    // and the learned correction is applied to the raw evaluator score only:
+    // transposition entries and every search score keep their own semantics.
+    struct CorrectionKeys {
+        std::uint64_t pawn = 0;
+        std::uint64_t material = 0;
+        std::uint64_t king = 0;
+    };
+
+    [[nodiscard]] static CorrectionKeys correction_keys_for(const GameState& state) noexcept {
+        CorrectionKeys keys;
+        keys.pawn = state.pawn_key();
+        // Material signature: FNV-1a over the ten piece counts.  Counts, not
+        // placements, so positions with the same material share experience.
+        std::uint64_t signature = 0xCBF29CE484222325ULL;
+        constexpr std::array<PieceType, 5> kTypes{PieceType::pawn, PieceType::knight,
+                                                  PieceType::bishop, PieceType::rook,
+                                                  PieceType::queen};
+        constexpr std::array<Color, 2> kColors{Color::white, Color::black};
+        for (const PieceType type : kTypes) {
+            for (const Color color : kColors) {
+                const std::uint64_t count = static_cast<std::uint64_t>(
+                    std::popcount(state.piece_bitboard(type, color)));
+                signature = (signature ^ count) * 0x100000001B3ULL;
+            }
+        }
+        keys.material = signature;
+        const std::uint64_t king_bits =
+            state.piece_bitboard(PieceType::king, state.side_to_move());
+        keys.king = king_bits == 0
+            ? 64ULL
+            : static_cast<std::uint64_t>(std::countr_zero(king_bits));
+        return keys;
     }
 
     // Make/unmake wrappers that report the move to the evaluator worker, if it

@@ -49,6 +49,14 @@ public:
     [[nodiscard]] bool is_proven_counter_move(
         Color side, Move previous_move, Move move) const noexcept;
 
+    // Bounded static-evaluation correction learned from searched nodes. The
+    // correction only shifts the static eval used by pruning and ordering;
+    // TT scores always keep the unadjusted search result.
+    [[nodiscard]] int correction_value(std::uint64_t pawn_key, std::uint64_t material_key,
+                                       std::uint64_t king_key) const noexcept;
+    void update_correction(std::uint64_t pawn_key, std::uint64_t material_key,
+                           std::uint64_t king_key, int bonus) noexcept;
+
     void record_quiet_cutoff(Color side, Move move, int ply, int depth,
                              std::optional<Move> previous_move = std::nullopt) noexcept;
     void record_quiet_cutoff(Color side, const MoveMetadata& metadata, int depth,
@@ -77,6 +85,14 @@ private:
     static constexpr std::size_t kLowPlyHistoryPlies = 5;
     static constexpr std::size_t kPawnHistorySize = 32 * 1024;
     static constexpr std::size_t kContinuationHistorySize = 16 * 1024;
+    static constexpr std::size_t kPawnCorrectionHistorySize = 16 * 1024;
+    static constexpr std::size_t kMaterialCorrectionHistorySize = 8 * 1024;
+    static constexpr std::size_t kKingCorrectionHistorySize = 8 * 1024;
+    // Each correction entry saturates at the entry limit; the sum applied to
+    // the static evaluation is clamped to the total limit. Keeping both small
+    // makes the correction a nudge, never a replacement for the evaluator.
+    static constexpr int kCorrectionEntryLimit = 128;
+    static constexpr int kCorrectionTotalLimit = 192;
 
     [[nodiscard]] static int piece_index(PieceType type) noexcept;
     [[nodiscard]] static std::size_t move_index(Move move) noexcept;
@@ -99,6 +115,9 @@ private:
     std::array<int, kContinuationHistorySize> continuation_history_{};
     std::unique_ptr<int[]> multi_ply_continuation_history_;
     std::unique_ptr<int[]> pawn_history_;
+    std::unique_ptr<int[]> pawn_correction_;
+    std::unique_ptr<int[]> material_correction_;
+    std::unique_ptr<int[]> king_correction_;
 };
 
 } // namespace koi::detail

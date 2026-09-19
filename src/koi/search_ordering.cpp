@@ -83,6 +83,19 @@ void SearchMoveOrdering::clear() noexcept {
     scored_move_count_ = 0;
 }
 
+int SearchMoveOrdering::correction_value(const std::uint64_t pawn_key,
+                                         const std::uint64_t material_key,
+                                         const std::uint64_t king_key) const noexcept {
+    return tables_.correction_value(pawn_key, material_key, king_key);
+}
+
+void SearchMoveOrdering::update_correction(const std::uint64_t pawn_key,
+                                           const std::uint64_t material_key,
+                                           const std::uint64_t king_key,
+                                           const int bonus) noexcept {
+    tables_.update_correction(pawn_key, material_key, king_key, bonus);
+}
+
 bool SearchMoveOrdering::is_killer(const Move move, const int ply) const noexcept {
     return tables_.is_killer(move, ply);
 }

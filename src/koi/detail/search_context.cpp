@@ -656,6 +656,8 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
             });
         int static_eval = 0;
         bool static_eval_valid = false;
+        CorrectionKeys correction_keys{};
+        bool correction_keys_valid = false;
         if (checked) {
             const int previous_ply = ply - 2;
             if (previous_ply >= 0 && stack.frame(static_cast<std::size_t>(previous_ply))
@@ -667,7 +669,13 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
             static_eval = inherited_frame.static_eval;
             static_eval_valid = inherited_frame.static_eval_valid;
         } else {
-            static_eval = evaluate(state, state.side_to_move());
+            // The raw evaluator score is cached; the bounded correction is
+            // applied on top of it so the cache stays perspective-raw.
+            const int raw_eval = evaluate(state, state.side_to_move());
+            correction_keys = correction_keys_for(state);
+            correction_keys_valid = true;
+            static_eval = raw_eval + ordering.correction_value(
+                correction_keys.pawn, correction_keys.material, correction_keys.king);
             static_eval_valid = true;
         }
         frame.static_eval = static_eval;
@@ -1801,6 +1809,20 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
         path_selective_bound = path_selective_bound || selective_pruning ||
             inexact_child_search || unresolved_selective_child;
         path_lower_bound = best_score_safe_lower_bound;
+        // Feed the bounded correction history with the residual the search
+        // found beyond the corrected static evaluation.  Mate scores and
+        // inherited (checked/excluded) evaluations are not samples, and the
+        // update never touches the transposition table.
+        if (correction_keys_valid && !claimable_draw && best_metadata_valid &&
+            std::abs(best_score) < kMateThreshold) {
+            const int scaled_depth = std::min(depth, 8);
+            const int bonus = std::clamp((best_score - static_eval) * scaled_depth / 8, -48, 48);
+            if (bonus != 0) {
+                ordering.update_correction(correction_keys.pawn, correction_keys.material,
+                                           correction_keys.king, bonus);
+                ++stats.correction_history_updates;
+            }
+        }
         const TranspositionBound bound = best_score <= original_alpha ? TranspositionBound::upper
             : best_score >= original_beta ? TranspositionBound::lower : TranspositionBound::exact;
         // An exact bound requires at least one authoritative child and no

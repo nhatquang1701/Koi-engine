@@ -122,6 +122,10 @@ struct SearchStats {
     std::uint64_t capture_history_updates = 0;
     std::uint64_t quiet_history_updates = 0;
     std::uint64_t continuation_history_updates = 0;
+    // Number of bounded static-evaluation correction-history updates. The
+    // correction never touches TT scores; it only shifts the static eval used
+    // by pruning and move ordering.
+    std::uint64_t correction_history_updates = 0;
     std::uint64_t tbhits = 0;
     int seldepth = 0;
     std::chrono::milliseconds elapsed{0};
