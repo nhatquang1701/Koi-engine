@@ -125,6 +125,7 @@ void accumulate_stats(SearchStats& total, const SearchStats& partial) noexcept {
     total.position_feature_extractions += partial.position_feature_extractions;
     total.lmr_parent_feature_reuses += partial.lmr_parent_feature_reuses;
     total.evaluation_cache_hits += partial.evaluation_cache_hits;
+    total.correction_history_updates += partial.correction_history_updates;
     total.tt_hits += partial.tt_hits;
     total.pvs_searches += partial.pvs_searches;
     total.pvs_researches += partial.pvs_researches;
@@ -153,6 +154,7 @@ void accumulate_stats(SearchStats& total, const SearchStats& partial) noexcept {
     total.quiet_futility_prunes += partial.quiet_futility_prunes;
     total.reverse_futility_prunes += partial.reverse_futility_prunes;
     total.razoring_prunes += partial.razoring_prunes;
+    total.internal_iterative_deepening += partial.internal_iterative_deepening;
     total.probcut_searches += partial.probcut_searches;
     total.probcut_cutoffs += partial.probcut_cutoffs;
     total.singular_searches += partial.singular_searches;
@@ -1878,13 +1880,13 @@ struct RootScheduleRecord {
 // bit-for-bit deterministic.
 class LazySmpPool {
 public:
-    LazySmpPool(std::size_t helper_count, const GameState& root, const MoveMetadataList& root_moves,
+    LazySmpPool(std::size_t helper_count, const GameState& root, MoveMetadataList root_moves,
                 const Evaluator& evaluator, TranspositionTable& table, TimeManager& time_manager,
                 std::atomic_bool& stop_requested, std::mutex* evaluator_mutex,
                 bool use_transposition_table,
                 SearchOptions::QuietHistorySideHook quiet_history_side_hook,
                 TablebaseSearchBinding tablebase_binding = {})
-        : root_(root), root_moves_(&root_moves), evaluator_(evaluator), table_(table),
+        : root_(root), root_moves_(std::move(root_moves)), evaluator_(evaluator), table_(table),
           time_manager_(time_manager), stop_requested_(stop_requested),
           evaluator_mutex_(evaluator_mutex), use_transposition_table_(use_transposition_table),
           quiet_history_side_hook_(std::move(quiet_history_side_hook)),
@@ -1935,7 +1937,7 @@ private:
         GameState state = root_;
         auto context_storage = std::make_unique<SearchContext>(
             evaluator_, table_, time_manager_, stop_requested_, nullptr, evaluator_mutex_,
-            root_moves_, use_transposition_table_, quiet_history_side_hook_, tablebase_binding_);
+            &root_moves_, use_transposition_table_, quiet_history_side_hook_, tablebase_binding_);
         SearchContext& context = *context_storage;
         int depth = 1 + static_cast<int>(helper_index % 3);
         while (!stopping_.load(std::memory_order_relaxed) &&
@@ -1953,7 +1955,7 @@ private:
     }
 
     GameState root_;
-    const MoveMetadataList* root_moves_ = nullptr;
+    MoveMetadataList root_moves_;
     const Evaluator& evaluator_;
     TranspositionTable& table_;
     TimeManager& time_manager_;

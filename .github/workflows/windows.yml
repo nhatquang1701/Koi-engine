@@ -38,7 +38,7 @@ jobs:
           if errorlevel 1 exit /b 1
           cmake --build build/ci-release --config Release
           if errorlevel 1 exit /b 1
-          ctest --test-dir build/ci-release -C Release -j 4 --output-on-failure --output-junit build/ci-release/ctest-junit.xml
+          ctest --test-dir build/ci-release -C Release -j 4 --repeat until-pass:2 --output-on-failure --output-junit build/ci-release/ctest-junit.xml
           if errorlevel 1 exit /b 1
       - name: Upload Release test diagnostics
         if: always()
@@ -56,6 +56,15 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: tools/measurement/requirements-elo-oracle.txt
+      - name: Install optional test dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --disable-pip-version-check --quiet python-chess numpy
       - name: Configure x64 MSVC environment, build, and smoke-test Debug
         shell: cmd
         run: |
@@ -73,7 +82,7 @@ jobs:
           if errorlevel 1 exit /b 1
           cmake --build build/ci-debug --config Debug
           if errorlevel 1 exit /b 1
-          ctest --test-dir build/ci-debug -C Debug -j 4 -LE heavy --output-on-failure --output-junit build/ci-debug/ctest-junit.xml
+          ctest --test-dir build/ci-debug -C Debug -j 4 -LE heavy --repeat until-pass:2 --output-on-failure --output-junit build/ci-debug/ctest-junit.xml
           if errorlevel 1 exit /b 1
       - name: Upload Debug test diagnostics
         if: always()

@@ -4308,6 +4308,12 @@ int main(int argc, char** argv) {
     // run so stale entries are pruned (KOI_ALLOW_XPASS=1 is the transitional
     // escape hatch).
     const std::string_view known_failures[]{
+        // Open engine-v2 task: docs/superpowers/plans/2026-09-19-engine-v2.md
+        // still lists "True internal iterative deepening" as unchecked. PV
+        // nodes reached at depth >= 6 keep a table move from the previous
+        // iteration, so the probe cannot trigger at the depth the suite can
+        // afford; remove this entry once the engine-v2 item lands.
+        "true internal iterative deepening",
         "single-PV root forcing extension",
         "depth-one forcing check",
         "threaded depth-one forcing check",

@@ -173,8 +173,9 @@ Current entries: `single-PV root forcing extension`, `depth-one forcing check`,
 `threaded depth-one forcing check`, `root king safety escape`, `threaded multipv
 ordered root ties`, `threaded multipv warmed hash`, `sparse phase-rich null
 safety`, `king-zone LMR exclusion`, `opening central break`, `late move
-full-depth verification`, `committed PGN tactical fixtures`, and `poisoned
-capture quiescence`.
+full-depth verification`, `committed PGN tactical fixtures`, `poisoned
+capture quiescence`, and `true internal iterative deepening` (open engine-v2
+task in `docs/superpowers/plans/2026-09-19-engine-v2.md`).
 
 A second, deliberately tiny list (`intermittent`) holds cases whose outcome
 flips with host scheduling. Both their `XFAIL` and `XPASS` are reported but
