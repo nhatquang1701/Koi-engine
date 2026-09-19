@@ -20,7 +20,7 @@ param(
     [ValidateRange(1, 64)]
     [int]$Depth = 4,
 
-    [ValidateRange(1, 100)]
+    [ValidateRange(1, 100000)]
     [int]$Games = 1,
 
     [ValidateRange(0, 600000)]
@@ -74,7 +74,31 @@ param(
     [string]$BatchId = 'batch-00',
 
     [ValidateSet('measurement', 'before', 'after')]
-    [string]$RunLabel = 'measurement'
+    [string]$RunLabel = 'measurement',
+
+    # Sequential testing. When enabled the match stops as soon as the LLR
+    # crosses a bound (or reaches -SprtMaxGames) instead of playing every
+    # position. -Games still caps games per position, so set it large enough
+    # (or use a single position) for the intended sample.
+    [switch]$Sprt,
+
+    [ValidateRange(-1000.0, 1000.0)]
+    [double]$SprtElo0 = 0.0,
+
+    [ValidateRange(-1000.0, 1000.0)]
+    [double]$SprtElo1 = 5.0,
+
+    [ValidateRange(0.001, 0.5)]
+    [double]$SprtAlpha = 0.05,
+
+    [ValidateRange(0.001, 0.5)]
+    [double]$SprtBeta = 0.05,
+
+    [ValidateRange(2, 100000)]
+    [int]$SprtMinGames = 20,
+
+    [ValidateRange(2, 100000)]
+    [int]$SprtMaxGames = 2000
 )
 
 $ErrorActionPreference = 'Stop'
@@ -98,6 +122,84 @@ if (-not [string]::IsNullOrWhiteSpace($TimeControl) -and ($MovetimeMs -gt 0 -or 
 }
 if (-not [string]::IsNullOrWhiteSpace($FenFile) -and -not [string]::IsNullOrWhiteSpace($OpeningFile)) {
     throw 'Choose at most one of -FenFile and -OpeningFile.'
+}
+if ($Sprt -and $SprtElo1 -le $SprtElo0) {
+    throw 'SPRT requires -SprtElo1 greater than -SprtElo0.'
+}
+if ($Sprt -and $SprtMaxGames -lt $SprtMinGames) {
+    throw 'SPRT requires -SprtMaxGames greater than or equal to -SprtMinGames.'
+}
+
+# Pure sequential-testing state for the logistic SPRT (draw-aware trinomial
+# model, sample variance estimated from the game scores). Kept side-effect free
+# so the process tests can reason about it directly.
+function Get-SprtState {
+    param(
+        [int]$Wins,
+        [int]$Draws,
+        [int]$Losses,
+        [double]$Elo0,
+        [double]$Elo1,
+        [double]$Alpha,
+        [double]$Beta
+    )
+
+    $games = $Wins + $Draws + $Losses
+    $score = [double]$Wins + 0.5 * [double]$Draws
+    $mu0 = 1.0 / (1.0 + [Math]::Pow(10.0, -$Elo0 / 400.0))
+    $mu1 = 1.0 / (1.0 + [Math]::Pow(10.0, -$Elo1 / 400.0))
+    $lower = [Math]::Log($Beta / (1.0 - $Alpha))
+    $upper = [Math]::Log((1.0 - $Beta) / $Alpha)
+
+    $llr = 0.0
+    if ($games -ge 2) {
+        $mean = $score / $games
+        $variance = (
+            $Wins * (1.0 - $mean) * (1.0 - $mean) +
+            $Losses * $mean * $mean +
+            $Draws * (0.5 - $mean) * (0.5 - $mean)) / ($games - 1)
+        # A degenerate sample (for example an all-wins or all-draws match) has
+        # an estimated variance of zero, which leaves the normal-approximation
+        # LLR undefined. Fall back to the variance implied by the null
+        # hypothesis so the test stays well defined and conservative instead of
+        # dividing by a floor and manufacturing a decision.
+        if ($variance -lt 1e-9) {
+            $variance = $mu0 * (1.0 - $mu0)
+        }
+        $llr = (($mu1 - $mu0) * (2.0 * $score - $games * ($mu0 + $mu1))) / (2.0 * $variance)
+    }
+
+    $elo = $null
+    if ($games -gt 0) {
+        $rate = $score / $games
+        if ($rate -le 0.0) {
+            $elo = -3000.0
+        } elseif ($rate -ge 1.0) {
+            $elo = 3000.0
+        } else {
+            $elo = 400.0 / [Math]::Log(10.0) * [Math]::Log($rate / (1.0 - $rate))
+        }
+    }
+
+    $decision = 'running'
+    if ($llr -ge $upper) {
+        $decision = 'accept'
+    } elseif ($llr -le $lower) {
+        $decision = 'reject'
+    }
+
+    return [pscustomobject]@{
+        llr = [Math]::Round($llr, 6)
+        lower = [Math]::Round($lower, 6)
+        upper = [Math]::Round($upper, 6)
+        decision = $decision
+        games = $games
+        wins = $Wins
+        draws = $Draws
+        losses = $Losses
+        score = $score
+        elo = $elo
+    }
 }
 
 function Resolve-Executable([string]$Path, [string]$Label) {
@@ -703,6 +805,10 @@ $koiStop = [pscustomobject]@{ status = 'process exit'; exit_code = $null; stderr
 $opponentStop = [pscustomobject]@{ status = 'process exit'; exit_code = $null; stderr = '' }
 $gameRecords = [System.Collections.Generic.List[object]]::new()
 $pgnGames = [System.Collections.Generic.List[string]]::new()
+$sprtWins = 0
+$sprtDraws = 0
+$sprtLosses = 0
+$sprtAborted = 0
 
 try {
     $koiEngine = Start-UciEngine $koiExecutable 'Koi'
@@ -861,6 +967,38 @@ try {
             $gameObject = [pscustomobject]$game
             $gameRecords.Add($gameObject)
             $pgnGames.Add((Format-Pgn $position $gameObject $whiteName $blackName $pgnTimeControl))
+
+            if ($Sprt) {
+                # Sequential testing needs a decisive or drawn score for every
+                # game. Games that simply run into the ply cap are adjudicated
+                # as draws; only process failures, timeouts, and illegal moves
+                # stay outside the score (and the match aborts on those).
+                if ($result -ceq '1/2-1/2' -or
+                    ($result -ceq '*' -and ($termination -ceq 'max plies' -or $termination -ceq 'rule draw'))) {
+                    ++$sprtDraws
+                } elseif ($result -ceq '1-0' -or $result -ceq '0-1') {
+                    $koiWon = ($result -ceq '1-0' -and $KoiColor -ceq 'white') -or
+                        ($result -ceq '0-1' -and $KoiColor -ceq 'black')
+                    if ($koiWon) {
+                        ++$sprtWins
+                    } else {
+                        ++$sprtLosses
+                    }
+                } else {
+                    ++$sprtAborted
+                }
+                $scoredGames = $sprtWins + $sprtDraws + $sprtLosses
+                if ($scoredGames -ge $SprtMinGames) {
+                    $sprtState = Get-SprtState -Wins $sprtWins -Draws $sprtDraws -Losses $sprtLosses `
+                        -Elo0 $SprtElo0 -Elo1 $SprtElo1 -Alpha $SprtAlpha -Beta $SprtBeta
+                    if ($sprtState.decision -ne 'running') {
+                        $stopMatches = $true
+                    }
+                }
+                if ($scoredGames -ge $SprtMaxGames) {
+                    $stopMatches = $true
+                }
+            }
         }
     }
 }
@@ -940,6 +1078,35 @@ $measurement = [ordered]@{
     time_control = Get-TimeControlMetadata
 }
 
+$sprtSummary = if ($Sprt) {
+    $finalState = Get-SprtState -Wins $sprtWins -Draws $sprtDraws -Losses $sprtLosses `
+        -Elo0 $SprtElo0 -Elo1 $SprtElo1 -Alpha $SprtAlpha -Beta $SprtBeta
+    [ordered]@{
+        enabled = $true
+        elo0 = $SprtElo0
+        elo1 = $SprtElo1
+        alpha = $SprtAlpha
+        beta = $SprtBeta
+        min_games = $SprtMinGames
+        max_games = $SprtMaxGames
+        llr = $finalState.llr
+        lower = $finalState.lower
+        upper = $finalState.upper
+        decision = if ($finalState.decision -eq 'running') { 'inconclusive' } else { $finalState.decision }
+        games = $finalState.games
+        wins = $finalState.wins
+        draws = $finalState.draws
+        losses = $finalState.losses
+        aborted = $sprtAborted
+        elo = $finalState.elo
+    }
+} else {
+    [ordered]@{
+        enabled = $false
+        decision = 'disabled'
+    }
+}
+
 $report = [ordered]@{
     schema = 'koi-uci-match-v2'
     generated_utc = (Get-Date).ToUniversalTime().ToString('o')
@@ -972,6 +1139,7 @@ $report = [ordered]@{
     engines = $engineSummary
     positions = @($positions)
     games = @($gameRecords)
+    sprt = $sprtSummary
 }
 
 $jsonPath = "$basePath.json"

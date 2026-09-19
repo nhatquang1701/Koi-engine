@@ -38,13 +38,19 @@ function Invoke-ScriptedMatch([string]$KoiPath, [string]$OpponentPath, [string]$
                                [string]$OpeningFile = '', [string]$TimeControl = '',
                                [string]$KoiColor = 'white', [uint64]$KoiRandomSeed = 1,
                                [bool]$KoiOwnBook = $true, [string]$KoiBookFile = 'book.bin',
-                               [int]$KoiBookDepth = 16) {
+                               [int]$KoiBookDepth = 16,
+                                [switch]$Sprt, [int]$SprtMinGames = 20, [int]$SprtMaxGames = 2000,
+                                [double]$SprtElo1 = 5.0) {
     $optionalArguments = @()
     if (-not [string]::IsNullOrWhiteSpace($OpeningFile)) {
         $optionalArguments += @('-OpeningFile', $OpeningFile)
     }
     if (-not [string]::IsNullOrWhiteSpace($TimeControl)) {
         $optionalArguments += @('-TimeControl', $TimeControl)
+    }
+    if ($Sprt) {
+        $optionalArguments += @('-Sprt', '-SprtMinGames', $SprtMinGames, '-SprtMaxGames', $SprtMaxGames,
+            '-SprtElo1', $SprtElo1)
     }
     $output = & $PowerShellExecutable -NoProfile -ExecutionPolicy Bypass -File $matchScript `
         -KoiPath $KoiPath -OpponentPath $OpponentPath -ReplayPath $replayPath `
@@ -317,6 +323,57 @@ try {
     $newGameCommands = @(Get-Content -LiteralPath $slowKoi.log | Where-Object { $_ -ceq 'ucinewgame' })
     if ($newGameCommands.Count -ne 1) {
         throw 'A timed-out engine must not receive a later-game ucinewgame command.'
+    }
+
+    # The forced-result cases use elo1=200 so a 100% score produces a decisive
+    # LLR quickly; with the default elo1=5 a perfect score only gains about
+    # 0.014 per game, which is correct SPRT behaviour but would not stop inside
+    # a 100-game cap.
+    $sprtWinDirectory = Join-Path $outputDirectory 'sprt-win'
+    New-Item -ItemType Directory -Path $sprtWinDirectory -Force | Out-Null
+    $mateWhite = New-ScriptedUciEngine -FixturePath $fixturePath -Directory $sprtWinDirectory 'mate-white'
+    $passiveBlack = New-ScriptedUciEngine -FixturePath $fixturePath -Directory $sprtWinDirectory 'passive-black'
+    $sprtWinMatch = Invoke-ScriptedMatch $mateWhite.path $passiveBlack.path $sprtWinDirectory `
+        200 16 5000 '' '' 'white' 1 $false 'book.bin' 16 -Sprt -SprtMinGames 10 -SprtMaxGames 100 `
+        -SprtElo1 200
+    $sprtWinReport = $sprtWinMatch.report
+    if ($sprtWinReport.sprt.enabled -ne $true -or $sprtWinReport.sprt.decision -ne 'accept' -or
+        $sprtWinReport.sprt.games -lt 10 -or $sprtWinReport.sprt.games -ge 100 -or
+        $sprtWinReport.sprt.llr -lt $sprtWinReport.sprt.upper -or
+        $sprtWinReport.sprt.wins -ne $sprtWinReport.sprt.games -or
+        $sprtWinReport.games.Count -ne $sprtWinReport.sprt.games) {
+        throw 'An always-winning candidate must accept the SPRT alternative at the first legal stop.'
+    }
+
+    $sprtLoseDirectory = Join-Path $outputDirectory 'sprt-lose'
+    New-Item -ItemType Directory -Path $sprtLoseDirectory -Force | Out-Null
+    $passiveBlackLose = New-ScriptedUciEngine -FixturePath $fixturePath -Directory $sprtLoseDirectory 'passive-black'
+    $mateWhiteLose = New-ScriptedUciEngine -FixturePath $fixturePath -Directory $sprtLoseDirectory 'mate-white'
+    $sprtLoseMatch = Invoke-ScriptedMatch $passiveBlackLose.path $mateWhiteLose.path $sprtLoseDirectory `
+        200 16 5000 '' '' 'black' 1 $false 'book.bin' 16 -Sprt -SprtMinGames 10 -SprtMaxGames 100 `
+        -SprtElo1 200
+    $sprtLoseReport = $sprtLoseMatch.report
+    if ($sprtLoseReport.sprt.decision -ne 'reject' -or
+        $sprtLoseReport.sprt.games -lt 10 -or $sprtLoseReport.sprt.games -ge 100 -or
+        $sprtLoseReport.sprt.llr -gt $sprtLoseReport.sprt.lower -or
+        $sprtLoseReport.sprt.losses -ne $sprtLoseReport.sprt.games) {
+        throw 'An always-losing candidate must reject the SPRT alternative at the first legal stop.'
+    }
+
+    $sprtBalancedDirectory = Join-Path $outputDirectory 'sprt-balanced'
+    New-Item -ItemType Directory -Path $sprtBalancedDirectory -Force | Out-Null
+    $alternatorWhite = New-ScriptedUciEngine -FixturePath $fixturePath -Directory $sprtBalancedDirectory 'sprt-alternator-white'
+    $alternatorBlack = New-ScriptedUciEngine -FixturePath $fixturePath -Directory $sprtBalancedDirectory 'sprt-alternator-black'
+    $sprtBalancedMatch = Invoke-ScriptedMatch $alternatorWhite.path $alternatorBlack.path $sprtBalancedDirectory `
+        40 16 5000 '' '' 'white' 1 $false 'book.bin' 16 -Sprt -SprtMinGames 10 -SprtMaxGames 30
+    $sprtBalancedReport = $sprtBalancedMatch.report
+    if ($sprtBalancedReport.sprt.decision -ne 'inconclusive' -or
+        $sprtBalancedReport.sprt.games -ne 30 -or
+        $sprtBalancedReport.sprt.wins -ne 15 -or $sprtBalancedReport.sprt.losses -ne 15 -or
+        $sprtBalancedReport.sprt.draws -ne 0 -or
+        [Math]::Abs([double]$sprtBalancedReport.sprt.llr) -gt 0.5 -or
+        $sprtBalancedReport.games.Count -ne 30) {
+        throw 'A balanced candidate must run to the SPRT game cap and report inconclusive.'
     }
 }
 finally {
