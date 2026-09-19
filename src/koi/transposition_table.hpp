@@ -99,6 +99,10 @@ public:
     void store(std::uint64_t key, int depth, int score, TranspositionBound bound, Move best_move,
                int ply = 0, bool pv = false) noexcept;
     [[nodiscard]] std::optional<TranspositionEntry> probe(std::uint64_t key, int ply = 0) const noexcept;
+    // Software prefetch of the probe cluster.  Search calls this a few
+    // instructions before the matching probe so the cache line fetch overlaps
+    // the work in between; a disabled or empty table is a no-op.
+    void prefetch(std::uint64_t key) const noexcept;
 
 private:
     struct Storage;

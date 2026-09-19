@@ -1711,7 +1711,9 @@ void GameState::legal_moves_with_metadata(MoveMetadataList& moves,
     moves.clear();
     const std::uint64_t key = position_key();
     try {
-        std::array<Move, kMaximumLegalMoves> legal{};
+        // Only the first `legal_count` entries are read; the generator writes
+        // them all before use, so the zero-fill pass is skipped.
+        std::array<Move, kMaximumLegalMoves> legal;
         const std::size_t legal_count = impl_->native_position.legal_moves_into(legal);
         for (std::size_t index = 0; index < legal_count; ++index) {
             const Move& move = legal[index];
@@ -1735,7 +1737,9 @@ bool GameState::legal_tactical_moves_with_metadata(MoveMetadataList& moves,
     const std::uint64_t key = position_key();
     bool has_legal_moves = false;
     try {
-        std::array<Move, kMaximumLegalMoves> legal{};
+        // Only the first `legal_count` entries are read; the generator writes
+        // them all before use, so the zero-fill pass is skipped.
+        std::array<Move, kMaximumLegalMoves> legal;
         const std::size_t legal_count = impl_->native_position.legal_moves_into(legal);
         has_legal_moves = legal_count != 0;
         const bool checked = impl_->native_position.in_check();
@@ -1798,7 +1802,7 @@ std::optional<MoveMetadata> GameState::metadata_for_native_move(
     }
 
     const Piece target = impl_->native_position.piece_at(move.to());
-    MoveMetadata metadata;
+    MoveMetadata metadata{};
     metadata.move = move;
     metadata.moving_piece = moving.type;
     metadata.captured_piece = target.empty() ? PieceType::none : target.type;

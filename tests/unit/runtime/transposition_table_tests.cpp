@@ -124,6 +124,44 @@ void test_resize_changes_the_reported_size() {
     require(table.size_mb() == 1, "requests below the minimum must clamp to one megabyte");
 }
 
+void test_power_of_two_rounding_and_prefetch() {
+    // Cluster indexing masks the key, so the allocation rounds down to the
+    // nearest power of two clusters and the reported size follows it.
+    TranspositionTable table(3);
+    require(table.size_mb() == 2, "a three megabyte request must round down to two");
+
+    (void)table.set_size_mb(5);
+    require(table.size_mb() == 4, "a five megabyte request must round down to four");
+
+    (void)table.set_size_mb(7);
+    require(table.size_mb() == 4, "a seven megabyte request must round down to four");
+
+    // A prefetch is advisory: it must be safe before a probe and must not
+    // change what the probe finds.
+    const Move move = parse_move("e2e4");
+    table.prefetch(0xABCDULL);
+    table.store(0xABCDULL, 6, 12, TranspositionBound::exact, move);
+    table.prefetch(0xABCDULL);
+    require(koi::test::require_value(table.probe(0xABCDULL),
+                                     "prefetch must not disturb a probe")
+                .score == 12,
+            "a prefetched probe must return the stored entry");
+}
+
+void test_cluster_masking_covers_every_slot() {
+    TranspositionTable table(2);
+    const Move move = parse_move("e2e4");
+
+    // Fewer keys than clusters, so every stored key must survive without a
+    // replacement collision; this catches a mask/segment-address mistake.
+    for (std::uint64_t key = 0; key < 4096; ++key) {
+        table.store(key, 2, static_cast<int>(key), TranspositionBound::exact, move);
+    }
+    for (std::uint64_t key = 0; key < 4096; ++key) {
+        require(table.probe(key).has_value(), "every stored key must probe");
+    }
+}
+
 void test_concurrent_store_and_probe_is_safe() {
     TranspositionTable table(1);
     const Move move = parse_move("e2e4");
@@ -162,6 +200,8 @@ int main(int argc, char** argv) {
         {"transposition generation ageing", test_new_generation_ages_entries},
         {"transposition clear and hashfull", test_clear_invalidates_entries_and_resets_hashfull},
         {"transposition resize bounds", test_resize_changes_the_reported_size},
+        {"transposition power of two rounding", test_power_of_two_rounding_and_prefetch},
+        {"transposition cluster masking", test_cluster_masking_covers_every_slot},
         {"transposition concurrent access", test_concurrent_store_and_probe_is_safe},
     };
     return koi::test::run_tests(tests, argc, argv);

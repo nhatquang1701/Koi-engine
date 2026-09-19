@@ -41,21 +41,26 @@ enum class CheckFlagMode : std::uint8_t {
 };
 
 struct MoveMetadata {
+    // Deliberately no default member initializers beyond Move's own sentinel:
+    // the search hot path stores these in fixed 256-entry lists where only the
+    // first `size()` entries are ever read, so a per-node value-initialization
+    // of the whole list would write ~10 KiB for nothing.  Use `MoveMetadata{}`
+    // when a zeroed record is wanted.
     Move move;
-    PieceType moving_piece = PieceType::none;
-    PieceType captured_piece = PieceType::none;
-    MoveKind kind = MoveKind::quiet;
-    bool gives_check = false;
-    bool see_computed = false;
-    std::int16_t see_score = 0;
-    std::int32_t ordering_score = 0;
+    PieceType moving_piece;
+    PieceType captured_piece;
+    MoveKind kind;
+    bool gives_check;
+    bool see_computed;
+    std::int16_t see_score;
+    std::int32_t ordering_score;
     // A generated metadata record is valid only for this exact position.
     // Keeping the key here lets the fast make path reject stale records
     // without rebuilding a native legal-move list.
-    std::uint64_t position_key = 0;
+    std::uint64_t position_key;
     // Internal provenance token.  It is deliberately not part of the public
     // UCI surface; zero means the record was not produced by Koi's generator.
-    std::uint64_t validation_token = 0;
+    std::uint64_t validation_token;
 
     [[nodiscard]] constexpr bool is_capture() const noexcept {
         return kind == MoveKind::capture || kind == MoveKind::en_passant;
@@ -72,6 +77,27 @@ class MoveMetadataList {
 public:
     using iterator = std::array<MoveMetadata, kMaximumLegalMoves>::iterator;
     using const_iterator = std::array<MoveMetadata, kMaximumLegalMoves>::const_iterator;
+
+    // The storage is intentionally left uninitialized: only the first
+    // `size()` entries are ever read, and the search hot path allocates one of
+    // these per node.  Copying is restricted to the live prefix for the same
+    // reason (an implicit array copy would read the uninitialized tail).
+    constexpr MoveMetadataList() noexcept = default;
+    MoveMetadataList(const MoveMetadataList& other) noexcept { copy_from(other); }
+    MoveMetadataList& operator=(const MoveMetadataList& other) noexcept {
+        if (this != &other) {
+            copy_from(other);
+        }
+        return *this;
+    }
+    MoveMetadataList(MoveMetadataList&& other) noexcept { copy_from(other); }
+    MoveMetadataList& operator=(MoveMetadataList&& other) noexcept {
+        if (this != &other) {
+            copy_from(other);
+        }
+        return *this;
+    }
+    ~MoveMetadataList() = default;
 
     [[nodiscard]] constexpr std::size_t size() const noexcept { return size_; }
     [[nodiscard]] constexpr bool empty() const noexcept { return size_ == 0; }
@@ -105,7 +131,14 @@ public:
     }
 
 private:
-    std::array<MoveMetadata, kMaximumLegalMoves> storage_{};
+    void copy_from(const MoveMetadataList& other) noexcept {
+        size_ = other.size_;
+        for (std::size_t index = 0; index < size_; ++index) {
+            storage_[index] = other.storage_[index];
+        }
+    }
+
+    std::array<MoveMetadata, kMaximumLegalMoves> storage_;
     std::size_t size_ = 0;
 };
 

@@ -523,6 +523,11 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
             return 0;
         }
         record_ply(ply);
+        // This node's search key is stable for its whole lifetime, so compute
+        // it once and let the cluster prefetch overlap the static evaluation,
+        // pruning gates, and move ordering before the probe below.
+        const std::uint64_t transposition_key = search_transposition_key(state);
+        table_access.prefetch(transposition_key);
 
         // Quiescence performs its own terminal-aware tactical/evasion move
         // generation. Do not build and annotate the full legal move list here
@@ -734,7 +739,7 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
         std::optional<Move> tt_move;
         std::optional<TranspositionEntry> tt_entry;
         int tt_lower_bound_floor = -kInfinity;
-        if (const auto entry = table_access.probe(search_transposition_key(state), ply);
+        if (const auto entry = table_access.probe(transposition_key, ply);
             entry.has_value()) {
             tt_entry = entry;
             ++stats.tt_hits;
@@ -1808,8 +1813,8 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
              (!selective_pruning && !inexact_child_search &&
               !unresolved_selective_child));
         if (!excluded_search && !claimable_draw && !path_repetition_sensitive && safe_to_store) {
-            table_access.store(
-                search_transposition_key(state), depth, best_score, bound, best_move, ply,
+        table_access.store(
+            transposition_key, depth, best_score, bound, best_move, ply,
                 frame.tt_pv);
         }
         if (root_authoritative_path != nullptr && ply == 0 && !excluded_search) {

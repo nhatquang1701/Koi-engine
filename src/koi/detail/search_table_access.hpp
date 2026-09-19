@@ -79,6 +79,14 @@ public:
         return table_->probe(key, ply);
     }
 
+    // Advisory prefetch of the cluster a later probe will read; a disabled
+    // view stays a complete no-op on the shared table.
+    void prefetch(const std::uint64_t key) const noexcept {
+        if (enabled_) {
+            table_->prefetch(key);
+        }
+    }
+
     void store(const std::uint64_t key, const int depth, const int score,
                const TranspositionBound bound, const Move best_move,
                const int ply = 0, const bool pv = false) noexcept {

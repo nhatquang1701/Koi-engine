@@ -2766,7 +2766,7 @@ void SearchRunner::run() {
                     !root_score_snapshot.empty() && result.best_move.has_value() &&
                     !mate_from_score(score).has_value()) {
                     struct ShallowRootCandidate {
-                        MoveMetadata metadata;
+                        MoveMetadata metadata{};
                         int score = -kInfinity;
                         bool forcing = false;
                     };
@@ -2937,7 +2937,7 @@ void SearchRunner::run() {
                         std::size_t candidate_count = 0;
                         struct QuietCandidate {
                             int score = -kInfinity;
-                            MoveMetadata metadata;
+                            MoveMetadata metadata{};
                         };
                         std::array<QuietCandidate, 2> quiet_candidates{};
                         std::size_t quiet_count = 0;

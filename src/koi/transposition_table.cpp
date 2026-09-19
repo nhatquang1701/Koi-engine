@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <bit>
 #include <limits>
 #include <mutex>
 #include <new>
@@ -15,6 +16,15 @@
 #define NOMINMAX
 #endif
 #include <windows.h>
+#endif
+
+#if defined(_MSC_VER) && (defined(_M_X64) || defined(_M_IX86))
+#include <intrin.h>
+#define KOI_TT_PREFETCH(address) _mm_prefetch(reinterpret_cast<const char*>(address), _MM_HINT_T0)
+#elif defined(__GNUC__) || defined(__clang__)
+#define KOI_TT_PREFETCH(address) __builtin_prefetch(address)
+#else
+#define KOI_TT_PREFETCH(address) ((void)(address))
 #endif
 
 namespace koi {
@@ -83,6 +93,26 @@ std::size_t u64_to_size(std::uint64_t value) noexcept {
     return static_cast<std::size_t>(std::min(value, maximum));
 }
 
+// Indexing uses a power-of-two cluster count so the probe/store hot path can
+// mask instead of divide.  The table therefore rounds its allocation down to
+// the nearest power of two clusters; the reported size follows the rounded
+// allocation.
+[[nodiscard]] std::size_t round_down_power_of_two(const std::size_t value) noexcept {
+    if (value <= 1) {
+        return 1;
+    }
+    return std::bit_floor(value);
+}
+
+[[nodiscard]] std::size_t rounded_size_mb(const std::size_t megabytes) noexcept {
+    const std::size_t requested_entries = std::max<std::size_t>(
+        kClusterSize, megabytes_to_bytes(megabytes) / sizeof(TranspositionEntry));
+    const std::size_t clusters = round_down_power_of_two(
+        std::max<std::size_t>(1, requested_entries / kClusterSize));
+    const std::size_t total_entries = clusters * kClusterSize;
+    return std::max<std::size_t>(1, bytes_to_megabytes(total_entries * sizeof(TranspositionEntry)));
+}
+
 } // namespace
 
 struct TranspositionTable::Storage {
@@ -99,14 +129,19 @@ struct TranspositionTable::Storage {
     };
 
     explicit Storage(std::size_t megabytes, const HashAllocationFailureProvider& failure)
-        : entries_per_segment(std::max<std::size_t>(
+        : entries_per_segment(round_down_power_of_two(std::max<std::size_t>(
               kClusterSize,
-              (kSegmentBytes / sizeof(TranspositionEntry)) / kClusterSize * kClusterSize)) {
+              (kSegmentBytes / sizeof(TranspositionEntry)) / kClusterSize * kClusterSize))),
+          entries_per_segment_mask(entries_per_segment - 1),
+          segment_shift(std::countr_zero(entries_per_segment)) {
         const std::size_t requested_bytes = megabytes_to_bytes(megabytes);
         const std::size_t requested_entries = std::max<std::size_t>(
             kClusterSize, requested_bytes / sizeof(TranspositionEntry));
-        const std::size_t total_entries = std::max<std::size_t>(
-            kClusterSize, requested_entries / kClusterSize * kClusterSize);
+        // Power-of-two cluster count so store/probe can mask the search key.
+        cluster_count = round_down_power_of_two(
+            std::max<std::size_t>(1, requested_entries / kClusterSize));
+        cluster_mask = cluster_count - 1;
+        const std::size_t total_entries = cluster_count * kClusterSize;
         const std::size_t segment_count =
             (total_entries + entries_per_segment - 1) / entries_per_segment;
         segments.reserve(segment_count);
@@ -117,29 +152,32 @@ struct TranspositionTable::Storage {
             remaining -= count;
         }
         total_slot_count = total_entries;
-        cluster_count = total_entries / kClusterSize;
         allocated_bytes = total_entries * sizeof(TranspositionEntry);
         size_mb = std::max<std::size_t>(1, bytes_to_megabytes(allocated_bytes));
     }
 
     [[nodiscard]] TranspositionEntry& at(std::size_t slot) noexcept {
-        const std::size_t segment = slot / entries_per_segment;
-        const std::size_t offset = slot % entries_per_segment;
-        return segments[segment]->entries[offset];
+        return segments[slot >> segment_shift]->entries[slot & entries_per_segment_mask];
     }
 
     [[nodiscard]] const TranspositionEntry& at(std::size_t slot) const noexcept {
-        const std::size_t segment = slot / entries_per_segment;
-        const std::size_t offset = slot % entries_per_segment;
-        return segments[segment]->entries[offset];
+        return segments[slot >> segment_shift]->entries[slot & entries_per_segment_mask];
+    }
+
+    // First entry of a cluster; the prefetch target for a probe.
+    [[nodiscard]] const TranspositionEntry* cluster_address(std::size_t cluster) const noexcept {
+        return &at(cluster * kClusterSize);
     }
 
     std::vector<std::unique_ptr<Segment>> segments;
     std::array<std::shared_mutex, kStripeCount> stripes;
     const std::size_t entries_per_segment;
+    const std::size_t entries_per_segment_mask;
+    const std::size_t segment_shift;
     std::size_t allocated_bytes = 0;
     std::size_t total_slot_count = 0;
     std::size_t cluster_count = 0;
+    std::size_t cluster_mask = 0;
     std::size_t size_mb = 0;
     std::uint16_t generation = 1;
     // `generation_age` is also the storage epoch for logical Clear Hash
@@ -219,7 +257,10 @@ HashResizeResult TranspositionTable::resize_locked(std::size_t megabytes) noexce
         return result;
     }
 
-    const std::size_t candidate_mb = std::max<std::size_t>(1, bytes_to_megabytes(allowed_bytes));
+    // Round the allocation down to the nearest power-of-two cluster count so
+    // mask indexing stays exact; the reported size matches the storage.
+    const std::size_t candidate_mb = rounded_size_mb(
+        std::max<std::size_t>(1, bytes_to_megabytes(allowed_bytes)));
     if (current != nullptr && current->size_mb == candidate_mb) {
         result.effective_mb = current->size_mb;
         result.allocated_bytes = current->allocated_bytes;
@@ -353,9 +394,10 @@ void TranspositionTable::store(std::uint64_t key, int depth, int score, Transpos
         return;
     }
 
-    const std::size_t cluster = key % storage->cluster_count;
+    const std::size_t cluster = static_cast<std::size_t>(key) & storage->cluster_mask;
     const std::size_t first_slot = cluster * kClusterSize;
-    std::unique_lock stripe_lock(storage->stripes[cluster % kStripeCount]);
+    static_assert(std::has_single_bit(kStripeCount));
+    std::unique_lock stripe_lock(storage->stripes[cluster & (kStripeCount - 1)]);
 
     std::size_t empty_slot = storage->total_slot_count;
     std::size_t replacement_slot = first_slot;
@@ -425,9 +467,12 @@ std::optional<TranspositionEntry> TranspositionTable::probe(std::uint64_t key, i
         return std::nullopt;
     }
 
-    const std::size_t cluster = key % storage->cluster_count;
+    const std::size_t cluster = static_cast<std::size_t>(key) & storage->cluster_mask;
     const std::size_t first_slot = cluster * kClusterSize;
-    std::shared_lock stripe_lock(storage->stripes[cluster % kStripeCount]);
+    // Pull the cluster in while the stripe lock is acquired; callers that
+    // prefetched the key earlier already have the fetch in flight.
+    KOI_TT_PREFETCH(storage->cluster_address(cluster));
+    std::shared_lock stripe_lock(storage->stripes[cluster & (kStripeCount - 1)]);
     for (std::size_t offset = 0; offset < kClusterSize; ++offset) {
         const TranspositionEntry& entry = storage->at(first_slot + offset);
         if (!entry.occupied || entry.generation_age != storage->clear_epoch ||
@@ -440,6 +485,15 @@ std::optional<TranspositionEntry> TranspositionTable::probe(std::uint64_t key, i
         return result;
     }
     return std::nullopt;
+}
+
+void TranspositionTable::prefetch(std::uint64_t key) const noexcept {
+    const auto storage = snapshot();
+    if (storage == nullptr || storage->cluster_count == 0) {
+        return;
+    }
+    const std::size_t cluster = static_cast<std::size_t>(key) & storage->cluster_mask;
+    KOI_TT_PREFETCH(storage->cluster_address(cluster));
 }
 
 } // namespace koi

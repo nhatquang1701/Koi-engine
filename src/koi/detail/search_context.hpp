@@ -63,7 +63,7 @@ struct SearchContext {
         }
 
         [[nodiscard]] MoveMetadata metadata() const noexcept {
-            MoveMetadata result;
+            MoveMetadata result{};
             result.move = move;
             result.moving_piece = moving_piece;
             result.captured_piece = captured_piece;

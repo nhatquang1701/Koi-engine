@@ -665,7 +665,7 @@ void test_fabricated_metadata_is_rejected_by_native_legality() {
     const auto move = koi::Move::parse_uci("e2e5");
     require(move.has_value(), "fabricated metadata move must parse");
 
-    koi::MoveMetadata fabricated;
+    koi::MoveMetadata fabricated{};
     fabricated.move = *move;
     fabricated.moving_piece = koi::PieceType::pawn;
     fabricated.kind = koi::MoveKind::quiet;
