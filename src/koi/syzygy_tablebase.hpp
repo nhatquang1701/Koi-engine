@@ -46,12 +46,24 @@ public:
     SyzygyTablebase& operator=(const SyzygyTablebase&) = delete;
 
     [[nodiscard]] bool enabled() const noexcept;
+    // Largest table registered in the loaded directory (0 when disabled).
+    // While this instance is enabled Fathom cannot be re-initialised, so the
+    // underlying TB_LARGEST global is stable and safe to read.
+    [[nodiscard]] int large_table_limit() const noexcept;
+    // Cheap pre-gate for tree probes.  It only consults the native piece count
+    // and castling rights, so callers can skip building a TablebaseSnapshot and
+    // running the full bitboard validation for positions that cannot be probed.
+    // A true result is permissive: probe/root probing still validates fully.
+    [[nodiscard]] bool probe_eligible(const GameState& state) const noexcept;
     [[nodiscard]] bool supports(const TablebaseSnapshot& snapshot) const noexcept;
     [[nodiscard]] bool allows_depth(int depth) const noexcept;
     [[nodiscard]] std::uint8_t probe_limit() const noexcept;
     [[nodiscard]] std::uint8_t probe_depth() const noexcept;
     [[nodiscard]] bool fifty_move_rule() const noexcept;
     [[nodiscard]] bool uses_clock_aware_root_probe() const noexcept;
+    // Fathom documents tb_probe_wdl as thread safe, so no adapter lock is taken
+    // here.  Root probing uses tb_probe_root, which is documented NOT thread
+    // safe and therefore stays serialised inside this adapter.
     [[nodiscard]] std::optional<SyzygyWdl> probe_wdl(const TablebaseSnapshot& snapshot) const noexcept;
     [[nodiscard]] std::optional<SyzygyRootResult> probe_root(
         const GameState& state, const std::vector<Move>& allowed_moves = {}) const noexcept;

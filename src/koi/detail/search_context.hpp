@@ -41,6 +41,16 @@ namespace koi::detail {
         status == DrawStatus::automatic_seventy_five_move;
 }
 
+// Interior tablebase probing configuration shared by every worker in a search.
+// The table pointer and hook are read-only during the search; each context
+// takes its own copy so workers never share mutable probe state.
+struct TablebaseSearchBinding {
+    const SyzygyTablebase* table = nullptr;
+    int interior_depth = 0;
+    bool fifty_move_rule = true;
+    SearchOptions::TablebaseProbeHook probe_hook;
+};
+
 struct SearchContext {
     // History maluses are deferred until a node has selected its final best
     // move.  They do not need SEE, provenance, or ordering data; retaining a
@@ -162,6 +172,7 @@ struct SearchContext {
     const MoveMetadataList* root_moves = nullptr;
     std::atomic_bool* iteration_aborted = nullptr;
     SearchOptions::QuietHistorySideHook quiet_history_side_hook;
+    TablebaseSearchBinding tablebase;
     SearchMoveOrdering ordering;
     SearchStats stats;
     bool aborted = false;
@@ -185,12 +196,14 @@ struct SearchContext {
                   std::mutex* evaluator_mutex = nullptr,
                   const MoveMetadataList* root_moves = nullptr,
                   bool use_transposition_table = true,
-                  SearchOptions::QuietHistorySideHook quiet_history_side_hook = {})
+                  SearchOptions::QuietHistorySideHook quiet_history_side_hook = {},
+                  TablebaseSearchBinding tablebase_binding = {})
         : evaluation(evaluator, evaluator_mutex), table_access(table, use_transposition_table),
           budget(time_manager, global_nodes), time_manager(time_manager),
           stop_requested(stop_requested), root_moves(root_moves),
           evaluation_cache(std::make_unique<EvaluationCacheEntry[]>(kEvaluationCacheSize)),
-          quiet_history_side_hook(std::move(quiet_history_side_hook)) {
+          quiet_history_side_hook(std::move(quiet_history_side_hook)),
+          tablebase(std::move(tablebase_binding)) {
         if (const auto budget = time_manager.time_budget(); budget.has_value() &&
             *budget <= kShortTimedSerialThreshold) {
             // A short timed search must finish its first root iteration before
@@ -214,6 +227,11 @@ struct SearchContext {
             return candidate;
         }
     }
+
+    // Interior Syzygy WDL probe.  Returns a decisive side-to-move score below
+    // the mate threshold, or nullopt when no cutoff applies.  A configured
+    // probe hook fully overrides real tablebase probing.  Never throws.
+    [[nodiscard]] std::optional<int> probe_tablebase(const GameState& state, int depth);
 
     void begin_iteration(std::atomic_bool* shared_abort) noexcept {
         stats = {};

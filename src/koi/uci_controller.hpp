@@ -118,6 +118,7 @@ private:
     std::filesystem::path eval_file_;
     std::uint8_t syzygy_probe_depth_ = 1;
     std::uint8_t syzygy_probe_limit_ = 5;
+    std::uint8_t syzygy_interior_depth_ = 0;
     bool syzygy_50_move_rule_ = true;
     std::shared_ptr<const SyzygyTablebase> syzygy_ =
         std::make_shared<SyzygyTablebase>();

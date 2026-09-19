@@ -1881,11 +1881,13 @@ public:
                 const Evaluator& evaluator, TranspositionTable& table, TimeManager& time_manager,
                 std::atomic_bool& stop_requested, std::mutex* evaluator_mutex,
                 bool use_transposition_table,
-                SearchOptions::QuietHistorySideHook quiet_history_side_hook)
+                SearchOptions::QuietHistorySideHook quiet_history_side_hook,
+                TablebaseSearchBinding tablebase_binding = {})
         : root_(root), root_moves_(&root_moves), evaluator_(evaluator), table_(table),
           time_manager_(time_manager), stop_requested_(stop_requested),
           evaluator_mutex_(evaluator_mutex), use_transposition_table_(use_transposition_table),
           quiet_history_side_hook_(std::move(quiet_history_side_hook)),
+          tablebase_binding_(std::move(tablebase_binding)),
           helper_stats_(std::max<std::size_t>(1, helper_count)) {
         helpers_.reserve(helper_stats_.size());
         try {
@@ -1932,7 +1934,7 @@ private:
         GameState state = root_;
         auto context_storage = std::make_unique<SearchContext>(
             evaluator_, table_, time_manager_, stop_requested_, nullptr, evaluator_mutex_,
-            root_moves_, use_transposition_table_, quiet_history_side_hook_);
+            root_moves_, use_transposition_table_, quiet_history_side_hook_, tablebase_binding_);
         SearchContext& context = *context_storage;
         int depth = 1 + static_cast<int>(helper_index % 3);
         while (!stopping_.load(std::memory_order_relaxed) &&
@@ -1958,6 +1960,7 @@ private:
     std::mutex* evaluator_mutex_ = nullptr;
     bool use_transposition_table_ = true;
     SearchOptions::QuietHistorySideHook quiet_history_side_hook_;
+    TablebaseSearchBinding tablebase_binding_;
     std::vector<std::thread> helpers_;
     std::vector<SearchStats> helper_stats_;
     std::atomic_bool stopping_{false};
@@ -1970,11 +1973,13 @@ public:
                    TimeManager& time_manager, std::atomic_bool& stop_requested,
                    std::atomic<std::uint64_t>* global_nodes, std::mutex* evaluator_mutex,
                    bool use_transposition_table,
-                   SearchOptions::QuietHistorySideHook quiet_history_side_hook = {})
+                   SearchOptions::QuietHistorySideHook quiet_history_side_hook = {},
+                   TablebaseSearchBinding tablebase_binding = {})
         : worker_count_(std::max<std::size_t>(1, worker_count)), evaluator_(evaluator), table_(table),
           time_manager_(time_manager), stop_requested_(stop_requested), global_nodes_(global_nodes),
           evaluator_mutex_(evaluator_mutex), use_transposition_table_(use_transposition_table),
-          quiet_history_side_hook_(std::move(quiet_history_side_hook)), worker_stats_(worker_count_) {
+          quiet_history_side_hook_(std::move(quiet_history_side_hook)),
+          tablebase_binding_(std::move(tablebase_binding)), worker_stats_(worker_count_) {
         workers_.reserve(worker_count_);
         try {
             for (std::size_t index = 0; index < worker_count_; ++index) {
@@ -2075,7 +2080,8 @@ private:
         // safe without requiring a serial confirmation search.
         auto context_storage = std::make_unique<SearchContext>(
             evaluator_, table_, time_manager_, stop_requested_, global_nodes_,
-            evaluator_mutex_, nullptr, use_transposition_table_, quiet_history_side_hook_);
+            evaluator_mutex_, nullptr, use_transposition_table_, quiet_history_side_hook_,
+            tablebase_binding_);
         SearchContext& context = *context_storage;
         std::uint64_t seen_sequence = 0;
 
@@ -2295,6 +2301,7 @@ private:
     std::mutex* evaluator_mutex_;
     bool use_transposition_table_;
     SearchOptions::QuietHistorySideHook quiet_history_side_hook_;
+    TablebaseSearchBinding tablebase_binding_;
     std::vector<std::thread> workers_;
     std::vector<SearchStats> worker_stats_;
     std::mutex mutex_;
@@ -2409,6 +2416,21 @@ void SearchRunner::run() {
         const int root_static_eval = result.score_cp;
         const bool root_is_claimable_draw = root.is_claimable_draw();
         const bool root_is_forced_draw = root.is_forced_draw();
+
+        // Interior tablebase probing is opt-in, off by default, and mirrors
+        // the root probe restrictions.  The diagnostic hook may stand in for
+        // a real tablebase so the plumbing can be verified without assets.
+        TablebaseSearchBinding tablebase_binding;
+        if (options.syzygy_interior_depth > 0 &&
+            (options.syzygy != nullptr || options.tablebase_probe_hook) &&
+            options.multi_pv == 1 && !options.analyse_mode && !limits.ponder &&
+            !limits.search_moves_specified && !root_is_claimable_draw && !root_is_forced_draw) {
+            tablebase_binding.table = options.syzygy ? options.syzygy.get() : nullptr;
+            tablebase_binding.interior_depth = options.syzygy_interior_depth;
+            tablebase_binding.fifty_move_rule =
+                options.syzygy == nullptr || options.syzygy->fifty_move_rule();
+            tablebase_binding.probe_hook = options.tablebase_probe_hook;
+        }
         const auto normalize_root_fallback_score =
             [root_is_claimable_draw, root_is_forced_draw](const int score) {
                 if (root_is_forced_draw) {
@@ -2506,7 +2528,7 @@ void SearchRunner::run() {
             lazy_pool = std::make_unique<LazySmpPool>(
                 options.threads - 1, root, legal_moves, *evaluator, *table, time_manager,
                 session->stop_requested(), evaluator_mutex_ptr, true,
-                options.quiet_history_side_hook);
+                options.quiet_history_side_hook, tablebase_binding);
         }
 
         if (legal_moves.empty()) {
@@ -2531,7 +2553,7 @@ void SearchRunner::run() {
             auto context_storage = std::make_unique<SearchContext>(
                 *evaluator, *table, time_manager, session->stop_requested(),
                 nullptr, evaluator_mutex_ptr, &legal_moves, true,
-                options.quiet_history_side_hook);
+                options.quiet_history_side_hook, tablebase_binding);
             SearchContext& context = *context_storage;
             context.allow_root_forcing_extension = limits.depth.has_value() &&
                 *limits.depth == 1;
@@ -3646,6 +3668,7 @@ void SearchRunner::run() {
                 info.seldepth = context.stats.seldepth;
                 info.qnodes = context.stats.qnodes;
                 info.tt_hits = context.stats.tt_hits;
+                info.tbhits = context.stats.tbhits;
                 safely_report_info(sink, info);
                 const int iteration_observation_score = bounded_fallback_result ?
                     searched_iteration_score : score;
@@ -3688,12 +3711,12 @@ void SearchRunner::run() {
             const bool multi_pv = options.multi_pv > 1;
             RootWorkerPool pool(worker_count, *evaluator, *table, time_manager,
                                 session->stop_requested(), global_nodes_ptr, evaluator_mutex_ptr, true,
-                                options.quiet_history_side_hook);
+                                options.quiet_history_side_hook, tablebase_binding);
             SearchStats total_stats;
             auto root_context_storage = std::make_unique<SearchContext>(
                 *evaluator, *table, time_manager, session->stop_requested(),
                 global_nodes_ptr, evaluator_mutex_ptr, nullptr, true,
-                options.quiet_history_side_hook);
+                options.quiet_history_side_hook, tablebase_binding);
             SearchContext& root_context = *root_context_storage;
 
             MoveMetadataList parallel_moves = legal_moves;
@@ -4471,6 +4494,7 @@ void SearchRunner::run() {
                     info.seldepth = total_stats.seldepth;
                     info.qnodes = total_stats.qnodes;
                     info.tt_hits = total_stats.tt_hits;
+                    info.tbhits = total_stats.tbhits;
                     info.multipv = static_cast<int>(rank + 1);
                     safely_report_info(sink, info);
                 }
@@ -4531,6 +4555,7 @@ void SearchRunner::run() {
             info.seldepth = result.stats.seldepth;
             info.qnodes = result.stats.qnodes;
             info.tt_hits = result.stats.tt_hits;
+            info.tbhits = result.stats.tbhits;
             safely_report_info(sink, info);
         }
         if (lazy_pool != nullptr) {

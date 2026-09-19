@@ -8,11 +8,55 @@
 #include <optional>
 #include <vector>
 
+#include "koi/syzygy_tablebase.hpp"
+
 namespace koi::detail {
 
 SearchContext::~SearchContext() = default;
 
 static_assert(SearchContext::stack_capacity() == SearchStack::kCapacity);
+
+std::optional<int> SearchContext::probe_tablebase(const GameState& state, const int depth) {
+    const auto decisive_score = [](const std::optional<int> mate) -> std::optional<int> {
+        if (!mate.has_value() || *mate == 0) {
+            // Draws, cursed wins, and blessed losses never cut off.
+            return std::nullopt;
+        }
+        return *mate > 0 ? std::optional<int>{kTablebaseInteriorWinScore} :
+            std::optional<int>{kTablebaseInteriorLossScore};
+    };
+
+    if (tablebase.probe_hook) {
+        if (tablebase.fifty_move_rule && state.halfmove_clock() != 0) {
+            // A win that the 50-move counter can dilute is not decisive.  Skip
+            // the hook entirely so the diagnostic seam has no false side effects.
+            return std::nullopt;
+        }
+        // The hook is a test/diagnostic seam and must never terminate a search.
+        try {
+            const std::optional<TablebaseProbeResult> result =
+                tablebase.probe_hook(state, depth);
+            if (!result.has_value()) {
+                return std::nullopt;
+            }
+            return decisive_score(result->mate);
+        } catch (...) {
+            return std::nullopt;
+        }
+    }
+
+    if (tablebase.table == nullptr || !tablebase.table->probe_eligible(state)) {
+        return std::nullopt;
+    }
+    if (tablebase.table->fifty_move_rule() && state.halfmove_clock() != 0) {
+        return std::nullopt;
+    }
+    const std::optional<SyzygyWdl> wdl = tablebase.table->probe_wdl(state.tablebase_snapshot());
+    if (!wdl.has_value()) {
+        return std::nullopt;
+    }
+    return decisive_score(syzygy_score(*wdl).mate);
+}
 
 int SearchContext::quiescence(GameState& state, int alpha, int beta, int ply,
                               int qdepth,
@@ -815,6 +859,23 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
             tt_move = root_move_hint;
         }
 
+        // Interior Syzygy WDL probe.  Opt-in and off by default; the root probe
+        // keeps its own gate.  Only quiet, non-repetition-sensitive interior
+        // nodes at or below the configured remaining depth may cut off, and a
+        // decisive result is a proven bound rather than a nominal-depth exact
+        // score for this node.
+        if (tablebase.interior_depth >= kMinimumSyzygyInteriorDepth && ply > 0 &&
+            !excluded_search && !claimable_draw && !repetition_sensitive &&
+            depth >= tablebase.interior_depth) {
+            if (const std::optional<int> tablebase_score = probe_tablebase(state, depth);
+                tablebase_score.has_value()) {
+                ++stats.tbhits;
+                path_selective_bound = true;
+                path_lower_bound = *tablebase_score > 0;
+                return *tablebase_score;
+            }
+        }
+
         // Null move is a cut-node probe.  Applying it at the root or on a PV
         // node lets a reduced, non-PV result masquerade as the authoritative
         // root score (especially during aspiration), and can also corrupt the
@@ -1086,6 +1147,36 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
             // nominal-depth node's lower-bound direction.
             path_lower_bound = false;
             return beta + kTranspositionProbCutMargin;
+        }
+
+        // True internal iterative deepening: when no transposition move is
+        // available, re-search this node at depth - 2 with a null window so
+        // the reduced search can seed the table with a move for the full-depth
+        // ordering. The probe score is discarded, and the probe re-enters this
+        // node's stack slot, so the frame fields the move loop still reads are
+        // restored afterwards.
+        const bool true_iid = !claimable_draw && !excluded_search && pv_node && !checked &&
+            !tactical_position && !state.is_repetition_sensitive() && !tt_move.has_value() &&
+            depth >= kTrueInternalIterativeDeepeningMinimumDepth;
+        if (true_iid) {
+            const int probe_depth = depth - 2;
+            PrincipalVariation probe_pv;
+            path_selective_bound = true;
+            // The probe re-enters this node at the same ply, so it rewrites the
+            // frame the move loop below reads; keep a copy and restore it.
+            const SearchFrame saved_frame = frame;
+            (void)negamax(state, probe_depth, alpha, alpha + 1, ply, probe_pv, previous_move,
+                          false, check_extensions_remaining, Move::no_move(), nullptr, nullptr);
+            if (aborted) {
+                return 0;
+            }
+            frame = saved_frame;
+            ++stats.internal_iterative_deepening;
+            const std::optional<TranspositionEntry> probe_entry =
+                table_access.probe(search_transposition_key(state), ply);
+            if (probe_entry.has_value() && probe_entry->best_move != Move::no_move()) {
+                tt_move = probe_entry->best_move;
+            }
         }
 
         SearchMovePicker picker(

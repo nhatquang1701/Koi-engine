@@ -167,11 +167,11 @@ suite stays green:
 - Any other failure prints `FAIL` and fails the run.
 
 Current entries: `single-PV root forcing extension`, `depth-one forcing check`,
-`threaded depth-one forcing check`, `root king safety escape`, `threaded
-root-in-check parity`, `threaded multipv ordered root ties`, `threaded multipv
-warmed hash`, `sparse phase-rich null safety`, `king-zone LMR exclusion`,
-`opening central break`, `late move full-depth verification`, `committed PGN
-tactical fixtures`, `poisoned capture quiescence`.
+`threaded depth-one forcing check`, `root king safety escape`, `threaded multipv
+ordered root ties`, `threaded multipv warmed hash`, `sparse phase-rich null
+safety`, `king-zone LMR exclusion`, `opening central break`, `late move
+full-depth verification`, `committed PGN tactical fixtures`, and `poisoned
+capture quiescence`.
 
 A second, deliberately tiny list (`intermittent`) holds cases whose outcome
 flips with host scheduling. Both their `XFAIL` and `XPASS` are reported but
@@ -251,6 +251,9 @@ timeout, configurable through `KOI_UCI_TIMEOUT_MS`.
 
 - `data/openings/` — opening corpora (`openings-basic.txt`, `openings-curated-32.txt`).
 - `data/positions/` — evaluation and forensic position sets.
+- `data/endgames/` — endgame regression positions (`endgame-positions.txt`)
+  consumed by `classical_evaluator_tests`, which checks perspective symmetry,
+  the bounded endgame scale factors, and dead-position totals.
 - `data/games/` — reference PGNs plus `manifest.json`; the manifest records the
   authoritative SHA-256 and size of each PGN. Most PGNs are reference material
   rather than runtime inputs for a specific test.

@@ -34,3 +34,4 @@ stable because plans and verification records link to each other.
 | `2026-09-18-nnue-studio-ui.md` | NNUE Studio UI: correctness fixes, training telemetry, and run-list UX. |
 | `2026-09-18-nnue-bullet-training.md` | Bullet GPU trainer: dependencies, dataset conversion, exact feature parity, campaign, bug and docs audits. |
 | `2026-09-19-engine-v2.md` | Koi Engine v2: SPRT harness, Studio adoption and redesign, NNUE/TT/SMP/search/movegen modernization. |
+| `2026-09-19-syzygy-endgames.md` | Endgame evaluation scaling and opt-in Syzygy interior WDL probing. |

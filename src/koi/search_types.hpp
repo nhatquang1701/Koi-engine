@@ -126,6 +126,10 @@ struct SearchStats {
     // correction never touches TT scores; it only shifts the static eval used
     // by pruning and move ordering.
     std::uint64_t correction_history_updates = 0;
+    // Number of true internal-iterative-deepening probe searches: nodes with
+    // no transposition move that re-searched themselves at depth - 2 with a
+    // null window to seed the move ordering.
+    std::uint64_t internal_iterative_deepening = 0;
     std::uint64_t tbhits = 0;
     int seldepth = 0;
     std::chrono::milliseconds elapsed{0};
@@ -199,12 +203,28 @@ struct SearchEventSink {
     std::function<void(const SearchResult&)> on_complete;
 };
 
+// Side-to-move relative score reported by an interior tablebase probe.  A
+// mate value marks a decisive WDL result: decisive at any depth, but never a
+// nominal-depth exact score.
+struct TablebaseProbeResult {
+    int score_cp = 0;
+    std::optional<int> mate;
+};
+
 struct SearchOptions {
     using StrengthProfileHook = std::function<void(SearchOptions&)>;
     // Optional test/diagnostic seam for checking which side is used by quiet history.
     // It is not called unless explicitly configured, may run concurrently on root workers,
     // and exceptions are ignored by the search implementation.
     using QuietHistorySideHook = std::function<Color(Color candidate, bool after_unmake)>;
+
+    // Test/diagnostic seam for interior Syzygy WDL probing.  A result is
+    // decisive only when it carries a mate value (win/loss); non-decisive
+    // results (draw, cursed win, blessed loss) must be reported without a mate
+    // value and never produce a cutoff.  When configured, the hook completely
+    // overrides real tablebase probing for interior nodes.
+    using TablebaseProbeHook =
+        std::function<std::optional<TablebaseProbeResult>(const GameState&, int depth)>;
 
     // The portable engine default is intentionally sized for the supported
     // 32 GiB development/match machine.  UCI can still reduce this for small
@@ -227,8 +247,14 @@ struct SearchOptions {
     // Stable UCI snapshot for the future calibrated strength profile; currently neutral.
     bool strength_mode = false;
     std::shared_ptr<const SyzygyTablebase> syzygy;
+    // Interior (in-tree) WDL probing depth.  0 keeps interior probing off and
+    // leaves the root-only behaviour (gated by SyzygyProbeDepth) unchanged.
+    // When non-zero, nodes at this remaining depth or deeper may use tablebase
+    // WDL cutoffs in addition to the root probe.
+    std::uint8_t syzygy_interior_depth = 0;
     StrengthProfileHook strength_profile_hook;
     QuietHistorySideHook quiet_history_side_hook;
+    TablebaseProbeHook tablebase_probe_hook;
 };
 
 [[nodiscard]] inline std::size_t maximum_search_threads() noexcept {

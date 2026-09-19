@@ -539,7 +539,17 @@ int king_activity_for(const PositionFeatures& features, Color color) noexcept {
         std::min(std::abs(rank - 3), std::abs(rank - 4));
     const int centrality = std::max(0, 6 - distance_from_center);
     const int endgame_phase = kEvaluation.maximum_phase - features.game_phase;
-    return centrality * kEvaluation.king_activity_weight * endgame_phase /
+    const int threshold = kEvaluation.king_activity_endgame_threshold;
+    const int span = kEvaluation.maximum_phase - threshold;
+    if (span <= 0 || endgame_phase <= threshold) {
+        return 0;
+    }
+    // Continuous ramp instead of the old hard `phase <= 2` cliff: the king
+    // earns centralization credit through the endgame material range, which
+    // matters for rook and minor-piece endings, and fades out entirely once
+    // enough material is still on the board.
+    const int taper = (endgame_phase - threshold) * kEvaluation.maximum_phase / span;
+    return centrality * kEvaluation.king_activity_weight * taper /
         kEvaluation.maximum_phase;
 }
 
@@ -672,8 +682,11 @@ int passed_pawn_for(const PositionFeatures& features, Color color) noexcept {
     const int own = color_index(color);
     const int direction = color == Color::white ? 1 : -1;
     const std::uint8_t king = features.king_squares[own].index();
+    const std::uint8_t enemy_king = features.king_squares[1 - own].index();
     const int king_file = king < 64 ? king % 8 : 0;
     const int king_rank = king < 64 ? king / 8 : 0;
+    const int enemy_king_file = enemy_king < 64 ? enemy_king % 8 : 0;
+    const int enemy_king_rank = enemy_king < 64 ? enemy_king / 8 : 0;
     const int endgame_phase = kEvaluation.maximum_phase - features.game_phase;
     int score = 0;
 
@@ -703,11 +716,21 @@ int passed_pawn_for(const PositionFeatures& features, Color color) noexcept {
         }
 
         const int king_distance = std::max(std::abs(file - king_file), std::abs(rank - king_rank));
-        if (king_distance <= 2) {
-            score += kEvaluation.passed_pawn_king_support_bonus;
-        }
-        score += std::max(0, 4 - king_distance) *
+        const int enemy_king_distance = std::max(
+            std::abs(file - enemy_king_file), std::abs(rank - enemy_king_rank));
+        // King proximity is only meaningful once the board clears, so taper the
+        // whole support package by the endgame phase: a middlegame passer must
+        // not earn credit for a king that is still sheltering.  The enemy-king
+        // term is a penalty rather than a bonus, so it is allowed to go
+        // negative for passers the hostile king controls.
+        int king_term = std::max(0, 4 - king_distance) *
             kEvaluation.passed_pawn_king_proximity_weight;
+        if (king_distance <= 2) {
+            king_term += kEvaluation.passed_pawn_king_support_bonus;
+        }
+        king_term -= std::max(0, 4 - enemy_king_distance) *
+            kEvaluation.passed_pawn_enemy_king_penalty_weight;
+        score += king_term * endgame_phase / kEvaluation.maximum_phase;
 
         const int advancement = color == Color::white ? rank : 7 - rank;
         score += advancement * kEvaluation.passed_pawn_promotion_weight * endgame_phase /
@@ -784,6 +807,70 @@ int king_safety_for(const PositionFeatures& features, Color color) noexcept {
     return score;
 }
 
+// Narrow, integer-only drawishness scaling for sparse endings.  The returned
+// factor is in 1/kEvaluationScaleOne units; kEvaluationScaleOne means the score
+// is untouched.  The two patterns are deliberately conservative: only endings
+// that are almost always drawn are discounted, so won material configurations
+// (KBB, KBN, KR, KQ) keep their full evaluation.
+int endgame_scale_for(const PositionFeatures& features) noexcept {
+    if (features.game_phase > kEvaluation.endgame_scale_start_phase) {
+        return kEvaluationScaleOne;
+    }
+
+    int knights[2]{};
+    int bishops[2]{};
+    int rooks[2]{};
+    int queens[2]{};
+    int pawns[2]{};
+    int bishop_square[2] = {-1, -1};
+    for (std::uint8_t square = 0; square < 64; ++square) {
+        const Piece piece = features.board[square];
+        if (piece.empty()) {
+            continue;
+        }
+        const int own = color_index(piece.color);
+        switch (piece.type) {
+        case PieceType::knight: ++knights[own]; break;
+        case PieceType::bishop: ++bishops[own]; bishop_square[own] = square; break;
+        case PieceType::rook: ++rooks[own]; break;
+        case PieceType::queen: ++queens[own]; break;
+        case PieceType::pawn: ++pawns[own]; break;
+        case PieceType::king:
+        case PieceType::none:
+            break;
+        }
+    }
+    if (rooks[0] != 0 || rooks[1] != 0 || queens[0] != 0 || queens[1] != 0) {
+        return kEvaluationScaleOne;
+    }
+
+    const int pawns_total = pawns[0] + pawns[1];
+    const bool one_minor_each =
+        knights[0] + bishops[0] == 1 && knights[1] + bishops[1] == 1;
+    if (pawns_total == 0 && one_minor_each) {
+        return kEvaluation.endgame_scale_minor_only;
+    }
+
+    const bool opposite_colored_bishops = knights[0] == 0 && knights[1] == 0 &&
+        bishops[0] == 1 && bishops[1] == 1 && bishop_square[0] >= 0 && bishop_square[1] >= 0 &&
+        ((bishop_square[0] + bishop_square[0] / 8) % 2) !=
+            ((bishop_square[1] + bishop_square[1] / 8) % 2);
+    if (pawns_total > 0 && opposite_colored_bishops) {
+        return kEvaluation.endgame_scale_opposite_bishops;
+    }
+    return kEvaluationScaleOne;
+}
+
+// Round-to-nearest fixed-point scaling.  Plain truncation would collapse
+// centipawn differences smaller than kEvaluationScaleOne / scale, which can
+// flip near-equal move choices in sparse endings; half-up rounding keeps the
+// ordering of close scores intact for as long as the factor allows.
+int apply_endgame_scale(int total, int scale) noexcept {
+    const int half = kEvaluationScaleOne / 2;
+    const int adjustment = total >= 0 ? half : -half;
+    return (total * scale + adjustment) / kEvaluationScaleOne;
+}
+
 } // namespace
 
 EvaluationBreakdown ClassicalEvaluator::breakdown(const GameState& state, Color perspective) const {
@@ -828,8 +915,8 @@ EvaluationBreakdown ClassicalEvaluator::breakdown(const GameState& state, Color 
                         king_safety_for(features, Color::black);
     score.king_safety = score.king_safety * (phase + kEvaluation.king_safety_phase_offset) /
         kEvaluation.king_safety_phase_divisor;
-    score.king_activity = phase <= 2 ?
-        king_activity_for(features, Color::white) - king_activity_for(features, Color::black) : 0;
+    score.king_activity = king_activity_for(features, Color::white) -
+                          king_activity_for(features, Color::black);
     score.passed_pawn = passed_pawn_for(features, Color::white) -
                         passed_pawn_for(features, Color::black);
     score.tempo = phase <= 2 ?
@@ -840,6 +927,13 @@ EvaluationBreakdown ClassicalEvaluator::breakdown(const GameState& state, Color 
                   score.king_safety + score.king_activity + score.passed_pawn + score.tempo;
     if (dead_position) {
         score.total = 0;
+    } else {
+        score.endgame_scale = endgame_scale_for(features);
+        if (score.endgame_scale != kEvaluationScaleOne) {
+            // Fixed-point drawishness discount applied before the perspective
+            // negation below.  Integer-only, so the result stays deterministic.
+            score.total = apply_endgame_scale(score.total, score.endgame_scale);
+        }
     }
 
     if (perspective == Color::black) {

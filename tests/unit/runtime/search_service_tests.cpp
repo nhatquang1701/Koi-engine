@@ -9,10 +9,12 @@
 #include <functional>
 #include <memory>
 #include <optional>
+#include <stdexcept>
 #include <thread>
 #include <vector>
 
 #include "koi/classical_evaluator.hpp"
+#include "koi/detail/search_constants.hpp"
 #include "koi/search_service.hpp"
 #include "koi/search_types.hpp"
 #include "koi_test_support.hpp"
@@ -29,6 +31,8 @@ using koi::SearchInfo;
 using koi::SearchLimits;
 using koi::SearchResult;
 using koi::SearchService;
+using koi::SearchOptions;
+using koi::TablebaseProbeResult;
 using koi::test::require;
 
 // Counts evaluations so the service-level evaluator swap can be observed from
@@ -297,6 +301,207 @@ void test_search_forwards_advisory_incremental_hooks() {
             "search null-move notifications must balance");
 }
 
+// Phase B interior tablebase plumbing: a diagnostic hook stands in for a real
+// tablebase so the cutoff, provenance and gating can be asserted without any
+// tablebase assets on disk.  SyzygyInteriorDepth = 0 must stay byte-identical.
+[[nodiscard]] std::optional<koi::TablebaseProbeResult> decisive_loss_hook(
+    std::atomic<int>* calls, const GameState&, int) {
+    calls->fetch_add(1, std::memory_order_relaxed);
+    return std::optional<koi::TablebaseProbeResult>{
+        koi::TablebaseProbeResult{0, -1}};
+}
+
+void test_interior_tablebase_hook_cuts_off_a_decisive_score() {
+    SearchService service(std::make_shared<koi::ClassicalEvaluator>(), {}, 16);
+    const GameState root = koi::test::require_value(
+        GameState::from_fen("8/8/8/4k3/8/8/4P3/4K3 w - - 0 1"),
+        "the interior tablebase hook fixture must parse");
+
+    std::atomic<int> calls{0};
+    SearchOptions options;
+    options.syzygy_interior_depth = 1;
+    options.tablebase_probe_hook = [&calls](const GameState& state, int depth) {
+        return decisive_loss_hook(&calls, state, depth);
+    };
+
+    SearchLimits limits;
+    limits.depth = 3;
+    std::optional<SearchResult> result;
+    SearchEventSink sink;
+    sink.on_complete = [&result](const SearchResult& completed) { result = completed; };
+    auto handle = service.start(root, limits, sink, options);
+    handle.wait();
+
+    require(result.has_value() && result->completed, "the hooked search must complete");
+    require(calls.load() > 0, "the interior hook must be consulted inside the tree");
+    require(result->stats.tbhits > 0,
+            "a decisive hook cutoff must record a tablebase hit [calls=" +
+                std::to_string(calls.load()) + " tbhits=" +
+                std::to_string(result->stats.tbhits) + " score=" +
+                std::to_string(result->score_cp) + " depth=" +
+                std::to_string(result->completed_depth) + "]");
+    require(result->score_cp == koi::detail::kTablebaseInteriorWinScore,
+            "a decisive hook cutoff must publish the tablebase win score");
+    require(!result->mate.has_value(),
+            "an interior tablebase score below the mate threshold must not advertise mate");
+}
+
+void test_interior_tablebase_hook_ignores_non_decisive_results() {
+    SearchService service(std::make_shared<koi::ClassicalEvaluator>(), {}, 16);
+    const GameState root = koi::test::require_value(
+        GameState::from_fen("8/8/8/4k3/8/8/4P3/4K3 w - - 0 1"),
+        "the interior tablebase hook fixture must parse");
+
+    std::atomic<int> calls{0};
+    SearchOptions options;
+    options.syzygy_interior_depth = 1;
+    options.tablebase_probe_hook = [&calls](const GameState&, int) {
+        calls.fetch_add(1, std::memory_order_relaxed);
+        return std::optional<koi::TablebaseProbeResult>{
+            koi::TablebaseProbeResult{1234, std::nullopt}};
+    };
+
+    SearchLimits limits;
+    limits.depth = 3;
+    std::optional<SearchResult> result;
+    SearchEventSink sink;
+    sink.on_complete = [&result](const SearchResult& completed) { result = completed; };
+    auto handle = service.start(root, limits, sink, options);
+    handle.wait();
+
+    require(result.has_value() && result->completed, "the hooked search must complete");
+    require(calls.load() > 0, "the interior hook must be consulted inside the tree");
+    require(result->stats.tbhits == 0,
+            "a non-decisive hook result must not record a tablebase hit");
+    require(result->score_cp > -koi::detail::kTablebaseInteriorWinScore,
+            "a non-decisive hook result must not replace the search score");
+}
+
+void test_interior_tablebase_hook_ignores_zero_mate_draws() {
+    SearchService service(std::make_shared<koi::ClassicalEvaluator>(), {}, 16);
+    const GameState root = koi::test::require_value(
+        GameState::from_fen("8/8/8/4k3/8/8/4P3/4K3 w - - 0 1"),
+        "the interior tablebase hook fixture must parse");
+
+    std::atomic<int> calls{0};
+    SearchOptions options;
+    options.syzygy_interior_depth = 1;
+    options.tablebase_probe_hook = [&calls](const GameState&, int) {
+        calls.fetch_add(1, std::memory_order_relaxed);
+        return std::optional<koi::TablebaseProbeResult>{
+            koi::TablebaseProbeResult{0, 0}};
+    };
+
+    SearchLimits limits;
+    limits.depth = 3;
+    std::optional<SearchResult> result;
+    SearchEventSink sink;
+    sink.on_complete = [&result](const SearchResult& completed) { result = completed; };
+    auto handle = service.start(root, limits, sink, options);
+    handle.wait();
+
+    require(result.has_value() && result->completed, "the hooked search must complete");
+    require(calls.load() > 0, "the interior hook must be consulted inside the tree");
+    require(result->stats.tbhits == 0,
+            "draw-class hook results must not record a tablebase hit");
+    require(result->score_cp > -koi::detail::kTablebaseInteriorWinScore,
+            "draw-class hook results must not replace the search score");
+}
+
+void test_interior_tablebase_hook_respects_the_fifty_move_rule() {
+    SearchService service(std::make_shared<koi::ClassicalEvaluator>(), {}, 16);
+    const GameState root = koi::test::require_value(
+        GameState::from_fen("8/8/8/4k3/8/8/8/4K2R w - - 20 40"),
+        "the fifty-move hook fixture must parse");
+
+    std::atomic<int> calls{0};
+    SearchOptions options;
+    options.syzygy_interior_depth = 1;
+    options.tablebase_probe_hook = [&calls](const GameState& state, int depth) {
+        return decisive_loss_hook(&calls, state, depth);
+    };
+
+    SearchLimits limits;
+    limits.depth = 3;
+    std::optional<SearchResult> result;
+    SearchEventSink sink;
+    sink.on_complete = [&result](const SearchResult& completed) { result = completed; };
+    auto handle = service.start(root, limits, sink, options);
+    handle.wait();
+
+    require(result.has_value() && result->completed, "the hooked search must complete");
+    require(calls.load() == 0,
+            "a nonzero halfmove clock must suppress the fifty-move-rule probe [calls=" +
+                std::to_string(calls.load()) + " tbhits=" +
+                std::to_string(result->stats.tbhits) + "]");
+    require(result->stats.tbhits == 0,
+            "a suppressed probe must not record a tablebase hit");
+}
+
+void test_interior_tablebase_hook_exceptions_are_swallowed() {
+    SearchService service(std::make_shared<koi::ClassicalEvaluator>(), {}, 16);
+    const GameState root = koi::test::require_value(
+        GameState::from_fen("8/8/8/4k3/8/8/4P3/4K3 w - - 0 1"),
+        "the interior tablebase hook fixture must parse");
+
+    SearchOptions options;
+    options.syzygy_interior_depth = 1;
+    options.tablebase_probe_hook = [](const GameState&, int) -> std::optional<koi::TablebaseProbeResult> {
+        throw std::runtime_error("diagnostic hook failure");
+    };
+
+    SearchLimits limits;
+    limits.depth = 2;
+    std::optional<SearchResult> result;
+    SearchEventSink sink;
+    sink.on_complete = [&result](const SearchResult& completed) { result = completed; };
+    auto handle = service.start(root, limits, sink, options);
+    handle.wait();
+
+    require(result.has_value() && result->completed && result->best_move.has_value(),
+            "a thrown hook error must not abort the search");
+    require(result->stats.tbhits == 0,
+            "a thrown hook error must not record a tablebase hit");
+}
+
+void test_interior_tablebase_default_off_is_byte_identical() {
+    const GameState root = GameState::startpos();
+    SearchLimits limits;
+    limits.depth = 4;
+
+    std::optional<SearchResult> reference;
+    SearchEventSink reference_sink;
+    reference_sink.on_complete = [&reference](const SearchResult& completed) {
+        reference = completed;
+    };
+    SearchService reference_service(std::make_shared<koi::ClassicalEvaluator>(), {}, 16);
+    auto reference_handle = reference_service.start(root, limits, reference_sink);
+    reference_handle.wait();
+    require(reference.has_value(), "the reference search must complete");
+
+    std::atomic<int> calls{0};
+    SearchOptions options;
+    options.tablebase_probe_hook = [&calls](const GameState& state, int depth) {
+        return decisive_loss_hook(&calls, state, depth);
+    };
+    std::optional<SearchResult> hooked;
+    SearchEventSink hooked_sink;
+    hooked_sink.on_complete = [&hooked](const SearchResult& completed) { hooked = completed; };
+    SearchService hooked_service(std::make_shared<koi::ClassicalEvaluator>(), {}, 16);
+    auto hooked_handle = hooked_service.start(root, limits, hooked_sink, options);
+    hooked_handle.wait();
+    require(hooked.has_value(), "the hooked search must complete");
+
+    require(calls.load() == 0,
+            "an interior hook without a configured interior depth must never run");
+    require(hooked->stats.nodes == reference->stats.nodes &&
+                hooked->stats.qnodes == reference->stats.qnodes,
+            "the default SyzygyInteriorDepth = 0 must preserve the node counts");
+    require(hooked->score_cp == reference->score_cp &&
+                hooked->best_move == reference->best_move,
+            "the default SyzygyInteriorDepth = 0 must preserve the result");
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -309,6 +514,12 @@ int main(int argc, char** argv) {
         {"search service sinkless search", test_search_without_a_sink_still_completes},
         {"search service ponderhit conversion", test_request_ponderhit_converts_a_running_ponder_search},
         {"search service incremental hooks", test_search_forwards_advisory_incremental_hooks},
+        {"interior tablebase hook cutoff", test_interior_tablebase_hook_cuts_off_a_decisive_score},
+        {"interior tablebase hook non-decisive", test_interior_tablebase_hook_ignores_non_decisive_results},
+        {"interior tablebase hook zero mate", test_interior_tablebase_hook_ignores_zero_mate_draws},
+        {"interior tablebase hook fifty move", test_interior_tablebase_hook_respects_the_fifty_move_rule},
+        {"interior tablebase hook exception", test_interior_tablebase_hook_exceptions_are_swallowed},
+        {"interior tablebase default off", test_interior_tablebase_default_off_is_byte_identical},
     };
     return koi::test::run_tests(tests, argc, argv);
 }

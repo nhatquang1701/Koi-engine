@@ -8,7 +8,7 @@
 namespace koi {
 
 struct ClassicalEvaluationParameters {
-    std::string_view version = "classical-eval-v7-opening-queen-discipline";
+    std::string_view version = "classical-eval-v8-endgame-scaling";
     int pawn_value = 100;
     int knight_value = 320;
     int bishop_value = 330;
@@ -51,10 +51,31 @@ struct ClassicalEvaluationParameters {
     int king_safety_phase_offset = 8;
     int king_safety_phase_divisor = 32;
     int king_activity_weight = 1;
+    // Endgame-phase depth at which king activity starts to fade in.  Below the
+    // threshold (i.e. while the position still has enough material) the term is
+    // exactly zero; above it the term ramps linearly to the full weight at a
+    // bare-kings phase.  This replaces the old hard `phase <= 2` cliff so rook
+    // and minor-piece endgames keep a king-centralization signal.
+    int king_activity_endgame_threshold = 12;
     int passed_pawn_king_support_bonus = 12;
     int passed_pawn_king_proximity_weight = 3;
+    // A passed pawn the enemy king still controls is worth less than one it
+    // cannot catch; the penalty ramps in as the hostile king closes in.
+    int passed_pawn_enemy_king_penalty_weight = 2;
     int passed_pawn_promotion_weight = 8;
     int tempo_bonus = 10;
+    // Endgame drawishness scaling.  `total` is multiplied by the selected
+    // factor and divided by 64, so 64 (the default) leaves the score untouched.
+    // Scaling only applies while the phase is at or below the start phase, and
+    // the patterns are deliberately narrow to avoid discounting won endings.
+    int endgame_scale_start_phase = 8;
+    // Exactly one minor piece each and no pawns: bishop vs knight, knight vs
+    // knight, and opposite-colored-bishop pairs are almost always drawn.  Two
+    // minors on one side (KBB/KBN) are excluded so those wins keep full value.
+    int endgame_scale_minor_only = 32;
+    // Exactly one bishop each on opposite square colors with no other non-pawn
+    // pieces: the standard opposite-colored-bishop drawing factor.
+    int endgame_scale_opposite_bishops = 32;
 };
 
 inline constexpr ClassicalEvaluationParameters kClassicalEvaluationParameters{};

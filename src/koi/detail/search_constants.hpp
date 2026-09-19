@@ -22,6 +22,12 @@ inline constexpr int kQuiescenceFutilityMargin = 306;
 inline constexpr int kQuiescenceFutilityMoveLimit = 2;
 inline constexpr int kQuiescenceSeeThreshold = 0;
 inline constexpr int kInternalIterativeReductionMinimumDepth = 6;
+// True internal iterative deepening re-searches the current node at a reduced
+// depth with a null window when no transposition move is available, so the
+// full-depth move loop starts from a table-seeded ordering.  The minimum
+// depth keeps the probe off shallow nodes where the extra search costs more
+// than the ordering it buys.
+inline constexpr int kTrueInternalIterativeDeepeningMinimumDepth = 6;
 inline constexpr int kTranspositionProbCutMargin = 428;
 inline constexpr int kReverseFutilityMinimumDepth = 2;
 inline constexpr int kReverseFutilityMaximumDepth = 12;
@@ -53,6 +59,15 @@ inline constexpr std::uint16_t kNullMoveRuleSafetyHalfmoves = 90;
 // verified before it can cut off, so use a smaller static confidence margin
 // and let depth supply the remaining safety distance.
 inline constexpr int kNullMoveStaticMargin = 96;
+
+// Interior Syzygy WDL cutoffs are decisive but deliberately below the mate
+// threshold: a tablebase win proves the result, not a mate distance, so it
+// must never be advertised as a mate score.  The magnitude still dominates
+// any static evaluation.
+inline constexpr int kTablebaseInteriorWinScore = 90'000;
+inline constexpr int kTablebaseInteriorLossScore = -90'000;
+// Interior probing starts at or below this remaining depth when enabled.
+inline constexpr int kMinimumSyzygyInteriorDepth = 1;
 
 // Kept as a private compatibility predicate for existing diagnostic tests;
 // SearchPolicy owns the live LMR decision and uses the same threshold.

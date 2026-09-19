@@ -675,6 +675,18 @@ for eligible single-PV play searches; analysis mode, `MultiPV > 1`, ponder, and
 reported as `tbhits` in valid `info` lines. No tablebase data is distributed
 with Koi.
 
+`SyzygyInteriorDepth` accepts 0..100 (default 0, which disables interior
+probing entirely). When set above zero, search nodes at or below that remaining
+depth may also take a decisive WDL cutoff, under the same eligibility rules as
+the root probe. Only decisive results apply: a win or loss is adopted, while
+draw, cursed-win, and blessed-loss results never override search, and a cutoff
+still requires a zero halfmove clock when `Syzygy50MoveRule` is true. Interior
+probing is experimental and strength-unvalidated (no tablebase assets were
+available to test it against), so leave the option at its default 0 unless you
+are deliberately experimenting. The option is inert unless `SyzygyPath` is set
+or a test probe hook is installed. The `SyzygyProbeDepth` gate on the root probe
+is unchanged by this option.
+
 ### Hidden developer diagnostics
 
 The unadvertised `Debug` check option and `DebugFile` string option are for local
@@ -835,7 +847,8 @@ the options at session start; the portable release defaults are `RandomSeed=0`,
 `UCI_ShowWDL=false`, `Move Overhead=30`, `Slow Mover=100`,
 `UCI_LimitStrength=false`, `UCI_Elo=1320`, `StrengthMode=false`,
 `SyzygyPath=""`, `SyzygyProbeDepth=1`, `SyzygyProbeLimit=5`,
-`Syzygy50MoveRule=true`, and `EvalFile=""` (empty keeps the boot-time evaluator).
+`Syzygy50MoveRule=true`, `SyzygyInteriorDepth=0`, and `EvalFile=""`
+(empty keeps the boot-time evaluator).
 For the recommended En Croissant smoke scenario, use `Hash=512`, `Threads=4`, and
 `Speed=100`, then keep the book and Syzygy paths explicitly configured if those
 assets are available.

@@ -240,6 +240,71 @@ void test_seven_piece_probe_limit_is_preserved() {
             "the tablebase adapter must retain the configured seven-piece ceiling");
 }
 
+void write_dummy_kqvk(const std::filesystem::path& directory) {
+    std::ofstream tablebase(directory / "KQvK.rtbw", std::ios::binary);
+    tablebase.write(std::string(80, '\0').data(), 80);
+}
+
+void test_large_table_limit_reflects_the_loaded_directory() {
+    const koi::SyzygyTablebase disabled("definitely-missing-syzygy-path", 5, 1, true);
+    require(disabled.large_table_limit() == 0,
+            "a disabled tablebase must report no registered tables");
+
+    const koi::test::TempDirectory root;
+    write_dummy_kqvk(root.path());
+    const koi::SyzygyTablebase enabled(root.path(), 5, 1, true);
+    require(enabled.enabled(), "the dummy KQvK fixture must enable probing");
+    require(TB_LARGEST > 0, "Fathom must register the dummy KQvK table");
+    require(enabled.large_table_limit() == static_cast<int>(TB_LARGEST),
+            "the reported large-table limit must match Fathom's registered maximum");
+}
+
+void test_probe_eligibility_is_a_cheap_conservative_gate() {
+    const koi::SyzygyTablebase disabled("definitely-missing-syzygy-path", 5, 1, true);
+    require(!disabled.probe_eligible(state_from_fen("4k3/8/8/8/8/8/8/4K3 w - - 0 1")),
+            "a disabled tablebase must never claim eligibility");
+
+    const koi::test::TempDirectory root;
+    write_dummy_kqvk(root.path());
+    const koi::SyzygyTablebase tablebase(root.path(), 5, 1, true);
+    require(tablebase.enabled(), "the dummy KQvK fixture must enable probing");
+
+    require(tablebase.probe_eligible(state_from_fen("4k3/8/8/8/8/8/8/3QK3 w - - 0 1")),
+            "a three-piece position inside the registered limit must be eligible");
+    require(!tablebase.probe_eligible(state_from_fen("4k3/8/8/8/8/8/8/R2QK3 w - - 0 1")),
+            "positions above the registered large-table limit must not be eligible");
+    require(!tablebase.probe_eligible(state_from_fen("4k3/8/8/8/8/8/8/R3K3 w Q - 0 1")),
+            "castling rights must gate eligibility even within the piece limit");
+    require(tablebase.probe_eligible(state_from_fen("4k3/8/8/8/8/8/8/R3K3 w - - 0 1")),
+            "the same three-piece position without castling rights must be eligible");
+    require(!tablebase.probe_eligible(koi::GameState::startpos()),
+            "the start position must never be eligible for a reduced-piece install");
+}
+
+void test_concurrent_enabled_wdl_probes_agree() {
+    const koi::test::TempDirectory root;
+    write_dummy_kqvk(root.path());
+    const koi::SyzygyTablebase tablebase(root.path(), 5, 1, true);
+    require(tablebase.enabled(), "the dummy KQvK fixture must enable probing");
+
+    const koi::TablebaseSnapshot snapshot = state_from_fen(
+        "4k3/8/8/8/8/8/8/3QK3 w - - 0 1").tablebase_snapshot();
+    std::vector<std::optional<koi::SyzygyWdl>> results(8);
+    std::vector<std::thread> workers;
+    for (int index = 0; index < 8; ++index) {
+        workers.emplace_back([&tablebase, &snapshot, &results, index] {
+            results[static_cast<std::size_t>(index)] = tablebase.probe_wdl(snapshot);
+        });
+    }
+    for (std::thread& worker : workers) {
+        worker.join();
+    }
+    for (const std::optional<koi::SyzygyWdl>& result : results) {
+        require(result == results.front(),
+                "concurrent WDL probes through one enabled tablebase must agree");
+    }
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -264,6 +329,11 @@ int main(int argc, char** argv) {
         {"50-move rule selects clock-aware root probe",
          test_50_move_rule_selects_clock_aware_root_probe},
         {"seven-piece probe limit is preserved", test_seven_piece_probe_limit_is_preserved},
+        {"large table limit reflects the loaded directory",
+         test_large_table_limit_reflects_the_loaded_directory},
+        {"probe eligibility is a cheap conservative gate",
+         test_probe_eligibility_is_a_cheap_conservative_gate},
+        {"concurrent enabled WDL probes agree", test_concurrent_enabled_wdl_probes_agree},
     };
     return koi::test::run_tests(tests, argc, argv);
 }

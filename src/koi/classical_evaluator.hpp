@@ -5,6 +5,10 @@
 
 namespace koi {
 
+// Fixed-point base for EvaluationBreakdown::endgame_scale.  A scale of 64
+// leaves the score untouched; smaller factors discount the drawish endings.
+inline constexpr int kEvaluationScaleOne = 64;
+
 struct EvaluationBreakdown {
     int material = 0;
     int piece_square = 0;
@@ -18,6 +22,11 @@ struct EvaluationBreakdown {
     int king_activity = 0;
     int passed_pawn = 0;
     int tempo = 0;
+    // Drawishness factor applied to the summed terms, in 1/64 units.  It is a
+    // magnitude, not a signed score: perspective negation leaves it unchanged.
+    // `total` therefore equals sum(terms) * endgame_scale / kEvaluationScaleOne
+    // for live positions.
+    int endgame_scale = kEvaluationScaleOne;
     int total = 0;
 };
 

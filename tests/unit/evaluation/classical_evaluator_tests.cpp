@@ -3,6 +3,9 @@
 // tempo and insufficient-material draws.  Search-level score gates stay in
 // koi_search_tests; this suite pins the evaluator contract directly.
 
+#include <filesystem>
+#include <fstream>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -26,6 +29,15 @@ using koi::test::require;
         breakdown.pawn_structure + breakdown.activity + breakdown.development +
         breakdown.center_control + breakdown.initiative + breakdown.king_safety +
         breakdown.king_activity + breakdown.passed_pawn + breakdown.tempo;
+}
+
+// Mirrors the evaluator's round-to-nearest fixed-point application so the
+// tests pin the rounding contract, not just the scale factor.
+[[nodiscard]] int scaled_total(const EvaluationBreakdown& breakdown) {
+    const int half = koi::kEvaluationScaleOne / 2;
+    const int sum = breakdown_sum(breakdown);
+    const int adjustment = sum >= 0 ? half : -half;
+    return (sum * breakdown.endgame_scale + adjustment) / koi::kEvaluationScaleOne;
 }
 
 const std::vector<std::string_view> kLiveFens = {
@@ -53,8 +65,8 @@ void test_breakdown_terms_sum_to_total() {
     for (const std::string_view fen : kLiveFens) {
         const GameState state = state_from(fen);
         const EvaluationBreakdown breakdown = evaluator.breakdown(state, Color::white);
-        require(breakdown_sum(breakdown) == breakdown.total,
-                "the named terms must sum to the reported total");
+        require(scaled_total(breakdown) == breakdown.total,
+                "the named terms must sum to the reported total up to the endgame scale");
         require(evaluator.evaluate(state, Color::white) == breakdown.total,
                 "evaluate must return the breakdown total");
     }
@@ -135,6 +147,118 @@ void test_endgame_tempo_is_phase_gated() {
             "tempo must stay out of the opening phase");
 }
 
+void test_endgame_scale_discounts_drawn_minor_endings() {
+    const koi::ClassicalEvaluator evaluator;
+    // Bishop versus knight without pawns is a dead draw in practice.
+    const GameState bishop_vs_knight = state_from("4k3/8/5n2/8/8/8/8/K1B5 w - - 0 1");
+    const EvaluationBreakdown minor = evaluator.breakdown(bishop_vs_knight, Color::white);
+    require(minor.endgame_scale == evaluator.parameters().endgame_scale_minor_only,
+            "pawnless bishop-versus-knight must receive the minor-piece draw scale");
+    require(minor.total == scaled_total(minor),
+            "the scaled total must stay the fixed-point product of the terms");
+
+    // Two minors on one side (KBN versus K) keep their winning value.
+    const GameState two_minors = state_from("4k3/8/8/8/8/8/8/KB5N w - - 0 1");
+    require(evaluator.breakdown(two_minors, Color::white).endgame_scale ==
+                koi::kEvaluationScaleOne,
+            "two minors versus a bare king must keep the full evaluation");
+}
+
+void test_endgame_scale_halves_opposite_colored_bishops() {
+    const koi::ClassicalEvaluator evaluator;
+    // c1 (dark) versus c8 (light) with one pawn: the standard drawn OCB ending.
+    const GameState opposite = state_from("2b1k3/8/8/8/8/8/4P3/2B1K3 w - - 0 1");
+    const EvaluationBreakdown ocb = evaluator.breakdown(opposite, Color::white);
+    require(ocb.endgame_scale == evaluator.parameters().endgame_scale_opposite_bishops,
+            "opposite-colored bishops must receive the drawing scale");
+    require(ocb.total == scaled_total(ocb),
+            "the scaled total must stay the fixed-point product of the terms");
+
+    // Same-colored bishops are not the drawn pattern and stay untouched.
+    const GameState same = state_from("3bk3/8/8/8/8/8/4P3/2B1K3 w - - 0 1");
+    require(evaluator.breakdown(same, Color::white).endgame_scale == koi::kEvaluationScaleOne,
+            "same-colored bishops must keep the full evaluation");
+}
+
+void test_king_activity_tapers_beyond_the_endgame_threshold() {
+    const koi::ClassicalEvaluator evaluator;
+    // Queen ending (phase 4): the term is active, so a centralized king must
+    // outscore a cornered one even though the old hard phase gate zeroed both.
+    const GameState central = state_from("k7/8/8/8/3K4/8/8/3Q4 w - - 0 1");
+    const GameState corner = state_from("k7/8/8/8/8/8/8/K2Q4 w - - 0 1");
+    require(evaluator.breakdown(central, Color::white).king_activity >
+                evaluator.breakdown(corner, Color::white).king_activity,
+            "king activity must fade in before the bare-kings phase");
+    require(evaluator.breakdown(corner, Color::white).king_activity == 0,
+            "a cornered king must not receive activity credit");
+
+    const GameState opening = state_from("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+    require(evaluator.breakdown(opening, Color::white).king_activity == 0,
+            "king activity must stay out of the full-material middlegame");
+}
+
+void test_endgame_fixture_invariants() {
+    const koi::ClassicalEvaluator evaluator;
+    const std::filesystem::path fixture = koi::test::fixture_path("endgames/endgame-positions.txt");
+    std::ifstream stream(fixture);
+    require(stream.good(), "the endgame fixture must open");
+
+    std::size_t checked = 0;
+    std::string line;
+    while (std::getline(stream, line)) {
+        if (!line.empty() && line.back() == '\r') {
+            line.pop_back();
+        }
+        if (line.empty() || line.starts_with('#')) {
+            continue;
+        }
+        const std::size_t separator = line.find('|');
+        require(separator != std::string::npos, "endgame fixture lines must be name|FEN");
+        const GameState state = state_from(
+            std::string_view(line).substr(separator + 1));
+
+        const EvaluationBreakdown white = evaluator.breakdown(state, Color::white);
+        const EvaluationBreakdown black = evaluator.breakdown(state, Color::black);
+        require(white.total == -black.total,
+                "endgame fixture totals must negate across perspectives");
+        require(white.endgame_scale == black.endgame_scale,
+                "both perspectives must select the same endgame scale");
+        if (state.is_dead_position()) {
+            require(white.total == 0 && black.total == 0,
+                    "dead endgame fixtures must score exactly zero");
+        } else {
+            require(scaled_total(white) == white.total,
+                    "endgame totals must follow the fixed-point scale rounding");
+        }
+        require(white.endgame_scale == koi::kEvaluationScaleOne ||
+                    white.endgame_scale == evaluator.parameters().endgame_scale_minor_only ||
+                    white.endgame_scale == evaluator.parameters().endgame_scale_opposite_bishops,
+                "endgame fixture scales must come from the parameter table");
+        ++checked;
+    }
+    require(checked >= 16, "the endgame fixture must cover the curated corpus");
+}
+
+void test_endgame_king_proximity_shapes_passed_pawn_value() {
+    const koi::ClassicalEvaluator evaluator;
+    // Same pawn, same white king; only the hostile king differs.  With the
+    // black king on c7 the d5 passer is within two squares of it, so the
+    // enemy-king penalty must discount the pawn.
+    const GameState hostile_king_near = state_from("8/2k5/8/3P4/8/8/8/K7 w - - 0 1");
+    const GameState hostile_king_far = state_from("7k/8/8/3P4/8/8/8/K7 w - - 0 1");
+    require(evaluator.breakdown(hostile_king_near, Color::white).passed_pawn <
+                evaluator.breakdown(hostile_king_far, Color::white).passed_pawn,
+            "a passed pawn the enemy king controls must be worth less");
+
+    // Owning-king support must still dominate: the d4 king supports the d5
+    // passer while the a1 king cannot reach it.
+    const GameState supported = state_from("7k/8/8/3P4/3K4/8/8/8 w - - 0 1");
+    const GameState unsupported = state_from("7k/8/8/3P4/8/8/8/K7 w - - 0 1");
+    require(evaluator.breakdown(supported, Color::white).passed_pawn >
+                evaluator.breakdown(unsupported, Color::white).passed_pawn,
+            "an own king supporting the passer must outscore a distant one");
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -147,6 +271,11 @@ int main(int argc, char** argv) {
         {"classical evaluator material", test_material_advantage_is_counted},
         {"classical evaluator mobility", test_mobility_term_follows_the_extra_rook},
         {"classical evaluator tempo gate", test_endgame_tempo_is_phase_gated},
+        {"classical evaluator minor-piece draw scale", test_endgame_scale_discounts_drawn_minor_endings},
+        {"classical evaluator opposite-bishop scale", test_endgame_scale_halves_opposite_colored_bishops},
+        {"classical evaluator king activity taper", test_king_activity_tapers_beyond_the_endgame_threshold},
+        {"classical evaluator passed pawn king proximity", test_endgame_king_proximity_shapes_passed_pawn_value},
+        {"classical evaluator endgame fixture invariants", test_endgame_fixture_invariants},
     };
     return koi::test::run_tests(tests, argc, argv);
 }

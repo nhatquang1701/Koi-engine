@@ -3460,6 +3460,18 @@ void test_search_records_static_eval_correction_history() {
             "a completed search must feed the bounded static-eval correction history");
 }
 
+void test_search_records_true_internal_iterative_deepening() {
+    koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>());
+    koi::SearchLimits limits;
+    limits.depth = 6;
+
+    const koi::SearchResult result = search(service, koi::GameState::startpos(), limits);
+    require(result.best_move.has_value(),
+            "the internal-iterative-deepening search must return a root move");
+    require(result.stats.internal_iterative_deepening > 0,
+            "a deep search without a transposition move must probe at depth - 2");
+}
+
 void test_opening_central_break_survives_root_search_reduction() {
     const koi::GameState root = require_state(
         "rnbqkb1r/pp3ppp/4pn2/2ppN3/3P4/2N5/PPP1PPPP/R1BQKB1R w KQkq - 0 5");
@@ -4253,6 +4265,7 @@ int main(int argc, char** argv) {
         {"late quiet move reductions", test_search_reduces_late_quiet_moves_without_losing_root_legality},
         {"static evaluation cache", test_search_reuses_static_evaluations_for_transpositions},
         {"static eval correction history", test_search_records_static_eval_correction_history},
+        {"true internal iterative deepening", test_search_records_true_internal_iterative_deepening},
         {"bounded mirror validation overhead", test_generated_move_path_has_bounded_mirror_validation_overhead},
         {"late move full-depth verification", test_reduced_late_move_is_verified_at_full_child_depth},
         {"committed PGN tactical fixtures", test_committed_pgn_loss_fixtures_retain_reviewed_move_and_score},

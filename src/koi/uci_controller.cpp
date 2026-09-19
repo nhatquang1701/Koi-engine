@@ -39,6 +39,8 @@ constexpr std::uint64_t kMaximumBookSafetyDepth = 3;
 constexpr std::uint64_t kMinimumSyzygyProbeDepth = 1;
 constexpr std::uint64_t kMaximumSyzygyProbeDepth = 100;
 constexpr std::uint64_t kMaximumSyzygyProbeLimit = 7;
+constexpr std::uint64_t kMinimumSyzygyInteriorDepth = 0;
+constexpr std::uint64_t kMaximumSyzygyInteriorDepth = 100;
 constexpr std::uintmax_t kDebugRotationBytes = 8U * 1024U * 1024U;
 constexpr int kWdlScoreLimit = 1'000;
 // Bounded fallback for a bare `go` and for malformed or asymmetric clock
@@ -148,6 +150,7 @@ enum class UciOptionId {
     syzygy_path,
     syzygy_probe_depth,
     syzygy_probe_limit,
+    syzygy_interior_depth,
     syzygy_50_move_rule,
     eval_file,
     debug,
@@ -169,7 +172,7 @@ struct UciOptionDescriptor {
 // and `handle_setoption` consume this table, so an advertised option can never
 // drift out of sync with the option the controller actually applies. The order
 // of the entries is the order advertised to a GUI and must stay stable.
-constexpr std::array<UciOptionDescriptor, 27> kUciOptions{{
+constexpr std::array<UciOptionDescriptor, 28> kUciOptions{{
     {"RandomSeed", UciOptionKind::spin, UciOptionId::random_seed, "0", 0,
      kMaximumRandomSeed, false, true},
     {"Hash", UciOptionKind::spin, UciOptionId::hash, "512", kMinimumHashMegabytes,
@@ -206,6 +209,10 @@ constexpr std::array<UciOptionDescriptor, 27> kUciOptions{{
      kMinimumSyzygyProbeDepth, kMaximumSyzygyProbeDepth, false, true},
     {"SyzygyProbeLimit", UciOptionKind::spin, UciOptionId::syzygy_probe_limit, "5", 0,
      kMaximumSyzygyProbeLimit, false, true},
+    // Experimental, unvalidated interior probing.  0 keeps root-only probing;
+    // SyzygyProbeDepth continues to gate the root probe.
+    {"SyzygyInteriorDepth", UciOptionKind::spin, UciOptionId::syzygy_interior_depth, "0",
+     kMinimumSyzygyInteriorDepth, kMaximumSyzygyInteriorDepth, false, true},
     {"Syzygy50MoveRule", UciOptionKind::check, UciOptionId::syzygy_50_move_rule, "true", 0, 0,
      false, true},
     // Empty keeps whatever evaluator the engine booted with (the classical
@@ -936,6 +943,14 @@ void UciController::handle_setoption(std::istream& command) {
         });
         break;
 
+    case UciOptionId::syzygy_interior_depth:
+        apply_unsigned(*option, [this](std::uint64_t depth) {
+            // Interior probing is a search-time policy, so no tablebase rebuild
+            // is needed; the value is snapshotted into each SearchOptions.
+            syzygy_interior_depth_ = static_cast<std::uint8_t>(depth);
+        });
+        break;
+
     case UciOptionId::syzygy_50_move_rule:
         apply_boolean([this](bool fifty_move_rule) {
             syzygy_50_move_rule_ = fifty_move_rule;
@@ -1277,6 +1292,7 @@ void UciController::start_search(GameState root, SearchLimits limits, bool skip_
     options.generation = generation;
     options.strength_mode = strength_mode_;
     options.syzygy = syzygy_;
+    options.syzygy_interior_depth = syzygy_interior_depth_;
     active_search_.emplace(search_service_.start(std::move(root), std::move(limits), std::move(sink), options));
 }
 
@@ -1419,6 +1435,19 @@ void UciController::rebuild_syzygy() {
     syzygy_.reset();
     syzygy_ = std::make_shared<SyzygyTablebase>(
         syzygy_path_, syzygy_probe_limit_, syzygy_probe_depth_, syzygy_50_move_rule_);
+    if (syzygy_path_.empty()) {
+        return;
+    }
+    // Surface load diagnostics and the largest registered table so a GUI can
+    // tell an empty/mismatched directory apart from a working install.
+    std::lock_guard lock(output_mutex_);
+    if (syzygy_->enabled()) {
+        output_ << "info string Syzygy: " << syzygy_->large_table_limit()
+                << "-man tables at " << syzygy_path_.string() << '\n' << std::flush;
+    } else {
+        output_ << "info string Syzygy: no usable tables at " << syzygy_path_.string() << '\n'
+                << std::flush;
+    }
 }
 
 void UciController::write_search_completion(std::uint64_t generation,

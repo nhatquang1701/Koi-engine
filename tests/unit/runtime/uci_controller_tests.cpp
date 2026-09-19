@@ -374,6 +374,9 @@ void test_syzygy_options_accept_valid_values_and_ignore_invalid_values() {
         "setoption name SyzygyProbeDepth value 101\n"
         "setoption name SyzygyProbeLimit value 5\n"
         "setoption name SyzygyProbeLimit value 6\n"
+        "setoption name SyzygyInteriorDepth value 3\n"
+        "setoption name SyzygyInteriorDepth value 0\n"
+        "setoption name SyzygyInteriorDepth value 101\n"
         "setoption name Syzygy50MoveRule value false\n"
         "setoption name Syzygy50MoveRule value invalid\n"
         "position fen 4k3/8/8/8/8/8/8/4K3 w - - 0 1\n"
@@ -1642,7 +1645,7 @@ void test_handshake_option_table_is_unique_and_well_formed() {
             "a handshake-only transcript must stay clean");
     const std::vector<std::string> options =
         lines_starting_with(output_lines(handshake.output), "option name ");
-    require(options.size() == 25, "the handshake must advertise exactly 25 options");
+    require(options.size() == 26, "the handshake must advertise exactly 26 options");
 
     const std::string prefix = "option name ";
     std::vector<std::string> names;

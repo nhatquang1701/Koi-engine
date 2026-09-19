@@ -235,6 +235,30 @@ SyzygyTablebase::~SyzygyTablebase() {
 
 bool SyzygyTablebase::enabled() const noexcept { return impl_->enabled; }
 
+int SyzygyTablebase::large_table_limit() const noexcept {
+    return impl_->enabled ? static_cast<int>(TB_LARGEST) : 0;
+}
+
+bool SyzygyTablebase::probe_eligible(const GameState& state) const noexcept {
+    if (!impl_->enabled || state.castling_rights() != 0) {
+        return false;
+    }
+    // The GameState bitboards are maintained incrementally, so this stays far
+    // cheaper than building a TablebaseSnapshot at every interior node.
+    std::size_t pieces = 0;
+    for (std::uint8_t type = static_cast<std::uint8_t>(PieceType::pawn);
+         type <= static_cast<std::uint8_t>(PieceType::king); ++type) {
+        const auto piece_type = static_cast<PieceType>(type);
+        pieces += static_cast<std::size_t>(std::popcount(state.piece_bitboard(piece_type, Color::white)));
+        pieces += static_cast<std::size_t>(std::popcount(state.piece_bitboard(piece_type, Color::black)));
+    }
+    if (pieces == 0 || pieces > impl_->probe_limit || pieces > 7) {
+        return false;
+    }
+    const int largest = large_table_limit();
+    return largest > 0 && pieces <= static_cast<std::size_t>(largest);
+}
+
 bool SyzygyTablebase::supports(const TablebaseSnapshot& snapshot) const noexcept {
     return valid_snapshot(snapshot) && snapshot.castling_rights == 0 &&
         snapshot.piece_count() <= impl_->probe_limit &&
@@ -259,7 +283,8 @@ std::optional<SyzygyWdl> SyzygyTablebase::probe_wdl(
     }
     std::uint64_t white, black, kings, queens, rooks, bishops, knights, pawns;
     native_bitboards(snapshot, white, black, kings, queens, rooks, bishops, knights, pawns);
-    std::lock_guard lock(fathom_mutex());
+    // tb_probe_wdl is documented as thread safe (third_party/fathom/tbprobe.h),
+    // so interior probes may run concurrently without the process lock.
     const unsigned result = tb_probe_wdl(white, black, kings, queens, rooks, bishops,
                                          knights, pawns, 0, snapshot.castling_rights,
                                          native_ep(snapshot), snapshot.side_to_move == Color::white);
@@ -288,6 +313,8 @@ std::optional<SyzygyRootResult> SyzygyTablebase::probe_root(
     TbRootMoves root_moves{};
     int probe_succeeded = 0;
     {
+        // tb_probe_root is documented as NOT thread safe, so root probes stay
+        // serialised against each other and against Fathom lifetime changes.
         std::lock_guard lock(fathom_mutex());
         if (impl_->fifty_move_rule) {
             probe_succeeded = tb_probe_root_dtz(

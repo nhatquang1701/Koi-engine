@@ -20,3 +20,4 @@ strength pass. Paths are intentionally stable because plans link to them.
 | `2026-09-18-nnue-studio-ui.md` | NNUE Studio UI verification (headless tests, GUI smoke, CTest). |
 | `2026-09-18-nnue-bullet-training.md` | Bullet training verification (dependencies, parity tests, campaign gates, audits). |
 | `2026-09-19-engine-v2.md` | Engine v2 verification (baseline, per-phase gates, final suites). |
+| `2026-09-19-syzygy-endgames.md` | Endgame evaluation and Syzygy interior probing verification (tests, A/B, suites). |

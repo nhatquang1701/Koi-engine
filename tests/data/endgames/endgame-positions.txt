@@ -1,0 +1,23 @@
+# Koi endgame evaluator regression corpus: name|FEN
+# Invariants pinned by classical_evaluator_tests (see the
+# "endgame fixture invariants" case): perspective negation, the fixed-point
+# endgame scale rounding contract, scale-magnitude agreement, and zero for
+# dead positions.  Keep every FEN legal with six fields.
+supported_passer|4k3/8/8/3P4/3K4/8/8/8 w - - 0 1
+advanced_passer|k7/6P1/8/8/8/8/8/K7 w - - 0 1
+enemy_king_near_passer|8/2k5/8/3P4/8/8/8/K7 w - - 0 1
+enemy_king_far_passer|7k/8/8/3P4/8/8/8/K7 w - - 0 1
+black_passer_race|4k3/8/8/8/3p4/8/8/4K3 b - - 0 1
+pawn_race_tempo|4k3/8/8/8/8/8/P7/4K3 w - - 0 1
+symmetrical_pawn_endgame|4k3/8/8/8/8/8/4P3/4K3 b - - 0 1
+kb_vs_kn|4k3/8/5n2/8/8/8/8/K1B5 w - - 0 1
+kbn_vs_k|4k3/8/8/8/8/8/8/KB5N w - - 0 1
+opposite_colored_bishops|2b1k3/8/8/8/8/8/4P3/2B1K3 w - - 0 1
+same_colored_bishops|3bk3/8/8/8/8/8/4P3/2B1K3 w - - 0 1
+rook_active_king|4k3/8/8/3R4/3K4/8/8/8 w - - 0 1
+rook_idle_king|4k3/8/8/3R4/8/8/8/K7 w - - 0 1
+rook_versus_king|4k3/8/8/8/8/8/8/R3K3 w - - 0 1
+queen_endgame|k7/8/8/8/3K4/8/8/3Q4 w - - 0 1
+bare_kings_draw|8/8/8/4k3/8/8/8/4K3 w - - 0 1
+kn_vs_k_draw|4k3/8/8/8/8/8/8/KN6 w - - 0 1
+locked_pawn_wall|8/2b1k3/7p/p1p1p2P/PpP1P3/1P1BK3/8/8 w - - 0 1

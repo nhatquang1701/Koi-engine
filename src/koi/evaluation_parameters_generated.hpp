@@ -21,7 +21,7 @@ struct EvaluationParameterMetadata {
 // metadata for offline tuning artifacts.
 inline constexpr EvaluationParameterMetadata kClassicalEvaluationParameterMetadata{
     "koi-evaluation-parameters-v1",
-    "classical-eval-v7-opening-queen-discipline",
+    "classical-eval-v8-endgame-scaling",
     "builtin",
     "builtin",
     "builtin",
