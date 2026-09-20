@@ -162,6 +162,64 @@ class NnueTrainingBoundaryTest(unittest.TestCase):
             self.assertEqual(result.returncode, 2)
             self.assertIn("PyTorch is required", result.stderr)
 
+    def test_torch_export_is_a_v3_container_with_small_quantization_error(self):
+        if importlib.util.find_spec("torch") is None:
+            self.skipTest("PyTorch is not installed; the torch backend is unavailable")
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            paths = {}
+            for name, text in ROWS.items():
+                paths[name] = directory / f"{name}.csv"
+                paths[name].write_text(text, encoding="utf-8")
+            network = directory / "torch.nnue"
+            metadata_path = directory / "torch.json"
+            command = [
+                sys.executable, str(TOOL), "nnue",
+                "--train", str(paths["train"]),
+                "--validation", str(paths["validation"]),
+                "--holdout", str(paths["holdout"]),
+                "--output-network", str(network),
+                "--output-metadata", str(metadata_path),
+                "--backend", "torch", "--device", "cpu", "--seed", "3",
+            ]
+            result = subprocess.run(command, cwd=ROOT, text=True,
+                                    capture_output=True, check=False)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            network_bytes = network.read_bytes()
+            self.assertEqual(network_bytes[:8], b"KOI-NNUE")
+            header = struct.unpack("<8sI4I4B", network_bytes[:32])
+            self.assertEqual(header[1], 3)
+            self.assertEqual(header[2:6], (960, 256, 32, 1))
+            hidden_shift, bottleneck_shift, output_shift, reserved = header[6:10]
+            self.assertGreater(hidden_shift, 0)
+            self.assertGreater(bottleneck_shift, 0)
+            self.assertGreater(output_shift, 0)
+            self.assertEqual(reserved, 0)
+            quantization_length, feature_set_length, _ = struct.unpack(
+                "<HHQ", network_bytes[32:44]
+            )
+            payload_offset = 44 + 32 + quantization_length + feature_set_length
+            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+            self.assertEqual(metadata["format_version"], 3)
+            fixed_point = metadata["fixed_point"]
+            self.assertEqual(fixed_point["hidden_shift"], hidden_shift)
+            self.assertEqual(fixed_point["bottleneck_shift"], bottleneck_shift)
+            self.assertEqual(fixed_point["output_shift"], output_shift)
+            # The integer forward pass must track the float model; the exporter
+            # reports the gap between the two on the training rows.
+            self.assertLess(fixed_point["quantization_mae_cp"], 50.0)
+            self.assertEqual(
+                hashlib.sha256(network_bytes[payload_offset:]).hexdigest(),
+                metadata["payload_sha256"],
+            )
+            boundary_executable = os.environ.get("KOI_NNUE_BOUNDARY_EXE")
+            if boundary_executable:
+                boundary = subprocess.run(
+                    [boundary_executable, str(network)],
+                    cwd=ROOT, text=True, capture_output=True, check=False,
+                )
+                self.assertEqual(boundary.returncode, 0, boundary.stderr + boundary.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -175,6 +175,34 @@ def nnue_container(payload: bytes) -> tuple[bytes, str]:
     return encoded, payload_hash
 
 
+def nnue_container_v3(
+    payload: bytes, hidden_shift: int, bottleneck_shift: int, output_shift: int
+) -> tuple[bytes, str]:
+    """Version-3 container: the v2 layout plus the three fixed-point shifts."""
+    payload_hash = hashlib.sha256(payload).hexdigest()
+    header = struct.pack(
+        "<8sI4I4B",
+        NNUE_MAGIC,
+        3,
+        *NNUE_ARCHITECTURE,
+        hidden_shift,
+        bottleneck_shift,
+        output_shift,
+        0,
+    )
+    header += struct.pack(
+        "<HHQ", len(NNUE_QUANTIZATION), len(NNUE_FEATURE_SET), len(payload)
+    )
+    encoded = (
+        header
+        + bytes.fromhex(payload_hash)
+        + NNUE_QUANTIZATION
+        + NNUE_FEATURE_SET
+        + payload
+    )
+    return encoded, payload_hash
+
+
 def synthetic_nnue_payload(seed: int) -> bytes:
     input_units, hidden_units, bottleneck_units, _ = NNUE_ARCHITECTURE
     feature_weights = [
@@ -274,7 +302,17 @@ def nnue_v2_features(fen: str) -> list[int]:
     return encoded
 
 
-def torch_nnue_payload(rows: list[tuple[str, str]], seed: int, device_name: str) -> bytes:
+def torch_nnue_payload(
+    rows: list[tuple[str, str]], seed: int, device_name: str
+) -> tuple[bytes, str, dict[str, int | float]]:
+    """Train the legacy torch model and export a version-3 container.
+
+    The version-2 container has a single shared quantization scale, so a trained
+    model's weights round to zero and the integer forward pass degenerates.
+    Version 3 stores explicit per-layer shifts instead: s1/s2 are fixed and the
+    output shift k3 is grid-searched so the integer forward pass reproduces the
+    float model on a sample of the training rows.
+    """
     try:
         import torch  # type: ignore
     except ImportError as error:
@@ -313,7 +351,6 @@ def torch_nnue_payload(rows: list[tuple[str, str]], seed: int, device_name: str)
         loss.backward()
         optimizer.step()
 
-    scale = NNUE_HYPERPARAMETERS["quantization_scale"]
     state = model.state_dict()
     first = state["0.weight"].detach().cpu().tolist()
     first_bias = state["0.bias"].detach().cpu().tolist()
@@ -322,30 +359,107 @@ def torch_nnue_payload(rows: list[tuple[str, str]], seed: int, device_name: str)
     output = state["4.weight"].detach().cpu().tolist()[0]
     output_bias = state["4.bias"].detach().cpu().tolist()[0]
 
+    # A result unit of +-1 maps to +-score_scale centipawns; the shifts give the
+    # int8 bottleneck/output layers enough resolution to carry that scale.
+    hidden_shift = 7
+    bottleneck_shift = 7
+    score_scale = 400.0
+    hidden_scale = float(2 ** hidden_shift)
+    bottleneck_scale = float(2 ** bottleneck_shift)
+
     def quantized(value: float, lower: int, upper: int) -> int:
-        return max(lower, min(upper, int(round(value * scale))))
+        return max(lower, min(upper, int(round(value))))
 
     feature_weights = [
-        quantized(first[hidden][feature], -32768, 32767)
+        quantized(first[hidden][feature] * hidden_scale, -32768, 32767)
         for feature in range(960)
         for hidden in range(256)
     ]
-    hidden_bias = [quantized(value, -2147483648, 2147483647) for value in first_bias]
+    hidden_bias = [
+        quantized(value * hidden_scale, -2147483648, 2147483647) for value in first_bias
+    ]
     bottleneck_weights = [
-        quantized(second[bottleneck][hidden], -128, 127)
+        quantized(second[bottleneck][hidden] * bottleneck_scale, -128, 127)
         for hidden in range(256)
         for bottleneck in range(32)
     ]
-    bottleneck_bias = [quantized(value, -2147483648, 2147483647) for value in second_bias]
-    output_weights = [quantized(value, -128, 127) for value in output]
-    return nnue_payload(
+    bottleneck_bias = [
+        quantized(value * hidden_scale, -2147483648, 2147483647) for value in second_bias
+    ]
+
+    # Hidden and bottleneck activations do not depend on the output shift, so
+    # compute them once and grid-search only the final layer.
+    sample_size = min(len(rows), 32)
+    sample_features = [nnue_v2_features(fen) for fen, _ in rows[:sample_size]]
+    activations: list[list[int]] = []
+    for active in sample_features:
+        hidden_sums = list(hidden_bias)
+        for feature in active:
+            base = feature * 256
+            for hidden in range(256):
+                hidden_sums[hidden] += feature_weights[base + hidden]
+        hidden_values = [min(127, max(0, value)) for value in hidden_sums]
+        bottleneck_sums = [0] * 32
+        for hidden, value in enumerate(hidden_values):
+            if value == 0:
+                continue
+            base = hidden * 32
+            for bottleneck in range(32):
+                bottleneck_sums[bottleneck] += value * bottleneck_weights[base + bottleneck]
+        activations.append(
+            [
+                min(127, max(0, (value >> bottleneck_shift) + bias))
+                for value, bias in zip(bottleneck_sums, bottleneck_bias)
+            ]
+        )
+
+    model.eval()
+    with torch.no_grad():
+        reference = [
+            row[0] * score_scale
+            for row in model(inputs[:sample_size]).detach().cpu().tolist()
+        ]
+
+    best: tuple[float, int, list[int], int] | None = None
+    for output_shift in (3, 4, 5, 6, 7):
+        final_scale = score_scale * float(2 ** output_shift) / hidden_scale
+        candidate_weights = [quantized(value * final_scale, -128, 127) for value in output]
+        candidate_bias = quantized(
+            output_bias * score_scale * float(2 ** output_shift),
+            -2147483648,
+            2147483647,
+        )
+        error = 0.0
+        for values, target in zip(activations, reference):
+            score = candidate_bias
+            for value, weight in zip(values, candidate_weights):
+                score += value * weight
+            error += abs((score >> output_shift) - target)
+        mae = error / max(1, len(activations))
+        if best is None or mae < best[0]:
+            best = (mae, output_shift, candidate_weights, candidate_bias)
+    assert best is not None
+    mae, output_shift, output_weights, output_bias_q = best
+
+    payload = nnue_payload(
         feature_weights,
         hidden_bias,
         bottleneck_weights,
         bottleneck_bias,
         output_weights,
-        quantized(output_bias, -2147483648, 2147483647),
+        output_bias_q,
     )
+    network, payload_hash = nnue_container_v3(
+        payload, hidden_shift, bottleneck_shift, output_shift
+    )
+    fixed_point: dict[str, int | float] = {
+        "hidden_shift": hidden_shift,
+        "bottleneck_shift": bottleneck_shift,
+        "output_shift": output_shift,
+        "score_scale": score_scale,
+        "quantization_mae_cp": round(mae, 3),
+    }
+    return network, payload_hash, fixed_point
 
 
 def _nnue_split_paths(args: argparse.Namespace) -> dict[str, pathlib.Path]:
@@ -393,6 +507,8 @@ def nnue_main(argv: list[str]) -> int:
         backend = args.backend
         device = args.device
         optional_dependencies: dict[str, str] = {}
+        fixed_point: dict[str, int | float] = {}
+        format_version = NNUE_FORMAT_VERSION
         if backend == "auto":
             backend = "synthetic"
         if backend == "torch":
@@ -405,12 +521,15 @@ def nnue_main(argv: list[str]) -> int:
             optional_dependencies["torch"] = torch.__version__
             if device == "auto":
                 device = "cuda" if torch.cuda.is_available() else "cpu"
-            payload = torch_nnue_payload(splits["train"], args.seed, device)
+            network, payload_hash, fixed_point = torch_nnue_payload(
+                splits["train"], args.seed, device
+            )
+            format_version = 3
         else:
             if device == "auto":
                 device = "cpu"
             payload = synthetic_nnue_payload(args.seed)
-        network, payload_hash = nnue_container(payload)
+            network, payload_hash = nnue_container(payload)
         output_network = args.output_network
         output_network.parent.mkdir(parents=True, exist_ok=True)
         output_network.write_bytes(network)
@@ -420,6 +539,7 @@ def nnue_main(argv: list[str]) -> int:
         metadata_path.parent.mkdir(parents=True, exist_ok=True)
         metadata: dict[str, Any] = {
             "schema": "koi-nnue-training-metadata-v1",
+            "format_version": format_version,
             "feature_set": NNUE_FEATURE_SET.decode("ascii"),
             "architecture": list(NNUE_ARCHITECTURE),
             "quantization": NNUE_QUANTIZATION.decode("ascii"),
@@ -436,6 +556,8 @@ def nnue_main(argv: list[str]) -> int:
             "command": [sys.executable, str(pathlib.Path(__file__).resolve()), *argv],
             "optional_dependencies": optional_dependencies,
         }
+        if fixed_point:
+            metadata["fixed_point"] = fixed_point
         metadata_path.write_text(
             json.dumps(metadata, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
