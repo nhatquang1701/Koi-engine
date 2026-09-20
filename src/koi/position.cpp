@@ -712,9 +712,15 @@ public:
             return false;
         }
         try {
-            NativePosition candidate = *this;
-            const auto moves = candidate.legal_moves();
-            return std::find(moves.begin(), moves.end(), move) != moves.end();
+            // Generate into a stack buffer instead of copying the whole
+            // position and allocating a vector: this probe runs once per PV
+            // move on the UCI reporting and completion paths.
+            std::array<Move, kMaximumLegalMoves> legal{};
+            const std::size_t count =
+                const_cast<NativePosition*>(this)->legal_moves_into(legal);
+            const Move* const begin = legal.data();
+            const Move* const end = begin + count;
+            return std::find(begin, end, move) != end;
         } catch (...) {
             return false;
         }
