@@ -15,27 +15,39 @@ namespace koi {
 
 enum class TranspositionBound : std::uint8_t { exact, lower, upper };
 
+// Sentinel for "this entry carries no static evaluation".  Real evaluations are
+// bounded far away from this value, so it is unambiguous.
+inline constexpr int kNoEvaluation = -1'000'000'000;
+
 struct TranspositionEntry {
     std::uint64_t key = 0;
     int depth = 0;
     int score = 0;
-    TranspositionBound bound = TranspositionBound::exact;
+    // Unadjusted static evaluation from the side to move's perspective, or
+    // kNoEvaluation when the entry was stored without one.  Search reuses it
+    // to skip evaluate() on a transposition hit.  Field order below keeps the
+    // entry at 32 bytes so a cluster still spans two cache lines.
+    int eval = kNoEvaluation;
     Move best_move = Move::no_move();
     // Replacement epoch and probe-time age.  These have nothing to do with
     // UciController's protocol generation or SearchRequestIdentity: the epoch
     // is advanced once per search by TranspositionTable::new_generation() so
     // replacement prefers entries from previous searches.
     std::uint16_t generation = 0;
-    bool occupied = false;
     // Distance from the current epoch, also reset by logical Clear Hash.  Kept
     // separate from `generation` so clear() can invalidate entries without
     // sweeping storage.
     std::uint16_t generation_age = 0;
+    TranspositionBound bound = TranspositionBound::exact;
+    bool occupied = false;
     // PV provenance survives transposition.  Search uses it to keep the
     // stronger PV-side reduction/singular gates when a position is revisited
     // through a non-PV window; bound type alone cannot recover that context.
     bool pv = false;
 };
+
+static_assert(sizeof(TranspositionEntry) == 32,
+              "TranspositionEntry must stay cache-line friendly");
 
 enum class HashResizeStatus : std::uint8_t {
     applied,
@@ -96,8 +108,11 @@ public:
     // once per search through detail::SearchTableAccess.  Unrelated to the UCI
     // protocol generation and SearchRequestIdentity (see TranspositionEntry).
     void new_generation() noexcept;
+    // `eval` is the unadjusted static evaluation for the position, or
+    // kNoEvaluation when the caller has none (checked nodes, bound-only
+    // stores).  It is stored so a later probe can skip evaluate().
     void store(std::uint64_t key, int depth, int score, TranspositionBound bound, Move best_move,
-               int ply = 0, bool pv = false) noexcept;
+               int ply = 0, bool pv = false, int eval = kNoEvaluation) noexcept;
     [[nodiscard]] std::optional<TranspositionEntry> probe(std::uint64_t key, int ply = 0) const noexcept;
     // Software prefetch of the probe cluster.  Search calls this a few
     // instructions before the matching probe so the cache line fetch overlaps

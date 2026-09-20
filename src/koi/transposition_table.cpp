@@ -388,7 +388,7 @@ void TranspositionTable::new_generation() noexcept {
 }
 
 void TranspositionTable::store(std::uint64_t key, int depth, int score, TranspositionBound bound,
-                               Move best_move, int ply, bool pv) noexcept {
+                               Move best_move, int ply, bool pv, int eval) noexcept {
     const auto storage = snapshot();
     if (storage == nullptr || storage->cluster_count == 0) {
         return;
@@ -417,9 +417,16 @@ void TranspositionTable::store(std::uint64_t key, int depth, int score, Transpos
                 candidate.generation_age = storage->clear_epoch;
                 return;
             }
-            candidate = TranspositionEntry{key, depth, score_for_storage(score, ply), bound,
-                                          best_move, storage->generation, true,
-                                          storage->clear_epoch, pv};
+            candidate = TranspositionEntry{.key = key,
+                                           .depth = depth,
+                                           .score = score_for_storage(score, ply),
+                                           .eval = eval,
+                                           .best_move = best_move,
+                                           .generation = storage->generation,
+                                           .generation_age = storage->clear_epoch,
+                                           .bound = bound,
+                                           .occupied = true,
+                                           .pv = pv};
             return;
         }
         if (!valid && empty_slot == storage->total_slot_count) {
@@ -457,8 +464,16 @@ void TranspositionTable::store(std::uint64_t key, int depth, int score, Transpos
             return;
         }
     }
-    destination = TranspositionEntry{key, depth, score_for_storage(score, ply), bound, best_move,
-                                     storage->generation, true, storage->clear_epoch, pv};
+    destination = TranspositionEntry{.key = key,
+                                     .depth = depth,
+                                     .score = score_for_storage(score, ply),
+                                     .eval = eval,
+                                     .best_move = best_move,
+                                     .generation = storage->generation,
+                                     .generation_age = storage->clear_epoch,
+                                     .bound = bound,
+                                     .occupied = true,
+                                     .pv = pv};
 }
 
 std::optional<TranspositionEntry> TranspositionTable::probe(std::uint64_t key, int ply) const noexcept {

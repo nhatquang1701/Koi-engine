@@ -173,8 +173,9 @@ int SearchContext::quiescence(GameState& state, int alpha, int beta, int ply,
             return terminal_score(state, legal_moves.size(), ply);
         }
 
+        const std::uint64_t qsearch_transposition_key = search_transposition_key(state);
         std::optional<TranspositionEntry> tt_entry;
-        if (const auto entry = table_access.probe(search_transposition_key(state), ply);
+        if (const auto entry = table_access.probe(qsearch_transposition_key, ply);
             entry.has_value()) {
             tt_entry = entry;
             ++stats.tt_hits;
@@ -196,6 +197,26 @@ int SearchContext::quiescence(GameState& state, int alpha, int beta, int ply,
             return 0;
         }
         const bool claimable_draw = is_claimable_draw_status(draw_status);
+
+        // A depth-valid TT entry can short-circuit the tactical frontier.  A
+        // qsearch entry is stored at depth zero, and any deeper regular entry
+        // is at least as strong for this horizon.  Exact values are
+        // authoritative; a proven lower bound may cut a fail-high.  Claimable
+        // draws and repetition-sensitive paths stay on the full search
+        // because their value depends on the rule state that produced it, and
+        // a wide (PV-like) window does not accept a bound cutoff.
+        if (!checked && !claimable_draw && !repetition_sensitive && tt_entry.has_value()) {
+            const TranspositionEntry& entry = *tt_entry;
+            if (entry.bound == TranspositionBound::exact) {
+                return entry.score;
+            }
+            if (beta - alpha <= 1 && entry.bound == TranspositionBound::lower &&
+                entry.score >= beta) {
+                path_selective_bound = true;
+                path_lower_bound = true;
+                return entry.score;
+            }
+        }
 
         // At this boundary the tactical generator deliberately stops probing
         // quiet checks.  Even when no capture remains, the stand-pat value is
@@ -245,14 +266,20 @@ int SearchContext::quiescence(GameState& state, int alpha, int beta, int ply,
         }
 
         int best = claimable_draw ? 0 : -kInfinity;
+        const int original_alpha = alpha;
         bool best_lower_bound = false;
         bool unknown_selective_child = false;
         int selective_upper_bound = -kInfinity;
+        Move best_move = Move::no_move();
+        int qsearch_eval = kNoEvaluation;
         if (!checked) {
-            best = evaluate(state, state.side_to_move());
-            if (claimable_draw) {
-                best = std::max(0, best);
-            }
+            // Reuse the unadjusted evaluation from a transposition hit when
+            // one is available; the stored eval is perspective-raw exactly
+            // like the evaluator's own return value.
+            const int raw_eval = (tt_entry.has_value() && tt_entry->eval != kNoEvaluation) ?
+                tt_entry->eval : evaluate(state, state.side_to_move());
+            qsearch_eval = raw_eval;
+            best = claimable_draw ? std::max(0, raw_eval) : raw_eval;
             // Stand-pat is a legal null continuation in qsearch terms, so it
             // provides a safe lower bound for the tactical frontier.  This
             // direction remains useful to a parent even when later pruning
@@ -263,6 +290,13 @@ int SearchContext::quiescence(GameState& state, int alpha, int beta, int ply,
                 path_lower_bound = true;
                 if (use_qsearch_cache) {
                     store_qsearch_cache(qsearch_key, best, true);
+                }
+                if (!path_repetition_sensitive) {
+                    // Stand-pat is a legal continuation, so it is a proven
+                    // lower bound for the tactical frontier.
+                    table_access.store(qsearch_transposition_key, 0, best,
+                                       TranspositionBound::lower, Move::no_move(), ply, false,
+                                       qsearch_eval);
                 }
                 return best;
             }
@@ -445,6 +479,7 @@ int SearchContext::quiescence(GameState& state, int alpha, int beta, int ply,
                 !child_score_is_selective_upper && score > alpha;
             if (score > best) {
                 best_lower_bound = child_score_lower_bound;
+                best_move = metadata.move;
             } else if (score == best && child_score_lower_bound) {
                 best_lower_bound = true;
             }
@@ -468,6 +503,13 @@ int SearchContext::quiescence(GameState& state, int alpha, int beta, int ply,
                     !child_selective_bound) {
                     store_qsearch_cache(qsearch_key, best, true);
                 }
+                if (best_lower_bound && !path_repetition_sensitive) {
+                    // The best score is a proven floor from a non-selective
+                    // child, so the shared table may keep it.
+                    table_access.store(qsearch_transposition_key, 0, best,
+                                       TranspositionBound::lower, best_move, ply, false,
+                                       qsearch_eval);
+                }
                 break;
             }
         }
@@ -489,6 +531,22 @@ int SearchContext::quiescence(GameState& state, int alpha, int beta, int ply,
             *repetition_sensitive_path = path_repetition_sensitive;
         }
         path_lower_bound = best_lower_bound;
+        if (!path_repetition_sensitive) {
+            // Without a selective cutoff and with a raised alpha every
+            // generated tactical candidate was searched, so the fail-soft
+            // result is exact at this horizon.  A proven floor is still
+            // useful when pruning touched the frontier, but it must stay a
+            // lower bound.
+            if (!path_selective_bound && best > original_alpha) {
+                table_access.store(qsearch_transposition_key, 0, best,
+                                   TranspositionBound::exact, best_move, ply, false,
+                                   qsearch_eval);
+            } else if (best_lower_bound) {
+                table_access.store(qsearch_transposition_key, 0, best,
+                                   TranspositionBound::lower, best_move, ply, false,
+                                   qsearch_eval);
+            }
+        }
         return best;
     }
 
@@ -699,93 +757,14 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
                 return metadata.is_capture() || metadata.gives_check ||
                     metadata.move.promotion() != Promotion::none;
             });
-        int static_eval = 0;
-        bool static_eval_valid = false;
-        CorrectionKeys correction_keys{};
-        bool correction_keys_valid = false;
-        if (checked) {
-            const int previous_ply = ply - 2;
-            if (previous_ply >= 0 && stack.frame(static_cast<std::size_t>(previous_ply))
-                    .static_eval_valid) {
-                static_eval = stack.frame(static_cast<std::size_t>(previous_ply)).static_eval;
-                static_eval_valid = true;
-            }
-        } else if (excluded_search) {
-            static_eval = inherited_frame.static_eval;
-            static_eval_valid = inherited_frame.static_eval_valid;
-        } else {
-            // The raw evaluator score is cached; the bounded correction is
-            // applied on top of it so the cache stays perspective-raw.
-            const int raw_eval = evaluate(state, state.side_to_move());
-            correction_keys = correction_keys_for(state);
-            correction_keys_valid = true;
-            static_eval = raw_eval + ordering.correction_value(
-                correction_keys.pawn, correction_keys.material, correction_keys.king);
-            static_eval_valid = true;
-        }
-        frame.static_eval = static_eval;
-        frame.static_eval_valid = static_eval_valid;
+        // The transposition probe runs before the static evaluation: a hit can
+        // carry the unadjusted evaluation from an earlier visit, and an early
+        // cutoff should not pay for evaluate().  This mirrors the reference
+        // engine, where the TT lookup precedes both eval and razoring.  The
+        // original window is captured first so a TT floor cannot change how
+        // this node's bound is classified at the store site.
         const bool pv_node = beta - alpha > 1;
         const bool cut_node = !pv_node;
-        const SearchFrame& grandparent_frame = ply > 1 ?
-            stack.frame(static_cast<std::size_t>(ply - 2)) : frame;
-        bool improving = static_eval_valid && grandparent_frame.static_eval_valid &&
-            static_eval > grandparent_frame.static_eval;
-        const bool opponent_worsening = static_eval_valid && parent_frame.static_eval_valid &&
-            static_eval > -parent_frame.static_eval;
-        // Hindsight compensation is one of Stockfish 19's safeguards around
-        // LMR: a reduced child that makes the static position worse deserves
-        // a little extra depth, while a reduced child that improves the
-        // evaluation need not be paid back.  Keep it outside excluded
-        // singular probes, whose depth is intentionally controlled by the
-        // singular gate itself.
-        if (!excluded_search && static_eval_valid && parent_frame.static_eval_valid) {
-            if (prior_reduction >= 3 && !opponent_worsening &&
-                depth < kMaximumSearchDepth) {
-                ++depth;
-            }
-            if (prior_reduction >= 2 && depth >= 2 &&
-                static_eval + parent_frame.static_eval > 166) {
-                --depth;
-            }
-        }
-        if (!excluded_search) {
-            frame.tt_pv = pv_node;
-        }
-        const bool phase_rich_quiet_position = !claimable_draw && !checked && depth == 1 &&
-            !tactical_position &&
-            ensure_features().game_phase >= 8;
-        const PositionFeatures* quiet_forcing_parent_features = nullptr;
-        const PositionFeatures* root_direct_forcing_features = nullptr;
-        if (!checked && depth == 1 && ply == 1) {
-            quiet_forcing_parent_features = &ensure_features();
-        }
-        if (!checked && depth == 1 && ply == 0 && allow_root_forcing_extension) {
-            root_direct_forcing_features = &ensure_features();
-        }
-        if (phase_rich_quiet_position && !pv_node) {
-            if (depth <= 1 && alpha > -kInfinity &&
-                static_eval + kRazorMarginPerDepthSquared * depth * depth <= alpha) {
-                bool razor_selective_bound = false;
-                bool razor_lower_bound = false;
-                const int razor_score = quiescence(state, alpha, beta, ply, 0,
-                                                   previous_move,
-                                                   &path_repetition_sensitive,
-                                                   &razor_selective_bound,
-                                                   &razor_lower_bound);
-                if (!aborted && razor_score <= alpha) {
-                    // Razoring replaces the nominal regular horizon with a
-                    // qsearch upper-bound probe. It can safely prune this
-                    // node, but its score must not be promoted through the
-                    // recursive boundary as a full-depth child result.
-                    path_selective_bound = true;
-                    path_lower_bound = razor_lower_bound;
-                    ++stats.razoring_prunes;
-                    return razor_score;
-                }
-            }
-        }
-
         const int original_alpha = alpha;
         const int original_beta = beta;
         const SearchHistoryContext history = history_context(
@@ -799,9 +778,6 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
             ++stats.tt_hits;
             if (!entry->best_move.is_no_move() && entry->best_move != excluded_move) {
                 tt_move = entry->best_move;
-            }
-            if (!excluded_search) {
-                frame.tt_pv = pv_node || entry->pv;
             }
             if (!claimable_draw && !excluded_search && !repetition_sensitive && !pv_node && ply > 0 &&
                 entry->depth >= depth) {
@@ -864,6 +840,102 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
         // the transposition move, so refutation feedback only punishes an
         // early non-TT quiet move.
         frame.had_tt_move = tt_move.has_value();
+        if (!excluded_search) {
+            // PV provenance survives transposition; bound type alone cannot
+            // recover it, so an entry marked PV keeps the stronger gates.
+            frame.tt_pv = pv_node || (tt_entry.has_value() && tt_entry->pv);
+        }
+
+        int static_eval = 0;
+        bool static_eval_valid = false;
+        int raw_static_eval = kNoEvaluation;
+        CorrectionKeys correction_keys{};
+        bool correction_keys_valid = false;
+        if (checked) {
+            const int previous_ply = ply - 2;
+            if (previous_ply >= 0 && stack.frame(static_cast<std::size_t>(previous_ply))
+                    .static_eval_valid) {
+                static_eval = stack.frame(static_cast<std::size_t>(previous_ply)).static_eval;
+                static_eval_valid = true;
+            }
+        } else if (excluded_search) {
+            static_eval = inherited_frame.static_eval;
+            static_eval_valid = inherited_frame.static_eval_valid;
+        } else {
+            // The raw evaluator score is cached; the bounded correction is
+            // applied on top of it so the cache stays perspective-raw.  A
+            // transposition hit may already carry the unadjusted evaluation
+            // from an earlier visit, in which case evaluate() is skipped.
+            const int raw_eval = (tt_entry.has_value() && tt_entry->eval != kNoEvaluation) ?
+                tt_entry->eval : evaluate(state, state.side_to_move());
+            raw_static_eval = raw_eval;
+            correction_keys = correction_keys_for(state);
+            correction_keys_valid = true;
+            static_eval = raw_eval + ordering.correction_value(
+                correction_keys.pawn, correction_keys.material, correction_keys.king);
+            static_eval_valid = true;
+        }
+        frame.static_eval = static_eval;
+        frame.static_eval_valid = static_eval_valid;
+        const SearchFrame& grandparent_frame = ply > 1 ?
+            stack.frame(static_cast<std::size_t>(ply - 2)) : frame;
+        bool improving = static_eval_valid && grandparent_frame.static_eval_valid &&
+            static_eval > grandparent_frame.static_eval;
+        const bool opponent_worsening = static_eval_valid && parent_frame.static_eval_valid &&
+            static_eval > -parent_frame.static_eval;
+        // Hindsight compensation is one of Stockfish 19's safeguards around
+        // LMR: a reduced child that makes the static position worse deserves
+        // a little extra depth, while a reduced child that improves the
+        // evaluation need not be paid back.  Keep it outside excluded
+        // singular probes, whose depth is intentionally controlled by the
+        // singular gate itself.
+        if (!excluded_search && static_eval_valid && parent_frame.static_eval_valid) {
+            if (prior_reduction >= 3 && !opponent_worsening &&
+                depth < kMaximumSearchDepth) {
+                ++depth;
+            }
+            if (prior_reduction >= 2 && depth >= 2 &&
+                static_eval + parent_frame.static_eval > 166) {
+                --depth;
+            }
+        }
+        const bool phase_rich_quiet_position = !claimable_draw && !checked && depth == 1 &&
+            !tactical_position &&
+            ensure_features().game_phase >= 8;
+        const PositionFeatures* quiet_forcing_parent_features = nullptr;
+        const PositionFeatures* root_direct_forcing_features = nullptr;
+        if (!checked && depth == 1 && ply == 1) {
+            quiet_forcing_parent_features = &ensure_features();
+        }
+        if (!checked && depth == 1 && ply == 0 && allow_root_forcing_extension) {
+            root_direct_forcing_features = &ensure_features();
+        }
+        if (phase_rich_quiet_position && !pv_node) {
+            if (depth <= 1 && alpha > -kInfinity &&
+                static_eval + kRazorMarginPerDepthSquared * depth * depth <= alpha) {
+                bool razor_selective_bound = false;
+                bool razor_lower_bound = false;
+                const int razor_score = quiescence(state, alpha, beta, ply, 0,
+                                                   previous_move,
+                                                   &path_repetition_sensitive,
+                                                   &razor_selective_bound,
+                                                   &razor_lower_bound);
+                if (!aborted && razor_score <= alpha) {
+                    // Razoring replaces the nominal regular horizon with a
+                    // qsearch upper-bound probe. It can safely prune this
+                    // node, but its score must not be promoted through the
+                    // recursive boundary as a full-depth child result.
+                    path_selective_bound = true;
+                    path_lower_bound = razor_lower_bound;
+                    ++stats.razoring_prunes;
+                    return razor_score;
+                }
+            }
+        }
+
+        // The transposition probe, the original-window capture, and the
+        // PV/TT-move bookkeeping now run before the static evaluation so a
+        // TT hit can supply the unadjusted eval; see the block above.
 
         // Interior Syzygy WDL probe.  Opt-in and off by default; the root probe
         // keeps its own gate.  Only quiet, non-repetition-sensitive interior
@@ -1135,7 +1207,7 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
                             table_access.store(
                                 search_transposition_key(state), probcut.depth + 1,
                                 probcut_score, TranspositionBound::lower,
-                                candidate.move, ply, false);
+                                candidate.move, ply, false, raw_static_eval);
                         }
                         return probcut_score - (probcut.beta - beta);
                     }
@@ -1978,9 +2050,8 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
              (!selective_pruning && !inexact_child_search &&
               !unresolved_selective_child));
         if (!excluded_search && !claimable_draw && !path_repetition_sensitive && safe_to_store) {
-        table_access.store(
-            transposition_key, depth, best_score, bound, best_move, ply,
-                frame.tt_pv);
+            table_access.store(transposition_key, depth, best_score, bound, best_move, ply,
+                               frame.tt_pv, raw_static_eval);
         }
         if (root_authoritative_path != nullptr && ply == 0 && !excluded_search) {
             const bool complete_root_coverage = root_move_score_count == moves.size();

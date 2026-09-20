@@ -89,9 +89,10 @@ public:
 
     void store(const std::uint64_t key, const int depth, const int score,
                const TranspositionBound bound, const Move best_move,
-               const int ply = 0, const bool pv = false) noexcept {
+               const int ply = 0, const bool pv = false,
+               const int eval = kNoEvaluation) noexcept {
         if (enabled_) {
-            table_->store(key, depth, score, bound, best_move, ply, pv);
+            table_->store(key, depth, score, bound, best_move, ply, pv, eval);
         }
     }
 
