@@ -25,12 +25,20 @@ inline constexpr int kQuiescenceFutilityMoveLimit = 2;
 // defensive captures in the -1..-73 band that perpetual-check and sacrifice
 // resources live in, so the boundary is the reference -74 instead.
 inline constexpr int kQuiescenceSeeThreshold = -74;
-// Fail-high qsearch returns are pulled toward beta so a large overshoot does
-// not destabilise the parent's window.  The weights are the reference
-// fixed-point blend: score * weight + beta * (1024 - weight), over 1024.
-// Decisive scores are never softened.
-inline constexpr int kQuiescenceStandPatSofteningWeight = 441;
-inline constexpr int kQuiescenceFailHighSofteningWeight = 462;
+// Razoring falls back to a quiescence upper-bound probe when the static score
+// is far below alpha.  The reference envelope scales with depth squared; the
+// per-depth coefficient is calibrated to the classical evaluator's narrower
+// score range (the depth-one margin is the historical live value).
+inline constexpr int kRazorMarginPerDepthSquared = 120;
+inline constexpr int kRazorMaximumDepth = 1;
+// Child futility removes late quiet moves whose static score is far below
+// alpha.  The reference shape uses the reduced depth (not the nominal node
+// depth) so heavily reduced late moves can be pruned at deeper nodes, and
+// keeps the slope calibrated to the classical evaluator.
+inline constexpr int kChildFutilityMaximumLmrDepth = 12;
+inline constexpr int kChildFutilityBaseMargin = 96;
+inline constexpr int kChildFutilityDepthMargin = 71;
+inline constexpr int kChildFutilityEvalAboveAlphaMargin = 54;
 inline constexpr int kInternalIterativeReductionMinimumDepth = 6;
 // True internal iterative deepening re-searches the current node at a reduced
 // depth with a null window when no transposition move is available, so the
@@ -40,7 +48,10 @@ inline constexpr int kInternalIterativeReductionMinimumDepth = 6;
 inline constexpr int kTrueInternalIterativeDeepeningMinimumDepth = 6;
 inline constexpr int kTranspositionProbCutMargin = 428;
 inline constexpr int kReverseFutilityMinimumDepth = 2;
-inline constexpr int kReverseFutilityMaximumDepth = 12;
+// The reference reverse-futility envelope runs to depth 18; the margins below
+// already keep Koi's version far more conservative than the reference, so the
+// depth envelope can match it without weakening the gate's calibration.
+inline constexpr int kReverseFutilityMaximumDepth = 18;
 inline constexpr int kReverseFutilityBaseMargin = 80;
 inline constexpr int kReverseFutilityDepthMargin = 60;
 inline constexpr int kReverseFutilityImprovingDiscount = 32;

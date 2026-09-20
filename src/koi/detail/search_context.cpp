@@ -763,7 +763,8 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
             root_direct_forcing_features = &ensure_features();
         }
         if (phase_rich_quiet_position && !pv_node) {
-            if (depth == 1 && alpha > -kInfinity && static_eval + 120 <= alpha) {
+            if (depth <= 1 && alpha > -kInfinity &&
+                static_eval + kRazorMarginPerDepthSquared * depth * depth <= alpha) {
                 bool razor_selective_bound = false;
                 bool razor_lower_bound = false;
                 const int razor_score = quiescence(state, alpha, beta, ply, 0,
@@ -1552,11 +1553,18 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
             // intentionally unavailable to the first move, PV nodes,
             // forcing moves, and TT moves, so a quiet move that is the only
             // plausible continuation still receives an authoritative search.
-            const bool child_futility = !claimable_draw && !pv_node && !checked && depth <= 3 &&
+            // The reference envelope is keyed to the reduced depth, so late
+            // reduced moves at deeper nodes are also covered; a static score
+            // already above alpha reduces the margin because the position is
+            // less clearly lost.
+            const bool child_futility = !claimable_draw && !pv_node && !checked &&
                 !tactical_position && move_number > 0 && !metadata.is_capture() &&
                 !metadata.gives_check &&
                 move.promotion() == Promotion::none && !is_tt_move &&
-                static_eval + 96 + depth * 72 <= alpha;
+                lmr_depth < kChildFutilityMaximumLmrDepth &&
+                static_eval + kChildFutilityBaseMargin +
+                    kChildFutilityDepthMargin * lmr_depth +
+                    (static_eval > alpha ? kChildFutilityEvalAboveAlphaMargin : 0) <= alpha;
             if (child_futility) {
                 selective_pruning = true;
                 ++stats.quiet_futility_prunes;
