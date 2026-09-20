@@ -23,6 +23,10 @@ jobs:
           python -m pip install --disable-pip-version-check --quiet python-chess numpy
       - name: Configure x64 MSVC environment, build, and test Release
         shell: cmd
+        env:
+          # Wall-clock-sensitive search cases get extra in-process attempts; a
+          # shared runner is easily starved when the suite runs at -j 4.
+          KOI_TEST_RETRIES: "3"
         run: |
           if not exist "%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" exit /b 1
           for /f "usebackq delims=" %%I in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do set "VSINSTALL=%%I"

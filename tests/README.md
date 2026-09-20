@@ -201,7 +201,9 @@ Remove an entry once the corresponding engine behavior is reliably fixed.
 - Timing-sensitive cases are declared via `TestRunOptions::timing_sensitive`.
   With `KOI_TEST_RETRIES=2` (or `tools/test/run_tests.ps1`'s
   `-RepeatUntilPass`, which adds `--repeat until-pass:2` at the CTest level)
-  they are retried before failing.
+  they are retried before failing. The Release CI job sets
+  `KOI_TEST_RETRIES=3`, because a shared runner can starve a case's wall-clock
+  budget even when the search itself is correct.
 - The short-oracle rook-lift case no longer runs a 100 ms clocked search; it
   asserts the same reviewed move with a deterministic depth-2 search
   (`f7g8`-family rejection at depth 2, threads 1).
