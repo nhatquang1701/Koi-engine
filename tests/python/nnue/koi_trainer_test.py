@@ -388,6 +388,53 @@ class DatasetLoaderTests(unittest.TestCase):
             with self.assertRaises(train_nnue_koi.TrainerError):
                 train_nnue_koi.load_binary_dataset(trailing, 0)
 
+    def test_binary_dataset_v2_buckets_follow_piece_counts(self):
+        self.assertIsNotNone(train_nnue_koi)
+        own_a_full = list(range(32))
+        # 65 threat features push the combined A+B count past the old
+        # feature-count heuristic, which derived a negative bucket and
+        # raised IndexError on the output head.
+        own_b_threats = [9216 + index for index in range(65)]
+        records = [
+            (own_a_full, [9216, 9217], own_a_full, [], 10),
+            (list(range(4)), own_b_threats, list(range(3)), [], -5),
+        ]
+        blob = bytearray()
+        blob += struct.pack("<8sIH", b"KOI-DATA", 2, 2)
+        for group in (FEATURE_SET, b"threat-pairs-v1"):
+            blob += struct.pack("<H", len(group))
+            blob += group
+        blob += struct.pack("<Q", len(records))
+        for a_own, b_own, a_opp, b_opp, score in records:
+            blob += struct.pack("<4H", len(a_own), len(b_own), len(a_opp), len(b_opp))
+            for block in (a_own, b_own, a_opp, b_opp):
+                blob += struct.pack(f"<{len(block)}H", *block)
+            blob += struct.pack("<i", score)
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / "buckets.koi-data"
+            path.write_bytes(bytes(blob))
+            (own, own_offsets, opp, opp_offsets, scores,
+             buckets) = train_nnue_koi.load_binary_dataset_v2(path, 0)
+            self.assertEqual(list(scores), [10, -5])
+            self.assertEqual(list(buckets), [0, 7])
+            self.assertEqual(int(own_offsets[-1]), 32 + 2 + 4 + 65)
+            self.assertEqual(int(opp_offsets[-1]), 32 + 0 + 3 + 0)
+
+    @unittest.skipUnless(CHESS_AVAILABLE, "python-chess is not installed")
+    def test_text_corpus_v5_buckets_follow_piece_counts(self):
+        self.assertIsNotNone(train_nnue_koi)
+        corpus = (
+            "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1;20;e2e4\n"
+            "8/8/8/4k3/8/8/4P3/4K3 w - - 0 1;90;e1d2\n"
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / "corpus.txt"
+            path.write_text(corpus, encoding="utf-8")
+            (own, own_offsets, opp, opp_offsets, scores,
+             buckets) = train_nnue_koi.load_text_corpus_v5(path, 0)
+            self.assertEqual(list(scores), [20, 90])
+            self.assertEqual(list(buckets), [0, 7])
+
 
 TRAINER_CORPUS = """\
 rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1;20;e2e4

@@ -190,8 +190,8 @@ def load_binary_dataset(path: pathlib.Path, limit: int) -> tuple[np.ndarray, np.
 
 def load_binary_dataset_v2(
     path: pathlib.Path, limit: int
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """Read a ``koi-dataset-v2`` dataset into own/opp indices, offsets, scores."""
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Read a ``koi-dataset-v2`` dataset into own/opp indices, offsets, scores, buckets."""
     if not path.exists():
         raise TrainerError(f"dataset not found: {path}")
     data = path.read_bytes()
@@ -229,6 +229,7 @@ def load_binary_dataset_v2(
     opp_indices = np.empty(count * capacity, dtype=np.int32)
     opp_offsets = np.zeros(count + 1, dtype=np.int64)
     scores = np.zeros(count, dtype=np.int32)
+    buckets = np.zeros(count, dtype=np.int64)
     own_written = 0
     opp_written = 0
     loaded = 0
@@ -253,28 +254,35 @@ def load_binary_dataset_v2(
         opp_indices[opp_written : opp_written + total_opp] = values[total_own:]
         opp_written += total_opp
         opp_offsets[row + 1] = opp_written
+        # Group A holds exactly one feature per piece, so its count is the
+        # piece count used by the piece-count output buckets.  Deriving the
+        # bucket from the combined A+B feature count (the old behavior)
+        # selected the wrong head whenever threat features were present.
+        buckets[row] = min(7, (32 - min(counts[0], 32)) // 4)
         loaded = row + 1
         if limit and loaded >= limit:
             break
     own_offsets = own_offsets[: loaded + 1]
     opp_offsets = opp_offsets[: loaded + 1]
     scores = scores[:loaded]
+    buckets = buckets[:loaded]
     if not limit and position != len(data):
         raise TrainerError(f"{path} has {len(data) - position} trailing bytes")
     return (own_indices[:own_written], own_offsets,
-            opp_indices[:opp_written], opp_offsets, scores)
+            opp_indices[:opp_written], opp_offsets, scores, buckets)
 
 
 def load_text_corpus_v5(
     path: pathlib.Path, limit: int
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """Read a ``FEN;cp`` corpus into own/opp feature packs for v5."""
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Read a ``FEN;cp`` corpus into own/opp feature packs and buckets for v5."""
     module = _require_dataset_module()
     if not path.exists():
         raise TrainerError(f"corpus not found: {path}")
     own_rows: list[list[int]] = []
     opp_rows: list[list[int]] = []
     scores: list[int] = []
+    buckets: list[int] = []
     with path.open("r", encoding="utf-8", errors="replace") as handle:
         for raw in handle:
             raw = raw.strip()
@@ -290,13 +298,15 @@ def load_text_corpus_v5(
             own_rows.append([int(value) for value in list(a_own) + list(b_own)])
             opp_rows.append([int(value) for value in list(a_opp) + list(b_opp)])
             scores.append(int(score))
+            buckets.append(int(module.output_bucket(board)))
             if limit and len(scores) >= limit:
                 break
     if not scores:
         raise TrainerError(f"corpus {path} produced no usable rows")
     own_flat, own_offsets, _ = _pack_rows(own_rows, scores)
     opp_flat, opp_offsets, packed_scores = _pack_rows(opp_rows, scores)
-    return own_flat, own_offsets, opp_flat, opp_offsets, packed_scores
+    return (own_flat, own_offsets, opp_flat, opp_offsets, packed_scores,
+            np.asarray(buckets, dtype=np.int64))
 
 
 def _pack_rows(rows: list[list[int]], scores: list[int]) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -695,15 +705,17 @@ def main_v5(args, rng) -> int:
     if l1_units < 8 or l1_units > 128:
         raise TrainerError("L1 units must be between 8 and 128")
     if args.dataset:
-        own_indices, own_offsets, opp_indices, opp_offsets, scores = load_binary_dataset_v2(
-            pathlib.Path(args.dataset), args.rows)
+        (own_indices, own_offsets, opp_indices, opp_offsets, scores,
+         buckets) = load_binary_dataset_v2(pathlib.Path(args.dataset), args.rows)
     else:
-        own_indices, own_offsets, opp_indices, opp_offsets, scores = load_text_corpus_v5(
-            pathlib.Path(args.corpus), args.rows)
+        (own_indices, own_offsets, opp_indices, opp_offsets, scores,
+         buckets) = load_text_corpus_v5(pathlib.Path(args.corpus), args.rows)
     rows = own_offsets.size - 1
     if rows <= 0:
         raise TrainerError("no training rows were loaded")
-    buckets = piece_count_buckets(own_offsets)
+    buckets = np.asarray(buckets, dtype=np.int64)
+    if buckets.size != rows or int(buckets.min()) < 0 or int(buckets.max()) >= OUTPUT_BUCKETS:
+        raise TrainerError("piece-count buckets are outside the v5 head range")
     own_active = int(np.max(own_offsets[1:] - own_offsets[:-1]))
     opp_active = int(np.max(opp_offsets[1:] - opp_offsets[:-1]))
     pad_length = max(own_active, opp_active, 1)
