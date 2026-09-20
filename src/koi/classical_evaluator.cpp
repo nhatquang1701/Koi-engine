@@ -1,6 +1,7 @@
 #include "koi/classical_evaluator.hpp"
 #include "koi/evaluation_features.hpp"
 #include "koi/piece_values.hpp"
+#include "koi/evaluation_piece_squares.hpp"
 
 #include "koi/detail/attack_tables.hpp"
 
@@ -21,164 +22,33 @@ constexpr int piece_value(PieceType type) noexcept {
     return type == PieceType::king ? 0 : piece_material_value(type);
 }
 
-constexpr std::array<int, 64> kPawnMiddleGame{
-      0,   0,   0,   0,   0,   0,   0,   0,
-      5,  10,  10, -20, -20,  10,  10,   5,
-      5,  -5, -10,   0,   0, -10,  -5,   5,
-      0,   0,   0,  20,  20,   0,   0,   0,
-      5,   5,  10,  25,  25,  10,   5,   5,
-     10,  10,  20,  30,  30,  20,  10,  10,
-     50,  50,  50,  50,  50,  50,  50,  50,
-      0,   0,   0,   0,   0,   0,   0,   0,
-};
-
-constexpr std::array<int, 64> kPawnEndGame{
-      0,   0,   0,   0,   0,   0,   0,   0,
-     10,  12,  14,  16,  16,  14,  12,  10,
-     10,  12,  14,  18,  18,  14,  12,  10,
-     12,  14,  18,  24,  24,  18,  14,  12,
-     16,  18,  24,  32,  32,  24,  18,  16,
-     22,  24,  30,  40,  40,  30,  24,  22,
-     36,  38,  44,  52,  52,  44,  38,  36,
-      0,   0,   0,   0,   0,   0,   0,   0,
-};
-
-constexpr std::array<int, 64> kKnightMiddleGame{
-    -50, -40, -30, -30, -30, -30, -40, -50,
-    -40, -20,   0,   0,   0,   0, -20, -40,
-    -30,   0,  10,  15,  15,  10,   0, -30,
-    -30,   5,  15,  20,  20,  15,   5, -30,
-    -30,   0,  15,  20,  20,  15,   0, -30,
-    -30,   5,  10,  15,  15,  10,   5, -30,
-    -40, -20,   0,   5,   5,   0, -20, -40,
-    -50, -40, -30, -30, -30, -30, -40, -50,
-};
-
-constexpr std::array<int, 64> kKnightEndGame{
-    -35, -25, -15, -10, -10, -15, -25, -35,
-    -25, -10,   5,  10,  10,   5, -10, -25,
-    -15,   5,  15,  20,  20,  15,   5, -15,
-    -10,  10,  20,  25,  25,  20,  10, -10,
-    -10,  10,  20,  25,  25,  20,  10, -10,
-    -15,   5,  15,  20,  20,  15,   5, -15,
-    -25, -10,   5,  10,  10,   5, -10, -25,
-    -35, -25, -15, -10, -10, -15, -25, -35,
-};
-
-constexpr std::array<int, 64> kBishopMiddleGame{
-    -20, -10, -10, -10, -10, -10, -10, -20,
-    -10,   0,   0,   0,   0,   0,   0, -10,
-    -10,   0,   5,  10,  10,   5,   0, -10,
-    -10,   5,   5,  10,  10,   5,   5, -10,
-    -10,   0,  10,  10,  10,  10,   0, -10,
-    -10,  10,  10,  10,  10,  10,  10, -10,
-    -10,   5,   0,   0,   0,   0,   5, -10,
-    -20, -10, -10, -10, -10, -10, -10, -20,
-};
-
-constexpr std::array<int, 64> kBishopEndGame{
-    -15, -10,  -8,  -6,  -6,  -8, -10, -15,
-     -8,   0,   4,   8,   8,   4,   0,  -8,
-     -6,   4,   9,  12,  12,   9,   4,  -6,
-     -4,   8,  12,  16,  16,  12,   8,  -4,
-     -4,   8,  12,  16,  16,  12,   8,  -4,
-     -6,   4,   9,  12,  12,   9,   4,  -6,
-     -8,   0,   4,   8,   8,   4,   0,  -8,
-    -15, -10,  -8,  -6,  -6,  -8, -10, -15,
-};
-
-constexpr std::array<int, 64> kRookMiddleGame{
-      0,   0,   0,   0,   0,   0,   0,   0,
-      5,  10,  10,  10,  10,  10,  10,   5,
-     -5,   0,   0,   0,   0,   0,   0,  -5,
-     -5,   0,   0,   0,   0,   0,   0,  -5,
-     -5,   0,   0,   0,   0,   0,   0,  -5,
-     -5,   0,   0,   0,   0,   0,   0,  -5,
-     -5,   0,   0,   0,   0,   0,   0,  -5,
-      0,   0,   5,  10,  10,   5,   0,   0,
-};
-
-constexpr std::array<int, 64> kRookEndGame{
-      0,   0,   5,  10,  10,   5,   0,   0,
-      5,  10,  15,  20,  20,  15,  10,   5,
-     -5,   0,   5,  10,  10,   5,   0,  -5,
-     -5,   0,   5,  10,  10,   5,   0,  -5,
-     -5,   0,   5,  10,  10,   5,   0,  -5,
-     -5,   0,   5,  10,  10,   5,   0,  -5,
-      5,  10,  15,  20,  20,  15,  10,   5,
-      0,   0,   5,  10,  10,   5,   0,   0,
-};
-
-constexpr std::array<int, 64> kQueenMiddleGame{
-    -20, -10, -10,  -5,  -5, -10, -10, -20,
-    -10,   0,   0,   0,   0,   0,   0, -10,
-    -10,   0,   5,   5,   5,   5,   0, -10,
-     -5,   0,   5,   5,   5,   5,   0,  -5,
-      0,   0,   5,   5,   5,   5,   0,  -5,
-    -10,   5,   5,   5,   5,   5,   0, -10,
-    -10,   0,   5,   0,   0,   0,   0, -10,
-    -20, -10, -10,  -5,  -5, -10, -10, -20,
-};
-
-constexpr std::array<int, 64> kQueenEndGame{
-    -10,  -5,  -5,   0,   0,  -5,  -5, -10,
-     -5,   0,   5,   5,   5,   5,   0,  -5,
-     -5,   5,  10,  12,  12,  10,   5,  -5,
-      0,   5,  12,  15,  15,  12,   5,   0,
-      0,   5,  12,  15,  15,  12,   5,   0,
-     -5,   5,  10,  12,  12,  10,   5,  -5,
-     -5,   0,   5,   5,   5,   5,   0,  -5,
-    -10,  -5,  -5,   0,   0,  -5,  -5, -10,
-};
-
-constexpr std::array<int, 64> kKingMiddleGame{
-    -30, -40, -40, -50, -50, -40, -40, -30,
-    -30, -40, -40, -50, -50, -40, -40, -30,
-    -30, -40, -40, -50, -50, -40, -40, -30,
-    -30, -40, -40, -50, -50, -40, -40, -30,
-    -20, -30, -30, -40, -40, -30, -30, -20,
-    -10, -20, -20, -20, -20, -20, -20, -10,
-     20,  20,   0,   0,   0,   0,  20,  20,
-     20,  30,  10,   0,   0,  10,  30,  20,
-};
-
-constexpr std::array<int, 64> kKingEndGame{
-    -50, -40, -30, -20, -20, -30, -40, -50,
-    -30, -20, -10,   0,   0, -10, -20, -30,
-    -20, -10,  10,  20,  20,  10, -10, -20,
-    -10,   0,  20,  30,  30,  20,   0, -10,
-    -10,   0,  20,  30,  30,  20,   0, -10,
-    -20, -10,  10,  20,  20,  10, -10, -20,
-    -30, -20, -10,   0,   0, -10, -20, -30,
-    -50, -40, -30, -20, -20, -30, -40, -50,
-};
 
 using PieceSquareTable = std::array<int, 64>;
 
 const PieceSquareTable& middle_game_table(PieceType type) noexcept {
     switch (type) {
-    case PieceType::pawn: return kPawnMiddleGame;
-    case PieceType::knight: return kKnightMiddleGame;
-    case PieceType::bishop: return kBishopMiddleGame;
-    case PieceType::rook: return kRookMiddleGame;
-    case PieceType::queen: return kQueenMiddleGame;
-    case PieceType::king: return kKingMiddleGame;
-    case PieceType::none: return kPawnMiddleGame;
+    case PieceType::pawn: return detail::kPawnMiddleGame;
+    case PieceType::knight: return detail::kKnightMiddleGame;
+    case PieceType::bishop: return detail::kBishopMiddleGame;
+    case PieceType::rook: return detail::kRookMiddleGame;
+    case PieceType::queen: return detail::kQueenMiddleGame;
+    case PieceType::king: return detail::kKingMiddleGame;
+    case PieceType::none: return detail::kPawnMiddleGame;
     }
-    return kPawnMiddleGame;
+    return detail::kPawnMiddleGame;
 }
 
 const PieceSquareTable& end_game_table(PieceType type) noexcept {
     switch (type) {
-    case PieceType::pawn: return kPawnEndGame;
-    case PieceType::knight: return kKnightEndGame;
-    case PieceType::bishop: return kBishopEndGame;
-    case PieceType::rook: return kRookEndGame;
-    case PieceType::queen: return kQueenEndGame;
-    case PieceType::king: return kKingEndGame;
-    case PieceType::none: return kPawnEndGame;
+    case PieceType::pawn: return detail::kPawnEndGame;
+    case PieceType::knight: return detail::kKnightEndGame;
+    case PieceType::bishop: return detail::kBishopEndGame;
+    case PieceType::rook: return detail::kRookEndGame;
+    case PieceType::queen: return detail::kQueenEndGame;
+    case PieceType::king: return detail::kKingEndGame;
+    case PieceType::none: return detail::kPawnEndGame;
     }
-    return kPawnEndGame;
+    return detail::kPawnEndGame;
 }
 
 constexpr int color_index(Color color) noexcept {
