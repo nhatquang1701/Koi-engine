@@ -2116,9 +2116,7 @@ private:
             root_frame.current_move = Move::no_move();
             root_frame.move_count = 0;
             root_frame.reduction = 0;
-            root_frame.extension = 0;
             root_frame.cutoff_count = 0;
-            root_frame.prior_fail_high = false;
             root_frame.tt_pv = true;
 
             const auto search_root = [&context, &job](std::size_t move_index) {

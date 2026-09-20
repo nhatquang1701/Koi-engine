@@ -120,11 +120,14 @@ private:
         done,
     };
 
+    // Deliberately without default member initializers: `staged_` is written
+    // for every candidate before any entry is read, and a picker is built once
+    // per node, so zeroing 256 records here would be pure per-node overhead.
     struct Candidate {
-        std::uint16_t source_index = 0;
-        std::uint8_t stage_rank = 0;
-        int priority = 0;
-        std::uint32_t tie_break = 0;
+        std::uint16_t source_index;
+        std::uint8_t stage_rank;
+        int priority;
+        std::uint32_t tie_break;
     };
 
     [[nodiscard]] bool is_excluded(std::size_t index) const noexcept;
@@ -144,16 +147,20 @@ private:
     int ply_ = 0;
     Mode mode_ = Mode::main;
     Stage stage_ = Stage::done;
+    // The bitsets below must start zeroed: they are the guards that decide
+    // whether a lazy SEE/check score has been computed yet.  The score arrays
+    // are always written under those guards before being read, so they stay
+    // uninitialized to avoid clearing several kilobytes at every node.
     std::bitset<kMaximumLegalMoves> emitted_{};
     std::bitset<kMaximumLegalMoves> see_computed_{};
     std::bitset<kMaximumLegalMoves> capture_check_computed_{};
     std::bitset<kMaximumLegalMoves> capture_checks_{};
-    std::array<std::int16_t, kMaximumLegalMoves> see_scores_{};
-    std::array<Candidate, kMaximumLegalMoves> staged_{};
+    std::array<std::int16_t, kMaximumLegalMoves> see_scores_;
+    std::array<Candidate, kMaximumLegalMoves> staged_;
     // The good-capture pass is already ordered by the same history/MVV score
     // used by the bad-capture pass. Keep only source indices for deferred
     // captures instead of copying the complete Candidate record a second time.
-    std::array<std::uint16_t, kMaximumLegalMoves> deferred_bad_capture_indices_{};
+    std::array<std::uint16_t, kMaximumLegalMoves> deferred_bad_capture_indices_;
     std::size_t candidate_count_ = 0;
     std::size_t candidate_index_ = 0;
     std::size_t deferred_bad_capture_count_ = 0;

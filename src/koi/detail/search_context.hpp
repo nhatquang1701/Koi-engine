@@ -57,13 +57,16 @@ struct SearchContext {
     // compact record keeps the recursive stack bounded when a node has many
     // legal moves while preserving the exact metadata dimensions used by the
     // ordering tables.
+    // Deliberately without default member initializers: `failed_moves` is a
+    // per-node stack array whose entries are only read below failed_move_count,
+    // so clearing it would cost several kilobytes at every node.
     struct DeferredHistoryMove {
-        Move move = Move::no_move();
-        PieceType moving_piece = PieceType::none;
-        PieceType captured_piece = PieceType::none;
-        MoveKind kind = MoveKind::quiet;
-        Color history_side = Color::white;
-        bool authoritative = true;
+        Move move;
+        PieceType moving_piece;
+        PieceType captured_piece;
+        MoveKind kind;
+        Color history_side;
+        bool authoritative;
 
         [[nodiscard]] static DeferredHistoryMove from(
             const MoveMetadata& metadata, const Color side = Color::white,

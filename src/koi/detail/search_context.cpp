@@ -120,7 +120,6 @@ int SearchContext::quiescence(GameState& state, int alpha, int beta, int ply,
         qframe.move_count = 0;
         qframe.reduction = 0;
         qframe.cutoff_count = 0;
-        qframe.prior_fail_high = false;
         const bool use_qsearch_cache = qsearch_cache_allowed(state, repetition_sensitive) &&
             !(checked && qdepth >= kMaximumQuiescenceSafetyDepth);
         const std::uint64_t qsearch_key = use_qsearch_cache ?
@@ -650,11 +649,9 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
         frame.in_check = checked;
         frame.move_count = 0;
         frame.reduction = 0;
-        frame.extension = 0;
         frame.cutoff_count = 0;
         frame.static_eval = excluded_search ? inherited_frame.static_eval : 0;
         frame.static_eval_valid = excluded_search ? inherited_frame.static_eval_valid : false;
-        frame.prior_fail_high = false;
         frame.tt_pv = excluded_search ? inherited_frame.tt_pv : false;
         frame.had_tt_move = false;
         if (ply + 1 < static_cast<int>(SearchStack::kCapacity)) {
@@ -718,12 +715,11 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
         int child_check_extensions_remaining = check_extensions_remaining;
         const bool check_extension_applied = SearchPolicy::check_extension(
             checked, depth, short_timed_root, check_extensions_remaining);
-        if (check_extension_applied) {
-            ++stats.check_extensions;
-            ++depth;
-            --child_check_extensions_remaining;
-            frame.extension = 1;
-        }
+            if (check_extension_applied) {
+                ++stats.check_extensions;
+                ++depth;
+                --child_check_extensions_remaining;
+            }
         // Mate-distance pruning keeps a delayed mate from displacing a mate
         // already found nearer to the root. A checked node with an available
         // extension gets the tactical horizon first; otherwise the tightened
@@ -1869,7 +1865,6 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
             }
             if (best_score_safe_lower_bound && alpha >= beta) {
                 frame.cutoff_count++;
-                frame.prior_fail_high = true;
                 best_move_cutoff = true;
                 break;
             }
