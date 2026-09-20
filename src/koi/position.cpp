@@ -448,6 +448,12 @@ bool has_legal_en_passant_capture_mutable(NativeState& state) noexcept {
 }
 
 bool has_legal_en_passant_capture(const NativeState& state) noexcept {
+    // The read-only wrapper is reached from draw detection on every node, so
+    // the overwhelmingly common "no en-passant target" case must not pay for
+    // the full NativeState copy (board plus the history array).
+    if (state.en_passant.index() >= Square::kInvalid) {
+        return false;
+    }
     NativeState scratch = state;
     return has_legal_en_passant_capture_in_place(scratch);
 }
@@ -797,8 +803,10 @@ public:
 
     [[nodiscard]] std::size_t piece_count() const noexcept {
         std::size_t count = 0;
-        for (const Piece& piece : state.board) {
-            if (!piece.empty()) ++count;
+        for (const auto& color_boards : state.piece_bitboards) {
+            for (const std::uint64_t board : color_boards) {
+                count += static_cast<std::size_t>(std::popcount(board));
+            }
         }
         return count;
     }
@@ -816,13 +824,15 @@ public:
     [[nodiscard]] bool in_check(Color color) const noexcept { return is_checked(state, color); }
 
     [[nodiscard]] bool has_non_pawn_material(Color color) const noexcept {
-        for (const Piece& piece : state.board) {
-            if (piece.color == color && !piece.empty() &&
-                piece.type != PieceType::pawn && piece.type != PieceType::king) {
-                return true;
-            }
-        }
-        return false;
+        const std::size_t color_index = color == Color::white ? 0U : 1U;
+        constexpr std::size_t knight = static_cast<std::size_t>(PieceType::knight);
+        constexpr std::size_t bishop = static_cast<std::size_t>(PieceType::bishop);
+        constexpr std::size_t rook = static_cast<std::size_t>(PieceType::rook);
+        constexpr std::size_t queen = static_cast<std::size_t>(PieceType::queen);
+        return (state.piece_bitboards[color_index][knight] |
+                state.piece_bitboards[color_index][bishop] |
+                state.piece_bitboards[color_index][rook] |
+                state.piece_bitboards[color_index][queen]) != 0;
     }
 
     [[nodiscard]] std::uint8_t castling_rights() const noexcept { return state.castling; }
@@ -837,6 +847,11 @@ public:
         // undone, so checking only for the most recent null snapshot would
         // let those artificial positions participate in repetition draws.
         if (state.repetition_history_suppressed) {
+            return 1;
+        }
+        // The shortest possible repetition cycle is four plies, so a shorter
+        // halfmove clock makes the backward scan pointless.
+        if (state.halfmove < 4) {
             return 1;
         }
         std::size_t count = 1;
@@ -883,49 +898,50 @@ public:
     }
 
     [[nodiscard]] bool is_insufficient_material() const noexcept {
-        int non_king = 0;
-        int bishops = 0;
-        int knights = 0;
-        int bishop_color = -1;
-        for (int square = 0; square < 64; ++square) {
-            const Piece piece = state.board[static_cast<std::size_t>(square)];
-            if (piece.empty() || piece.type == PieceType::king) {
-                continue;
-            }
-            if (piece.type == PieceType::pawn || piece.type == PieceType::rook ||
-                piece.type == PieceType::queen) {
-                return false;
-            }
-            ++non_king;
-            if (piece.type == PieceType::knight) {
-                ++knights;
-            } else if (piece.type == PieceType::bishop) {
-                ++bishops;
-                const int square_color = (file_of(square) + rank_of(square)) & 1;
-                if (bishop_color < 0) {
-                    bishop_color = square_color;
-                } else if (bishop_color != square_color) {
-                    bishop_color = 2;
+        // Bitboard form: draw_status() reaches this on every node, and the
+        // incrementally maintained piece bitboards answer it with a handful
+        // of popcounts instead of a 64-square scan.
+        constexpr std::size_t pawn = static_cast<std::size_t>(PieceType::pawn);
+        constexpr std::size_t knight = static_cast<std::size_t>(PieceType::knight);
+        constexpr std::size_t bishop = static_cast<std::size_t>(PieceType::bishop);
+        constexpr std::size_t rook = static_cast<std::size_t>(PieceType::rook);
+        constexpr std::size_t queen = static_cast<std::size_t>(PieceType::queen);
+        constexpr std::uint64_t dark_squares = [] {
+            std::uint64_t mask = 0;
+            for (int square = 0; square < 64; ++square) {
+                if ((((square & 7) + (square >> 3)) & 1) != 0) {
+                    mask |= std::uint64_t{1} << square;
                 }
             }
+            return mask;
+        }();
+        if ((state.piece_bitboards[0][pawn] | state.piece_bitboards[1][pawn] |
+             state.piece_bitboards[0][rook] | state.piece_bitboards[1][rook] |
+             state.piece_bitboards[0][queen] | state.piece_bitboards[1][queen]) != 0) {
+            return false;
         }
-        if (non_king <= 1) {
+        const std::uint64_t knights =
+            state.piece_bitboards[0][knight] | state.piece_bitboards[1][knight];
+        const std::uint64_t bishops =
+            state.piece_bitboards[0][bishop] | state.piece_bitboards[1][bishop];
+        if (static_cast<int>(std::popcount(knights | bishops)) <= 1) {
             return true;
         }
-        return knights == 0 && bishops == non_king && bishop_color >= 0 && bishop_color < 2;
+        if (knights != 0) {
+            return false;
+        }
+        // Only bishops remain: insufficient when every bishop stands on one
+        // square color.
+        return (bishops & dark_squares) == 0 || (bishops & ~dark_squares) == 0;
     }
 
     [[nodiscard]] bool is_known_locked_pawn_wall() const noexcept {
         // Keep dead-position recognition intentionally narrow. This blocked
         // pawn wall is a known FIDE dead-position example; the board is what
         // makes it dead, not the side to move or the bookkeeping fields in a
-        // FEN. An actually legal en-passant capture is an exception because it
-        // creates a pawn continuation from an otherwise locked wall. Compare
-        // the normalized board directly so a normal clock/full-move update
-        // cannot make the same dead position searchable again.
-        if (has_legal_en_passant_capture(state)) {
-            return false;
-        }
+        // FEN. Compare the normalized board first: the pattern is almost
+        // never present, and the en-passant certificate below needs a copy of
+        // the whole state, so it must only run for a matching board.
         static constexpr Board pattern = [] {
             Board result{};
             result[17] = {PieceType::pawn, Color::white};
@@ -952,7 +968,9 @@ public:
                 return false;
             }
         }
-        return true;
+        // An actually legal en-passant capture is an exception because it
+        // creates a pawn continuation from an otherwise locked wall.
+        return !has_legal_en_passant_capture(state);
     }
 
     [[nodiscard]] bool is_dead_position() const noexcept {
@@ -964,9 +982,11 @@ public:
         if (is_automatic_seventy_five_move_draw()) {
             return DrawStatus::automatic_seventy_five_move;
         }
-        if (is_automatic_fivefold_repetition()) return DrawStatus::automatic_fivefold;
+        // The fivefold and threefold checks share one history scan.
+        const std::size_t repetitions = repetition_count();
+        if (repetitions >= 5 && !is_checkmate()) return DrawStatus::automatic_fivefold;
         if (can_claim_fifty_move_draw()) return DrawStatus::claimable_fifty_move;
-        if (can_claim_threefold_repetition()) return DrawStatus::claimable_threefold;
+        if (repetitions >= 3 && !is_checkmate()) return DrawStatus::claimable_threefold;
         return DrawStatus::none;
     }
 
