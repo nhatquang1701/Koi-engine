@@ -34,6 +34,7 @@ if(MSVC)
         /EHsc
         /permissive-
         "$<$<CONFIG:Release>:/O2>"
+        "$<$<CONFIG:Release>:/Ob3>"
         "$<$<CONFIG:Release>:/DNDEBUG>"
         "$<$<CONFIG:Release>:/arch:AVX2>"
     )
