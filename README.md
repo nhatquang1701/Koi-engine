@@ -643,7 +643,9 @@ from the starting position (for example, `bestmove e2e4`).
   or asymmetric GUI commands cannot leave the engine searching indefinitely.
 - A depth limit is capped internally at 64 plies. `nodes`, `movetime`, and
   side-to-move clock limits stop search at their requested boundary; `infinite`
-  continues until `stop`.
+  continues until `stop`. `depth` and `nodes` are upper bounds: when a clock or
+  `movetime` is also supplied, whichever limit is reached first stops the search,
+  so `go depth 6 wtime 200` cannot overrun the clock.
 - Search reports completed iterations as UCI `info depth ... score ... nodes
   ... nps ... hashfull ... time ... pv ...` lines, where `hashfull` is the
   approximate transposition-table occupancy in permill (0..1000).
@@ -654,8 +656,12 @@ from the starting position (for example, `bestmove e2e4`).
 
 ### Timing controls
 
-Koi separates search limits from time-allocation policy. Explicit `go depth`,
-`go nodes`, and `go infinite` searches are not given an artificial time limit.
+Koi separates search limits from time-allocation policy. Explicit `go depth`
+and `go nodes` searches without a clock or `movetime` are not given an
+artificial time limit, and `go infinite` always searches until `stop`. When a
+depth or node limit is combined with a side-to-move clock or `movetime`, the
+explicit limit stays a strict upper bound while the time limit remains a
+deadline: the search stops at whichever is reached first.
 For `movetime` and clock searches, the requested budget is adjusted in this
 order: `Slow Mover`, then `Speed`, then `Move Overhead` is subtracted, followed
 by the existing safety margin and minimum safe budget. `Move Overhead` defaults

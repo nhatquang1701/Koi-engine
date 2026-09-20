@@ -652,21 +652,36 @@ void test_move_overhead_and_slow_mover_scale_time_in_order() {
             "clock allocations must use reserve, Slow Mover, Speed, and the adaptive hard budget");
 }
 
-void test_explicit_depth_and_nodes_remain_untimed_with_clock_fields() {
+void test_explicit_depth_and_nodes_honor_clock_guard() {
+    koi::SearchLimits depth_with_movetime;
+    depth_with_movetime.depth = 3;
+    depth_with_movetime.movetime = 1ms;
+    const koi::TimeManager movetime_manager(depth_with_movetime, koi::Color::white);
+    require(movetime_manager.time_budget().has_value(),
+            "explicit depth must keep the movetime deadline");
+
     koi::SearchLimits depth_with_clock;
     depth_with_clock.depth = 3;
-    depth_with_clock.movetime = 1ms;
     depth_with_clock.white_clock = koi::ClockLimit{1s, 1s};
     const koi::TimeManager depth_manager(depth_with_clock, koi::Color::white);
-    require(!depth_manager.time_budget().has_value(),
-            "explicit depth must remain untimed even when time fields are also present");
+    require(depth_manager.time_budget().has_value() && *depth_manager.time_budget() > 0ms,
+            "explicit depth must keep the clock deadline");
 
     koi::SearchLimits nodes_with_clock;
     nodes_with_clock.nodes = 100;
     nodes_with_clock.black_clock = koi::ClockLimit{1s, 1s};
     const koi::TimeManager nodes_manager(nodes_with_clock, koi::Color::black);
-    require(!nodes_manager.time_budget().has_value(),
-            "explicit nodes must remain untimed even when clock fields are also present");
+    require(nodes_manager.time_budget().has_value() && nodes_manager.node_limit().has_value(),
+            "explicit nodes must keep both the node limit and the clock deadline");
+
+    koi::SearchLimits depth_only;
+    depth_only.depth = 3;
+    koi::SearchLimits nodes_only;
+    nodes_only.nodes = 100;
+    require(!koi::TimeManager(depth_only, koi::Color::white, 1).time_budget().has_value(),
+            "a bare depth search must stay untimed");
+    require(!koi::TimeManager(nodes_only, koi::Color::white, 1).time_budget().has_value(),
+            "a bare node search must stay untimed");
 }
 
 void test_search_options_include_thread_and_speed_controls() {
@@ -4171,7 +4186,7 @@ int main(int argc, char** argv) {
         {"low-clock hard window", test_low_clock_hard_position_can_use_its_hard_window},
         {"speed budgets", test_speed_scales_only_time_based_search_budgets},
         {"compatibility timing controls", test_move_overhead_and_slow_mover_scale_time_in_order},
-        {"explicit limits remain untimed", test_explicit_depth_and_nodes_remain_untimed_with_clock_fields},
+        {"explicit limits honor clock guard", test_explicit_depth_and_nodes_honor_clock_guard},
         {"search options", test_search_options_include_thread_and_speed_controls},
         {"root filtering legal move", test_root_filtering_keeps_only_requested_legal_move},
         {"root filtering illegal move", test_root_filtering_ignores_syntactically_valid_illegal_move},

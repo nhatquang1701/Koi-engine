@@ -102,6 +102,23 @@ try {
         throw "a go depth 2 search took $($stopwatch.ElapsedMilliseconds) ms."
     }
 
+    # Mixed depth/node and clock limits: depth and nodes stay strict upper
+    # bounds, but a supplied clock must still bound the search. Before the fix
+    # these commands ignored the clock entirely and ran for several seconds.
+    foreach ($mixed in @(
+            @{ Command = 'go depth 6 wtime 200 btime 200'; Label = 'go depth 6 with a 200 ms clock' },
+            @{ Command = 'go nodes 2000000 wtime 200 btime 200'; Label = 'go nodes 2000000 with a 200 ms clock' })) {
+        Send-UciCommand -Session $session -Command 'position startpos'
+        $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+        Send-UciCommand -Session $session -Command $mixed.Command
+        $null = Read-UciUntil -Session $session -Predicate { param($value) $value.StartsWith('bestmove') } `
+            -Description "a bestmove after $($mixed.Label)"
+        $stopwatch.Stop()
+        if ($stopwatch.ElapsedMilliseconds -gt 1500) {
+            throw "$($mixed.Label) took $($stopwatch.ElapsedMilliseconds) ms; the clock guard did not fire."
+        }
+    }
+
     # A ponderhit must always be answered with a bestmove. The controller used to
     # stop the ponder search and return silently when its prediction could not be
     # validated, which leaves the GUI waiting and flags the engine.

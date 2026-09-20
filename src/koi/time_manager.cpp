@@ -133,7 +133,13 @@ void TimeManager::initialize(Color side_to_move, std::uint8_t speed_percent,
     timing_.extended_for_hard_position = hard_position_;
     timing_.horizon = std::max<std::uint32_t>(1, limits_.moves_to_go.value_or(20));
 
-    if (limits_.infinite || limits_.ponder || limits_.depth.has_value() || limits_.nodes.has_value()) {
+    // Explicit depth and node limits are strict upper bounds, but they must not
+    // disable the clock guard: a GUI may send `go depth N wtime ...` (or mix a
+    // node budget with clocks) and still expect the engine to answer inside the
+    // remaining clock. Only an unbounded search has no deadline. A bare
+    // `go depth N` / `go nodes N` remains untimed because it carries neither a
+    // movetime nor a clock and returns at the clock check below.
+    if (limits_.infinite || limits_.ponder) {
         return;
     }
 
