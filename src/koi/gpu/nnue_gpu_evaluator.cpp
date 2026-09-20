@@ -1,7 +1,9 @@
 #include "koi/gpu/nnue_gpu_evaluator.hpp"
 
+#include <algorithm>
 #include <atomic>
 #include <condition_variable>
+#include <cstddef>
 #include <cstdlib>
 #include <memory>
 #include <mutex>
@@ -26,13 +28,15 @@ std::size_t batch_capacity() {
     static const std::size_t capacity = [] {
         const char* value = std::getenv("KOI_GPU_BATCH");
         if (value == nullptr) {
-            return std::size_t{256};
+            return kMaximumGpuBatchSize;
         }
         const long parsed = std::strtol(value, nullptr, 10);
         if (parsed < 1) {
-            return std::size_t{256};
+            return kMaximumGpuBatchSize;
         }
-        return static_cast<std::size_t>(parsed);
+        // The service stages a fixed number of positions per launch, so a
+        // larger configured batch would fail on every evaluation.
+        return std::min(static_cast<std::size_t>(parsed), kMaximumGpuBatchSize);
     }();
     return capacity;
 }

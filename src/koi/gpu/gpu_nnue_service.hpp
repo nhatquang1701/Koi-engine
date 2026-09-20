@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <span>
@@ -11,6 +12,11 @@ struct NnueNetwork;
 } // namespace koi
 
 namespace koi::gpu {
+
+// The service stages this many positions per launch.  The batching evaluator
+// must never hand it a larger batch: a bigger one fails and falls back to the
+// CPU, so the batch size is clamped to this limit.
+inline constexpr std::size_t kMaximumGpuBatchSize = 256;
 
 // Synchronous GPU evaluation service for the v5 network.  The service owns the
 // device weights and a small amount of staging memory; callers pass a batch of

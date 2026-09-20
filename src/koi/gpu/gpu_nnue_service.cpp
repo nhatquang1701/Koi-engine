@@ -17,7 +17,7 @@ namespace {
 
 constexpr std::size_t kInput = 36864;
 constexpr std::size_t kBuckets = 8;
-constexpr std::size_t kMinimumCapacity = 256;
+constexpr std::size_t kMinimumCapacity = kMaximumGpuBatchSize;
 
 } // namespace
 
