@@ -882,7 +882,7 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
         // principal variation's first move.  Keep the compatibility policy
         // unchanged, but enforce the node-type boundary at its live call site.
         const bool null_move_shape_allowed = allow_null_pruning && !claimable_draw &&
-            !excluded_search &&
+            !excluded_search && ply >= null_verification_min_ply &&
             ply > 0 && cut_node;
         const bool null_move_allowed = null_move_shape_allowed && !repetition_sensitive;
         const NullMoveDecision null_move_gate = SearchPolicy::null_move(
@@ -921,12 +921,20 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
                         ++stats.null_verifications;
                         PrincipalVariation verification_pv;
                         const bool saved_table_state = table_access.enabled();
+                        const int saved_null_verification_min_ply = null_verification_min_ply;
                         const SearchFrame saved_frame = frame;
                         const bool has_probe_child_frame =
                             ply + 1 < static_cast<int>(SearchStack::kCapacity);
                         const SearchFrame saved_probe_child_frame = has_probe_child_frame ?
                             stack.frame(static_cast<std::size_t>(ply + 1)) : SearchFrame{};
+                        // The verification must stand on its own: a TT bound at
+                        // this node or in its subtree is flagged as a selective
+                        // result, which would make the confirmation unable to
+                        // prove the cutoff.  The null branch already has its
+                        // own key domain, so this disable is about evidence
+                        // provenance rather than key collisions.
                         table_access.set_enabled(false);
+                        null_verification_min_ply = ply + 3 * null_depth / 4;
                         try {
                             bool verification_repetition_sensitive = false;
                             bool verification_selective_bound = false;
@@ -945,6 +953,7 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
                                     saved_probe_child_frame;
                             }
                             table_access.set_enabled(saved_table_state);
+                            null_verification_min_ply = saved_null_verification_min_ply;
                             throw;
                         }
                         frame = saved_frame;
@@ -953,6 +962,7 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
                                 saved_probe_child_frame;
                         }
                         table_access.set_enabled(saved_table_state);
+                        null_verification_min_ply = saved_null_verification_min_ply;
                         if (aborted) {
                             return 0;
                         }

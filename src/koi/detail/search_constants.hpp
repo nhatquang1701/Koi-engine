@@ -59,6 +59,11 @@ inline constexpr std::uint16_t kNullMoveRuleSafetyHalfmoves = 90;
 // verified before it can cut off, so use a smaller static confidence margin
 // and let depth supply the remaining safety distance.
 inline constexpr int kNullMoveStaticMargin = 96;
+// Null-move verification is a deep-node safety net.  Below this depth an
+// eligible null fail-high is accepted when the reduced probe itself reached
+// beta without a selective cutoff; at and above it, a no-null, no-TT
+// confirmation search must reproduce the fail-high before the cutoff stands.
+inline constexpr int kNullMoveVerificationMinimumDepth = 16;
 
 // Interior Syzygy WDL cutoffs are decisive but deliberately below the mate
 // threshold: a tablebase win proves the result, not a mate distance, so it

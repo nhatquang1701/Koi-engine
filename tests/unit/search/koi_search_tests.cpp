@@ -3341,7 +3341,7 @@ void test_near_root_central_pawn_break_receives_forcing_extension() {
             "a central pawn break must receive a bounded forcing extension");
 }
 
-void test_eligible_null_move_receives_verification() {
+void test_shallow_null_fail_highs_skip_verification() {
     koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>());
     koi::SearchLimits limits;
     limits.depth = 7;
@@ -3350,9 +3350,9 @@ void test_eligible_null_move_receives_verification() {
     const koi::SearchResult result = search(service, root, limits);
 
     require(result.best_move.has_value() && root.is_legal(*result.best_move),
-            "a null-verification search must preserve a legal root move");
-    require(result.stats.null_verifications > 0,
-            "an eligible null-move fail-high must receive verification");
+            "a null-move search must preserve a legal root move");
+    require(result.stats.null_verifications == 0,
+            "null verification must stay off below the deep-search threshold");
 }
 
 void test_shallow_futility_pruning_is_safe_in_tactical_positions() {
@@ -4278,7 +4278,7 @@ int main(int argc, char** argv) {
         {"king-zone LMR exclusion", test_lmr_excludes_quiet_moves_that_increase_enemy_king_zone_pressure},
         {"high-history LMR exclusion", test_lmr_excludes_high_history_quiet_moves},
         {"opening central break", test_opening_central_break_survives_root_search_reduction},
-        {"eligible null verification", test_eligible_null_move_receives_verification},
+        {"shallow null verification off", test_shallow_null_fail_highs_skip_verification},
         {"shallow futility tactical safety", test_shallow_futility_pruning_is_safe_in_tactical_positions},
         {"shallow futility accounting", test_shallow_futility_accounts_for_safe_quiet_prunes},
         {"quiet history moving side", test_quiet_history_updates_use_saved_moving_side_after_unmake},

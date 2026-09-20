@@ -37,6 +37,28 @@ void test_null_move_policy_owns_window_and_reduction_rules() {
             "disabled null pruning must reject null move");
 }
 
+void test_dynamic_null_move_owns_reduction_and_verification_depth() {
+    using koi::detail::SearchPolicy;
+
+    const auto deep_candidate =
+        SearchPolicy::dynamic_null_move(16, 20, 21, 600, false, true, false, false);
+    require(deep_candidate.eligible && deep_candidate.verify,
+            "a deep eligible null fail-high must be verified");
+    require(deep_candidate.reduction == 7 + 16 / 3 + (600 - 21) / 256,
+            "the dynamic null reduction must keep the Stockfish depth/excess shape");
+
+    const auto shallow = SearchPolicy::dynamic_null_move(15, 20, 21, 600, false, true, false, false);
+    require(shallow.eligible && !shallow.verify,
+            "null verification must stay off below the deep-search threshold");
+
+    require(!SearchPolicy::dynamic_null_move(16, 20, 21, -400, false, true, false, false).eligible,
+            "a static evaluation below the confidence floor must reject null move");
+    require(!SearchPolicy::dynamic_null_move(16, 20, 21, 600, false, true, false, true).eligible,
+            "a pawn endgame must reject null move");
+    require(!SearchPolicy::dynamic_null_move(16, 20, 21, 600, true, true, false, false).eligible,
+            "checked nodes must reject null move");
+}
+
 void test_check_extension_policy_owns_timing_and_budget_rules() {
     require(koi::detail::SearchPolicy::check_extension(true, 4, false, 1),
             "checked nodes with budget must extend");
@@ -140,6 +162,7 @@ void test_ordering_tables_own_mutation_and_reset() {
 int main(int argc, char** argv) {
     const std::vector<koi::test::TestCase> tests{
         {"null move policy", test_null_move_policy_owns_window_and_reduction_rules},
+        {"dynamic null move policy", test_dynamic_null_move_owns_reduction_and_verification_depth},
         {"check extension policy", test_check_extension_policy_owns_timing_and_budget_rules},
         {"late move policy", test_late_move_policy_owns_gating_history_and_reduction},
         {"quiet futility policy", test_quiet_futility_policy_owns_exact_boundary},

@@ -177,6 +177,11 @@ struct SearchContext {
     SearchStats stats;
     bool aborted = false;
     bool allow_root_forcing_extension = false;
+    // While a null-move verification search runs, null pruning stays disabled
+    // at plies below this floor (Stockfish's nmpMinPly).  Keeping most of the
+    // verification subtree null-free stops the reduced probe from confirming
+    // itself through the same heuristic it is meant to validate.
+    int null_verification_min_ply = 0;
     int clock_poll_countdown = 0;
     int quiescence_check_depth_limit = kMaximumQuiescenceCheckDepth;
     SearchStack stack;

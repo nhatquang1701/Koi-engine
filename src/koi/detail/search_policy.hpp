@@ -82,13 +82,14 @@ public:
         // Keep the exact shape; the call site clamps the resulting child
         // depth at qsearch when R exceeds the remaining horizon.
         const int reduction = 7 + depth / 3 + excess / 256;
-        // The dynamic reduction reaches the qsearch horizon at shallow
-        // regular depths, so every eligible fail-high needs a no-null
-        // confirmation before it can cut off.  This is deliberately more
-        // conservative than a depth-only verification threshold: a shallow
-        // verification is cheap, and an unverified shallow null result is
-        // precisely where zugzwang and tactical-horizon errors are likeliest.
-        return DynamicNullMoveDecision{true, reduction, reduction >= 3};
+        // Verification is reserved for deep nodes, matching Stockfish 19's
+        // depth gate.  At those depths the reduced probe is a substantial
+        // search of the null-free position, so an unverified fail-high could
+        // overstate the bound; below the threshold the null probe itself must
+        // already have reached beta without a selective cutoff, and a second
+        // full search would only repeat the same shallow horizon.
+        const bool verify = reduction >= 3 && depth >= kNullMoveVerificationMinimumDepth;
+        return DynamicNullMoveDecision{true, reduction, verify};
     }
 
     [[nodiscard]] static constexpr bool check_extension(
