@@ -808,19 +808,43 @@ void test_deterministic_multipv_reports_sorted_distinct_legal_lines() {
     }
 }
 
-void test_threaded_search_uses_multiple_root_workers_and_matches_reference_result() {
+void test_threaded_search_uses_multiple_root_workers_and_keeps_up_with_the_reference() {
+    // Threads greater than one is intentionally nondeterministic: helpers share
+    // the transposition table and the pool may split the root differently on
+    // each run. Pin the invariants instead of exact parity: both searches
+    // return a legal move, more than one worker evaluates, the threaded search
+    // completes the requested depth, and its score stays close to the
+    // single-thread reference instead of collapsing.
+    koi::SearchLimits limits;
+    limits.depth = 2;
+
+    koi::SearchService reference_service(std::make_shared<ConcurrencyEvaluator>());
+    const koi::SearchResult reference = search(reference_service, koi::GameState::startpos(), limits);
+    require(reference.best_move.has_value(), "the single-thread reference must return a root move");
+
     auto threaded_evaluator = std::make_shared<ConcurrencyEvaluator>();
     koi::SearchService threaded_service(threaded_evaluator);
     koi::SearchOptions threaded_options;
     threaded_options.threads = 2;
-    koi::SearchLimits limits;
-    limits.depth = 2;
-    const koi::SearchResult threaded =
-        search(threaded_service, koi::GameState::startpos(), limits, threaded_options);
 
-    auto reference_evaluator = std::make_shared<ConcurrencyEvaluator>();
-    koi::SearchService reference_service(reference_evaluator);
-    const koi::SearchResult reference = search(reference_service, koi::GameState::startpos(), limits);
+    constexpr int kScoreToleranceCp = 150;
+    constexpr int kThreadedRuns = 3;
+    for (int run = 0; run < kThreadedRuns; ++run) {
+        const koi::GameState root = koi::GameState::startpos();
+        const koi::SearchResult threaded = search(threaded_service, root, limits, threaded_options);
+        require(threaded.best_move.has_value() && root.is_legal(*threaded.best_move),
+                "a threaded fixed-depth search must return a legal root move");
+        require(threaded.completed_depth >= reference.completed_depth,
+                "a threaded fixed-depth search must complete the reference depth");
+        const int score_delta = threaded.score_cp > reference.score_cp ?
+            threaded.score_cp - reference.score_cp : reference.score_cp - threaded.score_cp;
+        require(score_delta <= kScoreToleranceCp,
+                "a threaded fixed-depth search must stay within " +
+                    std::to_string(kScoreToleranceCp) +
+                    " cp of the single-thread reference (serial " +
+                    std::to_string(reference.score_cp) + ", threaded " +
+                    std::to_string(threaded.score_cp) + ")");
+    }
 
     if (koi::maximum_search_threads() > 1) {
         require(threaded_evaluator->maximum_active() >= 2,
@@ -829,10 +853,6 @@ void test_threaded_search_uses_multiple_root_workers_and_matches_reference_resul
         require(threaded_evaluator->maximum_active() >= 1,
                 "a single-thread host must still evaluate the root search");
     }
-    require(threaded.best_move.has_value() && reference.best_move.has_value(),
-            "threaded and reference searches must both return a root move");
-    require(*threaded.best_move == *reference.best_move && threaded.score_cp == reference.score_cp,
-            "threaded fixed-depth search must match the single-thread reference result");
 }
 
 void test_short_timed_threaded_search_keeps_up_with_serial_reference() {
@@ -4197,7 +4217,7 @@ int main(int argc, char** argv) {
         {"root filtering legal move", test_root_filtering_keeps_only_requested_legal_move},
         {"root filtering illegal move", test_root_filtering_ignores_syntactically_valid_illegal_move},
         {"deterministic multipv", test_deterministic_multipv_reports_sorted_distinct_legal_lines},
-        {"threaded root search", test_threaded_search_uses_multiple_root_workers_and_matches_reference_result},
+        {"threaded root search", test_threaded_search_uses_multiple_root_workers_and_keeps_up_with_the_reference},
         {"short timed threaded search", test_short_timed_threaded_search_keeps_up_with_serial_reference},
         {"medium timed forcing root", test_medium_timed_forcing_root_completes_authoritatively},
         {"low clock forcing root", test_low_clock_forcing_root_avoids_parallel_startup_fallback},
@@ -4353,13 +4373,6 @@ int main(int argc, char** argv) {
     // gap stays visible; the goal is to make each one deterministic and move it
     // back to known_failures (or delete it once the engine is fixed).
     const std::string_view intermittent_failures[]{
-        // Threaded depth-2 parity: Lazy SMP helpers share the transposition
-        // table and are documented as nondeterministic, so exact best-move and
-        // score equality with the serial reference can flip with scheduling
-        // (observed on CI runners, not locally). Rewrite as an invariant-based
-        // assertion (legal move, completed depth, bounded score delta) is
-        // tracked as the Phase 5 follow-up; remove this entry once it lands.
-        "threaded root search",
         "incomplete root forcing fallback",
         // Flips with thread scheduling: Debug passed 3 of 4 focused runs while
         // Release reported XFAIL 4 of 4, so it is not a deterministic fix.

@@ -181,11 +181,12 @@ A second, deliberately tiny list (`intermittent`) holds cases whose outcome
 flips with host scheduling. Both their `XFAIL` and `XPASS` are reported but
 neither is fatal, so the suite stays deterministic while the gap stays visible;
 the goal is to make each deterministic and move it back to `known_failures`
-(or delete it once the engine is fixed). Current entries: `threaded root
-search` (Lazy SMP depth-2 parity; rewrite to invariants tracked as the Phase 5
-follow-up), `incomplete root forcing fallback`, `threaded short forcing root
-research` (scheduling-dependent), and `timed poisoned capture`
-(configuration-dependent).
+(or delete it once the engine is fixed). Current entries: `incomplete root
+forcing fallback`, `threaded short forcing root research`
+(scheduling-dependent), and `timed poisoned capture`
+(configuration-dependent). The former `threaded root search` entry moved back
+to ordinary expectations once the case was rewritten around thread-count
+independent invariants (legal move, completed depth, bounded score delta).
 
 Remove an entry once the corresponding engine behavior is reliably fixed.
 
