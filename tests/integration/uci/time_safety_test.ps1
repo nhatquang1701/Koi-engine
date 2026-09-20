@@ -91,6 +91,19 @@ try {
         throw "a go movetime 500 search took $($stopwatch.ElapsedMilliseconds) ms."
     }
 
+    # Slow Mover tunes clock allocation; it must not extend a movetime request.
+    Send-UciCommand -Session $session -Command 'setoption name Slow Mover value 300'
+    Send-UciCommand -Session $session -Command 'position startpos'
+    $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+    Send-UciCommand -Session $session -Command 'go movetime 300'
+    $null = Read-UciUntil -Session $session -Predicate { param($value) $value.StartsWith('bestmove') } `
+        -Description 'a bestmove after go movetime 300 with Slow Mover 300'
+    $stopwatch.Stop()
+    Send-UciCommand -Session $session -Command 'setoption name Slow Mover value 100'
+    if ($stopwatch.ElapsedMilliseconds -ge 500) {
+        throw "Slow Mover 300 extended a go movetime 300 search to $($stopwatch.ElapsedMilliseconds) ms."
+    }
+
     # Fixed-depth searches are not governed by the clock and must stay fast.
     Send-UciCommand -Session $session -Command 'position startpos'
     $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()

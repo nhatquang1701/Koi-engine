@@ -662,9 +662,12 @@ artificial time limit, and `go infinite` always searches until `stop`. When a
 depth or node limit is combined with a side-to-move clock or `movetime`, the
 explicit limit stays a strict upper bound while the time limit remains a
 deadline: the search stops at whichever is reached first.
-For `movetime` and clock searches, the requested budget is adjusted in this
-order: `Slow Mover`, then `Speed`, then `Move Overhead` is subtracted, followed
-by the existing safety margin and minimum safe budget. `Move Overhead` defaults
+For clock searches, the requested budget is adjusted in this order:
+`Slow Mover`, then `Speed`, then `Move Overhead` is subtracted, followed
+by the existing safety margin and minimum safe budget. An explicit `movetime`
+is a direct request, so only `Speed` scales it (then `Move Overhead` and the
+safety margin apply) and the budget never exceeds the requested value; `Slow
+Mover` does not extend a `movetime` search. `Move Overhead` defaults
 to 30 ms and accepts 0..5000; `Slow Mover` defaults to 100 and accepts 10..1000.
 `Speed` defaults to 100 and accepts 1..100. These controls affect allocation,
 not explicit depth or node limits, and changing one while searching cancels and
