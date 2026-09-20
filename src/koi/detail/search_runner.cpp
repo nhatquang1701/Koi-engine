@@ -2455,7 +2455,7 @@ void SearchRunner::run() {
 
         std::optional<SyzygyRootResult> tablebase_result;
         if (options.syzygy && options.multi_pv == 1 && !options.analyse_mode &&
-            !limits.ponder && !limits.search_moves_specified &&
+            !limits.infinite && !limits.ponder && !limits.search_moves_specified &&
             !root_is_claimable_draw && !root_is_forced_draw &&
             options.syzygy->allows_depth(limits.depth.value_or(1))) {
             std::vector<Move> allowed_moves;
@@ -2549,6 +2549,7 @@ void SearchRunner::run() {
                 std::chrono::steady_clock::now() - started);
             SearchInfo info{1, result.score_cp, result.mate, 0, 0, elapsed,
                             {result.best_move.value()}, 0, 0, 0, 1, 1};
+            info.exact_wdl = syzygy_wdl_permill(tablebase_result->wdl);
             safely_report_info(sink, info);
         } else if (root_is_claimable_draw || root_is_forced_draw || use_lazy_smp ||
                    (options.threads == 1 && options.multi_pv == 1) || legal_moves.size() < 2 ||

@@ -178,7 +178,7 @@ bool valid_snapshot(const TablebaseSnapshot& snapshot) noexcept {
 class SyzygyTablebase::Impl {
 public:
     std::filesystem::path path;
-    std::uint8_t probe_limit = 5;
+    std::uint8_t probe_limit = 7;
     std::uint8_t probe_depth = 1;
     bool fifty_move_rule = true;
     bool enabled = false;
@@ -201,10 +201,42 @@ SyzygyScore syzygy_score(const SyzygyWdl wdl) noexcept {
     return {};
 }
 
+SyzygyScore syzygy_root_score(const SyzygyWdl wdl) noexcept {
+    switch (wdl) {
+    case SyzygyWdl::win:
+        return {90'000, std::nullopt};
+    case SyzygyWdl::loss:
+        return {-90'000, std::nullopt};
+    default:
+        // Draws, cursed wins, and blessed losses keep their near-zero scores
+        // and never advertise a mate distance.
+        return syzygy_score(wdl);
+    }
+}
+
+std::array<int, 3> syzygy_wdl_permill(const SyzygyWdl wdl) noexcept {
+    switch (wdl) {
+    case SyzygyWdl::win:
+        return {1'000, 0, 0};
+    case SyzygyWdl::loss:
+        return {0, 0, 1'000};
+    case SyzygyWdl::cursed_win:
+    case SyzygyWdl::blessed_loss:
+    case SyzygyWdl::draw:
+        return {0, 1'000, 0};
+    }
+    return {0, 1'000, 0};
+}
+
 SyzygyWdl syzygy_wdl_from_rank(const int rank) noexcept {
-    if (rank >= 1'000) return SyzygyWdl::win;
+    // Fathom's root ranks use |rank| >= 1000 for a win that converts inside the
+    // 50-move rule and 900..999 for a DTZ-optimal win that only converts if the
+    // opponent cooperates (v + cnt50 > 99 or a repetition). Its own root probe
+    // treats |rank| >= 900 as decisive, so classify on the same boundary instead
+    // of demoting 900..999 to cursed wins.
+    if (rank >= 900) return SyzygyWdl::win;
     if (rank > 0) return SyzygyWdl::cursed_win;
-    if (rank <= -1'000) return SyzygyWdl::loss;
+    if (rank <= -900) return SyzygyWdl::loss;
     if (rank < 0) return SyzygyWdl::blessed_loss;
     return SyzygyWdl::draw;
 }
@@ -213,9 +245,9 @@ SyzygyTablebase::SyzygyTablebase(std::filesystem::path path, const std::uint8_t 
                                  const std::uint8_t probe_depth, const bool fifty_move_rule)
     : impl_(std::make_unique<Impl>()) {
     impl_->path = std::move(path);
-    // The vendored Fathom snapshot supports seven-man tables.  Keep the
-    // default at five for predictable I/O, while allowing an explicit user
-    // opt-in to six- and seven-piece probing.
+    // The vendored Fathom snapshot supports seven-man tables, so the default
+    // probes every table the user may have installed (Stockfish defaults to 7
+    // as well); an explicit lower limit is still honoured.
     impl_->probe_limit = std::clamp<std::uint8_t>(probe_limit, 0, 7);
     impl_->probe_depth = std::clamp<std::uint8_t>(probe_depth, 1, 100);
     impl_->fifty_move_rule = fifty_move_rule;
@@ -266,7 +298,8 @@ bool SyzygyTablebase::supports(const TablebaseSnapshot& snapshot) const noexcept
 }
 
 bool SyzygyTablebase::allows_depth(const int depth) const noexcept {
-    return depth >= 1 && depth <= impl_->probe_depth;
+    // Minimum-depth gate: probe once the search reaches the requested depth.
+    return depth >= static_cast<int>(impl_->probe_depth);
 }
 
 std::uint8_t SyzygyTablebase::probe_limit() const noexcept { return impl_->probe_limit; }
@@ -365,7 +398,7 @@ std::optional<SyzygyRootResult> SyzygyTablebase::probe_root(
         return std::nullopt;
     }
     const SyzygyWdl wdl = syzygy_wdl_from_rank(best_rank);
-    SyzygyRootResult result{wdl, syzygy_score(wdl), std::move(best_moves)};
+    SyzygyRootResult result{wdl, syzygy_root_score(wdl), std::move(best_moves)};
     impl_->hits.fetch_add(1, std::memory_order_relaxed);
     return result;
 }

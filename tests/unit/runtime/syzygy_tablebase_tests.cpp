@@ -1,3 +1,4 @@
+#include <array>
 #include <atomic>
 #include <cstdint>
 #include <cstdlib>
@@ -199,12 +200,42 @@ void test_wdl_conversion_and_concurrent_disabled_probes() {
 
     require(koi::syzygy_wdl_from_rank(1000) == koi::SyzygyWdl::win,
             "rank 1000 must remain a true win");
+    require(koi::syzygy_wdl_from_rank(900) == koi::SyzygyWdl::win &&
+                koi::syzygy_wdl_from_rank(999) == koi::SyzygyWdl::win,
+            "ranks 900..999 must classify as wins (Fathom's 50-move-aware boundary)");
     require(koi::syzygy_wdl_from_rank(899) == koi::SyzygyWdl::cursed_win,
             "rank 899 must remain a cursed win");
     require(koi::syzygy_wdl_from_rank(-899) == koi::SyzygyWdl::blessed_loss,
             "rank -899 must remain a blessed loss");
-    require(koi::syzygy_wdl_from_rank(-1000) == koi::SyzygyWdl::loss,
-            "rank -1000 must remain a true loss");
+    require(koi::syzygy_wdl_from_rank(-900) == koi::SyzygyWdl::loss &&
+                koi::syzygy_wdl_from_rank(-1000) == koi::SyzygyWdl::loss,
+            "ranks -1000..-900 must classify as losses");
+
+    const koi::SyzygyScore root_win = koi::syzygy_root_score(koi::SyzygyWdl::win);
+    const koi::SyzygyScore root_loss = koi::syzygy_root_score(koi::SyzygyWdl::loss);
+    require(root_win.score_cp == 90'000 && !root_win.mate.has_value(),
+            "a root tablebase win must report a decisive score without a mate distance");
+    require(root_loss.score_cp == -90'000 && !root_loss.mate.has_value(),
+            "a root tablebase loss must report a decisive score without a mate distance");
+    require(koi::syzygy_root_score(koi::SyzygyWdl::cursed_win).score_cp == 1 &&
+                !koi::syzygy_root_score(koi::SyzygyWdl::cursed_win).mate.has_value(),
+            "root cursed wins must keep their near-zero non-mate score");
+
+    require(koi::syzygy_wdl_permill(koi::SyzygyWdl::win) == std::array<int, 3>{1'000, 0, 0},
+            "a tablebase win must report an exact winning WDL triplet");
+    require(koi::syzygy_wdl_permill(koi::SyzygyWdl::loss) == std::array<int, 3>{0, 0, 1'000},
+            "a tablebase loss must report an exact losing WDL triplet");
+    require(koi::syzygy_wdl_permill(koi::SyzygyWdl::cursed_win) == std::array<int, 3>{0, 1'000, 0} &&
+                koi::syzygy_wdl_permill(koi::SyzygyWdl::blessed_loss) ==
+                    std::array<int, 3>{0, 1'000, 0},
+            "cursed wins and blessed losses must report as draws under the 50-move rule");
+
+    const koi::SyzygyTablebase depth_gate({}, 7, 1, true);
+    const koi::SyzygyTablebase deep_gate({}, 7, 3, true);
+    require(depth_gate.allows_depth(1) && depth_gate.allows_depth(10),
+            "the default probe depth must allow probing at any search depth");
+    require(!deep_gate.allows_depth(2) && deep_gate.allows_depth(3) && deep_gate.allows_depth(9),
+            "a raised probe depth must only allow probing at or above that depth");
 
     const koi::SyzygyTablebase tablebase("missing-syzygy-path", 5, 1, true);
     const koi::TablebaseSnapshot snapshot = state_from_fen(

@@ -207,7 +207,7 @@ constexpr std::array<UciOptionDescriptor, 28> kUciOptions{{
     {"SyzygyPath", UciOptionKind::string, UciOptionId::syzygy_path, "", 0, 0, false, true},
     {"SyzygyProbeDepth", UciOptionKind::spin, UciOptionId::syzygy_probe_depth, "1",
      kMinimumSyzygyProbeDepth, kMaximumSyzygyProbeDepth, false, true},
-    {"SyzygyProbeLimit", UciOptionKind::spin, UciOptionId::syzygy_probe_limit, "5", 0,
+    {"SyzygyProbeLimit", UciOptionKind::spin, UciOptionId::syzygy_probe_limit, "7", 0,
      kMaximumSyzygyProbeLimit, false, true},
     // Experimental, unvalidated interior probing.  0 keeps root-only probing;
     // SyzygyProbeDepth continues to gate the root probe.
@@ -426,6 +426,10 @@ std::string debug_limits(const SearchLimits& limits) {
 }
 
 Wdl score_to_wdl(const SearchInfo& info) noexcept {
+    if (info.exact_wdl.has_value()) {
+        const std::array<int, 3>& triplet = *info.exact_wdl;
+        return Wdl{triplet[0], triplet[1], triplet[2]};
+    }
     if (info.mate.has_value()) {
         return *info.mate > 0 ? Wdl{1'000, 0, 0} : Wdl{0, 0, 1'000};
     }

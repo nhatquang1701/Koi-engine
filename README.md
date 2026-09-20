@@ -699,14 +699,17 @@ the strength hook is reserved for a later calibrated profile.
 
 Syzygy support is optional and never requires tablebase files for build, startup,
 or ordinary search. Set `SyzygyPath` to a directory containing licensed `.rtbw`
-and `.rtbz` files. `SyzygyProbeLimit` accepts 0..7 pieces (default 5),
-`SyzygyProbeDepth` accepts 1..100 (default 1), and `Syzygy50MoveRule` defaults to
-true. An empty, missing, unreadable, malformed, over-limit, or unsupported
-position safely falls back to normal search. Root WDL/DTZ selection is used only
-for eligible single-PV play searches; analysis mode, `MultiPV > 1`, ponder, and
-`searchmoves` retain their documented search paths. Successful probes may be
-reported as `tbhits` in valid `info` lines. No tablebase data is distributed
-with Koi.
+and `.rtbz` files. `SyzygyProbeLimit` accepts 0..7 pieces (default 7),
+`SyzygyProbeDepth` accepts 1..100 (default 1) and is a minimum depth: the root
+probe is used once the search reaches that depth, and `Syzygy50MoveRule`
+defaults to true. Root wins are reported with a decisive centipawn score and an
+exact `wdl` triplet when `UCI_ShowWDL` is enabled; long tablebase wins are never
+advertised as `mate 1`. An empty, missing, unreadable, malformed, over-limit, or
+unsupported position safely falls back to normal search. Root WDL/DTZ selection
+is used only for eligible single-PV play searches; analysis mode, `MultiPV > 1`,
+ponder, `go infinite`, and `searchmoves` retain their documented search paths.
+Successful probes may be reported as `tbhits` in valid `info` lines. No
+tablebase data is distributed with Koi.
 
 `SyzygyInteriorDepth` accepts 0..100 (default 0, which disables interior
 probing entirely). When set above zero, search nodes at or below that remaining
@@ -879,7 +882,7 @@ the options at session start; the portable release defaults are `RandomSeed=0`,
 `BookRandom=false`, `BookSafety=true`, `BookSafetyDepth=2`,
 `UCI_ShowWDL=false`, `Move Overhead=30`, `Slow Mover=100`,
 `UCI_LimitStrength=false`, `UCI_Elo=1320`, `StrengthMode=false`,
-`SyzygyPath=""`, `SyzygyProbeDepth=1`, `SyzygyProbeLimit=5`,
+`SyzygyPath=""`, `SyzygyProbeDepth=1`, `SyzygyProbeLimit=7`,
 `Syzygy50MoveRule=true`, `SyzygyInteriorDepth=0`, and `EvalFile=""`
 (empty keeps the boot-time evaluator).
 For the recommended En Croissant smoke scenario, use `Hash=512`, `Threads=4`, and

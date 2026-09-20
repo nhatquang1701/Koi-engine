@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <atomic>
 #include <cstdint>
 #include <filesystem>
@@ -26,6 +27,14 @@ struct SyzygyScore {
 };
 
 [[nodiscard]] SyzygyScore syzygy_score(SyzygyWdl wdl) noexcept;
+// Score for a decisive *root* tablebase result. It uses the same 90 000 cp band
+// as the interior tablebase cutoffs and never reports a mate distance, so a
+// long tablebase win is not advertised as `mate 1`.
+[[nodiscard]] SyzygyScore syzygy_root_score(SyzygyWdl wdl) noexcept;
+// Win/draw/loss triplet in permill for UCI `wdl` output. Cursed wins and
+// blessed losses are reported as draws, matching Fathom's 50-move-rule-aware
+// classification.
+[[nodiscard]] std::array<int, 3> syzygy_wdl_permill(SyzygyWdl wdl) noexcept;
 [[nodiscard]] SyzygyWdl syzygy_wdl_from_rank(int rank) noexcept;
 
 struct SyzygyRootResult {
@@ -38,7 +47,7 @@ class SyzygyTablebase {
 public:
     // Fathom is process-global; instances share one acquired path and release it
     // only after the final enabled instance is destroyed.
-    SyzygyTablebase(std::filesystem::path path = {}, std::uint8_t probe_limit = 5,
+    SyzygyTablebase(std::filesystem::path path = {}, std::uint8_t probe_limit = 7,
                     std::uint8_t probe_depth = 1, bool fifty_move_rule = true);
     ~SyzygyTablebase();
 
@@ -56,6 +65,8 @@ public:
     // A true result is permissive: probe/root probing still validates fully.
     [[nodiscard]] bool probe_eligible(const GameState& state) const noexcept;
     [[nodiscard]] bool supports(const TablebaseSnapshot& snapshot) const noexcept;
+    // Stockfish-compatible minimum-depth semantics: the root probe is used when
+    // the search depth reaches SyzygyProbeDepth (default 1, i.e. always).
     [[nodiscard]] bool allows_depth(int depth) const noexcept;
     [[nodiscard]] std::uint8_t probe_limit() const noexcept;
     [[nodiscard]] std::uint8_t probe_depth() const noexcept;

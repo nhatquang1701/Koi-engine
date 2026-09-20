@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -148,6 +149,11 @@ struct SearchInfo {
     std::uint64_t tt_hits = 0;
     int multipv = 1;
     std::uint64_t tbhits = 0;
+    // Exact win/draw/loss triplet in permill when the reported score came from
+    // a Syzygy root probe (cursed wins and blessed losses count as draws).
+    // nullopt means the UCI layer derives the heuristic WDL triplet from the
+    // score instead.
+    std::optional<std::array<int, 3>> exact_wdl;
 };
 
 // Identity of one controller request as seen by the completion pipeline.

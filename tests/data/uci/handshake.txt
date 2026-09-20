@@ -22,7 +22,7 @@ option name UCI_Elo type spin default 1320 min 1320 max 3190
 option name StrengthMode type check default false
 option name SyzygyPath type string default {empty}
 option name SyzygyProbeDepth type spin default 1 min 1 max 100
-option name SyzygyProbeLimit type spin default 5 min 0 max 7
+option name SyzygyProbeLimit type spin default 7 min 0 max 7
 option name SyzygyInteriorDepth type spin default 0 min 0 max 100
 option name Syzygy50MoveRule type check default true
 option name EvalFile type string default {empty}
