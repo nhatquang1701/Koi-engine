@@ -4332,6 +4332,13 @@ int main(int argc, char** argv) {
     // gap stays visible; the goal is to make each one deterministic and move it
     // back to known_failures (or delete it once the engine is fixed).
     const std::string_view intermittent_failures[]{
+        // Threaded depth-2 parity: Lazy SMP helpers share the transposition
+        // table and are documented as nondeterministic, so exact best-move and
+        // score equality with the serial reference can flip with scheduling
+        // (observed on CI runners, not locally). Rewrite as an invariant-based
+        // assertion (legal move, completed depth, bounded score delta) is
+        // tracked as the Phase 5 follow-up; remove this entry once it lands.
+        "threaded root search",
         "incomplete root forcing fallback",
         // Flips with thread scheduling: Debug passed 3 of 4 focused runs while
         // Release reported XFAIL 4 of 4, so it is not a deterministic fix.
