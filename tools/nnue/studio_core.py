@@ -53,6 +53,13 @@ ADOPTIONS_PATH = STUDIO_STATE_DIR / "adoptions.json"
 SETTINGS_SCHEMA = "koi-studio-settings-v1"
 ADOPTION_SCHEMA = "koi-nnue-adoption-registry-v1"
 
+# Adoption policy: the 64-position gate must actually clear a match floor, and a
+# candidate only replaces an installed network when the comparison says it is
+# stronger.  "inconclusive" means "play more games", not "adopt".
+GATE_MINIMUM_POSITIONS = 64
+GATE_MINIMUM_MATCHES = 60
+GATE_MINIMUM_MATCH_RATIO = 0.9
+
 # The tail thread and the Tk thread both persist run state; serialize the
 # read-modify-write so a progress update cannot clobber a finished marker.
 _STATE_LOCK = threading.Lock()
@@ -867,13 +874,23 @@ def run_gate(
 
 
 def gate_allows_install(gate: dict[str, Any] | None) -> bool:
-    """True only when the 64-position gate actually ran and accepted the net."""
+    """True only when the 64-position gate ran and cleared its match floor.
+
+    A net that merely produced bench lines is not enough: at least
+    ``GATE_MINIMUM_POSITIONS`` positions must have run, at least
+    ``GATE_MINIMUM_MATCHES`` of them must match, and the match ratio must clear
+    ``GATE_MINIMUM_MATCH_RATIO`` (so a larger suite cannot dilute a regression).
+    """
     if not gate or gate.get("error") or gate.get("rejected"):
         return False
     try:
-        return int(gate.get("positions", 0)) > 0
+        positions = int(gate.get("positions", 0))
+        matches = int(gate.get("matches", 0))
     except (TypeError, ValueError):
         return False
+    if positions < GATE_MINIMUM_POSITIONS or matches < GATE_MINIMUM_MATCHES:
+        return False
+    return matches >= positions * GATE_MINIMUM_MATCH_RATIO
 
 
 def run_ab_match(
@@ -1175,9 +1192,10 @@ def adoption_decision(
 ) -> dict[str, Any]:
     """Decide whether a validated network should replace the installed one.
 
-    The candidate is adopted only when the 64-position gate passed, and when a
-    network is already installed the candidate must not be weaker than it
-    (``candidate-stronger`` or ``inconclusive``; ``candidate-weaker`` skips).
+    The candidate is adopted only when the 64-position gate cleared its match
+    floor, and when a network is already installed only a ``candidate-stronger``
+    comparison result adopts.  ``inconclusive`` is treated as "play more games",
+    and ``candidate-weaker``/``incomplete`` skip.
     """
     if not gate_allows_install(gate):
         return {"decision": "skip", "reason": "the 64-position gate did not pass"}
@@ -1186,17 +1204,27 @@ def adoption_decision(
     if not net_match or net_match.get("error"):
         return {"decision": "skip", "reason": "the candidate comparison did not run"}
     verdict = net_match.get("verdict")
+    if verdict == "candidate-stronger":
+        return {
+            "decision": "adopt",
+            "reason": "gate passed and the candidate is stronger than the installed network",
+        }
+    if verdict == "inconclusive":
+        return {
+            "decision": "skip",
+            "reason": "the comparison is inconclusive; play more games before adopting",
+        }
+    if verdict == "incomplete":
+        return {
+            "decision": "skip",
+            "reason": "the comparison did not finish; play more games before adopting",
+        }
     if verdict == "candidate-weaker":
         return {
             "decision": "skip",
             "reason": "the candidate is weaker than the installed network",
         }
-    if verdict not in ("candidate-stronger", "inconclusive"):
-        return {"decision": "skip", "reason": f"unexpected comparison verdict: {verdict}"}
-    return {
-        "decision": "adopt",
-        "reason": f"gate passed and the candidate is {verdict} against the installed network",
-    }
+    return {"decision": "skip", "reason": f"unexpected comparison verdict: {verdict}"}
 
 
 def load_adoptions(path: Path | None = None) -> list[dict[str, Any]]:

@@ -81,6 +81,9 @@ class ValidationGatingTests(unittest.TestCase):
 
     def test_gate_allows_install_only_after_a_successful_run(self):
         self.assertTrue(self.core.gate_allows_install({"positions": 64, "matches": 64}))
+        self.assertTrue(self.core.gate_allows_install({"positions": 64, "matches": 60}))
+        self.assertFalse(self.core.gate_allows_install({"positions": 64, "matches": 50}))
+        self.assertFalse(self.core.gate_allows_install({"positions": 40, "matches": 40}))
         self.assertFalse(self.core.gate_allows_install({"positions": 0}))
         self.assertFalse(self.core.gate_allows_install({"positions": 64, "rejected": True}))
         self.assertFalse(self.core.gate_allows_install({"error": "koi-bench not found"}))
@@ -406,7 +409,14 @@ class AdoptionPolicyTests(unittest.TestCase):
         cls.core = load_studio_core()
 
     def test_gate_failure_skips(self):
-        for gate in (None, {}, {"error": "boom"}, {"rejected": True}, {"positions": 0}):
+        for gate in (
+            None,
+            {},
+            {"error": "boom"},
+            {"rejected": True},
+            {"positions": 0},
+            {"positions": 64, "matches": 30},
+        ):
             decision = self.core.adoption_decision(gate, None, None)
             self.assertEqual(decision["decision"], "skip")
 
@@ -416,7 +426,7 @@ class AdoptionPolicyTests(unittest.TestCase):
 
     def test_installed_network_requires_a_comparison(self):
         installed = Path("D:/eng/koi.nnue")
-        gate = {"positions": 64}
+        gate = {"positions": 64, "matches": 64}
         self.assertEqual(self.core.adoption_decision(gate, None, installed)["decision"], "skip")
         self.assertEqual(
             self.core.adoption_decision(gate, {"error": "no report"}, installed)["decision"],
@@ -428,11 +438,16 @@ class AdoptionPolicyTests(unittest.TestCase):
             )["decision"],
             "skip",
         )
-        for verdict in ("candidate-stronger", "inconclusive"):
-            self.assertEqual(
-                self.core.adoption_decision(gate, {"verdict": verdict}, installed)["decision"],
-                "adopt",
-            )
+        self.assertEqual(
+            self.core.adoption_decision(
+                gate, {"verdict": "candidate-stronger"}, installed
+            )["decision"],
+            "adopt",
+        )
+        for verdict in ("inconclusive", "incomplete"):
+            decision = self.core.adoption_decision(gate, {"verdict": verdict}, installed)
+            self.assertEqual(decision["decision"], "skip")
+            self.assertIn("more games", decision["reason"])
         self.assertEqual(
             self.core.adoption_decision(gate, {"verdict": "surprising"}, installed)["decision"],
             "skip",
