@@ -389,6 +389,21 @@ separately from normal search PV data. The harness sends Koi's book options with
 requiring a book reader or any Jack dependency; Koi versions predating book support
 ignore those UCI options safely.
 
+`tools/stability/sprt_compare.ps1` wraps `uci_match.ps1` for candidate-versus-baseline
+acceptance testing: it launches the white and black SPRT runs concurrently, reads both
+reports, and prints per-color and combined results. The combined decision accepts when
+either color accepts, rejects when either color rejects, and otherwise compares the sum
+of the two independent LLRs against the alpha = beta = 0.05 bounds. It exits 0 on
+accept, 1 on reject, and 2 when more games are needed.
+
+```powershell
+.\tools\stability\sprt_compare.ps1 `
+  -CandidatePath .\build\release\koi-engine.exe `
+  -BaselinePath .\artifacts\verification\baseline\koi-engine-baseline.exe `
+  -Nodes 20000 -Games 2 -MinGames 40 -MaxGames 64 -Elo1 5 `
+  -OutputDirectory .\artifacts\matches\sprt-candidate
+```
+
 ## Rough local Elo measurement
 
 `tools/measurement/elo_estimate.py` is a standard-library-only, measurement-only harness. Its
