@@ -125,6 +125,17 @@ void test_book_filters_illegal_and_zero_weight_entries_and_is_seeded() {
         }
     }
     require(d4_count > e4_count, "higher weights must win more seeded selections than lower weights");
+
+    const auto zero_seed_first = book.choose(state, 0, true, 16, 0, true);
+    const auto zero_seed_second = book.choose(state, 0, true, 16, 0, true);
+    require(zero_seed_first && zero_seed_second && zero_seed_first->move == zero_seed_second->move,
+            "RandomSeed 0 must select the same weighted book move for the same position");
+
+    OpeningBook fresh_book(files.path());
+    fresh_book.set_file(book_path);
+    const auto zero_seed_fresh = fresh_book.choose(state, 0, true, 16, 0, true);
+    require(zero_seed_first && zero_seed_fresh && zero_seed_first->move == zero_seed_fresh->move,
+            "RandomSeed 0 must be reproducible across book instances");
 }
 
 void test_book_defaults_to_highest_weight_and_coordinate_tie_breaking() {

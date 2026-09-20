@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <array>
-#include <chrono>
 #include <fstream>
 #include <limits>
 #include <mutex>
@@ -371,12 +370,11 @@ std::optional<BookChoice> OpeningBook::choose(
             selected = *best;
         }
     } else {
-        std::uint64_t seed = random_seed ^ key;
-        if (random_seed == 0) {
-            std::random_device entropy;
-            seed = (static_cast<std::uint64_t>(entropy()) << 32) ^ entropy() ^
-                static_cast<std::uint64_t>(std::chrono::high_resolution_clock::now().time_since_epoch().count());
-        }
+        // RandomSeed 0 is deterministic per position: the generator is seeded
+        // with the Polyglot key alone, so BookRandom play is reproducible until
+        // the user opts into a nonzero seed.  A nonzero seed still mixes with
+        // the position, so different roots draw independent moves.
+        const std::uint64_t seed = random_seed ^ key;
         std::mt19937_64 generator(seed);
         std::uniform_int_distribution<std::uint64_t> distribution(0, total_weight - 1);
         std::uint64_t random_choice = distribution(generator);

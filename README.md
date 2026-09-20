@@ -603,9 +603,10 @@ from the starting position (for example, `bestmove e2e4`).
   `position fen ...` set a position, optionally followed by legal UCI moves.
   Replacing the root cancels and joins the old search without leaking its
   result.
-- `setoption name RandomSeed value 0` uses runtime randomness (`RandomSeed 0`).
-  A nonzero seed remains available to the compatibility random chooser, but
-  normal `go` search is deterministic and does not use it.
+- `setoption name RandomSeed value 0` (the default) keeps book selection
+  deterministic per position. A nonzero seed selects a different, fully
+  repeatable stream for every position; normal `go` search itself is
+  deterministic and never uses the seed.
 - `setoption name Hash value <MB>` resizes the persistent search hash, and
   `setoption name Clear Hash` clears it. Either command stops and joins an
   active search before changing the table.
@@ -625,9 +626,9 @@ from the starting position (for example, `bestmove e2e4`).
   searches keep the evaluator they started with.
 - `setoption name BookRandom value false` (the default) selects the highest-
   weight legal Polyglot move, using deterministic coordinate ordering for equal
-  weights. `BookRandom true` enables weighted random selection; `RandomSeed 0`
-  is runtime-random only in that opt-in mode, while nonzero seeds remain
-  repeatable.
+  weights. `BookRandom true` enables weighted random selection; the default
+  `RandomSeed 0` always picks the same move for a given position, while a
+  nonzero seed draws a repeatable but different sequence.
 - `setoption name BookSafety value true` (the default) runs a shallow forcing
   material probe before accepting a book move. A move that immediately hangs a
   valuable piece is rejected and normal search chooses the move. Set
