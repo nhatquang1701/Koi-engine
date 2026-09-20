@@ -1583,11 +1583,18 @@ public:
     // The feature cache is a pure accelerator: a copied state recomputes the
     // features it needs.  Dropping the 256-slot copy keeps per-node search
     // copies (root-parallel workers, legality probes) inexpensive while
-    // preserving identical evaluation results.
-    Impl(const Impl& other) : compatibility_mirror(other.compatibility_mirror),
-                              native_position(other.native_position),
+    // preserving identical evaluation results.  The compatibility mirror is
+    // copied only while it is tracked: a detached search state never consults
+    // it, so descendants must not pay for a second board and its history.
+    // The assignment is conditional because mirror_tracking is declared after
+    // the mirror and cannot be read from the initializer list.
+    Impl(const Impl& other) : native_position(other.native_position),
                               feature_state(),
-                              mirror_tracking(other.mirror_tracking) {}
+                              mirror_tracking(other.mirror_tracking) {
+        if (mirror_tracking) {
+            compatibility_mirror = other.compatibility_mirror;
+        }
+    }
 };
 
 GameState::GameState() : impl_(std::make_unique<Impl>()) {}
