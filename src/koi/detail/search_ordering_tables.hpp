@@ -74,6 +74,16 @@ public:
     void record_capture_fail(const MoveMetadata& metadata, int depth,
                              const SearchHistoryContext& context) noexcept;
 
+    // Parent-move feedback: the quiet move that led to a node is rewarded when
+    // the node fails low (the move caused the failure) and penalized when the
+    // node finds a refutation. Updates land in the same tables that
+    // quiet_history_score() consults when that move is ordered again. Both
+    // updates are deliberately weaker than direct cutoff/failure evidence.
+    void record_parent_fail_low(Color side, Move move, PieceType piece, int parent_ply,
+                                const SearchHistoryContext& context, int depth) noexcept;
+    void record_parent_refuted(Color side, Move move, PieceType piece, int parent_ply,
+                               const SearchHistoryContext& context, int depth) noexcept;
+
 private:
     static constexpr int kMaximumPly = 64;
     static constexpr std::size_t kMoveTableSize = 64 * 64;
@@ -104,6 +114,9 @@ private:
                                                  PieceType piece, Square to) noexcept;
     [[nodiscard]] static int normalized_ply(int ply) noexcept;
     static void update_history(int& score, int delta, int maximum) noexcept;
+    void update_parent_histories(Color side, Move move, PieceType piece, int parent_ply,
+                                 const SearchHistoryContext& context, int bonus,
+                                 bool continuation_only) noexcept;
 
     std::array<std::array<Move, 2>, kMaximumPly> killers_{};
     std::array<std::array<int, kMoveTableSize>, 2> history_{};

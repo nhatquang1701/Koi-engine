@@ -28,6 +28,10 @@ struct SearchFrame {
     bool prior_fail_high = false;
     bool tt_pv = false;
     bool in_check = false;
+    // Records whether the node had a transposition move available. The child
+    // uses this to identify the parent's first non-TT quiet move when applying
+    // refutation feedback.
+    bool had_tt_move = false;
 };
 
 struct PrincipalVariation {

@@ -517,4 +517,64 @@ void SearchOrderingTables::record_capture_fail(
                    kCaptureHistoryMaximum);
 }
 
+void SearchOrderingTables::update_parent_histories(
+    const Color side, const Move move, const PieceType piece, const int parent_ply,
+    const SearchHistoryContext& context, const int bonus, const bool continuation_only) noexcept {
+    if (move.is_no_move() || move.promotion() != Promotion::none || bonus == 0) {
+        return;
+    }
+    if (!continuation_only) {
+        update_history(history_[static_cast<std::size_t>(color_index(side))][move_index(move)],
+                       bonus, kMaximumHistoryScore);
+        update_history(piece_to_history_[piece_to_index(piece, move.to())], bonus,
+                       kHistoryTableMaximum);
+        if (parent_ply >= 0 && parent_ply < static_cast<int>(kLowPlyHistoryPlies)) {
+            update_history(low_ply_history_[static_cast<std::size_t>(parent_ply) * kMoveTableSize +
+                                            move_index(move)],
+                           bonus, kHistoryTableMaximum);
+        }
+    }
+
+    // The move being updated is the immediate predecessor of the node that
+    // supplied `context`, so its own continuation pairs are one ply older than
+    // the current node's context. Mirror the weights used by
+    // record_quiet_cutoff(): the distance-zero pair is the compact table above,
+    // and the multi-ply table starts at the second predecessor.
+    const std::size_t move_count = std::min(context.count, kSearchContinuationPlies);
+    if (move_count > 1 && !context.continuation_moves[1].is_no_move()) {
+        update_history(continuation_history_[continuation_index(
+                           context.continuation_moves[1], move)],
+                       bonus * 2, kHistoryTableMaximum);
+    }
+    for (std::size_t distance = 1; distance + 1 < move_count; ++distance) {
+        const Move previous = context.continuation_moves[distance + 1];
+        if (previous.is_no_move()) {
+            continue;
+        }
+        update_history(multi_ply_continuation_history_[
+                           distance * kContinuationHistorySize +
+                           continuation_index(previous, move)],
+                       bonus, kHistoryTableMaximum);
+    }
+}
+
+void SearchOrderingTables::record_parent_fail_low(
+    const Color side, const Move move, const PieceType piece, const int parent_ply,
+    const SearchHistoryContext& context, const int depth) noexcept {
+    const int depth_bonus = std::clamp(depth, 1, kMaximumPly);
+    // Indirect evidence, so half the weight of a direct cutoff at this depth.
+    update_parent_histories(side, move, piece, parent_ply, context,
+                            std::max(1, depth_bonus * depth_bonus / 2), false);
+}
+
+void SearchOrderingTables::record_parent_refuted(
+    const Color side, const Move move, const PieceType piece, const int parent_ply,
+    const SearchHistoryContext& context, const int depth) noexcept {
+    const int depth_bonus = std::clamp(depth, 1, kMaximumPly);
+    // Stockfish penalizes only the continuation histories of a refuted early
+    // quiet move; the move's own failure malus is recorded at its parent node.
+    update_parent_histories(side, move, piece, parent_ply, context,
+                            -std::max(1, depth_bonus * depth_bonus / 2), true);
+}
+
 } // namespace koi::detail

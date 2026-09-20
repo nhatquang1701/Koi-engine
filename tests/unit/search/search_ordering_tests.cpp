@@ -286,6 +286,56 @@ void test_history_saturation_does_not_overflow_signed_intermediates() {
             "saturated quiet and continuation history must remain within signed bounds");
 }
 
+void test_parent_move_feedback_rewards_fail_low_and_penalizes_refutation() {
+    koi::detail::SearchOrderingTables tables;
+    const koi::Color side = koi::Color::white;
+    const koi::Move parent = require_move("g1f3");
+    const koi::Move grandparent = require_move("b1c3");
+    const koi::Move great_grandparent = require_move("d2d4");
+
+    koi::detail::SearchHistoryContext child_context;
+    child_context.ply = 3;
+    child_context.count = 3;
+    child_context.continuation_moves[0] = parent;
+    child_context.continuation_moves[1] = grandparent;
+    child_context.continuation_moves[2] = great_grandparent;
+
+    // The same tables that order the parent move at its own node must observe
+    // the reward: distance-zero continuation pair plus the multi-ply slot.
+    koi::detail::SearchHistoryContext parent_context;
+    parent_context.ply = 2;
+    parent_context.count = 2;
+    parent_context.continuation_moves[0] = grandparent;
+    parent_context.continuation_moves[1] = great_grandparent;
+    koi::MoveMetadata parent_metadata{};
+    parent_metadata.move = parent;
+    parent_metadata.moving_piece = koi::PieceType::knight;
+
+    const int baseline = tables.quiet_history_score(side, parent);
+    const int baseline_context =
+        tables.quiet_history_score(side, parent_metadata, parent_context);
+    tables.record_parent_fail_low(side, parent, koi::PieceType::knight, 2, child_context, 8);
+    const int rewarded = tables.quiet_history_score(side, parent);
+    const int rewarded_context =
+        tables.quiet_history_score(side, parent_metadata, parent_context);
+    require(rewarded > baseline, "a parent fail low must reward the move that caused it");
+    require(rewarded_context > baseline_context,
+            "parent feedback must update the continuation history consulted at its own node");
+
+    tables.record_parent_refuted(side, parent, koi::PieceType::knight, 2, child_context, 8);
+    require(tables.quiet_history_score(side, parent_metadata, parent_context) < rewarded_context,
+            "a refuted parent move must lose continuation history");
+    require(tables.quiet_history_score(side, parent) == rewarded,
+            "refutation feedback must leave the parent's main history untouched");
+
+    // Promotions are not quiet-history material.
+    const koi::Move promotion = require_move("e7e8q");
+    const int promotion_before = tables.quiet_history_score(side, promotion);
+    tables.record_parent_fail_low(side, promotion, koi::PieceType::queen, 2, child_context, 8);
+    require(tables.quiet_history_score(side, promotion) == promotion_before,
+            "parent feedback must ignore promotion moves");
+}
+
 void test_metadata_ordering_score_is_cached_with_see() {
     const koi::GameState state = require_state("4k3/8/8/3q4/4Q3/8/8/4K3 w - - 0 1");
     koi::MoveMetadataList moves;
@@ -406,6 +456,7 @@ int main(int argc, char** argv) {
         {"quiet checks before quiet moves", test_quiet_checks_are_ordered_before_ordinary_quiet_moves},
         {"history malus and continuation ordering", test_history_malus_and_continuation_history_shape_quiet_ordering},
         {"history saturation overflow safety", test_history_saturation_does_not_overflow_signed_intermediates},
+        {"parent move feedback", test_parent_move_feedback_rewards_fail_low_and_penalizes_refutation},
         {"cached move scores", test_metadata_ordering_score_is_cached_with_see},
         {"deferred SEE generation", test_search_move_generation_can_defer_see},
         {"quiet-only check metadata", test_search_move_generation_can_skip_capture_check_analysis},

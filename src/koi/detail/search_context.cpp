@@ -598,6 +598,7 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
         frame.static_eval_valid = excluded_search ? inherited_frame.static_eval_valid : false;
         frame.prior_fail_high = false;
         frame.tt_pv = excluded_search ? inherited_frame.tt_pv : false;
+        frame.had_tt_move = false;
         if (ply + 1 < static_cast<int>(SearchStack::kCapacity)) {
             // The current node reads the cutoff count owned by its immediate
             // child while deciding later-sibling LMR. Clear that slot before
@@ -859,6 +860,10 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
             }) != moves.end()) {
             tt_move = root_move_hint;
         }
+        // The child uses this to tell whether the first searched move here was
+        // the transposition move, so refutation feedback only punishes an
+        // early non-TT quiet move.
+        frame.had_tt_move = tt_move.has_value();
 
         // Interior Syzygy WDL probe.  Opt-in and off by default; the root probe
         // keeps its own gate.  Only quiet, non-repetition-sensitive interior
@@ -1885,6 +1890,35 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
                     ++stats.quiet_history_updates;
                     if (history.count > 0) {
                         ++stats.continuation_history_updates;
+                    }
+                }
+            }
+        }
+
+        // Stockfish-style parent-move feedback.  A node that fails low is
+        // evidence that the quiet move leading here was good; a node that
+        // finds a refutation says the parent's first non-TT quiet move was
+        // bad.  Only complete comparisons contribute, and the parent capture
+        // case is skipped because its captured piece is no longer visible.
+        if (ply > 0 && !excluded_search && complete_history_comparison &&
+            history.count > 0 && !history.continuation_moves[0].is_no_move()) {
+            const Move parent_move = history.continuation_moves[0];
+            const Piece parent_piece = state.piece_at(parent_move.to());
+            const Color parent_side = opposite(side_to_move);
+            if (parent_move.promotion() == Promotion::none && !parent_piece.empty() &&
+                parent_piece.color == parent_side) {
+                if (best_score <= original_alpha) {
+                    ordering.record_parent_fail_low(parent_side, parent_move, parent_piece.type,
+                                                    ply - 1, history, depth);
+                    ++stats.quiet_history_updates;
+                } else {
+                    const SearchFrame& parent_frame =
+                        stack.frame(static_cast<std::size_t>(ply - 1));
+                    const int first_non_tt_move = parent_frame.had_tt_move ? 2 : 1;
+                    if (parent_frame.move_count == first_non_tt_move) {
+                        ordering.record_parent_refuted(parent_side, parent_move, parent_piece.type,
+                                                       ply - 1, history, depth);
+                        ++stats.quiet_history_updates;
                     }
                 }
             }

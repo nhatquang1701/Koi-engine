@@ -48,6 +48,10 @@ public:
                              const SearchHistoryContext& history_context) noexcept;
     void record_capture_fail(const MoveMetadata& metadata, int depth,
                              const SearchHistoryContext& history_context) noexcept;
+    void record_parent_fail_low(Color side, Move move, PieceType piece, int parent_ply,
+                                const SearchHistoryContext& history_context, int depth) noexcept;
+    void record_parent_refuted(Color side, Move move, PieceType piece, int parent_ply,
+                               const SearchHistoryContext& history_context, int depth) noexcept;
     [[nodiscard]] bool is_killer(Move move, int ply) const noexcept;
     [[nodiscard]] int quiet_history_score(Color side, Move move,
                                           std::optional<Move> previous_move = std::nullopt) const noexcept;

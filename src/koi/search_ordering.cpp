@@ -373,6 +373,18 @@ void SearchMoveOrdering::record_capture_fail(
     tables_.record_capture_fail(metadata, depth, history_context);
 }
 
+void SearchMoveOrdering::record_parent_fail_low(
+    const Color side, const Move move, const PieceType piece, const int parent_ply,
+    const SearchHistoryContext& history_context, const int depth) noexcept {
+    tables_.record_parent_fail_low(side, move, piece, parent_ply, history_context, depth);
+}
+
+void SearchMoveOrdering::record_parent_refuted(
+    const Color side, const Move move, const PieceType piece, const int parent_ply,
+    const SearchHistoryContext& history_context, const int depth) noexcept {
+    tables_.record_parent_refuted(side, move, piece, parent_ply, history_context, depth);
+}
+
 SearchMovePicker::SearchMovePicker(
     const SearchMoveOrdering& ordering, const GameState& state,
     const MoveMetadataList& moves, std::optional<Move> tt_move,
