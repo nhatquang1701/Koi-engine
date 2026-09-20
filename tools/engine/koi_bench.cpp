@@ -30,6 +30,9 @@ struct BenchmarkConfig {
     bool timed = false;
     bool warm_hash = false;
     bool optional = false;
+    std::uint64_t node_limit = 0;
+    std::size_t warmup = 0;
+    std::size_t repeat = 1;
     std::optional<std::string> profile_json_path;
     std::optional<std::string> nnue_path;
 };
@@ -86,6 +89,37 @@ std::optional<BenchmarkConfig> parse_arguments(int argc, char** argv) {
             config.nnue_path = argv[++index];
             continue;
         }
+        if (argument == "--nodes") {
+            // Node-limited mode: measures the steady-state search instead of a
+            // fixed shallow depth, matching the SPRT/node-limited match regime.
+            if (index + 1 >= argc) {
+                return std::nullopt;
+            }
+            std::uint64_t value = 0;
+            if (!parse_uint64(argv[++index], value) || value == 0) {
+                return std::nullopt;
+            }
+            config.node_limit = value;
+            continue;
+        }
+        if (argument == "--warmup" || argument == "--repeat") {
+            if (index + 1 >= argc) {
+                return std::nullopt;
+            }
+            std::uint64_t value = 0;
+            if (!parse_uint64(argv[++index], value)) {
+                return std::nullopt;
+            }
+            if (argument == "--warmup") {
+                config.warmup = static_cast<std::size_t>(value);
+            } else {
+                if (value == 0) {
+                    return std::nullopt;
+                }
+                config.repeat = static_cast<std::size_t>(value);
+            }
+            continue;
+        }
         if (argument != "--threads" && argument != "--speed") {
             return std::nullopt;
         }
@@ -120,7 +154,11 @@ BenchmarkRun run_position(const koi::StrengthPosition& benchmark, const Benchmar
     }
 
     koi::SearchLimits limits;
-    limits.depth = benchmark.depth;
+    if (config.node_limit != 0) {
+        limits.nodes = config.node_limit;
+    } else {
+        limits.depth = benchmark.depth;
+    }
     koi::SearchOptions options;
     options.threads = config.threads;
     options.speed_percent = config.speed_percent;
@@ -160,8 +198,58 @@ void write_json_string(std::ostream& output, std::string_view value) {
     output << '"';
 }
 
+struct PositionProfile {
+    koi::StrengthPosition benchmark;
+    std::vector<BenchmarkRun> runs;
+};
+
+const BenchmarkRun& median_run(const std::vector<BenchmarkRun>& runs) {
+    std::vector<std::size_t> order(runs.size());
+    for (std::size_t index = 0; index < runs.size(); ++index) {
+        order[index] = index;
+    }
+    std::sort(order.begin(), order.end(), [&runs](std::size_t left, std::size_t right) {
+        return runs[left].wall_time < runs[right].wall_time;
+    });
+    return runs[order[order.size() / 2]];
+}
+
+void write_run_metrics(std::ostream& output, const BenchmarkRun& run, bool timed) {
+    const koi::SearchResult& result = run.result;
+    const std::uint64_t visited = result.stats.nodes + result.stats.qnodes;
+    const std::uint64_t elapsed = static_cast<std::uint64_t>(run.wall_time.count());
+    const std::uint64_t nps = timed ? (elapsed > 0 ? visited * 1000 / elapsed : visited) : 0;
+    output << "\"score_cp\": " << result.score_cp << ", \"pv\": [";
+    if (!run.pv.empty()) {
+        for (std::size_t pv_index = 0; pv_index < run.pv.size(); ++pv_index) {
+            if (pv_index != 0) {
+                output << ", ";
+            }
+            write_json_string(output, run.pv[pv_index].uci());
+        }
+    } else if (result.best_move.has_value()) {
+        write_json_string(output, result.best_move->uci());
+    }
+    output << "], \"nodes\": " << result.stats.nodes
+           << ", \"qnodes\": " << result.stats.qnodes
+           << ", \"tt_hits\": " << result.stats.tt_hits
+           << ", \"pruning\": {\"pvs_searches\": " << result.stats.pvs_searches
+           << ", \"pvs_researches\": " << result.stats.pvs_researches
+           << ", \"aspiration_researches\": " << result.stats.aspiration_researches
+           << ", \"check_extensions\": " << result.stats.check_extensions
+           << ", \"qchecks\": " << result.stats.qchecks
+           << ", \"see_prunes\": " << result.stats.see_prunes
+           << ", \"delta_prunes\": " << result.stats.delta_prunes
+           << ", \"null_cutoffs\": " << result.stats.null_cutoffs
+           << ", \"lmr_reductions\": " << result.stats.lmr_reductions
+           << "}, \"nps\": " << nps;
+    if (timed) {
+        output << ", \"elapsed_ms\": " << run.wall_time.count();
+    }
+}
+
 void write_profile_json(const std::string& path, const BenchmarkConfig& config,
-                        const std::vector<std::pair<koi::StrengthPosition, BenchmarkRun>>& runs) {
+                        const std::vector<PositionProfile>& profiles) {
     std::ofstream output(path, std::ios::binary | std::ios::trunc);
     if (!output) {
         throw std::runtime_error("unable to write benchmark profile JSON");
@@ -174,6 +262,9 @@ void write_profile_json(const std::string& path, const BenchmarkConfig& config,
            << "  \"warm_hash\": " << (config.warm_hash ? "true" : "false") << ",\n"
            << "  \"hash_state\": \"" << (config.warm_hash ? "warm" : "cold") << "\",\n"
            << "  \"timed\": " << (config.timed ? "true" : "false") << ",\n"
+           << "  \"warmup\": " << config.warmup << ",\n"
+           << "  \"repeat\": " << config.repeat << ",\n"
+           << "  \"node_limit\": " << config.node_limit << ",\n"
            << "  \"hash_mb\": 512,\n"
            << "  \"threads\": " << config.threads << ",\n"
            << "  \"speed\": " << static_cast<unsigned>(config.speed_percent) << ",\n"
@@ -186,19 +277,19 @@ void write_profile_json(const std::string& path, const BenchmarkConfig& config,
         output << ", \"bytes\": " << (file_error ? 0 : network_bytes) << "},\n";
     }
     output << "  \"positions\": [\n";
-    for (std::size_t index = 0; index < runs.size(); ++index) {
-        const auto& [benchmark, run] = runs[index];
-        const koi::SearchResult& result = run.result;
-        const std::uint64_t visited = result.stats.nodes + result.stats.qnodes;
-        const std::uint64_t elapsed = static_cast<std::uint64_t>(run.wall_time.count());
-        const std::uint64_t nps = config.timed ?
-            (elapsed > 0 ? visited * 1000 / elapsed : visited) : 0;
+    for (std::size_t index = 0; index < profiles.size(); ++index) {
+        const koi::StrengthPosition& benchmark = profiles[index].benchmark;
+        const BenchmarkRun& run = median_run(profiles[index].runs);
         output << "    {\"id\": ";
         write_json_string(output, benchmark.name);
         output << ", \"fen\": ";
         write_json_string(output, benchmark.fen);
-        output << ", \"limits\": {\"depth\": " << static_cast<unsigned>(benchmark.depth)
-               << "}, \"expected_move\": ";
+        if (config.node_limit != 0) {
+            output << ", \"limits\": {\"nodes\": " << config.node_limit << "}";
+        } else {
+            output << ", \"limits\": {\"depth\": " << static_cast<unsigned>(benchmark.depth) << "}";
+        }
+        output << ", \"expected_move\": ";
         write_json_string(output, benchmark.expected_move);
         output << ", \"accepted_moves\": [";
         bool first_accepted_move = true;
@@ -216,35 +307,18 @@ void write_profile_json(const std::string& path, const BenchmarkConfig& config,
         write_json_string(output, benchmark.category);
         output << ", \"hash_mb\": 512, \"hash_state\": \""
                << (config.warm_hash ? "warm" : "cold") << "\", \"threads\": " << config.threads
-               << ", \"speed\": " << static_cast<unsigned>(config.speed_percent)
-               << ", \"score_cp\": " << result.score_cp << ", \"pv\": [";
-        if (!run.pv.empty()) {
-            for (std::size_t pv_index = 0; pv_index < run.pv.size(); ++pv_index) {
-                if (pv_index != 0) {
-                    output << ", ";
-                }
-                write_json_string(output, run.pv[pv_index].uci());
+               << ", \"speed\": " << static_cast<unsigned>(config.speed_percent) << ", ";
+        write_run_metrics(output, run, config.timed);
+        if (profiles[index].runs.size() > 1) {
+            output << ", \"runs\": [";
+            for (std::size_t run_index = 0; run_index < profiles[index].runs.size(); ++run_index) {
+                output << (run_index == 0 ? "{" : ", {");
+                write_run_metrics(output, profiles[index].runs[run_index], config.timed);
+                output << '}';
             }
-        } else if (result.best_move.has_value()) {
-            write_json_string(output, result.best_move->uci());
+            output << ']';
         }
-        output << "], \"nodes\": " << result.stats.nodes
-                << ", \"qnodes\": " << result.stats.qnodes
-                << ", \"tt_hits\": " << result.stats.tt_hits
-               << ", \"pruning\": {\"pvs_searches\": " << result.stats.pvs_searches
-               << ", \"pvs_researches\": " << result.stats.pvs_researches
-               << ", \"aspiration_researches\": " << result.stats.aspiration_researches
-               << ", \"check_extensions\": " << result.stats.check_extensions
-               << ", \"qchecks\": " << result.stats.qchecks
-               << ", \"see_prunes\": " << result.stats.see_prunes
-                << ", \"delta_prunes\": " << result.stats.delta_prunes
-                << ", \"null_cutoffs\": " << result.stats.null_cutoffs
-                << ", \"lmr_reductions\": " << result.stats.lmr_reductions
-                << "}, \"nps\": " << nps;
-        if (config.timed) {
-            output << ", \"elapsed_ms\": " << run.wall_time.count();
-        }
-        output << '}' << (index + 1 == runs.size() ? '\n' : ',') << '\n';
+        output << '}' << (index + 1 == profiles.size() ? '\n' : ',') << '\n';
     }
     output << "  ]\n}\n";
     if (!output) {
@@ -257,7 +331,7 @@ void write_profile_json(const std::string& path, const BenchmarkConfig& config,
 int main(int argc, char** argv) {
     const auto config = parse_arguments(argc, argv);
     if (!config.has_value()) {
-        std::cerr << "usage: koi-bench [--threads N] [--speed 1-100] [--timed] [--warm-hash] [--optional] [--nnue path] [--profile-json path]\n";
+        std::cerr << "usage: koi-bench [--threads N] [--speed 1-100] [--timed] [--warm-hash] [--optional] [--nodes N] [--warmup K] [--repeat K] [--nnue path] [--profile-json path]\n";
         return 2;
     }
 
@@ -270,13 +344,18 @@ int main(int argc, char** argv) {
         if (config->optional) {
             std::cout << " suite " << suite_name(*config);
         }
+        if (config->node_limit != 0) {
+            std::cout << " nodes " << config->node_limit;
+        }
+        if (config->warmup != 0) {
+            std::cout << " warmup " << config->warmup;
+        }
+        if (config->repeat != 1) {
+            std::cout << " repeat " << config->repeat;
+        }
         std::cout << '\n';
         const std::span<const koi::StrengthPosition> benchmarks = config->optional ?
             koi::optional_strength_positions() : koi::strength_positions();
-        std::vector<std::pair<koi::StrengthPosition, BenchmarkRun>> profile_runs;
-        if (config->profile_json_path.has_value()) {
-            profile_runs.reserve(benchmarks.size());
-        }
         koi::EvaluatorSelection selection;
         if (config->nnue_path.has_value()) {
             selection = koi::make_evaluator(std::filesystem::path{*config->nnue_path});
@@ -290,33 +369,88 @@ int main(int argc, char** argv) {
             selection.evaluator = std::make_shared<koi::ClassicalEvaluator>();
         }
         koi::SearchService service(std::move(selection.evaluator));
-        for (const koi::StrengthPosition& benchmark : benchmarks) {
-            if (!config->warm_hash) {
-                // Reuse the 512 MB allocation while keeping every cold position
-                // independent of entries produced by its predecessor.
-                service.clear_hash();
+        const auto run_suite = [&](const bool record) {
+            std::vector<PositionProfile> collected;
+            if (record && config->profile_json_path.has_value()) {
+                collected.reserve(benchmarks.size());
             }
-            const BenchmarkRun run = run_position(benchmark, *config, service);
-            const koi::SearchResult& result = run.result;
-            const bool matched = result.best_move.has_value() && accepts_move(benchmark, *result.best_move);
-            std::cout << "position " << benchmark.name
-                      << " depth " << result.completed_depth
-                      << " nodes " << result.stats.nodes
-                      << " qnodes " << result.stats.qnodes
-                      << " tt_hits " << result.stats.tt_hits
-                      << " score " << result.score_cp
-                      << " expected " << benchmark.expected_move
-                      << " move " << (result.best_move.has_value() ? result.best_move->uci() : "0000")
-                      << " match " << (matched ? 1 : 0);
-            if (config->timed) {
+            for (const koi::StrengthPosition& benchmark : benchmarks) {
+                if (!config->warm_hash) {
+                    // Reuse the 512 MB allocation while keeping every cold
+                    // position independent of entries produced by its predecessor.
+                    service.clear_hash();
+                }
+                const BenchmarkRun run = run_position(benchmark, *config, service);
+                if (record) {
+                    auto existing = std::find_if(collected.begin(), collected.end(),
+                        [&benchmark](const PositionProfile& profile) {
+                            return profile.benchmark.name == benchmark.name;
+                        });
+                    if (existing == collected.end()) {
+                        collected.push_back(PositionProfile{benchmark, {run}});
+                    } else {
+                        existing->runs.push_back(run);
+                    }
+                    const koi::SearchResult& result = run.result;
+                    const bool matched = result.best_move.has_value() &&
+                        accepts_move(benchmark, *result.best_move);
+                    std::cout << "position " << benchmark.name
+                              << " depth " << result.completed_depth
+                              << " nodes " << result.stats.nodes
+                              << " qnodes " << result.stats.qnodes
+                              << " tt_hits " << result.stats.tt_hits
+                              << " score " << result.score_cp
+                              << " expected " << benchmark.expected_move
+                              << " move " << (result.best_move.has_value() ? result.best_move->uci() : "0000")
+                              << " match " << (matched ? 1 : 0);
+                    if (config->timed) {
+                        const std::uint64_t visited = result.stats.nodes + result.stats.qnodes;
+                        const std::uint64_t elapsed = static_cast<std::uint64_t>(run.wall_time.count());
+                        std::cout << " elapsed_ms " << run.wall_time.count()
+                                  << " nps " << (elapsed > 0 ? visited * 1000 / elapsed : visited);
+                    }
+                    std::cout << '\n';
+                }
+            }
+            return collected;
+        };
+        // Warmup passes keep the transposition table hot so the measured pass
+        // reflects steady-state throughput rather than first-touch behavior.
+        for (std::size_t pass = 0; pass < config->warmup; ++pass) {
+            (void)run_suite(false);
+        }
+        std::vector<PositionProfile> profile_runs;
+        for (std::size_t pass = 0; pass < config->repeat; ++pass) {
+            std::vector<PositionProfile> collected = run_suite(true);
+            if (pass == 0) {
+                profile_runs = std::move(collected);
+            } else {
+                for (PositionProfile& profile : collected) {
+                    auto existing = std::find_if(profile_runs.begin(), profile_runs.end(),
+                        [&profile](const PositionProfile& candidate) {
+                            return candidate.benchmark.name == profile.benchmark.name;
+                        });
+                    if (existing != profile_runs.end()) {
+                        existing->runs.insert(existing->runs.end(),
+                                              profile.runs.begin(), profile.runs.end());
+                    }
+                }
+            }
+        }
+        if (config->repeat > 1) {
+            std::cout << "repeat " << config->repeat << " median summary\n";
+            for (const PositionProfile& profile : profile_runs) {
+                const BenchmarkRun& run = median_run(profile.runs);
+                const koi::SearchResult& result = run.result;
                 const std::uint64_t visited = result.stats.nodes + result.stats.qnodes;
                 const std::uint64_t elapsed = static_cast<std::uint64_t>(run.wall_time.count());
-                std::cout << " elapsed_ms " << run.wall_time.count()
-                          << " nps " << (elapsed > 0 ? visited * 1000 / elapsed : visited);
-            }
-            std::cout << '\n';
-            if (config->profile_json_path.has_value()) {
-                profile_runs.emplace_back(benchmark, run);
+                std::cout << "position " << profile.benchmark.name
+                          << " nodes " << result.stats.nodes
+                          << " qnodes " << result.stats.qnodes
+                          << " score " << result.score_cp
+                          << " elapsed_ms " << run.wall_time.count()
+                          << " nps " << (elapsed > 0 ? visited * 1000 / elapsed : visited)
+                          << '\n';
             }
         }
         if (config->profile_json_path.has_value()) {

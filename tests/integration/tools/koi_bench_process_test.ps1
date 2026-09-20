@@ -240,3 +240,39 @@ if ($optional.Stdout -notmatch '(?m)^config threads 1 speed 100 timed 0 hash col
     $optionalRows.Count -ne 128) {
     throw "the optional benchmark text report must identify its suite and report 128 positions: $($optional.Stdout)"
 }
+
+# Steady-state measurement mode: node-limited, warm hash, warmup pass, repeats
+# with per-run samples and a median-selected primary result.
+$steadyProfile = Join-Path $scratchDirectory 'steady-profile.json'
+$steady = Invoke-Benchmark $BenchPath "--nodes 2000 --timed --warm-hash --warmup 1 --repeat 2 --profile-json `"$steadyProfile`"" 'steady-state'
+if ($steady.ExitCode -ne 0 -or $steady.Stderr.Length -ne 0) {
+    throw "steady-state benchmark failed: $($steady.Stderr)"
+}
+if ($steady.Stdout -notmatch '(?m)^config threads 1 speed 100 timed 1 hash warm nodes 2000 warmup 1 repeat 2\r?$') {
+    throw "steady-state benchmark must report its node limit, warmup, and repeat settings: $($steady.Stdout)"
+}
+if (-not (Test-Path -LiteralPath $steadyProfile -PathType Leaf)) {
+    throw "steady-state benchmark did not write profile JSON: $steadyProfile"
+}
+$steadyJson = Get-Content -LiteralPath $steadyProfile -Raw | ConvertFrom-Json
+if ($steadyJson.schema -ne 'koi-bench-profile-v1' -or $steadyJson.node_limit -ne 2000 -or
+    $steadyJson.warmup -ne 1 -or $steadyJson.repeat -ne 2 -or
+    $steadyJson.timed -ne $true -or $steadyJson.hash_state -cne 'warm') {
+    throw 'steady-state profile must preserve its node limit, warmup, repeat, and warm-hash configuration.'
+}
+foreach ($position in $steadyJson.positions) {
+    if ([uint64]$position.limits.nodes -ne 2000) {
+        throw 'steady-state profile positions must record the node limit.'
+    }
+    if ($position.runs.Count -ne 2) {
+        throw "steady-state profile positions must retain every repeated run, got $($position.runs.Count)."
+    }
+    $primary = "$($position.nodes)|$($position.qnodes)|$($position.score_cp)"
+    $sample = @($position.runs | Where-Object { "$($_.nodes)|$($_.qnodes)|$($_.score_cp)" -ceq $primary })
+    if ($sample.Count -eq 0) {
+        throw 'steady-state profile primary result must match one of the retained runs.'
+    }
+}
+if ($steady.Stdout -notmatch '(?m)^repeat 2 median summary\r?$') {
+    throw "steady-state benchmark must print its repeat summary: $($steady.Stdout)"
+}

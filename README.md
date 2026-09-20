@@ -155,6 +155,7 @@ From the configured build directory:
 .\build\release\koi-bench.exe
 .\build\release\koi-bench.exe --threads 4 --speed 100 --timed
 .\build\release\koi-bench.exe --optional --profile-json .\artifacts\verification\optional-strength.json
+.\build\release\koi-bench.exe --nodes 20000 --timed --warm-hash --warmup 1 --repeat 5 --profile-json .\artifacts\verification\steady-state.json
 .\build\release\koi-replay.exe startpos moves e2e4 e7e5 g1f3
 ```
 
@@ -167,12 +168,17 @@ that suite in both its text and JSON-profile output. `--threads N` and `--speed
 configuration as the corresponding engine controls. Every text report includes
 `hash cold` or `hash warm`; `--warm-hash` reuses one search service across rows
 and is useful for comparing warmed-table behavior. The default is cold.
-`--timed` is opt-in and adds wall-clock `elapsed_ms` and measured NPS to text and
-JSON; it is intentionally absent from the default CI-shaped output. Untimed JSON
-profiles use the stable `Koi Engine 1.1.0` build identity, set `timed` to `false`,
-and record `nps` as unmeasured (`0`). Each profile carries `hash_state` (`cold` or
-`warm`) at the top level and on every position. It is a separate process and never
-writes to the UCI engine's stdout.
+`--nodes N` replaces the per-position fixed depth with a node limit, matching the
+node-limited match regime; `--warmup K` runs K unmeasured suite passes first and
+`--repeat K` keeps K measured samples per position, reporting the median-time
+sample as the primary result and retaining every sample in the profile's `runs`
+array. Combine all three for steady-state throughput comparisons. `--timed` is
+opt-in and adds wall-clock `elapsed_ms` and measured NPS to text and JSON; it is
+intentionally absent from the default CI-shaped output. Untimed JSON profiles use
+the stable `Koi Engine 1.1.0` build identity, set `timed` to `false`, and record
+`nps` as unmeasured (`0`). Each profile carries `hash_state` (`cold` or `warm`) at
+the top level and on every position. It is a separate process and never writes to
+the UCI engine's stdout.
 
 `koi-replay` is a separate rules-boundary tool for replaying coordinate moves without
 exposing the vendored chess library. Give it `startpos` or `fen <six-field FEN>`, then
