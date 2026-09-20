@@ -193,8 +193,8 @@ TranspositionTable::TranspositionTable(std::size_t megabytes, HashMemoryPolicy p
     (void)resize_locked(megabytes);
 }
 
-std::shared_ptr<TranspositionTable::Storage> TranspositionTable::snapshot() const noexcept {
-    return std::atomic_load_explicit(&storage_, std::memory_order_acquire);
+TranspositionTable::Storage* TranspositionTable::hot_storage() const noexcept {
+    return hot_storage_.load(std::memory_order_acquire);
 }
 
 std::size_t TranspositionTable::normalized_size_mb(std::size_t megabytes) noexcept {
@@ -211,7 +211,7 @@ HashResizeResult TranspositionTable::resize_locked(std::size_t megabytes) noexce
     result.requested_mb = megabytes;
     const std::size_t normalized = normalized_size_mb(megabytes);
     const bool request_was_clamped = normalized != megabytes;
-    const auto current = snapshot();
+    std::shared_ptr<Storage> current = storage_;
     const std::size_t current_bytes = current == nullptr ? 0 : current->allocated_bytes;
     const std::size_t requested_bytes = megabytes_to_bytes(normalized);
     std::size_t allowed_bytes = requested_bytes;
@@ -283,7 +283,15 @@ HashResizeResult TranspositionTable::resize_locked(std::size_t megabytes) noexce
         if (result.reason == HashResizeReason::none && request_was_clamped) {
             result.reason = HashResizeReason::request_clamped;
         }
-        std::atomic_store_explicit(&storage_, std::move(replacement), std::memory_order_release);
+        Storage* const raw = replacement.get();
+        if (current != nullptr) {
+            retired_storages_.push_back(current);
+            if (retired_storages_.size() > kRetiredStorageLimit) {
+                retired_storages_.erase(retired_storages_.begin());
+            }
+        }
+        storage_ = std::move(replacement);
+        hot_storage_.store(raw, std::memory_order_release);
         return result;
     } catch (const std::bad_alloc&) {
         result.effective_mb = current == nullptr ? 0 : current->size_mb;
@@ -310,12 +318,16 @@ HashResizeResult TranspositionTable::resize_locked(std::size_t megabytes) noexce
 }
 
 std::size_t TranspositionTable::size_mb() const noexcept {
-    const auto storage = snapshot();
-    return storage == nullptr ? 0 : storage->size_mb;
+    std::lock_guard lock(maintenance_mutex_);
+    return storage_ == nullptr ? 0 : storage_->size_mb;
 }
 
 std::size_t TranspositionTable::hashfull_permill() const noexcept {
-    const auto storage = snapshot();
+    std::shared_ptr<Storage> storage;
+    {
+        std::lock_guard lock(maintenance_mutex_);
+        storage = storage_;
+    }
     if (storage == nullptr || storage->total_slot_count == 0) {
         return 0;
     }
@@ -345,7 +357,7 @@ std::size_t TranspositionTable::hashfull_permill() const noexcept {
 
 void TranspositionTable::clear() noexcept {
     std::lock_guard maintenance_lock(maintenance_mutex_);
-    const auto storage = snapshot();
+    const std::shared_ptr<Storage> storage = storage_;
     if (storage == nullptr || storage->total_slot_count == 0) {
         return;
     }
@@ -369,7 +381,7 @@ void TranspositionTable::new_generation() noexcept {
     // the table; it is neither the UCI protocol generation nor a search
     // request identity (see transposition_table.hpp).
     std::lock_guard maintenance_lock(maintenance_mutex_);
-    const auto storage = snapshot();
+    const std::shared_ptr<Storage> storage = storage_;
     if (storage == nullptr || storage->total_slot_count == 0) {
         return;
     }
@@ -389,7 +401,7 @@ void TranspositionTable::new_generation() noexcept {
 
 void TranspositionTable::store(std::uint64_t key, int depth, int score, TranspositionBound bound,
                                Move best_move, int ply, bool pv, int eval) noexcept {
-    const auto storage = snapshot();
+    Storage* const storage = hot_storage();
     if (storage == nullptr || storage->cluster_count == 0) {
         return;
     }
@@ -477,7 +489,7 @@ void TranspositionTable::store(std::uint64_t key, int depth, int score, Transpos
 }
 
 std::optional<TranspositionEntry> TranspositionTable::probe(std::uint64_t key, int ply) const noexcept {
-    const auto storage = snapshot();
+    Storage* const storage = hot_storage();
     if (storage == nullptr || storage->cluster_count == 0) {
         return std::nullopt;
     }
@@ -503,7 +515,7 @@ std::optional<TranspositionEntry> TranspositionTable::probe(std::uint64_t key, i
 }
 
 void TranspositionTable::prefetch(std::uint64_t key) const noexcept {
-    const auto storage = snapshot();
+    Storage* const storage = hot_storage();
     if (storage == nullptr || storage->cluster_count == 0) {
         return;
     }

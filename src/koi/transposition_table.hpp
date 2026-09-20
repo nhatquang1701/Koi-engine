@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -124,12 +125,20 @@ private:
 
     [[nodiscard]] static std::size_t normalized_size_mb(std::size_t megabytes) noexcept;
     [[nodiscard]] HashResizeResult resize_locked(std::size_t megabytes) noexcept;
-    [[nodiscard]] std::shared_ptr<Storage> snapshot() const noexcept;
+    // Lock-free storage handle for the store/probe/prefetch hot paths.  The
+    // owning shared_ptr stays under maintenance_mutex_, and replaced storages
+    // are retired until a later resize so a reader that loaded the pointer
+    // just before a resize still sees a live object.
+    [[nodiscard]] Storage* hot_storage() const noexcept;
 
     static constexpr std::size_t kStripeCount = 64;
+    // Replaced tables kept alive across resizes (normally at most one).
+    static constexpr std::size_t kRetiredStorageLimit = 2;
 
     mutable std::mutex maintenance_mutex_;
     std::shared_ptr<Storage> storage_;
+    std::atomic<Storage*> hot_storage_{nullptr};
+    std::vector<std::shared_ptr<Storage>> retired_storages_;
     HashMemoryPolicy memory_policy_;
 };
 
