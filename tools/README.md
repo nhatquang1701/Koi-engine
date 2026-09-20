@@ -398,17 +398,7 @@ colour-split A/B match (`tools/nnue/ab_match.ps1` versus the classical evaluator
 reports: the classical evaluator remains the engine default and no reported
 number is an Elo claim.
 
-GPU NNUE inference is optional and off by default. When `nvcc` is available
-(CMake option `KOI_ENABLE_GPU_NNUE`, on by default), the build compiles
-`src/koi/gpu/koi_nnue_v5.cu` to PTX and embeds it; at runtime the engine loads
-`nvcuda.dll` dynamically and uses the driver API only, so a CPU-only build or a
-missing GPU simply stays on the CPU path. Set `KOI_GPU_NNUE=1` to use the GPU
-for `Threads > 1`; `KOI_GPU_FORCE_FAIL=1` forces the CPU fallback for testing.
-`tools/engine/koi_gpu_probe.cpp` verifies the device path and
-`tests/unit/runtime/gpu_nnue_tests.cpp` checks bit-exact parity against the CPU
-scalar evaluation. No strength or speed claim is attached to this first pass.
-
-GPU NNUE inference is optional and off by default. When `nvcc` is available
+GPU NNUE inference is optional at runtime. When `nvcc` is available
 (CMake option `KOI_ENABLE_GPU_NNUE`, on by default), the build compiles
 `src/koi/gpu/koi_nnue_v5.cu` to PTX and embeds it; at runtime the engine loads
 `nvcuda.dll` dynamically and uses the driver API only, so a CPU-only build or a

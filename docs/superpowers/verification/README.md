@@ -23,4 +23,3 @@ strength pass. Paths are intentionally stable because plans link to them.
 | `2026-09-19-syzygy-endgames.md` | Endgame evaluation and Syzygy interior probing verification (tests, A/B, suites). |
 | `2026-09-19-nnue-v5-threat-architecture.md` | NNUE version 5 architecture verification (threat features, container v5, trainers, cross-language parity, suites). |
 | `2026-09-20-gpu-nnue-inference.md` | GPU NNUE inference verification (sm_61 PTX build, driver loader, bit-exact parity, env gating, benchmarks). |
-| `2026-09-19-nnue-v5-threat-architecture.md` | NNUE version 5 architecture verification (threat features, container v5, trainers, cross-language parity, suites). |

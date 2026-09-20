@@ -45,7 +45,7 @@ ctest --test-dir build\release -N
 ctest --test-dir build\release -C Release -R koi_strength_tests --output-on-failure
 ```
 
-The default Release configuration registers **58 tests** (python-chess
+The default Release configuration registers **61 tests** (python-chess
 installed, `KOI_BUILD_SHADOW_DIFF=OFF`). The count varies
 with optional dependencies: `elo_oracle_python` requires python-chess,
 `koi_shadow_diff_tests` requires `-DKOI_BUILD_SHADOW_DIFF=ON`, and

@@ -16,3 +16,9 @@ tools/nnue/bullet_train/target/
 *.ilk
 *.exe
 *.dll
+
+.opencode/
+book.bin
+*.nnue
+*.pt
+koi-debug.log
