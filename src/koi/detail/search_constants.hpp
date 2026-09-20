@@ -20,7 +20,17 @@ inline constexpr int kMaximumCheckExtensionsPerPath = 2;
 inline constexpr int kMaximumQuiescenceCheckDepth = 3;
 inline constexpr int kQuiescenceFutilityMargin = 306;
 inline constexpr int kQuiescenceFutilityMoveLimit = 2;
-inline constexpr int kQuiescenceSeeThreshold = 0;
+// Only captures whose static exchange value is worse than this floor are
+// removed from the tactical frontier.  A floor of zero discards the sound
+// defensive captures in the -1..-73 band that perpetual-check and sacrifice
+// resources live in, so the boundary is the reference -74 instead.
+inline constexpr int kQuiescenceSeeThreshold = -74;
+// Fail-high qsearch returns are pulled toward beta so a large overshoot does
+// not destabilise the parent's window.  The weights are the reference
+// fixed-point blend: score * weight + beta * (1024 - weight), over 1024.
+// Decisive scores are never softened.
+inline constexpr int kQuiescenceStandPatSofteningWeight = 441;
+inline constexpr int kQuiescenceFailHighSofteningWeight = 462;
 inline constexpr int kInternalIterativeReductionMinimumDepth = 6;
 // True internal iterative deepening re-searches the current node at a reduced
 // depth with a null window when no transposition move is available, so the

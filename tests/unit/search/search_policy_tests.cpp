@@ -120,8 +120,11 @@ void test_quiet_futility_policy_owns_exact_boundary() {
 void test_quiescence_capture_policy_classifies_see_and_delta_prunes() {
     using Prune = koi::detail::QuiescenceCapturePrune;
     require(koi::detail::SearchPolicy::quiescence_capture(
-                false, true, false, false, -1, 500, 0, 0) == Prune::static_exchange,
-            "losing captures must use SEE pruning");
+                false, true, false, false, -75, 500, 0, 0) == Prune::static_exchange,
+            "captures below the SEE floor must use SEE pruning");
+    require(koi::detail::SearchPolicy::quiescence_capture(
+                false, true, false, false, -1, 500, 0, 0) == Prune::none,
+            "captures inside the SEE floor band must remain in quiescence");
     require(koi::detail::SearchPolicy::quiescence_capture(
                 false, true, false, false, 0, 500, -1000, 0) == Prune::delta,
             "insufficient-gain captures must use delta pruning");
