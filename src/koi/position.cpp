@@ -660,13 +660,14 @@ public:
         return result;
     }
 
-    std::size_t legal_moves_into(std::span<Move> output) {
+    template <bool TacticalOnly>
+    std::size_t legal_moves_into_impl(std::span<Move> output) {
         if (output.empty()) {
             return 0;
         }
         const Color mover = state.side;
         MoveBuffer pseudo;
-        generate_pseudo(pseudo);
+        generate_pseudo<TacticalOnly>(pseudo);
         std::size_t count = 0;
         for (const Move& move : pseudo) {
             const Snapshot saved = snapshot();
@@ -677,6 +678,33 @@ public:
             restore(saved);
         }
         return count;
+    }
+
+    std::size_t legal_moves_into(std::span<Move> output) {
+        return legal_moves_into_impl<false>(output);
+    }
+
+    std::size_t legal_tactical_moves_into(std::span<Move> output) {
+        return legal_moves_into_impl<true>(output);
+    }
+
+    // Stops at the first legal candidate instead of validating the whole
+    // pseudo-legal list.  Quiescence only needs to know whether a legal reply
+    // exists before deciding that a position is terminal.
+    [[nodiscard]] bool has_legal_move() {
+        const Color mover = state.side;
+        MoveBuffer pseudo;
+        generate_pseudo(pseudo);
+        for (const Move& move : pseudo) {
+            const Snapshot saved = snapshot();
+            apply_unchecked(move);
+            const bool legal = !is_checked(state, mover);
+            restore(saved);
+            if (legal) {
+                return true;
+            }
+        }
+        return false;
     }
 
     [[nodiscard]] bool is_legal(const Move& move) const noexcept {
@@ -1058,7 +1086,10 @@ private:
         }
     }
 
-    template <typename MoveContainer>
+    // `TacticalOnly` emits captures, en-passant, and promotions without the
+    // quiet moves that quiescence would discard anyway.  The full generator
+    // stays the default so perft and the public move list are unchanged.
+    template <bool TacticalOnly = false, typename MoveContainer>
     void generate_pseudo(MoveContainer& moves) {
         const Color side = state.side;
         for (int from = 0; from < 64; ++from) {
@@ -1070,12 +1101,19 @@ private:
                 const int direction = side == Color::white ? 1 : -1;
                 const int one = from + direction * 8;
                 if (valid_square(one) && state.board[static_cast<std::size_t>(one)].empty()) {
-                    push(moves, from, one);
-                    const int two = from + direction * 16;
-                    const int start_rank = side == Color::white ? 1 : 6;
-                    if (rank == start_rank && state.board[static_cast<std::size_t>(two)].empty()) {
-                        moves.emplace_back(Square::from_index(static_cast<std::uint8_t>(from)),
-                                           Square::from_index(static_cast<std::uint8_t>(two)));
+                    if constexpr (!TacticalOnly) {
+                        push(moves, from, one);
+                        const int two = from + direction * 16;
+                        const int start_rank = side == Color::white ? 1 : 6;
+                        if (rank == start_rank && state.board[static_cast<std::size_t>(two)].empty()) {
+                            moves.emplace_back(Square::from_index(static_cast<std::uint8_t>(from)),
+                                               Square::from_index(static_cast<std::uint8_t>(two)));
+                        }
+                    } else {
+                        const int promotion_rank = side == Color::white ? 7 : 0;
+                        if (rank_of(one) == promotion_rank) {
+                            push(moves, from, one);
+                        }
                     }
                 }
                 for (const int file_delta : {-1, 1}) {
@@ -1103,10 +1141,19 @@ private:
                     const int target_file = file + step[0];
                     const int target_rank = rank + step[1];
                     if (target_file >= 0 && target_file < 8 && target_rank >= 0 && target_rank < 8) {
-                        push(moves, from, target_rank * 8 + target_file);
+                        const int to = target_rank * 8 + target_file;
+                        if constexpr (TacticalOnly) {
+                            const Piece target = state.board[static_cast<std::size_t>(to)];
+                            if (target.empty() || target.color == side ||
+                                target.type == PieceType::king) {
+                                continue;
+                            }
+                        }
+                        push(moves, from, to);
                     }
                 }
-                if (piece.type == PieceType::king && !is_checked(state, side)) {
+                if constexpr (!TacticalOnly) {
+                    if (piece.type == PieceType::king && !is_checked(state, side)) {
                     const int rank_base = side == Color::white ? 0 : 7;
                     if (from == rank_base * 8 + 4) {
                         const std::uint8_t king_right = side == Color::white ? kWhiteKingSide : kBlackKingSide;
@@ -1129,6 +1176,7 @@ private:
                                                Square::from_index(static_cast<std::uint8_t>(rank_base * 8 + 2)));
                         }
                     }
+                    }
                 }
                 continue;
             }
@@ -1147,8 +1195,10 @@ private:
                         const int to = target_rank * 8 + target_file;
                         const Piece target = state.board[static_cast<std::size_t>(to)];
                         if (target.empty()) {
-                            moves.emplace_back(Square::from_index(static_cast<std::uint8_t>(from)),
-                                               Square::from_index(static_cast<std::uint8_t>(to)));
+                            if constexpr (!TacticalOnly) {
+                                moves.emplace_back(Square::from_index(static_cast<std::uint8_t>(from)),
+                                                   Square::from_index(static_cast<std::uint8_t>(to)));
+                            }
                         } else {
                             if (target.color != state.side && target.type != PieceType::king) {
                                 moves.emplace_back(Square::from_index(static_cast<std::uint8_t>(from)),
@@ -1301,6 +1351,22 @@ std::size_t Position::legal_moves_into(std::span<Move> output) const noexcept {
         return const_cast<NativePosition&>(impl_->position).legal_moves_into(output);
     } catch (...) {
         return 0;
+    }
+}
+
+std::size_t Position::legal_tactical_moves_into(std::span<Move> output) const noexcept {
+    try {
+        return const_cast<NativePosition&>(impl_->position).legal_tactical_moves_into(output);
+    } catch (...) {
+        return 0;
+    }
+}
+
+bool Position::has_legal_move() const noexcept {
+    try {
+        return const_cast<NativePosition&>(impl_->position).has_legal_move();
+    } catch (...) {
+        return false;
     }
 }
 

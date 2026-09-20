@@ -32,6 +32,11 @@ public:
     // the same deterministic ordering as legal_moves(); entries beyond the
     // returned count are untouched.
     [[nodiscard]] std::size_t legal_moves_into(std::span<Move> output) const noexcept;
+    // Tactical-only variant for quiescence: captures, en-passant, and
+    // promotions, in the same relative order as legal_moves_into().
+    [[nodiscard]] std::size_t legal_tactical_moves_into(std::span<Move> output) const noexcept;
+    // True as soon as one legal move is found, without generating the rest.
+    [[nodiscard]] bool has_legal_move() const noexcept;
     [[nodiscard]] bool is_legal(const Move& move) const noexcept;
     [[nodiscard]] bool is_capture(const Move& move) const noexcept;
     bool make_move(const Move& move) noexcept;

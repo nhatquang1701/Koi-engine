@@ -1747,9 +1747,17 @@ bool GameState::legal_tactical_moves_with_metadata(MoveMetadataList& moves,
         // Only the first `legal_count` entries are read; the generator writes
         // them all before use, so the zero-fill pass is skipped.
         std::array<Move, kMaximumLegalMoves> legal;
-        const std::size_t legal_count = impl_->native_position.legal_moves_into(legal);
-        has_legal_moves = legal_count != 0;
         const bool checked = impl_->native_position.in_check();
+        // Quiescence without quiet checks only needs the tactical frontier.
+        // A position whose only legal moves are quiet still has to count as
+        // non-terminal, so the tactical list is completed by a single
+        // early-exit legality probe.
+        const bool tactical_only = !checked && !include_quiet_checks;
+        const std::size_t legal_count = tactical_only ?
+            impl_->native_position.legal_tactical_moves_into(legal) :
+            impl_->native_position.legal_moves_into(legal);
+        has_legal_moves = legal_count != 0 ||
+            (tactical_only && impl_->native_position.has_legal_move());
         for (std::size_t index = 0; index < legal_count; ++index) {
             const Move& move = legal[index];
             auto metadata = metadata_for_native_move(move, false, check_flag_mode);
