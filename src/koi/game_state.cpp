@@ -1936,7 +1936,6 @@ bool GameState::make_move(const Move& move) noexcept {
         (void)impl_->native_position.unmake_move();
         return false;
     }
-    invalidate_feature_cache();
     return true;
 }
 
@@ -1971,7 +1970,6 @@ bool GameState::apply_generated_move(const MoveMetadata& metadata,
             return false;
         }
     }
-    invalidate_feature_cache();
     return true;
 }
 
@@ -2028,7 +2026,6 @@ bool GameState::make_null_move() noexcept {
         (void)impl_->native_position.unmake_null_move();
         return false;
     }
-    invalidate_feature_cache();
     return true;
 }
 
@@ -2046,6 +2043,10 @@ bool GameState::unmake_null_move() noexcept {
 }
 
 void GameState::invalidate_feature_cache() noexcept {
+    // Kept for callers that want to force a rebuild.  Make and unmake no
+    // longer call it: every lookup validates the cached position key, so a
+    // stale slot is rejected on its own, and leaving the entries in place lets
+    // a re-search of the same child (PVS or LMR re-search) reuse them.
     impl_->feature_state.invalidate(impl_->native_position.history_size());
 }
 

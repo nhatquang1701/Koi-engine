@@ -41,7 +41,8 @@ private:
     mutable std::array<std::atomic<Entry*>, kMaximumGameStateHistory> published_{};
     mutable std::array<std::atomic_bool, kMaximumGameStateHistory> published_valid_{};
     mutable std::array<std::atomic_uint64_t, kMaximumGameStateHistory> keys_{};
-    mutable std::uint64_t cache_misses_ = 0;
+    // Atomic so the diagnostic read path never has to take the shared lock.
+    mutable std::atomic<std::uint64_t> cache_misses_{0};
 };
 
 } // namespace koi::detail

@@ -40,7 +40,8 @@ FeatureState::FeatureState(const FeatureState& other,
             published_valid_[index].store(true, std::memory_order_release);
         }
     }
-    cache_misses_ = other.cache_misses_;
+    cache_misses_.store(other.cache_misses_.load(std::memory_order_relaxed),
+                        std::memory_order_relaxed);
 }
 
 PositionFeatures FeatureState::get_or_compute(const std::size_t cache_index,
@@ -67,7 +68,7 @@ PositionFeatures FeatureState::get_or_compute(const std::size_t cache_index,
         }
     }
 
-    ++cache_misses_;
+    cache_misses_.fetch_add(1, std::memory_order_relaxed);
     const PositionFeatures features = builder(position);
     if (cache_index < kMaximumGameStateHistory) {
         try {
@@ -100,8 +101,7 @@ void FeatureState::invalidate(const std::size_t cache_index) noexcept {
 }
 
 std::uint64_t FeatureState::cache_misses() const noexcept {
-    std::shared_lock lock(mutex_);
-    return cache_misses_;
+    return cache_misses_.load(std::memory_order_relaxed);
 }
 
 } // namespace koi::detail
