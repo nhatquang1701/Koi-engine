@@ -304,6 +304,60 @@ if ($immediatePonderBestmoves.Count -ne 1) {
         "$($immediatePonderBestmoves.Count) bestmoves")
 }
 
+# A depth-limited ponder must keep deepening until stop/ponderhit instead of
+# re-searching the same final depth forever, and it must not emit a bestmove
+# while it is still pondering.
+$deepeningPonder = Start-UciSession -Executable $EnginePath
+Send-UciCommand $deepeningPonder 'position startpos'
+Send-UciCommand $deepeningPonder 'go ponder depth 2'
+$maxPonderDepth = 0
+$ponderDeadline = [DateTime]::UtcNow.AddSeconds(10)
+while ([DateTime]::UtcNow -lt $ponderDeadline -and $maxPonderDepth -lt 3) {
+    $line = Read-UciLine $deepeningPonder 'ponder deepening'
+    if ($line -like 'bestmove *') {
+        throw "a pondering depth-limited search emitted a bestmove before stop or ponderhit: $line"
+    } elseif ($line -match '^info depth ([0-9]+)') {
+        $maxPonderDepth = [Math]::Max($maxPonderDepth, [int]$Matches[1])
+    } elseif (-not (Test-SearchInfo $line)) {
+        throw "Invalid output while pondering: $line"
+    }
+}
+if ($maxPonderDepth -lt 3) {
+    throw ("a ponder depth-2 search must keep deepening past depth 2 instead of repeating it; " +
+        "the highest depth observed was $maxPonderDepth")
+}
+Send-UciCommand $deepeningPonder 'ponderhit'
+$convertedPonderBestmoves = [System.Collections.Generic.List[string]]::new()
+$ponderDeadline = [DateTime]::UtcNow.AddSeconds(10)
+while ($convertedPonderBestmoves.Count -eq 0 -and [DateTime]::UtcNow -lt $ponderDeadline) {
+    $line = Read-UciLine $deepeningPonder 'bestmove after the converted ponder'
+    if ($line -like 'bestmove *') {
+        $convertedPonderBestmoves.Add($line)
+    } elseif (-not (Test-SearchInfo $line)) {
+        throw "Invalid output after the ponderhit: $line"
+    }
+}
+if ($convertedPonderBestmoves.Count -ne 1) {
+    throw "a converted ponder search must emit exactly one bestmove"
+}
+Send-UciCommand $deepeningPonder 'stop'
+Send-UciCommand $deepeningPonder 'isready'
+while ($true) {
+    $line = Read-UciLine $deepeningPonder 'readyok after the converted ponder'
+    if ($line -ceq 'readyok') {
+        break
+    }
+    if ($line -like 'bestmove *') {
+        $convertedPonderBestmoves.Add($line)
+    } elseif (-not (Test-SearchInfo $line)) {
+        throw "Invalid output after the converted ponder search: $line"
+    }
+}
+$null = Complete-UciSession $deepeningPonder $true
+if ($convertedPonderBestmoves.Count -ne 1) {
+    throw "the converted ponder search emitted $($convertedPonderBestmoves.Count) bestmoves"
+}
+
 $replacement = Start-UciSession -Executable $EnginePath
 Send-UciCommand $replacement 'position startpos'
 Send-UciCommand $replacement 'go infinite'

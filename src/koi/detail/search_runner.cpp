@@ -2422,12 +2422,14 @@ void SearchRunner::run() {
         const bool root_is_forced_draw = root.is_forced_draw();
 
         // Interior tablebase probing is opt-in, off by default, and mirrors
-        // the root probe restrictions.  The diagnostic hook may stand in for
-        // a real tablebase so the plumbing can be verified without assets.
+        // the root probe restrictions except for ponder: a pondering search is
+        // converted in place on ponderhit, so the binding must already be in
+        // force when the conversion happens.  The diagnostic hook may stand in
+        // for a real tablebase so the plumbing can be verified without assets.
         TablebaseSearchBinding tablebase_binding;
         if (options.syzygy_interior_depth > 0 &&
             (options.syzygy != nullptr || options.tablebase_probe_hook) &&
-            options.multi_pv == 1 && !options.analyse_mode && !limits.ponder &&
+            options.multi_pv == 1 && !options.analyse_mode &&
             !limits.search_moves_specified && !root_is_claimable_draw && !root_is_forced_draw) {
             tablebase_binding.table = options.syzygy ? options.syzygy.get() : nullptr;
             tablebase_binding.interior_depth = options.syzygy_interior_depth;
@@ -2454,6 +2456,10 @@ void SearchRunner::run() {
         }
 
         std::optional<SyzygyRootResult> tablebase_result;
+        // A ponder search cannot take the root fast path because it must not
+        // emit a bestmove before stop/ponderhit.  After an in-place conversion
+        // the search continues from its warmed state without a fresh root
+        // probe; interior probing, when enabled, is already active.
         if (options.syzygy && options.multi_pv == 1 && !options.analyse_mode &&
             !limits.infinite && !limits.ponder && !limits.search_moves_specified &&
             !root_is_claimable_draw && !root_is_forced_draw &&
@@ -2604,6 +2610,14 @@ void SearchRunner::run() {
             int maximum_depth =
                 std::min(kMaximumSearchDepth, std::max(1, limits.depth.value_or(kMaximumSearchDepth)));
             bool unbounded = limits.infinite || limits.ponder;
+            if (limits.ponder && limits.depth.has_value()) {
+                // While pondering, a depth limit only says how deep the GUI
+                // wanted the search before it started pondering; the engine must
+                // keep deepening instead of re-searching the same final depth
+                // until stop/ponderhit.  A ponderhit conversion below reinstates
+                // the converted depth/time budget.
+                maximum_depth = kMaximumSearchDepth;
+            }
             std::optional<int> previous_score;
             std::chrono::milliseconds previous_iteration_elapsed{1};
             std::chrono::milliseconds previous_report_elapsed{0};
@@ -3770,6 +3784,12 @@ void SearchRunner::run() {
             int maximum_depth =
                 std::min(kMaximumSearchDepth, std::max(1, limits.depth.value_or(kMaximumSearchDepth)));
             bool unbounded = limits.infinite || limits.ponder;
+            if (limits.ponder && limits.depth.has_value()) {
+                // Mirror of the serial driver: a ponder depth limit is a target,
+                // not an iteration cap, so the search keeps deepening until
+                // stop/ponderhit instead of repeating the final depth.
+                maximum_depth = kMaximumSearchDepth;
+            }
             std::optional<int> previous_score;
             std::chrono::milliseconds previous_iteration_elapsed{1};
             std::chrono::milliseconds previous_report_elapsed{0};

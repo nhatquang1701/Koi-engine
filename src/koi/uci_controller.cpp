@@ -1085,11 +1085,10 @@ void UciController::handle_ponderhit() {
     // No running search to convert (for example a node-limited ponder that
     // already completed). The stale ponder search is suppressed and a fresh,
     // bounded search of the real position answers this move so the GUI always
-    // receives exactly one bestmove.
+    // receives exactly one bestmove.  The restart keeps any searchmoves the
+    // ponder `go` carried so the converted search has the same root.
     debug_event("ponderhit without a running ponder search; searching the current position");
     stop_and_suppress_active_search();
-    converted.search_moves_specified = false;
-    converted.search_moves.clear();
     start_search(position_, converted, true);
 }
 
