@@ -51,11 +51,12 @@ struct PendingRequest {
 // Leader-follower batcher shared by every worker of every GPU evaluator in the
 // process.  A leader drains up to `batch_capacity()` requests that share its
 // service and evaluates them with one kernel launch; the others wait until
-// their request completes.
+// their request completes.  Requests are shared_ptr-owned so that a completed
+// batch can release its references while the waiting threads still hold theirs.
 struct BatchState {
     std::mutex mutex;
     std::condition_variable cv;
-    std::vector<std::unique_ptr<PendingRequest>> pending;
+    std::vector<std::shared_ptr<PendingRequest>> pending;
     bool in_flight = false;
 };
 
@@ -93,14 +94,14 @@ bool GpuNnueEvaluator::evaluate_on_gpu(const GameState& state, const Color persp
         return false;
     }
     BatchState& shared = batch_state();
-    std::unique_ptr<PendingRequest> owned = std::make_unique<PendingRequest>();
+    std::shared_ptr<PendingRequest> owned = std::make_shared<PendingRequest>();
     owned->state = &state;
     owned->perspective = perspective;
     owned->service = service_;
     PendingRequest* active = owned.get();
 
     std::unique_lock lock(shared.mutex);
-    shared.pending.push_back(std::move(owned));
+    shared.pending.push_back(owned);
     shared.cv.notify_all();
     for (;;) {
         if (active->done) {
@@ -113,7 +114,7 @@ bool GpuNnueEvaluator::evaluate_on_gpu(const GameState& state, const Color persp
         }
         if (!shared.in_flight) {
             shared.in_flight = true;
-            std::vector<std::unique_ptr<PendingRequest>> batch;
+            std::vector<std::shared_ptr<PendingRequest>> batch;
             std::vector<const GameState*> states;
             std::vector<std::int32_t> scores;
             const std::size_t capacity = batch_capacity();
@@ -122,7 +123,7 @@ bool GpuNnueEvaluator::evaluate_on_gpu(const GameState& state, const Color persp
                 if (candidate->service != service_) {
                     break;
                 }
-                std::unique_ptr<PendingRequest> taken = std::move(shared.pending.back());
+                std::shared_ptr<PendingRequest> taken = shared.pending.back();
                 shared.pending.pop_back();
                 states.push_back(taken->state);
                 scores.push_back(0);
@@ -145,7 +146,12 @@ bool GpuNnueEvaluator::evaluate_on_gpu(const GameState& state, const Color persp
             shared.cv.notify_all();
             continue;
         }
-        shared.cv.wait(lock, [active] { return active->done; });
+        // Wake when this request completes or when the current batch finishes:
+        // a waiter whose request was not in that batch must get a chance to
+        // take over as the next leader, or its request could sleep forever.
+        shared.cv.wait(lock, [active, &shared] {
+            return active->done || !shared.in_flight;
+        });
     }
 }
 

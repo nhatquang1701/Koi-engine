@@ -48,12 +48,33 @@ struct GpuNnueService::Impl {
     std::vector<std::uint8_t> host_kings;
     std::vector<std::int32_t> host_scores;
     std::vector<std::uint8_t> host_overflow;
+
+    // Frees every device buffer.  Called from the service destructor so that a
+    // failed create() and an EvalFile swap do not leak the uploaded network.
+    void release_all() noexcept {
+        for (CUdeviceptr* pointer : {&occupancy, &pieces, &side, &kings,
+                                     &feature_weights, &hidden_bias, &l1_weights,
+                                     &l1_bias, &output_weights, &output_bias,
+                                     &scores, &overflow}) {
+            if (*pointer != 0) {
+                driver.release(*pointer);
+                *pointer = 0;
+            }
+        }
+        kernel = nullptr;
+    }
 #endif
 };
 
 GpuNnueService::GpuNnueService() : impl_(std::make_unique<Impl>()) {}
 
-GpuNnueService::~GpuNnueService() = default;
+GpuNnueService::~GpuNnueService() {
+#if KOI_GPU_INFERENCE_AVAILABLE
+    if (impl_ != nullptr) {
+        impl_->release_all();
+    }
+#endif
+}
 GpuNnueService::GpuNnueService(GpuNnueService&&) noexcept = default;
 GpuNnueService& GpuNnueService::operator=(GpuNnueService&&) noexcept = default;
 

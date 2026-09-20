@@ -2,13 +2,17 @@
 // exactly.  Without a CUDA driver (or in a build without nvcc) the cases skip.
 
 #include <array>
+#include <atomic>
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <thread>
 #include <vector>
 
+#include "koi/classical_evaluator.hpp"
 #include "koi/game_state.hpp"
 #include "koi/gpu/gpu_nnue_service.hpp"
+#include "koi/gpu/nnue_gpu_evaluator.hpp"
 #include "koi/nnue.hpp"
 #include "koi_test_support.hpp"
 
@@ -160,12 +164,70 @@ void test_gpu_matches_cpu_across_batch_sizes() {
 #endif
 }
 
+void test_concurrent_batch_requests_keep_their_own_scores() {
+#if !KOI_GPU_INFERENCE_AVAILABLE
+    skip("this build has no GPU NNUE kernel");
+#else
+    const auto weights = test_network();
+    std::string error;
+    std::unique_ptr<koi::gpu::GpuNnueService> service = open_service(weights, error);
+    if (!service) {
+        skip("GPU NNUE service is unavailable: " + error);
+    }
+    std::vector<koi::GameState> states = fixture_states();
+    koi::gpu::set_gpu_nnue_threaded(true);
+    koi::gpu::GpuNnueEvaluator evaluator(std::make_shared<koi::ClassicalEvaluator>(),
+                                         std::move(service));
+
+    // Sequential reference through the same batcher.
+    std::vector<int> reference(states.size(), 0);
+    for (std::size_t index = 0; index < states.size(); ++index) {
+        require(evaluator.evaluate_on_gpu(states[index], states[index].side_to_move(),
+                                          reference[index]),
+                "the GPU must evaluate the fixture positions");
+    }
+
+    // Eight threads issue overlapping requests: a finished batch must not free a
+    // request while its owner is still reading the result.
+    constexpr int kRounds = 8;
+    std::vector<std::thread> threads;
+    std::vector<int> observed(states.size() * kRounds, 0);
+    std::atomic<bool> failed{false};
+    for (int round = 0; round < kRounds; ++round) {
+        threads.emplace_back([&, round] {
+            for (std::size_t index = 0; index < states.size(); ++index) {
+                int score = 0;
+                if (!evaluator.evaluate_on_gpu(states[index], states[index].side_to_move(),
+                                               score)) {
+                    failed.store(true);
+                    return;
+                }
+                observed[static_cast<std::size_t>(round) * states.size() + index] = score;
+            }
+        });
+    }
+    for (std::thread& thread : threads) {
+        thread.join();
+    }
+    koi::gpu::set_gpu_nnue_threaded(false);
+    require(!failed.load(), "every concurrent GPU request must succeed");
+    for (int round = 0; round < kRounds; ++round) {
+        for (std::size_t index = 0; index < states.size(); ++index) {
+            require(observed[static_cast<std::size_t>(round) * states.size() + index] ==
+                        reference[index],
+                    "a concurrent request must observe the score for its own position");
+        }
+    }
+#endif
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
-    const std::array<koi::test::TestCase, 2> tests{{
+    const std::array<koi::test::TestCase, 3> tests{{
         {"GPU NNUE matches CPU scalar", test_gpu_matches_cpu_scalar},
         {"GPU NNUE batch sizes agree", test_gpu_matches_cpu_across_batch_sizes},
+        {"GPU NNUE concurrent requests", test_concurrent_batch_requests_keep_their_own_scores},
     }};
     return koi::test::run_tests(tests, argc, argv);
 }

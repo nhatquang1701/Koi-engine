@@ -35,6 +35,7 @@ struct CudaDriver::Api {
     CUresult (*device_compute_capability)(int*, int*, CUdevice) = nullptr;
     CUresult (*ctx_create)(CUcontext*, unsigned, CUdevice) = nullptr;
     CUresult (*ctx_destroy)(CUcontext) = nullptr;
+    CUresult (*ctx_set_current)(CUcontext) = nullptr;
     CUresult (*module_load_data_ex)(CUmodule*, const void*, unsigned,
                                     CUjit_option*, void**) = nullptr;
     CUresult (*module_unload)(CUmodule) = nullptr;
@@ -54,7 +55,27 @@ struct CudaDriver::Api {
     CUresult (*mem_free_host)(void*) = nullptr;
 };
 
-CudaDriver::~CudaDriver() { unload_module(); }
+CudaDriver::~CudaDriver() { release(); }
+
+void CudaDriver::release() noexcept {
+    unload_module();
+    if (stream_ != nullptr && api_ != nullptr && api_->stream_destroy != nullptr) {
+        api_->stream_destroy(stream_);
+        stream_ = nullptr;
+    }
+    if (context_ != nullptr && api_ != nullptr && api_->ctx_destroy != nullptr) {
+        api_->ctx_destroy(context_);
+        context_ = nullptr;
+    }
+#ifdef _WIN32
+    if (api_ != nullptr && api_->library != nullptr) {
+        FreeLibrary(api_->library);
+        api_->library = nullptr;
+    }
+#endif
+    delete api_;
+    api_ = nullptr;
+}
 
 CudaDriver::CudaDriver(CudaDriver&& other) noexcept
     : api_(std::exchange(other.api_, nullptr)),
@@ -67,19 +88,7 @@ CudaDriver::CudaDriver(CudaDriver&& other) noexcept
 
 CudaDriver& CudaDriver::operator=(CudaDriver&& other) noexcept {
     if (this != &other) {
-        unload_module();
-        if (stream_ != nullptr && api_ != nullptr && api_->stream_destroy != nullptr) {
-            api_->stream_destroy(stream_);
-        }
-        if (context_ != nullptr && api_ != nullptr && api_->ctx_destroy != nullptr) {
-            api_->ctx_destroy(context_);
-        }
-#ifdef _WIN32
-        if (api_ != nullptr && api_->library != nullptr) {
-            FreeLibrary(api_->library);
-        }
-#endif
-        delete api_;
+        release();
         api_ = std::exchange(other.api_, nullptr);
         context_ = std::exchange(other.context_, nullptr);
         stream_ = std::exchange(other.stream_, nullptr);
@@ -109,6 +118,15 @@ bool CudaDriver::check(CUresult result, std::string_view what,
     return false;
 }
 
+bool CudaDriver::ensure_context(std::string& error) const {
+    // CUDA contexts are per-thread: a worker that did not create the context
+    // must make it current before any call that touches device memory.
+    if (context_ == nullptr || api_ == nullptr || api_->ctx_set_current == nullptr) {
+        return true;
+    }
+    return check(api_->ctx_set_current(context_), "cuCtxSetCurrent", error);
+}
+
 CudaDriver CudaDriver::open(std::string& error) {
     CudaDriver driver;
     driver.api_ = new Api();
@@ -134,6 +152,7 @@ CudaDriver CudaDriver::open(std::string& error) {
             driver.api_->device_compute_capability);
     resolve(library, "cuCtxCreate_v2", driver.api_->ctx_create);
     resolve(library, "cuCtxDestroy_v2", driver.api_->ctx_destroy);
+    resolve(library, "cuCtxSetCurrent", driver.api_->ctx_set_current);
     resolve(library, "cuModuleLoadDataEx", driver.api_->module_load_data_ex);
     resolve(library, "cuModuleUnload", driver.api_->module_unload);
     resolve(library, "cuModuleGetFunction", driver.api_->module_get_function);
@@ -220,6 +239,9 @@ CudaDriver CudaDriver::open(std::string& error) {
 
 bool CudaDriver::load_module(std::span<const std::uint8_t> ptx,
                              std::string& error) {
+    if (!ensure_context(error)) {
+        return false;
+    }
     if (!available_ || api_->module_load_data_ex == nullptr) {
         error = "CUDA driver is not available";
         return false;
@@ -238,6 +260,9 @@ bool CudaDriver::module_function(std::string_view name, CUfunction& function,
                                  std::string& error) const {
     if (module_ == nullptr || api_->module_get_function == nullptr) {
         error = "no CUDA module is loaded";
+        return false;
+    }
+    if (!ensure_context(error)) {
         return false;
     }
     const std::string text(name);
@@ -263,6 +288,9 @@ bool CudaDriver::allocate(std::size_t bytes, CUdeviceptr& pointer,
         error = "CUDA driver is not available";
         return false;
     }
+    if (!ensure_context(error)) {
+        return false;
+    }
     CUdeviceptr result = 0;
     if (!check(api_->mem_alloc(&result, bytes), "cuMemAlloc", error)) {
         return false;
@@ -279,12 +307,18 @@ void CudaDriver::release(CUdeviceptr pointer) noexcept {
 
 bool CudaDriver::upload(const void* source, CUdeviceptr destination,
                         std::size_t bytes, std::string& error) const {
+    if (!ensure_context(error)) {
+        return false;
+    }
     return check(api_->memcpy_htod(destination, source, bytes), "cuMemcpyHtoD",
                  error);
 }
 
 bool CudaDriver::download(CUdeviceptr source, void* destination, std::size_t bytes,
                           std::string& error) const {
+    if (!ensure_context(error)) {
+        return false;
+    }
     return check(api_->memcpy_dtoh(destination, source, bytes), "cuMemcpyDtoH",
                  error);
 }
@@ -323,6 +357,9 @@ bool CudaDriver::launch_and_wait(CUfunction function, unsigned grid_x,
         error = "CUDA driver is not available";
         return false;
     }
+    if (!ensure_context(error)) {
+        return false;
+    }
     if (!check(api_->launch_kernel(function, grid_x, 1, 1, block_x, 1, 1,
                                    shared_bytes, stream_, arguments, nullptr),
                "cuLaunchKernel", error)) {
@@ -333,6 +370,9 @@ bool CudaDriver::launch_and_wait(CUfunction function, unsigned grid_x,
 
 bool CudaDriver::synchronize(std::string& error) {
     if (stream_ != nullptr && api_->stream_synchronize != nullptr) {
+        if (!ensure_context(error)) {
+            return false;
+        }
         return check(api_->stream_synchronize(stream_), "cuStreamSynchronize",
                      error);
     }

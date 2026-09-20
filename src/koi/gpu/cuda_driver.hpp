@@ -80,6 +80,12 @@ private:
     struct Api;
     [[nodiscard]] bool check(CUresult result, std::string_view what,
                              std::string& error) const;
+    // Makes this driver's context current on the calling thread; CUDA contexts
+    // are per-thread, so evaluation workers must call this before device work.
+    [[nodiscard]] bool ensure_context(std::string& error) const;
+    // Releases the module, stream, context, and library handle.  Called by the
+    // destructor and by move assignment.
+    void release() noexcept;
 
     Api* api_ = nullptr;
     CUcontext context_ = nullptr;
