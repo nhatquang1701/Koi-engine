@@ -42,6 +42,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import pathlib
 import struct
 import sys
@@ -374,13 +375,22 @@ if nn is not None:
             nn.init.uniform_(self.feature.weight, -0.1, 0.1)
             self.hidden_bias = nn.Parameter(torch.zeros(hidden_units))
             self.l1_weight = nn.Parameter(torch.empty(l1_units, hidden_units))
-            nn.init.uniform_(self.l1_weight, -0.05, 0.05)
+            # The pair products are small (roughly 0.05 rms), so the default
+            # +-0.05 init leaves the L1 pre-activations near zero and the head
+            # cannot move the score.  Scale the init so a freshly built head
+            # already produces unit-variance activations.
+            nn.init.uniform_(self.l1_weight, -34.0 / math.sqrt(hidden_units),
+                             34.0 / math.sqrt(hidden_units))
             self.l1_bias = nn.Parameter(torch.zeros(l1_units))
             self.output_weight = nn.Parameter(torch.empty(OUTPUT_BUCKETS, l1_units))
-            nn.init.uniform_(self.output_weight, -0.05, 0.05)
+            # Predictions start within a couple of target units instead of at
+            # zero, which is what the integer export can actually represent.
+            nn.init.uniform_(self.output_weight, -0.9, 0.9)
             self.output_bias = nn.Parameter(torch.zeros(OUTPUT_BUCKETS))
 
         def forward(self, own_flat, own_weights, opp_flat, opp_weights, buckets):
+            # The exported integer net clamps activations to 0..127 after
+            # shifting, so the training forward keeps the same [0, 1] range.
             own = torch.clamp(
                 self.feature(own_flat, per_sample_weights=own_weights) + self.hidden_bias,
                 0.0, 1.0)
@@ -676,7 +686,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--threads", type=int, default=4)
     parser.add_argument("--hidden-units", type=int, default=1024)
     parser.add_argument("--hidden-shifts", type=int, nargs="+", default=[6, 7, 8])
-    parser.add_argument("--output-shifts", type=int, nargs="+", default=[12, 14, 16, 18, 20])
+    parser.add_argument("--output-shifts", type=int, nargs="+", default=[4, 5, 6, 7, 8])
     parser.add_argument("--tune-samples", type=int, default=4000)
     parser.add_argument("--float-out", type=pathlib.Path, default=None,
                         help="optional path for a float checkpoint after training")
