@@ -39,6 +39,7 @@ struct Config {
     seed: u64,
     threads: usize,
     save_rate: usize,
+    wdl: f32,
 }
 
 fn usage() -> String {
@@ -59,6 +60,7 @@ fn usage() -> String {
         "  --seed <n>                    rng seed (default 20260916)",
         "  --threads <n>                 data loader threads (default 4)",
         "  --save-rate <n>               save every N superbatches (default 10)",
+        "  --wdl <f>                     result blend weight, 0 ignores the result (default 0.5)",
     ]
     .join("\n")
 }
@@ -81,6 +83,7 @@ fn parse_args() -> Result<Config, String> {
     let mut seed = 20260916u64;
     let mut threads = 4usize;
     let mut save_rate = 10usize;
+    let mut wdl = 0.5f32;
 
     let args: Vec<String> = std::env::args().skip(1).collect();
     let mut index = 0;
@@ -126,6 +129,7 @@ fn parse_args() -> Result<Config, String> {
             "--save-rate" => {
                 save_rate = value.parse().map_err(|_| "bad --save-rate".to_string())?
             }
+            "--wdl" => wdl = value.parse().map_err(|_| "bad --wdl".to_string())?,
             other => return Err(format!("unknown argument {other}\n\n{}", usage())),
         }
         index += 2;
@@ -151,6 +155,9 @@ fn parse_args() -> Result<Config, String> {
     if batch == 0 || superbatches == 0 || batches_per_superbatch == 0 || save_rate == 0 {
         return Err("--batch, --batches-per-superbatch, --superbatches and --save-rate must be positive".to_string());
     }
+    if !(0.0..=1.0).contains(&wdl) {
+        return Err("--wdl must be between 0 and 1".to_string());
+    }
 
     Ok(Config {
         data: data.ok_or_else(|| format!("--data is required\n\n{}", usage()))?,
@@ -168,6 +175,7 @@ fn parse_args() -> Result<Config, String> {
         seed,
         threads,
         save_rate,
+        wdl,
     })
 }
 
@@ -199,7 +207,7 @@ fn main() -> ExitCode {
             start_superbatch: 1,
             end_superbatch: config.superbatches,
         },
-        wdl_scheduler: wdl::ConstantWDL { value: 0.0 },
+        wdl_scheduler: wdl::ConstantWDL { value: config.wdl },
         lr_scheduler: lr::CosineDecayLR {
             initial_lr: config.lr,
             final_lr: config.final_lr,

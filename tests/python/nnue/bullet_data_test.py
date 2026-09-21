@@ -48,6 +48,28 @@ class TextConversionTests(unittest.TestCase):
         self.assertEqual(to_bullet.bullet_text_row(STARTPOS, True, 42), f"{STARTPOS} | 42 | 0.5")
         self.assertEqual(to_bullet.bullet_text_row(BLACK_TO_MOVE, False, 42), f"{BLACK_TO_MOVE} | -42 | 0.5")
         self.assertEqual(to_bullet.bullet_text_row(BLACK_TO_MOVE, False, -17), f"{BLACK_TO_MOVE} | 17 | 0.5")
+        self.assertEqual(
+            to_bullet.bullet_text_row(STARTPOS, True, 42, "1.0"), f"{STARTPOS} | 42 | 1.0"
+        )
+
+    def test_game_results_are_carried_through(self) -> None:
+        self.assertEqual(to_bullet.row_result(f"{STARTPOS};12;e2e4;1.0"), "1.0")
+        self.assertEqual(to_bullet.row_result(f"{STARTPOS};12;e2e4;0.0"), "0.0")
+        self.assertEqual(to_bullet.row_result(f"{STARTPOS};12;e2e4"), "0.5")
+        self.assertEqual(to_bullet.row_result(f"{STARTPOS};12;e2e4;bogus"), "0.5")
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            corpus = directory / "labels.txt"
+            corpus.write_text(
+                f"{STARTPOS};12;e2e4;1.0\n{BLACK_TO_MOVE};-8;e7e5;0.0\n",
+                encoding="utf-8",
+            )
+            to_bullet.convert_labels(
+                corpus, directory / "out", val_fraction=0.0, log=lambda _: None
+            )
+            rows = (directory / "out" / "train.txt").read_text(encoding="utf-8").splitlines()
+            self.assertEqual(rows[0], f"{STARTPOS} | 12 | 1.0")
+            self.assertEqual(rows[1], f"{BLACK_TO_MOVE} | 8 | 0.0")
 
     def test_split_limit_and_malformed_rows(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

@@ -381,6 +381,9 @@ cargo and a CUDA 12.x toolkit are installed, defaulting to version 5 with
 text labels with `tools/nnue/to_bullet.py`, trains, measures validation MAE from
 each saved checkpoint, and exports the matching container with
 `tools/measurement/export_bullet_v5.py` (v5) or `export_bullet_v4.py` (v4).
+The converter carries the corpus game result through when the labels record
+one, and the trainer's `--wdl` weight (default `0.5`) blends it with the
+centipawn target; `--wdl 0` reproduces the pure evaluation blend.
 `koi-dataset-v2` encodes four index groups (`A_stm`, `B_stm`, `A_opp`, `B_opp`)
 per record.
 

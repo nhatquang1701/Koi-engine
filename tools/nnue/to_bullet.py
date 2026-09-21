@@ -1,13 +1,15 @@
 """Convert Koi label corpora into bulletformat datasets.
 
-Reads the ``FEN;cp;best_move`` label corpus (side-to-move centipawns), writes
-white-relative bullet text rows ``<FEN> | <score> | <result>``, and converts
-them to ``bulletformat`` ``ChessBoard`` binaries with the ``convert`` binary
-from ``tools/nnue/bullet_train``.
+Reads the ``FEN;cp;best_move[;result]`` label corpus (side-to-move
+centipawns), writes white-relative bullet text rows
+``<FEN> | <score> | <result>``, and converts them to ``bulletformat``
+``ChessBoard`` binaries with the ``convert`` binary from
+``tools/nnue/bullet_train``.
 
-The pseudo-result ``0.5`` is intentional: the bullet trainer runs with
-``ConstantWDL { value: 0.0 }``, so the result component is ignored and the
-network is trained purely on the centipawn evaluation.
+The game result is carried through when the corpus records one (the games
+stage writes it as a white-relative ``1.0``/``0.5``/``0.0``); otherwise the
+pseudo-result ``0.5`` is written.  How much the result matters is decided by
+the trainer's ``--wdl`` weight, which defaults to ``0.5``.
 
 Usage:
     python tools/nnue/to_bullet.py --input artifacts/training/labels.txt \\
@@ -35,16 +37,25 @@ DEFAULT_CONVERT_CANDIDATES = (
     REPO_ROOT / "tools" / "nnue" / "bullet_train" / "target" / "debug" / "convert.exe",
 )
 PSEUDO_RESULT = "0.5"
+RESULT_TOKENS = frozenset({"1.0", "0.5", "0.0"})
 
 
 class ConversionError(RuntimeError):
     """Raised when the corpus cannot be converted."""
 
 
-def bullet_text_row(fen: str, side_to_move_white: bool, cp: int) -> str:
+def bullet_text_row(fen: str, side_to_move_white: bool, cp: int, result: str = PSEUDO_RESULT) -> str:
     """Build one white-relative bullet text row."""
     white_cp = cp if side_to_move_white else -cp
-    return f"{fen} | {white_cp} | {PSEUDO_RESULT}"
+    return f"{fen} | {white_cp} | {result}"
+
+
+def row_result(raw: str) -> str:
+    """Return the white-relative result recorded on a corpus row, if any."""
+    parts = raw.strip().split(";")
+    if len(parts) > 3 and parts[3] in RESULT_TOKENS:
+        return parts[3]
+    return PSEUDO_RESULT
 
 
 def validation_stride(val_fraction: float) -> int:
@@ -73,6 +84,7 @@ def convert_labels(
     validation_rows: list[str] = []
     accepted = 0
     skipped = 0
+    recorded = 0
 
     with input_path.open("r", encoding="utf-8", errors="replace") as handle:
         for raw in handle:
@@ -83,9 +95,12 @@ def convert_labels(
                 skipped += 1
                 continue
             board, cp = parsed
+            result = row_result(raw)
+            if result != PSEUDO_RESULT:
+                recorded += 1
             index = accepted
             accepted += 1
-            row = bullet_text_row(board.fen(), board.turn, cp)
+            row = bullet_text_row(board.fen(), board.turn, cp, result)
             if stride and index % stride == 0:
                 validation_rows.append(row)
             else:
@@ -103,6 +118,8 @@ def convert_labels(
         validation_path.unlink()
 
     log(f"to_bullet: wrote {len(train_rows)} train rows and {len(validation_rows)} validation rows")
+    if recorded:
+        log(f"to_bullet: carried a game result for {recorded} rows")
     if skipped:
         log(f"to_bullet: skipped {skipped} unusable lines")
     return len(train_rows), len(validation_rows)
