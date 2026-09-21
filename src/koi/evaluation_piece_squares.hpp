@@ -139,3 +139,21 @@ inline constexpr std::array<int, 64> kKingEndGame{
 
 }  // namespace detail
 }  // namespace koi
+
+// A tuned table set is optional: `tools/measurement/tune_classical.py` can
+// generate `koi/evaluation_piece_squares_tuned.hpp` from a labeled corpus, and
+// the evaluator adds those per-square corrections to the built-in tables.  A
+// build without the generated header uses the built-in values unchanged.
+#if __has_include("koi/evaluation_piece_squares_tuned.hpp")
+#include "koi/evaluation_piece_squares_tuned.hpp"
+#else
+namespace koi {
+namespace detail {
+
+inline constexpr bool kHasTunedPieceSquares = false;
+inline constexpr std::array<int, 6 * 64> kTunedMiddleGameDeltas{};
+inline constexpr std::array<int, 6 * 64> kTunedEndGameDeltas{};
+
+}  // namespace detail
+}  // namespace koi
+#endif

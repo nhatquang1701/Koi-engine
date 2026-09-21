@@ -63,6 +63,83 @@ class RecoveryTests(unittest.TestCase):
             tune_classical.fit_scales(rows, "cp")
 
 
+class PieceSquareTests(unittest.TestCase):
+    def test_placement_squares_mirrors_black_pieces(self) -> None:
+        parsed = tune_classical.placement_squares("8/8/8/8/4N3/8/8/K6k w - - 0 1")
+        self.assertIsNotNone(parsed)
+        assert parsed is not None
+        white_to_move, placements = parsed
+        self.assertTrue(white_to_move)
+        # White knight on e4: rank 4, file e -> (4 - 1) * 8 + 4 = 28.
+        self.assertIn((1, 28, True), placements)
+        # Black king on h1 is mirrored to the white perspective: h8 -> 63.
+        self.assertIn((5, 63, False), placements)
+
+    def test_residual_corrections_are_zero_sum_and_clamped(self) -> None:
+        rows: list[dict[str, float | str]] = []
+        # The corpus thinks a knight on e4 is worth 30 cp more than the current
+        # evaluation says, and a knight on d4 is worth exactly what it says.
+        for _ in range(2):
+            rows.append(
+                {
+                    **{term: 0.0 for term in TERMS},
+                    "fen": "8/8/8/8/4N3/8/8/K6k w - - 0 1",
+                    "phase": 24,
+                    "total": 0.0,
+                    "cp": 30.0,
+                }
+            )
+            rows.append(
+                {
+                    **{term: 0.0 for term in TERMS},
+                    "fen": "8/8/8/8/3N4/8/8/K6k w - - 0 1",
+                    "phase": 24,
+                    "total": 0.0,
+                    "cp": 0.0,
+                }
+            )
+        fit = tune_classical.fit_piece_square_deltas(rows, "cp", limit_cp=24)
+        self.assertEqual(fit["rows"], 4)
+        middle = fit["middle_game_deltas"]
+        # The e4 knight keeps the largest share of the residual and is clamped.
+        self.assertEqual(middle[1 * 64 + 28], 24)
+        self.assertLess(middle[1 * 64 + 27], middle[1 * 64 + 28])
+        self.assertEqual(fit["nonzero"], 4)
+
+        unclamped = tune_classical.fit_piece_square_deltas(rows, "cp", limit_cp=1000)
+        values = unclamped["middle_game_deltas"]
+        self.assertEqual(values[1 * 64 + 28], 25)
+        self.assertEqual(values[1 * 64 + 27], -5)
+        # The corrections are zero-sum when weighted by how often each bucket
+        # was observed (the knight buckets twice, the king buckets four times):
+        # the fit redistributes the residual instead of shifting the average.
+        weighted = (
+            values[1 * 64 + 28] * 2
+            + values[1 * 64 + 27] * 2
+            + values[5 * 64 + 0] * 4
+            + values[5 * 64 + 63] * 4
+        )
+        self.assertEqual(weighted, 0)
+
+    def test_header_declares_the_tuned_tables(self) -> None:
+        rows = [
+            {
+                **{term: 0.0 for term in TERMS},
+                "fen": "8/8/8/8/4N3/8/8/K6k w - - 0 1",
+                "phase": 4,
+                "total": 0.0,
+                "cp": -40.0,
+            }
+        ]
+        fit = tune_classical.fit_piece_square_deltas(rows, "cp", limit_cp=24)
+        header = tune_classical.piece_square_header(fit, "cafebabe")
+        self.assertIn("kHasTunedPieceSquares = true", header)
+        self.assertIn("kTunedMiddleGameDeltas", header)
+        self.assertIn("kTunedEndGameDeltas", header)
+        self.assertIn("cafebabe", header)
+        self.assertIn("std::array<int, 6 * 64>", header)
+
+
 class ReportTests(unittest.TestCase):
     def test_header_and_report_symbols(self) -> None:
         report = tune_classical.fit_scales(synthetic_rows(), "cp", ridge=1e-9)

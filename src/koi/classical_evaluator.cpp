@@ -102,9 +102,27 @@ int sliding_mobility(const PositionFeatures& features, std::uint8_t square,
     return std::popcount(attacks & ~masks.colors[color_index(moving.color)]);
 }
 
+constexpr int piece_square_index(PieceType type) noexcept {
+    switch (type) {
+    case PieceType::pawn: return 0;
+    case PieceType::knight: return 1;
+    case PieceType::bishop: return 2;
+    case PieceType::rook: return 3;
+    case PieceType::queen: return 4;
+    case PieceType::king: return 5;
+    case PieceType::none: return 0;
+    }
+    return 0;
+}
+
 int tapered_piece_square(PieceType type, std::uint8_t square, int phase) noexcept {
-    const int middle = middle_game_table(type)[square];
-    const int end = end_game_table(type)[square];
+    int middle = middle_game_table(type)[square];
+    int end = end_game_table(type)[square];
+    if constexpr (detail::kHasTunedPieceSquares) {
+        const int index = piece_square_index(type) * 64 + static_cast<int>(square);
+        middle += detail::kTunedMiddleGameDeltas[static_cast<std::size_t>(index)];
+        end += detail::kTunedEndGameDeltas[static_cast<std::size_t>(index)];
+    }
     return (middle * phase + end * (kEvaluation.maximum_phase - phase)) /
         kEvaluation.maximum_phase;
 }
