@@ -3,12 +3,15 @@
 Two stages, both parallelised across worker threads:
 
   1. games     - play Stockfish self-play (and optional noisy random) games,
-                 extract every position into a deduplicated FEN list.
+                 extract every position into a deduplicated ``FEN;result`` list
+                 where result is the white-relative game outcome (1.0/0.5/0.0).
   2. label     - score each FEN with Stockfish at a fixed depth and write
-                 ``FEN;cp;best_move`` rows (cp is from the side to move).
+                 ``FEN;cp;best_move;result`` rows (cp is from the side to move).
 
 The output is consumed by ``train_nnue_koi.py`` (version 4) directly or through
-``koi_dataset.py``, and by the legacy ``train_nnue_sf.py`` (version 3).
+``koi_dataset.py``, and by the legacy ``train_nnue_sf.py`` (version 3).  The
+trailing result field is optional for those readers: they split on ``;`` and
+read the leading fields, so corpora without results keep working.
 Everything is resumable: position dumps are appended and the labeler skips
 already-labeled FENs when ``--resume`` is given.
 
@@ -63,6 +66,14 @@ def move_weight(board: chess.Board, move: chess.Move) -> int:
     return weight
 
 
+def game_result(board: chess.Board) -> str:
+    """White-relative outcome of a finished game as ``1.0``/``0.5``/``0.0``."""
+    outcome = board.outcome(claim_draw=True)
+    if outcome is None or outcome.winner is None:
+        return "0.5"
+    return "1.0" if outcome.winner == chess.WHITE else "0.0"
+
+
 def load_seen_hashes(path: Path) -> set[int]:
     """Seed the position-dedup set from an existing positions file (--resume)."""
     seen: set[int] = set()
@@ -73,8 +84,11 @@ def load_seen_hashes(path: Path) -> set[int]:
             line = line.strip()
             if not line:
                 continue
+            fen = line.split(";", 1)[0]
+            if not fen:
+                continue
             try:
-                seen.add(chess.polyglot.zobrist_hash(chess.Board(line)))
+                seen.add(chess.polyglot.zobrist_hash(chess.Board(fen)))
             except ValueError:
                 continue
     return seen
@@ -160,12 +174,13 @@ def play_games(args: argparse.Namespace, positions_fh, seen: set[int], counters:
                 if plies >= MIN_PLIES:
                     positions.append(board.copy(stack=True))
             with counters["lock"]:
+                result = game_result(board)
                 for position in positions:
                     key = chess.polyglot.zobrist_hash(position)
                     if key in seen:
                         continue
                     seen.add(key)
-                    positions_fh.write(position.fen() + "\n")
+                    positions_fh.write(f"{position.fen()};{result}\n")
                     counters["positions"] += 1
             if game_number % 25 == 0:
                 with counters["lock"]:
@@ -186,6 +201,7 @@ def noise_games(args: argparse.Namespace, positions_fh, seen: set[int], counters
             counters["games_done"] += 1
         board = chess.Board()
         plies = 0
+        positions: list[chess.Board] = []
         while not board.is_game_over(claim_draw=False) and plies < MAX_PLIES:
             moves = list(board.legal_moves)
             if not moves:
@@ -196,12 +212,16 @@ def noise_games(args: argparse.Namespace, positions_fh, seen: set[int], counters
             board.push(rng.choice(weighted))
             plies += 1
             if plies >= MIN_PLIES and not board.is_game_over(claim_draw=False):
-                with counters["lock"]:
-                    key = chess.polyglot.zobrist_hash(board)
-                    if key not in seen:
-                        seen.add(key)
-                        positions_fh.write(board.fen() + "\n")
-                        counters["positions"] += 1
+                positions.append(board.copy(stack=True))
+        with counters["lock"]:
+            result = game_result(board)
+            for position in positions:
+                key = chess.polyglot.zobrist_hash(position)
+                if key in seen:
+                    continue
+                seen.add(key)
+                positions_fh.write(f"{position.fen()};{result}\n")
+                counters["positions"] += 1
     log("noise game worker finished")
 
 
@@ -254,13 +274,18 @@ def run_label_stage(args: argparse.Namespace) -> int:
     positions_path = Path(args.positions)
     output_path = Path(args.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    fens: list[str] = []
+    rows: list[tuple[str, str | None]] = []
     with open(positions_path, encoding="utf-8") as handle:
         for line in handle:
             line = line.strip()
-            if line:
-                fens.append(line)
-    log(f"loaded {len(fens)} positions")
+            if not line:
+                continue
+            parts = line.split(";", 1)
+            if not parts[0]:
+                continue
+            outcome = parts[1].strip() if len(parts) > 1 else ""
+            rows.append((parts[0], outcome or None))
+    log(f"loaded {len(rows)} positions")
 
     done: set[str] = set()
     if args.resume:
@@ -268,26 +293,27 @@ def run_label_stage(args: argparse.Namespace) -> int:
         if done:
             log(f"resume: {len(done)} positions already labeled")
 
-    work: queue.Queue[str | None] = queue.Queue()
-    for fen in fens:
+    work: queue.Queue[tuple[str, str | None] | None] = queue.Queue()
+    for fen, outcome in rows:
         if fen in done:
             continue
-        work.put(fen)
+        work.put((fen, outcome))
     for _ in range(args.workers):
         work.put(None)
 
     counters = {"labeled": 0, "skipped": 0, "start": time.time(), "lock": threading.Lock()}
     writer_lock = threading.Lock()
     output_fh = open(output_path, "a", encoding="utf-8", buffering=1)
-    target = args.limit if args.limit > 0 else len(fens)
+    target = args.limit if args.limit > 0 else len(rows)
 
     def worker() -> None:
         labeler = Labeler(args.stockfish, depth=args.label_depth, hash_mb=args.label_hash, threads=1)
         try:
             while True:
-                fen = work.get()
-                if fen is None:
+                item = work.get()
+                if item is None:
                     break
+                fen, outcome = item
                 with counters["lock"]:
                     if counters["labeled"] >= target:
                         work.task_done()
@@ -302,8 +328,9 @@ def run_label_stage(args: argparse.Namespace) -> int:
                         counters["skipped"] += 1
                 else:
                     cp, best = result
+                    suffix = f";{outcome}" if outcome else ""
                     with writer_lock:
-                        output_fh.write(f"{fen};{cp};{best}\n")
+                        output_fh.write(f"{fen};{cp};{best}{suffix}\n")
                     with counters["lock"]:
                         counters["labeled"] += 1
                         if counters["labeled"] % 5000 == 0:

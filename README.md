@@ -269,6 +269,13 @@ python .\tools\measurement\train_nnue_koi.py --dataset .\artifacts\training\koi-
 .\build\release\koi-bench.exe --nnue .\artifacts\training\koi-v5.nnue
 ```
 
+The games stage records the white-relative outcome of every self-play game, so
+`positions.txt` rows are `FEN;result` and `labels.txt` rows are
+`FEN;cp;best_move;result` (`1.0`/`0.5`/`0.0`). The trailing column is optional for
+every reader: `koi_dataset.py`, `train_nnue_koi.py`, and `train_nnue_sf.py` split on
+`;` and read the leading fields, so older corpora keep working and the result can be
+used as a WDL target once a trainer consumes it.
+
 Load a trained network with the UCI `EvalFile` option, or place `koi.nnue` beside
 the executable (or point the `KOI_NNUE_PATH` environment variable at it) to select it
 at startup. A missing or rejected file falls back to the classical evaluator and
