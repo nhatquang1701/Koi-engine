@@ -4022,6 +4022,20 @@ void SearchRunner::run() {
                             result.best_move = partial_best.pv.moves[0];
                             result.pv = partial_best.pv.to_vector();
                         }
+                    } else if (result.completed_depth == 0 && !used_short_fallback) {
+                        // An interrupted first iteration is never an
+                        // authoritative tactical result, and the root lines
+                        // did not produce a safe exact one either. Fall back
+                        // to the same last-resort safety scan the serial
+                        // driver uses instead of answering with the
+                        // pre-search ordered move, which may expose an
+                        // immediate check.
+                        if (const auto fallback = first_safe_short_search_move(
+                                root, parallel_moves);
+                            fallback.has_value()) {
+                            result.best_move = *fallback;
+                            result.pv = {*fallback};
+                        }
                     }
                     break;
                 }
