@@ -264,14 +264,17 @@ def _position_count(value: Any, pgn_value: Any, fen_value: Any) -> int:
 
 
 def _optional_chess_modules() -> Tuple[Optional[Any], Optional[Any], Optional[str]]:
-    """Load python-chess lazily so raw extraction remains standard-library-safe."""
+    """Load koi_chess lazily so raw extraction remains standard-library-safe."""
 
+    module_dir = Path(__file__).resolve().parent
+    if str(module_dir) not in sys.path:
+        sys.path.insert(0, str(module_dir))
     try:
-        import chess
-        import chess.pgn
+        import koi_chess
+        import koi_chess.pgn
     except ImportError as error:
         return None, None, str(error)
-    return chess, chess.pgn, None
+    return koi_chess, koi_chess.pgn, None
 
 
 def _canonical_game_key(pgn_value: Any, fen_value: Any, result: str) -> str:
@@ -317,7 +320,7 @@ def _decode_pgn(pgn_value: Any, fen_value: Any) -> Tuple[List[Dict[str, Any]], D
     if chess is None or pgn_module is None:
         return [], {
             "status": "fallback",
-            "reason": f"python-chess unavailable: {import_error or 'unknown import error'}",
+            "reason": f"koi-chess unavailable: {import_error or 'unknown import error'}",
         }
     try:
         if pgn_value is None:
@@ -331,7 +334,7 @@ def _decode_pgn(pgn_value: Any, fen_value: Any) -> Tuple[List[Dict[str, Any]], D
                     "actual_move_uci": None,
                     "actual_move_san": None,
                 }
-            ], {"status": "decoded", "decoder": "python-chess"}
+            ], {"status": "decoded", "decoder": "koi-chess"}
 
         with contextlib.redirect_stderr(io.StringIO()):
             game = pgn_module.read_game(io.StringIO(str(pgn_value)))
@@ -356,7 +359,7 @@ def _decode_pgn(pgn_value: Any, fen_value: Any) -> Tuple[List[Dict[str, Any]], D
                 }
             )
             board.push(move)
-        return positions, {"status": "decoded", "decoder": "python-chess"}
+        return positions, {"status": "decoded", "decoder": "koi-chess"}
     except Exception as error:
         return [], {"status": "fallback", "reason": f"move decoding failed: {error}"}
 
@@ -649,7 +652,7 @@ def sample_database(
         "table": selected_table,
         "read_only": True,
         "query_only": query_only,
-        "decoder": "python-chess when available; bounded raw-record fallback otherwise",
+        "decoder": "koi-chess; bounded raw-record fallback otherwise",
     }
     decoded_candidates = [_decode_selected_record(record) for record in selected_records]
     legal_positions = 0

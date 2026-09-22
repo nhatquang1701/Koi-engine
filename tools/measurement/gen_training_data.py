@@ -31,9 +31,7 @@ import threading
 import time
 from pathlib import Path
 
-import chess
-import chess.engine
-import chess.polyglot
+import koi_chess as chess
 
 DEFAULT_STOCKFISH = (
     Path(__file__).resolve().parents[2]
@@ -74,9 +72,14 @@ def game_result(board: chess.Board) -> str:
     return "1.0" if outcome.winner == chess.WHITE else "0.0"
 
 
-def load_seen_hashes(path: Path) -> set[int]:
+def position_key(board: chess.Board) -> str:
+    """Position identity for deduplication (the first four FEN fields)."""
+    return " ".join(board.fen().split(" ")[:4])
+
+
+def load_seen_positions(path: Path) -> set[str]:
     """Seed the position-dedup set from an existing positions file (--resume)."""
-    seen: set[int] = set()
+    seen: set[str] = set()
     if not path.exists():
         return seen
     with open(path, encoding="utf-8") as handle:
@@ -88,7 +91,7 @@ def load_seen_hashes(path: Path) -> set[int]:
             if not fen:
                 continue
             try:
-                seen.add(chess.polyglot.zobrist_hash(chess.Board(fen)))
+                seen.add(position_key(chess.Board(fen)))
             except ValueError:
                 continue
     return seen
@@ -146,7 +149,7 @@ class Labeler:
             pass
 
 
-def play_games(args: argparse.Namespace, positions_fh, seen: set[int], counters: dict) -> None:
+def play_games(args: argparse.Namespace, positions_fh, seen: set[str], counters: dict) -> None:
     rng = random.Random(args.seed + threading.get_ident())
     labeler = Labeler(args.stockfish, depth=args.game_depth, hash_mb=args.game_hash, threads=1)
     try:
@@ -176,7 +179,7 @@ def play_games(args: argparse.Namespace, positions_fh, seen: set[int], counters:
             with counters["lock"]:
                 result = game_result(board)
                 for position in positions:
-                    key = chess.polyglot.zobrist_hash(position)
+                    key = position_key(position)
                     if key in seen:
                         continue
                     seen.add(key)
@@ -191,7 +194,7 @@ def play_games(args: argparse.Namespace, positions_fh, seen: set[int], counters:
         labeler.close()
 
 
-def noise_games(args: argparse.Namespace, positions_fh, seen: set[int], counters: dict) -> None:
+def noise_games(args: argparse.Namespace, positions_fh, seen: set[str], counters: dict) -> None:
     """Random-ish playouts biased towards captures and checks for tactical coverage."""
     rng = random.Random(args.seed ^ 0x5F3759DF ^ threading.get_ident())
     while True:
@@ -216,7 +219,7 @@ def noise_games(args: argparse.Namespace, positions_fh, seen: set[int], counters
         with counters["lock"]:
             result = game_result(board)
             for position in positions:
-                key = chess.polyglot.zobrist_hash(position)
+                key = position_key(position)
                 if key in seen:
                     continue
                 seen.add(key)
@@ -228,9 +231,9 @@ def noise_games(args: argparse.Namespace, positions_fh, seen: set[int], counters
 def run_games_stage(args: argparse.Namespace) -> int:
     path = Path(args.positions)
     path.parent.mkdir(parents=True, exist_ok=True)
-    seen: set[int] = set()
+    seen: set[str] = set()
     if args.resume:
-        seen = load_seen_hashes(path)
+        seen = load_seen_positions(path)
         if seen:
             log(f"resume: seeded {len(seen)} existing positions")
     counters = {

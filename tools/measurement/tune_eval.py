@@ -14,6 +14,10 @@ import sys
 from typing import Any, Iterable, Mapping
 
 
+MEASUREMENT_DIR = pathlib.Path(__file__).resolve().parent
+if str(MEASUREMENT_DIR) not in sys.path:
+    sys.path.insert(0, str(MEASUREMENT_DIR))
+
 RESULTS = {"1-0": "1-0", "0-1": "0-1", "1/2-1/2": "1/2-1/2", "1": "1-0", "-1": "0-1", "0": "1/2-1/2", "win": "1-0", "loss": "0-1", "draw": "1/2-1/2"}
 CANONICAL_HEADER = pathlib.Path(__file__).resolve().parents[2] / "src" / "koi" / "evaluation_parameters.hpp"
 NNUE_MAGIC = b"KOI-NNUE"
@@ -40,41 +44,9 @@ def canonical_parameters(header_path: pathlib.Path = CANONICAL_HEADER) -> tuple[
     return version_match.group(1), fields
 
 
-def fallback_valid_fen(fen: str) -> bool:
-    fields = fen.split()
-    if len(fields) != 6 or fields[1] not in {"w", "b"}:
-        return False
-    ranks = fields[0].split("/")
-    if len(ranks) != 8:
-        return False
-    kings = {"K": 0, "k": 0}
-    for rank in ranks:
-        width = 0
-        for character in rank:
-            if character.isdigit() and character in "12345678":
-                width += int(character)
-            elif character in "PNBRQKpnbrqk":
-                width += 1
-                if character in kings:
-                    kings[character] += 1
-            else:
-                return False
-        if width != 8:
-            return False
-    if kings["K"] != 1 or kings["k"] != 1:
-        return False
-    if fields[2] != "-" and any(character not in "KQkq" for character in fields[2]):
-        return False
-    if fields[3] != "-" and (len(fields[3]) != 2 or fields[3][0] not in "abcdefgh" or fields[3][1] not in "36"):
-        return False
-    return fields[4].isdigit() and fields[5].isdigit()
-
-
 def valid_fen(fen: str) -> bool:
-    try:
-        import chess  # type: ignore
-    except ImportError:
-        return fallback_valid_fen(fen)
+    import koi_chess as chess
+
     try:
         return chess.Board(fen).is_valid()
     except ValueError:

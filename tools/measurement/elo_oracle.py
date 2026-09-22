@@ -197,15 +197,15 @@ def parse_bestmove_line(line: str) -> Optional[Tuple[str, Optional[str]]]:
 
 
 def _load_chess_modules() -> Tuple[Any, Any]:
+    module_dir = Path(__file__).resolve().parent
+    if str(module_dir) not in sys.path:
+        sys.path.insert(0, str(module_dir))
     try:
-        import chess
-        import chess.pgn
-    except ImportError as error:
-        raise OracleError(
-            "python-chess is required for PGN extraction; install it with "
-            "'python -m pip install python-chess'."
-        ) from error
-    return chess, chess.pgn
+        import koi_chess
+        import koi_chess.pgn
+    except ImportError as error:  # pragma: no cover - the package ships in-tree
+        raise OracleError(f"koi_chess is unavailable: {error}") from error
+    return koi_chess, koi_chess.pgn
 
 
 def _utc_timestamp() -> str:

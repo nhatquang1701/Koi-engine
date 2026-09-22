@@ -146,7 +146,7 @@ def read_raw_weights(raw_path: pathlib.Path, hidden: int, l1_units: int) -> dict
 
 
 def load_validation(path: pathlib.Path, limit: int, seed: int) -> dict:
-    import chess  # noqa: PLC0415 - optional dependency imported on use
+    import koi_chess as chess  # noqa: PLC0415 - in-tree package imported on use
 
     rows: list[tuple[int, int, np.ndarray, np.ndarray]] = []
     with path.open("r", encoding="utf-8", errors="replace") as handle:

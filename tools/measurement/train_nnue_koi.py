@@ -100,8 +100,8 @@ def log(message: str) -> None:
 def _require_dataset_module():
     if koi_dataset is None:
         raise TrainerError(
-            "the text corpus path needs python-chess and koi_dataset.py; "
-            "install python-chess or pass --dataset"
+            "the text corpus path needs koi_dataset.py with the in-tree koi_chess "
+            "package; pass --dataset to use a binary dataset"
         )
     return koi_dataset
 
@@ -125,7 +125,7 @@ def load_text_corpus(path: pathlib.Path, limit: int) -> tuple[np.ndarray, np.nda
             if abs(cp) > module.MAX_ABS_CP:
                 continue
             try:
-                import chess
+                import koi_chess as chess
 
                 board = chess.Board(parts[0])
             except ValueError:

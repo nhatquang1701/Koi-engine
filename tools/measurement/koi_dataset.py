@@ -47,7 +47,7 @@ import sys
 import time
 from pathlib import Path
 
-import chess
+import koi_chess as chess
 
 FEATURE_SET = "halfka-king-bucket-v1"
 THREAT_FEATURE_SET = "threat-pairs-v1"
@@ -137,13 +137,7 @@ def halfka_king_bucket_indices(board: chess.Board) -> list[int]:
 
 def attacks_mask(board: chess.Board, square: int) -> int:
     """Pseudo-legal attack bitboard of the piece on ``square``."""
-    try:
-        return board.attacks_mask(square)
-    except AttributeError:  # pragma: no cover - older python-chess
-        mask = 0
-        for target in board.attacks(square):
-            mask |= 1 << target
-        return mask
+    return board.attacks_mask(square)
 
 
 def threat_pairs_indices(

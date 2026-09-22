@@ -117,7 +117,7 @@ def read_raw_weights(raw_path: Path) -> tuple[int, dict[str, np.ndarray]]:
 
 
 def load_validation(path: Path, limit: int, seed: int) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    import chess
+    import koi_chess as chess
 
     indices: list[int] = []
     offsets = [0]
