@@ -12,6 +12,9 @@ from __future__ import annotations
 WHITE = True
 BLACK = False
 
+#: Type alias kept for python-chess compatibility (``chess.Color`` is ``bool``).
+Color = bool
+
 PAWN = 1
 KNIGHT = 2
 BISHOP = 3

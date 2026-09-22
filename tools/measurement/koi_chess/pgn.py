@@ -28,8 +28,29 @@ DEFAULT_HEADER_VALUES = {
     "Result": "*",
 }
 RESULT_TOKENS = frozenset({"1-0", "0-1", "1/2-1/2", "*"})
-_DELIMITERS = "{}();$"
 _HEADER_RE = re.compile(r'^\[([^"\]\s]+)\s+"(.*)"\]\s*$')
+# Suffix glyphs map to the standard NAGs the way python-chess reads them.
+_GLYPH_NAGS = {"!": 1, "?": 2, "!!": 3, "??": 4, "!?": 5, "?!": 6}
+# Movetext grammar: SAN first, then castling and null moves, then the
+# punctuation python-chess consumes separately (comments, NAGs, variations,
+# results and suffix glyphs).  Anything else - move numbers, dots, commas,
+# novelty markers such as ",N", check and mate marks - is skipped, exactly as
+# it is when python-chess tokenizes movetext.
+_MOVETEXT_RE = re.compile(
+    r"""
+    (?P<san>[NBKRQ]?[a-h]?[1-8]?[\-x]?[a-h][1-8](?:=?[nbrqkNBRQK])?)
+    |(?P<castling>O-O(?:-O)?|0-0(?:-0)?)
+    |(?P<null>--|Z0|0000|@@@@)
+    |(?P<comment>\{[\s\S]*?(?:\}|$))
+    |(?P<line_comment>;[^\n]*)
+    |(?P<nag>\$[0-9]+)
+    |(?P<open>\()
+    |(?P<close>\))
+    |(?P<result>\*|1-0|0-1|1/2-1/2)
+    |(?P<glyph>[?!]{1,2})
+    """,
+    re.VERBOSE,
+)
 
 
 class Node:
@@ -42,7 +63,7 @@ class Node:
         self.variations = []
         self.move = move
         self.comment = ""
-        self.nags = []
+        self.nags = set()
         self.starting_comment = ""
 
     def mainline(self):
@@ -115,74 +136,75 @@ def _brace_depth_change(text: str, depth: int) -> int:
 
 
 def _tokenize_movetext(text: str):
-    """Split movetext into move/result tokens while skipping variations."""
+    """Split movetext into move/result tokens while skipping variations.
+
+    Suffix annotations are consumed as separate tokens, so ``Qd2?!,N`` yields
+    the move ``Qd2`` with NAG 6 while ``Qd2N`` stays one (illegal) SAN token.
+    """
     tokens = []
     index = 0
     length = len(text)
     while index < length:
-        char = text[index]
-        if char.isspace():
+        match = _MOVETEXT_RE.match(text, index)
+        if match is None:
             index += 1
-        elif char == "{":
-            end = text.find("}", index + 1)
-            if end < 0:
-                end = length
-            comment = text[index + 1 : end]
+            continue
+        index = match.end()
+        san = match.group("san") or match.group("castling") or match.group("null")
+        if san is not None:
+            tokens.append({"san": san, "comment": "", "nags": []})
+            continue
+        comment = match.group("comment")
+        if comment is not None:
+            inner = comment[1:]
+            if inner.endswith("}"):
+                inner = inner[:-1]
+                if inner.endswith(" "):
+                    inner = inner[:-1]
+            if inner.startswith(" "):
+                inner = inner[1:]
             if tokens and "san" in tokens[-1]:
                 existing = tokens[-1]["comment"]
-                tokens[-1]["comment"] = f"{existing} {comment}".strip() if existing else comment
-            index = end + 1
-        elif char == ";":
-            end = text.find("\n", index + 1)
-            index = length if end < 0 else end + 1
-        elif char == "(":
+                tokens[-1]["comment"] = " ".join(part for part in (existing, inner) if part)
+            continue
+        if match.group("line_comment") is not None:
+            continue
+        nag = match.group("nag")
+        if nag is not None:
+            if tokens and "san" in tokens[-1]:
+                tokens[-1]["nags"].append(int(nag[1:]))
+            continue
+        glyph = match.group("glyph")
+        if glyph is not None:
+            if tokens and "san" in tokens[-1]:
+                tokens[-1]["nags"].append(_GLYPH_NAGS[glyph])
+            continue
+        if match.group("open") is not None:
             depth = 1
-            cursor = index + 1
-            while cursor < length and depth:
-                if text[cursor] == "(":
-                    depth += 1
-                elif text[cursor] == ")":
-                    depth -= 1
-                cursor += 1
-            index = cursor
-        elif char == "$":
-            cursor = index + 1
-            while cursor < length and text[cursor].isdigit():
-                cursor += 1
-            if tokens and "san" in tokens[-1] and cursor > index + 1:
-                tokens[-1]["nags"].append(int(text[index + 1 : cursor]))
-            index = cursor
-        else:
-            start = index
             cursor = index
-            while (
-                cursor < length
-                and not text[cursor].isspace()
-                and text[cursor] not in _DELIMITERS
-            ):
-                cursor += 1
-            if cursor == index:
-                # A stray delimiter such as a closing parenthesis.
-                index += 1
-                continue
-            token = text[index:cursor]
+            while cursor < length and depth:
+                char = text[cursor]
+                if char == "{":
+                    end = text.find("}", cursor + 1)
+                    cursor = length if end < 0 else end + 1
+                elif char == ";":
+                    end = text.find("\n", cursor + 1)
+                    cursor = length if end < 0 else end + 1
+                elif char == "(":
+                    depth += 1
+                    cursor += 1
+                elif char == ")":
+                    depth -= 1
+                    cursor += 1
+                else:
+                    cursor += 1
             index = cursor
-            if token in RESULT_TOKENS:
-                tokens.append({"result": token, "offset": start})
-                continue
-            digits_end = 0
-            while digits_end < len(token) and token[digits_end].isdigit():
-                digits_end += 1
-            if digits_end:
-                dots_end = digits_end
-                while dots_end < len(token) and token[dots_end] == ".":
-                    dots_end += 1
-                if dots_end == len(token):
-                    continue  # A pure move number such as "23...".
-                san = token[dots_end:]
-            else:
-                san = token
-            tokens.append({"san": san, "comment": "", "nags": []})
+            continue
+        if match.group("close") is not None:
+            continue
+        result = match.group("result")
+        if result is not None:
+            tokens.append({"result": result, "offset": match.start()})
     return tokens
 
 
@@ -315,7 +337,7 @@ def read_game(stream):
         board.push(move)
         child = Node(node, move)
         child.comment = token["comment"]
-        child.nags = list(token["nags"])
+        child.nags = set(token["nags"])
         node.variations.append(child)
         node = child
     return game

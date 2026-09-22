@@ -110,7 +110,7 @@ class MovetextTests(unittest.TestCase):
         self.assertIsNone(nodes[0].parent.move)
         self.assertEqual(nodes[1].parent.move.uci(), "e2e4")
         self.assertEqual(nodes[0].comment, "")
-        self.assertEqual(nodes[0].nags, [])
+        self.assertEqual(nodes[0].nags, set())
 
     def test_move_numbers_with_and_without_spaces(self):
         game = read_games("1.e4 e5 2. Nf3 2... Nc6 3. Bc4 *\n")[0]
@@ -125,10 +125,27 @@ class MovetextTests(unittest.TestCase):
     def test_comments_and_nags_attach_to_the_previous_move(self):
         game = read_games("1. e4 $1 {first} e5 {second} $2 $3 *\n")[0]
         nodes = list(game.mainline())
-        self.assertEqual(nodes[0].nags, [1])
+        self.assertEqual(nodes[0].nags, {1})
         self.assertEqual(nodes[0].comment, "first")
         self.assertEqual(nodes[1].comment, "second")
-        self.assertEqual(nodes[1].nags, [2, 3])
+        self.assertEqual(nodes[1].nags, {2, 3})
+
+    def test_suffix_glyphs_become_nags(self):
+        game = read_games("1. e4?! e5!! 2. Nf3!? Nc6?? *\n")[0]
+        self.assertFalse(game.errors)
+        nodes = list(game.mainline())
+        self.assertEqual([node.nags for node in nodes], [{6}, {3}, {5}, {4}])
+
+    def test_novelty_markers_and_glued_annotations(self):
+        game = read_games("1. e4?!,N e5?,N 2. Nf3?!N Nc6! *\n")[0]
+        self.assertFalse(game.errors)
+        nodes = list(game.mainline())
+        self.assertEqual([node.nags for node in nodes], [{6}, {2}, {6}, {1}])
+
+    def test_plain_trailing_letter_is_illegal(self):
+        game = read_games("1. e4N e5 *\n")[0]
+        self.assertTrue(game.errors)
+        self.assertEqual(mainline_ucis(game), [])
 
     def test_multiple_comments_are_joined(self):
         game = read_games("1. e4 {a} {b} e5 *\n")[0]
@@ -160,14 +177,19 @@ class MovetextTests(unittest.TestCase):
         self.assertEqual(mainline_ucis(game), ["e2e4"])
 
     def test_illegal_move_is_reported_and_stops_the_mainline(self):
-        game = read_games("1. e4 e5 2. Ke2 Ke7 3. e9 *\n")[0]
+        game = read_games("1. e4 e5 2. Ke2 Ke7 3. a8=Q+ *\n")[0]
         self.assertTrue(game.errors)
         self.assertEqual(mainline_ucis(game), ["e2e4", "e7e5", "e1e2", "e8e7"])
 
     def test_illegal_first_move_reports_an_error(self):
-        game = read_games("1. e9 *\n")[0]
+        game = read_games("1. a8=Q+ *\n")[0]
         self.assertTrue(game.errors)
         self.assertEqual(list(game.mainline()), [])
+
+    def test_tokens_that_cannot_be_san_are_skipped(self):
+        game = read_games("1. e9 e4 *\n")[0]
+        self.assertFalse(game.errors)
+        self.assertEqual(mainline_ucis(game), ["e2e4"])
 
     def test_percent_escape_lines_are_skipped(self):
         game = read_games('% escape\n[Event "A"]\n\n1. e4 *\n')[0]
