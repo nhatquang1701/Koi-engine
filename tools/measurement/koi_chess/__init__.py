@@ -35,6 +35,7 @@ from .core import (
     square_name,
     square_rank,
 )
+from . import pgn  # noqa: E402  (imported after the core re-exports)
 
 __all__ = [
     "BB_ALL",
@@ -59,6 +60,7 @@ __all__ = [
     "WHITE",
     "Termination",
     "parse_square",
+    "pgn",
     "square",
     "square_file",
     "square_name",
