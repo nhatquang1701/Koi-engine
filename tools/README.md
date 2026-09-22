@@ -82,10 +82,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\build\performance_ga
   -OutputDirectory .\artifacts\verification\performance-gate
 ```
 
-Install the pinned PGN dependency from the repository root:
+Install the measurement dependencies from the repository root:
 
 ```powershell
-python -m pip install -r .\tools\measurement\requirements-elo-oracle.txt
+python -m pip install -r .\tools\measurement\requirements.txt
 python -m unittest .\tests\python\measurement\elo_oracle_test.py -v
 ```
 
@@ -276,7 +276,7 @@ The campaign produces no Elo or rating report; it is a reliability gate.
 
 All three tools fail with an actionable stderr message and nonzero exit code for
 missing inputs or engine/configuration errors. The C++ engine remains independent
-of Python and `python-chess`.
+of Python; the measurement tooling uses the in-tree `koi_chess` package.
 
 ## Rough local Elo estimation
 

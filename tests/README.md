@@ -45,9 +45,9 @@ ctest --test-dir build\release -N
 ctest --test-dir build\release -C Release -R koi_strength_tests --output-on-failure
 ```
 
-The default Release configuration registers **61 tests** (python-chess
-installed, `KOI_BUILD_SHADOW_DIFF=OFF`). The count varies
-with optional dependencies: `elo_oracle_python` requires python-chess,
+The default Release configuration with Python 3 registers **64 tests**
+(`KOI_BUILD_SHADOW_DIFF=OFF`). The count varies
+with optional dependencies:
 `koi_shadow_diff_tests` requires `-DKOI_BUILD_SHADOW_DIFF=ON`, and
 `cutechess_stability_smoke` is only registered when `cutechess-cli.exe` is
 found. `cutechess_stability_diagnostics` is always registered and exercises the
@@ -235,8 +235,9 @@ Remove an entry once the corresponding engine behavior is reliably fixed.
 
 ## Optional dependencies and skips
 
-- `python-chess` enables `elo_oracle_python`; without it that test is not
-  registered and `measurement_forensics_python` self-skips its legality case.
+- The in-tree `koi_chess` package supplies the rules, PGN, and UCI clients for
+  `elo_oracle_python`, `koi_dataset_python`, and the NNUE exporter tests; no
+  third-party chess package is required.
 - PyTorch is required only by the NNUE training boundary test; it skips when the
   package is absent.
 - `cutechess_stability_smoke` is registered only when `cutechess-cli.exe` is
@@ -275,7 +276,7 @@ timeout, configurable through `KOI_UCI_TIMEOUT_MS`.
 `.github/workflows/windows.yml` has three independent jobs (no `fail-fast`
 cancellation):
 
-- `release-full` installs `python-chess`, builds Release, runs the parallel
+- `release-full` installs the measurement requirements (`numpy`), builds Release, runs the parallel
   suite (`ctest -C Release -j 4 --output-junit ...`), and uploads the JUnit
   report plus `LastTest.log`.
 - `debug-smoke` builds Debug and runs the fast subset (`-LE heavy`) with the

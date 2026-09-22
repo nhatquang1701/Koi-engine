@@ -9,7 +9,7 @@ Koi Engine is a Windows x64 UCI chess engine written in C++26, built with MSVC a
 - Ninja
 - PowerShell (`pwsh` or `powershell`)
 - Optional: Python 3 for measurement tooling and Python tests:
-  `python -m pip install -r .\tools\measurement\requirements-elo-oracle.txt`
+  `python -m pip install -r .\tools\measurement\requirements.txt`
 
 ## Build
 

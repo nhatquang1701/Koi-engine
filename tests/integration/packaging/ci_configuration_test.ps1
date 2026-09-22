@@ -9,6 +9,11 @@ if (-not (Test-Path -LiteralPath $workflow -PathType Leaf)) {
 
 $content = Get-Content -LiteralPath $workflow -Raw
 $cmakeContent = Get-Content -LiteralPath $cmake -Raw
+$requirements = Join-Path $repositoryRoot 'tools\measurement\requirements.txt'
+if (-not (Test-Path -LiteralPath $requirements -PathType Leaf)) {
+    throw "Python requirements file is missing: $requirements"
+}
+$requirementsContent = Get-Content -LiteralPath $requirements -Raw
 
 function Require-WorkflowPattern([string]$Pattern, [string]$Description) {
     if ($content -notmatch $Pattern) {
@@ -22,6 +27,24 @@ function Require-CMakePattern([string]$Pattern, [string]$Description) {
     }
 }
 
+function Deny-WorkflowPattern([string]$Pattern, [string]$Description) {
+    if ($content -match $Pattern) {
+        throw "Windows CI workflow must not define $Description."
+    }
+}
+
+function Require-RequirementsPattern([string]$Pattern, [string]$Description) {
+    if ($requirementsContent -notmatch $Pattern) {
+        throw "tools/measurement/requirements.txt must define $Description."
+    }
+}
+
+function Deny-RequirementsPattern([string]$Pattern, [string]$Description) {
+    if ($requirementsContent -match $Pattern) {
+        throw "tools/measurement/requirements.txt must not define $Description."
+    }
+}
+
 Require-WorkflowPattern '(?m)^\s*runs-on:\s*windows-latest\s*$' 'a Windows runner'
 # Three independent jobs: a failing Debug or differential leg must not cancel
 # the primary Release suite, and every leg uploads its own diagnostics.
@@ -30,8 +53,11 @@ Require-WorkflowPattern '(?m)^\s{2}debug-smoke:\s*$' 'the Debug smoke job'
 Require-WorkflowPattern '(?m)^\s{2}shadow-diff:\s*$' 'the differential shadow job'
 Require-WorkflowPattern '(?m)^\s*timeout-minutes:\s*60\s*$' 'a Release/Debug job timeout'
 Require-WorkflowPattern '(?m)^\s*timeout-minutes:\s*30\s*$' 'a differential job timeout'
-Require-WorkflowPattern '(?i)python-chess' 'the optional python-chess dependency install'
-Require-WorkflowPattern '(?i)numpy' 'the optional numpy dependency install'
+Require-WorkflowPattern '(?i)tools/measurement/requirements\.txt' 'the shared Python requirements file install'
+Deny-WorkflowPattern '(?i)python-chess' 'the removed python-chess dependency'
+Deny-WorkflowPattern '(?i)requirements-elo-oracle' 'the removed requirements-elo-oracle.txt file'
+Require-RequirementsPattern '(?i)numpy' 'the numpy dependency'
+Deny-RequirementsPattern '(?i)python-chess' 'the removed python-chess dependency'
 Require-WorkflowPattern '(?i)actions/checkout@v5' 'the current checkout action'
 Require-WorkflowPattern '(?i)actions/setup-python@v6' 'the current Python setup action'
 Require-WorkflowPattern '(?i)actions/upload-artifact@v5' 'test diagnostic artifact upload'

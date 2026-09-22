@@ -187,20 +187,20 @@ and the final six-field `fen`; an illegal move leaves the reported position at t
 last legal state. It is useful for reproducing a match-ply or validating a UCI log.
 
 The Stockfish position oracle is a measurement-only Python tool and does not add a
-dependency to the C++ engine. Install its pinned dependency and run its test directly
-from the repository root:
+dependency to the C++ engine. Install the measurement dependencies and run its test
+directly from the repository root:
 
 ```powershell
-python -m pip install -r .\tools\measurement\requirements-elo-oracle.txt
+python -m pip install -r .\tools\measurement\requirements.txt
 python -m unittest .\tests\python\measurement\elo_oracle_test.py -v
 ```
 
 See [`tools/README.md`](tools/README.md) for the extract-only schema, the named
 book-audit and match entrypoints, and the external-results workflow.
 
-When Python 3 and `python-chess` are available at CMake configure time, the same test
-is registered as `elo_oracle_python` in CTest; otherwise the C++ test suite is unchanged
-and CMake reports that the optional test was skipped.
+When Python 3 is available at CMake configure time, the same test is registered as
+`elo_oracle_python` in CTest. The in-tree `koi_chess` package supplies the rules,
+PGN, and UCI tooling, so no third-party chess package is required.
 
 To analyze a supplied standard-SAN PGN with Stockfish as the position oracle, keep the
 JSON output under this checkout's artifacts directory and provide the exact
@@ -508,8 +508,8 @@ continues to evaluate standard FIDE chess.
 
 ### Test inventory and known gaps
 
-The default local configuration registers 61 CTest tests (python-chess
-installed, `KOI_BUILD_SHADOW_DIFF=OFF`); enabling the shadow-diff oracle adds
+The default local configuration with Python 3 registers 64 CTest tests
+(`KOI_BUILD_SHADOW_DIFF=OFF`); enabling the shadow-diff oracle adds
 `koi_shadow_diff_tests`, and a local `cutechess-cli.exe` adds the optional
 stability smoke, so the count varies with those optional pieces. `koi_search_tests`, the heaviest suite, is
 registered as four shards, every test carries labels (`unit`, `integration`,
