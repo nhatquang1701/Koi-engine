@@ -58,6 +58,12 @@ MAX_HIDDEN = 8192
 DEFAULT_HIDDEN = 1536
 DEFAULT_SEED = 20260916
 DEFAULT_TUNE_SAMPLES = 4000
+# A quantized output weight at +/-W2_LIMIT means the float weight was clipped,
+# which collapses the exported score range; combinations above this fraction are
+# only used when every candidate saturates.
+MAX_OUTPUT_SATURATION = 0.05
+# The exported integer score must still be able to express a decisive advantage.
+DECISIVE_SCORE_CP = 4000
 
 
 class ExportError(RuntimeError):
@@ -347,6 +353,29 @@ def saturation_fractions(params: dict) -> tuple[float, float, float]:
     return w1, l1, w2
 
 
+def auto_output_shifts(params: dict, l1_units: int) -> list[int]:
+    """Output shifts that keep the quantized output weights inside int8.
+
+    The integer score is ``(b2 + sum_k e_k * W2_k) >> s_out`` with ``e_k`` in
+    [0, 127] and ``W2 = rint(w2 * TARGET_SCALE * 2**s_out / 127)``, so the
+    weights saturate once ``|w2| * TARGET_SCALE * 2**s_out / 127`` passes 127.
+    The old default grid started at 12, which clipped almost every weight and
+    left the exported network with an effectively constant score.
+    """
+    weights = params["output_weights"]
+    peak = float(np.max(np.abs(weights))) if weights.size else 0.0
+    if peak <= 0.0:
+        return [6, 7, 8]
+    weight_limit = (W2_LIMIT * W2_LIMIT) / (TARGET_SCALE * peak)
+    range_limit = (W2_LIMIT * L1_LIMIT * l1_units) / DECISIVE_SCORE_CP
+    safe = min(
+        int(np.floor(np.log2(max(weight_limit, 1.0)))),
+        int(np.floor(np.log2(max(range_limit, 1.0)))),
+    )
+    safe = int(np.clip(safe, 2, 12))
+    return sorted({max(2, safe - 1), safe, min(12, safe + 1)})
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--checkpoint", required=True, type=pathlib.Path)
@@ -357,7 +386,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--l1-units", type=int, default=DEFAULT_L1_UNITS)
     parser.add_argument("--hidden-shifts", type=int, nargs="+", default=[6, 7, 8])
     parser.add_argument("--l1-shifts", type=int, nargs="+", default=[6, 7, 8])
-    parser.add_argument("--output-shifts", type=int, nargs="+", default=[12, 14, 16, 18, 20])
+    parser.add_argument("--output-shifts", type=int, nargs="+", default=None,
+                        help="output shifts to try; the default derives them from the checkpoint")
     parser.add_argument("--tune-samples", type=int, default=DEFAULT_TUNE_SAMPLES)
     parser.add_argument("--seed", type=int, default=DEFAULT_SEED)
     parser.add_argument("--net-id", default="koi-v5")
@@ -373,6 +403,13 @@ def main(argv: list[str] | None = None) -> int:
         if hidden < MIN_HIDDEN or hidden > MAX_HIDDEN or hidden % 2 != 0:
             raise ExportError(f"hidden units {hidden} are out of range")
         params = read_raw_weights(raw_path, hidden, args.l1_units)
+        output_shifts = (
+            args.output_shifts
+            if args.output_shifts
+            else auto_output_shifts(params, args.l1_units)
+        )
+        peak = float(np.max(np.abs(params["output_weights"]))) if params["output_weights"].size else 0.0
+        log(f"output shift candidates {output_shifts} (peak |w2| {peak:.4f})")
 
         validation = {"scores": np.zeros(0, dtype=np.int32), "buckets": np.zeros(0, dtype=np.int32),
                       "own": [], "opp": []}
@@ -389,6 +426,8 @@ def main(argv: list[str] | None = None) -> int:
 
         best: tuple | None = None
         best_params: dict = {}
+        saturated: tuple | None = None
+        saturated_params: dict = {}
         for hidden_shift in args.hidden_shifts:
             feature_params = quantize_feature(params, hidden_shift)
             own = opp = None
@@ -396,8 +435,11 @@ def main(argv: list[str] | None = None) -> int:
                 own, opp = hidden_activations(feature_params, validation, hidden)
             for l1_shift in args.l1_shifts:
                 l1_params = quantize_l1(params, l1_shift)
-                for output_shift in args.output_shifts:
+                for output_shift in output_shifts:
                     output_params = quantize_output(params, output_shift)
+                    w2_saturation = float(
+                        np.mean(np.abs(output_params["output_weights"]) >= W2_LIMIT)
+                    )
                     if has_validation:
                         scores = integer_scores(
                             own,
@@ -413,11 +455,22 @@ def main(argv: list[str] | None = None) -> int:
                         mae = float("inf")
                     log(
                         f"quantization v5 s1={hidden_shift} s_l1={l1_shift} "
-                        f"k3={output_shift} val_mae_cp {mae:.2f}"
+                        f"k3={output_shift} val_mae_cp {mae:.2f} "
+                        f"w2_saturation {w2_saturation:.3f}"
                     )
+                    if saturated is None or mae < saturated[0]:
+                        saturated = (mae, hidden_shift, l1_shift, output_shift)
+                        saturated_params = {**feature_params, **l1_params, **output_params}
+                    if w2_saturation > MAX_OUTPUT_SATURATION:
+                        continue
                     if best is None or mae < best[0]:
                         best = (mae, hidden_shift, l1_shift, output_shift)
                         best_params = {**feature_params, **l1_params, **output_params}
+        if best is None:
+            assert saturated is not None
+            log("every quantization combination saturates the output weights")
+            best = saturated
+            best_params = saturated_params
         assert best is not None
         mae, hidden_shift, l1_shift, output_shift = best
         log(

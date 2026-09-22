@@ -148,7 +148,7 @@ def build_export_command(
     meta_out: Path,
     hidden: int,
     hidden_shifts: list[int],
-    output_shifts: list[int],
+    output_shifts: list[int] | None,
     tune_samples: int,
     arch: str = "v4",
     l1_units: int = 32,
@@ -166,11 +166,12 @@ def build_export_command(
             "--l1-units", str(l1_units),
             "--hidden-shifts", *[str(shift) for shift in hidden_shifts],
             "--l1-shifts", *[str(shift) for shift in (l1_shifts or [6, 7, 8])],
-            "--output-shifts", *[str(shift) for shift in output_shifts],
-            "--tune-samples", str(tune_samples),
         ]
+        if output_shifts:
+            command += ["--output-shifts", *[str(shift) for shift in output_shifts]]
+        command += ["--tune-samples", str(tune_samples)]
         return command
-    return [
+    command = [
         sys.executable,
         str(TOOLS_MEASUREMENT / "export_bullet_v4.py"),
         "--checkpoint", str(checkpoint),
@@ -179,9 +180,11 @@ def build_export_command(
         "--meta-out", str(meta_out),
         "--hidden", str(hidden),
         "--hidden-shifts", *[str(shift) for shift in hidden_shifts],
-        "--output-shifts", *[str(shift) for shift in output_shifts],
-        "--tune-samples", str(tune_samples),
     ]
+    if output_shifts:
+        command += ["--output-shifts", *[str(shift) for shift in output_shifts]]
+    command += ["--tune-samples", str(tune_samples)]
+    return command
 
 
 def build_convert_command(corpus: Path, data_dir: Path, val_fraction: float, limit: int) -> list[str]:
@@ -360,7 +363,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--rows", type=int, default=0)
     parser.add_argument("--tune-samples", type=int, default=4000)
     parser.add_argument("--hidden-shifts", type=int, nargs="+", default=[6, 7, 8])
-    parser.add_argument("--output-shifts", type=int, nargs="+", default=[12, 14, 16, 18, 20])
+    parser.add_argument("--output-shifts", type=int, nargs="+", default=None,
+                        help="output shifts to try; the exporter derives them when omitted")
     parser.add_argument("--arch", choices=["v4", "v5"], default="v5")
     parser.add_argument("--l1-units", type=int, default=32)
     parser.add_argument("--l1-shifts", type=int, nargs="+", default=[6, 7, 8])

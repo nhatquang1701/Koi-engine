@@ -383,6 +383,33 @@ class ExporterV5Tests(unittest.TestCase):
         np.testing.assert_allclose(weights["output_weights"], output_bucket, rtol=0, atol=1e-6)
         np.testing.assert_allclose(weights["output_bias"], output_bias, rtol=0, atol=1e-6)
 
+    def test_auto_output_shifts_avoid_weight_saturation(self) -> None:
+        l1 = 8
+        biases = np.zeros(8, dtype=np.float32)
+        for peak in (0.05, 0.5, 5.0):
+            weights = np.zeros((8, l1), dtype=np.float32)
+            weights[0, 0] = peak
+            params = {"output_weights": weights, "output_bias": biases}
+            shifts = export_bullet_v5.auto_output_shifts(params, 32)
+            self.assertEqual(shifts, sorted(shifts))
+            self.assertGreaterEqual(min(shifts), 2)
+            self.assertLessEqual(max(shifts), 12)
+            quantized = export_bullet_v5.quantize_output(params, shifts[0])
+            saturation = float(
+                np.mean(np.abs(quantized["output_weights"]) >= export_bullet_v5.W2_LIMIT)
+            )
+            self.assertLessEqual(saturation, export_bullet_v5.MAX_OUTPUT_SATURATION)
+        # The old fixed grid started at shift 12, which clipped the weights and
+        # left the exported network with an effectively constant score.
+        weights = np.zeros((8, l1), dtype=np.float32)
+        weights[0, 0] = 0.5
+        quantized = export_bullet_v5.quantize_output(
+            {"output_weights": weights, "output_bias": biases}, 12
+        )
+        self.assertGreater(
+            float(np.mean(np.abs(quantized["output_weights"]) >= export_bullet_v5.W2_LIMIT)), 0.0
+        )
+
     def test_exporter_writes_a_v5_container(self) -> None:
         import json
 
