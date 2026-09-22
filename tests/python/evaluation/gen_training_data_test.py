@@ -3,16 +3,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
-try:
-    import chess
-except ImportError:  # pragma: no cover - optional dependency
-    chess = None
-
-if chess is None:  # pragma: no cover - optional dependency
-    raise unittest.SkipTest("python-chess is unavailable")
-
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "tools" / "measurement"))
+import koi_chess as chess  # noqa: E402
 import gen_training_data  # noqa: E402
 
 
@@ -34,10 +27,12 @@ class GenTrainingDataTest(unittest.TestCase):
                 "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1",
             ]
             path.write_text("\n".join(fens) + "\n\n", encoding="utf-8")
-            seen = gen_training_data.load_seen_hashes(path)
-            expected = {chess.polyglot.zobrist_hash(chess.Board(fen)) for fen in fens}
+            seen = gen_training_data.load_seen_positions(path)
+            expected = {gen_training_data.position_key(chess.Board(fen)) for fen in fens}
             self.assertEqual(seen, expected)
-            self.assertEqual(gen_training_data.load_seen_hashes(Path(temporary) / "missing.txt"), set())
+            self.assertEqual(
+                gen_training_data.load_seen_positions(Path(temporary) / "missing.txt"), set()
+            )
 
     def test_label_resume_reader_parses_rows(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -78,8 +73,8 @@ class GenTrainingDataTest(unittest.TestCase):
                 "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1",
             ]
             path.write_text(f"{fens[0]};1.0\n{fens[1]};0.5\n", encoding="utf-8")
-            seen = gen_training_data.load_seen_hashes(path)
-            expected = {chess.polyglot.zobrist_hash(chess.Board(fen)) for fen in fens}
+            seen = gen_training_data.load_seen_positions(path)
+            expected = {gen_training_data.position_key(chess.Board(fen)) for fen in fens}
             self.assertEqual(seen, expected)
 
     def test_consumers_ignore_the_optional_result_column(self):

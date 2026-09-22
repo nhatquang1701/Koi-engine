@@ -19,15 +19,13 @@ except ImportError:  # pragma: no cover - environment dependent
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 NNUE_DIR = REPO_ROOT / "tools" / "nnue"
+MEASUREMENT_DIR = REPO_ROOT / "tools" / "measurement"
 if str(NNUE_DIR) not in sys.path:
     sys.path.insert(0, str(NNUE_DIR))
+if str(MEASUREMENT_DIR) not in sys.path:
+    sys.path.insert(0, str(MEASUREMENT_DIR))
 
-try:
-    import chess  # noqa: F401
-
-    CHESS_AVAILABLE = True
-except ImportError:  # pragma: no cover - environment dependent
-    CHESS_AVAILABLE = False
+import koi_chess  # noqa: E402,F401
 
 try:
     import run_bullet  # noqa: E402  (also puts tools/measurement on sys.path)
@@ -42,7 +40,6 @@ BLACK_TO_MOVE = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1"
 
 
 @unittest.skipUnless(BULLET_TOOLING_AVAILABLE, "numpy and the bullet tooling are required")
-@unittest.skipUnless(CHESS_AVAILABLE, "python-chess is required for the converter")
 class TextConversionTests(unittest.TestCase):
     def test_scores_are_converted_to_white_relative(self) -> None:
         self.assertEqual(to_bullet.bullet_text_row(STARTPOS, True, 42), f"{STARTPOS} | 42 | 0.5")
@@ -118,7 +115,6 @@ class TextConversionTests(unittest.TestCase):
 
 
 @unittest.skipUnless(BULLET_TOOLING_AVAILABLE, "numpy and the bullet tooling are required")
-@unittest.skipUnless(CHESS_AVAILABLE, "python-chess is required for the converter")
 class CliTests(unittest.TestCase):
     def test_text_only_does_not_need_the_convert_binary(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -342,7 +338,6 @@ class ExporterTests(unittest.TestCase):
 
 
 @unittest.skipUnless(BULLET_TOOLING_AVAILABLE, "numpy and the bullet tooling are required")
-@unittest.skipUnless(CHESS_AVAILABLE, "python-chess is required for the exporter")
 class ExporterV5Tests(unittest.TestCase):
     def test_infer_hidden_units_v5(self) -> None:
         l1 = 8

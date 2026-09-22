@@ -664,29 +664,16 @@ koi_set_timeout(package_release_layout 60)
 
 find_package(Python3 COMPONENTS Interpreter QUIET)
 if(Python3_Interpreter_FOUND)
-    execute_process(
-        COMMAND "${Python3_EXECUTABLE}" -c "import chess"
-        RESULT_VARIABLE ELO_ORACLE_PYTHON_CHESS_RESULT
-        OUTPUT_QUIET
-        ERROR_QUIET
+    add_test(
+        NAME elo_oracle_python
+        COMMAND "${Python3_EXECUTABLE}" -m unittest tests/python/measurement/elo_oracle_test.py -v
     )
-    if(ELO_ORACLE_PYTHON_CHESS_RESULT EQUAL 0)
-        add_test(
-            NAME elo_oracle_python
-            COMMAND "${Python3_EXECUTABLE}" -m unittest tests/python/measurement/elo_oracle_test.py -v
-        )
-        set_tests_properties(
-            elo_oracle_python
-            PROPERTIES
-                WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
-                ENVIRONMENT "PYTHONDONTWRITEBYTECODE=1"
-        )
-    else()
-        message(STATUS
-            "Skipping elo_oracle_python: python-chess is unavailable. "
-            "Install tools/measurement/requirements-elo-oracle.txt to register the test."
-        )
-    endif()
+    set_tests_properties(
+        elo_oracle_python
+        PROPERTIES
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+            ENVIRONMENT "PYTHONDONTWRITEBYTECODE=1"
+    )
     add_test(
         NAME elo_estimate_python
         COMMAND "${Python3_EXECUTABLE}" -m unittest tests/python/measurement/elo_estimate_test.py -v
@@ -726,6 +713,18 @@ if(Python3_Interpreter_FOUND)
     add_test(
         NAME koi_dataset_python
         COMMAND "${Python3_EXECUTABLE}" -m unittest tests/python/evaluation/koi_dataset_test.py -v
+    )
+    add_test(
+        NAME koi_chess_python
+        COMMAND "${Python3_EXECUTABLE}" -m unittest tests/python/rules/koi_chess_test.py -v
+    )
+    add_test(
+        NAME koi_chess_pgn_python
+        COMMAND "${Python3_EXECUTABLE}" -m unittest tests/python/rules/koi_chess_pgn_test.py -v
+    )
+    add_test(
+        NAME koi_chess_engine_python
+        COMMAND "${Python3_EXECUTABLE}" -m unittest tests/python/rules/koi_chess_engine_test.py -v
     )
     add_test(
         NAME gen_training_data_python
@@ -774,6 +773,7 @@ if(Python3_Interpreter_FOUND)
     set_tests_properties(
         tune_eval_python
         nnue_training_python nnue_wrapper_python koi_dataset_python gen_training_data_python
+        koi_chess_python koi_chess_pgn_python koi_chess_engine_python
         measurement_phase_python measurement_forensics_python
         strength_report_python nnue_studio_python nnue_studio_ui_python tune_classical_python
         bullet_data_python

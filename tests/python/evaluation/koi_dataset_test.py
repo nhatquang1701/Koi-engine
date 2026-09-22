@@ -7,17 +7,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
-try:
-    import chess
-except ImportError:  # pragma: no cover - optional dependency
-    chess = None
-
-if chess is None:  # pragma: no cover - optional dependency
-    raise unittest.SkipTest("python-chess is unavailable")
-
 ROOT = Path(__file__).resolve().parents[3]
 TOOL = ROOT / "tools" / "measurement" / "koi_dataset.py"
 sys.path.insert(0, str(TOOL.parent))
+import koi_chess as chess  # noqa: E402
 import koi_dataset  # noqa: E402
 
 # Pinned golden list for the white-to-move start position (bucket 0).

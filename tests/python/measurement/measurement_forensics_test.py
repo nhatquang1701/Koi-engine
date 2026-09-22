@@ -8,13 +8,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
-try:
-    import chess
-except ImportError:  # pragma: no cover - python-chess is an optional dependency
-    chess = None
-
-
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(REPOSITORY_ROOT / "tools" / "measurement"))
+
+import koi_chess as chess  # noqa: E402
 PGN_FORENSICS_SCRIPT = REPOSITORY_ROOT / "tools" / "measurement" / "pgn_forensics.py"
 GIGABASE_SCRIPT = REPOSITORY_ROOT / "tools" / "measurement" / "gigabase_extract.py"
 FIXTURE_PATH = REPOSITORY_ROOT / "tests" / "data" / "positions" / "measurement-forensics.json"
@@ -168,7 +165,6 @@ class MeasurementForensicsTests(unittest.TestCase):
         self.assertIn("under artifacts", completed.stderr)
         self.assertFalse(output_path.exists())
 
-    @unittest.skipUnless(chess is not None, "python-chess is unavailable")
     def test_forensic_fixture_categories_are_legal(self):
         fixture = json.loads(FIXTURE_PATH.read_text(encoding="utf-8"))
         expected_categories = {

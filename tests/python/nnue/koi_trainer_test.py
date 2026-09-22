@@ -52,12 +52,7 @@ try:
 except Exception:  # pragma: no cover - optional dependency
     TORCH_AVAILABLE = False
 
-try:
-    import chess  # noqa: F401
-
-    CHESS_AVAILABLE = True
-except Exception:  # pragma: no cover - optional dependency
-    CHESS_AVAILABLE = False
+import koi_chess as chess  # noqa: E402
 
 HEADER = struct.Struct("<8sIIIIIBB2xHHQ")
 HEADER_V5 = struct.Struct("<8sIIIIIBBBBHHQ")
@@ -221,8 +216,7 @@ class EncoderParityTests(unittest.TestCase):
         executable = os.environ.get("KOI_NNUE_BOUNDARY_EXE")
         if not executable or not pathlib.Path(executable).is_file():
             self.skipTest("KOI_NNUE_BOUNDARY_EXE is not set to a built boundary test")
-        self.assertIsNotNone(koi_dataset, "koi_dataset requires python-chess")
-        self.assertTrue(CHESS_AVAILABLE, "python-chess is required for the encoder parity test")
+        self.assertIsNotNone(koi_dataset, "koi_dataset is unavailable")
         with tempfile.TemporaryDirectory() as directory:
             container_path = pathlib.Path(directory) / "fixture.nnue"
             completed = subprocess.run(
@@ -262,8 +256,7 @@ class EncoderParityTests(unittest.TestCase):
         executable = os.environ.get("KOI_NNUE_BOUNDARY_EXE")
         if not executable or not pathlib.Path(executable).is_file():
             self.skipTest("KOI_NNUE_BOUNDARY_EXE is not set to a built boundary test")
-        self.assertIsNotNone(koi_dataset, "koi_dataset requires python-chess")
-        self.assertTrue(CHESS_AVAILABLE, "python-chess is required for the encoder parity test")
+        self.assertIsNotNone(koi_dataset, "koi_dataset is unavailable")
         with tempfile.TemporaryDirectory() as directory:
             container_path = pathlib.Path(directory) / "fixture-v5.nnue"
             completed = subprocess.run(
@@ -420,7 +413,6 @@ class DatasetLoaderTests(unittest.TestCase):
             self.assertEqual(int(own_offsets[-1]), 32 + 2 + 4 + 65)
             self.assertEqual(int(opp_offsets[-1]), 32 + 0 + 3 + 0)
 
-    @unittest.skipUnless(CHESS_AVAILABLE, "python-chess is not installed")
     def test_text_corpus_v5_buckets_follow_piece_counts(self):
         self.assertIsNotNone(train_nnue_koi)
         corpus = (
