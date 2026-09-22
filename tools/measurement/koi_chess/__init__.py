@@ -36,6 +36,7 @@ from .core import (
     square_rank,
 )
 from . import pgn  # noqa: E402  (imported after the core re-exports)
+from . import engine  # noqa: E402  (imported after the core re-exports)
 
 __all__ = [
     "BB_ALL",
@@ -59,6 +60,7 @@ __all__ = [
     "STARTING_FEN",
     "WHITE",
     "Termination",
+    "engine",
     "parse_square",
     "pgn",
     "square",
