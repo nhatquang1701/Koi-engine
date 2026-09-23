@@ -58,13 +58,65 @@ jobs:
             -R "koi_engine_time_safety_process|koi_benchmark_process" \
             --repeat until-pass:2 \
             --output-on-failure --output-junit build/ci-release/ctest-heavy-process-junit.xml
-      - name: Run the process suite
+      # Every process test gets its own step with a hard step timeout so a hung
+      # test names itself in the job summary instead of stalling the whole job,
+      # and the diagnostics upload below still runs.
+      - name: Process suite - koi_replay_tests
         env:
           KOI_TEST_RETRIES: "3"
+        timeout-minutes: 6
         run: |
-          ctest --test-dir build/ci-release -C Release -j 2 -LE "unit;heavy;python" \
+          ctest --test-dir build/ci-release -C Release -j 1 -R "^koi_replay_tests$" \
             --repeat until-pass:2 \
-            --output-on-failure --output-junit build/ci-release/ctest-process-junit.xml
+            --output-on-failure --output-junit build/ci-release/ctest-process-1-junit.xml
+      - name: Process suite - koi_engine_process
+        env:
+          KOI_TEST_RETRIES: "3"
+        timeout-minutes: 6
+        run: |
+          ctest --test-dir build/ci-release -C Release -j 1 -R "^koi_engine_process$" \
+            --repeat until-pass:2 \
+            --output-on-failure --output-junit build/ci-release/ctest-process-2-junit.xml
+      - name: Process suite - koi_engine_variant_process
+        env:
+          KOI_TEST_RETRIES: "3"
+        timeout-minutes: 6
+        run: |
+          ctest --test-dir build/ci-release -C Release -j 1 -R "^koi_engine_variant_process$" \
+            --repeat until-pass:2 \
+            --output-on-failure --output-junit build/ci-release/ctest-process-3-junit.xml
+      - name: Process suite - koi_engine_en_croissant_process
+        env:
+          KOI_TEST_RETRIES: "3"
+        timeout-minutes: 6
+        run: |
+          ctest --test-dir build/ci-release -C Release -j 1 -R "^koi_engine_en_croissant_process$" \
+            --repeat until-pass:2 \
+            --output-on-failure --output-junit build/ci-release/ctest-process-4-junit.xml
+      - name: Process suite - koi_uci_match_process
+        env:
+          KOI_TEST_RETRIES: "3"
+        timeout-minutes: 6
+        run: |
+          ctest --test-dir build/ci-release -C Release -j 1 -R "^koi_uci_match_process$" \
+            --repeat until-pass:2 \
+            --output-on-failure --output-junit build/ci-release/ctest-process-5-junit.xml
+      - name: Process suite - koi_stockfish_strength_option
+        env:
+          KOI_TEST_RETRIES: "3"
+        timeout-minutes: 6
+        run: |
+          ctest --test-dir build/ci-release -C Release -j 1 -R "^koi_stockfish_strength_option$" \
+            --repeat until-pass:2 \
+            --output-on-failure --output-junit build/ci-release/ctest-process-6-junit.xml
+      - name: Process suite - koi_uci_match_clock
+        env:
+          KOI_TEST_RETRIES: "3"
+        timeout-minutes: 6
+        run: |
+          ctest --test-dir build/ci-release -C Release -j 1 -R "^koi_uci_match_clock$" \
+            --repeat until-pass:2 \
+            --output-on-failure --output-junit build/ci-release/ctest-process-7-junit.xml
       - name: Run the Python suite
         env:
           KOI_TEST_RETRIES: "3"
@@ -134,13 +186,65 @@ jobs:
             -R "koi_engine_time_safety_process|koi_benchmark_process" \
             --repeat until-pass:2 \
             --output-on-failure --output-junit build/ci-release/ctest-heavy-process-junit.xml
-      - name: Run the process suite
+      # Every process test gets its own step with a hard step timeout so a hung
+      # test names itself in the job summary instead of stalling the whole job,
+      # and the diagnostics upload below still runs.
+      - name: Process suite - koi_replay_tests
         env:
           KOI_TEST_RETRIES: "3"
+        timeout-minutes: 6
         run: |
-          ctest --test-dir build/ci-release -C Release -j 2 -LE "unit;heavy;python" \
+          ctest --test-dir build/ci-release -C Release -j 1 -R "^koi_replay_tests$" \
             --repeat until-pass:2 \
-            --output-on-failure --output-junit build/ci-release/ctest-process-junit.xml
+            --output-on-failure --output-junit build/ci-release/ctest-process-1-junit.xml
+      - name: Process suite - koi_engine_process
+        env:
+          KOI_TEST_RETRIES: "3"
+        timeout-minutes: 6
+        run: |
+          ctest --test-dir build/ci-release -C Release -j 1 -R "^koi_engine_process$" \
+            --repeat until-pass:2 \
+            --output-on-failure --output-junit build/ci-release/ctest-process-2-junit.xml
+      - name: Process suite - koi_engine_variant_process
+        env:
+          KOI_TEST_RETRIES: "3"
+        timeout-minutes: 6
+        run: |
+          ctest --test-dir build/ci-release -C Release -j 1 -R "^koi_engine_variant_process$" \
+            --repeat until-pass:2 \
+            --output-on-failure --output-junit build/ci-release/ctest-process-3-junit.xml
+      - name: Process suite - koi_engine_en_croissant_process
+        env:
+          KOI_TEST_RETRIES: "3"
+        timeout-minutes: 6
+        run: |
+          ctest --test-dir build/ci-release -C Release -j 1 -R "^koi_engine_en_croissant_process$" \
+            --repeat until-pass:2 \
+            --output-on-failure --output-junit build/ci-release/ctest-process-4-junit.xml
+      - name: Process suite - koi_uci_match_process
+        env:
+          KOI_TEST_RETRIES: "3"
+        timeout-minutes: 6
+        run: |
+          ctest --test-dir build/ci-release -C Release -j 1 -R "^koi_uci_match_process$" \
+            --repeat until-pass:2 \
+            --output-on-failure --output-junit build/ci-release/ctest-process-5-junit.xml
+      - name: Process suite - koi_stockfish_strength_option
+        env:
+          KOI_TEST_RETRIES: "3"
+        timeout-minutes: 6
+        run: |
+          ctest --test-dir build/ci-release -C Release -j 1 -R "^koi_stockfish_strength_option$" \
+            --repeat until-pass:2 \
+            --output-on-failure --output-junit build/ci-release/ctest-process-6-junit.xml
+      - name: Process suite - koi_uci_match_clock
+        env:
+          KOI_TEST_RETRIES: "3"
+        timeout-minutes: 6
+        run: |
+          ctest --test-dir build/ci-release -C Release -j 1 -R "^koi_uci_match_clock$" \
+            --repeat until-pass:2 \
+            --output-on-failure --output-junit build/ci-release/ctest-process-7-junit.xml
       - name: Run the Python suite
         env:
           KOI_TEST_RETRIES: "3"
