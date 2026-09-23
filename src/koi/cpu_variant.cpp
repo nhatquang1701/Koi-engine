@@ -10,9 +10,12 @@
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#elif defined(__linux__)
+#include <unistd.h>
 #endif
 
 #include "koi/cpu_features.hpp"
+#include "koi/executable_path.hpp"
 
 namespace koi {
 namespace {
@@ -48,19 +51,6 @@ std::string_view trim(std::string_view text) noexcept {
 }
 
 #ifdef _WIN32
-
-// Returns the directory that holds this executable, or an empty path when the
-// module path cannot be resolved.
-std::filesystem::path executable_directory() noexcept {
-    std::wstring buffer(32'768, L'\0');
-    const DWORD length = ::GetModuleFileNameW(nullptr, buffer.data(),
-                                              static_cast<DWORD>(buffer.size()));
-    if (length == 0 || length >= buffer.size()) {
-        return {};
-    }
-    buffer.resize(length);
-    return std::filesystem::path(buffer).parent_path();
-}
 
 // Launches `variant` with the parent's standard handles and waits for it. The
 // child is placed in a job object that dies with the parent so a GUI that kills
@@ -162,7 +152,33 @@ int launch_variant(const std::filesystem::path& directory, CpuVariant variant,
     return static_cast<int>(exit_code);
 }
 
-#endif // _WIN32
+#elif defined(__linux__)
+
+// Replaces this process with `variant` through execv: the child keeps the
+// standard streams, the process id, and the controlling terminal, so a GUI or
+// tournament sees exactly one engine process. execv returns only when the child
+// could not be started; the caller then keeps running the baseline build unless
+// the variant was requested explicitly.
+int launch_variant(const std::filesystem::path& directory, CpuVariant variant,
+                   bool explicit_choice) noexcept {
+    const std::filesystem::path child_path =
+        directory / std::filesystem::path(cpu_variant_executable_name(variant));
+    std::string path_text = child_path.string();
+    char* arguments[] = {path_text.data(), nullptr};
+    ::execv(path_text.c_str(), arguments);
+    if (explicit_choice) {
+        std::fprintf(stderr, "koi-engine: could not start %s.\n", path_text.c_str());
+    }
+    return -1;
+}
+
+#else
+
+int launch_variant(const std::filesystem::path&, CpuVariant, bool) noexcept {
+    return -1;
+}
+
+#endif // platform launch
 
 } // namespace
 
@@ -181,6 +197,7 @@ std::optional<CpuVariant> parse_cpu_variant(std::string_view text) noexcept {
 }
 
 std::string_view cpu_variant_executable_name(CpuVariant variant) noexcept {
+#ifdef _WIN32
     switch (variant) {
     case CpuVariant::generic:
         return "koi-engine.exe";
@@ -190,6 +207,17 @@ std::string_view cpu_variant_executable_name(CpuVariant variant) noexcept {
         return "koi-engine-avx512.exe";
     }
     return "koi-engine.exe";
+#else
+    switch (variant) {
+    case CpuVariant::generic:
+        return "koi-engine";
+    case CpuVariant::avx2:
+        return "koi-engine-avx2";
+    case CpuVariant::avx512:
+        return "koi-engine-avx512";
+    }
+    return "koi-engine";
+#endif
 }
 
 CpuVariant choose_cpu_variant(bool avx512_supported, bool avx2_supported,
@@ -221,11 +249,11 @@ CpuVariant choose_cpu_variant(bool avx512_supported, bool avx2_supported,
 }
 
 int run_cpu_selector() noexcept {
-#ifdef _WIN32
-    const std::filesystem::path directory = executable_directory();
-    if (directory.empty()) {
+    const std::filesystem::path executable = current_executable_path();
+    if (executable.empty()) {
         return -1;
     }
+    const std::filesystem::path directory = executable.parent_path();
 
     std::optional<CpuVariant> forced;
     if (const char* text = std::getenv("KOI_CPU_VARIANT"); text != nullptr && *text != '\0') {
@@ -247,9 +275,6 @@ int run_cpu_selector() noexcept {
         return -1;
     }
     return launch_variant(directory, chosen, forced.has_value());
-#else
-    return -1;
-#endif
 }
 
 } // namespace koi

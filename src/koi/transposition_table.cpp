@@ -16,6 +16,8 @@
 #define NOMINMAX
 #endif
 #include <windows.h>
+#elif defined(__linux__)
+#include <sys/sysinfo.h>
 #endif
 
 #if defined(_MSC_VER) && (defined(_M_X64) || defined(_M_IX86))
@@ -71,6 +73,17 @@ HashMemorySnapshot default_memory_snapshot() noexcept {
     status.dwLength = sizeof(status);
     if (GlobalMemoryStatusEx(&status) != 0) {
         return HashMemorySnapshot{status.ullTotalPhys, status.ullAvailPhys, status.ullAvailPageFile};
+    }
+#elif defined(__linux__)
+    struct sysinfo status {};
+    if (::sysinfo(&status) == 0) {
+        const std::uint64_t unit = status.mem_unit != 0 ? status.mem_unit : 1;
+        const std::uint64_t total = static_cast<std::uint64_t>(status.totalram) * unit;
+        const std::uint64_t available = static_cast<std::uint64_t>(status.freeram) * unit;
+        const std::uint64_t commit = (static_cast<std::uint64_t>(status.freeram) +
+                                      static_cast<std::uint64_t>(status.totalswap)) *
+                                     unit;
+        return HashMemorySnapshot{total, available, commit};
     }
 #endif
     return {};

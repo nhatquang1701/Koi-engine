@@ -25,6 +25,11 @@ bool cpu_supports_avx2() noexcept {
     int extended_features[4]{};
     __cpuidex(extended_features, 7, 0);
     return (extended_features[1] & (1 << 5)) != 0;
+#elif defined(__GNUC__) || defined(__clang__)
+    // GCC and Clang probe the CPU (and the OS XSAVE state) through libgcc's
+    // runtime CPU model, which already accounts for the XCR0 bits the AVX
+    // instructions need.
+    return __builtin_cpu_supports("avx2");
 #else
     return false;
 #endif
@@ -59,6 +64,10 @@ bool cpu_supports_avx512() noexcept {
                          (1 << kAvx512ConflictDetection) | (1 << kAvx512ByteWord) |
                          (1 << kAvx512VectorLength);
     return (extended_features[1] & required) == required;
+#elif defined(__GNUC__) || defined(__clang__)
+    return __builtin_cpu_supports("avx512f") && __builtin_cpu_supports("avx512bw") &&
+           __builtin_cpu_supports("avx512cd") && __builtin_cpu_supports("avx512dq") &&
+           __builtin_cpu_supports("avx512vl");
 #else
     return false;
 #endif

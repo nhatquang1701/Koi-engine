@@ -1,4 +1,3 @@
-#include <array>
 #include <cstdlib>
 #include <filesystem>
 #include <iostream>
@@ -6,30 +5,42 @@
 #include <optional>
 #include <utility>
 
-#ifdef _WIN32
-#define NOMINMAX
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
+#if defined(__linux__)
+#include <pthread.h>
 #endif
 
 #include "koi/classical_evaluator.hpp"
 #include "koi/cpu_features.hpp"
 #include "koi/cpu_variant.hpp"
+#include "koi/executable_path.hpp"
 #include "koi/nnue.hpp"
 #include "koi/search_service.hpp"
 #include "koi/uci_controller.hpp"
 
 namespace {
 
-std::filesystem::path executable_directory(int argc, char* argv[]) {
-#ifdef _WIN32
-    std::array<wchar_t, 32'768> module_path{};
-    const DWORD length = ::GetModuleFileNameW(nullptr, module_path.data(),
-                                              static_cast<DWORD>(module_path.size()));
-    if (length != 0 && length < module_path.size()) {
-        return std::filesystem::path(std::wstring_view(module_path.data(), length)).parent_path();
+#if defined(__linux__) && defined(__GLIBC__)
+// The Windows build links with a 16 MiB stack reserve that worker threads
+// inherit.  glibc derives new thread stacks from RLIMIT_STACK (8 MiB by
+// default) and ignores the linker's PT_GNU_STACK size, so raise the process
+// default before any search thread exists; deep tactical lines rely on it.
+void configure_worker_stack() noexcept {
+    pthread_attr_t attributes;
+    if (pthread_getattr_default_np(&attributes) != 0) {
+        return;
     }
+    if (pthread_attr_setstacksize(&attributes, 16U * 1024U * 1024U) == 0) {
+        (void)pthread_setattr_default_np(&attributes);
+    }
+    pthread_attr_destroy(&attributes);
+}
 #endif
+
+std::filesystem::path executable_directory(int argc, char* argv[]) {
+    const std::filesystem::path module_path = koi::current_executable_path();
+    if (!module_path.empty()) {
+        return module_path.parent_path();
+    }
 
     std::error_code path_error;
     if (argc > 0) {
@@ -44,6 +55,9 @@ std::filesystem::path executable_directory(int argc, char* argv[]) {
 } // namespace
 
 int main(int argc, char* argv[]) {
+#if defined(__linux__) && defined(__GLIBC__)
+    configure_worker_stack();
+#endif
 #if defined(KOI_CPU_SELECTOR)
     // The baseline build runs on any x64 CPU. When a faster sibling executable
     // sits next to this binary and the host supports it, re-exec through that
@@ -54,13 +68,13 @@ int main(int argc, char* argv[]) {
         return selector_exit;
     }
 #endif
-#if defined(NDEBUG) && defined(_MSC_VER) && defined(KOI_CPU_REQUIRES_AVX512)
+#if defined(NDEBUG) && defined(KOI_CPU_REQUIRES_AVX512)
     if (!koi::cpu_supports_avx512()) {
         std::cerr << "Koi Engine Release requires an x64 CPU with AVX-512 support.\n";
         return 3;
     }
 #endif
-#if defined(NDEBUG) && defined(_MSC_VER) && defined(KOI_CPU_REQUIRES_AVX2)
+#if defined(NDEBUG) && defined(KOI_CPU_REQUIRES_AVX2)
     if (!koi::cpu_supports_avx2()) {
         std::cerr << "Koi Engine Release requires an x64 CPU with AVX2 support.\n";
         return 3;

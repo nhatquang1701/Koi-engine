@@ -592,6 +592,11 @@ UciController::~UciController() {
 
 int UciController::run() {
     for (std::string line; std::getline(input_, line);) {
+        // A GUI on Linux may send CRLF line endings; strip the carriage return
+        // so the last token of the command parses like it does on Windows.
+        if (!line.empty() && line.back() == '\r') {
+            line.pop_back();
+        }
         {
             std::lock_guard lock(output_mutex_);
             last_command_ = line;

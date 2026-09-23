@@ -198,6 +198,7 @@ set(KOI_CORE_SOURCES
     src/koi/completion_gate.cpp
     src/koi/cpu_features.cpp
     src/koi/cpu_variant.cpp
+    src/koi/executable_path.cpp
     src/koi/evaluation_features.cpp
     src/koi/game_state.cpp
     src/koi/gpu/cuda_driver.cpp
