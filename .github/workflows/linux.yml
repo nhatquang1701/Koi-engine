@@ -31,6 +31,18 @@ jobs:
             -DKOI_TEST_TIMEOUT_SECONDS=300 \
             -DPython3_EXECUTABLE="$(command -v python)"
           cmake --build build/ci-release --config Release -j 4
+      # The CPU-flavor tests depend on what the host actually supports, and the
+      # runner image changes over time, so record the flags and the AVX-512
+      # binary's own verdict before the suite runs.
+      - name: Show the host CPU features
+        run: |
+          grep -m1 '^flags' /proc/cpuinfo | tr ' ' '\n' | grep -E '^avx' | sort | tr '\n' ' '; echo
+          set +e
+          ./build/ci-release/koi-engine-avx512 </dev/null >/tmp/koi-avx512.out 2>/tmp/koi-avx512.err
+          echo "koi-engine-avx512 exit=$?"
+          cat /tmp/koi-avx512.out
+          cat /tmp/koi-avx512.err
+          set -e
       # The suite runs in four label-grouped steps so a slow or hanging group is
       # localized, the heavy search cases do not compete with the process tests,
       # and an interrupted step still leaves the earlier JUnit reports behind.
@@ -164,6 +176,17 @@ jobs:
             -DKOI_STATIC_RUNTIME=OFF -DKOI_TEST_TIMEOUT_SECONDS=300 \
             -DPython3_EXECUTABLE="$(command -v python)"
           cmake --build build/ci-release --config Release -j 4
+      # Record the host's AVX flags and the AVX-512 binary's own verdict: the
+      # gate must answer the host, not the flags the build was compiled with.
+      - name: Show the host CPU features
+        run: |
+          grep -m1 '^flags' /proc/cpuinfo | tr ' ' '\n' | grep -E '^avx' | sort | tr '\n' ' '; echo
+          set +e
+          ./build/ci-release/koi-engine-avx512 </dev/null >/tmp/koi-avx512.out 2>/tmp/koi-avx512.err
+          echo "koi-engine-avx512 exit=$?"
+          cat /tmp/koi-avx512.out
+          cat /tmp/koi-avx512.err
+          set -e
       - name: Run the unit suite
         env:
           KOI_TEST_RETRIES: "3"
