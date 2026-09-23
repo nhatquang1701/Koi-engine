@@ -36,7 +36,6 @@ if(MSVC)
         "$<$<CONFIG:Release>:/O2>"
         "$<$<CONFIG:Release>:/Ob3>"
         "$<$<CONFIG:Release>:/DNDEBUG>"
-        "$<$<CONFIG:Release>:/arch:AVX2>"
     )
     # The recursive search can legitimately descend through check, singular,
     # and quiet-forcing extensions. A 1 MiB default stack is not enough for a
@@ -64,95 +63,6 @@ target_include_directories(koi_test_support INTERFACE
 target_compile_definitions(koi_test_support INTERFACE
     KOI_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/data"
 )
-
-add_library(koi_core
-    src/koi/classical_evaluator.cpp
-    src/koi/detail/compatibility_mirror.cpp
-    src/koi/detail/attack_tables.cpp
-    src/koi/detail/evaluation_context.cpp
-    src/koi/detail/feature_state.cpp
-    src/koi/detail/root_coordinator.cpp
-    src/koi/detail/search_context.cpp
-    src/koi/detail/search_context_support.cpp
-    src/koi/detail/search_ordering_tables.cpp
-    src/koi/detail/search_runner.cpp
-    src/koi/detail/search_session.cpp
-    src/koi/completion_gate.cpp
-    src/koi/cpu_features.cpp
-    src/koi/evaluation_features.cpp
-    src/koi/game_state.cpp
-    src/koi/move.cpp
-    src/koi/move_chooser.cpp
-    src/koi/nnue.cpp
-    src/koi/opening_book.cpp
-    src/koi/perft.cpp
-    src/koi/position.cpp
-    src/koi/search_service.cpp
-    src/koi/search_ordering.cpp
-    src/koi/static_exchange.cpp
-    src/koi/syzygy_tablebase.cpp
-    src/koi/strength_suite.cpp
-    src/koi/time_manager.cpp
-    src/koi/transposition_table.cpp
-    src/koi/uci_controller.cpp
-)
-
-set(KOI_MODULE_SOURCES
-    src/koi/modules/types.ixx
-    src/koi/modules/position.ixx
-    src/koi/modules/eval.ixx
-    src/koi/modules/tablebase.ixx
-    src/koi/modules/search.ixx
-    src/koi/modules/runtime.ixx
-    src/koi/modules/koi.ixx
-)
-
-# CMake 3.31+ and MSVC are required above, so named modules are a mandatory
-# part of the core target rather than an optional experimental build.
-target_sources(koi_core PUBLIC
-    FILE_SET CXX_MODULES TYPE CXX_MODULES FILES ${KOI_MODULE_SOURCES}
-)
-
-target_include_directories(koi_core PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/src
-)
-
-target_include_directories(koi_core PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/chess-library
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/fathom
-)
-
-set_source_files_properties(third_party/fathom/tbprobe.c PROPERTIES LANGUAGE CXX)
-target_sources(koi_core PRIVATE third_party/fathom/tbprobe.c)
-
-target_compile_definitions(koi_core PUBLIC
-    KOI_ENGINE_BUILD_VERSION="${PROJECT_VERSION}"
-)
-
-option(KOI_BUILD_SHADOW_DIFF
-    "Build the optional chess-library differential oracle tests" OFF)
-
-# Release and Debug binaries do not deserve the same budgets: the Debug build is
-# several times slower and the process tests launch real searches. The scale
-# defaults to 3 for Debug trees (and 1 otherwise) so that only genuine hangs
-# trip the limits instead of expected slowness; set -DKOI_TIMEOUT_SCALE=N to
-# override it explicitly.
-set(KOI_TEST_TIMEOUT_SECONDS "600" CACHE STRING
-    "Default timeout in seconds for tests without an explicit budget")
-set(KOI_TIMEOUT_SCALE "auto" CACHE STRING
-    "Multiplier applied to explicit process-test and default timeouts (auto: 3 for Debug, else 1)")
-if(KOI_TIMEOUT_SCALE STREQUAL "auto")
-    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-        set(KOI_TIMEOUT_SCALE "3")
-    else()
-        set(KOI_TIMEOUT_SCALE "1")
-    endif()
-endif()
-
-function(koi_set_timeout test_name release_seconds)
-    math(EXPR KOI_SCALED_TIMEOUT "${release_seconds} * ${KOI_TIMEOUT_SCALE}")
-    set_tests_properties(${test_name} PROPERTIES TIMEOUT ${KOI_SCALED_TIMEOUT})
-endfunction()
 
 # --- Optional GPU NNUE inference -------------------------------------------------
 # The v5 evaluation kernel is compiled to PTX by nvcc at build time and embedded
@@ -183,16 +93,131 @@ if(KOI_NVCC)
     add_custom_target(koi_gpu_ptx DEPENDS "${KOI_GPU_PTX_HEADER}")
 endif()
 
-target_sources(koi_core PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/koi/gpu/cuda_driver.cpp"
-                                "${CMAKE_CURRENT_SOURCE_DIR}/src/koi/gpu/gpu_nnue_service.cpp"
-                                "${CMAKE_CURRENT_SOURCE_DIR}/src/koi/gpu/nnue_gpu_evaluator.cpp")
-if(KOI_NVCC)
-    target_include_directories(koi_core PRIVATE "${CMAKE_BINARY_DIR}/generated")
-    add_dependencies(koi_core koi_gpu_ptx)
-    target_compile_definitions(koi_core PRIVATE KOI_GPU_INFERENCE_AVAILABLE=1)
-else()
-    target_compile_definitions(koi_core PRIVATE KOI_GPU_INFERENCE_AVAILABLE=0)
+set(KOI_CORE_SOURCES
+    src/koi/classical_evaluator.cpp
+    src/koi/detail/compatibility_mirror.cpp
+    src/koi/detail/attack_tables.cpp
+    src/koi/detail/evaluation_context.cpp
+    src/koi/detail/feature_state.cpp
+    src/koi/detail/root_coordinator.cpp
+    src/koi/detail/search_context.cpp
+    src/koi/detail/search_context_support.cpp
+    src/koi/detail/search_ordering_tables.cpp
+    src/koi/detail/search_runner.cpp
+    src/koi/detail/search_session.cpp
+    src/koi/completion_gate.cpp
+    src/koi/cpu_features.cpp
+    src/koi/cpu_variant.cpp
+    src/koi/evaluation_features.cpp
+    src/koi/game_state.cpp
+    src/koi/gpu/cuda_driver.cpp
+    src/koi/gpu/gpu_nnue_service.cpp
+    src/koi/gpu/nnue_gpu_evaluator.cpp
+    src/koi/move.cpp
+    src/koi/move_chooser.cpp
+    src/koi/nnue.cpp
+    src/koi/opening_book.cpp
+    src/koi/perft.cpp
+    src/koi/position.cpp
+    src/koi/search_service.cpp
+    src/koi/search_ordering.cpp
+    src/koi/static_exchange.cpp
+    src/koi/syzygy_tablebase.cpp
+    src/koi/strength_suite.cpp
+    src/koi/time_manager.cpp
+    src/koi/transposition_table.cpp
+    src/koi/uci_controller.cpp
+)
+
+set(KOI_MODULE_SOURCES
+    src/koi/modules/types.ixx
+    src/koi/modules/position.ixx
+    src/koi/modules/eval.ixx
+    src/koi/modules/tablebase.ixx
+    src/koi/modules/search.ixx
+    src/koi/modules/runtime.ixx
+    src/koi/modules/koi.ixx
+)
+
+# Fathom is vendored C; compiling it as C++ keeps the toolchain single-language.
+set_source_files_properties(third_party/fathom/tbprobe.c PROPERTIES LANGUAGE CXX)
+
+# Defines one static library from the shared core sources. `arch_option` is the
+# MSVC /arch flag applied in Release only (empty for the baseline variant).
+# Named modules are attached to the default koi_core target alone: no
+# implementation file imports them, so the engine variants do not need a second
+# module provider.
+function(koi_add_core_target target arch_option)
+    add_library(${target} ${KOI_CORE_SOURCES})
+    target_include_directories(${target} PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+    target_include_directories(${target} PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/third_party/chess-library
+        ${CMAKE_CURRENT_SOURCE_DIR}/third_party/fathom
+    )
+    target_sources(${target} PRIVATE third_party/fathom/tbprobe.c)
+    target_compile_definitions(${target} PUBLIC
+        KOI_ENGINE_BUILD_VERSION="${PROJECT_VERSION}"
+    )
+    if(arch_option)
+        target_compile_options(${target} PRIVATE "$<$<CONFIG:Release>:${arch_option}>")
+    endif()
+    if(KOI_NVCC)
+        target_include_directories(${target} PRIVATE "${CMAKE_BINARY_DIR}/generated")
+        add_dependencies(${target} koi_gpu_ptx)
+        target_compile_definitions(${target} PRIVATE KOI_GPU_INFERENCE_AVAILABLE=1)
+    else()
+        target_compile_definitions(${target} PRIVATE KOI_GPU_INFERENCE_AVAILABLE=0)
+    endif()
+endfunction()
+
+# koi_core is the AVX2 build used by the developer tools and every test binary.
+koi_add_core_target(koi_core "/arch:AVX2")
+
+# CMake 3.31+ and MSVC are required above, so named modules are a mandatory
+# part of the core target rather than an optional experimental build.
+target_sources(koi_core PUBLIC
+    FILE_SET CXX_MODULES TYPE CXX_MODULES FILES ${KOI_MODULE_SOURCES}
+)
+
+# koi_core_avx512 backs koi-engine-avx512.exe.
+koi_add_core_target(koi_core_avx512 "/arch:AVX512")
+
+# koi_core_generic backs the baseline koi-engine.exe that runs on any x64 CPU.
+# Fathom's vendored popcount selects `_mm_popcnt_u64` unconditionally on MSVC
+# x64, so the baseline build asks for its software fallback; the standard
+# library's own std::popcount/countr_zero already dispatch on __isa_available.
+koi_add_core_target(koi_core_generic "")
+target_compile_definitions(koi_core_generic PRIVATE TB_NO_HW_POP_COUNT)
+
+option(KOI_BUILD_SHADOW_DIFF
+    "Build the optional chess-library differential oracle tests" OFF)
+
+# Release and Debug binaries do not deserve the same budgets: the Debug build is
+# several times slower and the process tests launch real searches. The scale
+# defaults to 3 for Debug trees (and 1 otherwise) so that only genuine hangs
+# trip the limits instead of expected slowness; set -DKOI_TIMEOUT_SCALE=N to
+# override it explicitly.
+set(KOI_TEST_TIMEOUT_SECONDS "600" CACHE STRING
+    "Default timeout in seconds for tests without an explicit budget")
+set(KOI_TIMEOUT_SCALE "auto" CACHE STRING
+    "Multiplier applied to explicit process-test and default timeouts (auto: 3 for Debug, else 1)")
+if(KOI_TIMEOUT_SCALE STREQUAL "auto")
+    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+        set(KOI_TIMEOUT_SCALE "3")
+    else()
+        set(KOI_TIMEOUT_SCALE "1")
+    endif()
 endif()
+
+function(koi_set_timeout test_name release_seconds)
+    math(EXPR KOI_SCALED_TIMEOUT "${release_seconds} * ${KOI_TIMEOUT_SCALE}")
+    set_tests_properties(${test_name} PROPERTIES TIMEOUT ${KOI_SCALED_TIMEOUT})
+endfunction()
+
+# The GPU PTX generation and the per-core GPU wiring live with the core targets
+# above; the probe and parity test below reuse KOI_NVCC and the generated header.
 
 add_executable(koi_gpu_probe "${CMAKE_CURRENT_SOURCE_DIR}/tools/engine/koi_gpu_probe.cpp")
 target_link_libraries(koi_gpu_probe PRIVATE koi_core)
@@ -485,12 +510,32 @@ add_executable(koi_eval_features
 target_link_libraries(koi_eval_features PRIVATE koi_core)
 set_target_properties(koi_eval_features PROPERTIES OUTPUT_NAME "koi-eval-features")
 
+# Three engine flavors: the baseline `koi-engine.exe` selects the best sibling
+# at startup, while the AVX2/AVX-512 binaries gate themselves when launched
+# directly on a CPU that cannot execute them.
 add_executable(koi_engine
     src/main.cpp
 )
 
-target_link_libraries(koi_engine PRIVATE koi_core)
+target_link_libraries(koi_engine PRIVATE koi_core_generic)
+target_compile_definitions(koi_engine PRIVATE KOI_CPU_SELECTOR=1)
 set_target_properties(koi_engine PROPERTIES OUTPUT_NAME "koi-engine")
+
+add_executable(koi_engine_avx2
+    src/main.cpp
+)
+
+target_link_libraries(koi_engine_avx2 PRIVATE koi_core)
+target_compile_definitions(koi_engine_avx2 PRIVATE KOI_CPU_REQUIRES_AVX2=1)
+set_target_properties(koi_engine_avx2 PROPERTIES OUTPUT_NAME "koi-engine-avx2")
+
+add_executable(koi_engine_avx512
+    src/main.cpp
+)
+
+target_link_libraries(koi_engine_avx512 PRIVATE koi_core_avx512)
+target_compile_definitions(koi_engine_avx512 PRIVATE KOI_CPU_REQUIRES_AVX512=1)
+set_target_properties(koi_engine_avx512 PROPERTIES OUTPUT_NAME "koi-engine-avx512")
 
 # Every C++ test binary shares the assertion/fixture helpers. The optional
 # shadow-diff oracle joins the list only when it is part of the build.

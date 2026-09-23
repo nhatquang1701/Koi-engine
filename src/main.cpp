@@ -14,6 +14,7 @@
 
 #include "koi/classical_evaluator.hpp"
 #include "koi/cpu_features.hpp"
+#include "koi/cpu_variant.hpp"
 #include "koi/nnue.hpp"
 #include "koi/search_service.hpp"
 #include "koi/uci_controller.hpp"
@@ -43,7 +44,23 @@ std::filesystem::path executable_directory(int argc, char* argv[]) {
 } // namespace
 
 int main(int argc, char* argv[]) {
-#if defined(NDEBUG) && defined(_MSC_VER)
+#if defined(KOI_CPU_SELECTOR)
+    // The baseline build runs on any x64 CPU. When a faster sibling executable
+    // sits next to this binary and the host supports it, re-exec through that
+    // binary so the AVX2 or AVX-512 code paths are used without asking the user
+    // to pick a flavor. A missing or unstartable sibling keeps this process.
+    const int selector_exit = koi::run_cpu_selector();
+    if (selector_exit >= 0) {
+        return selector_exit;
+    }
+#endif
+#if defined(NDEBUG) && defined(_MSC_VER) && defined(KOI_CPU_REQUIRES_AVX512)
+    if (!koi::cpu_supports_avx512()) {
+        std::cerr << "Koi Engine Release requires an x64 CPU with AVX-512 support.\n";
+        return 3;
+    }
+#endif
+#if defined(NDEBUG) && defined(_MSC_VER) && defined(KOI_CPU_REQUIRES_AVX2)
     if (!koi::cpu_supports_avx2()) {
         std::cerr << "Koi Engine Release requires an x64 CPU with AVX2 support.\n";
         return 3;
