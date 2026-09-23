@@ -13,6 +13,7 @@
 #include "koi/game_state.hpp"
 #include "koi/gpu/gpu_nnue_service.hpp"
 #include "koi/gpu/nnue_gpu_evaluator.hpp"
+#include "koi/gpu/ptx_variant.hpp"
 #include "koi/nnue.hpp"
 #include "koi_test_support.hpp"
 
@@ -221,13 +222,47 @@ void test_concurrent_batch_requests_keep_their_own_scores() {
 #endif
 }
 
+void test_ptx_variant_selection_prefers_the_newest_supported_module() {
+    // PTX JITs forward only, so a device runs the newest embedded module whose
+    // compute capability does not exceed its own.  This case needs no GPU and
+    // runs in every build, including the CPU-only ones.
+    constexpr std::array<koi::gpu::NnueV5PtxVariant, 5> variants{{
+        {6, 1, "sm61"},
+        {7, 5, "sm75"},
+        {8, 6, "sm86"},
+        {8, 9, "sm89"},
+        {12, 0, "sm120"},
+    }};
+    koi::test::require(koi::gpu::select_ptx_variant(variants, 6, 1) == 0,
+                       "sm_61 must select the Pascal module");
+    koi::test::require(koi::gpu::select_ptx_variant(variants, 7, 5) == 1,
+                       "sm_75 must select the Turing module");
+    koi::test::require(koi::gpu::select_ptx_variant(variants, 8, 0) == 1,
+                       "sm_80 must JIT the newest module at or below it");
+    koi::test::require(koi::gpu::select_ptx_variant(variants, 8, 6) == 2,
+                       "sm_86 must select the Ampere module");
+    koi::test::require(koi::gpu::select_ptx_variant(variants, 8, 9) == 3,
+                       "sm_89 must select the Ada module");
+    koi::test::require(koi::gpu::select_ptx_variant(variants, 9, 0) == 3,
+                       "sm_90 must JIT the newest module at or below it");
+    koi::test::require(koi::gpu::select_ptx_variant(variants, 12, 0) == 4,
+                       "sm_120 must select the Blackwell module");
+    koi::test::require(koi::gpu::select_ptx_variant(variants, 12, 1) == 4,
+                       "a newer minor must still use the newest module at or below it");
+    koi::test::require(koi::gpu::select_ptx_variant(variants, 5, 2) == -1,
+                       "a device older than every module must fall back to the CPU");
+    koi::test::require(koi::gpu::select_ptx_variant(variants, 6, 0) == -1,
+                       "a device just below the oldest module must fall back to the CPU");
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
-    const std::array<koi::test::TestCase, 3> tests{{
+    const std::array<koi::test::TestCase, 4> tests{{
         {"GPU NNUE matches CPU scalar", test_gpu_matches_cpu_scalar},
         {"GPU NNUE batch sizes agree", test_gpu_matches_cpu_across_batch_sizes},
         {"GPU NNUE concurrent requests", test_concurrent_batch_requests_keep_their_own_scores},
+        {"GPU NNUE PTX variant selection", test_ptx_variant_selection_prefers_the_newest_supported_module},
     }};
     return koi::test::run_tests(tests, argc, argv);
 }

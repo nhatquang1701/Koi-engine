@@ -333,6 +333,14 @@ target_link_libraries(koi_cpu_features_tests PRIVATE koi_core)
 
 add_test(NAME koi_cpu_features_tests COMMAND koi_cpu_features_tests)
 
+add_executable(koi_cpu_variant_tests
+    tests/unit/runtime/cpu_variant_tests.cpp
+)
+
+target_link_libraries(koi_cpu_variant_tests PRIVATE koi_core)
+
+add_test(NAME koi_cpu_variant_tests COMMAND koi_cpu_variant_tests)
+
 add_executable(koi_module_tests
     tests/unit/core/koi_module_tests.cpp
 )
@@ -583,6 +591,7 @@ set(KOI_TEST_SUPPORT_TARGETS
     evaluation_architecture_tests
     nnue_boundary_tests
     koi_cpu_features_tests
+    koi_cpu_variant_tests
     koi_module_tests
     syzygy_tablebase_tests
     koi_rules_tests
@@ -624,6 +633,17 @@ add_test(
 )
 
 koi_set_timeout(koi_engine_process 60)
+
+add_test(
+    NAME koi_engine_variant_process
+    COMMAND ${POWERSHELL_EXECUTABLE} -NoProfile -ExecutionPolicy Bypass -File
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/uci/engine_variant_process_test.ps1"
+            -EnginePath "$<TARGET_FILE:koi_engine>"
+            -Avx2EnginePath "$<TARGET_FILE:koi_engine_avx2>"
+            -Avx512EnginePath "$<TARGET_FILE:koi_engine_avx512>"
+)
+
+koi_set_timeout(koi_engine_variant_process 60)
 
 add_test(
     NAME koi_engine_en_croissant_process
@@ -876,7 +896,7 @@ endif()
 # `ctest -j` run, and RUN_SERIAL protects the one test that writes into the
 # build tree next to the engine binary.
 set_tests_properties(
-    koi_core_tests koi_cpu_features_tests koi_module_tests syzygy_tablebase_tests
+    koi_core_tests koi_cpu_features_tests koi_cpu_variant_tests koi_module_tests syzygy_tablebase_tests
     koi_rules_tests native_rule_state_tests opening_book_tests completion_gate_tests
     search_ordering_tests search_architecture_tests search_policy_tests
     search_runtime_tests static_exchange_tests time_manager_tests perft_tests
@@ -901,7 +921,7 @@ set_tests_properties(
 )
 set_tests_properties(koi_strength_tests PROPERTIES LABELS "unit;search;heavy")
 set_tests_properties(koi_replay_tests PROPERTIES LABELS "integration;tools")
-set_tests_properties(koi_engine_process koi_engine_en_croissant_process
+set_tests_properties(koi_engine_process koi_engine_variant_process koi_engine_en_croissant_process
     PROPERTIES LABELS "process;uci")
 set_tests_properties(koi_engine_process PROPERTIES RUN_SERIAL TRUE)
 set_tests_properties(koi_engine_time_safety_process
