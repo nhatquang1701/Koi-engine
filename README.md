@@ -1,6 +1,6 @@
 # Koi Engine
 
-Koi Engine is a Windows x64 UCI chess engine for standard chess. It is
+Koi Engine is a Windows x64 and Linux x86-64 UCI chess engine for standard chess. It is
 written in C++26 and is documented and process-tested against En Croissant as
 the primary GUI workflow. It uses deterministic iterative-deepening alpha-beta search
 with a classical evaluator, an opt-in Koi-native NNUE pipeline (training
@@ -109,13 +109,26 @@ histories across helper threads remain deliberately future work.
 
 ## Build prerequisites
 
-- A C++26-capable x64 MSVC toolchain (the current CMake configuration selects
+On Windows:
+
+- A C++26-capable x64 MSVC toolchain (the CMake configuration selects
   Visual Studio's `/std:c++latest` compiler mode). Run CMake from an x64
   Native Tools Command Prompt or x64 Developer PowerShell for Visual Studio,
-  so `cl.exe` is selected; the currently available MinGW/GCC/Clang toolchains
-  do not meet the C++26 requirement.
+  so `cl.exe` is selected; MinGW/GCC/Clang are not supported on Windows.
 - CMake 3.31 or newer.
 - Ninja.
+
+On Linux (x86-64 only):
+
+- GCC 14+ or Clang 18+ (the CMake configuration requires one of the two and
+  selects `-std=c++26` / `-std=c++2c`).
+- CMake 3.31 or newer. Distributions such as Ubuntu 24.04 ship an older CMake,
+  so install a newer one first, for example with
+  `python3 -m pip install --upgrade cmake`, `pipx install cmake`, or the
+  Kitware APT repository.
+- Ninja (required for the C++26 named-module build) and a pthreads libc.
+- Optional: `pwsh` for the PowerShell process tests and Python 3 for the
+  Python tooling tests.
 
 From an x64 Visual Studio developer shell in the repository root:
 
@@ -125,8 +138,25 @@ cmake --build build\release --config Release
 ctest --test-dir build\release -C Release -j 8 --output-on-failure
 ```
 
+On Linux the equivalent commands use the system compiler; substitute
+`clang-18`/`clang++-18` for the Clang build:
+
+```bash
+cmake -S . -B build/release -G Ninja -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_C_COMPILER=gcc-14 -DCMAKE_CXX_COMPILER=g++-14
+cmake --build build/release --config Release
+ctest --test-dir build/release -C Release -j 8 --output-on-failure
+```
+
+C++26 named modules are auto-detected: they are built with MSVC, Clang 18+,
+and GCC 14+, and the CMake option `KOI_BUILD_MODULES=OFF` skips them (and the
+module test) on compilers where they are not usable. The Linux build links
+libstdc++/libgcc statically by default for a portable binary; pass
+`-DKOI_STATIC_RUNTIME=OFF` to link the system runtime instead.
+
 For a Debug build, substitute `build\debug` and `Debug` in those commands. The
-Release build produces three engine executables in `build\release`:
+Release build produces three engine executables in `build\release`
+(`build/release` on Linux, where they carry no `.exe` suffix):
 
 - `koi-engine.exe` — the baseline build and the single entry point for GUIs and
   scripts. It starts the fastest sibling this CPU supports
@@ -139,10 +169,11 @@ Release build produces three engine executables in `build\release`:
 Each optimized sibling checks the CPU at startup and exits with code 3 and a
 clear message instead of executing an unsupported instruction. Set
 `KOI_CPU_VARIANT=generic`, `avx2`, or `avx512` to force one build (`auto` and
-unknown values keep the automatic behavior). The selector launches the sibling
-as a child process, forwards its exit code, and a job object kills the child if
-the parent disappears. All other tools (`koi-bench`, `koi-replay`, `koi-perft`,
-`koi-eval-features`, `koi-gpu-probe`) are AVX2 builds.
+unknown values keep the automatic behavior). On Windows the selector launches
+the sibling as a child process, forwards its exit code, and a job object kills
+the child if the parent disappears; on Linux it `execv`s the sibling so the
+process image is replaced. All other tools (`koi-bench`, `koi-replay`,
+`koi-perft`, `koi-eval-features`, `koi-gpu-probe`) are AVX2 builds.
 
 For an independently reproducible release gate, run the checked-in harness from
 an x64 Visual Studio developer shell. It configures and builds fresh canonical
@@ -534,7 +565,9 @@ continues to evaluate standard FIDE chess.
 The default local configuration with Python 3 registers 66 CTest tests
 (`KOI_BUILD_SHADOW_DIFF=OFF`); enabling the shadow-diff oracle adds
 `koi_shadow_diff_tests`, and a local `cutechess-cli.exe` adds the optional
-stability smoke, so the count varies with those optional pieces. `koi_search_tests`, the heaviest suite, is
+stability smoke, so the count varies with those optional pieces. Continuous
+integration runs the suite on Windows (`.github/workflows/windows.yml`) and on
+Linux with GCC 14 and Clang 18 (`.github/workflows/linux.yml`). `koi_search_tests`, the heaviest suite, is
 registered as four shards, every test carries labels (`unit`, `integration`,
 `process`, `python`, `heavy`, and focused sub-labels), and the whole suite runs
 in parallel (`ctest -j`; `tools/test/run_tests.ps1` builds, runs it with JUnit
@@ -790,10 +823,10 @@ protocol clean. Leave this option disabled for normal release use.
 
 ## Register in En Croissant (primary)
 
-1. Build the Windows x64 Release target and resolve the absolute path to
-   `build\release\koi-engine.exe` (or the executable in your chosen build
-   directory).
-2. In En Croissant, add a UCI engine and select that `koi-engine.exe` path.
+1. Build the Release target and resolve the absolute path to
+   `build\release\koi-engine.exe` (`build/release/koi-engine` on Linux) — or
+   the executable in your chosen build directory.
+2. In En Croissant, add a UCI engine and select that `koi-engine` path.
    Keep the engine's working directory beside the executable when configuring
    the engine so portable relative assets resolve predictably.
 3. If using the opening book, place the user-supplied licensed `book.bin` in
@@ -916,7 +949,7 @@ Before registering it, check the process transcript: stdout should contain
 only valid UCI responses, with no logging or diagnostics mixed into it. For
 the smoke test, also confirm that stderr is empty for a valid transcript. If
 Lucas Chess cannot start the engine, verify the executable path, that the
-Windows x64 build exists, and that the process can complete the `uci` / `isready`
+Release build exists, and that the process can complete the `uci` / `isready`
 handshake from PowerShell.
 
 For final Lucas acceptance, play at least one short standard game after the

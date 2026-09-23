@@ -23,6 +23,14 @@ The checked-in fixtures are under `tests/data/games`, `tests/data/openings`,
 and `tests/data/positions`. Stockfish and other installed dependencies may be
 selected explicitly; they are never copied into generated report directories.
 
+The tooling runs on Windows and Linux. Python tools use the in-tree
+`koi_chess` package, PowerShell tools run under `pwsh`, and binary names pick
+up the platform suffix automatically (`.exe` on Windows, no suffix on Linux).
+The Studio GUI starts from `Koi NNUE Studio.cmd` on Windows and
+`./koi-nnue-studio.sh` on Linux. `tools/build/package_release.ps1` writes the
+Windows `.zip` or, on Linux, the portable `koi-engine-v1.1-linux-x86_64.tar.gz`
+built in an Ubuntu 22.04 container by CI.
+
 ## Curating legacy evidence
 
 `tools/build/curate_artifacts.ps1` is a one-time, allowlisted importer for

@@ -19,14 +19,25 @@ unique (GUID or process-unique) name so the suite is safe under `ctest -j`.
 
 ## Running the suite
 
-Configure and build a Release tree (from an x64 Visual Studio developer shell),
-then run CTest, preferably in parallel:
+Configure and build a Release tree (from an x64 Visual Studio developer shell
+on Windows, or with the system GCC 14+/Clang 18+ on Linux), then run CTest,
+preferably in parallel:
 
 ```powershell
 cmake -S . -B build\release -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=cl
 cmake --build build\release --config Release
 ctest --test-dir build\release -C Release -j 8 --output-on-failure
 ```
+
+```bash
+cmake -S . -B build/release -G Ninja -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_C_COMPILER=gcc-14 -DCMAKE_CXX_COMPILER=g++-14
+cmake --build build/release --config Release
+ctest --test-dir build/release -C Release -j 8 --output-on-failure
+```
+
+The PowerShell process tests are registered only when `pwsh` is found; the C++
+and Python suites are registered on both platforms.
 
 `tools/test/run_tests.ps1` wraps that flow (build + parallel CTest + JUnit and
 `LastTest.log` capture). When `cl.exe` is not on `PATH`, pass the developer
@@ -51,7 +62,9 @@ with optional dependencies:
 `koi_shadow_diff_tests` requires `-DKOI_BUILD_SHADOW_DIFF=ON`, and
 `cutechess_stability_smoke` is only registered when `cutechess-cli.exe` is
 found. `cutechess_stability_diagnostics` is always registered and exercises the
-fabricated-engine harness.
+fabricated-engine harness. The Windows-only packaging and stability tests are
+registered only on Windows, and `koi_module_tests` is registered only when
+C++26 named modules are built (pass `-DKOI_BUILD_MODULES=OFF` to skip them).
 
 The previously monolithic `koi_search_tests` CTest entry is now four shards
 (`koi_search_tests_1of4` … `koi_search_tests_4of4`) so the heaviest suite
@@ -288,3 +301,14 @@ cancellation):
   3x scaled timeouts.
 - `shadow-diff` builds with `-DKOI_BUILD_SHADOW_DIFF=ON` and runs
   `koi_shadow_diff_tests`.
+
+`.github/workflows/linux.yml` runs the same suite on Linux:
+
+- `linux-gcc` and `linux-clang` build Release with GCC 14 and Clang 18 and run
+  the full CTest suite.
+- `linux-modules-off` configures with `-DKOI_BUILD_MODULES=OFF`, asserts that
+  the module test is not registered, and runs the unit subset.
+- `linux-tarball` builds inside an Ubuntu 22.04 container, packages the
+  portable `koi-engine-v1.1-linux-x86_64.tar.gz` with
+  `tools/build/package_release.ps1`, and runs UCI smokes with the automatic and
+  `KOI_CPU_VARIANT=generic` variants.
