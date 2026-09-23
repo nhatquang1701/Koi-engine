@@ -4,10 +4,13 @@
 
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
+#include <span>
 #include <string>
 #include <vector>
 
 #include "koi/gpu/cuda_driver.hpp"
+#include "koi/gpu/ptx_variant.hpp"
 
 #if KOI_GPU_INFERENCE_AVAILABLE
 #include "koi_nnue_v5_ptx.hpp"
@@ -63,9 +66,47 @@ int main() {
                 info.name.c_str(), info.compute_major, info.compute_minor,
                 info.driver_version);
 
+    const auto variants = std::span<const koi::gpu::NnueV5PtxVariant>(
+        koi::gpu::kNnueV5PtxVariants,
+        static_cast<std::size_t>(koi::gpu::kNnueV5PtxVariantCount));
+    std::string embedded;
+    for (const koi::gpu::NnueV5PtxVariant& variant : variants) {
+        embedded += " sm_";
+        embedded += std::to_string(variant.major);
+        embedded += std::to_string(variant.minor);
+    }
+    std::printf("gpu-probe: embedded PTX:%s\n", embedded.c_str());
+
+    int variant_index = -1;
+    if (const char* forced = std::getenv("KOI_GPU_PTX_ARCH");
+        forced != nullptr && *forced != '\0') {
+        const long wanted = std::strtol(forced, nullptr, 10);
+        for (std::size_t index = 0; index < variants.size(); ++index) {
+            if (variants[index].major * 10 + variants[index].minor == wanted) {
+                variant_index = static_cast<int>(index);
+                break;
+            }
+        }
+        if (variant_index < 0) {
+            std::printf("gpu-probe: KOI_GPU_PTX_ARCH=%s names no embedded variant\n", forced);
+            return 3;
+        }
+    } else {
+        variant_index =
+            koi::gpu::select_ptx_variant(variants, info.compute_major, info.compute_minor);
+        if (variant_index < 0) {
+            std::printf("gpu-probe: no embedded PTX variant supports sm_%d%d\n",
+                        info.compute_major, info.compute_minor);
+            return 3;
+        }
+    }
+    const koi::gpu::NnueV5PtxVariant& chosen =
+        variants[static_cast<std::size_t>(variant_index)];
+    std::printf("gpu-probe: PTX variant sm_%d%d\n", chosen.major, chosen.minor);
+
     const auto ptx = std::span<const std::uint8_t>(
-        reinterpret_cast<const std::uint8_t*>(koi::gpu::kNnueV5PtxSource),
-        std::char_traits<char>::length(koi::gpu::kNnueV5PtxSource));
+        reinterpret_cast<const std::uint8_t*>(chosen.source),
+        std::char_traits<char>::length(chosen.source));
     if (!driver.load_module(ptx, error)) {
         std::printf("gpu-probe: module load failed: %s\n", error.c_str());
         return 3;

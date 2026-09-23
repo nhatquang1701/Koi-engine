@@ -1,10 +1,12 @@
 #include "koi/gpu/gpu_nnue_service.hpp"
 
 #include <algorithm>
+#include <cstdlib>
 #include <vector>
 
 #include "koi/game_state.hpp"
 #include "koi/gpu/cuda_driver.hpp"
+#include "koi/gpu/ptx_variant.hpp"
 #include "koi/nnue.hpp"
 
 #if KOI_GPU_INFERENCE_AVAILABLE
@@ -114,9 +116,39 @@ std::unique_ptr<GpuNnueService> GpuNnueService::create(const NnueNetwork& networ
     if (!impl.driver.available()) {
         return nullptr;
     }
+    // Pick the newest embedded PTX module the device can run.  PTX is only
+    // forward compatible, so a device older than the oldest module has no GPU
+    // path; KOI_GPU_PTX_ARCH forces a specific module for diagnostics.
+    const auto variants = std::span<const NnueV5PtxVariant>(
+        kNnueV5PtxVariants, static_cast<std::size_t>(kNnueV5PtxVariantCount));
+    int variant_index = -1;
+    if (const char* forced = std::getenv("KOI_GPU_PTX_ARCH");
+        forced != nullptr && *forced != '\0') {
+        const long wanted = std::strtol(forced, nullptr, 10);
+        for (std::size_t index = 0; index < variants.size(); ++index) {
+            if (variants[index].major * 10 + variants[index].minor == wanted) {
+                variant_index = static_cast<int>(index);
+                break;
+            }
+        }
+        if (variant_index < 0) {
+            error = "KOI_GPU_PTX_ARCH names no embedded PTX variant";
+            return nullptr;
+        }
+    } else {
+        const CudaDeviceInfo& info = impl.driver.device_info();
+        variant_index = select_ptx_variant(variants, info.compute_major, info.compute_minor);
+        if (variant_index < 0) {
+            error = "no embedded PTX variant supports sm_" +
+                std::to_string(info.compute_major) + std::to_string(info.compute_minor) +
+                " (the oldest embedded variant is sm_61)";
+            return nullptr;
+        }
+    }
+    const NnueV5PtxVariant& chosen = variants[static_cast<std::size_t>(variant_index)];
     const auto ptx = std::span<const std::uint8_t>(
-        reinterpret_cast<const std::uint8_t*>(kNnueV5PtxSource),
-        std::char_traits<char>::length(kNnueV5PtxSource));
+        reinterpret_cast<const std::uint8_t*>(chosen.source),
+        std::char_traits<char>::length(chosen.source));
     if (!impl.driver.load_module(ptx, error) ||
         !impl.driver.module_function("koi_nnue_v5_eval", impl.kernel, error)) {
         return nullptr;
