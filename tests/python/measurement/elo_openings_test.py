@@ -6,10 +6,11 @@ from pathlib import Path
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 CORPUS_PATH = REPOSITORY_ROOT / "tests" / "data" / "openings" / "openings-curated-32.txt"
+_BINARY_SUFFIX = ".exe" if os.name == "nt" else ""
 REPLAY_CANDIDATES = (
-    REPOSITORY_ROOT / "build" / "debug" / "koi-replay.exe",
-    REPOSITORY_ROOT / "build" / "release" / "koi-replay.exe",
-    REPOSITORY_ROOT / "build" / "ci-release" / "koi-replay.exe",
+    REPOSITORY_ROOT / "build" / "debug" / f"koi-replay{_BINARY_SUFFIX}",
+    REPOSITORY_ROOT / "build" / "release" / f"koi-replay{_BINARY_SUFFIX}",
+    REPOSITORY_ROOT / "build" / "ci-release" / f"koi-replay{_BINARY_SUFFIX}",
 )
 REPLAY_TIMEOUT_SECONDS = 10
 
@@ -40,7 +41,7 @@ def replay_path():
     candidates = list(REPLAY_CANDIDATES)
     for build_root in (REPOSITORY_ROOT / "build",):
         if build_root.is_dir():
-            candidates.extend(sorted(build_root.rglob("koi-replay.exe")))
+            candidates.extend(sorted(build_root.rglob(f"koi-replay{_BINARY_SUFFIX}")))
     for candidate in candidates:
         if candidate.is_file():
             return candidate

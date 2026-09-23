@@ -6,7 +6,7 @@
 # launch / read / shutdown plumbing.  Import this module instead:
 #
 #   Import-Module ([System.IO.Path]::GetFullPath(
-#       (Join-Path $PSScriptRoot '..\..\support\UciSession.psm1'))) -Force
+#       (Join-Path $PSScriptRoot '../../support/UciSession.psm1'))) -Force
 #
 # Session objects returned by Start-UciSession expose:
 #   Process    : the System.Diagnostics.Process running the engine

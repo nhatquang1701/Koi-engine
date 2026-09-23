@@ -9,9 +9,10 @@ if (-not (Test-Path -LiteralPath $EnginePath -PathType Leaf)) {
     throw "engine executable is missing: $EnginePath"
 }
 
-$repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\..'))
-$matchScript = Join-Path $repositoryRoot 'tools\stability\uci_match.ps1'
-$openingFile = Join-Path $repositoryRoot 'tests\data\openings\openings-basic.txt'
+$repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../../..'))
+$matchScript = Join-Path $repositoryRoot 'tools/stability/uci_match.ps1'
+$openingFile = Join-Path $repositoryRoot 'tests/data/openings/openings-basic.txt'
+$binarySuffix = if ($env:OS -eq 'Windows_NT') { '.exe' } else { '' }
 if (-not (Test-Path -LiteralPath $matchScript -PathType Leaf)) {
     throw "UCI match script is missing: $matchScript"
 }
@@ -19,17 +20,17 @@ if (-not (Test-Path -LiteralPath $openingFile -PathType Leaf)) {
     throw "Opening suite is missing: $openingFile"
 }
 
-$replayPath = Join-Path (Split-Path -Parent $EnginePath) 'koi-replay.exe'
+$replayPath = Join-Path (Split-Path -Parent $EnginePath) "koi-replay$binarySuffix"
 if (-not (Test-Path -LiteralPath $replayPath -PathType Leaf)) {
     throw "replay executable is missing: $replayPath"
 }
 
-$fixturePath = Join-Path (Split-Path -Parent $EnginePath) 'uci_match_fixture.exe'
+$fixturePath = Join-Path (Split-Path -Parent $EnginePath) "uci_match_fixture$binarySuffix"
 if (-not (Test-Path -LiteralPath $fixturePath -PathType Leaf)) {
     throw "UCI match fixture executable is missing: $fixturePath"
 }
 
-Import-Module ([System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\support\MatchSupport.psm1'))) -Force
+Import-Module ([System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../../support/MatchSupport.psm1'))) -Force
 
 $PowerShellExecutable = Get-PowerShellExecutable
 

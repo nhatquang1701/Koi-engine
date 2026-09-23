@@ -1,15 +1,20 @@
 $ErrorActionPreference = 'Stop'
 
-$repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\..'))
-$workflow = Join-Path $repositoryRoot '.github\workflows\windows.yml'
+$repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../../..'))
+$workflow = Join-Path $repositoryRoot '.github/workflows/windows.yml'
+$linuxWorkflow = Join-Path $repositoryRoot '.github/workflows/linux.yml'
 $cmake = Join-Path $repositoryRoot 'CMakeLists.txt'
 if (-not (Test-Path -LiteralPath $workflow -PathType Leaf)) {
     throw "Windows CI workflow is missing: $workflow"
 }
+if (-not (Test-Path -LiteralPath $linuxWorkflow -PathType Leaf)) {
+    throw "Linux CI workflow is missing: $linuxWorkflow"
+}
 
 $content = Get-Content -LiteralPath $workflow -Raw
+$linuxContent = Get-Content -LiteralPath $linuxWorkflow -Raw
 $cmakeContent = Get-Content -LiteralPath $cmake -Raw
-$requirements = Join-Path $repositoryRoot 'tools\measurement\requirements.txt'
+$requirements = Join-Path $repositoryRoot 'tools/measurement/requirements.txt'
 if (-not (Test-Path -LiteralPath $requirements -PathType Leaf)) {
     throw "Python requirements file is missing: $requirements"
 }
@@ -30,6 +35,12 @@ function Require-CMakePattern([string]$Pattern, [string]$Description) {
 function Deny-WorkflowPattern([string]$Pattern, [string]$Description) {
     if ($content -match $Pattern) {
         throw "Windows CI workflow must not define $Description."
+    }
+}
+
+function Require-LinuxWorkflowPattern([string]$Pattern, [string]$Description) {
+    if ($linuxContent -notmatch $Pattern) {
+        throw "Linux CI workflow must define $Description."
     }
 }
 
@@ -88,3 +99,29 @@ Require-CMakePattern '(?i)project\s*\(\s*koi_engine\s+VERSION\s+1\.1\.0' 'the v1
 Require-CMakePattern '(?i)CMAKE_MSVC_RUNTIME_LIBRARY' 'the static MSVC runtime policy'
 Require-CMakePattern '(?i)FILE_SET\s+CXX_MODULES' 'the C++26 named-module source set'
 Require-CMakePattern '(?i)KOI_BUILD_SHADOW_DIFF' 'the opt-in differential test switch'
+Require-CMakePattern '(?i)elseif\s*\(\s*UNIX\s*\)' 'the x86-64 Linux platform branch'
+Require-CMakePattern '(?i)KOI_BUILD_MODULES' 'the C++26 module auto-detection switch'
+Require-CMakePattern '(?i)KOI_STATIC_RUNTIME' 'the static libstdc++/libgcc release policy'
+Require-CMakePattern '(?i)koi_arch_compile_option' 'the per-compiler architecture flag mapping'
+Require-CMakePattern '(?i)-mavx2' 'the GCC/Clang AVX2 optimization flag'
+Require-CMakePattern '(?i)-mavx512f' 'the GCC/Clang AVX-512 optimization flag'
+
+# The Linux legs: GCC, Clang, the modules-off fallback, and the portable tarball.
+Require-LinuxWorkflowPattern '(?m)^\s*runs-on:\s*ubuntu-24\.04\s*$' 'an Ubuntu runner'
+Require-LinuxWorkflowPattern '(?m)^\s{2}linux-gcc:\s*$' 'the GCC job'
+Require-LinuxWorkflowPattern '(?m)^\s{2}linux-clang:\s*$' 'the Clang job'
+Require-LinuxWorkflowPattern '(?m)^\s{2}linux-modules-off:\s*$' 'the modules-off job'
+Require-LinuxWorkflowPattern '(?m)^\s{2}linux-tarball:\s*$' 'the portable tarball job'
+Require-LinuxWorkflowPattern '(?i)g\+\+-14' 'the GCC 14 compiler'
+Require-LinuxWorkflowPattern '(?i)clang-18' 'the Clang 18 compiler'
+Require-LinuxWorkflowPattern '(?i)-DCMAKE_CXX_COMPILER=g\+\+-14' 'the GCC C++ compiler selection'
+Require-LinuxWorkflowPattern '(?i)-DCMAKE_CXX_COMPILER=clang\+\+-18' 'the Clang C++ compiler selection'
+Require-LinuxWorkflowPattern '(?i)-DKOI_BUILD_MODULES=OFF' 'the explicit modules-off configure switch'
+Require-LinuxWorkflowPattern '(?i)koi_module_tests' 'the modules-off assertion on the module test'
+Require-LinuxWorkflowPattern '(?i)ctest\s+--test-dir\s+build/ci-release\s+-C\s+Release' 'the Linux CTest invocation'
+Require-LinuxWorkflowPattern '(?i)ubuntu:22\.04' 'the Ubuntu 22.04 tarball container'
+Require-LinuxWorkflowPattern '(?i)tools/build/package_release\.ps1' 'the shared packaging script'
+Require-LinuxWorkflowPattern '(?i)koi-engine-v1\.1-linux-x86_64\.tar\.gz' 'the Linux tarball name'
+Require-LinuxWorkflowPattern '(?i)-DKOI_ENABLE_GPU_NNUE=OFF' 'the CPU-only tarball configure switch'
+Require-LinuxWorkflowPattern '(?i)KOI_CPU_VARIANT=generic' 'the forced generic UCI smoke'
+Require-LinuxWorkflowPattern '(?i)actions/upload-artifact@v5' 'test diagnostic artifact upload'

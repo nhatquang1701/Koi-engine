@@ -15,7 +15,7 @@ $TimeoutMilliseconds = if ($env:KOI_UCI_TIMEOUT_MS) {
 }
 
 Import-Module ([System.IO.Path]::GetFullPath(
-    (Join-Path $PSScriptRoot '..\..\support\UciSession.psm1'))) -Force
+    (Join-Path $PSScriptRoot '../../support/UciSession.psm1'))) -Force
 
 # Every engine process the shared session module starts is tracked there so a
 # failed assertion can never orphan a running koi-engine.exe. The trap runs on

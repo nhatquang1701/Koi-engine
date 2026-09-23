@@ -11,7 +11,7 @@ $TimeoutMilliseconds = if ($env:KOI_UCI_TIMEOUT_MS) {
 }
 $MaximumThreads = [Math]::Max(1, [Math]::Min(64, [Environment]::ProcessorCount))
 
-Import-Module ([System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\support\UciSession.psm1'))) -Force
+Import-Module ([System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../../support/UciSession.psm1'))) -Force
 
 # Every engine process the shared session module starts is tracked there so a
 # failed assertion can never orphan a running koi-engine.exe. The trap runs on
@@ -56,7 +56,7 @@ Send-UciCommand $session 'uci'
 # The handshake contract is shared with the C++ unit test through
 # tests/data/uci/handshake.txt so both layers assert the same bytes.
 $handshakeFixture = [System.IO.Path]::GetFullPath(
-    (Join-Path $PSScriptRoot '..\..\data\uci\handshake.txt'))
+    (Join-Path $PSScriptRoot '../../data/uci/handshake.txt'))
 if (-not (Test-Path -LiteralPath $handshakeFixture)) {
     throw "Missing handshake fixture: $handshakeFixture"
 }
@@ -78,6 +78,7 @@ if ((Read-UciLine $session 'initial readyok') -cne 'readyok') {
 }
 
 $bookFileName = "uci-process-book-$([guid]::NewGuid().ToString('N')).bin"
+$engineFileName = if ($env:OS -eq 'Windows_NT') { 'koi-engine.exe' } else { 'koi-engine' }
 $bookPath = Join-Path (Split-Path -Parent $EnginePath) $bookFileName
 $bookLaunchDirectory = Join-Path ([System.IO.Path]::GetTempPath()) "koi-uci-process-$([guid]::NewGuid().ToString('N'))"
 $originalPath = $env:PATH
@@ -85,8 +86,8 @@ $bookSession = $null
 try {
     Write-StartPositionBook $bookPath
     New-Item -ItemType Directory -Path $bookLaunchDirectory | Out-Null
-    $env:PATH = "$(Split-Path -Parent $EnginePath);$originalPath"
-    $bookSession = Start-UciSession -Executable 'koi-engine.exe' -WorkingDirectory $bookLaunchDirectory
+    $env:PATH = "$(Split-Path -Parent $EnginePath)$([System.IO.Path]::PathSeparator)$originalPath"
+    $bookSession = Start-UciSession -Executable $engineFileName -WorkingDirectory $bookLaunchDirectory
     Send-UciCommand $bookSession 'uci'
     foreach ($expected in $expectedHandshake) {
         if ((Read-UciLine $bookSession $expected) -cne $expected) {
@@ -99,7 +100,7 @@ try {
     Send-UciCommand $bookSession 'position startpos'
     Send-UciCommand $bookSession 'go depth 1'
     if ((Read-UciLine $bookSession 'executable-relative book marker') -cne 'info string book move e2e4 depth 0') {
-        throw 'A book beside koi-engine.exe must emit its standard marker before bestmove.'
+        throw 'A book beside the engine executable must emit its standard marker before bestmove.'
     }
     if ((Read-UciLine $bookSession 'executable-relative book bestmove') -cne 'bestmove e2e4') {
         throw 'A book hit must emit exactly the selected legal bestmove.'

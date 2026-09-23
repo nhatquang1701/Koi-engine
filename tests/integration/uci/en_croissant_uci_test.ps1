@@ -5,7 +5,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-Import-Module ([System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\support\UciSession.psm1'))) -Force
+Import-Module ([System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../../support/UciSession.psm1'))) -Force
 
 $session = Start-UciSession -Executable $EnginePath
 try {

@@ -12,14 +12,14 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\..'))
+$repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../../..'))
 if ([string]::IsNullOrWhiteSpace($OpponentPath)) {
-    $OpponentPath = Join-Path $repositoryRoot 'third_party\stockfish-19\stockfish-windows-x86-64-universal\stockfish\stockfish-windows-x86-64-universal.exe'
+    $OpponentPath = Join-Path $repositoryRoot 'third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/stockfish-windows-x86-64-universal.exe'
 }
 if ([string]::IsNullOrWhiteSpace($StabilityScript)) {
-    $StabilityScript = Join-Path $repositoryRoot 'tools\stability\cutechess_stability.ps1'
+    $StabilityScript = Join-Path $repositoryRoot 'tools/stability/cutechess_stability.ps1'
 }
-$CampaignScript = Join-Path $repositoryRoot 'tools\stability\cutechess_stability_campaign.ps1'
+$CampaignScript = Join-Path $repositoryRoot 'tools/stability/cutechess_stability_campaign.ps1'
 if (-not (Test-Path -LiteralPath $StabilityScript -PathType Leaf)) {
     throw "Cutechess stability script is missing: $StabilityScript"
 }

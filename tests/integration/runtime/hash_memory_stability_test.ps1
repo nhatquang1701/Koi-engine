@@ -5,8 +5,8 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\..'))
-$soakScript = Join-Path $repositoryRoot 'tools\stability\hash_memory_soak.ps1'
+$repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../../..'))
+$soakScript = Join-Path $repositoryRoot 'tools/stability/hash_memory_soak.ps1'
 
 # A per-run scratch directory keeps this test independent of any other soak run
 # and removes the previous "newest manifest wins" race under parallel CTest.

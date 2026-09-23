@@ -29,13 +29,20 @@ void test_parse_cpu_variant() {
 }
 
 void test_executable_names() {
-    koi::test::require(cpu_variant_executable_name(CpuVariant::generic) == "koi-engine.exe",
+    const std::string suffix =
+#if defined(_WIN32)
+        ".exe";
+#else
+        "";
+#endif
+    koi::test::require(cpu_variant_executable_name(CpuVariant::generic) ==
+                           "koi-engine" + suffix,
                        "the baseline build keeps the primary engine name");
     koi::test::require(cpu_variant_executable_name(CpuVariant::avx2) ==
-                           "koi-engine-avx2.exe",
+                           "koi-engine-avx2" + suffix,
                        "the AVX2 build must expose its own name");
     koi::test::require(cpu_variant_executable_name(CpuVariant::avx512) ==
-                           "koi-engine-avx512.exe",
+                           "koi-engine-avx512" + suffix,
                        "the AVX-512 build must expose its own name");
 }
 

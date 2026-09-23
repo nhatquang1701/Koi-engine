@@ -5,7 +5,7 @@
 # and fixture-engine plumbing:
 #
 #   Import-Module ([System.IO.Path]::GetFullPath(
-#       (Join-Path $PSScriptRoot '..\..\support\MatchSupport.psm1'))) -Force
+#       (Join-Path $PSScriptRoot '../../support/MatchSupport.psm1'))) -Force
 
 function Get-PowerShellExecutable {
     <#
@@ -29,8 +29,9 @@ function New-ScriptedUciEngine {
     .SYNOPSIS
         Copy the scripted UCI fixture next to a match and name it.
     .DESCRIPTION
-        Places $FixturePath in $Directory as "$Name.exe" and returns the
-        engine descriptor ({ path, log }) consumed by the match invocations.
+        Places $FixturePath in $Directory as "$Name.exe" on Windows and
+        "$Name" elsewhere, then returns the engine descriptor ({ path, log })
+        consumed by the match invocations.
     #>
     param(
         [Parameter(Mandatory = $true, Position = 0)]
@@ -41,7 +42,8 @@ function New-ScriptedUciEngine {
         [string]$Name
     )
 
-    $path = Join-Path $Directory "$Name.exe"
+    $binarySuffix = if ($env:OS -eq 'Windows_NT') { '.exe' } else { '' }
+    $path = Join-Path $Directory "$Name$binarySuffix"
     Copy-Item -LiteralPath $FixturePath -Destination $path
     return [pscustomobject]@{
         path = $path

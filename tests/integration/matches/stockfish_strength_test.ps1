@@ -9,11 +9,12 @@ $ErrorActionPreference = 'Stop'
 # hardcoded powershell.exe so the test works on hosts that only ship pwsh.
 $powerShellExecutable = (Get-Process -Id $PID).Path
 
-$repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\..'))
-$matchScript = Join-Path $repositoryRoot 'tools\stability\uci_match.ps1'
+$repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../../..'))
+$matchScript = Join-Path $repositoryRoot 'tools/stability/uci_match.ps1'
+$binarySuffix = if ($env:OS -eq 'Windows_NT') { '.exe' } else { '' }
 $enginePath = (Resolve-Path -LiteralPath $EnginePath).Path
-$fixturePath = Join-Path (Split-Path -Parent $enginePath) 'uci_match_fixture.exe'
-$replayPath = Join-Path (Split-Path -Parent $enginePath) 'koi-replay.exe'
+$fixturePath = Join-Path (Split-Path -Parent $enginePath) "uci_match_fixture$binarySuffix"
+$replayPath = Join-Path (Split-Path -Parent $enginePath) "koi-replay$binarySuffix"
 $defaultOutputDirectory = Join-Path ([System.IO.Path]::GetTempPath()) ('koi-task2-default-strength-' + [guid]::NewGuid().ToString('N'))
 $outputDirectory = Join-Path ([System.IO.Path]::GetTempPath()) ('koi-task2-strength-' + [guid]::NewGuid().ToString('N'))
 

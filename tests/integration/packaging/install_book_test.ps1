@@ -4,7 +4,7 @@ param()
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$installerPath = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\..\tools\build\install_book.ps1'))
+$installerPath = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../../../tools/build/install_book.ps1'))
 $failures = [System.Collections.Generic.List[string]]::new()
 
 function Assert-True {

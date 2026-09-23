@@ -181,7 +181,8 @@ class EmittedCsvTests(unittest.TestCase):
     """The real dump must satisfy the contract the tuner assumes."""
 
     def test_feature_csv_round_trip(self) -> None:
-        executable = REPO_ROOT / "build" / "release" / "koi-eval-features.exe"
+        binary_name = "koi-eval-features.exe" if sys.platform == "win32" else "koi-eval-features"
+        executable = REPO_ROOT / "build" / "release" / binary_name
         if not executable.exists():
             self.skipTest("koi-eval-features is not built")
         corpus = (

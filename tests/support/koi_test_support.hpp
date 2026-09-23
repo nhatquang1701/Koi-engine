@@ -58,6 +58,8 @@
 
 #ifdef _WIN32
 #include <process.h>
+#else
+#include <unistd.h>
 #endif
 
 // Absolute path of the test data directory, injected by CMake through the
