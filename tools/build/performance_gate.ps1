@@ -101,14 +101,14 @@ function Resolve-CanonicalPath([string]$Path) {
     return [System.IO.Path]::GetFullPath($canonicalPath)
 }
 
-$repositoryRoot = Resolve-CanonicalPath (Join-Path $PSScriptRoot '..\..')
+$repositoryRoot = Resolve-CanonicalPath (Join-Path $PSScriptRoot '../..')
 if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
-    $OutputDirectory = Join-Path $repositoryRoot ('artifacts\verification\performance-gate-' +
+    $OutputDirectory = Join-Path $repositoryRoot ('artifacts/verification/performance-gate-' +
         'koi-task5-perf-gate-' + [guid]::NewGuid().ToString('N'))
 }
 $verificationRoot = Resolve-CanonicalPath $OutputDirectory
-$artifactsRoot = Resolve-CanonicalPath (Join-Path $repositoryRoot 'artifacts\verification')
-$artifactsPrefix = $artifactsRoot.TrimEnd('\') + '\'
+$artifactsRoot = Resolve-CanonicalPath (Join-Path $repositoryRoot 'artifacts/verification')
+$artifactsPrefix = $artifactsRoot.TrimEnd('\', '/') + [System.IO.Path]::DirectorySeparatorChar
 if ($verificationRoot -ieq $artifactsRoot -or
     -not $verificationRoot.StartsWith($artifactsPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
     throw "Performance-gate output must be under repository artifacts: $verificationRoot"

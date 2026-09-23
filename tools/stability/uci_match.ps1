@@ -102,9 +102,9 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
+$repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
-    $OutputDirectory = Join-Path $repositoryRoot ('artifacts\matches\run-' +
+    $OutputDirectory = Join-Path $repositoryRoot ('artifacts/matches/run-' +
         (Get-Date).ToUniversalTime().ToString('yyyyMMdd-HHmmss-fff'))
 }
 $KoiOwnBookEnabled = $KoiOwnBook -in @('true', '1')

@@ -6,7 +6,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
+$repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $buildRoot = [System.IO.Path]::GetFullPath((Join-Path $repositoryRoot 'build'))
 $outRoot = [System.IO.Path]::GetFullPath((Join-Path $repositoryRoot 'out'))
 $canonicalBuildDirectories = @('debug', 'release', 'ci-debug', 'ci-release')

@@ -21,7 +21,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
+$repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $target = Join-Path $repositoryRoot 'Koi NNUE Studio.cmd'
 if (-not (Test-Path -LiteralPath $target -PathType Leaf)) {
     throw "Studio launcher is missing: $target"

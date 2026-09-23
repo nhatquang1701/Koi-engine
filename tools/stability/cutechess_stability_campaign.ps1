@@ -203,15 +203,15 @@ if ($MaxMoves -lt 1) { throw 'MaxMoves must be at least 1.' }
 if ($Hash -lt 1 -or $Hash -gt 4096) { throw 'Hash must be between 1 and 4096 MB.' }
 if ($Speed -lt 1 -or $Speed -gt 100) { throw 'Speed must be between 1 and 100.' }
 
-$repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
-$stabilityScript = Join-Path $repositoryRoot 'tools\stability\cutechess_stability.ps1'
+$repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
+$stabilityScript = Join-Path $repositoryRoot 'tools/stability/cutechess_stability.ps1'
 $stabilityScript = Assert-File $stabilityScript 'Stability harness'
 $koi = Assert-File $KoiPath 'Koi executable'
 $stockfish = Assert-File $StockfishPath 'Stockfish executable'
 $cutechess = Assert-File $CutechessPath 'Cutechess executable'
 
 if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
-    $OutputDirectory = Join-Path $repositoryRoot ('artifacts\stability\campaign-' +
+    $OutputDirectory = Join-Path $repositoryRoot ('artifacts/stability/campaign-' +
         (Get-Date).ToUniversalTime().ToString('yyyyMMdd-HHmmss'))
 }
 New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null

@@ -9,7 +9,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
+$repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $artifactRoot = [System.IO.Path]::GetFullPath((Join-Path $repositoryRoot 'artifacts'))
 if ([string]::IsNullOrWhiteSpace($DestinationRoot)) {
     $DestinationRoot = $artifactRoot
@@ -96,7 +96,7 @@ foreach ($selection in $selections) {
     if ($sourceItem.PSIsContainer) {
         $pruneTargets.Add($sourceItem.FullName)
         foreach ($file in Get-ChildItem -LiteralPath $sourceItem.FullName -Recurse -File) {
-            $relative = $file.FullName.Substring($sourceItem.FullName.Length).TrimStart('\')
+            $relative = $file.FullName.Substring($sourceItem.FullName.Length).TrimStart('\', '/')
             Copy-EvidenceFile $file.FullName (Join-Path $destinationPath $relative)
         }
     } else {
@@ -129,11 +129,11 @@ New-Item -ItemType Directory -Path (Split-Path -Parent $manifestPath) -Force | O
 $manifest | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $manifestPath -Encoding UTF8
 
 if ($PruneSource) {
-    $sourceRootResolved = (Resolve-Path -LiteralPath $source).Path.TrimEnd('\')
+    $sourceRootResolved = (Resolve-Path -LiteralPath $source).Path.TrimEnd('\', '/')
     foreach ($target in $pruneTargets | Sort-Object -Unique) {
-        $targetResolved = (Resolve-Path -LiteralPath $target).Path.TrimEnd('\')
+        $targetResolved = (Resolve-Path -LiteralPath $target).Path.TrimEnd('\', '/')
         if ($targetResolved -ieq $sourceRootResolved -or
-            -not $targetResolved.StartsWith($sourceRootResolved + '\', [System.StringComparison]::OrdinalIgnoreCase)) {
+            -not $targetResolved.StartsWith($sourceRootResolved + [System.IO.Path]::DirectorySeparatorChar, [System.StringComparison]::OrdinalIgnoreCase)) {
             throw "Refusing to prune outside the selected source root: $targetResolved"
         }
         Remove-Item -LiteralPath $targetResolved -Recurse -Force

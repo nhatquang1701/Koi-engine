@@ -8,14 +8,14 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
+$repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $artifactRoot = [System.IO.Path]::GetFullPath((Join-Path $repositoryRoot 'artifacts'))
 $manifestRoot = [System.IO.Path]::GetFullPath((Join-Path $artifactRoot 'manifests'))
 if ([string]::IsNullOrWhiteSpace($OutputPath)) {
     $OutputPath = Join-Path $manifestRoot 'organization-manifest.json'
 }
 $resolvedOutput = [System.IO.Path]::GetFullPath($OutputPath)
-$artifactPrefix = $artifactRoot.TrimEnd('\', '/') + '\'
+$artifactPrefix = $artifactRoot.TrimEnd('\', '/') + [System.IO.Path]::DirectorySeparatorChar
 if ($resolvedOutput -ine $artifactRoot -and
     -not $resolvedOutput.StartsWith($artifactPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
     throw "Organization manifest must be under artifacts: $resolvedOutput"

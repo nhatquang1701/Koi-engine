@@ -26,7 +26,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
+$repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 
 function Get-ExecutableHash([string]$Path) {
     return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash
@@ -321,7 +321,7 @@ if (-not [string]::IsNullOrWhiteSpace($FenFile)) {
 }
 
 if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
-    $OutputDirectory = Join-Path $repositoryRoot ('artifacts\stability\run-' +
+    $OutputDirectory = Join-Path $repositoryRoot ('artifacts/stability/run-' +
         (Get-Date).ToUniversalTime().ToString('yyyyMMdd-HHmmss-fff'))
 }
 New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null

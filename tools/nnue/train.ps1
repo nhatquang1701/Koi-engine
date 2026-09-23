@@ -34,8 +34,8 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
-$studio = Join-Path $repositoryRoot 'tools\nnue\koi_nnue_studio.py'
+$repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
+$studio = Join-Path $repositoryRoot 'tools/nnue/koi_nnue_studio.py'
 if (-not (Test-Path -LiteralPath $studio -PathType Leaf)) {
     throw "koi_nnue_studio.py is missing: $studio"
 }

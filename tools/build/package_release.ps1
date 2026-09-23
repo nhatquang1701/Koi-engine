@@ -1,11 +1,11 @@
 [CmdletBinding()]
 param(
-    [string]$BuildDirectory = (Join-Path $PSScriptRoot '..\..\build\release'),
-    [string]$OutputDirectory = (Join-Path $PSScriptRoot '..\..\artifacts\packages')
+    [string]$BuildDirectory = (Join-Path $PSScriptRoot '../../build/release'),
+    [string]$OutputDirectory = (Join-Path $PSScriptRoot '../../artifacts/packages')
 )
 
 $ErrorActionPreference = 'Stop'
-$repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
+$repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $buildRoot = [System.IO.Path]::GetFullPath($BuildDirectory)
 $outputRoot = [System.IO.Path]::GetFullPath($OutputDirectory)
 $isWindowsHost = $env:OS -eq 'Windows_NT'

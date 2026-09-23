@@ -63,7 +63,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
+$repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $binarySuffix = if ($env:OS -eq 'Windows_NT') { '.exe' } else { '' }
 if ([string]::IsNullOrWhiteSpace($EnginePath)) {
     $EnginePath = Join-Path (Join-Path $repositoryRoot 'build/release') "koi-engine$binarySuffix"

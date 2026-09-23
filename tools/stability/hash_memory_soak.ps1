@@ -13,13 +13,13 @@ if ([string]::IsNullOrWhiteSpace($EnginePath)) {
 
 $ErrorActionPreference = 'Stop'
 
-$repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
+$repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $resolvedEnginePath = [System.IO.Path]::GetFullPath($EnginePath)
 $resolvedOutputDirectory = [System.IO.Path]::GetFullPath($OutputDirectory)
 $parsedHashValues = @($HashValues -split '[,;\s]+' | Where-Object { $_ -ne '' } |
     ForEach-Object { [int]$_ })
 $artifactRoot = [System.IO.Path]::GetFullPath((Join-Path $repositoryRoot 'artifacts'))
-$artifactPrefix = $artifactRoot.TrimEnd('\') + '\'
+$artifactPrefix = $artifactRoot.TrimEnd('\', '/') + [System.IO.Path]::DirectorySeparatorChar
 
 if (-not (Test-Path -LiteralPath $resolvedEnginePath -PathType Leaf)) {
     throw "Engine executable was not found: $resolvedEnginePath"
