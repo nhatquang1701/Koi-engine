@@ -11,6 +11,14 @@
 
 #include "koi_test_support.hpp"
 
+#if defined(_WIN32)
+#define KOI_POPEN _popen
+#define KOI_PCLOSE _pclose
+#else
+#define KOI_POPEN popen
+#define KOI_PCLOSE pclose
+#endif
+
 namespace {
 
 std::filesystem::path replay_path;
@@ -19,11 +27,19 @@ std::string quote_argument(std::string_view argument) {
     return '"' + std::string(argument) + '"';
 }
 
+std::string pipe_command(const std::filesystem::path& replay, std::string_view arguments) {
+#if defined(_WIN32)
+    // cmd.exe needs the whole command wrapped in one extra pair of quotes.
+    return '"' + quote_argument(replay.string()) + ' ' + std::string(arguments) + '"';
+#else
+    return quote_argument(replay.string()) + ' ' + std::string(arguments);
+#endif
+}
+
 std::map<std::string, std::string> run_replay(const std::filesystem::path& replay,
                                               std::string_view arguments) {
-    const std::string command = '"' + quote_argument(replay.string()) + ' ' +
-                                std::string(arguments) + '"';
-    FILE* pipe = _popen(command.c_str(), "r");
+    const std::string command = pipe_command(replay, arguments);
+    FILE* pipe = KOI_POPEN(command.c_str(), "r");
     if (pipe == nullptr) {
         throw std::runtime_error("unable to start koi-replay");
     }
@@ -33,7 +49,7 @@ std::map<std::string, std::string> run_replay(const std::filesystem::path& repla
     while (std::fgets(buffer.data(), static_cast<int>(buffer.size()), pipe) != nullptr) {
         output += buffer.data();
     }
-    const int exit_code = _pclose(pipe);
+    const int exit_code = KOI_PCLOSE(pipe);
     if (exit_code != 0) {
         throw std::runtime_error("koi-replay exited unsuccessfully: " + output);
     }
@@ -56,9 +72,8 @@ std::map<std::string, std::string> run_replay(const std::filesystem::path& repla
 }
 
 int run_replay_exit_code(const std::filesystem::path& replay, std::string_view arguments) {
-    const std::string command = '"' + quote_argument(replay.string()) + ' ' +
-                                std::string(arguments) + '"';
-    FILE* pipe = _popen(command.c_str(), "r");
+    const std::string command = pipe_command(replay, arguments);
+    FILE* pipe = KOI_POPEN(command.c_str(), "r");
     if (pipe == nullptr) {
         throw std::runtime_error("unable to start koi-replay");
     }
@@ -66,7 +81,7 @@ int run_replay_exit_code(const std::filesystem::path& replay, std::string_view a
     std::array<char, 256> buffer{};
     while (std::fgets(buffer.data(), static_cast<int>(buffer.size()), pipe) != nullptr) {
     }
-    return _pclose(pipe);
+    return KOI_PCLOSE(pipe);
 }
 
 void require_field(const std::map<std::string, std::string>& fields, std::string_view field,
