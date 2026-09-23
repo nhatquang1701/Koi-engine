@@ -2,18 +2,28 @@
 
 #include <utility>
 
-#ifdef _WIN32
+#if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#elif defined(__linux__)
+#include <dlfcn.h>
 #endif
 
 namespace koi::gpu {
 namespace {
 
+#if defined(_WIN32)
+using DriverLibrary = HMODULE;
+#else
+using DriverLibrary = void*;
+#endif
+
 template <typename T>
-void resolve(HMODULE library, const char* name, T& target) {
-#ifdef _WIN32
+void resolve(DriverLibrary library, const char* name, T& target) {
+#if defined(_WIN32)
     target = reinterpret_cast<T>(GetProcAddress(library, name));
+#elif defined(__linux__)
+    target = reinterpret_cast<T>(dlsym(library, name));
 #else
     (void)library;
     (void)name;
@@ -24,9 +34,7 @@ void resolve(HMODULE library, const char* name, T& target) {
 } // namespace
 
 struct CudaDriver::Api {
-#ifdef _WIN32
-    HMODULE library = nullptr;
-#endif
+    DriverLibrary library = nullptr;
     CUresult (*init)(unsigned) = nullptr;
     CUresult (*driver_get_version)(int*) = nullptr;
     CUresult (*device_get_count)(int*) = nullptr;
@@ -67,12 +75,14 @@ void CudaDriver::release() noexcept {
         api_->ctx_destroy(context_);
         context_ = nullptr;
     }
-#ifdef _WIN32
     if (api_ != nullptr && api_->library != nullptr) {
+#if defined(_WIN32)
         FreeLibrary(api_->library);
+#elif defined(__linux__)
+        dlclose(api_->library);
+#endif
         api_->library = nullptr;
     }
-#endif
     delete api_;
     api_ = nullptr;
 }
@@ -130,19 +140,31 @@ bool CudaDriver::ensure_context(std::string& error) const {
 CudaDriver CudaDriver::open(std::string& error) {
     CudaDriver driver;
     driver.api_ = new Api();
-#ifdef _WIN32
+#if defined(_WIN32)
     driver.api_->library = LoadLibraryW(L"nvcuda.dll");
     if (driver.api_->library == nullptr) {
         error = "nvcuda.dll is not available";
         driver.error_ = error;
         return driver;
     }
-    HMODULE library = driver.api_->library;
+#elif defined(__linux__)
+    (void)dlerror(); // clear any stale loader error before probing
+    driver.api_->library = dlopen("libcuda.so.1", RTLD_NOW | RTLD_LOCAL);
+    if (driver.api_->library == nullptr) {
+        error = "libcuda.so.1 is not available";
+        if (const char* detail = dlerror(); detail != nullptr) {
+            error.append(": ");
+            error.append(detail);
+        }
+        driver.error_ = error;
+        return driver;
+    }
 #else
-    error = "CUDA is only wired for Windows in this build";
+    error = "CUDA is not wired for this platform";
     driver.error_ = error;
     return driver;
 #endif
+    DriverLibrary library = driver.api_->library;
     resolve(library, "cuInit", driver.api_->init);
     resolve(library, "cuDriverGetVersion", driver.api_->driver_get_version);
     resolve(library, "cuDeviceGetCount", driver.api_->device_get_count);
@@ -170,7 +192,7 @@ CudaDriver CudaDriver::open(std::string& error) {
 
     if (driver.api_->init == nullptr || driver.api_->ctx_create == nullptr ||
         driver.api_->launch_kernel == nullptr) {
-        error = "nvcuda.dll does not expose the required driver entry points";
+        error = "the CUDA driver library does not expose the required entry points";
         driver.error_ = error;
         return driver;
     }

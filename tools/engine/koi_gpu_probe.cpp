@@ -77,38 +77,51 @@ int main() {
     }
     std::printf("gpu-probe: embedded PTX:%s\n", embedded.c_str());
 
-    int variant_index = -1;
+    // Choose the newest module the device can run and the installed driver can
+    // load.  KOI_GPU_PTX_ARCH forces exactly one module for diagnostics.
+    std::vector<int> candidates(
+        static_cast<std::size_t>(koi::gpu::kNnueV5PtxVariantCount));
+    std::size_t candidate_count = 0;
     if (const char* forced = std::getenv("KOI_GPU_PTX_ARCH");
         forced != nullptr && *forced != '\0') {
         const long wanted = std::strtol(forced, nullptr, 10);
         for (std::size_t index = 0; index < variants.size(); ++index) {
             if (variants[index].major * 10 + variants[index].minor == wanted) {
-                variant_index = static_cast<int>(index);
+                candidates[0] = static_cast<int>(index);
+                candidate_count = 1;
                 break;
             }
         }
-        if (variant_index < 0) {
+        if (candidate_count == 0) {
             std::printf("gpu-probe: KOI_GPU_PTX_ARCH=%s names no embedded variant\n", forced);
             return 3;
         }
     } else {
-        variant_index =
-            koi::gpu::select_ptx_variant(variants, info.compute_major, info.compute_minor);
-        if (variant_index < 0) {
+        candidate_count = koi::gpu::select_ptx_candidates(
+            variants, info.compute_major, info.compute_minor, candidates);
+        if (candidate_count == 0) {
             std::printf("gpu-probe: no embedded PTX variant supports sm_%d%d\n",
                         info.compute_major, info.compute_minor);
             return 3;
         }
     }
-    const koi::gpu::NnueV5PtxVariant& chosen =
-        variants[static_cast<std::size_t>(variant_index)];
-    std::printf("gpu-probe: PTX variant sm_%d%d\n", chosen.major, chosen.minor);
-
-    const auto ptx = std::span<const std::uint8_t>(
-        reinterpret_cast<const std::uint8_t*>(chosen.source),
-        std::char_traits<char>::length(chosen.source));
-    if (!driver.load_module(ptx, error)) {
-        std::printf("gpu-probe: module load failed: %s\n", error.c_str());
+    bool module_loaded = false;
+    for (std::size_t index = 0; index < candidate_count; ++index) {
+        const koi::gpu::NnueV5PtxVariant& chosen =
+            variants[static_cast<std::size_t>(candidates[index])];
+        const auto ptx = std::span<const std::uint8_t>(
+            reinterpret_cast<const std::uint8_t*>(chosen.source),
+            std::char_traits<char>::length(chosen.source));
+        if (driver.load_module(ptx, error)) {
+            std::printf("gpu-probe: PTX variant sm_%d%d\n", chosen.major, chosen.minor);
+            module_loaded = true;
+            break;
+        }
+        std::printf("gpu-probe: PTX variant sm_%d%d failed to load: %s\n",
+                    chosen.major, chosen.minor, error.c_str());
+    }
+    if (!module_loaded) {
+        std::puts("gpu-probe: no embedded PTX variant could be loaded");
         return 3;
     }
     CUfunction function = nullptr;

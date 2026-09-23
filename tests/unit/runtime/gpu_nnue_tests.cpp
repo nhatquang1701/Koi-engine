@@ -255,14 +255,43 @@ void test_ptx_variant_selection_prefers_the_newest_supported_module() {
                        "a device just below the oldest module must fall back to the CPU");
 }
 
+void test_ptx_candidate_list_orders_loadable_modules_newest_first() {
+    // PTX JIT is forward-compatible but not backward-compatible, and a driver
+    // can reject a module it cannot JIT.  The candidate list lets the service
+    // fall back to older modules, so it must be ordered newest first and stop
+    // at the device ceiling.
+    constexpr std::array<koi::gpu::NnueV5PtxVariant, 5> variants{{
+        {6, 1, "sm61"},
+        {7, 5, "sm75"},
+        {8, 6, "sm86"},
+        {8, 9, "sm89"},
+        {12, 0, "sm120"},
+    }};
+    std::array<int, 5> candidates{};
+    koi::test::require(koi::gpu::select_ptx_candidates(variants, 12, 0, candidates) == 5,
+                       "sm_120 must offer all five modules");
+    koi::test::require(candidates[0] == 4 && candidates[1] == 3 && candidates[2] == 2 &&
+                           candidates[3] == 1 && candidates[4] == 0,
+                       "candidates must be ordered newest first");
+    koi::test::require(koi::gpu::select_ptx_candidates(variants, 8, 0, candidates) == 2,
+                       "sm_80 must offer the two modules it can run");
+    koi::test::require(candidates[0] == 1 && candidates[1] == 0,
+                       "sm_80 must offer sm_75 before sm_61");
+    koi::test::require(koi::gpu::select_ptx_candidates(variants, 6, 1, candidates) == 1,
+                       "sm_61 must offer exactly the Pascal module");
+    koi::test::require(koi::gpu::select_ptx_candidates(variants, 5, 2, candidates) == 0,
+                       "a device older than every module must offer no candidates");
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
-    const std::array<koi::test::TestCase, 4> tests{{
+    const std::array<koi::test::TestCase, 5> tests{{
         {"GPU NNUE matches CPU scalar", test_gpu_matches_cpu_scalar},
         {"GPU NNUE batch sizes agree", test_gpu_matches_cpu_across_batch_sizes},
         {"GPU NNUE concurrent requests", test_concurrent_batch_requests_keep_their_own_scores},
         {"GPU NNUE PTX variant selection", test_ptx_variant_selection_prefers_the_newest_supported_module},
+        {"GPU NNUE PTX candidate list", test_ptx_candidate_list_orders_loadable_modules_newest_first},
     }};
     return koi::test::run_tests(tests, argc, argv);
 }

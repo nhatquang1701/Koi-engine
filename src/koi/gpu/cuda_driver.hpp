@@ -1,8 +1,9 @@
 #pragma once
 
 // Minimal dynamic loader for the CUDA driver API.  Koi links no CUDA library:
-// `nvcuda.dll` is resolved at runtime, so a machine without a CUDA driver simply
-// reports the GPU as unavailable and every caller falls back to the CPU path.
+// `nvcuda.dll` on Windows and `libcuda.so.1` on Linux are resolved at runtime,
+// so a machine without a CUDA driver simply reports the GPU as unavailable and
+// every caller falls back to the CPU path.
 
 #include <cstddef>
 #include <cstdint>
@@ -43,8 +44,8 @@ public:
     CudaDriver(CudaDriver&& other) noexcept;
     CudaDriver& operator=(CudaDriver&& other) noexcept;
 
-    // Loads nvcuda.dll, initializes the API, selects device 0, and creates a
-    // context plus a stream.  On failure the returned object reports
+    // Loads the CUDA driver library, initializes the API, selects device 0, and
+    // creates a context plus a stream.  On failure the returned object reports
     // `available() == false` and `error` carries the reason.
     [[nodiscard]] static CudaDriver open(std::string& error);
 

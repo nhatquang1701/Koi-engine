@@ -51,4 +51,23 @@ struct NnueV5PtxVariant {
     return best;
 }
 
+// Writes the indices of every variant the device can run into `candidates`,
+// newest first, and returns how many were written.  PTX loading can still fail
+// when the installed driver predates the PTX version, so callers try each
+// candidate in order and keep the newest module that actually loads.
+[[nodiscard]] constexpr std::size_t select_ptx_candidates(
+    std::span<const NnueV5PtxVariant> variants, int device_major, int device_minor,
+    std::span<int> candidates) noexcept {
+    std::size_t count = 0;
+    for (std::size_t index = variants.size(); index > 0 && count < candidates.size();
+         --index) {
+        const std::size_t candidate = index - 1;
+        if (ptx_variant_supports(variants[candidate], device_major, device_minor)) {
+            candidates[count] = static_cast<int>(candidate);
+            ++count;
+        }
+    }
+    return count;
+}
+
 } // namespace koi::gpu
