@@ -276,6 +276,20 @@ try {
     $threadSummaries.Add("Optional rows=$($optionalRows.Count) profile_positions=$($optionalProfile.positions.Count)")
 
     $smokeLines = Invoke-UciSmoke $enginePath (Join-Path $verificationRoot 'uci-smoke.txt') (Join-Path $verificationRoot 'uci-smoke.stderr.txt')
+    # The same contract must hold for the baseline build, which runs in-process
+    # without a sibling executable.  Forcing the variant keeps the gate
+    # independent of the CPU that happens to run it.
+    $previousVariant = $env:KOI_CPU_VARIANT
+    try {
+        $env:KOI_CPU_VARIANT = 'generic'
+        $genericSmokeLines = Invoke-UciSmoke $enginePath (Join-Path $verificationRoot 'uci-smoke-generic.txt') (Join-Path $verificationRoot 'uci-smoke-generic.stderr.txt')
+    } finally {
+        if ($null -ne $previousVariant) {
+            $env:KOI_CPU_VARIANT = $previousVariant
+        } else {
+            Remove-Item Env:\KOI_CPU_VARIANT -ErrorAction SilentlyContinue
+        }
+    }
     $replayStdoutPath = Join-Path $verificationRoot 'replay.txt'
     $replayStderrPath = Join-Path $verificationRoot 'replay.stderr.txt'
     $replayLines = Invoke-CapturedProcess $replayPath @('startpos', 'moves', 'g1f3', 'g8f6', 'f3g1', 'f6g8',
@@ -314,7 +328,7 @@ try {
     Write-Output "verification_root=$verificationRoot"
     Write-Output "cmake=$versionLine generator=$Generator compiler=$CxxCompiler"
     Write-Output 'Debug configure/build/CTest=PASS; Release configure/build/CTest=PASS'
-    Write-Output ('UCI smoke lines=' + @($smokeLines).Count + ' bestmove=1 stderr=0')
+    Write-Output ('UCI smoke lines=' + @($smokeLines).Count + ' bestmove=1 stderr=0 generic_lines=' + @($genericSmokeLines).Count)
     Write-Output ('Replay legal=1 result=1/2-1/2 termination=rule draw')
     foreach ($summary in $threadSummaries) {
         Write-Output $summary

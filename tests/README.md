@@ -45,7 +45,7 @@ ctest --test-dir build\release -N
 ctest --test-dir build\release -C Release -R koi_strength_tests --output-on-failure
 ```
 
-The default Release configuration with Python 3 registers **64 tests**
+The default Release configuration with Python 3 registers **66 tests**
 (`KOI_BUILD_SHADOW_DIFF=OFF`). The count varies
 with optional dependencies:
 `koi_shadow_diff_tests` requires `-DKOI_BUILD_SHADOW_DIFF=ON`, and
@@ -101,15 +101,20 @@ C++ unit / integration tests (27 executables under `tests/unit/` and
   `search_architecture_tests`, `search_policy_tests`, `search_runtime_tests`,
   `search_service_tests`, `static_exchange_tests`, `time_manager_tests`,
   `transposition_table_tests`, `completion_gate_tests`, `koi_strength_tests`,
-  `gpu_nnue_tests` (GPU NNUE bit-exact parity; skips without a CUDA device).
-- Runtime and boundaries: `koi_cpu_features_tests`, `koi_module_tests`,
+  `gpu_nnue_tests` (GPU NNUE bit-exact parity plus the PTX variant table; the
+  parity cases skip without a CUDA device).
+- Runtime and boundaries: `koi_cpu_features_tests`, `koi_cpu_variant_tests`
+  (variant parsing, executable names, automatic selection, and the override
+  rules), `koi_module_tests`,
   `syzygy_tablebase_tests`, `opening_book_tests`, `uci_controller_tests`,
   `koi_replay_tests`.
 
 PowerShell process tests (`tests/integration/**/*.ps1`), driven through
 `pwsh` with the built engine path:
 
-- `koi_engine_process`, `koi_engine_en_croissant_process`,
+- `koi_engine_process`, `koi_engine_variant_process` (three engine binaries,
+  automatic selection, and the `KOI_CPU_VARIANT` overrides),
+  `koi_engine_en_croissant_process`,
   `koi_engine_time_safety_process`, `koi_benchmark_process`,
   `koi_uci_match_process`, `koi_stockfish_strength_option`, `koi_uci_match_clock`,
   `cutechess_stability_diagnostics`, `cutechess_stability_smoke`,

@@ -19,7 +19,8 @@ try {
 
     $packageDirectory = Join-Path $outputDirectory 'koi-engine-v1.1'
     $archivePath = Join-Path $outputDirectory 'koi-engine-v1.1.zip'
-    foreach ($required in @('koi-engine.exe', 'koi-bench.exe', 'koi-replay.exe', 'koi-perft.exe',
+    foreach ($required in @('koi-engine.exe', 'koi-engine-avx2.exe', 'koi-engine-avx512.exe',
+                            'koi-bench.exe', 'koi-replay.exe', 'koi-perft.exe',
                             'README.md', 'licenses\chess-library-MIT.txt', 'licenses\fathom-MIT.txt')) {
         if (-not (Test-Path -LiteralPath (Join-Path $packageDirectory $required) -PathType Leaf)) {
             throw "package is missing $required"
@@ -35,7 +36,12 @@ try {
     $archive = [System.IO.Compression.ZipFile]::OpenRead($archivePath)
     try {
         $names = @($archive.Entries | ForEach-Object { $_.FullName })
-        if ($names -notcontains 'koi-engine.exe' -or $names -contains 'book.bin') {
+        foreach ($expected in @('koi-engine.exe', 'koi-engine-avx2.exe', 'koi-engine-avx512.exe')) {
+            if ($names -notcontains $expected) {
+                throw "package archive is missing $expected"
+            }
+        }
+        if ($names -contains 'book.bin') {
             throw 'package archive has an invalid executable/book layout'
         }
     } finally {

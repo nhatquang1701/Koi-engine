@@ -18,7 +18,7 @@ cmake -S . -B build\release -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMP
 cmake --build build\release --config Release
 ```
 
-Debug builds: substitute `build\debug` and `Debug`. The engine binary is `build\release\koi-engine.exe`.
+Debug builds: substitute `build\debug` and `Debug`. The engine binary is `build\release\koi-engine.exe`. It automatically starts the AVX2 or AVX-512 sibling (`koi-engine-avx2.exe` / `koi-engine-avx512.exe`) when the CPU supports it, and `KOI_CPU_VARIANT=generic|avx2|avx512` forces one build. Keep the selector silent on stdout and stderr; GUIs treat engine chatter as protocol output.
 
 Quick UCI smoke test:
 

@@ -31,7 +31,8 @@ if (-not (Test-Path -LiteralPath $buildRoot -PathType Container)) {
 }
 New-Item -ItemType Directory -Path $outputRoot -Force | Out-Null
 
-$requiredExecutables = @('koi-engine.exe', 'koi-bench.exe', 'koi-replay.exe', 'koi-perft.exe')
+$requiredExecutables = @('koi-engine.exe', 'koi-engine-avx2.exe', 'koi-engine-avx512.exe',
+                         'koi-bench.exe', 'koi-replay.exe', 'koi-perft.exe')
 function Test-RequiredExecutables {
     param(
         [Parameter(Mandatory = $true)]
@@ -87,6 +88,11 @@ Copy-Item -LiteralPath (Join-Path $repositoryRoot 'third_party\fathom\LICENSE') 
 Koi Engine v1.1 installation
 
 Run koi-engine.exe as a UCI engine from En Croissant or another UCI GUI.
+koi-engine.exe starts the fastest build this CPU supports: it launches the
+koi-engine-avx512.exe or koi-engine-avx2.exe sibling when it is present and the
+CPU supports those instructions, and otherwise runs its own baseline build in
+place. Set KOI_CPU_VARIANT=generic, avx2, or avx512 to force one build.
+
 The optional user-supplied book.bin belongs beside koi-engine.exe and is not
 included in this package. Syzygy tablebase files are also user-supplied;
 configure SyzygyPath in the GUI when they are available.
@@ -100,7 +106,10 @@ Recommended starting options:
   BookDepth=16
   BookRandom=false
 
-The AVX2 Release binary requires an x64 CPU with AVX2 support.
+Every build requires an x64 CPU. The AVX2 build requires AVX2 and the AVX-512
+build requires AVX-512; the baseline build has no instruction-set requirement.
+The optional GPU NNUE inference needs an NVIDIA GPU (Pascal sm_61 or newer)
+with a CUDA 12.x-capable driver and is opt-in with KOI_GPU_NNUE=1.
 '@ | Set-Content -LiteralPath (Join-Path $packageDirectory 'INSTALL.txt') -Encoding UTF8
 
 $manifest = [ordered]@{

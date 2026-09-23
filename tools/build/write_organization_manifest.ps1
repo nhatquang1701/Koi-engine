@@ -62,7 +62,8 @@ $buildDirectories = @('debug', 'release', 'ci-debug', 'ci-release') | ForEach-Ob
 }
 
 $releaseDirectory = Join-Path $repositoryRoot 'build\release'
-$releaseExecutables = @('koi-engine.exe', 'koi-bench.exe', 'koi-replay.exe', 'koi-perft.exe') | ForEach-Object {
+$releaseExecutables = @('koi-engine.exe', 'koi-engine-avx2.exe', 'koi-engine-avx512.exe',
+                        'koi-bench.exe', 'koi-replay.exe', 'koi-perft.exe') | ForEach-Object {
     $path = Join-Path $releaseDirectory $_
     [ordered]@{
         name = $_

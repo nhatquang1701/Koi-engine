@@ -126,7 +126,23 @@ ctest --test-dir build\release -C Release -j 8 --output-on-failure
 ```
 
 For a Debug build, substitute `build\debug` and `Debug` in those commands. The
-resulting engine executable is `build\release\koi-engine.exe`.
+Release build produces three engine executables in `build\release`:
+
+- `koi-engine.exe` — the baseline build and the single entry point for GUIs and
+  scripts. It starts the fastest sibling this CPU supports
+  (`koi-engine-avx512.exe`, then `koi-engine-avx2.exe`) when that file is
+  present, and otherwise runs its own baseline code in place. The selector
+  writes nothing to stdout or stderr.
+- `koi-engine-avx2.exe` — Release-only `/arch:AVX2` build.
+- `koi-engine-avx512.exe` — Release-only `/arch:AVX512` build.
+
+Each optimized sibling checks the CPU at startup and exits with code 3 and a
+clear message instead of executing an unsupported instruction. Set
+`KOI_CPU_VARIANT=generic`, `avx2`, or `avx512` to force one build (`auto` and
+unknown values keep the automatic behavior). The selector launches the sibling
+as a child process, forwards its exit code, and a job object kills the child if
+the parent disappears. All other tools (`koi-bench`, `koi-replay`, `koi-perft`,
+`koi-eval-features`, `koi-gpu-probe`) are AVX2 builds.
 
 For an independently reproducible release gate, run the checked-in harness from
 an x64 Visual Studio developer shell. It configures and builds fresh canonical
@@ -333,11 +349,18 @@ the version 5 network on the GPU. Set `KOI_GPU_NNUE=1` in the environment and
 run with `Threads` greater than one; Threads=1 keeps the deterministic CPU path.
 The feature is opt-in and never changes the advertised UCI surface or
 `EvalFile` semantics: any driver, device, or kernel failure silently falls back
-to the CPU network. The build compiles `src/koi/gpu/koi_nnue_v5.cu` to PTX with
-`nvcc` (compute capability 6.1, the local GTX 1060) and embeds it; at runtime
-only `nvcuda.dll` is loaded dynamically, so builds without `nvcc` stay CPU-only.
-The GPU result is bit-exact with the CPU scalar evaluation, but this first pass
-does not promise a speedup and makes no strength or Elo claims.
+to the CPU network. The build compiles `src/koi/gpu/koi_nnue_v5.cu` to PTX for
+the compute capabilities in `KOI_GPU_PTX_ARCHS` (`61;75;86;89;120` by default,
+covering the GTX 10-series through the RTX 50-series) and embeds one module per
+architecture; at runtime only `nvcuda.dll` is loaded dynamically, so builds
+without `nvcc` stay CPU-only. The engine selects the newest embedded module the
+device can run and JITs it, so a GTX 1060 (sm_61) and an RTX 50-series card
+(sm_120) both work, while a GPU older than sm_61 stays on the CPU. Set
+`KOI_GPU_PTX_ARCH=75` to force one embedded module for testing. CUDA 12.x is
+required at build time because CUDA 13 drops Pascal support; the installed
+driver only has to be CUDA 12.x-capable. The GPU result is bit-exact with the
+CPU scalar evaluation, but this first pass does not promise a speedup and makes
+no strength or Elo claims.
 
 For a reproducible local match against Stockfish or another UCI engine, use the
 optional PowerShell harness:
@@ -508,7 +531,7 @@ continues to evaluate standard FIDE chess.
 
 ### Test inventory and known gaps
 
-The default local configuration with Python 3 registers 64 CTest tests
+The default local configuration with Python 3 registers 66 CTest tests
 (`KOI_BUILD_SHADOW_DIFF=OFF`); enabling the shadow-diff oracle adds
 `koi_shadow_diff_tests`, and a local `cutechess-cli.exe` adds the optional
 stability smoke, so the count varies with those optional pieces. `koi_search_tests`, the heaviest suite, is
