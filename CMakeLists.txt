@@ -2,22 +2,45 @@ cmake_minimum_required(VERSION 3.31)
 
 project(koi_engine VERSION 1.1.0 LANGUAGES CXX)
 
-if(NOT WIN32)
-    message(FATAL_ERROR "Koi Engine v1.1 targets Windows x64")
+# Koi Engine supports Windows x64 with MSVC (the primary development platform)
+# and x86-64 Linux with GCC 14+ or Clang 18+.
+if(WIN32)
+    if(NOT MSVC)
+        message(FATAL_ERROR
+            "Koi Engine on Windows requires the MSVC x64 toolchain; unsupported "
+            "compiler ID: ${CMAKE_CXX_COMPILER_ID}")
+    endif()
+    if(NOT CMAKE_CXX_COMPILER_ARCHITECTURE_ID STREQUAL "x64")
+        message(FATAL_ERROR "Koi Engine requires an x86-64 compiler target")
+    endif()
+elseif(UNIX)
+    if(NOT CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
+        message(FATAL_ERROR
+            "Koi Engine targets x86-64 Linux; detected: ${CMAKE_SYSTEM_PROCESSOR}")
+    endif()
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 14)
+            message(FATAL_ERROR
+                "Koi Engine needs GCC 14 or newer for C++26 (found "
+                "${CMAKE_CXX_COMPILER_VERSION})")
+        endif()
+    elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 18)
+            message(FATAL_ERROR
+                "Koi Engine needs Clang 18 or newer (found "
+                "${CMAKE_CXX_COMPILER_VERSION})")
+        endif()
+    else()
+        message(FATAL_ERROR
+            "Koi Engine supports GCC 14+ or Clang 18+ on Linux; unsupported "
+            "compiler ID: ${CMAKE_CXX_COMPILER_ID}")
+    endif()
+else()
+    message(FATAL_ERROR "Koi Engine targets Windows x64 and x86-64 Linux")
 endif()
 
 if(NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
-    message(FATAL_ERROR "Koi Engine v1.1 requires a 64-bit Windows toolchain")
-endif()
-
-if(NOT CMAKE_CXX_COMPILER_ARCHITECTURE_ID STREQUAL "x64")
-    message(FATAL_ERROR "Koi Engine v1.1 requires an x86-64 compiler target")
-endif()
-
-if(NOT MSVC)
-    message(FATAL_ERROR
-        "Koi Engine v1.1 requires the MSVC x64 toolchain for C++26 named modules; "
-        "unsupported compiler ID: ${CMAKE_CXX_COMPILER_ID}")
+    message(FATAL_ERROR "Koi Engine requires a 64-bit toolchain")
 endif()
 
 set(CMAKE_CXX_STANDARD 26)
@@ -42,13 +65,40 @@ if(MSVC)
     # deep tactical line, so reserve a larger stack for the image (worker
     # threads inherit this reserve on Windows).
     add_link_options("/STACK:16777216")
-    include(CheckIPOSupported)
-    check_ipo_supported(RESULT KOI_IPO_SUPPORTED OUTPUT KOI_IPO_ERROR LANGUAGES CXX)
-    if(KOI_IPO_SUPPORTED)
-        set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
-    else()
-        message(WARNING "Koi Engine Release IPO/LTO is unavailable: ${KOI_IPO_ERROR}")
-    endif()
+else()
+    add_compile_options(
+        "$<$<CONFIG:Release>:-O2>"
+        "$<$<CONFIG:Release>:-O3>"
+        "$<$<CONFIG:Release>:-DNDEBUG>"
+    )
+    find_package(Threads REQUIRED)
+    # glibc ignores the ELF stack-size header, so the engine raises the default
+    # worker-thread stack at startup instead (see KOI_LINUX_STACK_BYTES in
+    # src/main.cpp); the main thread follows the shell's `ulimit -s`.
+endif()
+
+# Prebuilt Linux binaries should run on any modern distribution, so the C++
+# runtime is linked statically by default. The C library stays dynamic: a fully
+# static glibc would break dlopen("libcuda.so.1"). Sanitizer builds should pass
+# -DKOI_STATIC_RUNTIME=OFF.
+if(MSVC)
+    set(KOI_STATIC_RUNTIME_DEFAULT OFF)
+else()
+    set(KOI_STATIC_RUNTIME_DEFAULT ON)
+endif()
+option(KOI_STATIC_RUNTIME
+    "Link the C++ runtime statically for portable Linux binaries"
+    ${KOI_STATIC_RUNTIME_DEFAULT})
+if(KOI_STATIC_RUNTIME AND NOT MSVC)
+    add_link_options("-static-libstdc++" "-static-libgcc")
+endif()
+
+include(CheckIPOSupported)
+check_ipo_supported(RESULT KOI_IPO_SUPPORTED OUTPUT KOI_IPO_ERROR LANGUAGES CXX)
+if(KOI_IPO_SUPPORTED)
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
+else()
+    message(WARNING "Koi Engine Release IPO/LTO is unavailable: ${KOI_IPO_ERROR}")
 endif()
 
 include(CTest)
@@ -79,7 +129,9 @@ set(KOI_GPU_PTX_AVAILABLE FALSE)
 if(KOI_ENABLE_GPU_NNUE)
     find_program(KOI_NVCC nvcc
         HINTS "$ENV{CUDA_PATH}/bin"
-              "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.9/bin")
+              "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.9/bin"
+              "/usr/local/cuda/bin"
+              "/opt/cuda/bin")
 endif()
 if(KOI_NVCC)
     # Toolkits drop architectures over time (CUDA 13 removed offline compute_61),
@@ -180,11 +232,27 @@ set(KOI_MODULE_SOURCES
 # Fathom is vendored C; compiling it as C++ keeps the toolchain single-language.
 set_source_files_properties(third_party/fathom/tbprobe.c PROPERTIES LANGUAGE CXX)
 
+# Translates the MSVC /arch flag used by the Windows build into the GCC/Clang
+# equivalent so both platforms share one set of call sites. The AVX-512 flag set
+# is the x86-64-v4 baseline (F/BW/CD/DQ/VL), matching MSVC /arch:AVX512.
+function(koi_arch_compile_option msvc_flag output)
+    if(MSVC OR msvc_flag STREQUAL "")
+        set(${output} "${msvc_flag}" PARENT_SCOPE)
+    elseif(msvc_flag STREQUAL "/arch:AVX2")
+        set(${output} "-mavx2" PARENT_SCOPE)
+    elseif(msvc_flag STREQUAL "/arch:AVX512")
+        set(${output}
+            "-mavx512f;-mavx512bw;-mavx512cd;-mavx512dq;-mavx512vl" PARENT_SCOPE)
+    else()
+        message(FATAL_ERROR "Unknown architecture flag: ${msvc_flag}")
+    endif()
+endfunction()
+
 # Defines one static library from the shared core sources. `arch_option` is the
-# MSVC /arch flag applied in Release only (empty for the baseline variant).
-# Named modules are attached to the default koi_core target alone: no
-# implementation file imports them, so the engine variants do not need a second
-# module provider.
+# MSVC /arch flag applied in Release only (empty for the baseline variant);
+# koi_arch_compile_option maps it to the GCC/Clang equivalent. Named modules are
+# attached to the default koi_core target alone: no implementation file imports
+# them, so the engine variants do not need a second module provider.
 function(koi_add_core_target target arch_option)
     add_library(${target} ${KOI_CORE_SOURCES})
     target_include_directories(${target} PUBLIC
@@ -198,8 +266,13 @@ function(koi_add_core_target target arch_option)
     target_compile_definitions(${target} PUBLIC
         KOI_ENGINE_BUILD_VERSION="${PROJECT_VERSION}"
     )
+    if(NOT MSVC)
+        target_link_libraries(${target} PUBLIC Threads::Threads)
+    endif()
     if(arch_option)
-        target_compile_options(${target} PRIVATE "$<$<CONFIG:Release>:${arch_option}>")
+        koi_arch_compile_option("${arch_option}" KOI_ARCH_COMPILE_OPTION)
+        target_compile_options(${target} PRIVATE
+            "$<$<CONFIG:Release>:${KOI_ARCH_COMPILE_OPTION}>")
     endif()
     if(KOI_GPU_PTX_AVAILABLE)
         target_include_directories(${target} PRIVATE "${CMAKE_BINARY_DIR}/generated")
@@ -213,11 +286,34 @@ endfunction()
 # koi_core is the AVX2 build used by the developer tools and every test binary.
 koi_add_core_target(koi_core "/arch:AVX2")
 
-# CMake 3.31+ and MSVC are required above, so named modules are a mandatory
-# part of the core target rather than an optional experimental build.
-target_sources(koi_core PUBLIC
-    FILE_SET CXX_MODULES TYPE CXX_MODULES FILES ${KOI_MODULE_SOURCES}
-)
+# C++26 named modules are a verified part of the MSVC build. GCC's module
+# implementation is still experimental and Clang's module scanning depends on
+# the toolchain, so the interface is auto-detected here and can always be
+# disabled with -DKOI_BUILD_MODULES=OFF. Nothing in the core library imports
+# the modules, so the engine itself never depends on them.
+if(MSVC)
+    set(KOI_MODULES_DEFAULT ON)
+elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang"
+        AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 18)
+    set(KOI_MODULES_DEFAULT ON)
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU"
+        AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 14)
+    set(KOI_MODULES_DEFAULT ON)
+else()
+    set(KOI_MODULES_DEFAULT OFF)
+endif()
+option(KOI_BUILD_MODULES
+    "Build the C++26 named-module interface and its test"
+    ${KOI_MODULES_DEFAULT})
+if(KOI_BUILD_MODULES)
+    target_sources(koi_core PUBLIC
+        FILE_SET CXX_MODULES TYPE CXX_MODULES FILES ${KOI_MODULE_SOURCES}
+    )
+else()
+    message(STATUS
+        "KOI_BUILD_MODULES=OFF: skipping the C++26 module interface "
+        "(${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION})")
+endif()
 
 # koi_core_avx512 backs koi-engine-avx512.exe.
 koi_add_core_target(koi_core_avx512 "/arch:AVX512")
@@ -341,13 +437,15 @@ target_link_libraries(koi_cpu_variant_tests PRIVATE koi_core)
 
 add_test(NAME koi_cpu_variant_tests COMMAND koi_cpu_variant_tests)
 
-add_executable(koi_module_tests
-    tests/unit/core/koi_module_tests.cpp
-)
+if(KOI_BUILD_MODULES)
+    add_executable(koi_module_tests
+        tests/unit/core/koi_module_tests.cpp
+    )
 
-target_link_libraries(koi_module_tests PRIVATE koi_core)
+    target_link_libraries(koi_module_tests PRIVATE koi_core)
 
-add_test(NAME koi_module_tests COMMAND koi_module_tests)
+    add_test(NAME koi_module_tests COMMAND koi_module_tests)
+endif()
 
 add_executable(syzygy_tablebase_tests
     tests/unit/runtime/syzygy_tablebase_tests.cpp
@@ -592,7 +690,6 @@ set(KOI_TEST_SUPPORT_TARGETS
     nnue_boundary_tests
     koi_cpu_features_tests
     koi_cpu_variant_tests
-    koi_module_tests
     syzygy_tablebase_tests
     koi_rules_tests
     native_rule_state_tests
@@ -615,6 +712,10 @@ set(KOI_TEST_SUPPORT_TARGETS
     koi_replay_tests
 )
 
+if(TARGET koi_module_tests)
+    list(APPEND KOI_TEST_SUPPORT_TARGETS koi_module_tests)
+endif()
+
 if(TARGET koi_shadow_diff_tests)
     list(APPEND KOI_TEST_SUPPORT_TARGETS koi_shadow_diff_tests)
 endif()
@@ -623,7 +724,15 @@ foreach(KOI_TEST_TARGET IN LISTS KOI_TEST_SUPPORT_TARGETS)
     target_link_libraries(${KOI_TEST_TARGET} PRIVATE koi_test_support)
 endforeach()
 
-find_program(POWERSHELL_EXECUTABLE NAMES pwsh powershell REQUIRED)
+# PowerShell drives the process-level integration tests. It ships on Windows and
+# on GitHub's Linux runners, but the C++ and Python suites already cover the
+# engine, so a machine without pwsh still configures and tests the build.
+find_program(POWERSHELL_EXECUTABLE NAMES pwsh powershell)
+if(NOT POWERSHELL_EXECUTABLE)
+    message(STATUS "pwsh not found; the PowerShell process tests are omitted")
+endif()
+
+if(POWERSHELL_EXECUTABLE)
 
 add_test(
     NAME koi_engine_process
@@ -699,6 +808,11 @@ add_test(
 
 koi_set_timeout(koi_uci_match_clock 120)
 
+# The Windows-only harnesses: Cutechess fake engines are .cmd files, the memory
+# soak reads Windows process counters, and the packaging tests exercise the
+# MSVC-specific release layout.
+if(WIN32)
+
 # The diagnostic half of the Cutechess harness uses fabricated engines and runs
 # everywhere.  The real smoke requires cutechess-cli, so it is only registered
 # when the executable is actually present instead of reporting a silent SKIP.
@@ -764,6 +878,10 @@ add_test(
 )
 
 koi_set_timeout(package_release_layout 60)
+
+endif() # WIN32
+
+endif() # POWERSHELL_EXECUTABLE
 
 find_package(Python3 COMPONENTS Interpreter QUIET)
 if(Python3_Interpreter_FOUND)
@@ -896,12 +1014,15 @@ endif()
 # `ctest -j` run, and RUN_SERIAL protects the one test that writes into the
 # build tree next to the engine binary.
 set_tests_properties(
-    koi_core_tests koi_cpu_features_tests koi_cpu_variant_tests koi_module_tests syzygy_tablebase_tests
+    koi_core_tests koi_cpu_features_tests koi_cpu_variant_tests syzygy_tablebase_tests
     koi_rules_tests native_rule_state_tests opening_book_tests completion_gate_tests
     search_ordering_tests search_architecture_tests search_policy_tests
     search_runtime_tests static_exchange_tests time_manager_tests perft_tests
     PROPERTIES LABELS "unit"
 )
+if(TARGET koi_module_tests)
+    set_tests_properties(koi_module_tests PROPERTIES LABELS "unit")
+endif()
 set_tests_properties(
     evaluation_boundary_tests evaluation_architecture_tests nnue_boundary_tests
     classical_evaluator_tests evaluation_features_tests
@@ -921,26 +1042,30 @@ set_tests_properties(
 )
 set_tests_properties(koi_strength_tests PROPERTIES LABELS "unit;search;heavy")
 set_tests_properties(koi_replay_tests PROPERTIES LABELS "integration;tools")
-set_tests_properties(koi_engine_process koi_engine_variant_process koi_engine_en_croissant_process
-    PROPERTIES LABELS "process;uci")
-set_tests_properties(koi_engine_process PROPERTIES RUN_SERIAL TRUE)
-set_tests_properties(koi_engine_time_safety_process
-    PROPERTIES LABELS "process;uci;heavy" PROCESSORS 2)
-set_tests_properties(koi_benchmark_process
-    PROPERTIES LABELS "process;tools;heavy" PROCESSORS 2)
-set_tests_properties(koi_uci_match_process koi_uci_match_clock
-    PROPERTIES LABELS "process;matches")
-set_tests_properties(koi_uci_match_clock PROPERTIES PROCESSORS 2)
-set_tests_properties(koi_stockfish_strength_option PROPERTIES LABELS "process;matches")
-set_tests_properties(cutechess_stability_diagnostics
-    PROPERTIES LABELS "process;matches")
-if(TEST cutechess_stability_smoke)
-    set_tests_properties(cutechess_stability_smoke
-        PROPERTIES LABELS "process;matches;heavy" PROCESSORS 2)
+if(POWERSHELL_EXECUTABLE)
+    set_tests_properties(koi_engine_process koi_engine_variant_process koi_engine_en_croissant_process
+        PROPERTIES LABELS "process;uci")
+    set_tests_properties(koi_engine_process PROPERTIES RUN_SERIAL TRUE)
+    set_tests_properties(koi_engine_time_safety_process
+        PROPERTIES LABELS "process;uci;heavy" PROCESSORS 2)
+    set_tests_properties(koi_benchmark_process
+        PROPERTIES LABELS "process;tools;heavy" PROCESSORS 2)
+    set_tests_properties(koi_uci_match_process koi_uci_match_clock
+        PROPERTIES LABELS "process;matches")
+    set_tests_properties(koi_uci_match_clock PROPERTIES PROCESSORS 2)
+    set_tests_properties(koi_stockfish_strength_option PROPERTIES LABELS "process;matches")
+    if(WIN32)
+        set_tests_properties(cutechess_stability_diagnostics
+            PROPERTIES LABELS "process;matches")
+        if(TEST cutechess_stability_smoke)
+            set_tests_properties(cutechess_stability_smoke
+                PROPERTIES LABELS "process;matches;heavy" PROCESSORS 2)
+        endif()
+        set_tests_properties(hash_memory_stability PROPERTIES LABELS "process;runtime")
+        set_tests_properties(windows_ci_configuration install_book_script package_release_layout
+            PROPERTIES LABELS "process;packaging")
+    endif()
 endif()
-set_tests_properties(hash_memory_stability PROPERTIES LABELS "process;runtime")
-set_tests_properties(windows_ci_configuration install_book_script package_release_layout
-    PROPERTIES LABELS "process;packaging")
 
 if(TARGET koi_shadow_diff_tests)
     set_tests_properties(koi_shadow_diff_tests PROPERTIES LABELS "integration;rules")
