@@ -36,10 +36,15 @@ import export_bullet_v4  # noqa: E402
 import export_bullet_v5  # noqa: E402
 import to_bullet  # noqa: E402
 
-DEFAULT_TRAINER = REPO_ROOT / "tools" / "nnue" / "bullet_train" / "target" / "release" / "bullet_train.exe"
+_BINARY_SUFFIX = ".exe" if os.name == "nt" else ""
+DEFAULT_TRAINER = (
+    REPO_ROOT / "tools" / "nnue" / "bullet_train" / "target" / "release" / f"bullet_train{_BINARY_SUFFIX}"
+)
 DEFAULT_DATA_DIR = REPO_ROOT / "artifacts" / "training" / "bullet"
 CUDA_BIN_CANDIDATES = (
     Path(os.environ.get("CUDA_PATH", "")) / "bin" if os.environ.get("CUDA_PATH") else None,
+    Path("/usr/local/cuda/bin"),
+    Path("/opt/cuda/bin"),
     Path(r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.9\bin"),
     Path(r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.8\bin"),
     Path(r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.6\bin"),

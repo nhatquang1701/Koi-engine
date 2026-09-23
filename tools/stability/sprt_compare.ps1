@@ -3,8 +3,8 @@ param(
     [string]$CandidatePath,
     [Parameter(Mandatory = $true)]
     [string]$BaselinePath,
-    [string]$ReplayPath = (Join-Path $PSScriptRoot '..\..\build\release\koi-replay.exe'),
-    [string]$OpeningFile = (Join-Path $PSScriptRoot '..\..\tests\data\openings\openings-curated-32.txt'),
+    [string]$ReplayPath = '',
+    [string]$OpeningFile = (Join-Path $PSScriptRoot '../../tests/data/openings/openings-curated-32.txt'),
     [int]$Nodes = 20000,
     [string]$TimeControl = '',
     [int]$Games = 2,
@@ -14,9 +14,14 @@ param(
     [double]$Elo1 = 5,
     [int]$Threads = 1,
     [int]$Hash = 64,
-    [string]$OutputDirectory = 'artifacts\matches\sprt-compare',
+    [string]$OutputDirectory = 'artifacts/matches/sprt-compare',
     [string]$Label = 'compare'
 )
+
+$binarySuffix = if ($env:OS -eq 'Windows_NT') { '.exe' } else { '' }
+if ([string]::IsNullOrWhiteSpace($ReplayPath)) {
+    $ReplayPath = Join-Path (Join-Path $PSScriptRoot '../../build/release') "koi-replay$binarySuffix"
+}
 
 $ErrorActionPreference = 'Stop'
 

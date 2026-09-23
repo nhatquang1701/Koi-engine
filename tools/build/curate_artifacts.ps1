@@ -16,12 +16,13 @@ if ([string]::IsNullOrWhiteSpace($DestinationRoot)) {
 }
 $source = (Resolve-Path -LiteralPath $SourceRoot -ErrorAction Stop).Path
 $destination = [System.IO.Path]::GetFullPath($DestinationRoot)
-$artifactPrefix = $artifactRoot.TrimEnd('\') + '\'
+$separator = [System.IO.Path]::DirectorySeparatorChar
+$artifactPrefix = $artifactRoot.TrimEnd('\', '/') + $separator
 if ($destination -ine $artifactRoot -and
     -not $destination.StartsWith($artifactPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
     throw "Destination must be inside the repository artifacts directory: $destination"
 }
-if ($source -ieq $destination -or $source.StartsWith($destination.TrimEnd('\') + '\', [System.StringComparison]::OrdinalIgnoreCase)) {
+if ($source -ieq $destination -or $source.StartsWith($destination.TrimEnd('\', '/') + $separator, [System.StringComparison]::OrdinalIgnoreCase)) {
     throw "Source and destination may not overlap: $source -> $destination"
 }
 

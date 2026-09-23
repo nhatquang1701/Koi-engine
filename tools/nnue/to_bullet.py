@@ -32,9 +32,10 @@ import koi_dataset  # noqa: E402  (path setup above)
 
 DEFAULT_INPUT = REPO_ROOT / "artifacts" / "training" / "labels.txt"
 DEFAULT_OUTPUT_DIR = REPO_ROOT / "artifacts" / "training" / "bullet"
+_BINARY_SUFFIX = ".exe" if sys.platform == "win32" else ""
 DEFAULT_CONVERT_CANDIDATES = (
-    REPO_ROOT / "tools" / "nnue" / "bullet_train" / "target" / "release" / "convert.exe",
-    REPO_ROOT / "tools" / "nnue" / "bullet_train" / "target" / "debug" / "convert.exe",
+    REPO_ROOT / "tools" / "nnue" / "bullet_train" / "target" / "release" / f"convert{_BINARY_SUFFIX}",
+    REPO_ROOT / "tools" / "nnue" / "bullet_train" / "target" / "debug" / f"convert{_BINARY_SUFFIX}",
 )
 PSEUDO_RESULT = "0.5"
 RESULT_TOKENS = frozenset({"1.0", "0.5", "0.0"})

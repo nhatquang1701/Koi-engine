@@ -66,7 +66,8 @@ function Resolve-EngineExecutable {
         throw "EnginePath must identify a regular filesystem executable file: $Path"
     }
 
-    if (-not [string]::Equals($item.Extension, '.exe', [System.StringComparison]::OrdinalIgnoreCase)) {
+    if (($env:OS -eq 'Windows_NT') -and
+        -not [string]::Equals($item.Extension, '.exe', [System.StringComparison]::OrdinalIgnoreCase)) {
         throw "EnginePath must point to a .exe file: $Path"
     }
 

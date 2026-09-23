@@ -9,10 +9,10 @@ Design notes
 * A "run" is a self-contained directory under ``artifacts/training/runs/``
   holding ``config.json``, ``command.json``, ``train.log``, ``pid.txt``,
   ``exit_code.txt`` and the produced network/metadata/validation files.
-* Training is launched through a generated ``run.cmd`` inside the run directory
-  which starts the real command detached, records its pid and writes the exit
-  code.  That makes runs survive a GUI close and lets the GUI re-attach by
-  tailing ``train.log``.
+* Training is launched through a generated launcher script inside the run
+  directory (``run.cmd`` on Windows, ``run.sh`` elsewhere) which starts the real
+  command detached, records its pid and writes the exit code.  That makes runs
+  survive a GUI close and lets the GUI re-attach by tailing ``train.log``.
 * Backends (``tools/nnue/backends``) only provide the command line and the
   file locations; everything else is backend agnostic, so the PyTorch CPU
   trainers and the bullet GPU trainer share the same GUI, progress parsing and
@@ -25,7 +25,9 @@ import json
 import os
 import queue
 import re
+import shlex
 import shutil
+import signal
 import subprocess
 import sys
 import threading
@@ -43,8 +45,10 @@ RUNS_DIR = TRAINING_DIR / "runs"
 DEFAULT_CORPUS = TRAINING_DIR / "labels.txt"
 DEFAULT_POSITIONS = TRAINING_DIR / "positions.txt"
 DEFAULT_BUILD_DIR = REPO_ROOT / "build" / "release"
-DEFAULT_BENCH = DEFAULT_BUILD_DIR / "koi-bench.exe"
-DEFAULT_ENGINE = DEFAULT_BUILD_DIR / "koi-engine.exe"
+# Engine and tool binaries carry a suffix on Windows and are bare elsewhere.
+BINARY_SUFFIX = ".exe" if os.name == "nt" else ""
+DEFAULT_BENCH = DEFAULT_BUILD_DIR / f"koi-bench{BINARY_SUFFIX}"
+DEFAULT_ENGINE = DEFAULT_BUILD_DIR / f"koi-engine{BINARY_SUFFIX}"
 RUN_SCHEMA = "koi-nnue-studio-run-v1"
 STUDIO_VERSION = "1.0.0"
 STUDIO_STATE_DIR = REPO_ROOT / "artifacts" / "studio"
@@ -129,11 +133,11 @@ def python_executable() -> str:
 
 
 def powershell_executable() -> str:
-    for candidate in ("pwsh.exe", "powershell.exe"):
+    for candidate in ("pwsh", "pwsh.exe", "powershell.exe"):
         found = shutil.which(candidate)
         if found:
             return found
-    return "powershell.exe"
+    return "powershell.exe" if os.name == "nt" else "pwsh"
 
 
 def count_rows(path: Path | str) -> int:
@@ -604,44 +608,65 @@ def build_command_file(run: Run, argv: list[str]) -> Path:
 def launch_run(run: Run) -> None:
     """Start the run detached so it survives closing the studio window.
 
-    The launcher is a generated ``run.cmd`` inside the run directory: it
-    redirects stdout/stderr into ``train.log``/``train.err``, records the exit
-    code and finally removes ``running.lock``.  ``pid.txt`` holds the launcher
-    process so ``stop_run`` can kill the whole tree.
+    The launcher is a generated script inside the run directory (``run.cmd`` on
+    Windows, ``run.sh`` elsewhere): it redirects stdout/stderr into
+    ``train.log``/``train.err``, records the exit code and finally removes
+    ``running.lock``.  ``pid.txt`` holds the launcher process so ``stop_run``
+    can kill the whole tree.
     """
     command = read_json(run.directory / "command.json", {})
     command_line = command.get("command")
+    argv = command.get("argv")
     if not command_line:
         raise RuntimeError("run has no command.json; nothing to launch")
     log = run.directory / "train.log"
     error_log = run.directory / "train.err"
     exit_code = run.exit_code_path
     lock = run.lock_path
-    script = run.directory / "run.cmd"
-    script.write_text(
-        "@echo off\r\n"
-        f'cd /d "{command.get("cwd", REPO_ROOT)}"\r\n'
-        f"{command_line} > \"{log}\" 2> \"{error_log}\"\r\n"
-        f'echo %ERRORLEVEL% > "{exit_code}"\r\n'
-        f'del "{lock}" >nul 2>nul\r\n',
-        encoding="utf-8",
-    )
-    lock.write_text("starting\n", encoding="utf-8")
-    creationflags = 0
+    cwd = command.get("cwd", REPO_ROOT)
     if os.name == "nt":
+        script = run.directory / "run.cmd"
+        script.write_text(
+            "@echo off\r\n"
+            f'cd /d "{cwd}"\r\n'
+            f"{command_line} > \"{log}\" 2> \"{error_log}\"\r\n"
+            f'echo %ERRORLEVEL% > "{exit_code}"\r\n'
+            f'del "{lock}" >nul 2>nul\r\n',
+            encoding="utf-8",
+        )
+        launcher = ["cmd.exe", "/d", "/c", str(script)]
         creationflags = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(
             subprocess, "CREATE_NEW_PROCESS_GROUP", 0
         )
+        popen_options: dict[str, Any] = {"creationflags": creationflags}
+    else:
+        script = run.directory / "run.sh"
+        # command.json keeps a Windows-style command line for display; on POSIX
+        # the exact argv list is the only safe thing to run.
+        quoted = shlex.join(argv) if isinstance(argv, list) and argv else command_line
+        script.write_text(
+            "#!/bin/sh\n"
+            f"cd {shlex.quote(str(cwd))}\n"
+            f"{quoted} > {shlex.quote(str(log))} 2> {shlex.quote(str(error_log))}\n"
+            f"echo $? > {shlex.quote(str(exit_code))}\n"
+            f"rm -f {shlex.quote(str(lock))}\n",
+            encoding="utf-8",
+        )
+        launcher = ["/bin/sh", str(script)]
+        # start_new_session detaches the run from the studio so it survives a
+        # GUI close and owns its own process group for stop_run.
+        popen_options = {"start_new_session": True}
+    lock.write_text("starting\n", encoding="utf-8")
     launcher_log = open(run.directory / "launcher.log", "ab")
     try:
         process = subprocess.Popen(
-            ["cmd.exe", "/d", "/c", str(script)],
-            cwd=str(command.get("cwd", REPO_ROOT)),
+            launcher,
+            cwd=str(cwd),
             stdin=subprocess.DEVNULL,
             stdout=launcher_log,
             stderr=launcher_log,
-            creationflags=creationflags,
             close_fds=True,
+            **popen_options,
         )
     finally:
         launcher_log.close()
@@ -662,6 +687,9 @@ def pid_alive(pid: int | None) -> bool:
         return str(pid) in result.stdout
     try:
         os.kill(pid, 0)
+    except PermissionError:
+        # The process exists but belongs to another user.
+        return True
     except OSError:
         return False
     return True
@@ -671,11 +699,21 @@ def stop_run(run: Run) -> bool:
     """Terminate a run's process tree; returns True when something was killed."""
     pid = run.pid()
     if pid and pid_alive(pid):
-        subprocess.run(
-            ["taskkill", "/PID", str(pid), "/T", "/F"],
-            capture_output=True,
-            check=False,
-        )
+        if os.name == "nt":
+            subprocess.run(
+                ["taskkill", "/PID", str(pid), "/T", "/F"],
+                capture_output=True,
+                check=False,
+            )
+        else:
+            # The POSIX launcher owns its own session, so the whole group dies.
+            try:
+                os.killpg(os.getpgid(pid), signal.SIGTERM)
+            except OSError:
+                try:
+                    os.kill(pid, signal.SIGTERM)
+                except OSError:
+                    pass
     run.lock_path.unlink(missing_ok=True)
     run.write_state(status="stopped", stopped=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))
     return bool(pid)
@@ -740,15 +778,24 @@ class CancelToken:
 
 def terminate_process_tree(pid: int) -> None:
     """Best-effort termination of a process and its children."""
+    if os.name == "nt":
+        try:
+            subprocess.run(
+                ["taskkill", "/PID", str(pid), "/T", "/F"],
+                capture_output=True,
+                check=False,
+                timeout=30,
+            )
+        except (OSError, subprocess.SubprocessError):
+            pass
+        return
     try:
-        subprocess.run(
-            ["taskkill", "/PID", str(pid), "/T", "/F"],
-            capture_output=True,
-            check=False,
-            timeout=30,
-        )
-    except (OSError, subprocess.SubprocessError):
-        pass
+        os.killpg(os.getpgid(pid), signal.SIGKILL)
+    except OSError:
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except OSError:
+            pass
 
 
 def run_process(
@@ -1299,6 +1346,22 @@ def revert_adoption(
 
 def running_engines() -> list[int]:
     """PIDs of running ``koi-engine`` processes (empty when unknown)."""
+    if os.name != "nt":
+        pids: list[int] = []
+        try:
+            entries = Path("/proc").iterdir()
+        except OSError:
+            return pids
+        for entry in entries:
+            if not entry.name.isdigit():
+                continue
+            try:
+                name = (entry / "comm").read_text(encoding="utf-8").strip()
+            except OSError:
+                continue
+            if name.startswith("koi-engine"):
+                pids.append(int(entry.name))
+        return pids
     try:
         result = subprocess.run(
             ["tasklist", "/FI", "IMAGENAME eq koi-engine.exe", "/FO", "CSV", "/NH"],

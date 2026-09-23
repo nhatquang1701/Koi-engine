@@ -61,9 +61,11 @@ $buildDirectories = @('debug', 'release', 'ci-debug', 'ci-release') | ForEach-Ob
     }
 }
 
-$releaseDirectory = Join-Path $repositoryRoot 'build\release'
-$releaseExecutables = @('koi-engine.exe', 'koi-engine-avx2.exe', 'koi-engine-avx512.exe',
-                        'koi-bench.exe', 'koi-replay.exe', 'koi-perft.exe') | ForEach-Object {
+$releaseDirectory = Join-Path (Join-Path $repositoryRoot 'build') 'release'
+$binarySuffix = if ($env:OS -eq 'Windows_NT') { '.exe' } else { '' }
+$releaseExecutables = @("koi-engine$binarySuffix", "koi-engine-avx2$binarySuffix",
+                        "koi-engine-avx512$binarySuffix", "koi-bench$binarySuffix",
+                        "koi-replay$binarySuffix", "koi-perft$binarySuffix") | ForEach-Object {
     $path = Join-Path $releaseDirectory $_
     [ordered]@{
         name = $_
@@ -91,7 +93,7 @@ $compiler = $cache | Where-Object { $_ -like 'CMAKE_CXX_COMPILER:*=*' } | Select
 # Report the summary of the most recent CTest run instead of a frozen count,
 # so the manifest cannot drift from the suite inventory.
 $releaseCtestSummary = 'not recorded'
-$lastTestLog = Join-Path $releaseDirectory 'Testing\Temporary\LastTest.log'
+$lastTestLog = Join-Path (Join-Path (Join-Path $releaseDirectory 'Testing') 'Temporary') 'LastTest.log'
 if (Test-Path -LiteralPath $lastTestLog -PathType Leaf) {
     $summaryMatch = Select-String -LiteralPath $lastTestLog -Pattern 'tests passed, .*tests failed out of' -ErrorAction SilentlyContinue |
         Select-Object -Last 1

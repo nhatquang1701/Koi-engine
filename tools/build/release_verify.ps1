@@ -2,20 +2,20 @@ param(
     [string]$OutputDirectory = '',
     [string]$CMakePath = 'cmake',
     [string]$Generator = 'Ninja',
-    [string]$CxxCompiler = 'cl',
+    [string]$CxxCompiler = $(if ($env:OS -eq 'Windows_NT') { 'cl' } else { '' }),
     [int]$BuildJobs = 2
 )
 
 $ErrorActionPreference = 'Stop'
 
-$repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
+$repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
-    $OutputDirectory = Join-Path $repositoryRoot ('artifacts\verification\release-verify-' +
+    $OutputDirectory = Join-Path $repositoryRoot ('artifacts/verification/release-verify-' +
         [guid]::NewGuid().ToString('N'))
 }
 $verificationRoot = [System.IO.Path]::GetFullPath($OutputDirectory)
-$artifactsRoot = [System.IO.Path]::GetFullPath((Join-Path $repositoryRoot 'artifacts\verification'))
-$artifactsPrefix = $artifactsRoot.TrimEnd('\') + '\'
+$artifactsRoot = [System.IO.Path]::GetFullPath((Join-Path $repositoryRoot 'artifacts/verification'))
+$artifactsPrefix = $artifactsRoot.TrimEnd('\', '/') + [System.IO.Path]::DirectorySeparatorChar
 if ($verificationRoot -ieq $artifactsRoot -or -not $verificationRoot.StartsWith($artifactsPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
     throw "Verification output must be under repository artifacts: $verificationRoot"
 }
@@ -153,13 +153,15 @@ try {
         throw "CMake 3.31 or newer is required; found $versionLine"
     }
     $cmakeCommand = Get-Command $CMakePath -ErrorAction Stop
-    $ctestPath = Join-Path (Split-Path -Parent $cmakeCommand.Source) 'ctest.exe'
+    $ctestName = if ($env:OS -eq 'Windows_NT') { 'ctest.exe' } else { 'ctest' }
+    $ctestPath = Join-Path (Split-Path -Parent $cmakeCommand.Source) $ctestName
     if (-not (Test-Path -LiteralPath $ctestPath -PathType Leaf)) {
         $ctestPath = 'ctest'
     }
 
-    $debugBuild = Join-Path $repositoryRoot 'build\debug'
-    $releaseBuild = Join-Path $repositoryRoot 'build\release'
+    $binarySuffix = if ($env:OS -eq 'Windows_NT') { '.exe' } else { '' }
+    $debugBuild = Join-Path (Join-Path $repositoryRoot 'build') 'debug'
+    $releaseBuild = Join-Path (Join-Path $repositoryRoot 'build') 'release'
     foreach ($configuration in @('Debug', 'Release')) {
         $build = if ($configuration -eq 'Debug') { $debugBuild } else { $releaseBuild }
         $configureLog = Join-Path $verificationRoot ("configure-$configuration.txt")
@@ -190,9 +192,9 @@ try {
     if (Test-Path -LiteralPath $releaseConfigurationDirectory -PathType Container) {
         $releaseBin = $releaseConfigurationDirectory
     }
-    $benchPath = Join-Path $releaseBin 'koi-bench.exe'
-    $enginePath = Join-Path $releaseBin 'koi-engine.exe'
-    $replayPath = Join-Path $releaseBin 'koi-replay.exe'
+    $benchPath = Join-Path $releaseBin "koi-bench$binarySuffix"
+    $enginePath = Join-Path $releaseBin "koi-engine$binarySuffix"
+    $replayPath = Join-Path $releaseBin "koi-replay$binarySuffix"
     foreach ($path in @($benchPath, $enginePath, $replayPath)) {
         if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
             throw "Release executable is missing: $path"
@@ -302,7 +304,7 @@ try {
     $enCroissantDirectory = Join-Path $verificationRoot 'en-croissant-style-24ply'
     New-Item -ItemType Directory -Path $enCroissantDirectory -Force | Out-Null
     $enCroissantThreads = if ($maximumThreads -ge 4) { 4 } else { $maximumThreads }
-    $matchScript = Join-Path $repositoryRoot 'tools\stability\uci_match.ps1'
+    $matchScript = Join-Path $repositoryRoot 'tools/stability/uci_match.ps1'
     # Use the current PowerShell host instead of a hardcoded powershell.exe so
     # the gate works on hosts that only ship pwsh.
     $matchOutput = Invoke-LoggedCommand (Get-Process -Id $PID).Path @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $matchScript,

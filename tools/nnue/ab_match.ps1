@@ -58,21 +58,22 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
+$binarySuffix = if ($env:OS -eq 'Windows_NT') { '.exe' } else { '' }
 if ([string]::IsNullOrWhiteSpace($EnginePath)) {
-    $EnginePath = Join-Path $repositoryRoot 'build\release\koi-engine.exe'
+    $EnginePath = Join-Path (Join-Path $repositoryRoot 'build/release') "koi-engine$binarySuffix"
 }
 if ([string]::IsNullOrWhiteSpace($UciMatchPath)) {
-    $UciMatchPath = Join-Path $repositoryRoot 'tools\stability\uci_match.ps1'
+    $UciMatchPath = Join-Path (Join-Path $repositoryRoot 'tools/stability') 'uci_match.ps1'
 }
 if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
-    $OutputDirectory = Join-Path $repositoryRoot ('artifacts\matches\nnue-ab-' +
+    $OutputDirectory = Join-Path (Join-Path $repositoryRoot 'artifacts/matches') ('nnue-ab-' +
         (Get-Date).ToUniversalTime().ToString('yyyyMMdd-HHmmss-fff'))
 }
 New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
 
 $nnuePath = (Resolve-Path -LiteralPath $NnueNet).Path
 $engine = (Resolve-Path -LiteralPath $EnginePath).Path
-$replay = Join-Path (Split-Path -Parent $engine) 'koi-replay.exe'
+$replay = Join-Path (Split-Path -Parent $engine) "koi-replay$binarySuffix"
 if (-not (Test-Path -LiteralPath $replay -PathType Leaf)) {
     throw "koi-replay executable is missing beside the engine: $replay"
 }

@@ -1,10 +1,15 @@
 [CmdletBinding()]
 param(
-    [string]$EnginePath = (Join-Path $PSScriptRoot '..\..\build\release\koi-engine.exe'),
+    [string]$EnginePath = '',
     [string]$HashValues = '512,2048,3072,4096',
     [int]$Cycles = 1,
-    [string]$OutputDirectory = (Join-Path $PSScriptRoot '..\..\artifacts\stability\hash-memory')
+    [string]$OutputDirectory = (Join-Path $PSScriptRoot '../../artifacts/stability/hash-memory')
 )
+
+$binarySuffix = if ($env:OS -eq 'Windows_NT') { '.exe' } else { '' }
+if ([string]::IsNullOrWhiteSpace($EnginePath)) {
+    $EnginePath = Join-Path (Join-Path $PSScriptRoot '../../build/release') "koi-engine$binarySuffix"
+}
 
 $ErrorActionPreference = 'Stop'
 

@@ -8,8 +8,15 @@ $ErrorActionPreference = 'Stop'
 $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 $buildRoot = [System.IO.Path]::GetFullPath($BuildDirectory)
 $outputRoot = [System.IO.Path]::GetFullPath($OutputDirectory)
-$packageDirectory = Join-Path $outputRoot 'koi-engine-v1.1'
-$archivePath = Join-Path $outputRoot 'koi-engine-v1.1.zip'
+$isWindowsHost = $env:OS -eq 'Windows_NT'
+$binarySuffix = if ($isWindowsHost) { '.exe' } else { '' }
+$platformTag = if ($isWindowsHost) { '' } else { '-linux-x86_64' }
+$packageDirectory = Join-Path $outputRoot "koi-engine-v1.1$platformTag"
+$archivePath = if ($isWindowsHost) {
+    Join-Path $outputRoot 'koi-engine-v1.1.zip'
+} else {
+    Join-Path $outputRoot "koi-engine-v1.1$platformTag.tar.gz"
+}
 
 function Get-Sha256Hex {
     param(
@@ -31,8 +38,9 @@ if (-not (Test-Path -LiteralPath $buildRoot -PathType Container)) {
 }
 New-Item -ItemType Directory -Path $outputRoot -Force | Out-Null
 
-$requiredExecutables = @('koi-engine.exe', 'koi-engine-avx2.exe', 'koi-engine-avx512.exe',
-                         'koi-bench.exe', 'koi-replay.exe', 'koi-perft.exe')
+$requiredExecutables = @("koi-engine$binarySuffix", "koi-engine-avx2$binarySuffix",
+                         "koi-engine-avx512$binarySuffix", "koi-bench$binarySuffix",
+                         "koi-replay$binarySuffix", "koi-perft$binarySuffix")
 function Test-RequiredExecutables {
     param(
         [Parameter(Mandatory = $true)]
@@ -62,7 +70,7 @@ if (-not (Test-Path -LiteralPath $readmePath -PathType Leaf)) {
 
 # Only the exact generated package directory is replaced.  The resolved target
 # is checked to stay below the explicitly selected output directory.
-$outputPrefix = $outputRoot.TrimEnd('\', '/') + '\'
+$outputPrefix = $outputRoot.TrimEnd('\', '/') + [System.IO.Path]::DirectorySeparatorChar
 $resolvedPackage = [System.IO.Path]::GetFullPath($packageDirectory)
 if (-not $resolvedPackage.StartsWith($outputPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
     throw "Refusing to replace package outside the output directory: $resolvedPackage"
@@ -79,21 +87,24 @@ Copy-Item -LiteralPath $readmePath -Destination (Join-Path $packageDirectory 'RE
 
 $licenseDirectory = Join-Path $packageDirectory 'licenses'
 New-Item -ItemType Directory -Path $licenseDirectory -Force | Out-Null
-Copy-Item -LiteralPath (Join-Path $repositoryRoot 'third_party\chess-library\LICENSE') `
+Copy-Item -LiteralPath (Join-Path $repositoryRoot 'third_party/chess-library/LICENSE') `
     -Destination (Join-Path $licenseDirectory 'chess-library-MIT.txt')
-Copy-Item -LiteralPath (Join-Path $repositoryRoot 'third_party\fathom\LICENSE') `
+Copy-Item -LiteralPath (Join-Path $repositoryRoot 'third_party/fathom/LICENSE') `
     -Destination (Join-Path $licenseDirectory 'fathom-MIT.txt')
 
-@'
+$engineName = "koi-engine$binarySuffix"
+$avx2Name = "koi-engine-avx2$binarySuffix"
+$avx512Name = "koi-engine-avx512$binarySuffix"
+@"
 Koi Engine v1.1 installation
 
-Run koi-engine.exe as a UCI engine from En Croissant or another UCI GUI.
-koi-engine.exe starts the fastest build this CPU supports: it launches the
-koi-engine-avx512.exe or koi-engine-avx2.exe sibling when it is present and the
-CPU supports those instructions, and otherwise runs its own baseline build in
-place. Set KOI_CPU_VARIANT=generic, avx2, or avx512 to force one build.
+Run $engineName as a UCI engine from En Croissant or another UCI GUI.
+$engineName starts the fastest build this CPU supports: it launches the
+$avx512Name or $avx2Name sibling when it is present and the CPU supports those
+instructions, and otherwise runs its own baseline build in place. Set
+KOI_CPU_VARIANT=generic, avx2, or avx512 to force one build.
 
-The optional user-supplied book.bin belongs beside koi-engine.exe and is not
+The optional user-supplied book.bin belongs beside $engineName and is not
 included in this package. Syzygy tablebase files are also user-supplied;
 configure SyzygyPath in the GUI when they are available.
 
@@ -106,11 +117,12 @@ Recommended starting options:
   BookDepth=16
   BookRandom=false
 
-Every build requires an x64 CPU. The AVX2 build requires AVX2 and the AVX-512
-build requires AVX-512; the baseline build has no instruction-set requirement.
-The optional GPU NNUE inference needs an NVIDIA GPU (Pascal sm_61 or newer)
-with a CUDA 12.x-capable driver and is opt-in with KOI_GPU_NNUE=1.
-'@ | Set-Content -LiteralPath (Join-Path $packageDirectory 'INSTALL.txt') -Encoding UTF8
+Every build requires an x86-64 CPU. The AVX2 build requires AVX2 and the
+AVX-512 build requires AVX-512; the baseline build has no instruction-set
+requirement. The optional GPU NNUE inference needs an NVIDIA GPU (Pascal
+sm_61 or newer) with a CUDA 12.x-capable driver and is opt-in with
+KOI_GPU_NNUE=1.
+"@ | Set-Content -LiteralPath (Join-Path $packageDirectory 'INSTALL.txt') -Encoding UTF8
 
 $manifest = [ordered]@{
     schema = 'koi-engine-package-v1'
@@ -127,7 +139,14 @@ $manifest | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $packa
 if (Test-Path -LiteralPath $archivePath) {
     Remove-Item -LiteralPath $archivePath -Force
 }
-Compress-Archive -Path (Join-Path $packageDirectory '*') -DestinationPath $archivePath -CompressionLevel Optimal
+if ($isWindowsHost) {
+    Compress-Archive -Path (Join-Path $packageDirectory '*') -DestinationPath $archivePath -CompressionLevel Optimal
+} else {
+    & tar -czf $archivePath -C $packageDirectory .
+    if ($LASTEXITCODE -ne 0) {
+        throw "tar failed with exit code $LASTEXITCODE."
+    }
+}
 
 Write-Output "package_directory=$packageDirectory"
 Write-Output "archive=$archivePath"

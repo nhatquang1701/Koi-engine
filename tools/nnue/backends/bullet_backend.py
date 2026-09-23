@@ -13,6 +13,7 @@ to build it.
 
 from __future__ import annotations
 
+import os
 import shutil
 from pathlib import Path
 
@@ -24,10 +25,15 @@ from studio_core import (
     python_executable,
 )
 
-TRAINER = REPO_ROOT / "tools" / "nnue" / "bullet_train" / "target" / "release" / "bullet_train.exe"
+_BINARY_SUFFIX = ".exe" if os.name == "nt" else ""
+TRAINER = (
+    REPO_ROOT / "tools" / "nnue" / "bullet_train" / "target" / "release" / f"bullet_train{_BINARY_SUFFIX}"
+)
 RUNNER = REPO_ROOT / "tools" / "nnue" / "run_bullet.py"
 DEFAULT_DATA_DIR = REPO_ROOT / "artifacts" / "training" / "bullet"
 CUDA_BIN_CANDIDATES = (
+    Path("/usr/local/cuda/bin"),
+    Path("/opt/cuda/bin"),
     Path(r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.9\bin"),
     Path(r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.8\bin"),
     Path(r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.6\bin"),
@@ -38,7 +44,7 @@ def _cargo() -> str | None:
     found = shutil.which("cargo")
     if found:
         return found
-    local = Path.home() / ".cargo" / "bin" / "cargo.exe"
+    local = Path.home() / ".cargo" / "bin" / f"cargo{_BINARY_SUFFIX}"
     return str(local) if local.exists() else None
 
 

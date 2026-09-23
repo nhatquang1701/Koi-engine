@@ -1,7 +1,8 @@
-# Requires the repository's MSVC x64 environment. Either run this script from a
-# Visual Studio developer shell, or pass -EnvironmentScript pointing at a .cmd
-# wrapper that calls vcvars64.bat and forwards its arguments (see the developer
-# notes in tools/README.md). The wrapper avoids re-quoting cl/cmake invocations.
+# On Windows this requires the repository's MSVC x64 environment. Either run it
+# from a Visual Studio developer shell, or pass -EnvironmentScript pointing at a
+# .cmd wrapper that calls vcvars64.bat and forwards its arguments (see the
+# developer notes in tools/README.md). On Linux no wrapper is needed: the
+# default GCC/Clang toolchain is used as-is.
 #
 # Examples:
 #   .\tools\test\run_tests.ps1                                  # full Release suite, parallel
@@ -48,9 +49,11 @@ if ($Parallel -le 0) {
     $Parallel = [Math]::Max(1, [Environment]::ProcessorCount)
 }
 
+$isWindowsHost = $env:OS -eq 'Windows_NT'
+
 function Invoke-WithEnvironment {
     param([scriptblock]$Action)
-    $needsWrapper = -not (Get-Command cl.exe -ErrorAction SilentlyContinue)
+    $needsWrapper = $isWindowsHost -and -not (Get-Command cl.exe -ErrorAction SilentlyContinue)
     if (-not $needsWrapper) {
         & $Action
         return
@@ -75,7 +78,9 @@ if (-not (Test-Path -LiteralPath $BuildDirectory)) {
 
 if (-not $NoBuild) {
     Write-Host "build: $BuildDirectory ($Configuration)"
-    if (Get-Command cl.exe -ErrorAction SilentlyContinue) {
+    if (-not $isWindowsHost) {
+        & $cmake --build $BuildDirectory --config $Configuration
+    } elseif (Get-Command cl.exe -ErrorAction SilentlyContinue) {
         & $cmake --build $BuildDirectory --config $Configuration
     } else {
         if (-not $EnvironmentScript) {

@@ -300,7 +300,8 @@ $replay = $null
 if (-not [string]::IsNullOrWhiteSpace($ReplayPath)) {
     $replay = Assert-File $ReplayPath 'Replay executable'
 } elseif (-not [string]::IsNullOrWhiteSpace($KoiPath)) {
-    $candidateReplay = Join-Path (Split-Path -Parent $koi) 'koi-replay.exe'
+    $binarySuffix = if ($env:OS -eq 'Windows_NT') { '.exe' } else { '' }
+    $candidateReplay = Join-Path (Split-Path -Parent $koi) "koi-replay$binarySuffix"
     if (Test-Path -LiteralPath $candidateReplay -PathType Leaf) {
         $replay = (Resolve-Path -LiteralPath $candidateReplay).Path
     }

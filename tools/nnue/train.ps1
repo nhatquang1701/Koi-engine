@@ -40,7 +40,12 @@ if (-not (Test-Path -LiteralPath $studio -PathType Leaf)) {
     throw "koi_nnue_studio.py is missing: $studio"
 }
 
-$python = (Get-Command python.exe -ErrorAction Stop).Source
+$pythonCommand = Get-Command python, python3, python.exe -ErrorAction SilentlyContinue |
+    Select-Object -First 1
+if (-not $pythonCommand) {
+    throw 'python is not on PATH.'
+}
+$python = $pythonCommand.Source
 $arguments = @($studio, '--run', $Preset, '--backend', $Backend)
 if ($Detach) {
     $arguments += '--detach'

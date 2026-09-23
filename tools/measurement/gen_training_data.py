@@ -26,6 +26,7 @@ import argparse
 import os
 import queue
 import random
+import shutil
 import sys
 import threading
 import time
@@ -33,7 +34,7 @@ from pathlib import Path
 
 import koi_chess as chess
 
-DEFAULT_STOCKFISH = (
+_VENDORED_STOCKFISH = (
     Path(__file__).resolve().parents[2]
     / "third_party"
     / "stockfish-19"
@@ -41,6 +42,17 @@ DEFAULT_STOCKFISH = (
     / "stockfish"
     / "stockfish-windows-x86-64-universal.exe"
 )
+
+
+def _default_stockfish_path() -> Path:
+    """The vendored Windows build, or the system ``stockfish`` elsewhere."""
+    if os.name == "nt":
+        return _VENDORED_STOCKFISH
+    found = shutil.which("stockfish")
+    return Path(found) if found else _VENDORED_STOCKFISH
+
+
+DEFAULT_STOCKFISH = _default_stockfish_path()
 
 # Positions with absurd material or book-like shallow plies are skipped.
 MIN_PLIES = 6

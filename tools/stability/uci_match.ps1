@@ -772,7 +772,8 @@ function Format-Pgn($Position, $Game, [string]$WhiteName, [string]$BlackName, [s
 
 $koiExecutable = Resolve-Executable $KoiPath 'Koi'
 $opponentExecutable = Resolve-Executable $OpponentPath 'opponent'
-$defaultReplayPath = Join-Path (Split-Path -Parent $koiExecutable) 'koi-replay.exe'
+$binarySuffix = if ($env:OS -eq 'Windows_NT') { '.exe' } else { '' }
+$defaultReplayPath = Join-Path (Split-Path -Parent $koiExecutable) "koi-replay$binarySuffix"
 $replayExecutable = Resolve-Executable $(if ([string]::IsNullOrWhiteSpace($ReplayPath)) { $defaultReplayPath } else { $ReplayPath }) 'koi-replay'
 $positions = Read-OpeningSpecs
 if ($null -eq $positions) {
