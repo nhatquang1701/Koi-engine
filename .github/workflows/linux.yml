@@ -1,0 +1,164 @@
+name: Linux CTest
+
+on:
+  push:
+  pull_request:
+
+# Separate jobs so a GCC, Clang, modules-off, or packaging failure cannot cancel
+# the others, and so each leg can upload its own diagnostics.  The GCC/Clang
+# legs exercise the C++26 named-module build; the modules-off leg proves the
+# documented fallback (KOI_BUILD_MODULES=OFF) still builds and tests cleanly.
+jobs:
+  linux-gcc:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: tools/measurement/requirements.txt
+      - name: Install the GCC 14 toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends g++-14 ninja-build
+          python -m pip install --disable-pip-version-check --quiet --upgrade cmake -r tools/measurement/requirements.txt
+      - name: Configure and build with GCC 14
+        run: |
+          cmake -S . -B build/ci-release -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER=gcc-14 -DCMAKE_CXX_COMPILER=g++-14 \
+            -DPython3_EXECUTABLE="$(command -v python)"
+          cmake --build build/ci-release --config Release -j 4
+      - name: Run the full CTest suite
+        env:
+          # Wall-clock-sensitive search cases get extra in-process attempts; a
+          # shared runner is easily starved when the suite runs at -j 4.
+          KOI_TEST_RETRIES: "3"
+        run: |
+          ctest --test-dir build/ci-release -C Release -j 4 --repeat until-pass:2 \
+            --output-on-failure --output-junit build/ci-release/ctest-junit.xml
+      - name: Upload GCC test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: linux-gcc-test-diagnostics
+          path: |
+            build/ci-release/ctest-junit.xml
+            build/ci-release/Testing/Temporary/LastTest.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+  linux-clang:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: tools/measurement/requirements.txt
+      - name: Install the Clang 18 toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends clang-18 clang-tools-18 libclang-rt-18-dev ninja-build
+          python -m pip install --disable-pip-version-check --quiet --upgrade cmake -r tools/measurement/requirements.txt
+      - name: Configure and build with Clang 18
+        run: |
+          cmake -S . -B build/ci-release -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER=clang-18 -DCMAKE_CXX_COMPILER=clang++-18 \
+            -DPython3_EXECUTABLE="$(command -v python)"
+          cmake --build build/ci-release --config Release -j 4
+      - name: Run the full CTest suite
+        env:
+          KOI_TEST_RETRIES: "3"
+        run: |
+          ctest --test-dir build/ci-release -C Release -j 4 --repeat until-pass:2 \
+            --output-on-failure --output-junit build/ci-release/ctest-junit.xml
+      - name: Upload Clang test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: linux-clang-test-diagnostics
+          path: |
+            build/ci-release/ctest-junit.xml
+            build/ci-release/Testing/Temporary/LastTest.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+  linux-modules-off:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: tools/measurement/requirements.txt
+      - name: Install the GCC 14 toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends g++-14 ninja-build
+          python -m pip install --disable-pip-version-check --quiet --upgrade cmake -r tools/measurement/requirements.txt
+      - name: Configure and build without C++26 modules
+        run: |
+          cmake -S . -B build/ci-release -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER=gcc-14 -DCMAKE_CXX_COMPILER=g++-14 \
+            -DKOI_BUILD_MODULES=OFF -DPython3_EXECUTABLE="$(command -v python)"
+          cmake --build build/ci-release --config Release -j 4
+      - name: Assert the module test is not registered, then run the unit suite
+        run: |
+          if ctest --test-dir build/ci-release -N | grep -q koi_module_tests; then
+            echo "koi_module_tests must not be registered when KOI_BUILD_MODULES=OFF" >&2
+            exit 1
+          fi
+          ctest --test-dir build/ci-release -C Release -j 4 -L unit -LE heavy --output-on-failure
+      - name: Upload modules-off test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: linux-modules-off-test-diagnostics
+          path: build/ci-release/Testing/Temporary/LastTest.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+  linux-tarball:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+      # The release tarball must run on older distributions, so it is built in
+      # an Ubuntu 22.04 container (glibc 2.35 floor) with GCC 14 from the
+      # toolchain PPA and a statically linked libstdc++/libgcc.
+      - name: Build and package inside an Ubuntu 22.04 container
+        run: |
+          docker run --rm -v "$PWD":/work -w /work ubuntu:22.04 bash -euxo pipefail -c '
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates wget software-properties-common python3-pip
+          add-apt-repository -y ppa:ubuntu-toolchain-r/test
+          wget -q https://packages.microsoft.com/config/ubuntu/22.04/packages-microsoft-prod.deb -O /tmp/packages-microsoft-prod.deb
+          dpkg -i /tmp/packages-microsoft-prod.deb
+          apt-get update
+          apt-get install -y --no-install-recommends g++-14 powershell
+          python3 -m pip install --disable-pip-version-check --quiet --upgrade cmake ninja
+          cmake -S . -B build/ci-release -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=gcc-14 -DCMAKE_CXX_COMPILER=g++-14 -DKOI_BUILD_MODULES=OFF -DKOI_ENABLE_GPU_NNUE=OFF
+          cmake --build build/ci-release --config Release -j 4
+          pwsh -NoProfile -File tools/build/package_release.ps1 -BuildDirectory build/ci-release -OutputDirectory artifacts/packages
+          ls -l artifacts/packages
+          printf "uci\nisready\nposition startpos\ngo depth 2\nquit\n" | ./build/ci-release/koi-engine > /tmp/smoke-auto.txt
+          grep -q "bestmove" /tmp/smoke-auto.txt
+          printf "uci\nisready\nposition startpos\ngo depth 2\nquit\n" | env KOI_CPU_VARIANT=generic ./build/ci-release/koi-engine > /tmp/smoke-generic.txt
+          grep -q "bestmove" /tmp/smoke-generic.txt
+          tar -tzf artifacts/packages/koi-engine-v1.1-linux-x86_64.tar.gz
+          '
+      - name: Upload the portable tarball
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: koi-engine-linux-tarball
+          path: artifacts/packages/koi-engine-v1.1-linux-x86_64.tar.gz
+          if-no-files-found: ignore
+          retention-days: 7
