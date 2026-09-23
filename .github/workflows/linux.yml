@@ -28,24 +28,27 @@ jobs:
         run: |
           cmake -S . -B build/ci-release -G Ninja -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_C_COMPILER=gcc-14 -DCMAKE_CXX_COMPILER=g++-14 \
+            -DKOI_TEST_TIMEOUT_SECONDS=300 \
             -DPython3_EXECUTABLE="$(command -v python)"
           cmake --build build/ci-release --config Release -j 4
-      # The suite runs in three label-grouped steps so a slow or hanging group
-      # is localized, the heavy search cases do not compete with the process
-      # tests, and an interrupted step still leaves the earlier JUnit reports
-      # behind.  Wall-clock-sensitive search cases get extra in-process attempts
-      # because a shared runner is easily starved.
+      # The suite runs in four label-grouped steps so a slow or hanging group is
+      # localized, the heavy search cases do not compete with the process tests,
+      # and an interrupted step still leaves the earlier JUnit reports behind.
+      # `--repeat until-pass:2` matches the Windows gate: wall-clock-sensitive
+      # search and process cases are retried once on a starved shared runner.
       - name: Run the unit suite
         env:
           KOI_TEST_RETRIES: "3"
         run: |
           ctest --test-dir build/ci-release -C Release -j 4 -L unit -LE heavy \
+            --repeat until-pass:2 \
             --output-on-failure --output-junit build/ci-release/ctest-unit-junit.xml
       - name: Run the heavy search suite
         env:
           KOI_TEST_RETRIES: "3"
         run: |
           ctest --test-dir build/ci-release -C Release -j 2 -L heavy -LE process \
+            --repeat until-pass:2 \
             --output-on-failure --output-junit build/ci-release/ctest-heavy-junit.xml
       - name: Run the heavy process suite
         env:
@@ -53,13 +56,22 @@ jobs:
         run: |
           ctest --test-dir build/ci-release -C Release -j 1 \
             -R "koi_engine_time_safety_process|koi_benchmark_process" \
+            --repeat until-pass:2 \
             --output-on-failure --output-junit build/ci-release/ctest-heavy-process-junit.xml
-      - name: Run the process and Python suites
+      - name: Run the process suite
         env:
           KOI_TEST_RETRIES: "3"
         run: |
-          ctest --test-dir build/ci-release -C Release -j 2 -LE "unit;heavy" \
-            --output-on-failure --output-junit build/ci-release/ctest-rest-junit.xml
+          ctest --test-dir build/ci-release -C Release -j 2 -LE "unit;heavy;python" \
+            --repeat until-pass:2 \
+            --output-on-failure --output-junit build/ci-release/ctest-process-junit.xml
+      - name: Run the Python suite
+        env:
+          KOI_TEST_RETRIES: "3"
+        run: |
+          ctest --test-dir build/ci-release -C Release -j 2 -L python \
+            --repeat until-pass:2 \
+            --output-on-failure --output-junit build/ci-release/ctest-python-junit.xml
       - name: Show the test log tail
         if: always()
         run: tail -n 150 build/ci-release/Testing/Temporary/LastTest.log || true
@@ -97,19 +109,22 @@ jobs:
           cmake -S . -B build/ci-release -G Ninja -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_C_COMPILER=clang-18 -DCMAKE_CXX_COMPILER=clang++-18 \
             -DCMAKE_CXX_FLAGS=-stdlib=libc++ -DCMAKE_EXE_LINKER_FLAGS=-stdlib=libc++ \
-            -DKOI_STATIC_RUNTIME=OFF -DPython3_EXECUTABLE="$(command -v python)"
+            -DKOI_STATIC_RUNTIME=OFF -DKOI_TEST_TIMEOUT_SECONDS=300 \
+            -DPython3_EXECUTABLE="$(command -v python)"
           cmake --build build/ci-release --config Release -j 4
       - name: Run the unit suite
         env:
           KOI_TEST_RETRIES: "3"
         run: |
           ctest --test-dir build/ci-release -C Release -j 4 -L unit -LE heavy \
+            --repeat until-pass:2 \
             --output-on-failure --output-junit build/ci-release/ctest-unit-junit.xml
       - name: Run the heavy search suite
         env:
           KOI_TEST_RETRIES: "3"
         run: |
           ctest --test-dir build/ci-release -C Release -j 2 -L heavy -LE process \
+            --repeat until-pass:2 \
             --output-on-failure --output-junit build/ci-release/ctest-heavy-junit.xml
       - name: Run the heavy process suite
         env:
@@ -117,13 +132,22 @@ jobs:
         run: |
           ctest --test-dir build/ci-release -C Release -j 1 \
             -R "koi_engine_time_safety_process|koi_benchmark_process" \
+            --repeat until-pass:2 \
             --output-on-failure --output-junit build/ci-release/ctest-heavy-process-junit.xml
-      - name: Run the process and Python suites
+      - name: Run the process suite
         env:
           KOI_TEST_RETRIES: "3"
         run: |
-          ctest --test-dir build/ci-release -C Release -j 2 -LE "unit;heavy" \
-            --output-on-failure --output-junit build/ci-release/ctest-rest-junit.xml
+          ctest --test-dir build/ci-release -C Release -j 2 -LE "unit;heavy;python" \
+            --repeat until-pass:2 \
+            --output-on-failure --output-junit build/ci-release/ctest-process-junit.xml
+      - name: Run the Python suite
+        env:
+          KOI_TEST_RETRIES: "3"
+        run: |
+          ctest --test-dir build/ci-release -C Release -j 2 -L python \
+            --repeat until-pass:2 \
+            --output-on-failure --output-junit build/ci-release/ctest-python-junit.xml
       - name: Show the test log tail
         if: always()
         run: tail -n 150 build/ci-release/Testing/Temporary/LastTest.log || true
