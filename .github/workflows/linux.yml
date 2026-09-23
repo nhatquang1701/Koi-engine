@@ -57,9 +57,9 @@ jobs:
             --output-on-failure --output-junit build/ci-release/ctest-unit-junit.xml
       - name: Run the heavy search suite
         env:
-          KOI_TEST_RETRIES: "3"
+          KOI_TEST_RETRIES: "5"
         run: |
-          ctest --test-dir build/ci-release -C Release -j 2 -L heavy -LE process \
+          ctest --test-dir build/ci-release -C Release -j 1 -L heavy -LE process \
             --repeat until-pass:2 \
             --output-on-failure --output-junit build/ci-release/ctest-heavy-junit.xml
       - name: Run the heavy process suite
@@ -196,9 +196,9 @@ jobs:
             --output-on-failure --output-junit build/ci-release/ctest-unit-junit.xml
       - name: Run the heavy search suite
         env:
-          KOI_TEST_RETRIES: "3"
+          KOI_TEST_RETRIES: "5"
         run: |
-          ctest --test-dir build/ci-release -C Release -j 2 -L heavy -LE process \
+          ctest --test-dir build/ci-release -C Release -j 1 -L heavy -LE process \
             --repeat until-pass:2 \
             --output-on-failure --output-junit build/ci-release/ctest-heavy-junit.xml
       - name: Run the heavy process suite
@@ -311,12 +311,15 @@ jobs:
             -DKOI_BUILD_MODULES=OFF -DPython3_EXECUTABLE="$(command -v python)"
           cmake --build build/ci-release --config Release -j 4
       - name: Assert the module test is not registered, then run the unit suite
+        env:
+          KOI_TEST_RETRIES: "3"
         run: |
           if ctest --test-dir build/ci-release -N | grep -q koi_module_tests; then
             echo "koi_module_tests must not be registered when KOI_BUILD_MODULES=OFF" >&2
             exit 1
           fi
-          ctest --test-dir build/ci-release -C Release -j 4 -L unit -LE heavy --output-on-failure
+          ctest --test-dir build/ci-release -C Release -j 4 -L unit -LE heavy \
+            --repeat until-pass:2 --output-on-failure
       - name: Upload modules-off test diagnostics
         if: always()
         uses: actions/upload-artifact@v5

@@ -196,7 +196,6 @@ set(KOI_CORE_SOURCES
     src/koi/detail/search_runner.cpp
     src/koi/detail/search_session.cpp
     src/koi/completion_gate.cpp
-    src/koi/cpu_features.cpp
     src/koi/cpu_variant.cpp
     src/koi/executable_path.cpp
     src/koi/evaluation_features.cpp
@@ -249,6 +248,32 @@ function(koi_arch_compile_option msvc_flag output)
     endif()
 endfunction()
 
+# CPU detection is compiled for the baseline instruction set and shared by every
+# variant: a binary built for AVX2/AVX-512 must be able to ask whether the host
+# supports its instruction set before executing anything else.
+add_library(koi_cpu_features OBJECT src/koi/cpu_features.cpp)
+target_include_directories(koi_cpu_features PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+# GCC and Clang vectorize the library's static initializers with the instructions
+# enabled by the build flags, so a variant binary can execute an unsupported
+# instruction before main() reaches its gate.  These baseline objects install a
+# pre-main guard (constructor priority 101) into the variant executables, where
+# MSVC needs no equivalent because its startup code stays baseline-safe.
+if(NOT MSVC)
+    add_library(koi_cpu_guard_avx2 OBJECT src/koi/cpu_variant_guard.cpp)
+    target_include_directories(koi_cpu_guard_avx2 PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+    target_compile_definitions(koi_cpu_guard_avx2 PRIVATE KOI_CPU_REQUIRES_AVX2=1)
+    add_library(koi_cpu_guard_avx512 OBJECT src/koi/cpu_variant_guard.cpp)
+    target_include_directories(koi_cpu_guard_avx512 PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+    target_compile_definitions(koi_cpu_guard_avx512 PRIVATE KOI_CPU_REQUIRES_AVX512=1)
+endif()
+
 # Defines one static library from the shared core sources. `arch_option` is the
 # MSVC /arch flag applied in Release only (empty for the baseline variant);
 # koi_arch_compile_option maps it to the GCC/Clang equivalent. Named modules are
@@ -264,6 +289,8 @@ function(koi_add_core_target target arch_option)
         ${CMAKE_CURRENT_SOURCE_DIR}/third_party/fathom
     )
     target_sources(${target} PRIVATE third_party/fathom/tbprobe.c)
+    target_sources(${target} PRIVATE $<TARGET_OBJECTS:koi_cpu_features>)
+    add_dependencies(${target} koi_cpu_features)
     target_compile_definitions(${target} PUBLIC
         KOI_ENGINE_BUILD_VERSION="${PROJECT_VERSION}"
     )
@@ -676,6 +703,10 @@ add_executable(koi_engine_avx2
 
 target_link_libraries(koi_engine_avx2 PRIVATE koi_core)
 target_compile_definitions(koi_engine_avx2 PRIVATE KOI_CPU_REQUIRES_AVX2=1)
+if(NOT MSVC)
+    target_sources(koi_engine_avx2 PRIVATE $<TARGET_OBJECTS:koi_cpu_guard_avx2>)
+    add_dependencies(koi_engine_avx2 koi_cpu_guard_avx2)
+endif()
 set_target_properties(koi_engine_avx2 PROPERTIES OUTPUT_NAME "koi-engine-avx2")
 
 add_executable(koi_engine_avx512
@@ -684,6 +715,10 @@ add_executable(koi_engine_avx512
 
 target_link_libraries(koi_engine_avx512 PRIVATE koi_core_avx512)
 target_compile_definitions(koi_engine_avx512 PRIVATE KOI_CPU_REQUIRES_AVX512=1)
+if(NOT MSVC)
+    target_sources(koi_engine_avx512 PRIVATE $<TARGET_OBJECTS:koi_cpu_guard_avx512>)
+    add_dependencies(koi_engine_avx512 koi_cpu_guard_avx512)
+endif()
 set_target_properties(koi_engine_avx512 PROPERTIES OUTPUT_NAME "koi-engine-avx512")
 
 # Every C++ test binary shares the assertion/fixture helpers. The optional
