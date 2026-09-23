@@ -30,21 +30,46 @@ jobs:
             -DCMAKE_C_COMPILER=gcc-14 -DCMAKE_CXX_COMPILER=g++-14 \
             -DPython3_EXECUTABLE="$(command -v python)"
           cmake --build build/ci-release --config Release -j 4
-      - name: Run the full CTest suite
+      # The suite runs in three label-grouped steps so a slow or hanging group
+      # is localized, the heavy search cases do not compete with the process
+      # tests, and an interrupted step still leaves the earlier JUnit reports
+      # behind.  Wall-clock-sensitive search cases get extra in-process attempts
+      # because a shared runner is easily starved.
+      - name: Run the unit suite
         env:
-          # Wall-clock-sensitive search cases get extra in-process attempts; a
-          # shared runner is easily starved when the suite runs at -j 4.
           KOI_TEST_RETRIES: "3"
         run: |
-          ctest --test-dir build/ci-release -C Release -j 4 --repeat until-pass:2 \
-            --output-on-failure --output-junit build/ci-release/ctest-junit.xml
+          ctest --test-dir build/ci-release -C Release -j 4 -L unit -LE heavy \
+            --output-on-failure --output-junit build/ci-release/ctest-unit-junit.xml
+      - name: Run the heavy search suite
+        env:
+          KOI_TEST_RETRIES: "3"
+        run: |
+          ctest --test-dir build/ci-release -C Release -j 2 -L heavy -LE process \
+            --output-on-failure --output-junit build/ci-release/ctest-heavy-junit.xml
+      - name: Run the heavy process suite
+        env:
+          KOI_TEST_RETRIES: "3"
+        run: |
+          ctest --test-dir build/ci-release -C Release -j 1 \
+            -R "koi_engine_time_safety_process|koi_benchmark_process" \
+            --output-on-failure --output-junit build/ci-release/ctest-heavy-process-junit.xml
+      - name: Run the process and Python suites
+        env:
+          KOI_TEST_RETRIES: "3"
+        run: |
+          ctest --test-dir build/ci-release -C Release -j 2 -LE "unit;heavy" \
+            --output-on-failure --output-junit build/ci-release/ctest-rest-junit.xml
+      - name: Show the test log tail
+        if: always()
+        run: tail -n 150 build/ci-release/Testing/Temporary/LastTest.log || true
       - name: Upload GCC test diagnostics
         if: always()
         uses: actions/upload-artifact@v5
         with:
           name: linux-gcc-test-diagnostics
           path: |
-            build/ci-release/ctest-junit.xml
+            build/ci-release/ctest-*-junit.xml
             build/ci-release/Testing/Temporary/LastTest.log
           if-no-files-found: ignore
           retention-days: 7
@@ -74,19 +99,41 @@ jobs:
             -DCMAKE_CXX_FLAGS=-stdlib=libc++ -DCMAKE_EXE_LINKER_FLAGS=-stdlib=libc++ \
             -DKOI_STATIC_RUNTIME=OFF -DPython3_EXECUTABLE="$(command -v python)"
           cmake --build build/ci-release --config Release -j 4
-      - name: Run the full CTest suite
+      - name: Run the unit suite
         env:
           KOI_TEST_RETRIES: "3"
         run: |
-          ctest --test-dir build/ci-release -C Release -j 4 --repeat until-pass:2 \
-            --output-on-failure --output-junit build/ci-release/ctest-junit.xml
+          ctest --test-dir build/ci-release -C Release -j 4 -L unit -LE heavy \
+            --output-on-failure --output-junit build/ci-release/ctest-unit-junit.xml
+      - name: Run the heavy search suite
+        env:
+          KOI_TEST_RETRIES: "3"
+        run: |
+          ctest --test-dir build/ci-release -C Release -j 2 -L heavy -LE process \
+            --output-on-failure --output-junit build/ci-release/ctest-heavy-junit.xml
+      - name: Run the heavy process suite
+        env:
+          KOI_TEST_RETRIES: "3"
+        run: |
+          ctest --test-dir build/ci-release -C Release -j 1 \
+            -R "koi_engine_time_safety_process|koi_benchmark_process" \
+            --output-on-failure --output-junit build/ci-release/ctest-heavy-process-junit.xml
+      - name: Run the process and Python suites
+        env:
+          KOI_TEST_RETRIES: "3"
+        run: |
+          ctest --test-dir build/ci-release -C Release -j 2 -LE "unit;heavy" \
+            --output-on-failure --output-junit build/ci-release/ctest-rest-junit.xml
+      - name: Show the test log tail
+        if: always()
+        run: tail -n 150 build/ci-release/Testing/Temporary/LastTest.log || true
       - name: Upload Clang test diagnostics
         if: always()
         uses: actions/upload-artifact@v5
         with:
           name: linux-clang-test-diagnostics
           path: |
-            build/ci-release/ctest-junit.xml
+            build/ci-release/ctest-*-junit.xml
             build/ci-release/Testing/Temporary/LastTest.log
           if-no-files-found: ignore
           retention-days: 7
@@ -152,9 +199,15 @@ jobs:
           cmake --build build/ci-release --config Release -j 4
           pwsh -NoProfile -File tools/build/package_release.ps1 -BuildDirectory build/ci-release -OutputDirectory artifacts/packages
           ls -l artifacts/packages
-          printf "uci\nisready\nposition startpos\ngo depth 2\nquit\n" | ./build/ci-release/koi-engine > /tmp/smoke-auto.txt
+          # `stop` is required before `quit`: quitting an active search suppresses
+          # its completion, so the transcript would never carry a bestmove.
+          printf "uci\nisready\nposition startpos\ngo depth 2\nstop\nquit\n" | ./build/ci-release/koi-engine > /tmp/smoke-auto.txt 2> /tmp/smoke-auto.err
+          cat /tmp/smoke-auto.txt
+          cat /tmp/smoke-auto.err
           grep -q "bestmove" /tmp/smoke-auto.txt
-          printf "uci\nisready\nposition startpos\ngo depth 2\nquit\n" | env KOI_CPU_VARIANT=generic ./build/ci-release/koi-engine > /tmp/smoke-generic.txt
+          printf "uci\nisready\nposition startpos\ngo depth 2\nstop\nquit\n" | env KOI_CPU_VARIANT=generic ./build/ci-release/koi-engine > /tmp/smoke-generic.txt 2> /tmp/smoke-generic.err
+          cat /tmp/smoke-generic.txt
+          cat /tmp/smoke-generic.err
           grep -q "bestmove" /tmp/smoke-generic.txt
           tar -tzf artifacts/packages/koi-engine-v1.1-linux-x86_64.tar.gz
           '
