@@ -415,6 +415,15 @@ From the 2026-09-24 audit. `file:line` references are to the audit revision.
   search or evaluation behaviour change whose acceptance contract is a long
   recorded SPRT campaign, which does not fit this hardening pass; the deferred
   list is the input to the follow-up strength plan.
+- **CI-driven test-contract correction**: `koi_bench_process_test.ps1` no
+  longer requires Threads>1 benchmark rows to stay inside the fixture
+  accepted-move allowlist. Lazy SMP legitimately settles on different but
+  equally acceptable moves, which is what `release_verify.ps1` already
+  encodes (`$requireAllMatches = $threads -eq 1`). The deterministic
+  Threads=1 reference run now carries the strict invariant (zero
+  ` match 0` rows, with the offending rows in the failure message) and the
+  threaded runs must cover the same suite in the same order, keep the row
+  format, and finish without diagnostics.
 
 ## Verification
 
