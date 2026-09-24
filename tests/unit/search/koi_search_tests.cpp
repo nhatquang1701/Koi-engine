@@ -1723,7 +1723,12 @@ void test_short_search_rejects_the_b2b4_mating_rook_lift() {
     require(capture_metadata.has_value() && capture_metadata->is_capture(),
             "the b2b4 mating-lift fixture must expose the defensive capture");
     koi::SearchLimits limits;
-    limits.movetime = 100ms;
+    // 100 ms is not enough to reach the iteration where the safe capture wins on
+    // every compiler and host: this position needs the second iteration before
+    // the quiet rook lift is rejected, and both the MSVC and the GCC builds
+    // return the quiet lift deterministically at 100 ms. 250 ms keeps the
+    // search short while making the reviewed move set reachable everywhere.
+    limits.movetime = 250ms;
     koi::SearchOptions options;
     options.hash_mb = 16;
     options.threads = std::min<std::size_t>(4, koi::maximum_search_threads());
