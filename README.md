@@ -721,8 +721,11 @@ from the starting position (for example, `bestmove e2e4`).
   overrides analysis, MultiPV, ponder, infinite, or `searchmoves` book bypass.
 - Book files larger than 16 MiB, malformed files, missing files, and load or
   allocation failures are treated as unusable so normal search can continue.
-- `go` accepts `depth`, `nodes`, `movetime`, `wtime`, `btime`, `winc`, `binc`,
-  `movestogo`, and `infinite`. Malformed limit values are ignored. A bare `go`
+- `go` accepts `depth`, `nodes`, `mate`, `perft`, `movetime`, `wtime`, `btime`,
+  `winc`, `binc`, `movestogo`, and `infinite`. Malformed limit values are
+  ignored. `go mate N` searches to the depth that proves or refutes a mate in
+  `N` (2N-1 plies). `go perft N` answers with `info string <move>: <nodes>`
+  lines plus `info string Nodes searched: <total>` and no `bestmove`. A bare `go`
   uses a 250 ms move-time fallback, scaled by `Speed`. If a clock is supplied
   only for the non-moving side, Koi uses the same bounded fallback so malformed
   or asymmetric GUI commands cannot leave the engine searching indefinitely.
@@ -733,9 +736,13 @@ from the starting position (for example, `bestmove e2e4`).
   so `go depth 6 wtime 200` cannot overrun the clock.
 - Search reports completed iterations as UCI `info depth ... score ... nodes
   ... nps ... hashfull ... time ... pv ...` lines, where `hashfull` is the
-  approximate transposition-table occupancy in permill (0..1000).
+  approximate transposition-table occupancy in permill (0..1000). An iteration
+  published without full-window root authority carries a `lowerbound` flag
+  after the score, so GUIs can tell a bounded estimate from a completed pass.
 - `stop` cancels and joins the active worker and emits exactly one final legal
-  `bestmove` for that search.
+  `bestmove` for that search. The final `bestmove` includes a
+  ` ponder <reply>` suffix whenever the completed principal variation contains
+  a reply, independent of the `Ponder` option.
 - A terminal position with no legal moves returns `bestmove 0000`.
 - `quit` and input EOF cancel and join the worker without late protocol output.
 
@@ -775,10 +782,15 @@ every `go` is answered. `time_manager_tests` and
 
 `UCI_ShowWDL` defaults to false. When enabled, ordinary `info` lines append a
 deterministic `wdl W D L` triplet; it is omitted when disabled. `UCI_LimitStrength`
-defaults to false and `UCI_Elo` defaults to 1320 with a 1320..3190 range. These
-are Stockfish-compatible configuration controls. The current release keeps the
-normal deterministic search path unchanged and does not add random weakening;
-the strength hook is reserved for a later calibrated profile.
+defaults to false and `UCI_Elo` defaults to 1320 with a 1320..3190 range; they
+are Stockfish-compatible configuration controls. When `UCI_LimitStrength` is
+enabled, clock searches receive a monotone node cap derived from `UCI_Elo`
+(100 nodes at 500 Elo, doubling every 250 Elo up to 25 000, and unlimited at
+2600 and above), so weaker settings visibly search less. Explicit `go depth`,
+`go nodes`, `go movetime`, `go infinite`, and `go ponder` limits are always
+honoured exactly as sent, which keeps analysis and pinned tests deterministic.
+The mapping is deliberately uncalibrated until a recorded strength profile
+exists; it is a play-strength limiter, not an Elo-accurate handicap.
 
 ### Optional Syzygy tablebases
 

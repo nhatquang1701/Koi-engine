@@ -121,6 +121,18 @@ bool is_legal_move(const Position& position, std::string_view uci) {
     return false;
 }
 
+// A bestmove line may carry the optional ponder reply. Tests that only care
+// about the played move read the first token after the keyword.
+std::string first_bestmove_move(std::string_view bestmove_line) {
+    std::istringstream stream{std::string(bestmove_line)};
+    std::string keyword;
+    std::string move;
+    if (stream >> keyword >> move && keyword == "bestmove") {
+        return move;
+    }
+    return {};
+}
+
 bool is_valid_search_info(std::string_view line) {
     std::istringstream stream{std::string(line)};
     std::string info;
@@ -143,9 +155,20 @@ bool is_valid_search_info(std::string_view line) {
     std::uint64_t time = 0;
     std::string pv_name;
 
+    std::string bound_name;
     if (!(stream >> info >> depth_name >> depth >> seldepth_name >> seldepth >> multipv_name >> multipv >>
           score_name >> score_kind >> score >>
-          nodes_name >> nodes >> nps_name >> nps >> hashfull_name >> hashfull >>
+          bound_name)) {
+        return false;
+    }
+    if (bound_name == "lowerbound" || bound_name == "upperbound") {
+        if (!(stream >> bound_name)) {
+            return false;
+        }
+    }
+    // Without a bound flag the token already read is the "nodes" keyword.
+    nodes_name = bound_name;
+    if (!(stream >> nodes >> nps_name >> nps >> hashfull_name >> hashfull >>
           time_name >> time >> pv_name)) {
         return false;
     }
@@ -833,7 +856,7 @@ void test_book_fallback_and_analysis_style_commands_search_without_markers() {
                 "unusable books must leave normal-play fallback transcripts clean");
         require(lines_starting_with(lines, "info string book move ").empty(),
                 "a missing or malformed book must silently fall back to search");
-        require(bestmoves.size() == 1 && is_legal_move(Position{}, bestmoves[0].substr(9)),
+        require(bestmoves.size() == 1 && is_legal_move(Position{}, first_bestmove_move(bestmoves[0])),
                 "unusable book fallback must emit one legal normal-search bestmove");
     }
 
@@ -909,7 +932,7 @@ void test_multipv_search_bypasses_a_matching_book_without_analysis_mode() {
     }
     require(saw_multipv_one && saw_multipv_two && saw_multipv_three,
             "MultiPV book bypass must retain all requested ranked search variations");
-    require(bestmoves.size() == 1 && is_legal_move(Position{}, bestmoves[0].substr(9)),
+    require(bestmoves.size() == 1 && is_legal_move(Position{}, first_bestmove_move(bestmoves[0])),
             "MultiPV book bypass must retain exactly one legal search completion");
 }
 
@@ -971,7 +994,7 @@ void test_ponderhit_keeps_the_entire_ponder_workflow_out_of_the_book() {
     }
     require(expected_pv.size() >= 2, "ponderhit book bypass must retain an expected reply");
     const auto continued_bestmove = bestmoves.size() == 1 ?
-        koi::Move::parse_uci(bestmoves[0].substr(9)) : std::nullopt;
+        koi::Move::parse_uci(first_bestmove_move(bestmoves[0])) : std::nullopt;
     require(bestmoves.size() == 1 && continued_bestmove.has_value() &&
                 Position{}.is_legal(*continued_bestmove),
             "ponderhit must retain one legal search completion outside the book");
@@ -1045,7 +1068,7 @@ void test_book_option_changes_suppress_active_search_generations() {
 
     require(result.exit_code == 0 && result.diagnostics.empty(),
             "book option changes during search must leave a clean transcript");
-    require(bestmoves.size() == 1 && is_legal_move(Position{}, bestmoves[0].substr(9)),
+    require(bestmoves.size() == 1 && is_legal_move(Position{}, first_bestmove_move(bestmoves[0])),
             "each book option change must suppress stale searches and leave one current completion");
 }
 
@@ -1111,7 +1134,7 @@ void test_threads_and_speed_changes_suppress_the_active_generation() {
     const std::vector<std::string> bestmoves =
         lines_starting_with(output_lines(result.output), "bestmove ");
     require(bestmoves.size() == 1, "changing Threads or Speed must suppress the replaced search result");
-    require(is_legal_move(Position{}, bestmoves[0].substr(9)),
+    require(is_legal_move(Position{}, first_bestmove_move(bestmoves[0])),
             "the surviving search after an option change must return a legal move");
 }
 
@@ -1161,7 +1184,7 @@ void test_lucas_analysis_options_accept_valid_values_ignore_invalid_values_and_e
     }
     require(saw_multipv_one && saw_multipv_two && saw_multipv_three,
             "MultiPV must emit distinct ranked lines for all three requested variations");
-    require(bestmoves.size() == 1 && is_legal_move(Position{}, bestmoves[0].substr(9)),
+    require(bestmoves.size() == 1 && is_legal_move(Position{}, first_bestmove_move(bestmoves[0])),
             "Lucas analysis options must retain exactly one legal bestmove");
 }
 
@@ -1180,7 +1203,7 @@ void test_lucas_analysis_option_changes_suppress_the_active_generation() {
     const std::vector<std::string> bestmoves =
         lines_starting_with(output_lines(result.output), "bestmove ");
 
-    require(bestmoves.size() == 1 && is_legal_move(Position{}, bestmoves[0].substr(9)),
+    require(bestmoves.size() == 1 && is_legal_move(Position{}, first_bestmove_move(bestmoves[0])),
             "changing Lucas analysis options must suppress replaced search generations");
 }
 
@@ -1289,7 +1312,7 @@ void test_immediate_ponderhit_without_observed_reply_still_answers() {
             "an immediate ponderhit must shut down cleanly");
     const std::vector<std::string> bestmoves =
         lines_starting_with(output_lines(output.str()), "bestmove ");
-    require(bestmoves.size() == 1 && is_legal_move(Position{}, bestmoves[0].substr(9)),
+    require(bestmoves.size() == 1 && is_legal_move(Position{}, first_bestmove_move(bestmoves[0])),
             "a ponderhit always obliges the engine to answer: even without an observed expected "
             "reply it must emit exactly one legal bestmove instead of leaving the GUI waiting");
 }
@@ -1330,7 +1353,7 @@ void test_stopping_ponder_search_emits_one_legal_bestmove() {
         lines_starting_with(output_lines(result.output), "bestmove ");
 
     require(result.exit_code == 0, "ponder stop transcript must shut down normally");
-    require(bestmoves.size() == 1 && is_legal_move(Position{}, bestmoves[0].substr(9)),
+    require(bestmoves.size() == 1 && is_legal_move(Position{}, first_bestmove_move(bestmoves[0])),
             "stopping ponder must emit exactly one legal bestmove");
 }
 
@@ -1404,7 +1427,7 @@ void test_deterministic_search_repeats_the_best_move_with_compatibility_seed() {
             "both deterministic searches must complete before the transcript ends");
     require(bestmoves.size() == 2, "each go command must emit exactly one bestmove");
     require(bestmoves[0] == bestmoves[1], "deterministic search must repeat from the same root");
-    require(is_legal_move(initial, bestmoves[0].substr(9)),
+    require(is_legal_move(initial, first_bestmove_move(bestmoves[0])),
             "the deterministic start-position move must be legal");
 }
 
@@ -1441,9 +1464,9 @@ void test_startpos_and_fen_move_lists_define_the_search_root() {
             "test fixture start-position moves must be legal");
     require(after_fen.apply_uci("e1g1"), "test fixture FEN move must be legal");
     require(bestmoves.size() == 2, "both go commands must receive one bestmove");
-    require(is_legal_move(after_startpos, bestmoves[0].substr(9)),
+    require(is_legal_move(after_startpos, first_bestmove_move(bestmoves[0])),
             "startpos move list must be applied before searching");
-    require(is_legal_move(after_fen, bestmoves[1].substr(9)),
+    require(is_legal_move(after_fen, first_bestmove_move(bestmoves[1])),
             "FEN move list must be applied before searching");
 }
 
@@ -1465,10 +1488,21 @@ void test_all_go_limits_and_malformed_values_are_accepted_without_crashing() {
     require(result.exit_code == 0, "valid and malformed go tokens must not crash the controller");
     require(bestmoves.size() == 7, "every stopped go variant must emit exactly one bestmove");
     for (const std::string& bestmove : bestmoves) {
-        require(is_legal_move(en_passant, bestmove.substr(9)),
+        require(is_legal_move(en_passant, first_bestmove_move(bestmove)),
                 "every supported-limit search must retain a legal root move");
-        require(bestmove.find(" ponder ") == std::string::npos,
-                "go must never emit an unsupported ponder move");
+        // bestmove may carry the optional ponder reply; when present it must be
+        // a coordinate move, never a stray token.
+        std::istringstream line(bestmove);
+        std::string keyword;
+        std::string move;
+        std::string ponder_keyword;
+        std::string ponder_move;
+        require(line >> keyword >> move && keyword == "bestmove",
+                "every supported-limit search must emit a well-formed bestmove line");
+        if (line >> ponder_keyword) {
+            require(ponder_keyword == "ponder" && line >> ponder_move,
+                    "the optional bestmove reply must use the ponder keyword");
+        }
     }
 }
 
@@ -1709,7 +1743,7 @@ void test_ucinewgame_and_hash_changes_suppress_active_generations() {
 
     require(bestmoves.size() == 1,
             "ucinewgame, Hash, and Clear Hash must suppress each replaced generation");
-    require(is_legal_move(initial, bestmoves[0].substr(9)),
+    require(is_legal_move(initial, first_bestmove_move(bestmoves[0])),
             "the surviving post-option search must use the reset start position");
 }
 
@@ -1861,6 +1895,196 @@ void test_protocol_responses_flush_promptly() {
             "handshake, readyok, position error, and bestmove must each flush promptly");
 }
 
+// Reads the largest integer that follows a token such as "nodes" or "depth"
+// on every info line, so a test can bound what the search actually reported.
+std::uint64_t max_reported_value(std::string_view output, std::string_view key) {
+    std::uint64_t maximum = 0;
+    for (const std::string& line : output_lines(output)) {
+        if (!line.starts_with("info depth ")) {
+            continue;
+        }
+        std::istringstream stream(line);
+        for (std::string token; stream >> token;) {
+            if (token != key) {
+                continue;
+            }
+            std::uint64_t value = 0;
+            if (stream >> value) {
+                maximum = std::max(maximum, value);
+            }
+            break;
+        }
+    }
+    return maximum;
+}
+
+void test_go_perft_writes_move_counts_without_a_search() {
+    const ControllerResult result = run_controller(
+        "uci\n"
+        "isready\n"
+        "position startpos\n"
+        "go perft 1\n"
+        "quit\n");
+
+    const std::vector<std::string> lines = output_lines(result.output);
+    require(result.exit_code == 0 && result.diagnostics.empty(),
+            "go perft must shut down cleanly without diagnostics");
+    require(lines_starting_with(lines, "bestmove ").empty(),
+            "go perft is a debugging command and must not publish a bestmove");
+    require(line_index(lines, "info string Nodes searched: 20") != std::numeric_limits<std::size_t>::max(),
+            "go perft 1 must report the twenty legal startpos moves");
+    require(lines_starting_with(lines, "info string e2e4: 1").size() == 1,
+            "go perft must report one count per legal root move");
+}
+
+void test_go_mate_searches_the_proving_depth() {
+    const ControllerResult result = run_controller(
+        "position startpos\n"
+        "go mate 2\n"
+        "stop\n"
+        "quit\n");
+
+    const std::vector<std::string> bestmoves =
+        lines_starting_with(output_lines(result.output), "bestmove ");
+    require(result.exit_code == 0 && result.diagnostics.empty(),
+            "go mate must shut down cleanly without diagnostics");
+    require(bestmoves.size() == 1, "go mate must publish exactly one result");
+    require(max_reported_value(result.output, "depth") <= 3,
+            "go mate 2 must search the three-ply depth that proves the mate");
+
+    std::istringstream line(bestmoves.front());
+    std::string name;
+    std::string best;
+    require(line >> name >> best && name == "bestmove", "go mate must answer with a bestmove line");
+    require(is_legal_move(Position{}, best), "the go mate bestmove must be legal at the root");
+}
+
+// Runs a transcript whose second stage (usually stop/quit) is released as soon
+// as the first bestmove appears, so a bounded search must finish on its own.
+std::string run_gated_until_bestmove(std::string prefix, std::string suffix) {
+    StagedGatedInputBuffer input({std::move(prefix), std::move(suffix)});
+    std::istream input_stream(&input);
+    ReleaseOnBestmoveCountBuffer output_buffer(input, 1);
+    std::ostream output(&output_buffer);
+    std::ostringstream diagnostics;
+    std::thread controller_thread([&] {
+        UciController controller(input_stream, output, diagnostics);
+        (void)controller.run();
+    });
+    const bool marker_seen = input.wait_for_release_count(2, std::chrono::seconds(10));
+    if (!marker_seen) {
+        input.release_all();
+    }
+    controller_thread.join();
+    return output_buffer.str();
+}
+
+void test_strength_limit_caps_clock_searches_but_honours_explicit_limits() {
+    const std::string capped = run_gated_until_bestmove(
+        "setoption name UCI_LimitStrength value true\n"
+        "setoption name UCI_Elo value 1320\n"
+        "position startpos\n"
+        "go wtime 10000 btime 10000\n",
+        "stop\nquit\n");
+
+    const std::uint64_t capped_nodes = max_reported_value(capped, "nodes");
+    require(lines_starting_with(output_lines(capped), "bestmove ").size() == 1,
+            "a limited strength search must still publish one result");
+    require(capped_nodes > 0 && capped_nodes <= 800,
+            "UCI_Elo 1320 must cap a clock search near the documented node budget");
+
+    const std::string explicit_depth = run_gated_until_bestmove(
+        "setoption name UCI_LimitStrength value true\n"
+        "setoption name UCI_Elo value 1320\n"
+        "position startpos\n"
+        "go depth 3\n",
+        "stop\nquit\n");
+
+    require(lines_starting_with(output_lines(explicit_depth), "bestmove ").size() == 1,
+            "an explicit depth must still publish one result under the strength cap");
+    require(max_reported_value(explicit_depth, "nodes") > 800,
+            "an explicit depth must be searched without the strength node cap");
+}
+
+void test_reapplying_the_current_option_value_keeps_the_search_alive() {
+    GatedInputBuffer input(
+        "uci\n"
+        "isready\n"
+        "setoption name Threads value 1\n"
+        "position startpos\n"
+        "go infinite\n",
+        "setoption name Threads value 1\n"
+        "stop\n"
+        "quit\n");
+    std::istream input_stream(&input);
+    ReleaseOnDepthBuffer output_buffer(input, 1);
+    std::ostream output(&output_buffer);
+    std::ostringstream diagnostics;
+    int exit_code = -1;
+    std::thread controller_thread([&] {
+        UciController controller(input_stream, output, diagnostics);
+        exit_code = controller.run();
+    });
+    const bool marker_seen = input.wait_for_marker(std::chrono::seconds(5));
+    if (!marker_seen) {
+        input.release();
+    }
+    controller_thread.join();
+
+    const std::vector<std::string> bestmoves =
+        lines_starting_with(output_lines(output_buffer.str()), "bestmove ");
+    require(marker_seen && exit_code == 0 && diagnostics.str().empty(),
+            "re-applying the current option value must keep the controller quiet");
+    require(bestmoves.size() == 1,
+            "re-applying the current Threads value must not abort the active search");
+}
+
+void test_bestmove_reports_the_ponder_move_without_the_option() {
+    GatedInputBuffer input(
+        "setoption name OwnBook value false\n"
+        "position startpos\n"
+        "go depth 2\n",
+        "stop\n"
+        "quit\n");
+    std::istream input_stream(&input);
+    ReleaseOnDepthBuffer output_buffer(input, 2);
+    std::ostream output(&output_buffer);
+    std::ostringstream diagnostics;
+    int exit_code = -1;
+    std::thread controller_thread([&] {
+        UciController controller(input_stream, output, diagnostics);
+        exit_code = controller.run();
+    });
+    const bool marker_seen = input.wait_for_marker(std::chrono::seconds(5));
+    if (!marker_seen) {
+        input.release();
+    }
+    controller_thread.join();
+
+    const std::vector<std::string> bestmoves =
+        lines_starting_with(output_lines(output_buffer.str()), "bestmove ");
+    require(marker_seen && exit_code == 0 && diagnostics.str().empty(),
+            "the ponder transcript must shut down normally");
+    require(bestmoves.size() == 1, "a completed search must emit one result");
+
+    std::istringstream line(bestmoves.front());
+    std::string name;
+    std::string best;
+    std::string ponder_name;
+    std::string ponder;
+    require(line >> name >> best >> ponder_name >> ponder && name == "bestmove" &&
+                ponder_name == "ponder",
+            "bestmove must carry the ponder move even without the Ponder option");
+
+    const auto parsed_best = koi::Move::parse_uci(best);
+    const auto parsed_ponder = koi::Move::parse_uci(ponder);
+    require(parsed_best.has_value() && parsed_ponder.has_value(),
+            "the reported bestmove and ponder move must parse");
+    koi::GameState after_best = koi::GameState::startpos();
+    require(after_best.make_move(*parsed_best) && after_best.is_legal(*parsed_ponder),
+            "the reported ponder move must be legal after the bestmove");
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -1919,6 +2143,11 @@ int main(int argc, char** argv) {
         {"unknown stop quit", test_unknown_stop_and_blank_commands_are_quiet_and_quit},
         {"protocol-clean output", test_protocol_output_contains_only_valid_uci_responses},
         {"promptly flushed responses", test_protocol_responses_flush_promptly},
+        {"go perft output", test_go_perft_writes_move_counts_without_a_search},
+        {"go mate mapping", test_go_mate_searches_the_proving_depth},
+        {"strength limiter node cap", test_strength_limit_caps_clock_searches_but_honours_explicit_limits},
+        {"same-value option reapplication", test_reapplying_the_current_option_value_keeps_the_search_alive},
+        {"ponder move without the option", test_bestmove_reports_the_ponder_move_without_the_option},
     };
 
     return koi::test::run_tests(tests, argc, argv);

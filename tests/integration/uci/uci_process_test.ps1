@@ -120,7 +120,7 @@ try {
             throw "MultiPV greater than one must search instead of using the book: $line"
         }
         if ($line -like 'bestmove *') {
-            if ($line -notmatch '^bestmove [a-h][1-8][a-h][1-8][nbrq]?$') {
+            if ($line -notmatch '^bestmove [a-h][1-8][a-h][1-8][nbrq]?( ponder [a-h][1-8][a-h][1-8][nbrq]?)?$') {
                 throw "MultiPV search emitted an invalid bestmove: $line"
             }
             $multiPvBestmove = $line
@@ -421,7 +421,7 @@ if ($limitBestmoves.Count -ne 7) {
 }
 foreach ($line in $limitLines) {
     if ($line -like 'bestmove *') {
-        if ($line -notmatch '^bestmove [a-h][1-8][a-h][1-8][nbrq]?$') {
+        if ($line -notmatch '^bestmove [a-h][1-8][a-h][1-8][nbrq]?( ponder [a-h][1-8][a-h][1-8][nbrq]?)?$') {
             throw "Invalid coordinate bestmove: $line"
         }
     } elseif (-not (Test-SearchInfo $line)) {
@@ -441,7 +441,7 @@ while ($null -eq $asymmetricBestmove) {
         throw "Invalid output for asymmetric clock command: $line"
     }
 }
-if ($asymmetricBestmove -notmatch '^bestmove [a-h][1-8][a-h][1-8][nbrq]?$') {
+if ($asymmetricBestmove -notmatch '^bestmove [a-h][1-8][a-h][1-8][nbrq]?( ponder [a-h][1-8][a-h][1-8][nbrq]?)?$') {
     throw "Asymmetric clock command did not return a coordinate bestmove: $asymmetricBestmove"
 }
 Send-UciCommand $asymmetricClock 'isready'
@@ -462,7 +462,7 @@ while ($null -eq $infiniteNodesBestmove) {
         throw "Invalid output during infinite node-limit search: $line"
     }
 }
-if ($infiniteNodesBestmove -notmatch '^bestmove [a-h][1-8][a-h][1-8][nbrq]?$') {
+if ($infiniteNodesBestmove -notmatch '^bestmove [a-h][1-8][a-h][1-8][nbrq]?( ponder [a-h][1-8][a-h][1-8][nbrq]?)?$') {
     throw "Infinite node-limit search emitted an invalid bestmove: $infiniteNodesBestmove"
 }
 Send-UciCommand $infiniteNodes 'isready'
@@ -548,7 +548,7 @@ for ($ply = 0; $ply -lt 6; $ply++) {
     while ($null -eq $gameBestmove) {
         $line = Read-UciLine $gameSession "multi-ply bestmove $ply"
         if ($line -like 'bestmove *') {
-            if ($line -notmatch '^bestmove ([a-h][1-8][a-h][1-8][nbrq]?)$') {
+            if ($line -notmatch '^bestmove ([a-h][1-8][a-h][1-8][nbrq]?)( ponder [a-h][1-8][a-h][1-8][nbrq]?)?$') {
                 throw "Multi-ply game emitted an invalid bestmove: $line"
             }
             $gameBestmove = $Matches[1]

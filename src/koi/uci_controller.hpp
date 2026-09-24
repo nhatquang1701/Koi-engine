@@ -67,6 +67,7 @@ private:
                                std::uint32_t root_ply,
                                const std::shared_ptr<CompletionOnce>& completion_once);
     void write_position_error(const char* message);
+    void write_perft_results(int depth);
     void debug_event(std::string message) noexcept;
     void debug_json_event(std::string event, std::string fields) noexcept;
     void configure_debug_file();

@@ -26,6 +26,13 @@ struct ClockLimit {
 
 struct SearchLimits {
     std::optional<int> depth;
+    // `go mate N` asks for a mate in at most N moves. The controller turns it
+    // into the depth that is needed to prove it (2N - 1 plies) so the ordinary
+    // iterative deepening contract stays unchanged.
+    std::optional<int> mate;
+    // `go perft N` is a debugging command: the controller answers with the
+    // per-move node counts and total instead of starting a search.
+    std::optional<int> perft;
     std::optional<std::uint64_t> nodes;
     std::optional<std::chrono::milliseconds> movetime;
     std::optional<ClockLimit> white_clock;
@@ -137,6 +144,17 @@ struct SearchStats {
 };
 
 struct SearchInfo {
+    // How the reported score relates to the true root value.
+    //
+    //   exact - the score comes from a full-window root pass, so it is the
+    //           engine's value for the position;
+    //   lower - the search has only established that the value is at least
+    //           the reported score (selective root confirmation or an
+    //           emergency fallback that did not finish a full-window pass);
+    //   upper - reserved for a score that is only known to be at most the
+    //           reported value.
+    enum class Bound : std::uint8_t { exact = 0, lower = 1, upper = 2 };
+
     int depth = 0;
     int score_cp = 0;
     std::optional<int> mate;
@@ -149,6 +167,7 @@ struct SearchInfo {
     std::uint64_t tt_hits = 0;
     int multipv = 1;
     std::uint64_t tbhits = 0;
+    Bound bound = Bound::exact;
     // Exact win/draw/loss triplet in permill when the reported score came from
     // a Syzygy root probe (cursed wins and blessed losses count as draws).
     // nullopt means the UCI layer derives the heuristic WDL triplet from the

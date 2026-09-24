@@ -3846,6 +3846,13 @@ void SearchRunner::run() {
                     (lazy_pool != nullptr ? lazy_pool->live_tt_hits() : 0);
                 info.tbhits = context.stats.tbhits +
                     (lazy_pool != nullptr ? lazy_pool->live_tbhits() : 0);
+                if (!root_authoritative) {
+                    // A selective root pass is a usable published iteration, but
+                    // the score is only a bound: the alternatives were not all
+                    // verified with full windows, so the true value can still be
+                    // higher.
+                    info.bound = SearchInfo::Bound::lower;
+                }
                 safely_report_info(sink, info);
                 const int iteration_observation_score = bounded_fallback_result ?
                     searched_iteration_score : score;
@@ -4711,6 +4718,11 @@ void SearchRunner::run() {
                     info.tbhits = total_stats.tbhits +
                         (lazy_pool != nullptr ? lazy_pool->live_tbhits() : 0);
                     info.multipv = static_cast<int>(rank + 1);
+                    if (!authoritative_root_iteration) {
+                        // Same rule as the serial path: a selective root pass
+                        // reports a bound, not a proven value.
+                        info.bound = SearchInfo::Bound::lower;
+                    }
                     safely_report_info(sink, info);
                 }
                 const auto iteration_elapsed = elapsed - previous_report_elapsed;
@@ -4776,6 +4788,8 @@ void SearchRunner::run() {
             info.qnodes = result.stats.qnodes;
             info.tt_hits = result.stats.tt_hits;
             info.tbhits = result.stats.tbhits;
+            // The emergency line is a safety choice, not a proven value.
+            info.bound = SearchInfo::Bound::lower;
             safely_report_info(sink, info);
         }
         if (lazy_pool != nullptr) {

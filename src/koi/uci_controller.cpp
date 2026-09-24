@@ -17,6 +17,7 @@
 
 #include "koi/classical_evaluator.hpp"
 #include "koi/nnue.hpp"
+#include "koi/perft.hpp"
 
 namespace koi {
 
@@ -397,6 +398,22 @@ std::string debug_optional(const std::optional<T>& value) {
     return value.has_value() ? std::to_string(*value) : "-";
 }
 
+// Uncalibrated strength limiter: UCI_LimitStrength turns UCI_Elo into a
+// per-move node budget for time-controlled games. The mapping is deliberately
+// monotone and simple (100 nodes at 500 Elo, one doubling every 250 Elo up to
+// a 25k-node cap); it bounds the search instead of promising a rating, and
+// 2600 Elo or more leaves the search unlimited.
+[[nodiscard]] std::uint64_t strength_node_limit(std::uint32_t elo) noexcept {
+    constexpr std::uint32_t kFullStrengthElo = 2600;
+    if (elo >= kFullStrengthElo) {
+        return 0;
+    }
+    const std::uint32_t clamped = std::max<std::uint32_t>(elo, 500);
+    const std::uint32_t steps = (clamped - 500) / 250;
+    const std::uint64_t nodes = 100ull << std::min<std::uint32_t>(steps, 8);
+    return std::min<std::uint64_t>(nodes, 25'000);
+}
+
 std::string debug_limits(const SearchLimits& limits) {
     std::ostringstream stream;
     stream << "depth=" << debug_optional(limits.depth)
@@ -504,6 +521,20 @@ SearchLimits parse_go_limits(std::string_view arguments) {
                 limits.depth = static_cast<int>(parsed);
             }
             ++index;
+        } else if (token == "mate") {
+            std::uint64_t parsed = 0;
+            if (parse_uint64(value, parsed) && parsed > 0 && parsed <= 64) {
+                limits.mate = static_cast<int>(parsed);
+            }
+            ++index;
+        } else if (token == "perft") {
+            std::uint64_t parsed = 0;
+            // Perft is a debugging command; the cap keeps a typo from asking
+            // for an astronomically long walk.
+            if (parse_uint64(value, parsed) && parsed > 0 && parsed <= 10) {
+                limits.perft = static_cast<int>(parsed);
+            }
+            ++index;
         } else if (token == "nodes") {
             std::uint64_t parsed = 0;
             if (parse_uint64(value, parsed)) {
@@ -561,7 +592,8 @@ SearchLimits parse_go_limits(std::string_view arguments) {
 
     const bool has_usable_limit = limits.depth.has_value() || limits.nodes.has_value() ||
         limits.movetime.has_value() || limits.white_clock.has_value() ||
-        limits.black_clock.has_value() || limits.infinite || limits.ponder;
+        limits.black_clock.has_value() || limits.infinite || limits.ponder ||
+        limits.mate.has_value() || limits.perft.has_value();
     if (!has_usable_limit) {
         limits.movetime = kBareGoFallback;
     }
@@ -658,11 +690,9 @@ int UciController::run() {
 void UciController::handle_position(std::istream& command, std::string_view command_text) {
     // Suppress the old generation before doing any parsing work. A worker may
     // finish while a replacement position is being validated; it must not be
-    // allowed to emit a completion for the old root during that window.
-    {
-        std::lock_guard lock(output_mutex_);
-        state_ = ControllerState::ShuttingDown;
-    }
+    // allowed to emit a completion for the old root during that window. The
+    // suppression bumps the generation and leaves the state Idle, so a malformed
+    // position command no longer latches the controller in ShuttingDown.
     stop_and_suppress_active_search();
     const std::vector<std::string> tokens = remaining_tokens(command);
     if (tokens.empty()) {
@@ -760,19 +790,21 @@ void UciController::handle_setoption(std::istream& command) {
 
     // Type-aware helpers keep the parse -> ignore-invalid -> stop/suppress ->
     // commit sequence identical for every option: an invalid value never stops
-    // the active search and never changes engine state.
-    const auto apply_boolean = [this, &value](const auto& commit) {
+    // the active search and never changes engine state. Re-sending the value an
+    // option already has is a no-op too: GUIs routinely re-apply their settings
+    // between games, and aborting a live search for nothing desynchronises them.
+    const auto apply_boolean = [this, &value](bool current, const auto& commit) {
         bool parsed_boolean = false;
-        if (parse_boolean(value, parsed_boolean)) {
+        if (parse_boolean(value, parsed_boolean) && parsed_boolean != current) {
             stop_and_suppress_active_search();
             commit(parsed_boolean);
         }
     };
     const auto apply_unsigned = [this, &value](const UciOptionDescriptor& descriptor,
-                                               const auto& commit) {
+                                               std::uint64_t current, const auto& commit) {
         std::uint64_t parsed_value = 0;
         if (parse_uint64(value, parsed_value) && parsed_value >= descriptor.minimum &&
-            parsed_value <= option_maximum(descriptor)) {
+            parsed_value <= option_maximum(descriptor) && parsed_value != current) {
             stop_and_suppress_active_search();
             commit(parsed_value);
         }
@@ -831,13 +863,13 @@ void UciController::handle_setoption(std::istream& command) {
 
 
     case UciOptionId::threads:
-        apply_unsigned(*option, [this](std::uint64_t threads) {
+        apply_unsigned(*option, threads_, [this](std::uint64_t threads) {
             threads_ = static_cast<std::size_t>(threads);
         });
         break;
 
     case UciOptionId::speed:
-        apply_unsigned(*option, [this](std::uint64_t speed) {
+        apply_unsigned(*option, speed_percent_, [this](std::uint64_t speed) {
             speed_percent_ = static_cast<std::uint8_t>(speed);
         });
         break;
@@ -852,29 +884,29 @@ void UciController::handle_setoption(std::istream& command) {
     }
 
     case UciOptionId::multi_pv:
-        apply_unsigned(*option, [this](std::uint64_t multi_pv) {
+        apply_unsigned(*option, multi_pv_, [this](std::uint64_t multi_pv) {
             multi_pv_ = static_cast<std::size_t>(multi_pv);
         });
         break;
 
     case UciOptionId::ponder:
-        apply_boolean([this](bool ponder_enabled) { ponder_enabled_ = ponder_enabled; });
+        apply_boolean(ponder_enabled_, [this](bool ponder_enabled) { ponder_enabled_ = ponder_enabled; });
         break;
 
     case UciOptionId::own_book:
-        apply_boolean([this](bool own_book) { own_book_ = own_book; });
+        apply_boolean(own_book_, [this](bool own_book) { own_book_ = own_book; });
         break;
 
     case UciOptionId::book_random:
-        apply_boolean([this](bool book_random) { book_random_ = book_random; });
+        apply_boolean(book_random_, [this](bool book_random) { book_random_ = book_random; });
         break;
 
     case UciOptionId::book_safety:
-        apply_boolean([this](bool book_safety) { book_safety_ = book_safety; });
+        apply_boolean(book_safety_, [this](bool book_safety) { book_safety_ = book_safety; });
         break;
 
     case UciOptionId::book_safety_depth:
-        apply_unsigned(*option, [this](std::uint64_t book_safety_depth) {
+        apply_unsigned(*option, book_safety_depth_, [this](std::uint64_t book_safety_depth) {
             book_safety_depth_ = static_cast<std::uint8_t>(book_safety_depth);
         });
         break;
@@ -887,7 +919,7 @@ void UciController::handle_setoption(std::istream& command) {
         break;
 
     case UciOptionId::book_depth:
-        apply_unsigned(*option, [this](std::uint64_t book_depth) {
+        apply_unsigned(*option, book_depth_, [this](std::uint64_t book_depth) {
             book_depth_ = static_cast<std::uint8_t>(book_depth);
         });
         break;
@@ -898,27 +930,27 @@ void UciController::handle_setoption(std::istream& command) {
         break;
 
     case UciOptionId::show_wdl:
-        apply_boolean([this](bool show_wdl) { show_wdl_ = show_wdl; });
+        apply_boolean(show_wdl_, [this](bool show_wdl) { show_wdl_ = show_wdl; });
         break;
 
     case UciOptionId::move_overhead:
-        apply_unsigned(*option, [this](std::uint64_t overhead) {
+        apply_unsigned(*option, move_overhead_ms_, [this](std::uint64_t overhead) {
             move_overhead_ms_ = static_cast<std::uint32_t>(overhead);
         });
         break;
 
     case UciOptionId::slow_mover:
-        apply_unsigned(*option, [this](std::uint64_t slow_mover) {
+        apply_unsigned(*option, slow_mover_percent_, [this](std::uint64_t slow_mover) {
             slow_mover_percent_ = static_cast<std::uint32_t>(slow_mover);
         });
         break;
 
     case UciOptionId::limit_strength:
-        apply_boolean([this](bool limit_strength) { limit_strength_ = limit_strength; });
+        apply_boolean(limit_strength_, [this](bool limit_strength) { limit_strength_ = limit_strength; });
         break;
 
     case UciOptionId::elo:
-        apply_unsigned(*option, [this](std::uint64_t elo) {
+        apply_unsigned(*option, elo_, [this](std::uint64_t elo) {
             elo_ = static_cast<std::uint32_t>(elo);
         });
         break;
@@ -950,21 +982,21 @@ void UciController::handle_setoption(std::istream& command) {
     }
 
     case UciOptionId::syzygy_probe_depth:
-        apply_unsigned(*option, [this](std::uint64_t depth) {
+        apply_unsigned(*option, syzygy_probe_depth_, [this](std::uint64_t depth) {
             syzygy_probe_depth_ = static_cast<std::uint8_t>(depth);
             rebuild_syzygy();
         });
         break;
 
     case UciOptionId::syzygy_probe_limit:
-        apply_unsigned(*option, [this](std::uint64_t limit) {
+        apply_unsigned(*option, syzygy_probe_limit_, [this](std::uint64_t limit) {
             syzygy_probe_limit_ = static_cast<std::uint8_t>(limit);
             rebuild_syzygy();
         });
         break;
 
     case UciOptionId::syzygy_interior_depth:
-        apply_unsigned(*option, [this](std::uint64_t depth) {
+        apply_unsigned(*option, syzygy_interior_depth_, [this](std::uint64_t depth) {
             // Interior probing is a search-time policy, so no tablebase rebuild
             // is needed; the value is snapshotted into each SearchOptions.
             syzygy_interior_depth_ = static_cast<std::uint8_t>(depth);
@@ -972,7 +1004,7 @@ void UciController::handle_setoption(std::istream& command) {
         break;
 
     case UciOptionId::syzygy_50_move_rule:
-        apply_boolean([this](bool fifty_move_rule) {
+        apply_boolean(syzygy_50_move_rule_, [this](bool fifty_move_rule) {
             syzygy_50_move_rule_ = fifty_move_rule;
             rebuild_syzygy();
         });
@@ -1023,7 +1055,7 @@ void UciController::handle_setoption(std::istream& command) {
     }
 
     case UciOptionId::debug:
-        apply_boolean([this](bool debug) {
+        apply_boolean(debug_enabled_, [this](bool debug) {
             debug_enabled_ = debug;
             configure_debug_file();
         });
@@ -1044,6 +1076,20 @@ void UciController::handle_go(std::istream& command) {
     std::getline(command, arguments);
     SearchLimits limits = uci::parse_go_limits(arguments);
 
+    if (limits.perft.has_value()) {
+        // `go perft N` is a debugging command, not a search: answer with the
+        // per-move node counts and the total, and no bestmove.
+        stop_and_suppress_active_search();
+        write_perft_results(*limits.perft);
+        return;
+    }
+    if (limits.mate.has_value() && !limits.depth.has_value()) {
+        // `go mate N` proves a mate in at most N moves with an ordinary
+        // depth-limited search: 2N - 1 plies is exactly the horizon that can
+        // see every mating line of that length.
+        limits.depth = std::max(1, 2 * *limits.mate - 1);
+    }
+
     const bool has_explicit_limit = limits.depth.has_value() || limits.nodes.has_value() ||
         limits.movetime.has_value() || limits.infinite || limits.ponder;
     const bool has_side_to_move_clock = position_.side_to_move() == Color::white ?
@@ -1053,6 +1099,16 @@ void UciController::handle_go(std::istream& command) {
         // TimeManager intentionally leaves a clock for the other side unset;
         // the controller supplies the same bounded fallback as bare `go`.
         limits.movetime = kBareGoFallback;
+    }
+    if (limit_strength_ && !has_explicit_limit && !limits.nodes.has_value()) {
+        // UCI_LimitStrength turns UCI_Elo into a per-move node budget for
+        // time-controlled games. An explicit work limit (depth/nodes/movetime/
+        // infinite/ponder) is always honoured as sent, so analysis and tests
+        // keep their exact semantics.
+        const std::uint64_t cap = strength_node_limit(elo_);
+        if (cap != 0) {
+            limits.nodes = cap;
+        }
     }
     stop_and_suppress_active_search();
 
@@ -1483,6 +1539,27 @@ void UciController::write_readyok() {
     output_ << "readyok\n" << std::flush;
 }
 
+void UciController::write_perft_results(int depth) {
+    const GameState root = position_;
+    std::vector<std::pair<Move, std::uint64_t>> counts;
+    std::uint64_t total = 0;
+    for (const Move& move : root.legal_moves()) {
+        GameState child = root;
+        if (!child.make_move(move)) {
+            continue;
+        }
+        const std::uint64_t nodes = koi::perft(child, depth - 1);
+        total += nodes;
+        counts.emplace_back(move, nodes);
+    }
+    debug_event("perft depth " + std::to_string(depth) + " nodes " + std::to_string(total));
+    std::lock_guard lock(output_mutex_);
+    for (const auto& [move, nodes] : counts) {
+        output_ << "info string " << move.uci() << ": " << nodes << '\n';
+    }
+    output_ << "info string Nodes searched: " << total << '\n' << std::flush;
+}
+
 void UciController::write_search_info(std::uint64_t generation, const SearchInfo& info) {
     std::lock_guard lock(output_mutex_);
     if (generation != generation_ || info.depth <= 0) {
@@ -1495,6 +1572,11 @@ void UciController::write_search_info(std::uint64_t generation, const SearchInfo
         output_ << "mate " << *info.mate;
     } else {
         output_ << "cp " << info.score_cp;
+    }
+    if (info.bound == SearchInfo::Bound::lower) {
+        output_ << " lowerbound";
+    } else if (info.bound == SearchInfo::Bound::upper) {
+        output_ << " upperbound";
     }
     if (show_wdl_) {
         const Wdl wdl = score_to_wdl(info);
@@ -1540,7 +1622,10 @@ void UciController::write_search_completion(std::uint64_t generation,
 
     output_ << "bestmove "
             << (result.best_move.has_value() ? result.best_move->uci() : "0000");
-    if (ponder_enabled_ && result.best_move.has_value() && result.ponder_move.has_value()) {
+    // The ponder move is part of the answer whenever the engine knows it; the
+    // `Ponder` option only tells the engine whether the GUI will actually
+    // ponder, so gating the move on it needlessly starved GUIs of the hint.
+    if (result.best_move.has_value() && result.ponder_move.has_value()) {
         output_ << " ponder " << result.ponder_move->uci();
     }
     output_ << '\n' << std::flush;

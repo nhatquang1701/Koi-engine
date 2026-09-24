@@ -26,8 +26,8 @@ try {
     Send-UciCommand $session 'position startpos moves e2e4 e7e5 g1f3'
     Send-UciCommand $session 'go depth 2'
     Send-UciCommand $session 'stop'
-    $firstBestmove = Read-UciUntil -Session $session -Description 'bestmove after stopped analysis' -ValidateUciOutput -Predicate { param($line) $line -match '^bestmove [a-h][1-8][a-h][1-8][nbrq]?$' }
-    if ($firstBestmove -notmatch '^bestmove [a-h][1-8][a-h][1-8][nbrq]?$') {
+    $firstBestmove = Read-UciUntil -Session $session -Description 'bestmove after stopped analysis' -ValidateUciOutput -Predicate { param($line) $line -match '^bestmove [a-h][1-8][a-h][1-8][nbrq]?( ponder [a-h][1-8][a-h][1-8][nbrq]?)?$' }
+    if ($firstBestmove -notmatch '^bestmove [a-h][1-8][a-h][1-8][nbrq]?( ponder [a-h][1-8][a-h][1-8][nbrq]?)?$') {
         throw "Stopped analysis emitted an invalid bestmove: $firstBestmove"
     }
 
@@ -42,7 +42,7 @@ try {
     $multiPvRanks = [System.Collections.Generic.HashSet[int]]::new()
     while ($secondBestmoves.Count -eq 0) {
         $line = Read-UciLine $session 'MultiPV bestmove'
-        if ($line -match '^bestmove [a-h][1-8][a-h][1-8][nbrq]?$') {
+        if ($line -match '^bestmove [a-h][1-8][a-h][1-8][nbrq]?( ponder [a-h][1-8][a-h][1-8][nbrq]?)?$') {
             $secondBestmoves.Add($line)
         } elseif ($line -match ' multipv ([1-9][0-9]*) score ') {
             $null = $multiPvRanks.Add([int]$Matches[1])
@@ -61,8 +61,8 @@ try {
         throw 'Infinite analysis did not remain ready.'
     }
     Send-UciCommand $session 'stop'
-    $thirdBestmove = Read-UciUntil -Session $session -Description 'bestmove after infinite analysis' -ValidateUciOutput -Predicate { param($line) $line -match '^bestmove [a-h][1-8][a-h][1-8][nbrq]?$' }
-    if ($thirdBestmove -notmatch '^bestmove [a-h][1-8][a-h][1-8][nbrq]?$') {
+    $thirdBestmove = Read-UciUntil -Session $session -Description 'bestmove after infinite analysis' -ValidateUciOutput -Predicate { param($line) $line -match '^bestmove [a-h][1-8][a-h][1-8][nbrq]?( ponder [a-h][1-8][a-h][1-8][nbrq]?)?$' }
+    if ($thirdBestmove -notmatch '^bestmove [a-h][1-8][a-h][1-8][nbrq]?( ponder [a-h][1-8][a-h][1-8][nbrq]?)?$') {
         throw "Infinite analysis emitted an invalid bestmove: $thirdBestmove"
     }
 
@@ -75,7 +75,7 @@ try {
         throw "En Croissant transcript emitted $($bestmoves.Count) bestmoves; expected exactly three."
     }
     foreach ($line in $session.Lines) {
-        if ($line -notmatch '^(id |option |uciok$|readyok$|info )' -and $line -notmatch '^bestmove [a-h][1-8][a-h][1-8][nbrq]?$') {
+        if ($line -notmatch '^(id |option |uciok$|readyok$|info )' -and $line -notmatch '^bestmove [a-h][1-8][a-h][1-8][nbrq]?( ponder [a-h][1-8][a-h][1-8][nbrq]?)?$') {
             throw "Transcript contains non-UCI output: $line"
         }
     }

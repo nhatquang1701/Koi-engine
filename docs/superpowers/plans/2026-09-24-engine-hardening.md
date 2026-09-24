@@ -325,6 +325,44 @@ From the 2026-09-24 audit. `file:line` references are to the audit revision.
     the shared transposition table, the depth publication, and the honest NPS
     accounting added here.
 
+## Phase 4 record (2026-09-24)
+
+- **`go mate N`** maps to the depth that can prove or refute a mate in `N`
+  (`2N - 1` plies) unless an explicit depth was supplied. The engine answers
+  with an ordinary search and one `bestmove`.
+- **`go perft N`** is a debugging command: it copies the root, walks every legal
+  move, prints `info string <uci>: <nodes>` per move plus
+  `info string Nodes searched: <total>`, and emits no `bestmove`. `N` is
+  accepted in `1..10`.
+- **Bound flags**: `SearchInfo` carries `Bound { exact, lower, upper }` and every
+  publication made without full-window root authority (non-authoritative serial
+  iteration, non-authoritative MultiPV rank, depth-0 emergency report) now sets
+  `lowerbound`, which `write_search_info` prints after the score.
+- **Ponder reply**: the final `bestmove` prints ` ponder <reply>` whenever the
+  completed PV has a reply; the `Ponder` option only announces that the GUI will
+  ponder, so GUIs that never set it still receive the reply move.
+- **Same-value `setoption`**: `apply_boolean`/`apply_unsigned` compare the parsed
+  value with the current one and skip the stop/commit path when nothing changes,
+  so a GUI re-applying its settings between games cannot cancel a live search.
+- **`position` failures no longer latch the controller**: the pre-parse
+  `state_ = ShuttingDown` assignment was removed; suppression now goes through
+  `stop_and_suppress_active_search()` alone, which returns the controller to
+  `Idle`.
+- **Strength limiter**: `UCI_LimitStrength` + `UCI_Elo` now actually limit clock
+  searches through a monotone node cap (100 nodes at 500 Elo, doubling every
+  250 Elo, 25 000 cap, unlimited at 2600+). Explicit depth/nodes/movetime/
+  infinite/ponder limits are honoured exactly as sent, so analysis and pinned
+  tests never change. The mapping is uncalibrated and documented as such in the
+  README.
+- **Tests**: `uci_controller_tests` gained five cases (go perft output, go mate
+  mapping, limiter node cap versus explicit depth, same-value option
+  reapplication, ponder reply without the option) and all `.substr(9)` move
+  extractions were replaced with a tokenizer (`first_bestmove_move`). The shared
+  PowerShell validators were updated: `Test-SearchInfo` accepts the optional
+  bound token, and the bestmove regexes in `uci_process_test.ps1` and
+  `en_croissant_uci_test.ps1` accept the optional ponder suffix while keeping
+  the capture group on the played move.
+
 ## Verification
 
 - Every phase: full Release CTest, focused suites for the touched areas, and
