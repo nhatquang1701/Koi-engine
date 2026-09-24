@@ -218,6 +218,39 @@ From the 2026-09-24 audit. `file:line` references are to the audit revision.
   `sprt-self-check/` (32 games, 6W/20D/6L, Elo 0, LLR -0.009, inconclusive -
   identical binaries must not show an effect).
 
+## Phase 1 record (2026-09-24)
+
+- Transposition table use-after-free removed: readers hold a shared
+  `storage_mutex_` for the whole store/probe/prefetch and a resize takes it
+  exclusively before replacing (and dropping) the old storage, replacing the
+  two-entry retired-storage list.
+- Lazy SMP helpers can no longer terminate the process: the helper body is
+  wrapped in a catch-all that records the first failure, aborts the other
+  helpers, and marks `SearchResult::failed`.
+- `std::quick_exit(74)` is gone. The completion quarantine path and the book
+  quarantine path now answer `bestmove 0000` with an explanatory `info string`
+  and keep the process alive.
+- Ponder searches always wait for `stop`/`ponderhit` before publishing, so a
+  node-limited ponder no longer emits an early bestmove (and `ponderhit` can no
+  longer publish a second one). The UCI process test pins this.
+- `SearchSession::stop()` now stores the flag and notifies under
+  `stop_mutex_`, closing the lost-wakeup window.
+- `TimeManager` keeps the hot-path timing state in atomics (budget in
+  milliseconds, node limit, elapsed baseline) so helper `should_stop` reads
+  cannot race `reconfigure` on `ponderhit`.
+- Containment: NNUE containers are capped at 256 MiB with an allocation catch,
+  `EvalFile` installation and startup evaluator selection are guarded, and a
+  failed `SearchService::start` answers a legal fallback instead of
+  terminating the process.
+- Latent races closed: the `FeatureState` fast path takes a shared lock; the
+  GPU threaded gate is a counter held by a per-search RAII scope; CUDA release
+  re-establishes the context before freeing device memory.
+- Verification: Release CTest 66/66; the four search shards pass;
+  `release_verify.ps1` PASS (`artifacts/verification/engine-hardening/release-verify-phase1/`,
+  smoke 31 lines / 1 bestmove / 0 stderr, 64/64 rows at Threads 1/2/4 plus the
+  timed and optional runs); local Debug+ASan tree passes `ctest -L unit -LE heavy`
+  (25/25) and runs `koi_search_tests --shard=2/4` twice with no sanitizer report.
+
 ## Verification
 
 - Every phase: full Release CTest, focused suites for the touched areas, and

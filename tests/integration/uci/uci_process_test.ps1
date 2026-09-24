@@ -474,13 +474,35 @@ $null = Complete-UciSession $infiniteNodes $true
 $ponderNodes = Start-UciSession -Executable $EnginePath
 Send-UciCommand $ponderNodes 'position startpos'
 Send-UciCommand $ponderNodes 'go ponder nodes 1'
+# UCI forbids a bestmove while pondering. The node budget is already spent, so
+# the worker must park and answer isready normally without publishing.
+Send-UciCommand $ponderNodes 'isready'
 $ponderNodesBestmove = $null
 while ($null -eq $ponderNodesBestmove) {
-    $line = Read-UciLine $ponderNodes 'bestmove after ponder node-limit search'
+    $line = Read-UciLine $ponderNodes 'readiness while pondering at the node limit'
     if ($line -like 'bestmove *') {
         $ponderNodesBestmove = $line
-    } elseif (-not (Test-SearchInfo $line)) {
+        break
+    }
+    if ($line -ceq 'readyok') {
+        break
+    }
+    if (-not (Test-SearchInfo $line)) {
         throw "Invalid output during ponder node-limit search: $line"
+    }
+}
+if ($null -ne $ponderNodesBestmove) {
+    throw "Ponder node-limit search emitted a bestmove before stop: $ponderNodesBestmove"
+}
+Send-UciCommand $ponderNodes 'stop'
+while ($null -eq $ponderNodesBestmove) {
+    $line = Read-UciLine $ponderNodes 'bestmove after stopping a ponder node-limit search'
+    if ($line -like 'bestmove *') {
+        $ponderNodesBestmove = $line
+        break
+    }
+    if (-not (Test-SearchInfo $line)) {
+        throw "Invalid output while stopping a ponder node-limit search: $line"
     }
 }
 if ($ponderNodesBestmove -notmatch '^bestmove [a-h][1-8][a-h][1-8][nbrq]?( ponder [a-h][1-8][a-h][1-8][nbrq]?)?$') {

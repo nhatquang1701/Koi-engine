@@ -102,7 +102,8 @@ TimeManager::TimeManager(SearchLimits limits, Color side_to_move, std::uint8_t s
                          std::uint32_t move_overhead_ms, std::uint32_t slow_mover_percent,
                          RootTimingContext root_context,
                          TimePointProvider now)
-    : limits_(std::move(limits)), root_context_(root_context), now_(std::move(now)), started_(this->now()) {
+    : limits_(std::move(limits)), root_context_(root_context), now_(std::move(now)) {
+    started_ns_.store(now_nanoseconds(), std::memory_order_relaxed);
     initialize(side_to_move, speed_percent, move_overhead_ms, slow_mover_percent);
 }
 
@@ -112,13 +113,16 @@ void TimeManager::reconfigure(const SearchLimits& limits, Color side_to_move,
                               const RootTimingContext& root_context) {
     limits_ = limits;
     root_context_ = root_context;
-    started_ = now();
+    started_ns_.store(now_nanoseconds(), std::memory_order_relaxed);
     initialize(side_to_move, speed_percent, move_overhead_ms, slow_mover_percent);
 }
 
 void TimeManager::initialize(Color side_to_move, std::uint8_t speed_percent,
                              std::uint32_t move_overhead_ms, std::uint32_t slow_mover_percent) {
-    budget_.reset();
+    budget_ms_.store(-1, std::memory_order_relaxed);
+    unbounded_.store(limits_.infinite || limits_.ponder, std::memory_order_relaxed);
+    has_node_limit_.store(limits_.nodes.has_value(), std::memory_order_relaxed);
+    node_limit_.store(limits_.nodes.value_or(0), std::memory_order_relaxed);
     timing_ = TimeManagementStats{};
     previous_score_.reset();
     stable_observations_ = 0;
@@ -148,11 +152,12 @@ void TimeManager::initialize(Color side_to_move, std::uint8_t speed_percent,
         // an explicit movetime is a direct request from the GUI, so only Speed
         // scales it and the final budget never exceeds the request.
         const auto scaled = scale_duration(*limits_.movetime, speed_percent);
-        budget_ = std::min(*limits_.movetime,
-                           with_safety_margin(subtract_overhead(scaled, move_overhead_ms)));
-        timing_.usable = *budget_;
-        timing_.soft_budget = *budget_;
-        timing_.hard_budget = *budget_;
+        const auto movetime_budget = std::min(*limits_.movetime,
+                                              with_safety_margin(subtract_overhead(scaled, move_overhead_ms)));
+        budget_ms_.store(movetime_budget.count(), std::memory_order_relaxed);
+        timing_.usable = movetime_budget;
+        timing_.soft_budget = movetime_budget;
+        timing_.hard_budget = movetime_budget;
         return;
     }
 
@@ -238,7 +243,7 @@ void TimeManager::initialize(Color side_to_move, std::uint8_t speed_percent,
     // the first stop check rather than never.
     timing_.hard_budget = std::max(std::chrono::milliseconds{1}, capped_hard);
     timing_.soft_budget = std::min(timing_.soft_budget, timing_.hard_budget);
-    budget_ = timing_.hard_budget;
+    budget_ms_.store(timing_.hard_budget.count(), std::memory_order_relaxed);
 }
 
 std::chrono::steady_clock::time_point TimeManager::now() const noexcept {
@@ -250,6 +255,10 @@ std::chrono::steady_clock::time_point TimeManager::now() const noexcept {
     } catch (...) {
         return std::chrono::steady_clock::now();
     }
+}
+
+std::int64_t TimeManager::now_nanoseconds() const noexcept {
+    return std::chrono::duration_cast<std::chrono::nanoseconds>(now().time_since_epoch()).count();
 }
 
 int TimeManager::initial_hardness(const RootTimingContext& context) noexcept {
@@ -287,22 +296,35 @@ int TimeManager::initial_hardness(const RootTimingContext& context) noexcept {
 }
 
 std::optional<std::chrono::milliseconds> TimeManager::time_budget() const noexcept {
-    return budget_;
+    const std::int64_t budget_ms = budget_ms_.load(std::memory_order_relaxed);
+    if (budget_ms < 0) {
+        return std::nullopt;
+    }
+    return std::chrono::milliseconds{budget_ms};
 }
 
 std::optional<std::uint64_t> TimeManager::node_limit() const noexcept {
-    return limits_.nodes;
+    if (!has_node_limit_.load(std::memory_order_relaxed)) {
+        return std::nullopt;
+    }
+    return node_limit_.load(std::memory_order_relaxed);
 }
 
 bool TimeManager::should_stop(std::uint64_t nodes) const noexcept {
-    if (const std::optional<std::uint64_t> limit = node_limit(); limit.has_value() &&
-        nodes >= *limit) {
+    if (has_node_limit_.load(std::memory_order_relaxed) &&
+        nodes >= node_limit_.load(std::memory_order_relaxed)) {
         return true;
     }
-    if (limits_.infinite || limits_.ponder || !budget_.has_value()) {
+    if (unbounded_.load(std::memory_order_relaxed)) {
         return false;
     }
-    if (now() - started_ >= *budget_) {
+    const std::int64_t budget_ms = budget_ms_.load(std::memory_order_relaxed);
+    if (budget_ms < 0) {
+        return false;
+    }
+    const std::int64_t elapsed_ms =
+        (now_nanoseconds() - started_ns_.load(std::memory_order_relaxed)) / 1'000'000;
+    if (elapsed_ms >= budget_ms) {
         hard_deadline_reached_.store(true, std::memory_order_relaxed);
         return true;
     }
@@ -342,11 +364,13 @@ void TimeManager::observe_iteration(const SearchIterationObservation& observatio
 }
 
 bool TimeManager::should_stop_after_iteration() const noexcept {
-    if (limits_.infinite || limits_.ponder || !budget_.has_value()) {
+    const std::int64_t budget_ms = budget_ms_.load(std::memory_order_relaxed);
+    if (unbounded_.load(std::memory_order_relaxed) || budget_ms < 0) {
         return false;
     }
-    const auto elapsed = now() - started_;
-    if (elapsed >= *budget_) {
+    const auto elapsed = std::chrono::milliseconds{
+        (now_nanoseconds() - started_ns_.load(std::memory_order_relaxed)) / 1'000'000};
+    if (elapsed >= std::chrono::milliseconds{budget_ms}) {
         hard_deadline_reached_.store(true, std::memory_order_relaxed);
         return true;
     }
@@ -358,15 +382,18 @@ bool TimeManager::should_stop_after_iteration() const noexcept {
 }
 
 bool TimeManager::should_start_next_iteration(std::chrono::milliseconds estimated_next_iteration) const noexcept {
-    if (limits_.infinite || limits_.ponder || !budget_.has_value()) {
+    const std::int64_t budget_ms = budget_ms_.load(std::memory_order_relaxed);
+    if (unbounded_.load(std::memory_order_relaxed) || budget_ms < 0) {
         return true;
     }
-    const auto elapsed = now() - started_;
+    const auto elapsed = std::chrono::milliseconds{
+        (now_nanoseconds() - started_ns_.load(std::memory_order_relaxed)) / 1'000'000};
     if (emergency_pacing_ && !hard_position_ && elapsed >= timing_.soft_budget) {
         return false;
     }
-    return elapsed < *budget_ && elapsed +
-        std::max(estimated_next_iteration, std::chrono::milliseconds{1}) < *budget_;
+    const auto budget = std::chrono::milliseconds{budget_ms};
+    return elapsed < budget && elapsed +
+        std::max(estimated_next_iteration, std::chrono::milliseconds{1}) < budget;
 }
 
 TimeManagementStats TimeManager::diagnostics() const noexcept {

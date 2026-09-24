@@ -39,15 +39,14 @@ public:
 
 private:
     [[nodiscard]] std::chrono::steady_clock::time_point now() const noexcept;
+    [[nodiscard]] std::int64_t now_nanoseconds() const noexcept;
     [[nodiscard]] static int initial_hardness(const RootTimingContext& context) noexcept;
     void initialize(Color side_to_move, std::uint8_t speed_percent, std::uint32_t move_overhead_ms,
                     std::uint32_t slow_mover_percent);
 
     SearchLimits limits_;
-    std::optional<std::chrono::milliseconds> budget_;
     RootTimingContext root_context_;
     TimePointProvider now_;
-    std::chrono::steady_clock::time_point started_;
     TimeManagementStats timing_;
     std::optional<int> previous_score_;
     std::uint32_t stable_observations_ = 0;
@@ -55,6 +54,19 @@ private:
     bool clock_mode_ = false;
     bool emergency_pacing_ = false;
     mutable std::atomic_bool hard_deadline_reached_ = false;
+
+    // The stop checks run per node (SearchContext::interrupted) and from Lazy
+    // SMP helper threads while the main thread may reconfigure the manager on a
+    // ponderhit, so every value they read is a plain atomic. `limits_`,
+    // `timing_`, and the pacing members above stay main-thread-only.
+    std::atomic<std::uint64_t> node_limit_{0};
+    std::atomic_bool has_node_limit_{false};
+    // Budget in milliseconds; negative means "no deadline". Milliseconds keep
+    // very large requests (movetime or clocks near the int64 limit) exactly
+    // representable, which a nanosecond budget would overflow.
+    std::atomic<std::int64_t> budget_ms_{-1};
+    std::atomic<std::int64_t> started_ns_{0};
+    std::atomic_bool unbounded_{false};
 };
 
 } // namespace koi

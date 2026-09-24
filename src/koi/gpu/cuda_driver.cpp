@@ -66,6 +66,15 @@ struct CudaDriver::Api {
 CudaDriver::~CudaDriver() { release(); }
 
 void CudaDriver::release() noexcept {
+    // Device calls are only valid while the context is current on this thread,
+    // and release can run on a different thread than open() (for example when
+    // the last evaluator reference is dropped on a search worker).  A failed
+    // binding must not propagate out of a noexcept destructor path.
+    try {
+        std::string context_error;
+        (void)ensure_context(context_error);
+    } catch (...) {
+    }
     unload_module();
     if (stream_ != nullptr && api_ != nullptr && api_->stream_destroy != nullptr) {
         api_->stream_destroy(stream_);

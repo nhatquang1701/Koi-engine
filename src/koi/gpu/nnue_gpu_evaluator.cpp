@@ -17,7 +17,7 @@ namespace koi::gpu {
 
 namespace {
 
-std::atomic<bool> g_threaded{false};
+std::atomic<int> g_threaded_searches{0};
 
 bool forced_failure() {
     static const bool forced = std::getenv("KOI_GPU_FORCE_FAIL") != nullptr;
@@ -75,12 +75,22 @@ bool gpu_nnue_available() noexcept {
     return true;
 }
 
-void set_gpu_nnue_threaded(const bool threaded) noexcept {
-    g_threaded.store(threaded);
+void begin_gpu_nnue_threaded_search() noexcept {
+    g_threaded_searches.fetch_add(1, std::memory_order_relaxed);
+}
+
+void end_gpu_nnue_threaded_search() noexcept {
+    // Saturate at zero: an unmatched release must not turn the counter negative
+    // and permanently disable (or re-enable) the GPU path.
+    int current = g_threaded_searches.load(std::memory_order_relaxed);
+    while (current > 0 &&
+           !g_threaded_searches.compare_exchange_weak(current, current - 1,
+                                                      std::memory_order_relaxed)) {
+    }
 }
 
 bool gpu_nnue_threaded() noexcept {
-    return g_threaded.load();
+    return g_threaded_searches.load(std::memory_order_relaxed) > 0;
 }
 
 GpuNnueEvaluator::GpuNnueEvaluator(std::shared_ptr<const Evaluator> fallback,
@@ -88,7 +98,7 @@ GpuNnueEvaluator::GpuNnueEvaluator(std::shared_ptr<const Evaluator> fallback,
     : fallback_(std::move(fallback)), service_(std::move(service)) {}
 
 bool GpuNnueEvaluator::gpu_enabled() const noexcept {
-    return service_ != nullptr && service_->available() && g_threaded.load() &&
+    return service_ != nullptr && service_->available() && gpu_nnue_threaded() &&
         !forced_failure();
 }
 

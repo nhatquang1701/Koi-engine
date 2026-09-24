@@ -14,8 +14,11 @@ class GpuNnueService;
 [[nodiscard]] bool gpu_nnue_available() noexcept;
 
 // Search-wide gate: the GPU path only serves multi-threaded searches so the
-// deterministic single-threaded path stays on the CPU implementation.
-void set_gpu_nnue_threaded(bool threaded) noexcept;
+// deterministic single-threaded path stays on the CPU implementation.  The gate
+// is a counter rather than a flag so overlapping searches with different thread
+// counts cannot flip each other's evaluator path mid-search.
+void begin_gpu_nnue_threaded_search() noexcept;
+void end_gpu_nnue_threaded_search() noexcept;
 [[nodiscard]] bool gpu_nnue_threaded() noexcept;
 
 // Evaluator that dispatches single positions to the GPU batch service and

@@ -8,6 +8,7 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <shared_mutex>
 #include <vector>
 
 #include "koi/move.hpp"
@@ -126,19 +127,22 @@ private:
     [[nodiscard]] static std::size_t normalized_size_mb(std::size_t megabytes) noexcept;
     [[nodiscard]] HashResizeResult resize_locked(std::size_t megabytes) noexcept;
     // Lock-free storage handle for the store/probe/prefetch hot paths.  The
-    // owning shared_ptr stays under maintenance_mutex_, and replaced storages
-    // are retired until a later resize so a reader that loaded the pointer
-    // just before a resize still sees a live object.
+    // owning shared_ptr stays under maintenance_mutex_.  Callers keep the
+    // storage alive for the duration of the access by holding storage_mutex_ in
+    // shared mode; a resize takes it exclusively before it replaces and drops
+    // the old storage, so no reader can outlive the object it loaded.
     [[nodiscard]] Storage* hot_storage() const noexcept;
 
     static constexpr std::size_t kStripeCount = 64;
-    // Replaced tables kept alive across resizes (normally at most one).
-    static constexpr std::size_t kRetiredStorageLimit = 2;
 
+    // Shared by every reader for the whole access and taken exclusively by a
+    // resize before the replaced storage is destroyed.  Resizes are rare
+    // maintenance operations, so the extra shared acquisition on the hot path
+    // is the price of never freeing a storage a reader still points at.
+    mutable std::shared_mutex storage_mutex_;
     mutable std::mutex maintenance_mutex_;
     std::shared_ptr<Storage> storage_;
     std::atomic<Storage*> hot_storage_{nullptr};
-    std::vector<std::shared_ptr<Storage>> retired_storages_;
     HashMemoryPolicy memory_policy_;
 };
 

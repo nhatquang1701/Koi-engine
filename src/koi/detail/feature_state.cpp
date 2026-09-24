@@ -52,11 +52,16 @@ PositionFeatures FeatureState::get_or_compute(const std::size_t cache_index,
         return {};
     }
 
-    if (cache_index < kMaximumGameStateHistory &&
-        published_valid_[cache_index].load(std::memory_order_acquire)) {
-        const Entry* entry = published_[cache_index].load(std::memory_order_acquire);
-        if (entry != nullptr && keys_[cache_index].load(std::memory_order_acquire) == position_key) {
-            return entry->features;
+    if (cache_index < kMaximumGameStateHistory) {
+        // The published pointer is only stable while the shared lock is held: a
+        // concurrent writer replaces the slot entry in place, so reading
+        // `entry->features` without the lock could observe a torn struct.
+        std::shared_lock shared_lock(mutex_);
+        if (published_valid_[cache_index].load(std::memory_order_acquire)) {
+            const Entry* entry = published_[cache_index].load(std::memory_order_acquire);
+            if (entry != nullptr && keys_[cache_index].load(std::memory_order_acquire) == position_key) {
+                return entry->features;
+            }
         }
     }
 

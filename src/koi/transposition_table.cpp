@@ -126,6 +126,39 @@ std::size_t u64_to_size(std::uint64_t value) noexcept {
     return std::max<std::size_t>(1, bytes_to_megabytes(total_entries * sizeof(TranspositionEntry)));
 }
 
+// Shared-mode guard that keeps the hot storage alive for the duration of a
+// store/probe/prefetch.  A resize takes the same mutex exclusively before it
+// replaces and drops the storage, so a reader either observes the old storage
+// while it is still owned or the new one; it can never dereference a freed
+// object.  Acquisition cannot fail with a healthy mutex; if it ever did, the
+// caller degrades to reporting "no entry" instead of touching memory.
+class StorageReadGuard {
+public:
+    explicit StorageReadGuard(std::shared_mutex& mutex) noexcept : mutex_(&mutex) {
+        try {
+            mutex_->lock_shared();
+            locked_ = true;
+        } catch (...) {
+            locked_ = false;
+        }
+    }
+
+    ~StorageReadGuard() {
+        if (locked_) {
+            mutex_->unlock_shared();
+        }
+    }
+
+    StorageReadGuard(const StorageReadGuard&) = delete;
+    StorageReadGuard& operator=(const StorageReadGuard&) = delete;
+
+    [[nodiscard]] bool locked() const noexcept { return locked_; }
+
+private:
+    std::shared_mutex* mutex_;
+    bool locked_ = false;
+};
+
 } // namespace
 
 struct TranspositionTable::Storage {
@@ -297,14 +330,21 @@ HashResizeResult TranspositionTable::resize_locked(std::size_t megabytes) noexce
             result.reason = HashResizeReason::request_clamped;
         }
         Storage* const raw = replacement.get();
-        if (current != nullptr) {
-            retired_storages_.push_back(current);
-            if (retired_storages_.size() > kRetiredStorageLimit) {
-                retired_storages_.erase(retired_storages_.begin());
-            }
+        try {
+            // Exclude every in-flight reader before the replaced storage is
+            // dropped: after this critical section no thread holds a pointer to
+            // it, so the previous "keep the last two storages alive" cap (which
+            // could free a storage three resizes old while a descheduled reader
+            // still used it) is gone.
+            std::unique_lock storage_lock(storage_mutex_);
+            storage_ = std::move(replacement);
+            hot_storage_.store(raw, std::memory_order_release);
+        } catch (...) {
+            result.status = current == nullptr ? HashResizeStatus::disabled :
+                HashResizeStatus::unchanged;
+            result.reason = HashResizeReason::allocation_failed;
+            return result;
         }
-        storage_ = std::move(replacement);
-        hot_storage_.store(raw, std::memory_order_release);
         return result;
     } catch (const std::bad_alloc&) {
         result.effective_mb = current == nullptr ? 0 : current->size_mb;
@@ -414,6 +454,10 @@ void TranspositionTable::new_generation() noexcept {
 
 void TranspositionTable::store(std::uint64_t key, int depth, int score, TranspositionBound bound,
                                Move best_move, int ply, bool pv, int eval) noexcept {
+    const StorageReadGuard storage_guard(storage_mutex_);
+    if (!storage_guard.locked()) {
+        return;
+    }
     Storage* const storage = hot_storage();
     if (storage == nullptr || storage->cluster_count == 0) {
         return;
@@ -502,6 +546,10 @@ void TranspositionTable::store(std::uint64_t key, int depth, int score, Transpos
 }
 
 std::optional<TranspositionEntry> TranspositionTable::probe(std::uint64_t key, int ply) const noexcept {
+    const StorageReadGuard storage_guard(storage_mutex_);
+    if (!storage_guard.locked()) {
+        return std::nullopt;
+    }
     Storage* const storage = hot_storage();
     if (storage == nullptr || storage->cluster_count == 0) {
         return std::nullopt;
@@ -528,6 +576,10 @@ std::optional<TranspositionEntry> TranspositionTable::probe(std::uint64_t key, i
 }
 
 void TranspositionTable::prefetch(std::uint64_t key) const noexcept {
+    const StorageReadGuard storage_guard(storage_mutex_);
+    if (!storage_guard.locked()) {
+        return;
+    }
     Storage* const storage = hot_storage();
     if (storage == nullptr || storage->cluster_count == 0) {
         return;

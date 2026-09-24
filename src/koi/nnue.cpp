@@ -31,6 +31,12 @@ namespace {
 
 constexpr std::size_t kContainerHeaderBytes = 72;
 
+// The largest supported container is a v5 payload of 36864 inputs x 1536
+// hidden int16 weights (about 113 MiB); 256 MiB leaves room for a future
+// wider hidden layer while keeping a corrupt, truncated, or hostile EvalFile
+// from requesting an unbounded allocation before any validation runs.
+constexpr std::uintmax_t kMaximumNetworkBytes = 256ull * 1024ull * 1024ull;
+
 NnueError make_error(NnueErrorCode code, std::string message) {
     return NnueError{code, std::move(message)};
 }
@@ -1446,7 +1452,21 @@ std::expected<NnueNetwork, NnueError> NnueLoader::load_file(const std::filesyste
     if (end < 0 || static_cast<std::uintmax_t>(end) > std::numeric_limits<std::size_t>::max()) {
         return std::unexpected(make_error(NnueErrorCode::io_error, "unable to size NNUE container"));
     }
-    std::vector<std::uint8_t> bytes(static_cast<std::size_t>(end));
+    if (static_cast<std::uintmax_t>(end) > kMaximumNetworkBytes) {
+        // Reject before allocating: a bad EvalFile path (or a sparse file) must
+        // not be able to exhaust memory from inside the UCI loop.
+        return std::unexpected(make_error(NnueErrorCode::io_error,
+                                          "NNUE container exceeds the 256 MiB limit"));
+    }
+    std::vector<std::uint8_t> bytes;
+    try {
+        bytes.resize(static_cast<std::size_t>(end));
+    } catch (const std::exception&) {
+        // Surface allocation failure as a load error so the caller can keep the
+        // current evaluator instead of terminating on an escaping bad_alloc.
+        return std::unexpected(make_error(NnueErrorCode::io_error,
+                                          "unable to allocate memory for the NNUE container"));
+    }
     input.seekg(0);
     if (!bytes.empty() && !input.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()))) {
         return std::unexpected(make_error(NnueErrorCode::io_error, "unable to read NNUE container"));

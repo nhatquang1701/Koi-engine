@@ -39,8 +39,20 @@ void SearchSession::launch(std::function<void()> work) {
 }
 
 void SearchSession::stop() noexcept {
-    stop_requested_.store(true, std::memory_order_relaxed);
-    stop_condition_.notify_all();
+    // The stop mutex serializes with the wait predicates so the store cannot
+    // land between a waiter's predicate check and its block, which would lose
+    // the wakeup and hang the joining caller (and with it the UCI loop).
+    // request_ponderhit takes the same lock for the same reason.
+    try {
+        std::lock_guard stop_lock(stop_mutex_);
+        stop_requested_.store(true, std::memory_order_relaxed);
+        stop_condition_.notify_all();
+    } catch (...) {
+        // A failed lock is unrecoverable here; publish the flag anyway so the
+        // next predicate evaluation observes the stop.
+        stop_requested_.store(true, std::memory_order_relaxed);
+        stop_condition_.notify_all();
+    }
 }
 
 void SearchSession::wait() {

@@ -1,4 +1,5 @@
 #include <cstdlib>
+#include <exception>
 #include <filesystem>
 #include <iostream>
 #include <memory>
@@ -101,12 +102,31 @@ int main(int argc, char* argv[]) {
             nnue_path = candidate;
         }
     }
-    const koi::EvaluatorSelection selection =
-        nnue_path.empty() ? koi::make_evaluator()
-                          : koi::make_evaluator(std::optional<std::filesystem::path>(nnue_path));
-    if (selection.nnue_error.has_value()) {
-        std::cerr << "koi-engine: NNUE network rejected (" << selection.nnue_error->message
+    // Evaluator selection must never abort the process: a rejected network
+    // (including one too large to allocate) falls back to the classical
+    // evaluator.
+    koi::EvaluatorSelection selection;
+    try {
+        selection = nnue_path.empty()
+            ? koi::make_evaluator()
+            : koi::make_evaluator(std::optional<std::filesystem::path>(nnue_path));
+        if (selection.nnue_error.has_value()) {
+            std::cerr << "koi-engine: NNUE network rejected (" << selection.nnue_error->message
+                      << "); using the classical evaluator.\n";
+        }
+    } catch (const std::exception& error) {
+        std::cerr << "koi-engine: NNUE network rejected (" << error.what()
                   << "); using the classical evaluator.\n";
+        selection = {};
+    }
+    if (selection.evaluator == nullptr) {
+        try {
+            selection = koi::make_evaluator();
+        } catch (const std::exception& error) {
+            std::cerr << "koi-engine: unable to construct an evaluator (" << error.what()
+                      << ").\n";
+            return 4;
+        }
     }
     koi::SearchService search_service(selection.evaluator, {}, 1);
     koi::UciController controller(std::cin, std::cout, std::cerr, std::move(search_service),

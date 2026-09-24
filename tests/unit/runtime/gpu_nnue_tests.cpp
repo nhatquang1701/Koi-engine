@@ -176,7 +176,7 @@ void test_concurrent_batch_requests_keep_their_own_scores() {
         skip("GPU NNUE service is unavailable: " + error);
     }
     std::vector<koi::GameState> states = fixture_states();
-    koi::gpu::set_gpu_nnue_threaded(true);
+    koi::gpu::begin_gpu_nnue_threaded_search();
     koi::gpu::GpuNnueEvaluator evaluator(std::make_shared<koi::ClassicalEvaluator>(),
                                          std::move(service));
 
@@ -210,7 +210,7 @@ void test_concurrent_batch_requests_keep_their_own_scores() {
     for (std::thread& thread : threads) {
         thread.join();
     }
-    koi::gpu::set_gpu_nnue_threaded(false);
+    koi::gpu::end_gpu_nnue_threaded_search();
     require(!failed.load(), "every concurrent GPU request must succeed");
     for (int round = 0; round < kRounds; ++round) {
         for (std::size_t index = 0; index < states.size(); ++index) {

@@ -980,7 +980,7 @@ void UciController::handle_setoption(std::istream& command) {
             resolved = executable_directory_ / resolved;
         }
         stop_and_suppress_active_search();
-        const std::expected<NnueNetwork, NnueError> network = NnueLoader::load_file(resolved);
+        std::expected<NnueNetwork, NnueError> network = NnueLoader::load_file(resolved);
         if (!network.has_value()) {
             debug_event("EvalFile rejected " + resolved.string() + ": " +
                         network.error().message);
@@ -989,9 +989,20 @@ void UciController::handle_setoption(std::istream& command) {
                     << std::flush;
             break;
         }
-        auto weights = std::make_shared<const NnueNetwork>(std::move(*network));
-        search_service_.set_evaluator(koi::maybe_wrap_gpu_nnue(
-            weights, std::make_shared<NnueEvaluator>(weights)));
+        try {
+            auto weights = std::make_shared<const NnueNetwork>(std::move(*network));
+            search_service_.set_evaluator(koi::maybe_wrap_gpu_nnue(
+                weights, std::make_shared<NnueEvaluator>(weights)));
+        } catch (const std::exception& install_error) {
+            // Installing a network allocates; a failure here must keep the
+            // previous evaluator and the process alive.
+            debug_event("EvalFile installation failed " + resolved.string() + ": " +
+                        install_error.what());
+            std::lock_guard lock(output_mutex_);
+            output_ << "info string EvalFile rejected: " << install_error.what() << '\n'
+                    << std::flush;
+            break;
+        }
         eval_file_ = value;
         debug_json_event("eval_file", "\"path\":" + debug_quoted(resolved.string()) +
                                            ",\"enabled\":true");
@@ -1256,9 +1267,28 @@ void UciController::start_search(GameState root, SearchLimits limits, bool skip_
                         (validation.best_move.has_value() ? validation.best_move->uci() : "0000"));
         }
         if (validation.disposition == CompletionDisposition::quarantine) {
-            debug_event("fatal no common legal move for nonterminal search root generation " +
-                        std::to_string(generation) + " fen " + search_root.fen());
-            std::quick_exit(74);
+            // UCI requires exactly one answer per `go`, and a protocol or
+            // rules disagreement must never kill the engine: claim the
+            // completion, report the condition on the info channel, and answer
+            // 0000. The engine stays alive for the next command; the previous
+            // quick_exit(74) turned a recoverable root inconsistency into
+            // engine death.
+            debug_event("no common legal move for nonterminal search root generation " +
+                        std::to_string(generation) + " fen " + search_root.fen() +
+                        "; answering 0000");
+            if (!completion_once->try_claim()) {
+                debug_event("duplicate search completion suppressed generation " +
+                            std::to_string(generation));
+                return;
+            }
+            std::lock_guard lock(output_mutex_);
+            if (generation != generation_) {
+                return;
+            }
+            output_ << "info string no common legal move for the search root; answering 0000\n"
+                    << std::flush;
+            output_ << "bestmove 0000\n" << std::flush;
+            return;
         }
         if (!completion_once->try_claim()) {
             debug_event("duplicate search completion suppressed generation " +
@@ -1302,7 +1332,38 @@ void UciController::start_search(GameState root, SearchLimits limits, bool skip_
     options.strength_mode = strength_mode_;
     options.syzygy = syzygy_;
     options.syzygy_interior_depth = syzygy_interior_depth_;
-    active_search_.emplace(search_service_.start(std::move(root), std::move(limits), std::move(sink), options));
+    // Hold a legal root move so a resource failure (thread creation, an
+    // allocation inside the session) can still answer with exactly one
+    // bestmove. Resource exhaustion must not terminate the UCI loop.
+    SearchResult start_failure_fallback;
+    start_failure_fallback.identity = SearchRequestIdentity::from(search_root, generation);
+    start_failure_fallback.completed = true;
+    start_failure_fallback.failed = true;
+    for (const Move& move : search_root.legal_moves()) {
+        if (!limits.search_moves_specified ||
+            std::find(limits.search_moves.begin(), limits.search_moves.end(), move) !=
+                limits.search_moves.end()) {
+            start_failure_fallback.best_move = move;
+            start_failure_fallback.pv = {move};
+            break;
+        }
+    }
+    try {
+        active_search_.emplace(
+            search_service_.start(std::move(root), std::move(limits), std::move(sink), options));
+    } catch (const std::exception& error) {
+        debug_event("search failed to start: " + std::string(error.what()));
+        {
+            std::lock_guard lock(output_mutex_);
+            output_ << "info string search could not start: " << error.what() << '\n'
+                    << std::flush;
+        }
+        write_search_completion(generation, start_failure_fallback);
+        std::lock_guard lock(output_mutex_);
+        if (state_ != ControllerState::ShuttingDown) {
+            state_ = ControllerState::Idle;
+        }
+    }
 }
 
 void UciController::stop_active_search() {
@@ -1529,9 +1590,24 @@ void UciController::write_book_completion(std::uint64_t generation, const GameSt
         return;
     }
     if (validation.disposition == CompletionDisposition::quarantine) {
-        debug_event("fatal no common legal move for nonterminal book root generation " +
-                    std::to_string(generation) + " fen " + root.fen());
-        std::quick_exit(74);
+        // Mirror the search completion path: never exit the process for a
+        // rules/protocol disagreement, answer the one bestmove the GUI expects,
+        // and keep serving the next command.
+        debug_event("no common legal move for nonterminal book root generation " +
+                    std::to_string(generation) + " fen " + root.fen() + "; answering 0000");
+        if (!completion_once->try_claim()) {
+            debug_event("duplicate book completion suppressed generation " +
+                        std::to_string(generation));
+            return;
+        }
+        std::lock_guard lock(output_mutex_);
+        if (generation != generation_) {
+            return;
+        }
+        output_ << "info string no common legal move for the book root; answering 0000\n"
+                << std::flush;
+        output_ << "bestmove 0000\n" << std::flush;
+        return;
     }
     if (!completion_once->try_claim()) {
         debug_event("duplicate book completion suppressed generation " + std::to_string(generation));

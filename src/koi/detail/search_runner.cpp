@@ -10,6 +10,7 @@
 #include <memory>
 #include <mutex>
 #include <stdexcept>
+#include <string>
 #include <thread>
 #include <utility>
 #include <vector>
@@ -1936,8 +1937,46 @@ public:
         main_depth_.store(depth, std::memory_order_relaxed);
     }
 
+    // A helper that throws (bad_alloc under memory pressure, an evaluator
+    // failure) must not let the exception cross the thread entry point, which
+    // would call std::terminate and take the whole engine down. The failure is
+    // recorded here and surfaced to the driver, which stops deepening and
+    // publishes the best completed iteration (or the abort-safe fallback).
+    [[nodiscard]] bool failed() const noexcept {
+        return failed_.load(std::memory_order_relaxed);
+    }
+
+    [[nodiscard]] std::string failure_message() const {
+        std::lock_guard lock(failure_mutex_);
+        return failure_message_;
+    }
+
 private:
-    void helper_loop(std::size_t helper_index) {
+    void record_failure(const char* message) noexcept {
+        try {
+            std::lock_guard lock(failure_mutex_);
+            if (failure_message_.empty()) {
+                failure_message_ = message;
+            }
+        } catch (...) {
+            // The diagnostic is best-effort; the flags below are what stop the
+            // search and keep the process alive.
+        }
+        failed_.store(true, std::memory_order_relaxed);
+        helper_abort_.store(true, std::memory_order_relaxed);
+    }
+
+    void helper_loop(std::size_t helper_index) noexcept {
+        try {
+            helper_body(helper_index);
+        } catch (const std::exception& error) {
+            record_failure(error.what());
+        } catch (...) {
+            record_failure("an unknown error");
+        }
+    }
+
+    void helper_body(std::size_t helper_index) {
         // A helper owns its own position copy, ordering tables and evaluator
         // worker; only the transposition table and the time budget are shared.
         // The published depth is re-read at the top of every iteration, so a
@@ -1982,6 +2021,9 @@ private:
     std::atomic<int> main_depth_{1};
     std::atomic_bool stopping_{false};
     std::atomic_bool helper_abort_{false};
+    std::atomic_bool failed_{false};
+    mutable std::mutex failure_mutex_;
+    std::string failure_message_;
 };
 
 class RootWorkerPool {
@@ -2338,6 +2380,31 @@ void safely_report_info(const SearchEventSink& sink, const SearchInfo& info) {
     }
 }
 
+// Keeps the process-wide "GPU batching is worth it" counter true for exactly
+// the lifetime of a multi-threaded search.  A boolean flag would be wrong when
+// two searches with different thread counts overlap: the second search would
+// flip the evaluator path of the first one mid-flight.
+class ThreadedGpuSearchScope {
+public:
+    explicit ThreadedGpuSearchScope(const bool threaded) noexcept : threaded_(threaded) {
+        if (threaded_) {
+            gpu::begin_gpu_nnue_threaded_search();
+        }
+    }
+
+    ~ThreadedGpuSearchScope() {
+        if (threaded_) {
+            gpu::end_gpu_nnue_threaded_search();
+        }
+    }
+
+    ThreadedGpuSearchScope(const ThreadedGpuSearchScope&) = delete;
+    ThreadedGpuSearchScope& operator=(const ThreadedGpuSearchScope&) = delete;
+
+private:
+    bool threaded_;
+};
+
 } // namespace
 
 SearchRunner::SearchRunner(std::shared_ptr<SearchSession> session,
@@ -2369,7 +2436,7 @@ void SearchRunner::run() {
     // re-arms timing at the top of the next iteration.
     SearchLimits limits = session->limits();
     const SearchOptions& options = session->options();
-    gpu::set_gpu_nnue_threaded(options.threads > 1);
+    const ThreadedGpuSearchScope gpu_scope(options.threads > 1);
     SearchResult result;
     result.identity = session->identity();
     // The orchestrator uses the same table seam as the recursive search layer;
@@ -2715,7 +2782,17 @@ void SearchRunner::run() {
                             nullptr, &root_authoritative);
                     }
                 }
-                if (context.aborted) {
+                const bool helper_failed = lazy_pool != nullptr && lazy_pool->failed();
+                if (context.aborted || helper_failed) {
+                    if (helper_failed) {
+                        // A helper could not finish its iteration. Helpers only
+                        // feed the shared table, so the main result stays valid;
+                        // stop deepening, mark the diagnostic flag, and publish
+                        // the best completed iteration through the abort-safe
+                        // path below instead of letting the failure kill the
+                        // process or leave the search running.
+                        result.failed = true;
+                    }
                     if (result.completed_depth == 0 && !used_short_fallback &&
                         defer_nonchecking_short_fallback) {
                         if (const auto fallback = short_search_fallback_move(
@@ -4587,9 +4664,14 @@ void SearchRunner::run() {
             result.stats = total_stats;
         }
 
-        if (limits.ponder && (legal_moves.empty() || root_is_forced_draw)) {
-            // A terminal ponder root has nothing to deepen; it answers as soon
-            // as the GUI stops it or converts the ponder with a ponderhit.
+        if (limits.ponder) {
+            // A pondering search must never publish a bestmove on its own: UCI
+            // requires one answer only after `stop` or `ponderhit`. A terminal
+            // ponder root has nothing to deepen, and a node-limited ponder has
+            // already spent its budget, so both wait here; a time/infinite
+            // ponder only reaches this point after stop/ponderhit anyway. The
+            // conversion (if any) is consumed so the caller can see the
+            // converted limits.
             session->wait_until_stopped_or_ponderhit();
             (void)session->take_ponderhit_limits();
         }
@@ -4618,6 +4700,11 @@ void SearchRunner::run() {
             // merged here.
             lazy_pool->stop();
             accumulate_stats(result.stats, lazy_pool->stats());
+            if (lazy_pool->failed()) {
+                // The main iteration may have finished before the flag was
+                // observed; keep the diagnostic honest either way.
+                result.failed = true;
+            }
         }
         result.timing = time_manager.diagnostics();
     } catch (...) {
