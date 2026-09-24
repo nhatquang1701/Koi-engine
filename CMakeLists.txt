@@ -1116,6 +1116,7 @@ if(Python3_Interpreter_FOUND)
         elo_estimate_python stockfish_match_python elo_openings_python
         tune_eval_python nnue_training_python nnue_wrapper_python
         koi_dataset_python gen_training_data_python
+        koi_chess_python koi_chess_pgn_python koi_chess_engine_python
         measurement_phase_python measurement_forensics_python strength_report_python
         nnue_studio_python koi_trainer_python tune_classical_python nnue_studio_ui_python
         bullet_data_python
@@ -1136,5 +1137,19 @@ foreach(KOI_TEST_NAME IN LISTS KOI_REGISTERED_TESTS)
     if(KOI_TEST_TIMEOUT STREQUAL "NOTFOUND")
         math(EXPR KOI_DEFAULT_TIMEOUT "${KOI_TEST_TIMEOUT_SECONDS} * ${KOI_TIMEOUT_SCALE}")
         set_tests_properties(${KOI_TEST_NAME} PROPERTIES TIMEOUT ${KOI_DEFAULT_TIMEOUT})
+    endif()
+endforeach()
+
+# The Python tooling tests are deterministic and take well under a minute on
+# every platform; a hung subprocess must fail quickly instead of burning the
+# generic search budget, so they get their own bound.
+set(KOI_PYTHON_TEST_TIMEOUT_SECONDS "90" CACHE STRING
+    "Timeout in seconds for tests labeled python")
+math(EXPR KOI_PYTHON_TIMEOUT
+    "${KOI_PYTHON_TEST_TIMEOUT_SECONDS} * ${KOI_TIMEOUT_SCALE}")
+foreach(KOI_TEST_NAME IN LISTS KOI_REGISTERED_TESTS)
+    get_test_property(${KOI_TEST_NAME} LABELS KOI_TEST_LABELS)
+    if(KOI_TEST_LABELS MATCHES "(^|;)python(;|$)")
+        set_tests_properties(${KOI_TEST_NAME} PROPERTIES TIMEOUT ${KOI_PYTHON_TIMEOUT})
     endif()
 endforeach()

@@ -132,9 +132,12 @@ jobs:
       - name: Run the Python suite
         env:
           KOI_TEST_RETRIES: "3"
+        # The Python suites are deterministic and finish in well under a minute
+        # on Windows; a repeat here would only triple the cost of a hang, so the
+        # step fails fast instead.
+        timeout-minutes: 15
         run: |
           ctest --test-dir build/ci-release -C Release -j 2 -L python \
-            --repeat until-pass:2 \
             --output-on-failure --output-junit build/ci-release/ctest-python-junit.xml
       - name: Show the test log tail
         if: always()
@@ -271,9 +274,12 @@ jobs:
       - name: Run the Python suite
         env:
           KOI_TEST_RETRIES: "3"
+        # The Python suites are deterministic and finish in well under a minute
+        # on Windows; a repeat here would only triple the cost of a hang, so the
+        # step fails fast instead.
+        timeout-minutes: 15
         run: |
           ctest --test-dir build/ci-release -C Release -j 2 -L python \
-            --repeat until-pass:2 \
             --output-on-failure --output-junit build/ci-release/ctest-python-junit.xml
       - name: Show the test log tail
         if: always()
