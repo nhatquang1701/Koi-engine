@@ -1928,12 +1928,23 @@ public:
         return total;
     }
 
+    // The main driver publishes the depth it is about to search so helpers can
+    // keep pace with it instead of re-walking the shallow iterations the main
+    // thread has already finished. Depositing deeper lines into the shared
+    // table is the only way a helper can pay for itself.
+    void publish_depth(int depth) noexcept {
+        main_depth_.store(depth, std::memory_order_relaxed);
+    }
+
 private:
     void helper_loop(std::size_t helper_index) {
         // A helper owns its own position copy, ordering tables and evaluator
         // worker; only the transposition table and the time budget are shared.
-        // Staggered starting depths keep the helpers from duplicating each
-        // other's trees.
+        // The published depth is re-read at the top of every iteration, so a
+        // helper that starts late does not re-walk the shallow iterations, and
+        // a helper already ahead keeps its own progress. The starting class
+        // comes from the helper index (never from a race on the published
+        // value), so the stagger is deterministic for a fixed thread count.
         GameState state = root_;
         auto context_storage = std::make_unique<SearchContext>(
             evaluator_, table_, time_manager_, stop_requested_, nullptr, evaluator_mutex_,
@@ -1943,6 +1954,8 @@ private:
         while (!stopping_.load(std::memory_order_relaxed) &&
                !stop_requested_.load(std::memory_order_relaxed) &&
                !time_manager_.should_stop(0) && depth <= kMaximumSearchDepth) {
+            const int published = std::max(1, main_depth_.load(std::memory_order_relaxed));
+            depth = std::max(depth, published + static_cast<int>(helper_index % 3));
             PrincipalVariation pv;
             context.begin_iteration(&helper_abort_);
             context.negamax(state, depth, -kInfinity, kInfinity, 0, pv);
@@ -1966,6 +1979,7 @@ private:
     TablebaseSearchBinding tablebase_binding_;
     std::vector<std::thread> helpers_;
     std::vector<SearchStats> helper_stats_;
+    std::atomic<int> main_depth_{1};
     std::atomic_bool stopping_{false};
     std::atomic_bool helper_abort_{false};
 };
@@ -2638,6 +2652,9 @@ void SearchRunner::run() {
                 }
                 if (context.interrupted()) {
                     break;
+                }
+                if (lazy_pool) {
+                    lazy_pool->publish_depth(depth);
                 }
                 const std::optional<Move> previous_best_move = result.best_move;
                 const std::vector<Move> previous_pv = result.pv;

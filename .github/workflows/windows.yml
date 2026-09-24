@@ -4,8 +4,8 @@ on:
   push:
   pull_request:
 
-# Separate jobs so a Debug or differential failure cannot cancel the primary
-# Release suite, and so each leg can upload its own diagnostics.
+# Separate jobs so a Debug, sanitizer, or differential failure cannot cancel
+# the primary Release suite, and so each leg can upload its own diagnostics.
 jobs:
   release-full:
     runs-on: windows-latest
@@ -96,6 +96,46 @@ jobs:
           path: |
             build/ci-debug/ctest-junit.xml
             build/ci-debug/Testing/Temporary/LastTest.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+  sanitizer:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build and test with AddressSanitizer
+        shell: cmd
+        env:
+          # ASan slows the engine down dramatically, so the wall-clock-sensitive
+          # search and strength cases stay behind the heavy label; the few
+          # timing-sensitive unit cases get one extra attempt.
+          KOI_TEST_RETRIES: "2"
+        run: |
+          if not exist "%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" exit /b 1
+          for /f "usebackq delims=" %%I in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do set "VSINSTALL=%%I"
+          if not defined VSINSTALL exit /b 1
+          set "VSDEVCMD=%VSINSTALL%\Common7\Tools\VsDevCmd.bat"
+          if not exist "%VSDEVCMD%" exit /b 1
+          call "%VSDEVCMD%" -arch=x64 -host_arch=x64
+          if errorlevel 1 exit /b 1
+          where cl
+          cl 2>&1 | findstr /C:"x64" >nul
+          if errorlevel 1 exit /b 1
+          cmake -S . -B build/ci-asan -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=cl -DKOI_SANITIZE=ON
+          if errorlevel 1 exit /b 1
+          cmake --build build/ci-asan --config Debug
+          if errorlevel 1 exit /b 1
+          ctest --test-dir build/ci-asan -C Debug -j 2 -L unit -LE heavy --output-on-failure --output-junit build/ci-asan/ctest-junit.xml
+          if errorlevel 1 exit /b 1
+      - name: Upload sanitizer diagnostics
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: sanitizer-test-diagnostics
+          path: |
+            build/ci-asan/ctest-junit.xml
+            build/ci-asan/Testing/Temporary/LastTest.log
           if-no-files-found: ignore
           retention-days: 7
 

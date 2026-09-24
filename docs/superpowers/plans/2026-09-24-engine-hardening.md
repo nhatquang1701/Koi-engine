@@ -1,0 +1,246 @@
+# Engine hardening and feature foundations
+
+Status: in progress. Owner: Koi Engine.
+
+## Goal
+
+Fix the crash, hang, correctness, and infrastructure weaknesses found in the
+2026-09-24 four-part audit, then build the new features the fixes unlock:
+many-thread and long-game stability, the UCI/GUI protocol surface, and
+strength work (trained NNUE v5, evaluation tuning, search modernization).
+
+Scope decisions (confirmed):
+
+- Sequencing: stability first, then robustness/scale, then protocol/GUI, then
+  strength.
+- Feature targets: (1) many-thread and long-game stability, (2) `go mate`,
+  `go perft`, `lowerbound`/`upperbound`, ponder, `UCI_LimitStrength`/`UCI_Elo`,
+  (3) trained NNUE v5 and evaluation tuning.
+- The uncommitted Lazy SMP helper-depth change in
+  `src/koi/detail/search_runner.cpp` is fixed properly (per-iteration depth
+  read, deterministic stagger, benchmark evidence) rather than reverted.
+- Quality gates: a Windows AddressSanitizer CI job and a Linux no-retry flake
+  CI job. The sanitizer job is Windows-only (MSVC ASan); the flake job runs on
+  Linux CI.
+- The UCI handshake stays byte-identical unless a change is explicitly
+  intended and the handshake fixture is updated with it.
+- The classical evaluator stays the default; NNUE stays opt-in with a CPU
+  fallback. Elo/CPL/NPS remain reports, never CI thresholds.
+
+## Weakness inventory
+
+From the 2026-09-24 audit. `file:line` references are to the audit revision.
+
+### Stability and undefined behavior
+
+1. TT retired storages are erased after a two-slot window while lock-free
+   readers may still hold the raw `hot_storage()` pointer
+   (`transposition_table.cpp:299-307,415-425,504-515`); the CI-segfaulting
+   shard runs exactly this concurrency test.
+2. Lazy SMP helper threads have no exception guard, so any throw terminates
+   the process (`search_runner.cpp:1940-1965`).
+3. Worst-case search-stack usage (~1.2-1.5 MB) exceeds the 1 MB default
+   thread stack: per-frame `MoveMetadataList` buffers in negamax and
+   quiescence (`search_context.cpp:666,1127,1282,182,244`,
+   `search_stack.hpp:16`).
+4. `std::quick_exit(74)` on protocol input: an empty or fully illegal
+   `searchmoves` list and any native/shadow completion disagreement
+   (`completion_gate.cpp:13-20,101-131`,
+   `uci_controller.cpp:1258-1262,1531-1534`).
+5. `SearchSession::stop()` stores and notifies without holding the wait
+   mutex (lost wakeup -> hang) (`search_session.cpp:41-65`).
+6. A node-limited ponder publishes `bestmove` early and `ponderhit` can then
+   publish a second one (`search_runner.cpp:4587-4592`,
+   `uci_controller.cpp:1067-1097`).
+7. `TimeManager::reconfigure` mutates non-atomic state while helpers call
+   `should_stop` (`time_manager.cpp:109-128`, `search_runner.cpp:1955`).
+8. NNUE loading allocates by file size with no cap and `bad_alloc` escapes
+   the UCI loop and `main`; thread-creation failure also escapes
+   (`nnue.cpp:1440-1455`, `uci_controller.cpp:983-994`,
+   `search_session.cpp:23-38`).
+9. Latent races: `FeatureState` fast path (`feature_state.cpp:55-61`), the
+   process-global GPU threaded flag, GPU batch starvation and device frees
+   without a current context (`nnue_gpu_evaluator.cpp:60-152`,
+   `cuda_driver.cpp:324-328`).
+
+### Correctness
+
+10. Native history is capped at 256 plies and a long `position ... moves`
+    command is dropped wholesale, leaving a stale root
+    (`position.cpp:28,743-772`, `uci_controller.cpp:706-712`).
+11. Native and shadow repetition identity diverge for an illegal-en-passant
+    double push (`position.cpp:1299-1302` vs `chess.hpp:2109-2154`).
+12. The evaluation cache key omits `fullmove_number`, which the classical
+    evaluator reads (`search_context.hpp:443-456`,
+    `classical_evaluator.cpp:151,239`).
+13. Quiescence TT entries are horizon-blind (qdepth/check-limit are not in
+    the shared key) (`search_context.cpp:207-218,296-299`).
+14. Parallel-root abort can publish the unordered generated move
+    (`search_runner.cpp:2418-2422` vs `:3753-3761`).
+15. True IID cannot trigger (`!tt_move` never holds at depth >= 6) and marks
+    the node selective when it does (`search_context.cpp:1242-1257`).
+16. Syzygy: `SyzygyProbeLimit` defaults to 5 in code but is advertised as 7;
+    `SyzygyPath` resolves against the CWD; the root probe ignores
+    `SyzygyProbeDepth` for node/time searches (`uci_controller.hpp:120`,
+    `uci_controller.cpp:210-211,935-939`, `search_runner.cpp:2475`).
+17. Hygiene: FENs with the side not to move in check are accepted,
+    `legal_moves_into` silently truncates for small spans, and
+    `modules/types.ixx` drifts from the implementation.
+
+### Advertised but inert, or incomplete
+
+18. `UCI_LimitStrength`, `UCI_Elo`, and `StrengthMode` have no effect (the
+    only consumer is a hook nothing installs) (`search_service.cpp:89-92`,
+    `search_types.hpp:253-261`).
+19. No `go mate`, no `go perft`, no lowerbound/upperbound info; the ponder
+    move is suppressed unless the `Ponder` option is set; any valid
+    `setoption` aborts an active search; a `position` parse failure latches
+    `ShuttingDown`.
+20. Search modernization backlog: quiescence TT cutoffs, late-move pruning
+    tables (the live path computes LMR twice; the legacy `late_move` is
+    dead), MultiPV aspiration disabled by design, shared histories across
+    Lazy SMP helpers deferred, NPS under-reported, `root_result_publishable`
+    dead code.
+21. Evaluation: the tuner's "generated" header is a hand-written stub and its
+    adoption path is not wired; no pawn hash; mobility double-counts
+    bishops/queens and omits rooks/knights; king safety has no attack tables.
+22. NNUE v5 has no representative trained network and no holdout discipline;
+    the exporter's validation format does not match the label corpus; the GPU
+    service only accepts hidden 1536, so no committed v5 network can load, and
+    the kernel is structurally slow.
+23. Opening book safety is a shallow material-only probe and a rejection
+    discards the book move instead of trying the next candidate.
+
+### Tests, CI, and process
+
+24. No sanitizer job, no no-retry flake job, no coverage, no performance
+    gate, and no SPRT gate in CI.
+25. `XFAIL-UNSEEN` is only enforced on unfiltered, unsharded runs, and CI
+    always runs four shards (`koi_test_support.hpp:450-461`).
+26. The `uci_controller_tests` deterministic-search case races `go depth 2`
+    against an immediate `stop` (`uci_controller_tests.cpp:1277-1296`).
+27. The uncommitted Lazy SMP helper-depth change is ineffective (helpers read
+    `main_depth_` once before the loop) and adds scheduling-dependent start
+    depths (`search_runner.cpp:1931-1952,2653-2655`).
+28. Plan/document drift: the Linux plan is missing from the plans index and
+    several plan checkboxes are stale.
+
+## Design decisions
+
+- **TT reclamation**: readers take a snapshot of the current storage under
+  the maintenance mutex (or an epoch/hazard scheme); retired storages are
+  freed only when no reader can hold them. The concurrency test is
+  strengthened to hammer resizes under sanitizers.
+- **Search stack**: move the large per-node containers into per-context
+  scratch storage indexed by ply where possible; otherwise create search
+  threads with an explicit larger stack. The worst case is covered by a
+  depth-64 plus maximum-quiescence stress case.
+- **Protocol safety**: protocol input must never kill the process. An
+  unsatisfiable `searchmoves` restriction is treated as unrestricted (or
+  answered with `bestmove 0000`), and a completion-gate disagreement logs
+  diagnostics and publishes a native-legal fallback.
+- **Ponder lifecycle**: every ponder root waits for `stop`/`ponderhit`; a
+  request that already published cannot publish twice.
+- **Timing snapshot**: helper threads read an immutable atomic timing
+  snapshot; `reconfigure` swaps the snapshot rather than mutating fields.
+- **XFAIL policy**: `XFAIL-UNSEEN` becomes shard-aware and fatal, so removing
+  a known-failure entry fails CI even through the four shards; the
+  `tests/README.md` inventory must match the code lists.
+- **Sanitizer build**: a `KOI_SANITIZE` cache option (MSVC `/fsanitize=address`
+  with a dynamic CRT) and a Windows CI job; Linux keeps its no-retry flake
+  job. TSan is out of scope on MSVC, so thread races are covered by ASan plus
+  the hardened concurrency tests.
+- **Flake job**: runs the search shards and the controller tests with
+  `KOI_TEST_RETRIES=1`, no `--repeat until-pass`, repeated several times, so
+  first-attempt failures are visible.
+- **Evidence**: search behaviour changes keep the engine-v2 contract - the
+  64-position tactical gate, perft, shadow-diff, the full suites, and a
+  recorded SPRT/NPS report under `artifacts/verification/engine-hardening/`.
+
+## Phases
+
+0. **Safety net and baselines**: fix the flaky controller test; enforce
+   `XFAIL-UNSEEN` on shards; add the Windows ASan job (`KOI_SANITIZE`) and
+   the Linux flake job; fix the Lazy SMP helper-depth change; capture the
+   pre-change baseline (`release_verify.ps1`, `koi-bench --timed` at
+   Threads 1/2/4/8, SPRT self-check).
+1. **Stability**: TT reclamation, helper exception guard, stack headroom,
+   removal of the `quick_exit` protocol paths, session/ponder lifecycle,
+   timing snapshot, load/thread-creation containment, and the latent races.
+2. **Correctness**: long-game history, shadow repetition identity, evaluation
+   cache key, quiescence TT tagging, root abort ordering, IID provenance,
+   Syzygy defaults/paths/depth, and the hygiene items.
+3. **Robustness and scale**: a soak suite (long games, Threads 8/16, hash
+   resize during search, ponder cycles) under sanitizers; shared histories
+   across Lazy SMP helpers; honest NPS accounting and a report-only NPS
+   artifact; hash-cap and fixed-depth thread-shape decisions.
+4. **Protocol and GUI**: `go mate`, `go perft`, bound flags, ponder-move
+   emission, `setoption`/`position` state-machine fixes, and a calibrated
+   `UCI_LimitStrength`/`UCI_Elo` profile measured with the Elo harness (or
+   de-advertised if it cannot be evidenced).
+5. **Strength**: true IID redesign, late-move pruning tables, quiescence TT
+   cutoffs, MultiPV per-line aspiration, the evaluation tuning/adoption
+   workflow (pawn hash, mobility, king-safety tables), a representative
+   NNUE v5 with holdout discipline plus GPU parity, and the root-forcing
+   XFAIL burndown.
+6. **Verification and docs**: full Release and Debug suites, the release
+   gate, the sanitizer and flake jobs green, evidence records, a verification
+   record, and the README/index refresh.
+
+## Phase 0 record (2026-09-24)
+
+- Flaky `uci_controller_tests` deterministic-search case: the transcript now
+  releases one stage per completed `bestmove`
+  (`StagedGatedInputBuffer` / `ReleaseOnBestmoveCountBuffer`), so `stop` can no
+  longer race a completed search. 20/20 focused repeats and the full binary
+  (52 cases) pass.
+- `XFAIL-UNSEEN` is now enforced on filtered and sharded runs: an entry that
+  names no case, or a selected case that did not run, fails the run. Verified
+  with a temporary sentinel entry (fatal on unfiltered, sharded, and filtered
+  invocations) and on all four search shards.
+- Windows ASan job: `KOI_SANITIZE` (MSVC only) switches to the dynamic CRT,
+  strips `/RTC1`, disables LTO, and adds `/fsanitize=address`. Local
+  Debug+ASan tree: 375/375 targets built, `ctest -L unit -LE heavy` 25/25
+  passed. The new `sanitizer` CI job runs the same subset.
+- Linux no-retry flake job: `linux-flake` rebuilds with GCC 14 and repeats
+  `koi_search_tests_[1-4]of4`, `transposition_table_tests`,
+  `uci_controller_tests`, `search_service_tests`, and `time_manager_tests`
+  three times with `KOI_TEST_RETRIES=1` and no `--repeat`.
+- Lazy SMP helper-depth change fixed: helpers re-read the published depth at
+  the top of every iteration, keep their own progress with `std::max`, and the
+  starting class stays index-based (`helper_index % 3`) so it cannot depend on
+  thread scheduling. Threads=1 never starts a pool and is byte-identical.
+- Baseline evidence in `artifacts/verification/engine-hardening/`:
+  `bench-threads{1,2,4,8}.json` plus the timed runs, `baseline.txt`
+  (Threads=1 repeat identical, 64/64 matches at every thread count),
+  `release-verify/` (Debug+Release CTest PASS, smoke 31 lines / 1 bestmove /
+  0 stderr, replay rule draw, En Croissant-style match clean), and
+  `sprt-self-check/` (32 games, 6W/20D/6L, Elo 0, LLR -0.009, inconclusive -
+  identical binaries must not show an effect).
+
+## Verification
+
+- Every phase: full Release CTest, focused suites for the touched areas, and
+  a commit with an imperative capitalized message.
+- Stability and correctness phases: sanitizer job green; hardened
+  concurrency tests; no `quick_exit` on protocol input (process tests).
+- Feature phases: the 64-position tactical gate, perft byte-identical,
+  shadow-diff unchanged, plus a recorded SPRT/NPS report for behaviour
+  changes. Threads=1 stays deterministic; Threads>1 asserts invariants.
+- Final: Windows full CTest and `release_verify.ps1`; Linux CI green
+  (GCC, Clang, modules-off, tarball, flake); Windows ASan job green.
+
+## Risks
+
+- TT reclamation is subtle; the hardened concurrency test and ASan are the
+  guard rails, and the fallback is a shared-pointer snapshot per access.
+- The stack fix touches hot-path layout and can move NPS; every phase records
+  a benchmark delta.
+- `UCI_Elo` calibration needs a large game budget and a usable anchor
+  manifest; if the evidence cannot be produced, the options are de-advertised
+  instead of shipping an uncalibrated limiter.
+- NNUE v5 training needs compute and a corpus decision; the feature stays
+  opt-in and evidence-gated.
+- The root-forcing XFAIL cluster is one mechanism with many symptoms; it is
+  the largest single strength item and may be split into its own plan if the
+  evidence shows it needs to be.

@@ -359,6 +359,63 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  linux-flake:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: tools/measurement/requirements.txt
+      - name: Install the GCC 14 toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends g++-14 ninja-build
+          python -m pip install --disable-pip-version-check --quiet --upgrade cmake -r tools/measurement/requirements.txt
+      - name: Configure and build with GCC 14
+        run: |
+          cmake -S . -B build/ci-flake -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER=gcc-14 -DCMAKE_CXX_COMPILER=g++-14 \
+            -DPython3_EXECUTABLE="$(command -v python)"
+          cmake --build build/ci-flake --config Release -j 4
+      # The main legs tolerate a wall-clock flake with --repeat until-pass:2 and
+      # extra in-process retries. This leg does the opposite: every repeat must
+      # pass on its own, so a scheduling-dependent failure or a rare crash
+      # becomes a red signal instead of a hidden retry.
+      - name: Repeat the timing-sensitive suites without retries
+        env:
+          KOI_TEST_RETRIES: "1"
+        run: |
+          set +e
+          status=0
+          for attempt in 1 2 3; do
+            echo "::group::flake attempt ${attempt}"
+            timeout 900 ctest --test-dir build/ci-flake -C Release -j 1 \
+              -R "^(koi_search_tests_[1-4]of4|transposition_table_tests|uci_controller_tests|search_service_tests|time_manager_tests)$" \
+              --output-on-failure > "/tmp/koi-flake-${attempt}.log" 2>&1
+            attempt_status=$?
+            tail -n 40 "/tmp/koi-flake-${attempt}.log"
+            echo "::endgroup::"
+            echo "flake attempt ${attempt} exit=${attempt_status}"
+            if [ "${attempt_status}" -ne 0 ]; then
+              status="${attempt_status}"
+            fi
+          done
+          set -e
+          exit "${status}"
+      - name: Upload flake diagnostics
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: linux-flake-test-diagnostics
+          path: |
+            build/ci-flake/Testing/Temporary/LastTest.log
+            /tmp/koi-flake-*.log
+          if-no-files-found: ignore
+          retention-days: 7
+
   linux-tarball:
     runs-on: ubuntu-24.04
     timeout-minutes: 90

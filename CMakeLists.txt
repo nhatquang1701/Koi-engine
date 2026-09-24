@@ -51,8 +51,27 @@ if(MSVC AND NOT DEFINED CMAKE_CXX26_STANDARD_COMPILE_OPTION)
     set(CMAKE_CXX26_STANDARD_COMPILE_OPTION "/std:c++latest")
 endif()
 
+# --- AddressSanitizer (Windows/MSVC) ------------------------------------------
+# The sanitizer build exists to catch the memory errors behind the intermittent
+# crashes (for example the transposition-table storage resizes). It is wired for
+# MSVC only: the ASan runtime ships as a DLL, so the static CRT is impossible,
+# and /RTC (a Debug default) as well as LTCG must be disabled.
+option(KOI_SANITIZE "Build with AddressSanitizer (MSVC only)" OFF)
+if(KOI_SANITIZE AND NOT MSVC)
+    message(FATAL_ERROR "KOI_SANITIZE is currently wired for MSVC builds only")
+endif()
+
 if(MSVC)
-    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+    if(KOI_SANITIZE)
+        set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
+        string(REPLACE "/RTC1" "" CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
+        string(REPLACE "/RTC1" "" CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG}")
+        add_compile_options(/fsanitize=address)
+        add_link_options(/fsanitize=address)
+        message(STATUS "Koi Engine AddressSanitizer build enabled (dynamic CRT, no /RTC, no LTO)")
+    else()
+        set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+    endif()
     add_compile_options(
         /EHsc
         /permissive-
@@ -95,8 +114,10 @@ endif()
 
 include(CheckIPOSupported)
 check_ipo_supported(RESULT KOI_IPO_SUPPORTED OUTPUT KOI_IPO_ERROR LANGUAGES CXX)
-if(KOI_IPO_SUPPORTED)
+if(KOI_IPO_SUPPORTED AND NOT KOI_SANITIZE)
     set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
+elseif(KOI_IPO_SUPPORTED)
+    message(STATUS "Koi Engine Release IPO/LTO is disabled for the sanitizer build")
 else()
     message(WARNING "Koi Engine Release IPO/LTO is unavailable: ${KOI_IPO_ERROR}")
 endif()

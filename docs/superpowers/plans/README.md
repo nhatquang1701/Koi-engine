@@ -37,3 +37,5 @@ stable because plans and verification records link to each other.
 | `2026-09-19-syzygy-endgames.md` | Endgame evaluation scaling and opt-in Syzygy interior WDL probing. |
 | `2026-09-19-nnue-v5-threat-architecture.md` | NNUE v5: threat features, dual-perspective head, container v5, dataset v2, trainers, and Studio. |
 | `2026-09-20-gpu-nnue-inference.md` | GPU NNUE inference (sm_61 PTX pipeline, driver API, batched evaluator, verification). |
+| `2026-09-23-linux-compatibility.md` | Linux x86-64 compatibility: portable build, engine platform layer, GPU, tooling, and CI. |
+| `2026-09-24-engine-hardening.md` | Engine hardening: stability, correctness, robustness/scale, protocol surface, and strength foundations. |

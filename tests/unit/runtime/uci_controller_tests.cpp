@@ -286,6 +286,98 @@ private:
     int depth_;
 };
 
+// Streams a transcript in stages so a gated command is sent only after the
+// previous search has finished publishing its best move. Stage 0 is available
+// immediately; each release_stage() call makes the next stage readable.
+class StagedGatedInputBuffer final : public std::streambuf {
+public:
+    explicit StagedGatedInputBuffer(std::vector<std::string> stages) : stages_(std::move(stages)) {}
+
+    void release_stage() {
+        {
+            std::lock_guard lock(mutex_);
+            if (released_stages_ < stages_.size()) {
+                ++released_stages_;
+            }
+        }
+        condition_.notify_all();
+    }
+
+    void release_all() {
+        {
+            std::lock_guard lock(mutex_);
+            released_stages_ = stages_.size();
+        }
+        condition_.notify_all();
+    }
+
+    [[nodiscard]] bool wait_for_release_count(std::size_t count,
+                                              std::chrono::milliseconds timeout) {
+        std::unique_lock lock(mutex_);
+        return condition_.wait_for(lock, timeout,
+                                   [this, count] { return released_stages_ >= count; });
+    }
+
+protected:
+    int_type underflow() override {
+        std::unique_lock lock(mutex_);
+        for (;;) {
+            if (stage_index_ >= stages_.size()) {
+                return traits_type::eof();
+            }
+            const std::string& stage = stages_[stage_index_];
+            if (position_ < stage.size()) {
+                current_character_ = stage[position_++];
+                setg(&current_character_, &current_character_, &current_character_ + 1);
+                return traits_type::to_int_type(current_character_);
+            }
+            if (released_stages_ > stage_index_ + 1 || released_stages_ >= stages_.size()) {
+                ++stage_index_;
+                position_ = 0;
+                continue;
+            }
+            condition_.wait(lock, [this] { return released_stages_ > stage_index_ + 1; });
+        }
+    }
+
+private:
+    std::vector<std::string> stages_;
+    std::size_t stage_index_ = 0;
+    std::size_t position_ = 0;
+    std::size_t released_stages_ = 1;
+    char current_character_ = '\0';
+    std::mutex mutex_;
+    std::condition_variable condition_;
+};
+
+// Releases one input stage for every bestmove that appears in the captured
+// output, so a follow-up command cannot race the search that precedes it.
+class ReleaseOnBestmoveCountBuffer final : public std::stringbuf {
+public:
+    ReleaseOnBestmoveCountBuffer(StagedGatedInputBuffer& input, std::size_t count)
+        : input_(input), expected_(count) {}
+
+    int sync() override {
+        const std::string text = str();
+        std::size_t seen = 0;
+        for (std::size_t position = text.find("bestmove ");
+             position != std::string::npos;
+             position = text.find("bestmove ", position + 1)) {
+            ++seen;
+        }
+        while (released_ < seen && released_ < expected_) {
+            ++released_;
+            input_.release_stage();
+        }
+        return std::stringbuf::sync();
+    }
+
+private:
+    StagedGatedInputBuffer& input_;
+    std::size_t expected_;
+    std::size_t released_ = 0;
+};
+
 class PonderGateEvaluator final : public koi::Evaluator {
 public:
     explicit PonderGateEvaluator(GatedInputBuffer& input) : input_(input) {}
@@ -1275,21 +1367,42 @@ void test_isready_writes_readyok() {
 }
 
 void test_deterministic_search_repeats_the_best_move_with_compatibility_seed() {
-    const ControllerResult result = run_controller(
+    // Each search must finish on its own before the next command is sent:
+    // interrupting a search with stop lets the scheduler pick between the
+    // completed and aborted root fallbacks, which is not a determinism claim.
+    StagedGatedInputBuffer input({
         "setoption name RandomSeed value 42\n"
         "position startpos\n"
-        "go depth 2\n"
+        "go depth 2\n",
         "stop\n"
         "setoption name RandomSeed value 42\n"
         "position startpos\n"
-        "go depth 2\n"
+        "go depth 2\n",
         "stop\n"
-        "quit\n");
+        "quit\n"});
+    std::istream input_stream(&input);
+    ReleaseOnBestmoveCountBuffer output_buffer(input, 2);
+    std::ostream output(&output_buffer);
+    std::ostringstream diagnostics;
+    int exit_code = -1;
+    std::thread controller_thread([&] {
+        UciController controller(input_stream, output, diagnostics);
+        exit_code = controller.run();
+    });
+    const bool both_searches_completed =
+        input.wait_for_release_count(3, std::chrono::seconds(15));
+    if (!both_searches_completed) {
+        input.release_all();
+    }
+    controller_thread.join();
+
     const std::vector<std::string> bestmoves =
-        lines_starting_with(output_lines(result.output), "bestmove ");
+        lines_starting_with(output_lines(output_buffer.str()), "bestmove ");
     const Position initial;
 
-    require(bestmoves.size() == 2, "each stopped go command must emit exactly one bestmove");
+    require(both_searches_completed && exit_code == 0 && diagnostics.str().empty(),
+            "both deterministic searches must complete before the transcript ends");
+    require(bestmoves.size() == 2, "each go command must emit exactly one bestmove");
     require(bestmoves[0] == bestmoves[1], "deterministic search must repeat from the same root");
     require(is_legal_move(initial, bestmoves[0].substr(9)),
             "the deterministic start-position move must be legal");

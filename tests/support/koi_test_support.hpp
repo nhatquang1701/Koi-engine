@@ -448,15 +448,34 @@ inline int run_tests(std::span<const TestCase> tests, int argc = 0, char** argv 
     }
 
     std::size_t unseen = 0;
-    const bool full_selection = !selection.filter.has_value() && selection.shard_count == 1;
-    if (full_selection) {
-        for (const std::string_view known : options.known_failures) {
-            if (std::find(seen_known_failures.begin(), seen_known_failures.end(), known) ==
-                seen_known_failures.end()) {
-                std::cerr << "XFAIL-UNSEEN " << known << '\n';
-                ++unseen;
-                ++failed;
+    // Every known-failure entry must still exist in the registry, and when the
+    // current filter and shard select its case it must actually run. Checking
+    // selection here (instead of only on unfiltered runs) keeps CI honest:
+    // the search suite always runs as four shards, so a removed or renamed
+    // entry would otherwise never be noticed.
+    for (const std::string_view known : options.known_failures) {
+        bool exists = false;
+        bool selected = false;
+        for (std::size_t index = 0; index < tests.size(); ++index) {
+            if (tests[index].name != known) {
+                continue;
             }
+            exists = true;
+            const bool matches_filter =
+                !selection.filter.has_value() ||
+                tests[index].name.find(*selection.filter) != std::string_view::npos;
+            const bool matches_shard =
+                index % selection.shard_count == selection.shard_index;
+            selected = matches_filter && matches_shard;
+            break;
+        }
+        const bool seen =
+            std::find(seen_known_failures.begin(), seen_known_failures.end(), known) !=
+            seen_known_failures.end();
+        if (!exists || (selected && !seen)) {
+            std::cerr << "XFAIL-UNSEEN " << known << '\n';
+            ++unseen;
+            ++failed;
         }
     }
 

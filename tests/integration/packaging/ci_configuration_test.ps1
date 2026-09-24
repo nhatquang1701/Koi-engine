@@ -57,10 +57,12 @@ function Deny-RequirementsPattern([string]$Pattern, [string]$Description) {
 }
 
 Require-WorkflowPattern '(?m)^\s*runs-on:\s*windows-latest\s*$' 'a Windows runner'
-# Three independent jobs: a failing Debug or differential leg must not cancel
-# the primary Release suite, and every leg uploads its own diagnostics.
+# Four independent jobs: a failing Debug, sanitizer, or differential leg must
+# not cancel the primary Release suite, and every leg uploads its own
+# diagnostics.
 Require-WorkflowPattern '(?m)^\s{2}release-full:\s*$' 'the full Release job'
 Require-WorkflowPattern '(?m)^\s{2}debug-smoke:\s*$' 'the Debug smoke job'
+Require-WorkflowPattern '(?m)^\s{2}sanitizer:\s*$' 'the AddressSanitizer job'
 Require-WorkflowPattern '(?m)^\s{2}shadow-diff:\s*$' 'the differential shadow job'
 Require-WorkflowPattern '(?m)^\s*timeout-minutes:\s*60\s*$' 'a Release/Debug job timeout'
 Require-WorkflowPattern '(?m)^\s*timeout-minutes:\s*30\s*$' 'a differential job timeout'
@@ -84,6 +86,8 @@ Require-WorkflowPattern '(?m)^\s*cmake\s+--build\s+build/ci-debug\s+--config\s+D
 Require-WorkflowPattern '(?m)^\s*ctest\s+--test-dir\s+build/ci-release\s+-C\s+Release\s+-j\s+4\s+--repeat\s+until-pass:2\s+--output-on-failure\s+--output-junit\s+build/ci-release/ctest-junit\.xml\s*$' 'the parallel Release CTest command'
 Require-WorkflowPattern '(?m)^\s*ctest\s+--test-dir\s+build/ci-debug\s+-C\s+Debug\s+-j\s+4\s+-LE\s+heavy\s+--repeat\s+until-pass:2\s+--output-on-failure\s+--output-junit\s+build/ci-debug/ctest-junit\.xml\s*$' 'the bounded Debug smoke CTest command'
 Require-WorkflowPattern '(?m)^\s*ctest\s+--test-dir\s+build/ci-release\s+-C\s+Release\s+-R\s+koi_shadow_diff_tests\s+--output-on-failure\s*$' 'the differential CTest command'
+Require-WorkflowPattern '(?m)^\s*cmake\s+-S\s+\.\s+-B\s+build/ci-asan\s+-G\s+Ninja\s+-DCMAKE_BUILD_TYPE=Debug\s+-DCMAKE_CXX_COMPILER=cl\s+-DKOI_SANITIZE=ON\s*$' 'the AddressSanitizer CMake configure command'
+Require-WorkflowPattern '(?m)^\s*ctest\s+--test-dir\s+build/ci-asan\s+-C\s+Debug\s+-j\s+2\s+-L\s+unit\s+-LE\s+heavy\s+--output-on-failure\s+--output-junit\s+build/ci-asan/ctest-junit\.xml\s*$' 'the AddressSanitizer CTest command'
 Require-WorkflowPattern '(?i)-DKOI_BUILD_SHADOW_DIFF=ON' 'the opt-in differential configure switch'
 Require-CMakePattern '(?i)check_ipo_supported' 'an IPO/LTO capability check'
 Require-CMakePattern '(?i)CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE\s+ON' 'portable Release IPO/LTO'
@@ -105,13 +109,18 @@ Require-CMakePattern '(?i)KOI_STATIC_RUNTIME' 'the static libstdc++/libgcc relea
 Require-CMakePattern '(?i)koi_arch_compile_option' 'the per-compiler architecture flag mapping'
 Require-CMakePattern '(?i)-mavx2' 'the GCC/Clang AVX2 optimization flag'
 Require-CMakePattern '(?i)-mavx512f' 'the GCC/Clang AVX-512 optimization flag'
+Require-CMakePattern '(?i)KOI_SANITIZE' 'the AddressSanitizer build option'
+Require-CMakePattern '(?i)fsanitize=address' 'the MSVC AddressSanitizer flag'
 
 # The Linux legs: GCC, Clang, the modules-off fallback, and the portable tarball.
 Require-LinuxWorkflowPattern '(?m)^\s*runs-on:\s*ubuntu-24\.04\s*$' 'an Ubuntu runner'
 Require-LinuxWorkflowPattern '(?m)^\s{2}linux-gcc:\s*$' 'the GCC job'
 Require-LinuxWorkflowPattern '(?m)^\s{2}linux-clang:\s*$' 'the Clang job'
 Require-LinuxWorkflowPattern '(?m)^\s{2}linux-modules-off:\s*$' 'the modules-off job'
+Require-LinuxWorkflowPattern '(?m)^\s{2}linux-flake:\s*$' 'the no-retry flake job'
 Require-LinuxWorkflowPattern '(?m)^\s{2}linux-tarball:\s*$' 'the portable tarball job'
+Require-LinuxWorkflowPattern '(?i)KOI_TEST_RETRIES:\s*"1"' 'the no-retry flake setting'
+Require-LinuxWorkflowPattern '(?i)koi_search_tests_\[1-4\]of4' 'the repeated search shards in the flake job'
 Require-LinuxWorkflowPattern '(?i)g\+\+-14' 'the GCC 14 compiler'
 Require-LinuxWorkflowPattern '(?i)clang-18' 'the Clang 18 compiler'
 Require-LinuxWorkflowPattern '(?i)-DCMAKE_CXX_COMPILER=g\+\+-14' 'the GCC C++ compiler selection'

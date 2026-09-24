@@ -79,7 +79,8 @@ Every C++ test executable uses `tests/support/koi_test_support.hpp`: it defines
 `TempDirectory`. `run_tests` provides:
 
 - one result line per case: `PASS`, `FAIL`, `XFAIL`, `XPASS`, `SKIP`, plus
-  `XFAIL-UNSEEN` for known-failure entries that were not selected; and a final
+  `XFAIL-UNSEEN` for known-failure entries that are missing or were selected
+  but did not run; and a final
   `koi-test-summary run=.. pass=.. fail=.. xfail=.. xpass=.. skip=.. unseen=.. intermittent=..`
   line.
 - selection: `--filter=<substring>`, `--shard=<i>/<n>` (0-based shard index),
@@ -183,8 +184,9 @@ suite stays green:
 - A listed test that passes prints `XPASS` and **does** fail the run, so an
   entry is removed as soon as the engine is fixed. `KOI_ALLOW_XPASS=1`
   downgrades that back to informational output during triage.
-- `XFAIL-UNSEEN` reports a listed name that was not selected by the current
-  filter; it is only fatal on an unfiltered, unsharded run.
+- `XFAIL-UNSEEN` reports a listed name that no longer exists in the registry, or
+  one whose case the current filter and shard select but that did not run; both
+  are fatal, so the four search shards still keep the list honest.
 - Any other failure prints `FAIL` and fails the run.
 
 Current entries: `single-PV root forcing extension`, `depth-one forcing check`,
