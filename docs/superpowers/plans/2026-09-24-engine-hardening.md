@@ -287,6 +287,44 @@ From the 2026-09-24 audit. `file:line` references are to the audit revision.
   `perft_tests`, `transposition_table_tests`, plus `koi_search_tests
   --shard=2/4`, with no sanitizer report.
 
+## Phase 3 record (2026-09-24)
+
+- Stability soak suite: new `koi_soak_tests` (labels `unit;runtime`, 120 s
+  budget, about 4 s actual) with four bounded cases: a 322-ply replay that
+  crosses the 256-ply snapshot window and then searches it at Threads=8, a
+  12-step hash resize (1 <-> 4 MiB) under a live four-worker search, four
+  ponder cycles that must publish exactly one answer after `stop`, and a
+  thread-count sweep (1/2/4/8/16) that must keep every result legal and
+  unfailed. Repeated runs are clean, and the suite joins the sanitizer and
+  no-retry flake jobs.
+- Honest NPS accounting: helpers publish the counters of each finished
+  iteration into monotonic live totals (`live_nodes`, `live_qnodes`,
+  `live_tt_hits`, `live_tbhits`, and a max `seldepth`), and both `info`
+  writers (serial and root-parallel) report main plus live helper traffic. The
+  report-only NPS artifact is
+  `artifacts/verification/engine-hardening/nps-report.txt`: the 64-position
+  timed gate matches 64/64 at Threads 1/2/4/8 with aggregate
+  (nodes+qnodes)/elapsed = 227k / 418k / 691k / 905k nps, and the live info
+  probe on startpos (`go movetime 700`) reports 93k / 206k / 238k nps at
+  Threads 1/4/8.
+- Decisions recorded (no code change):
+  - **Hash cap stays 4096 MB.** The engine already clamps to the physical and
+    commit limits from the memory snapshot and to the segmented-allocator
+    policy; no measured workload is limited by the cap, and raising it would
+    change the memory contract for GUI hosts without evidence.
+  - **Fixed-depth thread shape stays as it is.** Depth-limited searches use
+    shared root PVS below four workers and root splitting at four or more; the
+    documented determinism contract is Threads=1 only (threaded runs assert
+    legality and coverage invariants), so the shape difference between
+    Threads=2 and Threads=4 is accepted rather than papered over.
+  - **Shared Lazy SMP histories deferred to Phase 5.** Moving the ordering
+    tables across helpers is a search-behaviour change that this plan's own
+    contract requires recorded strength evidence for. The SPRT harness is part
+    of the Phase 5 strength work, so the experiment is scheduled there instead
+    of landing an unvalidated change now. Helpers keep contributing through
+    the shared transposition table, the depth publication, and the honest NPS
+    accounting added here.
+
 ## Verification
 
 - Every phase: full Release CTest, focused suites for the touched areas, and

@@ -56,7 +56,7 @@ ctest --test-dir build\release -N
 ctest --test-dir build\release -C Release -R koi_strength_tests --output-on-failure
 ```
 
-The default Release configuration with Python 3 registers **66 tests**
+The default Release configuration with Python 3 registers **67 tests**
 (`KOI_BUILD_SHADOW_DIFF=OFF`). The count varies
 with optional dependencies:
 `koi_shadow_diff_tests` requires `-DKOI_BUILD_SHADOW_DIFF=ON`, and
@@ -104,7 +104,7 @@ $env:KOI_TEST_FILTER = "medium timed forcing root"
 
 ## Inventory
 
-C++ unit / integration tests (27 executables under `tests/unit/` and
+C++ unit / integration tests (28 executables under `tests/unit/` and
 `tests/integration/`):
 
 - Rules and state: `koi_core_tests`, `koi_rules_tests`, `native_rule_state_tests`,
@@ -115,6 +115,9 @@ C++ unit / integration tests (27 executables under `tests/unit/` and
   `search_architecture_tests`, `search_policy_tests`, `search_runtime_tests`,
   `search_service_tests`, `static_exchange_tests`, `time_manager_tests`,
   `transposition_table_tests`, `completion_gate_tests`, `koi_strength_tests`,
+  `koi_soak_tests` (bounded stability soak: long replays past the snapshot
+  window, hash resizes under a live search, ponder cycles, and a thread-count
+  sweep),
   `gpu_nnue_tests` (GPU NNUE bit-exact parity plus the PTX variant table; the
   parity cases skip without a CUDA device).
 - Runtime and boundaries: `koi_cpu_features_tests`, `koi_cpu_variant_tests`

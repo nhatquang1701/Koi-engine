@@ -624,6 +624,19 @@ target_link_libraries(search_service_tests PRIVATE koi_core)
 
 add_test(NAME search_service_tests COMMAND search_service_tests)
 
+# The soak suite drives the real search lifecycle with real threads and real
+# wall clock (long replays past the snapshot window, hash resizes under a live
+# search, ponder cycles, a thread-count sweep).  It is bounded to a few seconds
+# so the sanitizer and no-retry flake jobs can run it too.
+add_executable(koi_soak_tests
+    tests/unit/runtime/koi_soak_tests.cpp
+)
+
+target_link_libraries(koi_soak_tests PRIVATE koi_core)
+
+add_test(NAME koi_soak_tests COMMAND koi_soak_tests)
+koi_set_timeout(koi_soak_tests 120)
+
 add_executable(classical_evaluator_tests
     tests/unit/evaluation/classical_evaluator_tests.cpp
 )
@@ -765,6 +778,7 @@ set(KOI_TEST_SUPPORT_TARGETS
     static_exchange_tests
     transposition_table_tests
     search_service_tests
+    koi_soak_tests
     classical_evaluator_tests
     evaluation_features_tests
     time_manager_tests
@@ -1091,6 +1105,7 @@ set_tests_properties(
 )
 set_tests_properties(transposition_table_tests PROPERTIES LABELS "unit;runtime")
 set_tests_properties(search_service_tests PROPERTIES LABELS "unit;search")
+set_tests_properties(koi_soak_tests PROPERTIES LABELS "unit;runtime")
 set_tests_properties(uci_controller_tests PROPERTIES LABELS "unit;runtime")
 set_tests_properties(
     koi_search_tests_1of4 koi_search_tests_2of4 koi_search_tests_3of4 koi_search_tests_4of4

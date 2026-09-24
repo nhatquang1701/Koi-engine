@@ -1930,6 +1930,32 @@ public:
         return total;
     }
 
+    // Live totals for the `info` stream. The search reports node counts while
+    // helpers are still working, so the published NPS must include the traffic
+    // helpers already generated; otherwise a threaded search under-reports its
+    // own speed by the helper share. Each helper publishes the counters of the
+    // iteration it just finished, so the totals are monotonic and never
+    // double-count. `seldepth` keeps the maximum rather than a sum.
+    [[nodiscard]] std::uint64_t live_nodes() const noexcept {
+        return live_nodes_.load(std::memory_order_relaxed);
+    }
+
+    [[nodiscard]] std::uint64_t live_qnodes() const noexcept {
+        return live_qnodes_.load(std::memory_order_relaxed);
+    }
+
+    [[nodiscard]] std::uint64_t live_tt_hits() const noexcept {
+        return live_tt_hits_.load(std::memory_order_relaxed);
+    }
+
+    [[nodiscard]] std::uint64_t live_tbhits() const noexcept {
+        return live_tbhits_.load(std::memory_order_relaxed);
+    }
+
+    [[nodiscard]] int live_seldepth() const noexcept {
+        return live_seldepth_.load(std::memory_order_relaxed);
+    }
+
     // The main driver publishes the depth it is about to search so helpers can
     // keep pace with it instead of re-walking the shallow iterations the main
     // thread has already finished. Depositing deeper lines into the shared
@@ -1953,6 +1979,21 @@ public:
     }
 
 private:
+    // A helper's iteration counters are appended to the live totals once the
+    // iteration returns; the helper is the only writer of its own stats, so the
+    // relaxed read-modify-write cannot double-count.
+    void publish_iteration_stats(const SearchStats& iteration) noexcept {
+        live_nodes_.fetch_add(iteration.nodes, std::memory_order_relaxed);
+        live_qnodes_.fetch_add(iteration.qnodes, std::memory_order_relaxed);
+        live_tt_hits_.fetch_add(iteration.tt_hits, std::memory_order_relaxed);
+        live_tbhits_.fetch_add(iteration.tbhits, std::memory_order_relaxed);
+        int current = live_seldepth_.load(std::memory_order_relaxed);
+        while (iteration.seldepth > current &&
+               !live_seldepth_.compare_exchange_weak(current, iteration.seldepth,
+                                                     std::memory_order_relaxed)) {
+        }
+    }
+
     void record_failure(const char* message) noexcept {
         try {
             std::lock_guard lock(failure_mutex_);
@@ -2000,6 +2041,7 @@ private:
             context.begin_iteration(&helper_abort_);
             context.negamax(state, depth, -kInfinity, kInfinity, 0, pv);
             accumulate_stats(helper_stats_[helper_index], context.stats);
+            publish_iteration_stats(context.stats);
             if (stopping_.load(std::memory_order_relaxed) || context.aborted) {
                 break;
             }
@@ -2023,6 +2065,11 @@ private:
     std::atomic_bool stopping_{false};
     std::atomic_bool helper_abort_{false};
     std::atomic_bool failed_{false};
+    std::atomic<std::uint64_t> live_nodes_{0};
+    std::atomic<std::uint64_t> live_qnodes_{0};
+    std::atomic<std::uint64_t> live_tt_hits_{0};
+    std::atomic<std::uint64_t> live_tbhits_{0};
+    std::atomic<int> live_seldepth_{0};
     mutable std::mutex failure_mutex_;
     std::string failure_message_;
 };
@@ -3778,15 +3825,27 @@ void SearchRunner::run() {
 
                 const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
                     std::chrono::steady_clock::now() - started);
-                const std::uint64_t visited = context.stats.nodes + context.stats.qnodes;
+                // Helpers run in parallel with the main thread, so the `info`
+                // stream reports their live node traffic too; otherwise a
+                // threaded search looks slower than it is.
+                const std::uint64_t helper_nodes =
+                    lazy_pool != nullptr ? lazy_pool->live_nodes() : 0;
+                const std::uint64_t helper_qnodes =
+                    lazy_pool != nullptr ? lazy_pool->live_qnodes() : 0;
+                const std::uint64_t visited = context.stats.nodes + context.stats.qnodes +
+                    helper_nodes + helper_qnodes;
                 SearchInfo info{depth, score, result.mate, visited,
                                 elapsed.count() > 0 ? visited * 1000 /
                                     static_cast<std::uint64_t>(elapsed.count()) : visited,
                                 elapsed, pv.to_vector()};
-                info.seldepth = context.stats.seldepth;
-                info.qnodes = context.stats.qnodes;
-                info.tt_hits = context.stats.tt_hits;
-                info.tbhits = context.stats.tbhits;
+                info.seldepth = lazy_pool != nullptr ?
+                    std::max(context.stats.seldepth, lazy_pool->live_seldepth()) :
+                    context.stats.seldepth;
+                info.qnodes = context.stats.qnodes + helper_qnodes;
+                info.tt_hits = context.stats.tt_hits +
+                    (lazy_pool != nullptr ? lazy_pool->live_tt_hits() : 0);
+                info.tbhits = context.stats.tbhits +
+                    (lazy_pool != nullptr ? lazy_pool->live_tbhits() : 0);
                 safely_report_info(sink, info);
                 const int iteration_observation_score = bounded_fallback_result ?
                     searched_iteration_score : score;
@@ -4629,7 +4688,12 @@ void SearchRunner::run() {
                     continue;
                 }
 
-                const std::uint64_t visited = total_stats.nodes + total_stats.qnodes;
+                const std::uint64_t helper_nodes =
+                    lazy_pool != nullptr ? lazy_pool->live_nodes() : 0;
+                const std::uint64_t helper_qnodes =
+                    lazy_pool != nullptr ? lazy_pool->live_qnodes() : 0;
+                const std::uint64_t visited = total_stats.nodes + total_stats.qnodes +
+                    helper_nodes + helper_qnodes;
                 const std::uint64_t nps = elapsed.count() > 0 ? visited * 1000 /
                     static_cast<std::uint64_t>(elapsed.count()) : visited;
                 const std::size_t line_count = multi_pv ?
@@ -4638,10 +4702,14 @@ void SearchRunner::run() {
                     const RootLine& line = lines[ranked_indices[rank]];
                     SearchInfo info{depth, line.score, mate_from_score(line.score), visited,
                                     nps, elapsed, line.pv.to_vector()};
-                    info.seldepth = total_stats.seldepth;
-                    info.qnodes = total_stats.qnodes;
-                    info.tt_hits = total_stats.tt_hits;
-                    info.tbhits = total_stats.tbhits;
+                    info.seldepth = lazy_pool != nullptr ?
+                        std::max(total_stats.seldepth, lazy_pool->live_seldepth()) :
+                        total_stats.seldepth;
+                    info.qnodes = total_stats.qnodes + helper_qnodes;
+                    info.tt_hits = total_stats.tt_hits +
+                        (lazy_pool != nullptr ? lazy_pool->live_tt_hits() : 0);
+                    info.tbhits = total_stats.tbhits +
+                        (lazy_pool != nullptr ? lazy_pool->live_tbhits() : 0);
                     info.multipv = static_cast<int>(rank + 1);
                     safely_report_info(sink, info);
                 }
