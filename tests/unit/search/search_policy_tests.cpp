@@ -71,33 +71,52 @@ void test_check_extension_policy_owns_timing_and_budget_rules() {
 }
 
 void test_late_move_policy_owns_gating_history_and_reduction() {
-    const auto ordinary = koi::detail::SearchPolicy::late_move(
-        8, 4, 7, 0, false, false, false, false, false, false, false, true, false);
+    const auto ordinary_gate = koi::detail::SearchPolicy::late_move_gate(
+        8, 4, 0, 0, false, false, false, false, false, false, false);
+    require(ordinary_gate.candidate && !ordinary_gate.high_history_exclusion,
+            "an ordinary late quiet move must pass the late-move gate");
+
+    const auto ordinary = koi::detail::SearchPolicy::dynamic_late_move(
+        8, 4, 7, 0, 0, 0, false, false, false, false, false, false, false, true, false,
+        false, false, true, false, 0, true, false);
     require(ordinary.candidate && !ordinary.high_history_exclusion && ordinary.reduced,
             "an ordinary late quiet move must be reduced");
     require(ordinary.reduction == 1, "the baseline late move reduction must be one ply");
 
-    const auto deep = koi::detail::SearchPolicy::late_move(
-        12, 20, 11, 0, false, false, false, false, false, false, false, true, false);
+    const auto deep = koi::detail::SearchPolicy::dynamic_late_move(
+        12, 20, 11, 0, 0, 0, false, false, false, false, false, false, false, true, false,
+        false, false, true, false, 0, true, false);
     require(deep.candidate && deep.reduction == 3 && deep.reduced,
             "deep late moves must receive the configured depth/move reduction");
 
-    const auto high_history = koi::detail::SearchPolicy::late_move(
-        8, 4, 7, 128, false, false, false, false, false, false, false, true, false);
-    require(high_history.candidate && high_history.high_history_exclusion &&
-                !high_history.reduced,
+    const auto high_history_gate = koi::detail::SearchPolicy::late_move_gate(
+        8, 4, 128, 0, false, false, false, false, false, false, false);
+    require(high_history_gate.candidate && high_history_gate.high_history_exclusion,
             "high-history moves must remain authoritative instead of being reduced");
+    const auto high_history = koi::detail::SearchPolicy::dynamic_late_move(
+        8, 4, 7, 128, 0, 0, false, false, false, false, false, false, false, true, false,
+        false, false, true, false, 0, true, false);
+    require(!high_history.reduced,
+            "high-history moves must not be reduced even when they are late");
 
-    require(!koi::detail::SearchPolicy::late_move(
-                8, 4, 7, 0, false, false, true, false, false, false, false, true, false)
+    require(!koi::detail::SearchPolicy::late_move_gate(
+                8, 4, 0, 0, false, false, true, false, false, false, false)
                  .candidate,
             "checking moves must not be LMR candidates");
-    require(!koi::detail::SearchPolicy::late_move(
-                8, 4, 7, 0, false, false, false, true, false, false, false, true, false)
+    require(!koi::detail::SearchPolicy::late_move_gate(
+                8, 4, 0, -9'000, false, false, false, true, false, false, false)
                  .candidate,
-            "captures must not be LMR candidates");
-    require(!koi::detail::SearchPolicy::late_move(
-                8, 4, 7, 0, false, false, false, false, false, false, true, true, false)
+            "captures with deeply negative capture history must not be LMR candidates");
+    require(koi::detail::SearchPolicy::late_move_gate(
+                8, 4, 0, 0, false, false, false, true, false, false, false)
+                .candidate,
+            "captures with neutral capture history may be LMR candidates");
+    require(koi::detail::SearchPolicy::late_move_gate(
+                8, 4, 0, 512, false, false, false, true, false, false, false)
+                .candidate,
+            "captures with positive capture history may be LMR candidates");
+    require(!koi::detail::SearchPolicy::late_move_gate(
+                8, 4, 0, 0, false, false, false, false, false, false, true)
                  .candidate,
             "TT moves must not be LMR candidates");
 }

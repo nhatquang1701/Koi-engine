@@ -25,6 +25,16 @@ struct LateMoveDecision {
     bool reduced = false;
 };
 
+// The pre-make part of the late-move decision.  A candidate's reduction also
+// needs facts that only exist after the move is made (quiet forcing features,
+// child check state), so search queries the gate before the make and the full
+// decision after it; keeping the gate in one place stops the two computations
+// from drifting apart.
+struct LateMoveGate {
+    bool candidate = false;
+    bool high_history_exclusion = false;
+};
+
 struct ProbCutDecision {
     bool eligible = false;
     int beta = 0;
@@ -99,25 +109,20 @@ public:
             extensions_remaining > 0;
     }
 
-    [[nodiscard]] static constexpr LateMoveDecision late_move(
-        const int depth, const int move_number, const int full_child_depth,
-        const int history_score, const bool root_pawn_move, const bool checked,
-        const bool gives_check, const bool capture, const bool promotion,
-        const bool tt_move, const bool killer, const bool reducible_quiet,
-        const bool quiet_forcing) noexcept {
-        const bool candidate = !root_pawn_move && move_number >= 4 && depth >= 4 &&
-            !checked && !gives_check && !capture && !promotion && !tt_move && !killer;
+    [[nodiscard]] static constexpr LateMoveGate late_move_gate(
+        const int depth, const int move_number, const int history_score,
+        const int capture_history_score, const bool root_pawn_move,
+        const bool checked, const bool gives_check, const bool capture,
+        const bool promotion, const bool tt_move, const bool killer) noexcept {
+        // Stockfish applies LMR to sufficiently late non-checking captures as
+        // well as quiet moves. Captures start one step more conservatively,
+        // while their capture history still controls the final reduction.
+        const bool candidate = !root_pawn_move && move_number >= 2 && depth >= 3 &&
+            !checked && !gives_check && !promotion && !tt_move && !killer &&
+            (!capture || capture_history_score > -8'192);
         const bool high_history_exclusion = candidate &&
             high_history_move_excluded_from_lmr(history_score);
-        const int base_reduction = 1 + (depth >= 8 && move_number >= 12 ? 1 : 0) +
-            (depth >= 12 && move_number >= 20 ? 1 : 0);
-        const int history_adjustment = history_score > 256 ? -1 :
-            history_score < -256 ? 1 : 0;
-        const int reduction = std::clamp(
-            base_reduction + history_adjustment, 0, std::max(0, full_child_depth));
-        const bool reduced = candidate && !high_history_exclusion && reducible_quiet &&
-            !quiet_forcing && reduction > 0;
-        return LateMoveDecision{candidate, high_history_exclusion, reduction, reduced};
+        return LateMoveGate{candidate, high_history_exclusion};
     }
 
     [[nodiscard]] static constexpr LateMoveDecision dynamic_late_move(
@@ -131,14 +136,12 @@ public:
          const bool prior_fail_high, const int next_cutoff_count,
          const bool has_tt_move,
          const bool tt_pv) noexcept {
-        // Stockfish applies LMR to sufficiently late non-checking captures as
-        // well as quiet moves. Captures start one step more conservatively,
-        // while their capture history still controls the final reduction.
-        const bool candidate = !root_pawn_move && move_number >= 2 && depth >= 3 &&
-            !checked && !gives_check && !promotion && !tt_move && !killer &&
-            (!capture || capture_history_score > -8'192);
-        const bool high_history_exclusion = candidate &&
-            high_history_move_excluded_from_lmr(history_score);
+        const LateMoveGate gate = late_move_gate(
+            depth, move_number, history_score, capture_history_score,
+            root_pawn_move, checked, gives_check, capture, promotion, tt_move,
+            killer);
+        const bool candidate = gate.candidate;
+        const bool high_history_exclusion = gate.high_history_exclusion;
         if (!candidate) {
             return LateMoveDecision{false, false, 0, false};
         }
@@ -160,8 +163,6 @@ public:
         // move.  Stockfish's fixed-point LMR formula gives these nodes a
         // compensating reduction decrease after its node-type adjustments;
         // mirror that behavior in the integer-depth policy.
-        // The legacy late_move() contract remains unchanged for diagnostics;
-        // live search uses this dynamic form with the TT-PV state supplied.
         if (tt_pv) {
             --reduction;
         }

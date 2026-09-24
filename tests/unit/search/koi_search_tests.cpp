@@ -3509,13 +3509,20 @@ void test_search_records_static_eval_correction_history() {
 void test_search_records_true_internal_iterative_deepening() {
     koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>());
     koi::SearchLimits limits;
-    limits.depth = 6;
+    // The probe only fires at depth >= 6 on PV nodes whose transposition
+    // entry is missing or too weak to order the node (a failed-low bound, or
+    // an entry searched at less than half the current depth).  Depth seven is
+    // the shallowest search where the suite observes it: the re-search from
+    // an earlier iteration leaves failed-low and shallow entries on PV nodes
+    // that the next iteration's deeper nodes revisit, which is exactly the
+    // ordering gap the probe fills.
+    limits.depth = 7;
 
     const koi::SearchResult result = search(service, koi::GameState::startpos(), limits);
     require(result.best_move.has_value(),
             "the internal-iterative-deepening search must return a root move");
     require(result.stats.internal_iterative_deepening > 0,
-            "a deep search without a transposition move must probe at depth - 2");
+            "a deep search without a trustworthy ordering source must probe a bounded depth");
 }
 
 void test_opening_central_break_survives_root_search_reduction() {
@@ -4354,12 +4361,10 @@ int main(int argc, char** argv) {
     // run so stale entries are pruned (KOI_ALLOW_XPASS=1 is the transitional
     // escape hatch).
     const std::string_view known_failures[]{
-        // Open engine-v2 task: docs/superpowers/plans/2026-09-19-engine-v2.md
-        // still lists "True internal iterative deepening" as unchecked. PV
-        // nodes reached at depth >= 6 keep a table move from the previous
-        // iteration, so the probe cannot trigger at the depth the suite can
-        // afford; remove this entry once the engine-v2 item lands.
-        "true internal iterative deepening",
+        // True internal iterative deepening now probes when a PV node has no
+        // transposition move or only a failed-low or half-depth entry, and the
+        // probe is observable from a depth-8 startpos search, so the former
+        // entry here was removed.
         "single-PV root forcing extension",
         "depth-one forcing check",
         "threaded depth-one forcing check",

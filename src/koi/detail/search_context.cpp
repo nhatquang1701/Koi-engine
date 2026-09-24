@@ -1253,17 +1253,30 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
             return beta + kTranspositionProbCutMargin;
         }
 
-        // True internal iterative deepening: when no transposition move is
-        // available, re-search this node at depth - 2 with a null window so
-        // the reduced search can seed the table with a move for the full-depth
+        // True internal iterative deepening: when the transposition move is
+        // missing, or the stored entry is too weak to order this depth (it
+        // failed low before, or it was searched at less than half the current
+        // depth), re-search this node at depth - 2 with a null window so the
+        // reduced search can seed the table with a move for the full-depth
         // ordering. The probe score is discarded, and the probe re-enters this
         // node's stack slot, so the frame fields the move loop still reads are
         // restored afterwards.
+        const bool ordering_source_needs_probe = !tt_move.has_value() ||
+            (tt_entry.has_value() &&
+             (tt_entry->bound == TranspositionBound::upper ||
+              tt_entry->depth * 2 < depth));
         const bool true_iid = !claimable_draw && !excluded_search && pv_node && !checked &&
-            !tactical_position && !state.is_repetition_sensitive() && !tt_move.has_value() &&
+            !tactical_position && !state.is_repetition_sensitive() &&
+            ordering_source_needs_probe &&
             depth >= kTrueInternalIterativeDeepeningMinimumDepth;
         if (true_iid) {
-            const int probe_depth = depth - 2;
+            // The rewrite above deliberately keeps this trigger broad (a missing
+            // ordering source, a failed-low entry, or one searched at less than
+            // half this depth), so the probe depth is bounded to keep its cost a
+            // small fraction of the node it orders.  A depth - 2 probe would
+            // re-search almost the whole subtree, which measured a many-fold
+            // slowdown on deep PV nodes.
+            const int probe_depth = std::max(1, depth - 4);
             PrincipalVariation probe_pv;
             // The probe's score is discarded, so it must not taint this node's
             // provenance: the reduced search may write through the flag, and
@@ -1397,19 +1410,14 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
                 frame.move_count = move_number;
                 continue;
             }
-            const LateMoveDecision lmr_gate = excluded_search || claimable_draw ?
-                LateMoveDecision{} :
-                SearchPolicy::dynamic_late_move(
-                    depth, next_move_number, full_child_depth, history_score,
-                    continuation_score,
+            const LateMoveGate lmr_gate = excluded_search || claimable_draw ?
+                LateMoveGate{} :
+                SearchPolicy::late_move_gate(
+                    depth, next_move_number, history_score,
                     ordering.capture_history_score(metadata), root_pawn_move,
                     checked, metadata.gives_check, metadata.is_capture(),
                     move.promotion() != Promotion::none, is_tt_move,
-                    ordering.is_killer(move, ply), false, false,
-                    pv_node, cut_node, improving, prior_child_fail_high,
-                    ply + 1 < static_cast<int>(SearchStack::kCapacity) ?
-                        stack.frame(static_cast<std::size_t>(ply + 1)).cutoff_count : 0,
-                    tt_move.has_value(), frame.tt_pv);
+                    ordering.is_killer(move, ply));
             if (lmr_gate.high_history_exclusion) {
                 ++stats.lmr_high_history_exclusions;
             }

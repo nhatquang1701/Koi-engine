@@ -363,6 +363,59 @@ From the 2026-09-24 audit. `file:line` references are to the audit revision.
   `en_croissant_uci_test.ps1` accept the optional ponder suffix while keeping
   the capture group on the played move.
 
+## Phase 5 record (2026-09-25)
+
+- **Late-move pruning tables**: the pre-make gate and the post-make reduction
+  were two independent copies of the same rules and the live path evaluated
+  `dynamic_late_move` twice per candidate, discarding the first reduction. The
+  rules now live in `SearchPolicy::late_move_gate`, which both sites call
+  (`dynamic_late_move` delegates), so the gate cannot drift from the reduction.
+  The production-dead `SearchPolicy::late_move` was deleted and
+  `search_policy_tests` was rewritten against the gate plus the dynamic
+  reduction. Behaviour is unchanged and only the discarded work is gone.
+- **True internal iterative deepening**: the probe previously required
+  `!tt_move`, which no depth-6 PV node can satisfy once shallower iterations
+  have seeded the table, so the mechanism never ran and the suite carried it as
+  a `known_failures` entry. The trigger is now an untrustworthy ordering source
+  - no table move, an upper-bound entry, or an entry searched at less than half
+  the current depth - and the probe searches `max(1, depth - 4)` (a depth-2
+  re-search would repeat almost the whole subtree). The probe restores the
+  frame, the child cutoff count, and the provenance flag, then re-probes so the
+  seeded move orders the real search.
+- The `"true internal iterative deepening"` known failure was removed
+  (13 -> 12 entries). `test_search_records_true_internal_iterative_deepening`
+  searches depth seven: depth six never reaches a non-root PV node that
+  qualifies, and depth seven is the shallowest configuration that observes the
+  counter (40 s). A depth-eight startpos search costs about 613 s in this
+  engine, so it is not a test budget.
+- **Quiescence TT cutoffs: satisfied without further change.** Phase 2 tagged
+  qsearch entries with the negative horizon (`-1 - qdepth`); the acceptance
+  path takes an exact entry only when the horizon matches and a lower-bound
+  cutoff only on a null window, and no fail-low frontier is ever stored as
+  exact (stand-pat fail-highs and proven non-selective fail-highs store the
+  lower bound, raised-alpha lines store exact). The pruning-sensitive frontier
+  therefore cannot be reused under a different horizon.
+- **Evidence.** Focused suites: the four search shards, `search_policy_tests`,
+  and `koi_strength_tests` (64-position tactical gate, 3.0 s) all pass; full
+  Release CTest 67/67. Benchmarks against a worktree build of the previous
+  commit (`koi-bench --threads N --speed 100 --timed`): nodes 770 021/770 021
+  (T1), 1 536 845/1 538 730 (T2), 3 039 852/3 061 431 (T4), 6 253 577/6 257 495
+  (T8) and NPS within +/-1.1% at every thread count, so the IID change costs
+  no measurable search time. The recorded SPRT (128 games at 20 000 nodes,
+  candidate versus the previous commit) reports 24W/72D/32L, score 0.4688,
+  Elo -24, LLR -0.26, decision **inconclusive** - a point estimate inside one
+  standard error, i.e. no measurable strength change. Results and the NPS
+  report are under `artifacts/verification/engine-hardening/`.
+- **Deferred with reasons** (the plan's Risks section already splits these):
+  MultiPV per-line aspiration, the evaluation program (pawn hash, the
+  union-versus-per-piece mobility double count, king-safety attack tables,
+  tuner adoption workflow), shared Lazy SMP histories, a representative NNUE
+  version 5 network (needs a training campaign and corpus decision plus GPU
+  parity), and the remaining ten root-selection `known_failures`. Each is a
+  search or evaluation behaviour change whose acceptance contract is a long
+  recorded SPRT campaign, which does not fit this hardening pass; the deferred
+  list is the input to the follow-up strength plan.
+
 ## Verification
 
 - Every phase: full Release CTest, focused suites for the touched areas, and
