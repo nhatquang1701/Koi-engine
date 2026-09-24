@@ -134,11 +134,20 @@ jobs:
           KOI_TEST_RETRIES: "3"
         # The Python suites are deterministic and finish in well under a minute
         # on Windows; a repeat here would only triple the cost of a hang, so the
-        # step fails fast instead.
+        # step fails fast instead.  The output is redirected to a file so that a
+        # leaked grandchild cannot hold the runner's stdout pipe open, and
+        # `timeout` bounds the suite even when CTest cannot kill a stuck test.
         timeout-minutes: 15
         run: |
-          ctest --test-dir build/ci-release -C Release -j 2 -L python \
-            --output-on-failure --output-junit build/ci-release/ctest-python-junit.xml
+          set +e
+          timeout 600 ctest --test-dir build/ci-release -C Release -j 2 -L python \
+            --output-on-failure --output-junit build/ci-release/ctest-python-junit.xml \
+            > /tmp/koi-python.log 2>&1
+          status=$?
+          set -e
+          tail -n 250 /tmp/koi-python.log
+          echo "python suite exit=${status}"
+          exit "${status}"
       - name: Show the test log tail
         if: always()
         run: tail -n 150 build/ci-release/Testing/Temporary/LastTest.log || true
@@ -276,11 +285,20 @@ jobs:
           KOI_TEST_RETRIES: "3"
         # The Python suites are deterministic and finish in well under a minute
         # on Windows; a repeat here would only triple the cost of a hang, so the
-        # step fails fast instead.
+        # step fails fast instead.  The output is redirected to a file so that a
+        # leaked grandchild cannot hold the runner's stdout pipe open, and
+        # `timeout` bounds the suite even when CTest cannot kill a stuck test.
         timeout-minutes: 15
         run: |
-          ctest --test-dir build/ci-release -C Release -j 2 -L python \
-            --output-on-failure --output-junit build/ci-release/ctest-python-junit.xml
+          set +e
+          timeout 600 ctest --test-dir build/ci-release -C Release -j 2 -L python \
+            --output-on-failure --output-junit build/ci-release/ctest-python-junit.xml \
+            > /tmp/koi-python.log 2>&1
+          status=$?
+          set -e
+          tail -n 250 /tmp/koi-python.log
+          echo "python suite exit=${status}"
+          exit "${status}"
       - name: Show the test log tail
         if: always()
         run: tail -n 150 build/ci-release/Testing/Temporary/LastTest.log || true
