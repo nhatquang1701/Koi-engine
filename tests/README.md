@@ -296,7 +296,7 @@ timeout, configurable through `KOI_UCI_TIMEOUT_MS`.
 
 ## Continuous integration
 
-`.github/workflows/windows.yml` has three independent jobs (no `fail-fast`
+`.github/workflows/windows.yml` has four independent jobs (no `fail-fast`
 cancellation):
 
 - `release-full` installs the measurement requirements (`numpy`), builds Release, runs the parallel
@@ -304,6 +304,9 @@ cancellation):
   report plus `LastTest.log`.
 - `debug-smoke` builds Debug and runs the fast subset (`-LE heavy`) with the
   3x scaled timeouts.
+- `sanitizer` builds Debug with `-DKOI_SANITIZE=ON` (MSVC
+  `/fsanitize=address`, dynamic CRT, no LTO) and runs the fast subset, so
+  memory errors and use-after-free regressions fail CI.
 - `shadow-diff` builds with `-DKOI_BUILD_SHADOW_DIFF=ON` and runs
   `koi_shadow_diff_tests`.
 
@@ -313,6 +316,9 @@ cancellation):
   the full CTest suite.
 - `linux-modules-off` configures with `-DKOI_BUILD_MODULES=OFF`, asserts that
   the module test is not registered, and runs the unit subset.
+- `linux-flake` repeats the search, transposition-table, controller, service,
+  and time-manager suites three times with `KOI_TEST_RETRIES=1` and no
+  `--repeat`, so a first-attempt flake cannot hide behind a retry.
 - `linux-tarball` builds inside an Ubuntu 22.04 container, packages the
   portable `koi-engine-v1.1-linux-x86_64.tar.gz` with
   `tools/build/package_release.ps1`, and runs UCI smokes with the automatic and

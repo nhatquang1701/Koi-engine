@@ -425,6 +425,32 @@ From the 2026-09-24 audit. `file:line` references are to the audit revision.
   threaded runs must cover the same suite in the same order, keep the row
   format, and finish without diagnostics.
 
+## Phase 6 record (2026-09-25)
+
+- Local evidence at the final commit: full Release CTest `67/67` passed
+  (`KOI_TEST_RETRIES=3`), the Debug+ASan subset `-L unit -LE heavy` passed
+  `26/26` with zero AddressSanitizer reports, and `release_verify.ps1` passed
+  with its evidence under
+  `artifacts/verification/engine-hardening/release-verify-phase5/`.
+- CI on the final commit `a189ef3` is fully green: Windows `release-full`,
+  `debug-smoke`, `sanitizer`, and `shadow-diff`; Linux `linux-gcc`,
+  `linux-clang`, `linux-modules-off`, `linux-flake`, and `linux-tarball`.
+  The no-retry `linux-flake` job and the ASan `sanitizer` job are the two new
+  guards this pass added.
+- The `koi_benchmark_process` Threads>1 allowlist flake that failed the Linux
+  job once (run `36019175101`, commit `ab3e349`) is fixed by asserting the
+  allowlist only at Threads=1 (see the Phase 5 record bullet) and is verified
+  by `linux-flake` plus `release-full` on `a189ef3`.
+- `tests/README.md` now documents the sanitizer and flake jobs alongside the
+  existing CI entries; the test count stays 67 (the soak suite added in
+  Phase 3 brought it from 66 to 67).
+- Deferred items are listed in the Phase 5 record and are the input to a
+  follow-up strength plan: MultiPV per-line aspiration, the evaluation program
+  (pawn hash, mobility double count, king-safety attack tables, tuner
+  adoption), shared Lazy SMP histories, a representative NNUE v5 with a
+  training campaign and GPU parity, and the remaining ten root-selection
+  `known_failures`.
+
 ## Verification
 
 - Every phase: full Release CTest, focused suites for the touched areas, and
