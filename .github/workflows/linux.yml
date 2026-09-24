@@ -137,14 +137,17 @@ jobs:
         # step fails fast instead.  The output is redirected to a file so that a
         # leaked grandchild cannot hold the runner's stdout pipe open, and
         # `timeout` bounds the suite even when CTest cannot kill a stuck test.
+        # The tests run serially so the log always ends at the test that failed.
         timeout-minutes: 15
         run: |
           set +e
-          timeout 600 ctest --test-dir build/ci-release -C Release -j 2 -L python \
+          timeout 600 ctest --test-dir build/ci-release -C Release -j 1 -L python \
             --output-on-failure --output-junit build/ci-release/ctest-python-junit.xml \
             > /tmp/koi-python.log 2>&1
           status=$?
           set -e
+          free -m || true
+          sudo dmesg | tail -n 20 || true
           tail -n 250 /tmp/koi-python.log
           echo "python suite exit=${status}"
           exit "${status}"
@@ -288,14 +291,17 @@ jobs:
         # step fails fast instead.  The output is redirected to a file so that a
         # leaked grandchild cannot hold the runner's stdout pipe open, and
         # `timeout` bounds the suite even when CTest cannot kill a stuck test.
+        # The tests run serially so the log always ends at the test that failed.
         timeout-minutes: 15
         run: |
           set +e
-          timeout 600 ctest --test-dir build/ci-release -C Release -j 2 -L python \
+          timeout 600 ctest --test-dir build/ci-release -C Release -j 1 -L python \
             --output-on-failure --output-junit build/ci-release/ctest-python-junit.xml \
             > /tmp/koi-python.log 2>&1
           status=$?
           set -e
+          free -m || true
+          sudo dmesg | tail -n 20 || true
           tail -n 250 /tmp/koi-python.log
           echo "python suite exit=${status}"
           exit "${status}"
