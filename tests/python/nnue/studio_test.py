@@ -14,6 +14,7 @@ The GUI smoke test (``--gui-selftest``) runs only when tkinter is present.
 from __future__ import annotations
 
 import importlib.util
+import os
 import subprocess
 import sys
 import tempfile
@@ -147,6 +148,8 @@ class StudioCliTests(unittest.TestCase):
 
     @unittest.skipUnless(TK_AVAILABLE, "tkinter is unavailable")
     def test_gui_selftest_constructs_the_window(self):
+        if os.name != "nt" and not os.environ.get("DISPLAY") and not os.environ.get("WAYLAND_DISPLAY"):
+            self.skipTest("no display available")
         result = run_studio("--gui-selftest", timeout=120)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("PASS gui construction", result.stdout)

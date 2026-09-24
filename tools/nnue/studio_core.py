@@ -707,13 +707,7 @@ def stop_run(run: Run) -> bool:
             )
         else:
             # The POSIX launcher owns its own session, so the whole group dies.
-            try:
-                os.killpg(os.getpgid(pid), signal.SIGTERM)
-            except OSError:
-                try:
-                    os.kill(pid, signal.SIGTERM)
-                except OSError:
-                    pass
+            signal_process_tree(pid, signal.SIGTERM)
     run.lock_path.unlink(missing_ok=True)
     run.write_state(status="stopped", stopped=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))
     return bool(pid)
@@ -776,6 +770,28 @@ class CancelToken:
         return self._event.is_set()
 
 
+def signal_process_tree(pid: int, sig: int) -> None:
+    """Send ``sig`` to a process tree, never to the caller's own group.
+
+    A child started without ``start_new_session`` shares the caller's process
+    group, and killing that group would take the test runner down with it.
+    """
+    try:
+        group = os.getpgid(pid)
+    except OSError:
+        return
+    if group != os.getpgrp():
+        try:
+            os.killpg(group, sig)
+            return
+        except OSError:
+            pass
+    try:
+        os.kill(pid, sig)
+    except OSError:
+        pass
+
+
 def terminate_process_tree(pid: int) -> None:
     """Best-effort termination of a process and its children."""
     if os.name == "nt":
@@ -789,13 +805,7 @@ def terminate_process_tree(pid: int) -> None:
         except (OSError, subprocess.SubprocessError):
             pass
         return
-    try:
-        os.killpg(os.getpgid(pid), signal.SIGKILL)
-    except OSError:
-        try:
-            os.kill(pid, signal.SIGKILL)
-        except OSError:
-            pass
+    signal_process_tree(pid, signal.SIGKILL)
 
 
 def run_process(
@@ -818,6 +828,9 @@ def run_process(
         stderr=subprocess.STDOUT,
         text=True,
         bufsize=1,
+        # POSIX: give the command its own session so cancelling it can kill the
+        # tree without touching the studio (or the test runner) itself.
+        start_new_session=(os.name != "nt"),
     )
     lines: list[str] = []
     line_queue: queue.Queue = queue.Queue()

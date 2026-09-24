@@ -74,14 +74,15 @@ def write_fake_engine(temporary_path: Path, role: str) -> tuple[Path, Path]:
             encoding="utf-8",
         )
     else:
-        # POSIX executes the script directly, so it needs a shebang; without one
-        # the kernel rejects it with ENOEXEC ("Exec format error").  A shebang
-        # cannot carry an interpreter path that contains spaces, so fall back to
-        # the environment lookup in that case.
-        shebang = f"#!{sys.executable}" if " " not in sys.executable else "#!/usr/bin/env python3"
-        script_path.write_text(f"{shebang}\n{FAKE_ENGINE_SOURCE}", encoding="utf-8")
-        script_path.chmod(0o755)
-        command_path = script_path
+        # POSIX executes the command directly, so a shell wrapper mirrors the
+        # Windows .cmd shim and passes the role and log path as arguments.
+        script_path.write_text(FAKE_ENGINE_SOURCE, encoding="utf-8")
+        command_path = temporary_path / f"fake {role} engine.sh"
+        command_path.write_text(
+            "#!/bin/sh\n" f'exec "{sys.executable}" "{script_path}" {role} "{log_path}"\n',
+            encoding="utf-8",
+        )
+        command_path.chmod(0o755)
     return command_path, log_path
 
 

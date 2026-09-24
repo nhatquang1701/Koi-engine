@@ -331,6 +331,9 @@ inline bool contains(std::span<const std::string_view> values, std::string_view 
 
 inline int run_tests(std::span<const TestCase> tests, int argc = 0, char** argv = nullptr,
                      const TestRunOptions& options = {}) {
+    // Flush every line so a crash (for example a segfault) still leaves the
+    // name of the last completed test in the captured output.
+    std::cout << std::unitbuf;
     const detail::Selection selection = detail::parse_arguments(argc, argv);
 
     if (selection.list) {
