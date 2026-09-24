@@ -4,9 +4,16 @@
 #include <array>
 #include <cmath>
 #include <limits>
+#include <string>
 #include <utility>
 
 namespace koi::detail {
+
+// The native rule state clamps its halfmove clock here; the shadow board keeps
+// the same counter in a byte and wraps to zero one ply later. Above this value
+// the exact count no longer changes a rule decision, so comparisons accept the
+// wrapped shadow value.
+constexpr std::uint16_t kSaturatedHalfmoveClock = 255;
 
 namespace {
 
@@ -84,15 +91,39 @@ constexpr std::uint8_t kBlackQueenSideCastling = 0x8;
     return false;
 }
 
-[[nodiscard]] std::string shadow_fen_for_native_comparison(const Position& native_position,
-                                                            const chess::Board& shadow_board) {
-    std::string fen = shadow_board.getFen();
-    if (native_position.en_passant_square().index() < Square::kInvalid ||
-        shadow_board.enpassantSq() == chess::Square::NO_SQ ||
-        shadow_has_legal_en_passant_capture(shadow_board)) {
-        return fen;
+// Repetition identity must match the native key, which includes the
+// en-passant file only while a legal en-passant capture exists. The vendored
+// chess.hpp keeps the square whenever an enemy pawn attacks it, so a pinned
+// (illegal) capturer would otherwise make the shadow count a different
+// repetition than the native rule state. The rare divergent case is
+// normalized by dropping the en-passant field before hashing.
+[[nodiscard]] std::uint64_t shadow_repetition_key(const chess::Board& board) {
+    if (board.enpassantSq() == chess::Square::NO_SQ ||
+        shadow_has_legal_en_passant_capture(board)) {
+        return board.hash();
     }
+    try {
+        std::string fen = board.getFen();
+        const std::size_t board_end = fen.find(' ');
+        const std::size_t side_end = fen.find(' ', board_end + 1);
+        const std::size_t castling_end = fen.find(' ', side_end + 1);
+        const std::size_t en_passant_end = fen.find(' ', castling_end + 1);
+        if (board_end == std::string::npos || side_end == std::string::npos ||
+            castling_end == std::string::npos || en_passant_end == std::string::npos) {
+            return board.hash();
+        }
+        fen.replace(castling_end + 1, en_passant_end - castling_end - 1, "-");
+        chess::Board probe;
+        probe.setFen(fen);
+        return probe.hash();
+    } catch (...) {
+        return board.hash();
+    }
+}
 
+[[nodiscard]] std::string shadow_fen_for_native_comparison(const Position& native_position,
+                                                           const chess::Board& shadow_board) {
+    std::string fen = shadow_board.getFen();
     const std::size_t board_end = fen.find(' ');
     if (board_end == std::string::npos) return fen;
     const std::size_t side_end = fen.find(' ', board_end + 1);
@@ -101,7 +132,27 @@ constexpr std::uint8_t kBlackQueenSideCastling = 0x8;
     if (castling_end == std::string::npos) return fen;
     const std::size_t en_passant_end = fen.find(' ', castling_end + 1);
     if (en_passant_end == std::string::npos) return fen;
-    fen.replace(castling_end + 1, en_passant_end - castling_end - 1, "-");
+
+    if (native_position.en_passant_square().index() >= Square::kInvalid &&
+        shadow_board.enpassantSq() != chess::Square::NO_SQ &&
+        !shadow_has_legal_en_passant_capture(shadow_board)) {
+        fen.replace(castling_end + 1, en_passant_end - castling_end - 1, "-");
+    }
+
+    // The vendored shadow board keeps the halfmove clock in a byte, so a
+    // replay past 255 reversible plies wraps it to zero while the native clock
+    // clamps. Past the 75-move rule the exact value changes no rule decision,
+    // so the comparison uses the native (authoritative) counter.
+    const std::size_t shadow_en_passant_end = fen.find(' ', castling_end + 1);
+    if (native_position.halfmove_clock() >= kSaturatedHalfmoveClock &&
+        shadow_en_passant_end != std::string::npos) {
+        const std::size_t shadow_halfmove_end = fen.find(' ', shadow_en_passant_end + 1);
+        if (shadow_halfmove_end != std::string::npos) {
+            fen.replace(shadow_en_passant_end + 1,
+                        shadow_halfmove_end - shadow_en_passant_end - 1,
+                        std::to_string(native_position.halfmove_clock()));
+        }
+    }
     return fen;
 }
 
@@ -222,8 +273,15 @@ bool CompatibilityMirror::apply_native(const chess::Move move, const bool null_m
         const bool pawn_move = !null_move && moving_piece.type() == chess::PieceType::PAWN;
         const bool capture = !null_move &&
             (move.typeOf() == chess::Move::ENPASSANT || board_.at(move.to()) != chess::Piece::NONE);
+        if (history_.size() >= kMaximumMirrorHistory) {
+            // Match the native snapshot window: a replay that runs past the
+            // capacity drops the oldest record instead of rejecting the move,
+            // so both sides count repetitions over the same plies.
+            history_.erase(history_.begin());
+        }
         history_.push_back(HistoryRecord{
-            move, null_move, board_.hash(), repetition_history_suppressed_});
+            move, null_move, shadow_repetition_key(board_),
+            repetition_history_suppressed_});
         if (null_move) {
             board_.makeNullMove();
         } else {
@@ -343,13 +401,13 @@ std::size_t CompatibilityMirror::repetition_count() const noexcept {
     if (repetition_history_suppressed_) {
         return 1;
     }
-    const std::uint64_t key = position_key();
+    const std::uint64_t key = shadow_repetition_key(board_);
     std::size_t count = 1;
     for (auto record = history_.rbegin(); record != history_.rend(); ++record) {
         if (record->null_move) {
             break;
         }
-        if (record->position_key == key) {
+        if (record->repetition_key == key) {
             ++count;
         }
     }
@@ -369,9 +427,14 @@ Square CompatibilityMirror::en_passant_square_for_comparison(const Position& nat
 }
 
 bool CompatibilityMirror::matches(const Position& native) const {
+    // The shadow's byte-sized halfmove clock wraps once the native clock is
+    // saturated; above the 75-move rule the exact value changes no decision.
+    const bool halfmove_agrees =
+        native.halfmove_clock() == halfmove_clock() ||
+        native.halfmove_clock() >= kSaturatedHalfmoveClock;
     if (native.side_to_move() != side_to_move() ||
         native.castling_rights() != castling_rights() ||
-        native.halfmove_clock() != halfmove_clock() ||
+        !halfmove_agrees ||
         native.fullmove_number() != fullmove_number()) {
         return false;
     }

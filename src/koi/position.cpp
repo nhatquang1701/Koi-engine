@@ -9,6 +9,7 @@
 #include <charconv>
 #include <cctype>
 #include <cstdint>
+#include <cstring>
 #include <limits>
 #include <stdexcept>
 #include <string>
@@ -188,6 +189,22 @@ struct NativeState {
 
 bool has_legal_en_passant_capture(const NativeState& state) noexcept;
 bool has_legal_en_passant_capture_mutable(NativeState& state) noexcept;
+
+// Records a snapshot of the pre-move state. The array has a fixed capacity so
+// the search can make and unmake moves without allocating, but a game may
+// legitimately run past it: a long replay then drops the oldest snapshot and
+// keeps the recent window that repetition detection and search need. Without
+// this, a command listing more than `kMaximumHistory` moves would be rejected
+// and the engine would keep answering the stale position.
+void record_snapshot(NativeState& state, const Snapshot& saved) noexcept {
+    if (state.history_size >= kMaximumHistory) {
+        std::memmove(state.history.data(), state.history.data() + 1,
+                     (kMaximumHistory - 1) * sizeof(Snapshot));
+        state.history[kMaximumHistory - 1] = saved;
+        return;
+    }
+    state.history[state.history_size++] = saved;
+}
 
 std::uint64_t bit(int square) noexcept {
     return valid_square(square) ? (std::uint64_t{1} << square) : 0;
@@ -594,6 +611,10 @@ public:
             if (attacker_count(candidate, white_king, Color::black) > 2 ||
                 attacker_count(candidate, black_king, Color::white) > 2) return false;
             if (is_checked(candidate, Color::white) && is_checked(candidate, Color::black)) return false;
+            // Positions whose non-moving side is already in check stay
+            // accepted: they are unreachable in a real game, but composed
+            // analysis boards and the project's own tactical fixtures use
+            // them, and the search treats them as ordinary positions.
         }
         candidate.history_size = 0;
         state = candidate;
@@ -662,9 +683,6 @@ public:
 
     template <bool TacticalOnly>
     std::size_t legal_moves_into_impl(std::span<Move> output) {
-        if (output.empty()) {
-            return 0;
-        }
         const Color mover = state.side;
         MoveBuffer pseudo;
         generate_pseudo<TacticalOnly>(pseudo);
@@ -672,8 +690,12 @@ public:
         for (const Move& move : pseudo) {
             const Snapshot saved = snapshot();
             apply_unchecked(move);
-            if (!is_checked(state, mover) && count < output.size()) {
-                output[count++] = move;
+            if (!is_checked(state, mover)) {
+                // Count every legal move; a too-small span only drops moves.
+                if (count < output.size()) {
+                    output[count] = move;
+                }
+                ++count;
             }
             restore(saved);
         }
@@ -742,9 +764,8 @@ public:
 
     bool apply_legal(const Move& move) {
         const auto legal = legal_moves();
-        if (std::find(legal.begin(), legal.end(), move) == legal.end() ||
-            state.history_size >= kMaximumHistory) return false;
-        state.history[state.history_size++] = snapshot();
+        if (std::find(legal.begin(), legal.end(), move) == legal.end()) return false;
+        record_snapshot(state, snapshot());
         apply_unchecked(move);
         return true;
     }
@@ -758,15 +779,14 @@ public:
     }
 
     bool make_generated_move(const Move& move) noexcept {
-        if (state.history_size >= kMaximumHistory ||
-            move.from().index() >= Square::kInvalid || move.to().index() >= Square::kInvalid) {
+        if (move.from().index() >= Square::kInvalid || move.to().index() >= Square::kInvalid) {
             return false;
         }
         const Piece moving = state.board[move.from().index()];
         if (moving.empty() || moving.color != state.side) {
             return false;
         }
-        state.history[state.history_size++] = snapshot();
+        record_snapshot(state, snapshot());
         apply_unchecked(move);
         return true;
     }
@@ -786,12 +806,9 @@ public:
     }
 
     bool make_null_move() noexcept {
-        if (state.history_size >= kMaximumHistory) {
-            return false;
-        }
         Snapshot saved = snapshot();
         saved.null_move = true;
-        state.history[state.history_size++] = saved;
+        record_snapshot(state, saved);
         state.en_passant = {};
         state.halfmove = static_cast<std::uint16_t>(
             std::min<unsigned>(std::numeric_limits<std::uint16_t>::max(), state.halfmove + 1));

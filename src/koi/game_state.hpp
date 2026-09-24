@@ -191,11 +191,17 @@ struct PositionConsistencySnapshot {
     [[nodiscard]] bool operator==(const PositionConsistencySnapshot&) const = default;
 
     [[nodiscard]] bool consistent() const noexcept {
+        // The shadow keeps the halfmove clock in a byte, so a replay past 255
+        // reversible plies wraps it to zero while the native clock clamps.
+        // Past the 75-move rule the exact value changes no decision, so a
+        // saturated native clock accepts the wrapped shadow value.
+        const bool halfmove_clock_agrees =
+            native_halfmove_clock == shadow_halfmove_clock || native_halfmove_clock >= 255;
         return native_fen == shadow_fen &&
             native_legal_moves == shadow_legal_moves &&
             native_castling_rights == shadow_castling_rights &&
             native_en_passant_square == shadow_en_passant_square &&
-            native_halfmove_clock == shadow_halfmove_clock &&
+            halfmove_clock_agrees &&
             native_fullmove_number == shadow_fullmove_number &&
             native_repetition_count == shadow_repetition_count &&
             native_repetition_sensitive == shadow_repetition_sensitive &&

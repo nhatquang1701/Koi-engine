@@ -7,6 +7,7 @@
 #include <condition_variable>
 #include <cstdint>
 #include <exception>
+#include <limits>
 #include <memory>
 #include <mutex>
 #include <stdexcept>
@@ -2535,6 +2536,12 @@ void SearchRunner::run() {
         }
 
         std::optional<SyzygyRootResult> tablebase_result;
+        // SyzygyProbeDepth is a minimum search depth.  A declared depth limit is
+        // compared against it directly; a time or node search has no declared
+        // limit, so it is treated as unbounded and may probe (the search will
+        // pass any requested probe depth it is given time for).
+        const int probe_gate_depth = limits.depth.has_value() ? *limits.depth :
+            std::numeric_limits<int>::max();
         // A ponder search cannot take the root fast path because it must not
         // emit a bestmove before stop/ponderhit.  After an in-place conversion
         // the search continues from its warmed state without a fresh root
@@ -2542,7 +2549,7 @@ void SearchRunner::run() {
         if (options.syzygy && options.multi_pv == 1 && !options.analyse_mode &&
             !limits.infinite && !limits.ponder && !limits.search_moves_specified &&
             !root_is_claimable_draw && !root_is_forced_draw &&
-            options.syzygy->allows_depth(limits.depth.value_or(1))) {
+            options.syzygy->allows_depth(probe_gate_depth)) {
             std::vector<Move> allowed_moves;
             allowed_moves.reserve(legal_moves.size());
             for (const MoveMetadata& metadata : legal_moves) {
@@ -3939,6 +3946,15 @@ void SearchRunner::run() {
                     tt_move = result.best_move;
                 }
                 root_ordering.order(root, parallel_moves, tt_move, 0);
+                // Keep the abort-safe fallback in step with the ordering: an
+                // interrupted first iteration must answer with the best-ordered
+                // move, never with the generation-order head.
+                if (!parallel_moves.empty()) {
+                    result.best_move = parallel_moves.front().move;
+                    if (result.completed_depth == 0) {
+                        result.pv = {*result.best_move};
+                    }
+                }
                 if (depth > 1) {
                     std::vector<std::size_t> schedule_indices;
                     schedule_indices.reserve(parallel_moves.size());

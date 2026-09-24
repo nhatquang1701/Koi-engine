@@ -12,6 +12,20 @@
 
 namespace koi::detail {
 
+namespace {
+
+// The shared table stores quiescence results with a negative depth so a probe
+// can tell the quiescence horizon that produced them apart from a regular
+// search entry (whose depth is at least zero).  The tactical frontier depends
+// on qdepth, so a value searched under one horizon is not reusable under
+// another; regular entries stay usable at any frontier because they were
+// searched with the full move generator.
+[[nodiscard]] constexpr int qsearch_table_depth(const int qdepth) noexcept {
+    return -1 - qdepth;
+}
+
+} // namespace
+
 SearchContext::~SearchContext() = default;
 
 static_assert(SearchContext::stack_capacity() == SearchStack::kCapacity);
@@ -206,11 +220,17 @@ int SearchContext::quiescence(GameState& state, int alpha, int beta, int ply,
         // a wide (PV-like) window does not accept a bound cutoff.
         if (!checked && !claimable_draw && !repetition_sensitive && tt_entry.has_value()) {
             const TranspositionEntry& entry = *tt_entry;
-            if (entry.bound == TranspositionBound::exact) {
+            // A quiescence entry is only valid for the exact frontier that
+            // produced it (its depth is stored negated); a regular entry was
+            // searched with the full move generator and is at least as strong
+            // at any frontier.
+            const bool horizon_matches = entry.depth >= 0 ||
+                entry.depth == qsearch_table_depth(qdepth);
+            if (horizon_matches && entry.bound == TranspositionBound::exact) {
                 return entry.score;
             }
-            if (beta - alpha <= 1 && entry.bound == TranspositionBound::lower &&
-                entry.score >= beta) {
+            if (horizon_matches && beta - alpha <= 1 &&
+                entry.bound == TranspositionBound::lower && entry.score >= beta) {
                 path_selective_bound = true;
                 path_lower_bound = true;
                 return entry.score;
@@ -293,7 +313,7 @@ int SearchContext::quiescence(GameState& state, int alpha, int beta, int ply,
                 if (!path_repetition_sensitive) {
                     // Stand-pat is a legal continuation, so it is a proven
                     // lower bound for the tactical frontier.
-                    table_access.store(qsearch_transposition_key, 0, best,
+                    table_access.store(qsearch_transposition_key, qsearch_table_depth(qdepth), best,
                                        TranspositionBound::lower, Move::no_move(), ply, false,
                                        qsearch_eval);
                 }
@@ -505,7 +525,7 @@ int SearchContext::quiescence(GameState& state, int alpha, int beta, int ply,
                 if (best_lower_bound && !path_repetition_sensitive) {
                     // The best score is a proven floor from a non-selective
                     // child, so the shared table may keep it.
-                    table_access.store(qsearch_transposition_key, 0, best,
+                    table_access.store(qsearch_transposition_key, qsearch_table_depth(qdepth), best,
                                        TranspositionBound::lower, best_move, ply, false,
                                        qsearch_eval);
                 }
@@ -537,11 +557,11 @@ int SearchContext::quiescence(GameState& state, int alpha, int beta, int ply,
             // useful when pruning touched the frontier, but it must stay a
             // lower bound.
             if (!path_selective_bound && best > original_alpha) {
-                table_access.store(qsearch_transposition_key, 0, best,
+                table_access.store(qsearch_transposition_key, qsearch_table_depth(qdepth), best,
                                    TranspositionBound::exact, best_move, ply, false,
                                    qsearch_eval);
             } else if (best_lower_bound) {
-                table_access.store(qsearch_transposition_key, 0, best,
+                table_access.store(qsearch_transposition_key, qsearch_table_depth(qdepth), best,
                                    TranspositionBound::lower, best_move, ply, false,
                                    qsearch_eval);
             }
@@ -1245,16 +1265,23 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
         if (true_iid) {
             const int probe_depth = depth - 2;
             PrincipalVariation probe_pv;
-            path_selective_bound = true;
-            // The probe re-enters this node at the same ply, so it rewrites the
-            // frame the move loop below reads; keep a copy and restore it.
+            // The probe's score is discarded, so it must not taint this node's
+            // provenance: the reduced search may write through the flag, and
+            // only the full search below decides whether this node is
+            // selective. The probe also re-enters this ply, so both the frame
+            // and the child cutoff counter the move loop reads are restored.
+            const bool saved_selective_bound = path_selective_bound;
             const SearchFrame saved_frame = frame;
+            SearchFrame& child_frame = stack.frame(static_cast<std::size_t>(ply + 1));
+            const int saved_child_cutoff_count = child_frame.cutoff_count;
             (void)negamax(state, probe_depth, alpha, alpha + 1, ply, probe_pv, previous_move,
                           false, check_extensions_remaining, Move::no_move(), nullptr, nullptr);
             if (aborted) {
                 return 0;
             }
             frame = saved_frame;
+            child_frame.cutoff_count = saved_child_cutoff_count;
+            path_selective_bound = saved_selective_bound;
             ++stats.internal_iterative_deepening;
             const std::optional<TranspositionEntry> probe_entry =
                 table_access.probe(search_transposition_key(state), ply);

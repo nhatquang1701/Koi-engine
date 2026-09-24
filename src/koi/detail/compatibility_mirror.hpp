@@ -2,6 +2,7 @@
 
 #include <chess.hpp>
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -47,13 +48,20 @@ private:
     struct HistoryRecord {
         chess::Move move;
         bool null_move = false;
-        std::uint64_t position_key = 0;
+        // Normalized to the native repetition identity: the en-passant field
+        // participates only while a legal en-passant capture exists.
+        std::uint64_t repetition_key = 0;
         bool repetition_history_suppressed = false;
     };
 
     [[nodiscard]] chess::Move native_move_for(const Move& move) const noexcept;
     [[nodiscard]] chess::Move native_move_for(const MoveMetadata& metadata) const noexcept;
     [[nodiscard]] bool apply_native(chess::Move move, bool null_move) noexcept;
+
+    // The native rule state keeps a fixed window of the most recent snapshots.
+    // The mirror keeps the same window so a replay that runs past the capacity
+    // still reports the same repetition counts on both sides.
+    static constexpr std::size_t kMaximumMirrorHistory = 256;
 
     chess::Board board_{};
     std::vector<HistoryRecord> history_;

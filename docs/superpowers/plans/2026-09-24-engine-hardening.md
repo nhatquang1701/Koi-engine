@@ -251,6 +251,42 @@ From the 2026-09-24 audit. `file:line` references are to the audit revision.
   timed and optional runs); local Debug+ASan tree passes `ctest -L unit -LE heavy`
   (25/25) and runs `koi_search_tests --shard=2/4` twice with no sanitizer report.
 
+## Phase 2 record (2026-09-24)
+
+- Syzygy: the controller default `SyzygyProbeLimit` is 7 (matching the
+  advertised option and the handshake fixture) and the module contract agrees;
+  a single relative `SyzygyPath` resolves against the executable directory
+  (path lists are left alone); the root probe treats a time/node search as
+  unbounded instead of depth 1, so `SyzygyProbeDepth` applies.
+- The evaluation cache key mixes in `fullmove_number`, which the classical
+  evaluator reads for its early-queen and king-ring thresholds.
+- An interrupted parallel root now answers with the best-ordered root move
+  (the generated head was previously published when no safe partial line
+  existed).
+- Long replays are no longer rejected: the native snapshot ring drops its
+  oldest entry instead of refusing a move, and the compatibility mirror keeps
+  the same 256-ply window. Because the shadow stores the halfmove clock in a
+  byte (255 wraps to 0) while the native clamps at 255, the mirror comparison
+  and `PositionConsistencySnapshot::consistent()` tolerate a saturated native
+  clock; a real game ends at the 75-move rule long before this.
+- Repetition identity is shared with the shadow: when a double push leaves an
+  en-passant square that no legal capture can use, the mirror hashes the
+  position without it (the native key already does), so the two repetition
+  counts agree.
+- Quiescence table entries are tagged with a negative depth
+  (`-1 - qdepth`), so a shallow frontier can no longer reuse a value produced
+  under a different horizon; regular entries stay usable anywhere.
+- True IID no longer taints provenance: the probe's selective flag and the
+  child slot's cutoff count are restored after the (discarded) probe.
+- Hygiene: `legal_moves_into` reports the true legal count when the span is
+  small, the module `PackedMove` no-move value and `move_overhead_ms` match the
+  engine, and non-moving-side-in-check FENs stay accepted (the pinned tactical
+  fixtures rely on them; Stockfish accepts them too).
+- Verification: focused suites 11/11, full Release CTest 66/66, and the local
+  Debug+ASan tree passes `native_rule_state_tests`, `koi_rules_tests`,
+  `perft_tests`, `transposition_table_tests`, plus `koi_search_tests
+  --shard=2/4`, with no sanitizer report.
+
 ## Verification
 
 - Every phase: full Release CTest, focused suites for the touched areas, and

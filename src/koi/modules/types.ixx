@@ -17,9 +17,12 @@ enum class MoveKind : unsigned char {
 };
 
 struct PackedMove {
-    std::uint32_t value = 0;
+    // Keep in step with the native Move encoding: a zero value is a real move,
+    // and the sentinel for "no move" is all ones.
+    static constexpr std::uint32_t kNoMove = 0xFFFFFFFFU;
+    std::uint32_t value = kNoMove;
 
-    [[nodiscard]] constexpr bool is_null() const noexcept { return value == 0; }
+    [[nodiscard]] constexpr bool is_null() const noexcept { return value == kNoMove; }
 };
 
 struct SearchOptionsContract {
@@ -29,7 +32,7 @@ struct SearchOptionsContract {
     std::uint32_t multi_pv = 1;
     bool analyse_mode = false;
     bool show_wdl = false;
-    std::uint32_t move_overhead_ms = 10;
+    std::uint32_t move_overhead_ms = 30;
     std::uint32_t slow_mover_percent = 100;
 };
 

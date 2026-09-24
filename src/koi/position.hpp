@@ -29,8 +29,10 @@ public:
     [[nodiscard]] Piece piece_at(Square square) const noexcept;
     [[nodiscard]] std::vector<Move> legal_moves() const;
     // Allocation-free legal generation for hot callers. The output preserves
-    // the same deterministic ordering as legal_moves(); entries beyond the
-    // returned count are untouched.
+    // the same deterministic ordering as legal_moves(); the returned value is
+    // the total legal move count, and a span smaller than that count receives
+    // only its first entries (internal callers always pass the 256-move
+    // maximum, so truncation only affects external users).
     [[nodiscard]] std::size_t legal_moves_into(std::span<Move> output) const noexcept;
     // Tactical-only variant for quiescence: captures, en-passant, and
     // promotions, in the same relative order as legal_moves_into().

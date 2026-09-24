@@ -9,7 +9,7 @@ export namespace koi::module_api {
 inline constexpr unsigned tablebase_boundary_version = 2;
 
 struct TablebaseContract {
-    std::uint8_t probe_limit = 5;
+    std::uint8_t probe_limit = 7;
     std::uint8_t probe_depth = 1;
     // Interior probing is opt-in and off by default; probe_depth keeps gating
     // the root probe regardless of this value.

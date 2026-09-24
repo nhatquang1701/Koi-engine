@@ -932,11 +932,22 @@ void UciController::handle_setoption(std::istream& command) {
         break;
     }
 
-    case UciOptionId::syzygy_path:
+    case UciOptionId::syzygy_path: {
         stop_and_suppress_active_search();
-        syzygy_path_ = value;
+        // A single relative path resolves against the engine directory, like
+        // EvalFile and BookFile.  A path list is left untouched because its
+        // separators belong to Fathom's platform policy.
+        std::filesystem::path resolved = value;
+        const bool path_list = value.find(';') != std::string::npos ||
+            value.find(':') != std::string::npos;
+        if (!value.empty() && !path_list && resolved.is_relative() &&
+            !executable_directory_.empty()) {
+            resolved = executable_directory_ / resolved;
+        }
+        syzygy_path_ = resolved;
         rebuild_syzygy();
         break;
+    }
 
     case UciOptionId::syzygy_probe_depth:
         apply_unsigned(*option, [this](std::uint64_t depth) {

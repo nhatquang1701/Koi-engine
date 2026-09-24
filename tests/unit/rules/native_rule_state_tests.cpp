@@ -226,6 +226,60 @@ void test_en_passant_identity_requires_a_legal_capture() {
             "a legal en-passant capture must remain part of the native repetition identity");
 }
 
+void test_illegal_en_passant_identity_repeats_with_the_shadow() {
+    // The e5 pawn is pinned against the e8 rook, so after d7d5 the native key
+    // drops the unusable en-passant square. The shadow must count the same
+    // repetition when the position recurs, otherwise the completion gate sees
+    // disagreeing rule states.
+    GameState state = require_state("4r1k1/3p4/8/4P3/8/8/8/R3K3 b - - 0 1");
+    require(state.make_move(require_move("d7d5")),
+            "the pinned en-passant double push must be legal");
+    require(state.en_passant_square().index() == Square::kInvalid,
+            "an unusable en-passant target must not remain in the native state");
+
+    for (const std::string_view uci : {"a1a2", "e8f8", "a2a1", "f8e8"}) {
+        require(state.make_move(require_move(uci)),
+                "the repetition shuffle must stay legal");
+    }
+
+    require(state.repetition_count() == 2,
+            "the shuffled position must count as the second occurrence");
+    const koi::PositionConsistencySnapshot snapshot = state.consistency_snapshot();
+    require(snapshot.native_repetition_count == snapshot.shadow_repetition_count &&
+                snapshot.shadow_repetition_count == 2,
+            "native and shadow repetition counts must agree across an unusable "
+            "en-passant target");
+    require(snapshot.consistent(),
+            "the rule states must stay consistent across the repetition cycle");
+}
+
+void test_long_replays_keep_the_recent_history_window() {
+    // A game may run past the fixed snapshot capacity. The replay must keep
+    // applying legal moves by dropping the oldest snapshot instead of
+    // rejecting the whole command and answering a stale position.
+    GameState state = GameState::startpos();
+    constexpr std::string_view cycle[] = {"g1f3", "g8f6", "f3g1", "f6g8"};
+    constexpr int cycles = 80;
+    int ply = 0;
+    for (int repetition = 0; repetition < cycles; ++repetition) {
+        for (const std::string_view uci : cycle) {
+            const bool applied = state.make_move(require_move(uci));
+            require(applied,
+                    "a long replay must keep accepting legal moves past the "
+                    "snapshot capacity (rejected " + std::string(uci) + " at ply " +
+                        std::to_string(ply) + " in " + state.fen() + ")");
+            ++ply;
+        }
+    }
+
+    require(state.fen().starts_with("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"),
+            "a long replay must end on the expected board");
+    require(state.repetition_count() >= 3,
+            "the retained window must still see the repetition");
+    require(state.consistency_snapshot().consistent(),
+            "a saturated history window must keep native and shadow consistent");
+}
+
 void test_generated_move_transaction_preserves_shadow_consistency() {
     const GameState root = GameState::startpos();
     const std::string original_fen = root.fen();
@@ -288,6 +342,8 @@ int main(int argc, char** argv) {
         {"clock, checkmate, and dead positions", test_move_clock_checkmate_and_dead_position_rules},
         {"make/unmake and special moves", test_make_unmake_and_special_move_rules},
         {"legal en-passant repetition identity", test_en_passant_identity_requires_a_legal_capture},
+        {"unusable en-passant repetition identity", test_illegal_en_passant_identity_repeats_with_the_shadow},
+        {"long replay history window", test_long_replays_keep_the_recent_history_window},
         {"generated move transaction", test_generated_move_transaction_preserves_shadow_consistency},
         {"search move transaction", test_search_move_transaction_preserves_shadow_consistency},
         {"fixed-buffer legal generation", test_fixed_buffer_legal_generation_matches_vector_api},
