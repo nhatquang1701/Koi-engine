@@ -473,8 +473,13 @@ struct SearchContext {
     };
 
     [[nodiscard]] static CorrectionKeys correction_keys_for(const GameState& state) noexcept {
+        return correction_keys_for(state, state.pawn_key());
+    }
+
+    [[nodiscard]] static CorrectionKeys correction_keys_for(const GameState& state,
+                                                            std::uint64_t pawn_key) noexcept {
         CorrectionKeys keys;
-        keys.pawn = state.pawn_key();
+        keys.pawn = pawn_key;
         // Material signature: FNV-1a over the ten piece counts.  Counts, not
         // placements, so positions with the same material share experience.
         std::uint64_t signature = 0xCBF29CE484222325ULL;

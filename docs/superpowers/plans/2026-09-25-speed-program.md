@@ -1,6 +1,6 @@
 # Engine speed program: nodes per second and time to depth
 
-Status: Phases 0-2 complete (2026-09-25); Phase 3 next. Owner: Koi Engine.
+Status: Phases 0-3 complete (2026-09-25); Phase 4 next. Owner: Koi Engine.
 
 ## Goal
 
@@ -505,3 +505,39 @@ scope - they belong to a strength plan, not this program.
 - Git: `src/koi/game_state.hpp`, `src/koi/game_state.cpp`,
   `src/koi/classical_evaluator.cpp` plus this plan record; evidence untracked
   under `artifacts/verification/speed-program/phase-2/`.
+
+## Phase 3 record (2026-09-25)
+
+- Node-local reuse: the negamax entry values are now trusted for the whole
+  node instead of being re-derived from `state`: one `side_to_move` (used by
+  the TT cutoff, static eval, the null-move pawn-endgame test, and the
+  candidate-loop history side), one `is_repetition_sensitive` (four later
+  re-derivations removed), and the entry `has_non_pawn_material` reused for
+  the null-move `pawn_endgame` term. Every read happens with the position
+  restored, so the values are provably identical.
+- Pawn key reuse: the key extracted for the history context is passed into
+  `correction_keys_for`, which gains a `(state, pawn_key)` overload; the
+  original stays as a delegating wrapper.
+- Candidate-loop hoisting: `quiet_skip_threshold`, `previous_history_move`,
+  `full_child_depth`, `shallow_checked_root`, and `moving_side` are computed
+  once per node; `is_killer` and `capture_history_score` once per candidate
+  and shared by the negative-continuation, late-move, and dynamic late-move
+  gates.
+- Correctness evidence: pin byte-identical (default stdout sha256
+  `6F7D8FF5...A7F8`, timed rows identical after removing `elapsed_ms`/`nps`);
+  full test sweep green (`koi_search_tests` 152 run / 137 pass / 0 fail /
+  14 xfail / 1 xpass / 1 intermittent; all other suites as recorded in the
+  phase artifacts) and `koi_bench_process_test.ps1` exit 0.
+- Speed evidence, Phase 0 binary (`7A9AB33B...73F7`) vs the candidate
+  (`63310C97...FF24`), Threads=1, both PASS:
+  - T1 endgames 2..5, Runs=5: total +0.93%, median row +3.85%, 46 noise rows
+    (`phase-3/speed-gate-endgames`).
+  - T1 cold default suite, Runs=9: total +5.37%, median row +6.66%, 52 noise
+    rows (`phase-3/speed-gate-cold`).
+- Deferred within the phase: deleting the picker emission-time `priority`
+  recomputation (`search_ordering.cpp:565/616/625`), the constant
+  `null_move_is_safe` re-derivations (`search_context_support.cpp:273-276`),
+  and the `terminal_score` check probe.
+- Git: `src/koi/detail/search_context.cpp`,
+  `src/koi/detail/search_context.hpp` plus this plan record; evidence
+  untracked under `artifacts/verification/speed-program/phase-3/`.

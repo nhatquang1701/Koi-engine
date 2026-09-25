@@ -783,8 +783,9 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
         const bool cut_node = !pv_node;
         const int original_alpha = alpha;
         const int original_beta = beta;
+        const std::uint64_t node_pawn_key = state.pawn_key();
         const SearchHistoryContext history = history_context(
-            ply, previous_move, state.pawn_key());
+            ply, previous_move, node_pawn_key);
         std::optional<Move> tt_move;
         std::optional<TranspositionEntry> tt_entry;
         int tt_lower_bound_floor = -kInfinity;
@@ -826,7 +827,7 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
                             });
                         if (tt_metadata != moves.end() && !tt_metadata->is_capture() &&
                             tt_metadata->move.promotion() == Promotion::none) {
-                            const Color moving_side = history_side(state.side_to_move(), false);
+                            const Color moving_side = history_side(side_to_move, false);
                             ordering.record_quiet_cutoff(
                                 history_side(moving_side, true), *tt_metadata,
                                 std::max(1, depth / 2), history);
@@ -883,9 +884,9 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
             // transposition hit may already carry the unadjusted evaluation
             // from an earlier visit, in which case evaluate() is skipped.
             const int raw_eval = (tt_entry.has_value() && tt_entry->eval != kNoEvaluation) ?
-                tt_entry->eval : evaluate(state, state.side_to_move());
+                tt_entry->eval : evaluate(state, side_to_move);
             raw_static_eval = raw_eval;
-            correction_keys = correction_keys_for(state);
+            correction_keys = correction_keys_for(state, node_pawn_key);
             correction_keys_valid = true;
             static_eval = raw_eval + ordering.correction_value(
                 correction_keys.pawn, correction_keys.material, correction_keys.king);
@@ -984,8 +985,8 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
         if (null_move_gate.eligible && repetition_sensitive) {
             ++stats.null_repetition_skips;
         }
-        const bool pawn_endgame = !state.has_non_pawn_material(state.side_to_move()) ||
-            !state.has_non_pawn_material(opposite(state.side_to_move()));
+        const bool pawn_endgame = !parent_has_non_pawn_material ||
+            !state.has_non_pawn_material(opposite(side_to_move));
         const DynamicNullMoveDecision null_move_decision = SearchPolicy::dynamic_null_move(
             depth, alpha, beta, static_eval, checked,
             null_move_allowed,
@@ -1102,7 +1103,7 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
         // The result is explicitly selective, so neither this node nor a
         // parent may promote it to nominal-depth exact information.
         const bool reverse_futility_allowed = !claimable_draw && !excluded_search && ply > 0 &&
-            !repetition_sensitive && !state.is_repetition_sensitive() &&
+            !repetition_sensitive &&
             !pawn_endgame && !tactical_position && !tt_move.has_value() &&
             static_eval_valid;
         const ReverseFutilityDecision reverse_futility =
@@ -1127,7 +1128,7 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
         // continuation. This is the conservative counterpart of Stockfish
         // 19's no-TT IIR gate.
         if (!claimable_draw && !excluded_search && ply > 0 && !pv_node && !checked &&
-            !tactical_position && !state.is_repetition_sensitive() &&
+            !tactical_position && !repetition_sensitive &&
             !tt_move.has_value() && depth >= kInternalIterativeReductionMinimumDepth) {
             path_selective_bound = true;
             --depth;
@@ -1238,7 +1239,7 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
         // move loop.
         const bool tt_probcut = !claimable_draw && !excluded_search && !pv_node && !checked &&
             !pawn_endgame &&
-            !state.is_repetition_sensitive() && tt_entry.has_value() &&
+            !repetition_sensitive && tt_entry.has_value() &&
             tt_entry->bound == TranspositionBound::lower &&
             depth >= 4 && tt_entry->depth >= std::max(1, depth - 4) &&
             tt_entry->score >= beta + kTranspositionProbCutMargin &&
@@ -1266,7 +1267,7 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
              (tt_entry->bound == TranspositionBound::upper ||
               tt_entry->depth * 2 < depth));
         const bool true_iid = !claimable_draw && !excluded_search && pv_node && !checked &&
-            !tactical_position && !state.is_repetition_sensitive() &&
+            !tactical_position && !repetition_sensitive &&
             ordering_source_needs_probe &&
             depth >= kTrueInternalIterativeDeepeningMinimumDepth;
         if (true_iid) {
@@ -1359,6 +1360,14 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
             tt_entry->depth >= depth - 3 &&
             std::abs(tt_entry->score) < kMateThreshold;
         std::optional<PositionFeatures> lmr_parent_features;
+        const Color moving_side = history_side(side_to_move, false);
+        const int quiet_skip_threshold =
+            (3 + depth * depth) / (2 - static_cast<int>(improving));
+        const Move previous_history_move = history.count > 0 ?
+            history.continuation_moves[0] : Move::no_move();
+        const int full_child_depth = depth - 1;
+        const bool shallow_checked_root = ply == 1 && depth <= 3 &&
+            stack.frame(0).in_check;
         while (const auto candidate = picker.next()) {
             const MoveMetadata& metadata = *candidate;
             if (interrupted()) {
@@ -1366,6 +1375,8 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
             }
             const Move move = metadata.move;
             frame.current_move = move;
+            const bool is_killer_move = ordering.is_killer(move, ply);
+            const int capture_history = ordering.capture_history_score(metadata);
             // Once a cut node has already examined enough candidates, keep
             // Stockfish's staged-picker behavior: tactical moves and the
             // strongest quiet history are still available, while the tail of
@@ -1373,8 +1384,6 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
             // nodes retain every candidate so a partial ordering decision can
             // never replace an authoritative principal variation.
             const int next_move_number = move_number + 1;
-            const int quiet_skip_threshold =
-                (3 + depth * depth) / (2 - static_cast<int>(improving));
             if (!claimable_draw && !excluded_search && ply > 0 && !pv_node && !checked &&
                 !parent_frame.in_check &&
                 parent_has_non_pawn_material &&
@@ -1382,18 +1391,14 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
                 picker.skip_quiet_moves();
                 selective_pruning = true;
             }
-            const Color moving_side = history_side(state.side_to_move(), false);
             const int history_score = metadata.is_capture() ? 0 :
                 ordering.quiet_history_score(moving_side, metadata, history);
             const int continuation_score = ordering.continuation_history_score(metadata, history);
             const bool is_tt_move = tt_move.has_value() && move == *tt_move;
-            const Move previous_history_move = history.count > 0 ?
-                history.continuation_moves[0] : Move::no_move();
             const bool is_proven_counter_move = !previous_history_move.is_no_move() &&
                 ordering.is_proven_counter_move(
                     moving_side, previous_history_move, move);
             const bool root_pawn_move = ply == 0 && metadata.moving_piece == PieceType::pawn;
-            const int full_child_depth = depth - 1;
             const bool negative_continuation_allowed = !claimable_draw &&
                 !excluded_search && ply > 0 && !repetition_sensitive &&
                 !tactical_position && !pawn_endgame && !parent_frame.in_check &&
@@ -1402,7 +1407,7 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
                     depth, next_move_number, continuation_score, pv_node, checked,
                     metadata.is_capture(), metadata.gives_check,
                     move.promotion() != Promotion::none, is_tt_move,
-                    ordering.is_killer(move, ply), is_proven_counter_move,
+                    is_killer_move, is_proven_counter_move,
                     negative_continuation_allowed)) {
                 selective_pruning = true;
                 ++stats.continuation_history_prunes;
@@ -1414,10 +1419,10 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
                 LateMoveGate{} :
                 SearchPolicy::late_move_gate(
                     depth, next_move_number, history_score,
-                    ordering.capture_history_score(metadata), root_pawn_move,
+                    capture_history, root_pawn_move,
                     checked, metadata.gives_check, metadata.is_capture(),
                     move.promotion() != Promotion::none, is_tt_move,
-                    ordering.is_killer(move, ply));
+                    is_killer_move);
             if (lmr_gate.high_history_exclusion) {
                 ++stats.lmr_high_history_exclusions;
             }
@@ -1437,8 +1442,6 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
             // depth-three reduction there so threaded and serial evasions use
             // the same tactical horizon.  Ordinary quiet roots retain the
             // depth-three LMR needed by the verification path.
-            const bool shallow_checked_root = ply == 1 && depth <= 3 &&
-                stack.frame(0).in_check;
             const bool lmr_candidate = lmr_gate.candidate &&
                 !lmr_gate.high_history_exclusion && !shallow_checked_root &&
                 !phase_rich_shallow_node;
@@ -1606,10 +1609,10 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
                 SearchPolicy::dynamic_late_move(
                     depth, next_move_number, full_child_depth, history_score,
                     continuation_score,
-                    ordering.capture_history_score(metadata), root_pawn_move,
+                    capture_history, root_pawn_move,
                     checked, metadata.gives_check, metadata.is_capture(),
                     move.promotion() != Promotion::none, is_tt_move,
-                    ordering.is_killer(move, ply), reducible_quiet, quiet_forcing_extension,
+                    is_killer_move, reducible_quiet, quiet_forcing_extension,
                     pv_node, cut_node, improving, prior_child_fail_high,
                     ply + 1 < static_cast<int>(SearchStack::kCapacity) ?
                         stack.frame(static_cast<std::size_t>(ply + 1)).cutoff_count : 0,
@@ -1632,7 +1635,7 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
             // position, or a sacrifice below the draw score; those cases are
             // too important for mate and defensive resource discovery.
             const int lmr_depth = std::max(0, full_child_depth - (reduced ? reduction : 0));
-            const int capture_history_score = ordering.capture_history_score(metadata);
+            const int capture_history_score = capture_history;
             const bool capture_pruning = !claimable_draw && !excluded_search && ply > 0 &&
                 !pv_node && !checked &&
                 !child_in_check && !repetition_sensitive && move_number > 0 &&
