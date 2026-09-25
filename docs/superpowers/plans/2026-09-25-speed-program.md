@@ -1,6 +1,6 @@
 # Engine speed program: nodes per second and time to depth
 
-Status: Phases 0-3 complete (2026-09-25); Phase 4 next. Owner: Koi Engine.
+Status: Phases 0-4 complete (2026-09-25); Phase 5 next. Owner: Koi Engine.
 
 ## Goal
 
@@ -541,3 +541,44 @@ scope - they belong to a strength plan, not this program.
 - Git: `src/koi/detail/search_context.cpp`,
   `src/koi/detail/search_context.hpp` plus this plan record; evidence
   untracked under `artifacts/verification/speed-program/phase-3/`.
+
+## Phase 4 record (2026-09-25)
+
+- Stored king state: `NativeState` and `Snapshot` now carry per-colour
+  `checkers`, `pinned`, and `blockers_for_king` masks. `refresh_king_masks`
+  computes them from the final bitboards: checkers from the five attack sets,
+  blockers from the squares between the king and each slider checker, and pins
+  by temporarily clearing each own piece from `occupied` and testing whether an
+  enemy bishop or rook then attacks the king. Masks are recomputed in
+  `rebuild_derived` (FEN load, null move) and once per committed make
+  (`apply_legal`, `make_generated_move`); `snapshot()`/`restore()` copy them.
+- Fast legality filter: `move_requires_legality_probe` returns true only for
+  king moves, positions in check, moves from a pinned square, and en-passant
+  captures. `legal_moves`, `legal_moves_into_impl`, and `has_legal_move` now
+  skip the apply/undo legality probe for every other pseudo-legal move;
+  `is_legal` inherits the fast path through `legal_moves_into`. Pseudo-legal
+  order is untouched, and the probe path still validates the exceptions with
+  the same `apply_unchecked`/`is_checked` code as before.
+- Placement correction: the first version refreshed masks at the end of every
+  `apply_unchecked`, so each probe paid a full mask recomputation and the gates
+  read -16.20% (endgames) and -20.59% (cold default). Moving the refresh to the
+  two commit sites made it one refresh per make and turned those into +1.90%
+  and +7.38%.
+- Correctness evidence: pin byte-identical (default stdout sha256
+  `6F7D8FF5...A7F8`, timed rows identical after removing `elapsed_ms`/`nps`);
+  `perft_tests` 3/3 (startpos, Kiwipete, endgame pin), `native_rule_state_tests`
+  12/12 (including the fixed-buffer ordering case), `koi_rules_tests` 18/18,
+  `koi_core_tests` 27/27, and a full sweep with zero failures including
+  `koi_shadow_diff_tests` 7/7 and `koi_search_tests` 152 run / 137 pass.
+- Speed evidence, Phase 0 binary (`7A9AB33B...73F7`) vs the candidate
+  (`138A4595...C313`), Threads=1, both PASS:
+  - T1 endgames 2..5, Runs=5: total +1.90%, median row +8.26%, 47 noise rows
+    (`phase-4/speed-gate-endgames-fixed`).
+  - T1 cold default suite, Runs=9: total +7.38%, median row +6.61%, 54 noise
+    rows (`phase-4/speed-gate-cold-fixed`).
+- Deferred within the phase: generating legal moves directly (capture-checker
+  and block-ray predicates, pin-line restriction, EP double-vacate handling)
+  instead of probing exceptions; bitboard movegen; and maintaining the masks
+  incrementally from move metadata rather than recomputing them per commit.
+- Git: `src/koi/position.cpp` plus this plan record; evidence untracked under
+  `artifacts/verification/speed-program/phase-4/`.

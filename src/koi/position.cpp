@@ -165,6 +165,9 @@ struct Snapshot {
     std::array<std::array<std::uint64_t, 7>, 2> piece_bitboards{};
     std::array<std::uint64_t, 2> occupancy{};
     std::uint64_t occupied = 0;
+    std::array<std::uint64_t, 2> checkers{};
+    std::array<std::uint64_t, 2> pinned{};
+    std::array<std::uint64_t, 2> blockers_for_king{};
     bool null_move = false;
     std::uint64_t repetition_history_fingerprint = 0;
     bool repetition_history_suppressed = false;
@@ -183,12 +186,16 @@ struct NativeState {
     std::array<std::array<std::uint64_t, 7>, 2> piece_bitboards{};
     std::array<std::uint64_t, 2> occupancy{};
     std::uint64_t occupied = 0;
+    std::array<std::uint64_t, 2> checkers{};
+    std::array<std::uint64_t, 2> pinned{};
+    std::array<std::uint64_t, 2> blockers_for_king{};
     std::array<Snapshot, kMaximumHistory> history{};
     std::size_t history_size = 0;
 };
 
 bool has_legal_en_passant_capture(const NativeState& state) noexcept;
 bool has_legal_en_passant_capture_mutable(NativeState& state) noexcept;
+void refresh_king_masks(NativeState& state) noexcept;
 
 // Records a snapshot of the pre-move state. The array has a fixed capacity so
 // the search can make and unmake moves without allocating, but a game may
@@ -240,6 +247,7 @@ void rebuild_derived(NativeState& state) noexcept {
     }
     state.occupied = state.occupancy[0] | state.occupancy[1];
     state.key = calculate_key(state);
+    refresh_king_masks(state);
 }
 
 void remove_derived_piece(NativeState& state, Piece piece, int square) noexcept {
@@ -383,6 +391,82 @@ int attacker_count(const NativeState& state, int target, Color attacker) noexcep
 bool is_checked(const NativeState& state, Color color) noexcept {
     const int king = king_square(state, color);
     return king < 0 || square_attacked(state, king, opposite(color));
+}
+
+// Recomputes the per-colour king state used by incremental legality: the
+// checkers attacking each king, the own pieces pinned against an enemy
+// slider, and the squares between a king and a slider checker.  The masks
+// are keyed by colour because apply_unchecked flips the side before callers
+// ask about the mover.
+void refresh_king_masks(NativeState& state) noexcept {
+    for (std::size_t color_index = 0; color_index < 2; ++color_index) {
+        state.checkers[color_index] = 0;
+        state.pinned[color_index] = 0;
+        state.blockers_for_king[color_index] = 0;
+    }
+    for (std::size_t color_index = 0; color_index < 2; ++color_index) {
+        const Color color = color_index == 0 ? Color::white : Color::black;
+        const int king = king_square(state, color);
+        if (king < 0) continue;
+        const std::size_t enemy_index = 1 - color_index;
+        const bool enemy_pawns_are_white = color == Color::black;
+        const std::uint64_t enemy_pawns =
+            state.piece_bitboards[enemy_index][static_cast<std::size_t>(PieceType::pawn)];
+        const std::uint64_t enemy_knights =
+            state.piece_bitboards[enemy_index][static_cast<std::size_t>(PieceType::knight)];
+        const std::uint64_t enemy_kings =
+            state.piece_bitboards[enemy_index][static_cast<std::size_t>(PieceType::king)];
+        const std::uint64_t enemy_bishops =
+            state.piece_bitboards[enemy_index][static_cast<std::size_t>(PieceType::bishop)] |
+            state.piece_bitboards[enemy_index][static_cast<std::size_t>(PieceType::queen)];
+        const std::uint64_t enemy_rooks =
+            state.piece_bitboards[enemy_index][static_cast<std::size_t>(PieceType::rook)] |
+            state.piece_bitboards[enemy_index][static_cast<std::size_t>(PieceType::queen)];
+
+        const std::uint64_t checkers =
+            (detail::pawn_attackers_of(king, enemy_pawns_are_white) & enemy_pawns) |
+            (detail::knight_attacks(king) & enemy_knights) |
+            (detail::king_attacks(king) & enemy_kings) |
+            (detail::bishop_attacks(king, state.occupied) & enemy_bishops) |
+            (detail::rook_attacks(king, state.occupied) & enemy_rooks);
+        state.checkers[color_index] = checkers;
+
+        // Squares strictly between each slider checker and the king.
+        std::uint64_t blockers = 0;
+        for (std::uint64_t sliders = checkers & (enemy_bishops | enemy_rooks); sliders != 0;
+             sliders &= sliders - 1) {
+            const int checker = static_cast<int>(std::countr_zero(sliders));
+            const int file_step =
+                (file_of(checker) > file_of(king)) - (file_of(checker) < file_of(king));
+            const int rank_step =
+                (rank_of(checker) > rank_of(king)) - (rank_of(checker) < rank_of(king));
+            for (int file = file_of(king) + file_step, rank = rank_of(king) + rank_step;
+                 file != file_of(checker) || rank != rank_of(checker);
+                 file += file_step, rank += rank_step) {
+                blockers |= bit(rank * 8 + file);
+            }
+        }
+        state.blockers_for_king[color_index] = blockers;
+
+        // An own piece is pinned when removing it exposes the king to an
+        // enemy slider.  Removing a non-first blocker leaves the inner
+        // blocker in place, so the direct test is exact.
+        const std::uint64_t own_pieces =
+            state.occupancy[color_index] &
+            ~state.piece_bitboards[color_index][static_cast<std::size_t>(PieceType::king)];
+        std::uint64_t pinned = 0;
+        for (std::uint64_t candidates = own_pieces; candidates != 0; candidates &= candidates - 1) {
+            const int square = static_cast<int>(std::countr_zero(candidates));
+            const std::uint64_t saved_occupied = state.occupied;
+            state.occupied &= ~bit(square);
+            const bool exposes =
+                (detail::bishop_attacks(king, state.occupied) & enemy_bishops) != 0 ||
+                (detail::rook_attacks(king, state.occupied) & enemy_rooks) != 0;
+            state.occupied = saved_occupied;
+            if (exposes) pinned |= bit(square);
+        }
+        state.pinned[color_index] = pinned;
+    }
 }
 
 namespace {
@@ -666,20 +750,50 @@ public:
         return state.board[square.index()];
     }
 
-    std::vector<Move> legal_moves() {
-        const Color mover = state.side;
-        MoveBuffer pseudo;
-        generate_pseudo(pseudo);
-        std::vector<Move> result;
-        result.reserve(pseudo.size());
-        for (const Move& move : pseudo) {
+bool move_requires_legality_probe(const Move& move) const noexcept {
+    const int from = move.from().index();
+    const int to = move.to().index();
+    if (!valid_square(from) || !valid_square(to)) {
+        return true;
+    }
+    const Piece piece = state.board[static_cast<std::size_t>(from)];
+    if (piece.type == PieceType::king) {
+        return true;
+    }
+    const std::size_t side_index = state.side == Color::white ? 0U : 1U;
+    if (state.checkers[side_index] != 0) {
+        return true;
+    }
+    if ((state.pinned[side_index] & bit(from)) != 0) {
+        return true;
+    }
+    if (piece.type == PieceType::pawn && state.en_passant.index() < Square::kInvalid &&
+        to == state.en_passant.index() && state.board[static_cast<std::size_t>(to)].empty()) {
+        return true;
+    }
+    return false;
+}
+
+std::vector<Move> legal_moves() {
+    const Color mover = state.side;
+    MoveBuffer pseudo;
+    generate_pseudo(pseudo);
+    std::vector<Move> result;
+    result.reserve(pseudo.size());
+    for (const Move& move : pseudo) {
+        bool legal = !move_requires_legality_probe(move);
+        if (!legal) {
             const Snapshot saved = snapshot();
             apply_unchecked(move);
-            if (!is_checked(state, mover)) result.push_back(move);
+            legal = !is_checked(state, mover);
             restore(saved);
         }
-        return result;
+        if (legal) {
+            result.push_back(move);
+        }
     }
+    return result;
+}
 
     template <bool TacticalOnly>
     std::size_t legal_moves_into_impl(std::span<Move> output) {
@@ -687,19 +801,23 @@ public:
         MoveBuffer pseudo;
         generate_pseudo<TacticalOnly>(pseudo);
         std::size_t count = 0;
-        for (const Move& move : pseudo) {
+    for (const Move& move : pseudo) {
+        bool legal = !move_requires_legality_probe(move);
+        if (!legal) {
             const Snapshot saved = snapshot();
             apply_unchecked(move);
-            if (!is_checked(state, mover)) {
-                // Count every legal move; a too-small span only drops moves.
-                if (count < output.size()) {
-                    output[count] = move;
-                }
-                ++count;
-            }
+            legal = !is_checked(state, mover);
             restore(saved);
         }
-        return count;
+        if (legal) {
+            // Count every legal move; a too-small span only drops moves.
+            if (count < output.size()) {
+                output[count] = move;
+            }
+            ++count;
+        }
+    }
+    return count;
     }
 
     std::size_t legal_moves_into(std::span<Move> output) {
@@ -718,10 +836,13 @@ public:
         MoveBuffer pseudo;
         generate_pseudo(pseudo);
         for (const Move& move : pseudo) {
-            const Snapshot saved = snapshot();
-            apply_unchecked(move);
-            const bool legal = !is_checked(state, mover);
-            restore(saved);
+            bool legal = !move_requires_legality_probe(move);
+            if (!legal) {
+                const Snapshot saved = snapshot();
+                apply_unchecked(move);
+                legal = !is_checked(state, mover);
+                restore(saved);
+            }
             if (legal) {
                 return true;
             }
@@ -767,6 +888,7 @@ public:
         if (std::find(legal.begin(), legal.end(), move) == legal.end()) return false;
         record_snapshot(state, snapshot());
         apply_unchecked(move);
+        refresh_king_masks(state);
         return true;
     }
 
@@ -788,6 +910,7 @@ public:
         }
         record_snapshot(state, snapshot());
         apply_unchecked(move);
+        refresh_king_masks(state);
         return true;
     }
 
@@ -1070,11 +1193,12 @@ public:
 
 private:
     Snapshot snapshot() const noexcept {
-        return Snapshot{state.board, state.side, state.castling, state.en_passant,
-                         state.halfmove, state.fullmove, state.key, state.piece_bitboards,
-                         state.occupancy, state.occupied, false,
-                         state.repetition_history_fingerprint,
-                         state.repetition_history_suppressed};
+    return Snapshot{state.board, state.side, state.castling, state.en_passant,
+                     state.halfmove, state.fullmove, state.key, state.piece_bitboards,
+                     state.occupancy, state.occupied, state.checkers, state.pinned,
+                     state.blockers_for_king, false,
+                     state.repetition_history_fingerprint,
+                     state.repetition_history_suppressed};
     }
 
     void restore(const Snapshot& saved) noexcept {
@@ -1089,8 +1213,11 @@ private:
         state.repetition_history_suppressed = saved.repetition_history_suppressed;
         state.piece_bitboards = saved.piece_bitboards;
         state.occupancy = saved.occupancy;
-        state.occupied = saved.occupied;
-    }
+    state.occupied = saved.occupied;
+    state.checkers = saved.checkers;
+    state.pinned = saved.pinned;
+    state.blockers_for_king = saved.blockers_for_king;
+}
 
     template <typename MoveContainer>
     void push(MoveContainer& moves, int from, int to) const {
