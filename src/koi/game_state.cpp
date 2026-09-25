@@ -1202,6 +1202,7 @@ PositionFeatures native_position_features(const Position& position) noexcept {
                         [](std::uint64_t value, std::uint64_t board) { return value | board; }) |
         std::accumulate(pieces[1].begin(), pieces[1].end(), std::uint64_t{0},
                         [](std::uint64_t value, std::uint64_t board) { return value | board; });
+    features.occupied = occupied;
     std::array<std::uint64_t, 2> attacks{};
 
     for (const Color color : {Color::white, Color::black}) {
@@ -1209,6 +1210,8 @@ PositionFeatures native_position_features(const Position& position) noexcept {
         const std::uint64_t own = std::accumulate(
             pieces[color_index].begin(), pieces[color_index].end(), std::uint64_t{0},
             [](std::uint64_t value, std::uint64_t board) { return value | board; });
+        features.colors[color_index] = own;
+        features.pawns[color_index] = pieces[color_index][static_cast<std::size_t>(PieceType::pawn)];
         for (const PieceType type : {PieceType::pawn, PieceType::knight, PieceType::bishop,
                                      PieceType::rook, PieceType::queen, PieceType::king}) {
             std::uint64_t remaining = pieces[color_index][static_cast<std::size_t>(type)];
@@ -1246,7 +1249,11 @@ PositionFeatures native_position_features(const Position& position) noexcept {
                 default:
                     break;
                 }
-                attacks[color_index] |= native_feature_attacks(pieces, occupied, square, type, color);
+                const std::uint64_t piece_attacks =
+                    native_feature_attacks(pieces, occupied, square, type, color);
+                attacks[color_index] |= piece_attacks;
+                features.piece_mobility[static_cast<std::size_t>(square)] =
+                    static_cast<std::uint8_t>(std::popcount(piece_attacks & ~own));
             }
         }
         features.attacked_squares[color_index] = attacks[color_index];

@@ -1,6 +1,6 @@
 # Engine speed program: nodes per second and time to depth
 
-Status: Phases 0-1 complete (2026-09-25); Phase 2 next. Owner: Koi Engine.
+Status: Phases 0-2 complete (2026-09-25); Phase 3 next. Owner: Koi Engine.
 
 ## Goal
 
@@ -468,3 +468,40 @@ scope - they belong to a strength plan, not this program.
   CMake 3.31; the MinGW CMake 3.27 is below the project minimum.
 - Git: source, tool, and plan changes committed separately from the untracked
   evidence under `artifacts/verification/speed-program/phase-1/`.
+
+## Phase 2 record (2026-09-25)
+
+- Stored metadata: `PositionFeatures` gained `occupied`, `colors[2]`,
+  `pawns[2]`, and `piece_mobility[64]`; `native_position_features` fills them
+  from data it already computes. `feature_masks()` and the knight/sliding
+  mobility helpers read the stored bitboards and fall back to the 64-square
+  scan when `occupied == 0`, which keeps hand-built fixtures and empty boards
+  exact.
+- Pawn bitboards: `pawn_structure_for` and `passed_pawn_for` now derive file
+  counts, passed, connected, advanced support, blockade, and protection from
+  `pawns[color]` with small mask helpers (`file_mask`, `adjacent_files_mask`,
+  `ranks_mask`, `pawn_is_passed_bitboard`, `for_each_feature_pawn`); the legacy
+  loops remain as the `occupied == 0` fallback. Scoring arithmetic is
+  unchanged.
+- Correctness evidence: pin byte-identical (default stdout sha256
+  `6F7D8FF5...A7F8`, timed rows identical after removing `elapsed_ms`/`nps`);
+  `classical_evaluator_tests` 13/13, `koi_core_tests` 27/27,
+  `native_rule_state_tests` 12/12, `koi_strength_tests` 7/7,
+  `koi_search_tests` 152 run / 137 pass / 0 fail / 14 xfail / 1 xpass /
+  1 intermittent, `koi_soak_tests` 4/4, `transposition_table_tests` 9/9,
+  `koi_shadow_diff_tests` 7/7, `perft_tests` 3/3,
+  `evaluation_features_tests` 15/15, `koi_bench_process_test.ps1` exit 0.
+- Speed evidence, Phase 0 binary (`7A9AB33B...73F7`) vs the candidate
+  (`BA0AFA9D...4CA3`), Threads=1, both PASS:
+  - T1 endgames 2..5, Runs=5: total +0.96%, median row +2.80%, 47 noise rows
+    (`phase-2/speed-gate-step2-endgames`).
+  - T1 cold default suite, Runs=9: total +5.55%, median row +4.74%, 54 noise
+    rows (`phase-2/speed-gate-step2-cold`).
+  - The earlier step-1-only endgames gate read higher (+30%) at different
+    absolute levels; only paired alternating-run deltas are attributable.
+- Deferred within the phase: pawn hash keyed by `pawn_key`, locked-pawn-wall
+  cache, removing the FeatureState lock/copy, and eliminating the per-candidate
+  child `position_features()` extractions at `search_context.cpp:1559,1591`.
+- Git: `src/koi/game_state.hpp`, `src/koi/game_state.cpp`,
+  `src/koi/classical_evaluator.cpp` plus this plan record; evidence untracked
+  under `artifacts/verification/speed-program/phase-2/`.

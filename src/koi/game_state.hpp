@@ -145,6 +145,15 @@ private:
 struct PositionFeatures {
     std::array<Piece, 64> board{};
     std::array<std::uint64_t, 2> attacked_squares{};
+    // Bitboards captured at extraction time so consumers do not have to rebuild
+    // them from `board`.  `occupied == 0` marks synthetic features (hand-built
+    // fixtures, empty boards); consumers must fall back to scanning `board`.
+    std::uint64_t occupied = 0;
+    std::array<std::uint64_t, 2> colors{};
+    std::array<std::uint64_t, 2> pawns{};
+    // Mobility of the piece standing on each square (own pieces excluded),
+    // valid only when `occupied != 0`.
+    std::array<std::uint8_t, 64> piece_mobility{};
     std::array<std::uint16_t, 2> mobility{};
     std::array<Square, 2> king_squares{};
     std::array<std::uint8_t, 2> pawn_file_masks{};

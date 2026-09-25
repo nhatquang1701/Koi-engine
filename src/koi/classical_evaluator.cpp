@@ -72,6 +72,9 @@ struct FeatureMasks {
 };
 
 FeatureMasks feature_masks(const PositionFeatures& features) noexcept {
+    if (features.occupied != 0) {
+        return FeatureMasks{features.occupied, features.colors};
+    }
     FeatureMasks masks;
     for (std::size_t square = 0; square < 64; ++square) {
         const Piece piece = features.board[square];
@@ -93,6 +96,9 @@ int sliding_mobility(const PositionFeatures& features, std::uint8_t square,
     const Piece moving = features.board[square];
     if (moving.empty()) {
         return 0;
+    }
+    if (features.occupied != 0) {
+        return features.piece_mobility[square];
     }
     const FeatureMasks masks = feature_masks(features);
     const std::uint64_t attacks = type == PieceType::bishop ?
@@ -192,6 +198,9 @@ int knight_mobility(const PositionFeatures& features, std::uint8_t square) noexc
     const Piece moving = features.board[square];
     if (moving.empty()) {
         return 0;
+    }
+    if (features.occupied != 0) {
+        return features.piece_mobility[square];
     }
     const FeatureMasks masks = feature_masks(features);
     return std::popcount(detail::knight_attacks(square) & ~masks.colors[color_index(moving.color)]);
@@ -446,18 +455,89 @@ bool has_pawn_on_file(const PositionFeatures& features, int color, int file) noe
         (features.pawn_file_masks[static_cast<std::size_t>(color)] & (std::uint8_t{1} << file)) != 0;
 }
 
+// Bitboard helpers for the pawn terms. They consume the stored pawn bitboards,
+// which are only meaningful when features.occupied != 0; callers keep the
+// original square loops as a fallback for synthetic fixtures. The masks
+// reproduce the loops exactly: passed checks look at ranks strictly ahead of
+// the pawn, support checks include the pawn's own rank.
+constexpr std::uint64_t kFileMaskBits = 0x0101010101010101ULL;
+
+std::uint64_t file_mask(int file) noexcept {
+    return kFileMaskBits << file;
+}
+
+std::uint64_t adjacent_files_mask(int file) noexcept {
+    std::uint64_t mask = 0;
+    if (file > 0) {
+        mask |= file_mask(file - 1);
+    }
+    if (file < 7) {
+        mask |= file_mask(file + 1);
+    }
+    return mask;
+}
+
+std::uint64_t ranks_mask(int first, int last) noexcept {
+    if (first > last) {
+        return 0;
+    }
+    const std::uint64_t low = first == 0 ? 0 : ((std::uint64_t{1} << (first * 8)) - 1);
+    const std::uint64_t high = last == 7
+        ? ~std::uint64_t{0}
+        : ((std::uint64_t{1} << ((last + 1) * 8)) - 1);
+    return high ^ low;
+}
+
+// No enemy pawn on the three files around `file` at a rank strictly ahead of
+// `rank` in `direction`.
+bool pawn_is_passed_bitboard(const PositionFeatures& features, int enemy, int file, int rank,
+                             int direction) noexcept {
+    const int first_ahead = direction > 0 ? rank + 1 : 0;
+    const int last_ahead = direction > 0 ? 7 : rank - 1;
+    return (features.pawns[static_cast<std::size_t>(enemy)] & adjacent_files_mask(file) &
+            ranks_mask(first_ahead, last_ahead)) == 0;
+}
+
+template <typename Fn>
+void for_each_feature_pawn(const PositionFeatures& features, int color, Fn&& visit) noexcept {
+    std::uint64_t pawns = features.pawns[static_cast<std::size_t>(color)];
+    if (pawns != 0) {
+        while (pawns != 0) {
+            const int square = static_cast<int>(std::countr_zero(pawns));
+            pawns &= pawns - 1;
+            visit(square);
+        }
+        return;
+    }
+    for (std::uint8_t square = 0; square < 64; ++square) {
+        const Piece piece = features.board[square];
+        if (piece.type == PieceType::pawn && color_index(piece.color) == color) {
+            visit(static_cast<int>(square));
+        }
+    }
+}
+
 int pawn_structure_for(const PositionFeatures& features, Color color) noexcept {
     const int own = color_index(color);
     const int enemy = 1 - own;
     std::array<int, 8> own_file_counts{};
     std::array<int, 8> enemy_file_counts{};
-    for (std::uint8_t square = 0; square < 64; ++square) {
-        const Piece piece = features.board[square];
-        if (piece.type != PieceType::pawn) {
-            continue;
+    if (features.occupied != 0) {
+        for (int file = 0; file < 8; ++file) {
+            own_file_counts[static_cast<std::size_t>(file)] =
+                std::popcount(features.pawns[own] & file_mask(file));
+            enemy_file_counts[static_cast<std::size_t>(file)] =
+                std::popcount(features.pawns[enemy] & file_mask(file));
         }
-        auto& counts = color_index(piece.color) == own ? own_file_counts : enemy_file_counts;
-        ++counts[square % 8];
+    } else {
+        for (std::uint8_t square = 0; square < 64; ++square) {
+            const Piece piece = features.board[square];
+            if (piece.type != PieceType::pawn) {
+                continue;
+            }
+            auto& counts = color_index(piece.color) == own ? own_file_counts : enemy_file_counts;
+            ++counts[square % 8];
+        }
     }
 
     int score = 0;
@@ -478,24 +558,23 @@ int pawn_structure_for(const PositionFeatures& features, Color color) noexcept {
     }
     score -= std::max(0, islands - 1) * kEvaluation.pawn_island_penalty;
 
-    for (std::uint8_t square = 0; square < 64; ++square) {
-        const Piece pawn = features.board[square];
-        if (pawn.type != PieceType::pawn || color_index(pawn.color) != own) {
-            continue;
-        }
-
+    for_each_feature_pawn(features, own, [&](const int square) {
         const int file = square % 8;
         const int rank = square / 8;
         const int direction = color == Color::white ? 1 : -1;
         const int forward_rank = rank + direction;
         bool passed = true;
-        for (int candidate_file = std::max(0, file - 1); candidate_file <= std::min(7, file + 1);
-             ++candidate_file) {
-            for (int candidate_rank = rank + direction; candidate_rank >= 0 && candidate_rank < 8;
-                 candidate_rank += direction) {
-                const Piece candidate = features.board[static_cast<std::size_t>(candidate_rank * 8 + candidate_file)];
-                if (candidate.type == PieceType::pawn && color_index(candidate.color) == enemy) {
-                    passed = false;
+        if (features.occupied != 0) {
+            passed = pawn_is_passed_bitboard(features, enemy, file, rank, direction);
+        } else {
+            for (int candidate_file = std::max(0, file - 1); candidate_file <= std::min(7, file + 1);
+                 ++candidate_file) {
+                for (int candidate_rank = rank + direction; candidate_rank >= 0 && candidate_rank < 8;
+                     candidate_rank += direction) {
+                    const Piece candidate = features.board[static_cast<std::size_t>(candidate_rank * 8 + candidate_file)];
+                    if (candidate.type == PieceType::pawn && color_index(candidate.color) == enemy) {
+                        passed = false;
+                    }
                 }
             }
         }
@@ -517,15 +596,20 @@ int pawn_structure_for(const PositionFeatures& features, Color color) noexcept {
         }
 
         bool connected = false;
-        for (int adjacent_file : {file - 1, file + 1}) {
-            if (adjacent_file < 0 || adjacent_file >= 8) {
-                continue;
-            }
-            for (int adjacent_rank = std::max(0, rank - 1); adjacent_rank <= std::min(7, rank + 1);
-                 ++adjacent_rank) {
-                const Piece adjacent = features.board[static_cast<std::size_t>(adjacent_rank * 8 + adjacent_file)];
-                if (adjacent.type == PieceType::pawn && color_index(adjacent.color) == own) {
-                    connected = true;
+        if (features.occupied != 0) {
+            connected = (features.pawns[own] & adjacent_files_mask(file) &
+                         ranks_mask(std::max(0, rank - 1), std::min(7, rank + 1))) != 0;
+        } else {
+            for (int adjacent_file : {file - 1, file + 1}) {
+                if (adjacent_file < 0 || adjacent_file >= 8) {
+                    continue;
+                }
+                for (int adjacent_rank = std::max(0, rank - 1); adjacent_rank <= std::min(7, rank + 1);
+                     ++adjacent_rank) {
+                    const Piece adjacent = features.board[static_cast<std::size_t>(adjacent_rank * 8 + adjacent_file)];
+                    if (adjacent.type == PieceType::pawn && color_index(adjacent.color) == own) {
+                        connected = true;
+                    }
                 }
             }
         }
@@ -540,29 +624,37 @@ int pawn_structure_for(const PositionFeatures& features, Color color) noexcept {
             }
 
             bool has_advanced_support = false;
-            for (const int adjacent_file : {file - 1, file + 1}) {
-                if (adjacent_file < 0 || adjacent_file >= 8) {
-                    continue;
-                }
-                for (int candidate_rank = forward_rank;
-                     candidate_rank >= 0 && candidate_rank < 8;
-                     candidate_rank += direction) {
-                    const Piece candidate = features.board[
-                        static_cast<std::size_t>(candidate_rank * 8 + adjacent_file)];
-                    if (candidate.type == PieceType::pawn && color_index(candidate.color) == own) {
-                        has_advanced_support = true;
+            if (features.occupied != 0) {
+                const std::uint64_t support_ranks = direction > 0
+                    ? ranks_mask(forward_rank, 7)
+                    : ranks_mask(0, forward_rank);
+                has_advanced_support = (features.pawns[own] & adjacent_files_mask(file) &
+                                        support_ranks) != 0;
+            } else {
+                for (const int adjacent_file : {file - 1, file + 1}) {
+                    if (adjacent_file < 0 || adjacent_file >= 8) {
+                        continue;
+                    }
+                    for (int candidate_rank = forward_rank;
+                         candidate_rank >= 0 && candidate_rank < 8;
+                         candidate_rank += direction) {
+                        const Piece candidate = features.board[
+                            static_cast<std::size_t>(candidate_rank * 8 + adjacent_file)];
+                        if (candidate.type == PieceType::pawn && color_index(candidate.color) == own) {
+                            has_advanced_support = true;
+                            break;
+                        }
+                    }
+                    if (has_advanced_support) {
                         break;
                     }
-                }
-                if (has_advanced_support) {
-                    break;
                 }
             }
             if (!has_advanced_support && (features.attacked_squares[enemy] & forward_bit) != 0) {
                 score -= kEvaluation.backward_pawn_penalty;
             }
         }
-    }
+    });
     return score;
 }
 
@@ -578,29 +670,28 @@ int passed_pawn_for(const PositionFeatures& features, Color color) noexcept {
     const int endgame_phase = kEvaluation.maximum_phase - features.game_phase;
     int score = 0;
 
-    for (std::uint8_t square = 0; square < 64; ++square) {
-        const Piece pawn = features.board[square];
-        if (pawn.type != PieceType::pawn || color_index(pawn.color) != own) {
-            continue;
-        }
-
+    for_each_feature_pawn(features, own, [&](const int square) {
         const int file = square % 8;
         const int rank = square / 8;
         bool passed = true;
-        for (int candidate_file = std::max(0, file - 1);
-             candidate_file <= std::min(7, file + 1); ++candidate_file) {
-            for (int candidate_rank = rank + direction;
-                 candidate_rank >= 0 && candidate_rank < 8;
-                 candidate_rank += direction) {
-                const Piece candidate = features.board[
-                    static_cast<std::size_t>(candidate_rank * 8 + candidate_file)];
-                if (candidate.type == PieceType::pawn && color_index(candidate.color) != own) {
-                    passed = false;
+        if (features.occupied != 0) {
+            passed = pawn_is_passed_bitboard(features, 1 - own, file, rank, direction);
+        } else {
+            for (int candidate_file = std::max(0, file - 1);
+                 candidate_file <= std::min(7, file + 1); ++candidate_file) {
+                for (int candidate_rank = rank + direction;
+                     candidate_rank >= 0 && candidate_rank < 8;
+                     candidate_rank += direction) {
+                    const Piece candidate = features.board[
+                        static_cast<std::size_t>(candidate_rank * 8 + candidate_file)];
+                    if (candidate.type == PieceType::pawn && color_index(candidate.color) != own) {
+                        passed = false;
+                    }
                 }
             }
         }
         if (!passed) {
-            continue;
+            return;
         }
 
         const int king_distance = std::max(std::abs(file - king_file), std::abs(rank - king_rank));
@@ -623,7 +714,7 @@ int passed_pawn_for(const PositionFeatures& features, Color color) noexcept {
         const int advancement = color == Color::white ? rank : 7 - rank;
         score += advancement * kEvaluation.passed_pawn_promotion_weight * endgame_phase /
             kEvaluation.maximum_phase;
-    }
+    });
     return score;
 }
 
