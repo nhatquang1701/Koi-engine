@@ -1221,7 +1221,7 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
                             // selective cutoffs, but never label it PV or
                             // store it at the parent's nominal depth.
                             table_access.store(
-                                search_transposition_key(state), probcut.depth + 1,
+                                transposition_key, probcut.depth + 1,
                                 probcut_score, TranspositionBound::lower,
                                 candidate.move, ply, false, raw_static_eval);
                         }
@@ -1297,7 +1297,7 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
             path_selective_bound = saved_selective_bound;
             ++stats.internal_iterative_deepening;
             const std::optional<TranspositionEntry> probe_entry =
-                table_access.probe(search_transposition_key(state), ply);
+                table_access.probe(transposition_key, ply);
             if (probe_entry.has_value() && probe_entry->best_move != Move::no_move()) {
                 tt_move = probe_entry->best_move;
             }

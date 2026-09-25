@@ -300,7 +300,9 @@ function Get-Median([long[]]$Values) {
         throw 'Cannot compute a median without benchmark runs'
     }
     $ordered = @($Values | Sort-Object)
-    $middle = [int]($ordered.Count / 2)
+    # Casting a half-integer to [int] rounds (banker's), it does not truncate;
+    # floor explicitly so odd sample counts pick the true middle index.
+    $middle = [int][Math]::Floor($ordered.Count / 2.0)
     if (($ordered.Count % 2) -eq 1) {
         return [double]$ordered[$middle]
     }

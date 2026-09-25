@@ -21,6 +21,14 @@ enum class TranspositionBound : std::uint8_t { exact, lower, upper };
 // bounded far away from this value, so it is unambiguous.
 inline constexpr int kNoEvaluation = -1'000'000'000;
 
+// Number of hazard-pointer slots one table can hand out to concurrent readers.
+// Each store/probe/prefetch publishes the storage it is about to use in one
+// slot and revalidates it against the live pointer, and a resize waits for the
+// retired storage to leave every slot before dropping it.  The pool is a
+// thread-lifetime resource (acquired once per thread, released at thread exit),
+// so the capacity only has to cover live threads, not accesses.
+inline constexpr std::size_t kTranspositionHazardSlots = 1024;
+
 struct TranspositionEntry {
     std::uint64_t key = 0;
     int depth = 0;
@@ -124,25 +132,109 @@ public:
 private:
     struct Storage;
 
+    // Hazard-pointer lease for the store/probe/prefetch hot paths.  A reader
+    // publishes the storage pointer it is about to use in one hazard slot and
+    // then revalidates it against the live pointer; a resize swaps the live
+    // pointer first and only then waits for the retired storage to leave every
+    // slot, so a reader can never dereference freed storage.  A thread that
+    // cannot obtain a slot (pool exhausted) falls back to a maintenance-locked
+    // shared_ptr snapshot, so correctness never depends on hazard capacity.
+    class Lease {
+    public:
+        explicit Lease(const TranspositionTable& table) noexcept : table_(&table) {
+            std::size_t slot = cached_hazard_slot_;
+            if (slot >= kTranspositionHazardSlots) {
+                slot = register_thread_hazard_slot();
+            }
+            if (slot < kTranspositionHazardSlots) {
+                hazard_slot_ = slot;
+                publish(table);
+                return;
+            }
+            adopt_snapshot(table);
+        }
+
+        ~Lease() {
+            if (hazard_slot_ < kTranspositionHazardSlots) {
+                table_->hazards_[hazard_slot_].storage.store(nullptr, std::memory_order_release);
+            }
+        }
+
+        Lease(const Lease&) = delete;
+        Lease& operator=(const Lease&) = delete;
+
+        [[nodiscard]] Storage* storage() const noexcept { return storage_; }
+
+    private:
+        void publish(const TranspositionTable& table) noexcept {
+            // Hazard fast path: when this thread's slot already pins the live
+            // storage, no publication or revalidation is needed.  The pin was
+            // taken by an earlier access and a resize cannot complete while
+            // the slot still holds the retired pointer, so the value stays
+            // valid for this whole lease.
+            Storage* const live = table.hot_storage_.load(std::memory_order_acquire);
+            if (live != nullptr &&
+                table.hazards_[hazard_slot_].storage.load(std::memory_order_relaxed) == live) {
+                storage_ = live;
+                return;
+            }
+            for (;;) {
+                Storage* const candidate = table.hot_storage_.load(std::memory_order_acquire);
+                if (candidate == nullptr) {
+                    table.hazards_[hazard_slot_].storage.store(nullptr, std::memory_order_release);
+                    return;
+                }
+                table.hazards_[hazard_slot_].storage.store(candidate, std::memory_order_release);
+                // Revalidation closes the window where a resize swapped the
+                // live pointer between the load and the hazard publication:
+                // the writer scanned the slots before this one was published,
+                // so only a reader that re-observes its candidate may
+                // dereference it.
+                if (table.hot_storage_.load(std::memory_order_acquire) == candidate) {
+                    storage_ = candidate;
+                    return;
+                }
+            }
+        }
+
+        // Cold path for a thread that cannot obtain a hazard slot; keeps the
+        // storage alive with a maintenance-locked reference-counted snapshot.
+        void adopt_snapshot(const TranspositionTable& table) noexcept;
+
+        const TranspositionTable* table_ = nullptr;
+        Storage* storage_ = nullptr;
+        std::size_t hazard_slot_ = kTranspositionHazardSlots;
+        std::shared_ptr<Storage> fallback_;
+    };
+
     [[nodiscard]] static std::size_t normalized_size_mb(std::size_t megabytes) noexcept;
     [[nodiscard]] HashResizeResult resize_locked(std::size_t megabytes) noexcept;
-    // Lock-free storage handle for the store/probe/prefetch hot paths.  The
-    // owning shared_ptr stays under maintenance_mutex_.  Callers keep the
-    // storage alive for the duration of the access by holding storage_mutex_ in
-    // shared mode; a resize takes it exclusively before it replaces and drops
-    // the old storage, so no reader can outlive the object it loaded.
-    [[nodiscard]] Storage* hot_storage() const noexcept;
+    // Resolves this thread's hazard slot on first use and arranges its release
+    // at thread exit.  A constant-initialized thread_local above keeps the hot
+    // path free of dynamic-init guards.
+    [[nodiscard]] static std::size_t register_thread_hazard_slot() noexcept;
 
     static constexpr std::size_t kStripeCount = 64;
 
-    // Shared by every reader for the whole access and taken exclusively by a
-    // resize before the replaced storage is destroyed.  Resizes are rare
-    // maintenance operations, so the extra shared acquisition on the hot path
-    // is the price of never freeing a storage a reader still points at.
-    mutable std::shared_mutex storage_mutex_;
     mutable std::mutex maintenance_mutex_;
     std::shared_ptr<Storage> storage_;
     std::atomic<Storage*> hot_storage_{nullptr};
+    // One hazard slot per concurrent reader, see Lease.  Slots are assigned by
+    // a process-wide thread-lifetime pool, so a thread always publishes in the
+    // same slot and a resize can wait on a bounded array.
+    //
+    // Slots are cache-line padded: unpadded 8-byte atomics let two readers in
+    // adjacent slots ping-pong the same line on every table access, which
+    // measured as a ~9% multi-thread regression.
+    struct alignas(64) HazardSlot {
+        std::atomic<Storage*> storage{nullptr};
+    };
+
+    mutable std::array<HazardSlot, kTranspositionHazardSlots> hazards_{};
+    // This thread's hazard slot index, resolved once per thread.  Constant
+    // initialized so reading it in Lease does not run a TLS guard check; the
+    // sentinel means "not resolved yet".
+    inline static thread_local std::size_t cached_hazard_slot_ = kTranspositionHazardSlots;
     HashMemoryPolicy memory_policy_;
 };
 

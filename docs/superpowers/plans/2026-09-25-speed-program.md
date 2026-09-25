@@ -1,6 +1,6 @@
 # Engine speed program: nodes per second and time to depth
 
-Status: Phase 0 complete (2026-09-25); Phase 1 next. Owner: Koi Engine.
+Status: Phases 0-1 complete (2026-09-25); Phase 2 next. Owner: Koi Engine.
 
 ## Goal
 
@@ -406,3 +406,65 @@ scope - they belong to a strength plan, not this program.
   found.
 - Git: Phase 0 changes committed separately from this record's artifacts
   (bench JSON is untracked evidence).
+
+## Phase 1 record (2026-09-25)
+
+- Design: the storage `shared_mutex_` guard is gone from probe, store, and
+  prefetch. A reader `Lease` publishes the live `Storage*` into a per-thread
+  hazard slot and clears it on destruction; `resize_locked` retires the old
+  storage only after every hazard slot stops pointing at it. Slots are padded
+  to a cache line (`struct alignas(64) HazardSlot`). A 1024-slot pool hands
+  each thread one stable slot (leaky static with a thread-local releaser); the
+  cold fallback (`Lease::adopt_snapshot`) takes `maintenance_mutex_` and pins
+  the storage with a `shared_ptr` when no slot is available. `publish()` has a
+  fast path: when the live pointer is already pinned in this thread's slot it
+  is used without a store or revalidation, because a pinned lease blocks
+  retirement. Stripe locks remain for stores, `clear()`, and
+  `new_generation()`.
+- Key reuse: the `search_transposition_key` computed once per negamax node is
+  now reused for the ProbCut store and the IID probe instead of recomputed.
+- False sharing found during the T8 gate: the first hazard array used plain
+  8-byte `std::atomic<Storage*>` slots, so eight search threads ping-ponged one
+  cache line and lost about 9% at Threads=8. Cache-line padding removed it
+  (T8 gate went from -8.7% to +0.2% in the first padded run).
+- Inline hot path: the first hazard version regressed steady-state Threads=1 by
+  1.3% (out-of-line `Lease` ctor/dtor plus a guarded function-local
+  `thread_local`). The ctor/dtor are inline now and read a
+  constant-initialized `thread_local cached_hazard_slot_`, registering only on
+  first use; the steady warm A/B moved from -1.33% to +1.60%.
+- Gate tooling fixes: `Get-Median` used banker's rounding
+  (`[int]($Count / 2)`), which picks the wrong sample for odd counts (three
+  samples returned the maximum); fixed with `[Math]::Floor` in both
+  `speed_gate.ps1` and `performance_gate.ps1`. `speed_gate.ps1` gained
+  `-MinRowElapsedMs` (default 20 ms): rows below the floor are reported with
+  `noise = true` and excluded from the per-row verdict while the totals keep
+  every row; documented in `tools/README.md`.
+- Correctness evidence: pin byte-identical (default stdout sha256
+  `6F7D8FF5...A7F8`, 770,021 visited, 64 rows, timed rows identical after
+  removing `elapsed_ms`/`nps`); `transposition_table_tests` 9/9;
+  `koi_search_tests` 152 run / 137 pass / 0 fail / 14 xfail / 1 xpass /
+  1 intermittent (unchanged from before); `koi_soak_tests` 4/4;
+  `koi_bench_process_test.ps1` exit 0; ASan (KOI_SANITIZE, CI recipe
+  `ctest -L unit -LE heavy`) 26/26, including the hash-resize soak.
+- Speed evidence, Phase 0 binary (`7A9AB33B...73F7`) vs the final candidate
+  (`487B5052...DA83`), all PASS:
+  - T8 default suite, Runs=9: total -1.69%, median row -1.18%, 48 noise rows
+    (`phase-1/speed-gate-t8-fastpath-20ms`).
+  - T1 cold default suite, Runs=9: total -1.88%, median row -0.96%, 54 noise
+    rows (`phase-1/speed-gate-cold-fastpath`).
+  - T1 endgames 2..5, Runs=5: total +0.78%, median row 0.00%
+    (`phase-1/speed-gate-endgames-fastpath`).
+  - Warm-hash steady A/B: T1 -0.10%, T8 no regression signal; the machine's
+    run-to-run spread is about ±1-2%, so small differences are not
+    attributable.
+- Honest outcome: the win is structural (no storage lock on the hot read path,
+  one lease per access, padded hazards, key reuse). Wall-clock deltas sit
+  inside the ±2% gate at Threads=1 and are neutral-to-slightly-positive at
+  Threads=8; the work also fixes the gate tools' median bug and adds the noise
+  floor needed by later phases.
+- Local ASan note: the Community VS instance lacks the AddressSanitizer
+  runtime libraries, so the sanitizer build uses the BuildTools instance
+  (`C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools`) and its
+  CMake 3.31; the MinGW CMake 3.27 is below the project minimum.
+- Git: source, tool, and plan changes committed separately from the untracked
+  evidence under `artifacts/verification/speed-program/phase-1/`.

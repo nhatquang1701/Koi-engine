@@ -97,10 +97,13 @@ Phase 0 measurement upgrade (`--report`). It alternates timed passes between the
 executables, consumes the `koi-bench-speed-v1` artifacts, and compares per-row
 and total NPS medians plus the time-to-depth table. It fails when total NPS
 regresses past `-MaxNpsRegressionPercent` (default 2%) or when the median row
-NPS regresses past `-MaxRowNpsRegressionPercent`. The run artifacts and a
-`speed-gate.json` summary land under `artifacts/verification/`; like the
-fixed-depth gate this is a standalone measurement command, never a CTest
-threshold:
+NPS regresses past `-MaxRowNpsRegressionPercent`. Rows whose baseline median
+elapsed is below `-MinRowElapsedMs` (default 20 ms) are timer-quantized -- one
+millisecond tick is a >5% NPS step there -- so they are still reported with
+`noise=true` but excluded from the row verdict; the total keeps every row. The
+run artifacts and a `speed-gate.json` summary land under `artifacts/verification/`;
+like the fixed-depth gate this is a standalone measurement command, never a
+CTest threshold:
 
 ```powershell
 pwsh -NoProfile -File .\tools\build\speed_gate.ps1 `

@@ -18,7 +18,14 @@ param(
     [ValidateRange(0.0, 50.0)]
     [double]$MaxNpsRegressionPercent = 2.0,
     [ValidateRange(0.0, 50.0)]
-    [double]$MaxRowNpsRegressionPercent = 2.0
+    [double]$MaxRowNpsRegressionPercent = 2.0,
+    # Rows whose baseline median elapsed is below this are timer-quantized: a
+    # 3-4 ms row moves in ~25% steps, and the Phase 0 noise floor recorded up
+    # to 99.9% swings on 0-1 ms rows.  The 20 ms default keeps T8 rows (where
+    # one 1 ms tick is still >5%) out of the per-row verdict too.  Such rows
+    # are reported (with noise=true) but excluded from the row regression test.
+    [ValidateRange(0.0, 1000.0)]
+    [double]$MinRowElapsedMs = 20.0
 )
 
 $ErrorActionPreference = 'Stop'
@@ -47,7 +54,9 @@ function Get-Median([double[]]$Values) {
         throw 'Cannot compute a median without samples'
     }
     $ordered = @($Values | Sort-Object)
-    $middle = [int]($ordered.Count / 2)
+    # Casting a half-integer to [int] rounds (banker's), it does not truncate;
+    # floor explicitly so odd sample counts pick the true middle index.
+    $middle = [int][Math]::Floor($ordered.Count / 2.0)
     if (($ordered.Count % 2) -eq 1) {
         return [double]$ordered[$middle]
     }
@@ -172,7 +181,7 @@ Write-Output "output_directory=$outputFull"
 Write-Output "baseline_executable=$baselinePath"
 Write-Output "candidate_executable=$candidatePath"
 Write-Output "runs=$Runs threads=$Threads speed=$Speed timed=1 $corpusDescription $depthDescription"
-Write-Output ("nps_regression_limit={0:N2}% row_nps_regression_limit={1:N2}%" -f $MaxNpsRegressionPercent, $MaxRowNpsRegressionPercent)
+Write-Output ("nps_regression_limit={0:N2}% row_nps_regression_limit={1:N2}% min_row_elapsed_ms={2:N1}" -f $MaxNpsRegressionPercent, $MaxRowNpsRegressionPercent, $MinRowElapsedMs)
 
 # Alternating order spreads thermal and background-load drift across both
 # executables; per-row and total medians absorb the remaining noise.
@@ -235,6 +244,7 @@ foreach ($report in $candidateReports) {
 }
 
 $deltas = [System.Collections.Generic.List[double]]::new()
+$excludedNoiseRows = 0
 $rows = [System.Collections.Generic.List[object]]::new()
 foreach ($key in $rowKeys) {
     $baselineNps = Get-Median -Values $baselineRows[$key].ToArray()
@@ -242,7 +252,12 @@ foreach ($key in $rowKeys) {
     $baselineMs = Get-Median -Values $baselineElapsed[$key].ToArray()
     $candidateMs = Get-Median -Values $candidateElapsed[$key].ToArray()
     $deltaFraction = if ($baselineNps -gt 0.0) { ($candidateNps - $baselineNps) / $baselineNps } else { 0.0 }
-    [void]$deltas.Add($deltaFraction * 100.0)
+    $isNoise = $baselineMs -lt $MinRowElapsedMs
+    if ($isNoise) {
+        $excludedNoiseRows++
+    } else {
+        [void]$deltas.Add($deltaFraction * 100.0)
+    }
     [void]$rows.Add([pscustomobject]@{
         key = $key
         baseline_nps = [uint64]$baselineNps
@@ -250,17 +265,18 @@ foreach ($key in $rowKeys) {
         nps_delta_percent = [Math]::Round($deltaFraction * 100.0, 4)
         baseline_elapsed_ms = [uint64]$baselineMs
         candidate_elapsed_ms = [uint64]$candidateMs
+        noise = $isNoise
     })
 }
 
 $baselineTotalNps = Get-Median -Values @($baselineReports | ForEach-Object { Get-VisitedNps $_.totals })
 $candidateTotalNps = Get-Median -Values @($candidateReports | ForEach-Object { Get-VisitedNps $_.totals })
 $totalDelta = if ($baselineTotalNps -gt 0.0) { ($candidateTotalNps - $baselineTotalNps) / $baselineTotalNps } else { 0.0 }
-$medianRowDelta = Get-Median -Values $deltas.ToArray()
+$medianRowDelta = if ($deltas.Count -eq 0) { 0.0 } else { Get-Median -Values $deltas.ToArray() }
 
 Write-Output ("baseline_total_nps={0:N0} candidate_total_nps={1:N0} delta={2:P2}" -f `
     $baselineTotalNps, $candidateTotalNps, $totalDelta)
-Write-Output ("median_row_nps_delta={0:P2}" -f ($medianRowDelta / 100.0))
+Write-Output ("median_row_nps_delta={0:P2} excluded_noise_rows={1}" -f ($medianRowDelta / 100.0), $excludedNoiseRows)
 foreach ($row in $rows) {
     Write-Output ("row={0} baseline_nps={1} candidate_nps={2} nps_delta={3:N2}% baseline_ms={4} candidate_ms={5}" -f `
         $row.key, $row.baseline_nps, $row.candidate_nps, $row.nps_delta_percent,
@@ -280,6 +296,8 @@ $summary = [pscustomobject]@{
     depth_sweep = if ($DepthSweep -ne '') { $DepthSweep } else { $null }
     nps_regression_limit_percent = $MaxNpsRegressionPercent
     row_nps_regression_limit_percent = $MaxRowNpsRegressionPercent
+    min_row_elapsed_ms = $MinRowElapsedMs
+    excluded_noise_rows = $excludedNoiseRows
     baseline_total_nps = [uint64]$baselineTotalNps
     candidate_total_nps = [uint64]$candidateTotalNps
     total_nps_delta_percent = [Math]::Round($totalDelta * 100.0, 4)

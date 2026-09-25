@@ -9,6 +9,7 @@
 #include <new>
 #include <shared_mutex>
 #include <stdexcept>
+#include <thread>
 #include <utility>
 
 #if defined(_WIN32)
@@ -126,40 +127,63 @@ std::size_t u64_to_size(std::uint64_t value) noexcept {
     return std::max<std::size_t>(1, bytes_to_megabytes(total_entries * sizeof(TranspositionEntry)));
 }
 
-// Shared-mode guard that keeps the hot storage alive for the duration of a
-// store/probe/prefetch.  A resize takes the same mutex exclusively before it
-// replaces and drops the storage, so a reader either observes the old storage
-// while it is still owned or the new one; it can never dereference a freed
-// object.  Acquisition cannot fail with a healthy mutex; if it ever did, the
-// caller degrades to reporting "no entry" instead of touching memory.
-class StorageReadGuard {
+// Process-wide pool of hazard slots.  A slot index is owned by a thread for
+// its whole lifetime (thread_local below), not by an individual access, so the
+// acquire/release mutex is touched once per thread instead of once per node.
+// The pool is intentionally leaked: thread-local destructors run at thread
+// exit and may outlive a function-local static's destruction.
+class HazardSlotPool {
 public:
-    explicit StorageReadGuard(std::shared_mutex& mutex) noexcept : mutex_(&mutex) {
-        try {
-            mutex_->lock_shared();
-            locked_ = true;
-        } catch (...) {
-            locked_ = false;
+    HazardSlotPool() noexcept { words_.fill(~std::uint64_t{0}); }
+
+    [[nodiscard]] std::size_t acquire() noexcept {
+        std::lock_guard<std::mutex> lock(mutex_);
+        for (std::size_t word = 0; word < words_.size(); ++word) {
+            if (words_[word] == 0) {
+                continue;
+            }
+            const std::size_t bit = static_cast<std::size_t>(std::countr_zero(words_[word]));
+            words_[word] &= words_[word] - 1;
+            return word * 64 + bit;
         }
+        return kTranspositionHazardSlots;
     }
 
-    ~StorageReadGuard() {
-        if (locked_) {
-            mutex_->unlock_shared();
+    void release(const std::size_t index) noexcept {
+        if (index >= kTranspositionHazardSlots) {
+            return;
         }
+        std::lock_guard<std::mutex> lock(mutex_);
+        words_[index / 64] |= std::uint64_t{1} << (index % 64);
     }
-
-    StorageReadGuard(const StorageReadGuard&) = delete;
-    StorageReadGuard& operator=(const StorageReadGuard&) = delete;
-
-    [[nodiscard]] bool locked() const noexcept { return locked_; }
 
 private:
-    std::shared_mutex* mutex_;
-    bool locked_ = false;
+    std::mutex mutex_;
+    std::array<std::uint64_t, (kTranspositionHazardSlots + 63) / 64> words_{};
 };
 
+[[nodiscard]] HazardSlotPool& hazard_slot_pool() noexcept {
+    static HazardSlotPool* const pool = new HazardSlotPool();
+    return *pool;
+}
+
 } // namespace
+
+std::size_t TranspositionTable::register_thread_hazard_slot() noexcept {
+    const std::size_t slot = hazard_slot_pool().acquire();
+    cached_hazard_slot_ = slot;
+    struct Releaser {
+        std::size_t index = kTranspositionHazardSlots;
+        ~Releaser() {
+            if (index < kTranspositionHazardSlots) {
+                hazard_slot_pool().release(index);
+            }
+        }
+    };
+    static thread_local const Releaser releaser{slot};
+    (void)releaser;
+    return slot;
+}
 
 struct TranspositionTable::Storage {
     struct Segment {
@@ -239,8 +263,10 @@ TranspositionTable::TranspositionTable(std::size_t megabytes, HashMemoryPolicy p
     (void)resize_locked(megabytes);
 }
 
-TranspositionTable::Storage* TranspositionTable::hot_storage() const noexcept {
-    return hot_storage_.load(std::memory_order_acquire);
+void TranspositionTable::Lease::adopt_snapshot(const TranspositionTable& table) noexcept {
+    std::lock_guard<std::mutex> lock(table.maintenance_mutex_);
+    fallback_ = table.storage_;
+    storage_ = fallback_.get();
 }
 
 std::size_t TranspositionTable::normalized_size_mb(std::size_t megabytes) noexcept {
@@ -330,15 +356,24 @@ HashResizeResult TranspositionTable::resize_locked(std::size_t megabytes) noexce
             result.reason = HashResizeReason::request_clamped;
         }
         Storage* const raw = replacement.get();
+        Storage* const retired = current.get();
         try {
-            // Exclude every in-flight reader before the replaced storage is
-            // dropped: after this critical section no thread holds a pointer to
-            // it, so the previous "keep the last two storages alive" cap (which
-            // could free a storage three resizes old while a descheduled reader
-            // still used it) is gone.
-            std::unique_lock storage_lock(storage_mutex_);
+            // Publish the replacement first so no new reader can lease the
+            // retired storage, then wait for every reader that already leased
+            // it.  The local `current` reference keeps the retired storage
+            // alive across the wait; afterwards the last owner drops it (unless
+            // a cold-path reader holds its own snapshot), so a descheduled
+            // reader can no longer keep a freed storage alive the way the old
+            // "keep the last two storages" cap could.
             storage_ = std::move(replacement);
             hot_storage_.store(raw, std::memory_order_release);
+            if (retired != nullptr) {
+                for (const HazardSlot& hazard : hazards_) {
+                    while (hazard.storage.load(std::memory_order_acquire) == retired) {
+                        std::this_thread::yield();
+                    }
+                }
+            }
         } catch (...) {
             result.status = current == nullptr ? HashResizeStatus::disabled :
                 HashResizeStatus::unchanged;
@@ -454,11 +489,8 @@ void TranspositionTable::new_generation() noexcept {
 
 void TranspositionTable::store(std::uint64_t key, int depth, int score, TranspositionBound bound,
                                Move best_move, int ply, bool pv, int eval) noexcept {
-    const StorageReadGuard storage_guard(storage_mutex_);
-    if (!storage_guard.locked()) {
-        return;
-    }
-    Storage* const storage = hot_storage();
+    const Lease lease(*this);
+    Storage* const storage = lease.storage();
     if (storage == nullptr || storage->cluster_count == 0) {
         return;
     }
@@ -546,11 +578,8 @@ void TranspositionTable::store(std::uint64_t key, int depth, int score, Transpos
 }
 
 std::optional<TranspositionEntry> TranspositionTable::probe(std::uint64_t key, int ply) const noexcept {
-    const StorageReadGuard storage_guard(storage_mutex_);
-    if (!storage_guard.locked()) {
-        return std::nullopt;
-    }
-    Storage* const storage = hot_storage();
+    const Lease lease(*this);
+    Storage* const storage = lease.storage();
     if (storage == nullptr || storage->cluster_count == 0) {
         return std::nullopt;
     }
@@ -576,11 +605,8 @@ std::optional<TranspositionEntry> TranspositionTable::probe(std::uint64_t key, i
 }
 
 void TranspositionTable::prefetch(std::uint64_t key) const noexcept {
-    const StorageReadGuard storage_guard(storage_mutex_);
-    if (!storage_guard.locked()) {
-        return;
-    }
-    Storage* const storage = hot_storage();
+    const Lease lease(*this);
+    Storage* const storage = lease.storage();
     if (storage == nullptr || storage->cluster_count == 0) {
         return;
     }
