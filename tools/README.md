@@ -90,6 +90,27 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\build\performance_ga
   -OutputDirectory .\artifacts\verification\performance-gate
 ```
 
+## Speed program gate
+
+`speed_gate.ps1` compares two `koi-bench` executables that both include the
+Phase 0 measurement upgrade (`--report`). It alternates timed passes between the
+executables, consumes the `koi-bench-speed-v1` artifacts, and compares per-row
+and total NPS medians plus the time-to-depth table. It fails when total NPS
+regresses past `-MaxNpsRegressionPercent` (default 2%) or when the median row
+NPS regresses past `-MaxRowNpsRegressionPercent`. The run artifacts and a
+`speed-gate.json` summary land under `artifacts/verification/`; like the
+fixed-depth gate this is a standalone measurement command, never a CTest
+threshold:
+
+```powershell
+pwsh -NoProfile -File .\tools\build\speed_gate.ps1 `
+  -BaselineExecutable .\artifacts\verification\speed-program\phase-0\koi-bench-phase0.exe `
+  -CandidateExecutable .\build\release\koi-bench.exe `
+  -Runs 5 -Threads 1 -DepthSweep 2..7 `
+  -FenFile .\tests\data\positions\evaluation-positions.txt `
+  -OutputDirectory .\artifacts\verification\speed-program\speed-gate\phase-1
+```
+
 Install the measurement dependencies from the repository root:
 
 ```powershell

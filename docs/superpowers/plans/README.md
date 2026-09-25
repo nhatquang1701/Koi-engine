@@ -39,3 +39,4 @@ stable because plans and verification records link to each other.
 | `2026-09-20-gpu-nnue-inference.md` | GPU NNUE inference (sm_61 PTX pipeline, driver API, batched evaluator, verification). |
 | `2026-09-23-linux-compatibility.md` | Linux x86-64 compatibility: portable build, engine platform layer, GPU, tooling, and CI. |
 | `2026-09-24-engine-hardening.md` | Engine hardening: stability, correctness, robustness/scale, protocol surface, and strength foundations. |
+| `2026-09-25-speed-program.md` | Speed program: measurement, TT/movegen/eval/search hot paths, and Windows MSVC PGO. |

@@ -292,3 +292,118 @@ foreach ($position in $steadyJson.positions) {
 if ($steady.Stdout -notmatch '(?m)^repeat 2 median summary\r?$') {
     throw "steady-state benchmark must print its repeat summary: $($steady.Stdout)"
 }
+
+# Phase 0 speed program: external FEN corpus input, fixed-depth timed runs,
+# depth sweeps for time-to-depth tables, and the koi-bench-speed-v1 artifact
+# consumed by tools/build/speed_gate.ps1.
+$fenFile = Join-Path $scratchDirectory 'speed-corpus.txt'
+Set-Content -LiteralPath $fenFile -Value @(
+    '# speed corpus: blank lines and comments are ignored',
+    'opening|rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+    '',
+    'replay|e2e4 e7e5 g1f3'
+)
+$fixedReport = Join-Path $scratchDirectory 'fixed-speed-report.json'
+$fixed = Invoke-Benchmark $BenchPath "--threads 1 --speed 100 --timed --fen-file `"$fenFile`" --depth 4 --report `"$fixedReport`"" 'fen-fixed'
+if ($fixed.ExitCode -ne 0 -or $fixed.Stderr.Length -ne 0) {
+    throw "fixed-depth FEN benchmark failed: $($fixed.Stderr)"
+}
+$fixedLines = @($fixed.Stdout -split "`r?`n" | Where-Object { $_.Length -ne 0 })
+if ($fixedLines.Count -lt 4 -or
+    $fixedLines[1] -notmatch '^config threads 1 speed 100 timed 1 hash cold depth 4 fen-file .+speed-corpus\.txt$') {
+    throw "fixed-depth FEN benchmark must report its depth and source: $($fixed.Stdout)"
+}
+$fixedRows = @($fixedLines | Where-Object { $_ -like 'position *' })
+if ($fixedRows.Count -ne 2) {
+    throw "fixed-depth FEN benchmark must report every corpus position: $($fixed.Stdout)"
+}
+foreach ($line in $fixedRows) {
+    if ($line -notmatch '^position (opening|replay) depth 4 nodes [0-9]+ qnodes [0-9]+ tt_hits [0-9]+ score -?[0-9]+ move ([a-h][1-8][a-h][1-8][nbrq]?|0000) elapsed_ms [0-9]+ nps [0-9]+$') {
+        throw "fixed-depth FEN benchmark emitted an invalid row: $line"
+    }
+}
+if (-not (Test-Path -LiteralPath $fixedReport -PathType Leaf)) {
+    throw "fixed-depth FEN benchmark did not write its speed report: $fixedReport"
+}
+$fixedJson = Get-Content -LiteralPath $fixedReport -Raw | ConvertFrom-Json
+if ($fixedJson.schema -cne 'koi-bench-speed-v1' -or $fixedJson.suite -cne 'fen_file' -or
+    $fixedJson.depth -ne 4 -or $null -ne $fixedJson.depth_sweep -or
+    $fixedJson.positions.Count -ne 2 -or $fixedJson.totals.samples -ne 2) {
+    throw 'fixed-depth speed report must identify the FEN suite, fixed depth, and its two rows.'
+}
+foreach ($position in $fixedJson.positions) {
+    foreach ($field in @('id', 'fen', 'depth', 'nodes', 'qnodes', 'tt_hits', 'score_cp',
+                          'best_move', 'elapsed_ms', 'nps')) {
+        if ($null -eq $position.$field) {
+            throw "speed report position is missing $field"
+        }
+    }
+    if ($position.depth -ne 4) {
+        throw "fixed-depth speed report row must retain depth 4: $($position.depth)"
+    }
+}
+$replayPosition = $fixedJson.positions | Where-Object { $_.id -ceq 'replay' }
+if ($null -eq $replayPosition -or
+    $replayPosition.fen -cne 'rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2') {
+    throw "move-list corpus entries must replay from the start position: $($replayPosition.fen)"
+}
+$fixedVisited = [uint64]$fixedJson.totals.nodes + [uint64]$fixedJson.totals.qnodes
+if ([uint64]$fixedJson.totals.visited -ne $fixedVisited) {
+    throw 'fixed-depth speed report visited total must equal nodes plus qnodes.'
+}
+$fixedNps = if ($fixedJson.totals.elapsed_ms -gt 0) {
+    [uint64][Math]::Floor(([double]$fixedVisited * 1000) / $fixedJson.totals.elapsed_ms)
+} else {
+    $fixedVisited
+}
+if ([uint64]$fixedJson.totals.nps -ne $fixedNps) {
+    throw "fixed-depth speed report NPS must use elapsed_ms: expected $fixedNps, got $($fixedJson.totals.nps)"
+}
+
+$sweepReport = Join-Path $scratchDirectory 'sweep-speed-report.json'
+$sweep = Invoke-Benchmark $BenchPath "--threads 1 --speed 100 --timed --fen-file `"$fenFile`" --depth-sweep 2..3 --report `"$sweepReport`"" 'fen-sweep'
+if ($sweep.ExitCode -ne 0 -or $sweep.Stderr.Length -ne 0) {
+    throw "depth-sweep FEN benchmark failed: $($sweep.Stderr)"
+}
+$sweepLines = @($sweep.Stdout -split "`r?`n" | Where-Object { $_.Length -ne 0 })
+if ($sweepLines.Count -lt 6 -or
+    $sweepLines[1] -notmatch '^config threads 1 speed 100 timed 1 hash cold depth-sweep 2\.\.3 fen-file .+speed-corpus\.txt$') {
+    throw "depth-sweep FEN benchmark must report its range and source: $($sweep.Stdout)"
+}
+$sweepRows = @($sweepLines | Where-Object { $_ -like 'position *' })
+if ($sweepRows.Count -ne 4) {
+    throw "depth-sweep benchmark must report two depths for each of two positions: $($sweep.Stdout)"
+}
+foreach ($line in $sweepRows) {
+    if ($line -notmatch '^position (opening|replay) depth [23] nodes [0-9]+ qnodes [0-9]+ tt_hits [0-9]+ score -?[0-9]+ move ([a-h][1-8][a-h][1-8][nbrq]?|0000) elapsed_ms [0-9]+ nps [0-9]+$') {
+        throw "depth-sweep benchmark emitted an invalid row: $line"
+    }
+}
+$sweepDepths = @($sweepRows | ForEach-Object { [int](($_ -split ' ')[3]) })
+if (($sweepDepths -join ',') -cne '2,3,2,3') {
+    throw "depth-sweep rows must be ordered by position then depth: $($sweepDepths -join ',')"
+}
+if (-not (Test-Path -LiteralPath $sweepReport -PathType Leaf)) {
+    throw "depth-sweep benchmark did not write its speed report: $sweepReport"
+}
+$sweepJson = Get-Content -LiteralPath $sweepReport -Raw | ConvertFrom-Json
+if ($sweepJson.schema -cne 'koi-bench-speed-v1' -or $sweepJson.suite -cne 'fen_file' -or
+    $null -eq $sweepJson.depth_sweep -or $sweepJson.depth_sweep.from -ne 2 -or
+    $sweepJson.depth_sweep.to -ne 3 -or $sweepJson.positions.Count -ne 4 -or
+    $sweepJson.totals.samples -ne 4) {
+    throw 'depth-sweep speed report must identify its range and retain every depth sample.'
+}
+foreach ($position in $sweepJson.positions) {
+    if ($position.depth -lt 2 -or $position.depth -gt 3) {
+        throw "depth-sweep speed report must not retain out-of-range samples: $($position.depth)"
+    }
+    if ($null -eq $position.elapsed_ms -or $position.nps -le 0) {
+        throw 'depth-sweep speed report rows must carry measured timing.'
+    }
+}
+
+# Mutually exclusive measurement modes must be rejected instead of guessed.
+$conflict = Invoke-Benchmark $BenchPath "--fen-file `"$fenFile`" --depth 3 --depth-sweep 2..3" 'conflicting-modes'
+if ($conflict.ExitCode -eq 0) {
+    throw 'koi-bench must reject a fixed depth combined with a depth sweep.'
+}
