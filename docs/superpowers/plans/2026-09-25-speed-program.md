@@ -1,6 +1,6 @@
 # Engine speed program: nodes per second and time to depth
 
-Status: Phases 0-5 complete (2026-09-25); Phase 6 next. Owner: Koi Engine.
+Status: Phases 0-7 complete (2026-09-25). Owner: Koi Engine.
 
 ## Goal
 
@@ -621,3 +621,63 @@ scope - they belong to a strength plan, not this program.
   optimization for a future compiler/profile-set revisit.
 - Git: `CMakeLists.txt`, `tools/README.md` plus this plan record; evidence
   untracked under `artifacts/verification/speed-program/phase-5/`.
+
+## Phase 6 record (2026-09-25)
+
+- No behavior-changing candidate surfaced: every optimization that landed was
+  value-preserving (TT hazard leases, evaluation memoization, search
+  bookkeeping, king masks plus the fast legality filter). The SPRT gate was
+  therefore not used and no campaign was recorded.
+
+## Phase 7 record (2026-09-25)
+
+- Release CTest: 100% passed, 0 failed of 67 (392.66 s). Debug CTest: 100%
+  passed, 0 failed of 67 (1330.40 s). ASan subset (`-L unit -LE heavy`):
+  100% passed, 0 failed of 26 (48.44 s, inside the VS developer environment).
+- `release_verify.ps1`: Debug and Release configure/build/CTest PASS; UCI
+  smoke, replay, Threads=1/2/4 rows and profiles, timed and optional suites,
+  and the En Croissant-style replay all clean; no Elo claim (Stockfish data
+  unavailable) and no manual GUI gate claimed.
+- Final cumulative speed gates against the Phase 0 binary (candidate
+  `138A4595...C313`): T1 endgames 2..5 Runs=5 +1.48% total / +9.22% median
+  row; T1 cold default Runs=9 +7.30% total / +7.02% median row; both PASS.
+- The cumulative per-phase results, correctness evidence, the negative PGO
+  result, and the deferred work are collected in
+  `artifacts/verification/speed-program/phase-7/final-speed-report.md`.
+- Git: this plan record only (all source changes were committed with their
+  phases); evidence stays untracked under
+  `artifacts/verification/speed-program/`.
+
+## Phase 6 record (2026-09-25)
+
+- Not required. No phase surfaced a candidate worth a behavior-changing
+  branch: the value-preserving work covered the audited hot paths, and the
+  remaining ideas (TT replacement policy, richer eval caches, shared Lazy
+  SMP history) stay on the deferred list below. No SPRT campaign was run and
+  no behavior-changing change is part of this program.
+
+## Phase 7 record (2026-09-25)
+
+- Final verification: Release CTest 67/67 (392.66 s), Debug CTest 67/67
+  (1330.40 s, 301/301 targets built), ASan unit subset 26/26 inside the
+  BuildTools developer environment (48.44 s), and `release_verify.ps1` PASS
+  (Debug + Release configure/build/CTest, UCI smoke, replay, the
+  Threads 1/2/4/8 matrices, timed and optional rows, En Croissant-style
+  replay; no Elo claim because Stockfish data is unavailable).
+- Cumulative speed gate, Phase 0 baseline (`7A9AB33B...73F7`) vs the final
+  release binary (`138A4595...C313`), Threads=1, both PASS:
+  - endgames 2..5, Runs=5: total +1.48%, median row +9.22%
+    (`phase-7/final-endgames`).
+  - cold default suite, Runs=9: total +7.30%, median row +7.02%
+    (`phase-7/final-cold`).
+- The per-phase story is in
+  `artifacts/verification/speed-program/phase-7/final-speed-report.md`: the
+  value-preserving phases (1-4) carried the cold-default NPS gain to +7.30%
+  while keeping the pin byte-identical; Phase 5 (PGO) is recorded as a
+  verified negative result with the option kept default OFF.
+- Deferred work list: direct legal generation (the current filter still
+  probes king, check, pin, and en-passant moves), bitboard move generation,
+  incremental king-mask maintenance, pawn hash, locked-pawn-wall cache, and
+  the FeatureState lock/copy removal.
+- Git: this plan record; evidence untracked under
+  `artifacts/verification/speed-program/`.
