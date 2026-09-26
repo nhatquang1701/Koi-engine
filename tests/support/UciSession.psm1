@@ -29,7 +29,7 @@ $script:UciShutdownMilliseconds = 5000
 $script:KoiSessions = [System.Collections.Generic.List[System.Diagnostics.Process]]::new()
 
 $script:UciTranscriptLinePattern =
-    '^(id |option |info depth [1-9][0-9]* seldepth [0-9]+ multipv [1-9][0-9]* score (cp|mate) -?[0-9]+ nodes [0-9]+ nps [0-9]+ hashfull [0-9]+ time [0-9]+ pv( [a-h][1-8][a-h][1-8][nbrq]?)*( tbhits [0-9]+)?$)'
+    '^(id |option |info depth [1-9][0-9]* seldepth [0-9]+ multipv [1-9][0-9]*( score (cp|mate) -?[0-9]+( (lowerbound|upperbound))?( wdl [0-9]+ [0-9]+ [0-9]+)?)? nodes [0-9]+ nps [0-9]+ hashfull [0-9]+ time [0-9]+ pv( [a-h][1-8][a-h][1-8][nbrq]?)*( tbhits [0-9]+)?$)'
 
 function Start-UciSession {
     <#
@@ -262,9 +262,9 @@ function Test-SearchInfo {
         [string]$Line
     )
 
-    # The optional lowerbound/upperbound flag marks an iteration that was not
-    # published with full-window authority; the engine emits it after the score.
-    return $Line -match '^info depth [1-9][0-9]* seldepth [0-9]+ multipv [1-9][0-6]? score (cp|mate) -?[0-9]+( (lowerbound|upperbound))? nodes [0-9]+ nps [0-9]+ hashfull [0-9]+ time [0-9]+ pv( [a-h][1-8][a-h][1-8][nbrq]?)*( tbhits [0-9]+)?$'
+    # UCI permits an info line without score. Koi uses that form for a
+    # selective estimate with no proven bound direction while retaining PV.
+    return $Line -match '^info depth [1-9][0-9]* seldepth [0-9]+ multipv ([1-9]|1[0-6])( score (cp|mate) -?[0-9]+( (lowerbound|upperbound))?( wdl [0-9]+ [0-9]+ [0-9]+)?)? nodes [0-9]+ nps [0-9]+ hashfull [0-9]+ time [0-9]+ pv( [a-h][1-8][a-h][1-8][nbrq]?)*( tbhits [0-9]+)?$'
 }
 
 Export-ModuleMember -Function Start-UciSession, Stop-AllUciSessions, Send-UciCommand,

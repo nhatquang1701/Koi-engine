@@ -3040,7 +3040,8 @@ void SearchRunner::run() {
                 // publishing the score/PV.  This keeps fixed-depth UCI
                 // results and timing observations tied to one horizon.
                 const auto nominal_root_verification =
-                    [&context, &root, &legal_moves](const Move move, const int nominal_depth)
+                    [&context, &root, &legal_moves](const Move move, const int nominal_depth,
+                                                   const bool allow_estimated_line = false)
                     -> std::optional<SearchContext::RootVerification> {
                     const auto metadata = std::find_if(
                         legal_moves.begin(), legal_moves.end(),
@@ -3053,7 +3054,9 @@ void SearchRunner::run() {
                     ++context.stats.root_selective_candidates;
                     const SearchContext::RootVerification verification =
                         context.selectively_research_root_move(root, *metadata, nominal_depth);
-                    if (context.aborted || !verification.authoritative) {
+                    if (context.aborted ||
+                        (!verification.authoritative &&
+                         !(allow_estimated_line && verification.line_complete))) {
                         return std::nullopt;
                     }
                     return verification;
@@ -3413,6 +3416,7 @@ void SearchRunner::run() {
                             int extended_score = -kInfinity;
                             std::optional<Move> extended_move;
                             bool extended_forcing = false;
+                            bool estimated_candidate_used = false;
                             PrincipalVariation extended_pv;
                             const int confirmation_depth =
                                 has_quiet_forcing_candidate && limits.depth.has_value() ?
@@ -3425,9 +3429,18 @@ void SearchRunner::run() {
                                 if (context.aborted) {
                                     break;
                                 }
-                                if (!verification.authoritative) {
+                                // Fixed-depth-one move selection may use a
+                                // complete deeper line as a tactical estimate.
+                                // Its score never proves a bound or enters TT.
+                                const bool usable_tactical_probe =
+                                    verification.authoritative ||
+                                    (limits.depth.has_value() && depth == 1 &&
+                                     verification.line_complete);
+                                if (!usable_tactical_probe) {
                                     continue;
                                 }
+                                estimated_candidate_used = estimated_candidate_used ||
+                                    !verification.authoritative;
                                 const bool candidate_forcing = candidates[index].is_capture() ||
                                     candidates[index].gives_check ||
                                     candidates[index].move.promotion() != Promotion::none;
@@ -3440,16 +3453,20 @@ void SearchRunner::run() {
                                     extended_pv = verification.pv;
                                 }
                             }
-                            bool nominal_score_authoritative = false;
+                            bool nominal_line_complete = false;
                             if (extended_move.has_value() && !context.aborted) {
                                 if (const auto nominal = nominal_root_verification(
-                                        *extended_move, depth); nominal.has_value()) {
+                                        *extended_move, depth,
+                                        limits.depth.has_value() && depth == 1);
+                                    nominal.has_value()) {
                                     extended_score = nominal->score;
                                     extended_pv = nominal->pv;
-                                    nominal_score_authoritative = true;
+                                    nominal_line_complete = true;
+                                    root_authoritative = root_authoritative &&
+                                        !estimated_candidate_used && nominal->authoritative;
                                 }
                             }
-                            if (extended_move.has_value() && nominal_score_authoritative &&
+                            if (extended_move.has_value() && nominal_line_complete &&
                                 !context.aborted) {
                                 if (extended_move != result.best_move || extended_score != score) {
                                     ++context.stats.root_selective_researches;
@@ -3770,41 +3787,86 @@ void SearchRunner::run() {
                             const SearchContext::RootVerification best_verification =
                                 context.selectively_research_root_move(
                                     root, *best_metadata, kRootKingSafetySelectiveDepth);
-                            if (!context.aborted && best_verification.authoritative) {
+                            if (!context.aborted &&
+                                (best_verification.authoritative ||
+                                 best_verification.line_complete)) {
                                 int selected_score = best_verification.score;
                                 Move selected_move = best_metadata->move;
                                 PrincipalVariation selected_pv = best_verification.pv;
-                                for (const auto& [unused_shallow_score, candidate] :
-                                     defensive_candidates) {
-                                    (void)unused_shallow_score;
-                                    ++context.stats.root_selective_candidates;
-                                    const SearchContext::RootVerification verification =
-                                        context.selectively_research_root_move(
-                                            root, candidate, kRootKingSafetySelectiveDepth);
-                                    if (context.aborted) {
-                                        break;
+                                bool selected_from_estimate = false;
+                                if (best_verification.authoritative) {
+                                    for (const auto& [unused_shallow_score, candidate] :
+                                         defensive_candidates) {
+                                        (void)unused_shallow_score;
+                                        if (context.aborted) {
+                                            break;
+                                        }
+                                        ++context.stats.root_selective_candidates;
+                                        const SearchContext::RootVerification verification =
+                                            context.selectively_research_root_move(
+                                                root, candidate, kRootKingSafetySelectiveDepth);
+                                        if (context.aborted) {
+                                            break;
+                                        }
+                                        if (!verification.authoritative) {
+                                            continue;
+                                        }
+                                        if (verification.score > selected_score ||
+                                            verification.score >= best_verification.score -
+                                                kRootKingSafetyTieMargin) {
+                                            selected_score = verification.score;
+                                            selected_move = candidate.move;
+                                            selected_pv = verification.pv;
+                                        }
                                     }
-                                    if (!verification.authoritative) {
-                                        continue;
+                                } else {
+                                    // With no proven incumbent score, do not
+                                    // let its estimate veto every safe escape.
+                                    // Choose only from completed lines and
+                                    // exclude an escape already proven lost.
+                                    bool found_escape_estimate = false;
+                                    int escape_estimate_score = -kInfinity;
+                                    for (const auto& [unused_shallow_score, candidate] :
+                                         defensive_candidates) {
+                                        (void)unused_shallow_score;
+                                        if (context.aborted) {
+                                            break;
+                                        }
+                                        ++context.stats.root_selective_candidates;
+                                        const SearchContext::RootVerification verification =
+                                            context.selectively_research_root_move(
+                                                root, candidate, kRootKingSafetySelectiveDepth);
+                                        if (context.aborted || !verification.line_complete ||
+                                            verification.proves_losing_mate()) {
+                                            continue;
+                                        }
+                                        if (!found_escape_estimate ||
+                                            verification.score > escape_estimate_score) {
+                                            found_escape_estimate = true;
+                                            escape_estimate_score = verification.score;
+                                            selected_score = verification.score;
+                                            selected_move = candidate.move;
+                                            selected_pv = verification.pv;
+                                        }
                                     }
-                                    if (verification.score > selected_score ||
-                                        verification.score >= best_verification.score -
-                                            kRootKingSafetyTieMargin) {
-                                        selected_score = verification.score;
-                                        selected_move = candidate.move;
-                                        selected_pv = verification.pv;
-                                    }
+                                    selected_from_estimate = found_escape_estimate;
                                 }
-                                bool nominal_score_authoritative = false;
-                                if (!context.aborted) {
+                                bool nominal_score_usable = false;
+                                if (!context.aborted &&
+                                    (best_verification.authoritative || selected_from_estimate)) {
                                     if (const auto nominal = nominal_root_verification(
-                                            selected_move, depth); nominal.has_value()) {
+                                            selected_move, depth, selected_from_estimate);
+                                        nominal.has_value()) {
                                         selected_score = nominal->score;
                                         selected_pv = nominal->pv;
-                                        nominal_score_authoritative = true;
+                                        nominal_score_usable = nominal->authoritative ||
+                                            (selected_from_estimate && nominal->line_complete);
+                                        if (selected_from_estimate || !nominal->authoritative) {
+                                            root_authoritative = false;
+                                        }
                                     }
                                 }
-                                if (nominal_score_authoritative && !context.aborted) {
+                                if (nominal_score_usable && !context.aborted) {
                                     if (selected_move != result.best_move ||
                                         selected_score != result.score_cp) {
                                         ++context.stats.root_selective_researches;
@@ -3847,11 +3909,9 @@ void SearchRunner::run() {
                 info.tbhits = context.stats.tbhits +
                     (lazy_pool != nullptr ? lazy_pool->live_tbhits() : 0);
                 if (!root_authoritative) {
-                    // A selective root pass is a usable published iteration, but
-                    // the score is only a bound: the alternatives were not all
-                    // verified with full windows, so the true value can still be
-                    // higher.
-                    info.bound = SearchInfo::Bound::lower;
+                    // A selective root pass has a usable PV and score estimate,
+                    // but its unresolved children give no proven direction.
+                    info.bound = SearchInfo::Bound::estimate;
                 }
                 safely_report_info(sink, info);
                 const int iteration_observation_score = bounded_fallback_result ?
@@ -4720,8 +4780,8 @@ void SearchRunner::run() {
                     info.multipv = static_cast<int>(rank + 1);
                     if (!authoritative_root_iteration) {
                         // Same rule as the serial path: a selective root pass
-                        // reports a bound, not a proven value.
-                        info.bound = SearchInfo::Bound::lower;
+                        // has no proven score direction.
+                        info.bound = SearchInfo::Bound::estimate;
                     }
                     safely_report_info(sink, info);
                 }
@@ -4788,8 +4848,9 @@ void SearchRunner::run() {
             info.qnodes = result.stats.qnodes;
             info.tt_hits = result.stats.tt_hits;
             info.tbhits = result.stats.tbhits;
-            // The emergency line is a safety choice, not a proven value.
-            info.bound = SearchInfo::Bound::lower;
+            // The emergency line is a safety choice without a proven score
+            // direction.
+            info.bound = SearchInfo::Bound::estimate;
             safely_report_info(sink, info);
         }
         if (lazy_pool != nullptr) {

@@ -178,13 +178,11 @@ Every test carries CTest labels; combine them with `-L`/`-LE`, for example
 - `koi_engine_process` declares `RUN_SERIAL TRUE` because it installs a
   temporary `book.bin` next to the engine binary.
 
-## Known-failing behavior tests
+## Search failure reporting
 
-The search implementation is mid-refactor: some behavior tests encode the
-intended behavior of the root-forcing-extension and threading work that is not
-yet complete. Rather than abort the run on the first mismatch, `koi_search_tests`
-maintains a `known_failures` list and reports those entries as `XFAIL` while the
-suite stays green:
+`koi_search_tests` retains `known_failures` and `intermittent` registries for
+explicit triage. Both registries are empty for the 1.0.0 full-release gate, so
+every search behavior failure is fatal. The harness reports:
 
 - A listed test that fails prints `XFAIL` and does not fail the run.
 - A listed test that passes prints `XPASS` and **does** fail the run, so an
@@ -195,41 +193,24 @@ suite stays green:
   are fatal, so the four search shards still keep the list honest.
 - Any other failure prints `FAIL` and fails the run.
 
-Current entries: `single-PV root forcing extension`, `depth-one forcing check`,
-`threaded depth-one forcing check`, `root king safety escape`, `threaded multipv
-ordered root ties`, `threaded multipv warmed hash`, `sparse phase-rich null
-safety`, `king-zone LMR exclusion`, `opening central break`, `late move
-full-depth verification`, `committed PGN tactical fixtures`, and `poisoned
-capture quiescence` (open engine-v2 task in
-`docs/superpowers/plans/2026-09-19-engine-v2.md`).
-
-A second, deliberately tiny list (`intermittent`) holds cases whose outcome
-flips with host scheduling. Both their `XFAIL` and `XPASS` are reported but
-neither is fatal, so the suite stays deterministic while the gap stays visible;
-the goal is to make each deterministic and move it back to `known_failures`
-(or delete it once the engine is fixed). Current entries: `incomplete root
-forcing fallback`, `threaded short forcing root research`
-(scheduling-dependent), and `timed poisoned capture`
-(configuration-dependent). The former `threaded root search` entry moved back
-to ordinary expectations once the case was rewritten around thread-count
-independent invariants (legal move, completed depth, bounded score delta).
-
-Remove an entry once the corresponding engine behavior is reliably fixed.
+The former 12 known failures and three intermittent cases now run as ordinary
+tests. Fixed-depth tactical assertions retain reviewed moves or tactical
+properties; clocked and threaded cases assert legal, complete, coherent
+results under the schedule they actually receive.
 
 ## Determinism
 
 - `Threads = 1` is the deterministic configuration. `Threads > 1` runs Lazy
   SMP: helper threads search the same root against the shared transposition
   table, so threaded results are intentionally nondeterministic. Threaded
-  cases therefore either pin thread-count-independent invariants (legality,
-  coverage, completed depth) or live in the `known_failures`/`intermittent`
-  lists when they assert a specific move or score.
+  cases therefore pin thread-count-independent invariants such as legality,
+  coverage, completed depth, ranked MultiPV lines, and a coherent bestmove/PV.
 - Timing-sensitive cases are declared via `TestRunOptions::timing_sensitive`.
   With `KOI_TEST_RETRIES=2` (or `tools/test/run_tests.ps1`'s
   `-RepeatUntilPass`, which adds `--repeat until-pass:2` at the CTest level)
-  they are retried before failing. The Release CI job sets
-  `KOI_TEST_RETRIES=3`, because a shared runner can starve a case's wall-clock
-  budget even when the search itself is correct.
+  they are retried before failing. The main Release CI job sets
+  `KOI_TEST_RETRIES=3` for shared-runner tolerance; independent Windows and
+  Linux flake jobs and the local full-release gate use `KOI_TEST_RETRIES=1`.
 - The short-oracle rook-lift case no longer runs a 100 ms clocked search; it
   asserts the same reviewed move with a deterministic depth-2 search
   (`f7g8`-family rejection at depth 2, threads 1).

@@ -142,7 +142,6 @@ bool is_valid_search_info(std::string_view line) {
     int seldepth = 0;
     std::string multipv_name;
     int multipv = 0;
-    std::string score_name;
     std::string score_kind;
     int score = 0;
     std::string nodes_name;
@@ -155,32 +154,52 @@ bool is_valid_search_info(std::string_view line) {
     std::uint64_t time = 0;
     std::string pv_name;
 
-    std::string bound_name;
+    std::string next_name;
     if (!(stream >> info >> depth_name >> depth >> seldepth_name >> seldepth >> multipv_name >> multipv >>
-          score_name >> score_kind >> score >>
-          bound_name)) {
+          next_name)) {
         return false;
     }
-    if (bound_name == "lowerbound" || bound_name == "upperbound") {
-        if (!(stream >> bound_name)) {
+    if (next_name == "score") {
+        if (!(stream >> score_kind >> score >> next_name) ||
+            (score_kind != "cp" && score_kind != "mate")) {
             return false;
         }
+        if (next_name == "lowerbound" || next_name == "upperbound") {
+            if (!(stream >> next_name)) {
+                return false;
+            }
+        }
+        if (next_name == "wdl") {
+            int win = 0;
+            int draw = 0;
+            int loss = 0;
+            if (!(stream >> win >> draw >> loss >> next_name) ||
+                win < 0 || draw < 0 || loss < 0 || win + draw + loss != 1000) {
+                return false;
+            }
+        }
     }
-    // Without a bound flag the token already read is the "nodes" keyword.
-    nodes_name = bound_name;
+    // A complete selective iteration may publish legal PV progress without a
+    // score; UCI has no token for an estimate with unknown bound direction.
+    nodes_name = next_name;
     if (!(stream >> nodes >> nps_name >> nps >> hashfull_name >> hashfull >>
           time_name >> time >> pv_name)) {
         return false;
     }
     if (info != "info" || depth_name != "depth" || depth <= 0 || seldepth_name != "seldepth" ||
-        seldepth < depth || multipv_name != "multipv" || multipv < 1 || multipv > 16 || score_name != "score" ||
-        (score_kind != "cp" && score_kind != "mate") || nodes_name != "nodes" ||
+        seldepth < depth || multipv_name != "multipv" || multipv < 1 || multipv > 16 ||
+        nodes_name != "nodes" ||
         nps_name != "nps" || hashfull_name != "hashfull" || hashfull > 1000 ||
         time_name != "time" || pv_name != "pv") {
         return false;
     }
 
     for (std::string move; stream >> move;) {
+        if (move == "tbhits") {
+            std::uint64_t hits = 0;
+            std::string extra;
+            return static_cast<bool>(stream >> hits) && !(stream >> extra);
+        }
         if (move.size() != 4 && move.size() != 5) {
             return false;
         }
@@ -606,7 +625,7 @@ void test_task1_wdl_output_is_optional_and_mate_scores_are_converted() {
         "setoption name UCI_ShowWDL value true\n"
         "setoption name OwnBook value false\n"
         "position fen 7k/5Q2/6K1/8/8/8/8/8 w - - 0 1\n"
-        "go infinite\n", "stop\nquit\n");
+        "go infinite searchmoves f7e8\n", "stop\nquit\n");
     std::istream shown_input_stream(&shown_input);
     ReleaseOnDepthBuffer shown_output_buffer(shown_input, 1);
     std::ostream shown_output_stream(&shown_output_buffer);
@@ -629,7 +648,8 @@ void test_task1_wdl_output_is_optional_and_mate_scores_are_converted() {
             continue;
         }
         const std::size_t wdl = line.find(" wdl ");
-        require(wdl != std::string::npos, "enabled WDL output must contain a wdl triplet");
+        require(wdl != std::string::npos,
+                "enabled WDL output must contain a wdl triplet: " + shown_output);
         saw_wdl = true;
         saw_mate_wdl = saw_mate_wdl || line.find(" wdl 1000 0 0") != std::string::npos;
     }
@@ -1896,6 +1916,37 @@ void test_protocol_output_contains_only_valid_uci_responses() {
     require(result.diagnostics.empty(), "a valid transcript must leave stderr clean");
 }
 
+void test_selective_root_score_is_not_published_as_an_exact_value() {
+    GatedInputBuffer input(
+        "setoption name UCI_ShowWDL value true\n"
+        "position fen r1bqk2r/p4ppp/2p2n2/2bpP3/8/2N5/PPP1P1PP/R1BQKB1R b KQkq - 0 8\n"
+        "go depth 1\n",
+        "stop\nquit\n");
+    std::istream input_stream(&input);
+    ReleaseOnDepthBuffer output_buffer(input, 1);
+    std::ostream output(&output_buffer);
+    std::ostringstream diagnostics;
+    int exit_code = -1;
+    std::thread controller_thread([&] {
+        UciController controller(input_stream, output, diagnostics);
+        exit_code = controller.run();
+    });
+    const bool depth_seen = input.wait_for_marker(std::chrono::seconds(5));
+    if (!depth_seen) {
+        input.release();
+    }
+    controller_thread.join();
+
+    const auto infos = lines_starting_with(output_lines(output_buffer.str()), "info depth 1 ");
+    require(depth_seen && exit_code == 0 && diagnostics.str().empty() && !infos.empty(),
+            "the selective root fixture must produce a completed UCI depth-one line");
+    require(infos.back().find(" score ") == std::string::npos &&
+                infos.back().find(" wdl ") == std::string::npos &&
+                infos.back().find(" lowerbound") == std::string::npos &&
+                infos.back().find(" upperbound") == std::string::npos,
+            "an unproven selective root estimate must publish neither an exact UCI score nor WDL");
+}
+
 void test_protocol_responses_flush_promptly() {
     std::istringstream input(
         "uci\n"
@@ -2140,6 +2191,7 @@ int main(int argc, char** argv) {
         {"quit and EOF cleanup", test_quit_and_eof_join_without_late_bestmove},
         {"unknown stop quit", test_unknown_stop_and_blank_commands_are_quiet_and_quit},
         {"protocol-clean output", test_protocol_output_contains_only_valid_uci_responses},
+        {"selective root score provenance", test_selective_root_score_is_not_published_as_an_exact_value},
         {"promptly flushed responses", test_protocol_responses_flush_promptly},
         {"go perft output", test_go_perft_writes_move_counts_without_a_search},
         {"go mate mapping", test_go_mate_searches_the_proving_depth},

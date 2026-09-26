@@ -189,7 +189,7 @@ while ($null -eq $ponderBestmove) {
         throw "Invalid output after ponderhit: $line"
     }
 }
-if (-not @($ponderInfoLines | Where-Object { $_ -match ' multipv 2 score ' })) {
+if (-not @($ponderInfoLines | Where-Object { $_ -match ' multipv 2 ' })) {
     throw "Ponder MultiPV search did not emit rank two: $($ponderInfoLines -join ' | ')"
 }
 Send-UciCommand $session 'isready'

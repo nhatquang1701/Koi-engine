@@ -148,12 +148,14 @@ struct SearchInfo {
     //
     //   exact - the score comes from a full-window root pass, so it is the
     //           engine's value for the position;
-    //   lower - the search has only established that the value is at least
-    //           the reported score (selective root confirmation or an
-    //           emergency fallback that did not finish a full-window pass);
-    //   upper - reserved for a score that is only known to be at most the
-    //           reported value.
-    enum class Bound : std::uint8_t { exact = 0, lower = 1, upper = 2 };
+    //   estimate - a complete selective root pass supplies a useful score
+    //              and PV but has no proven bound direction;
+    //   lower - the search proved that the value is at least the score;
+    //   upper - the search proved that the value is at most the score.
+    // UCI has no estimate marker, so an estimated info line carries depth,
+    // nodes, and PV but omits score and WDL. Estimates must never be treated
+    // as exact inside the search.
+    enum class Bound : std::uint8_t { exact = 0, lower = 1, upper = 2, estimate = 3 };
 
     int depth = 0;
     int score_cp = 0;

@@ -1521,20 +1521,23 @@ void UciController::write_search_info(std::uint64_t generation, const SearchInfo
     }
 
     output_ << "info depth " << info.depth << " seldepth " << info.seldepth
-            << " multipv " << info.multipv << " score ";
-    if (info.mate.has_value()) {
-        output_ << "mate " << *info.mate;
-    } else {
-        output_ << "cp " << info.score_cp;
-    }
-    if (info.bound == SearchInfo::Bound::lower) {
-        output_ << " lowerbound";
-    } else if (info.bound == SearchInfo::Bound::upper) {
-        output_ << " upperbound";
-    }
-    if (show_wdl_) {
-        const Wdl wdl = score_to_wdl(info);
-        output_ << " wdl " << wdl.win << ' ' << wdl.draw << ' ' << wdl.loss;
+            << " multipv " << info.multipv;
+    if (info.bound != SearchInfo::Bound::estimate) {
+        output_ << " score ";
+        if (info.mate.has_value()) {
+            output_ << "mate " << *info.mate;
+        } else {
+            output_ << "cp " << info.score_cp;
+        }
+        if (info.bound == SearchInfo::Bound::lower) {
+            output_ << " lowerbound";
+        } else if (info.bound == SearchInfo::Bound::upper) {
+            output_ << " upperbound";
+        }
+        if (show_wdl_) {
+            const Wdl wdl = score_to_wdl(info);
+            output_ << " wdl " << wdl.win << ' ' << wdl.draw << ' ' << wdl.loss;
+        }
     }
     output_ << " nodes " << info.nodes << " nps " << info.nps
             << " hashfull " << search_service_.hashfull_permill()

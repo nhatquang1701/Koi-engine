@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "koi/detail/search_ordering_tables.hpp"
+#include "koi/detail/search_context.hpp"
 #include "koi/detail/search_policy.hpp"
 
 #include "koi_test_support.hpp"
@@ -179,6 +180,21 @@ void test_ordering_tables_own_mutation_and_reset() {
             "clearing ordering tables must remove adaptive state");
 }
 
+void test_selective_root_mate_estimate_is_not_a_proven_loss() {
+    koi::detail::SearchContext::RootVerification verification;
+    verification.score = -99'998;
+    verification.line_complete = true;
+    require(!verification.proves_losing_mate(),
+            "a completed selective mate estimate cannot prove an escape is lost");
+
+    verification.authoritative = true;
+    require(verification.proves_losing_mate(),
+            "an authoritative negative mate score can exclude a lost escape");
+    verification.score = -500;
+    require(!verification.proves_losing_mate(),
+            "an ordinary negative score is not a proven mate loss");
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -190,6 +206,7 @@ int main(int argc, char** argv) {
         {"quiet futility policy", test_quiet_futility_policy_owns_exact_boundary},
         {"quiescence capture policy", test_quiescence_capture_policy_classifies_see_and_delta_prunes},
         {"ordering table ownership", test_ordering_tables_own_mutation_and_reset},
+        {"root verification mate provenance", test_selective_root_mate_estimate_is_not_a_proven_loss},
     };
 
     return koi::test::run_tests(tests, argc, argv);

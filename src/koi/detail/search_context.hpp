@@ -103,6 +103,13 @@ struct SearchContext {
         int score = -kInfinity;
         PrincipalVariation pv;
         bool authoritative = false;
+        // Coverage and a legal root PV make the returned score usable as a
+        // move-selection estimate. It is not a directional score proof.
+        bool line_complete = false;
+
+        [[nodiscard]] bool proves_losing_mate() const noexcept {
+            return authoritative && score <= -kMateThreshold;
+        }
     };
 
     struct EvaluationCacheEntry {
@@ -264,36 +271,6 @@ struct SearchContext {
             });
     }
 
-    [[nodiscard]] bool root_result_publishable(const PrincipalVariation& pv) const noexcept {
-        if (!root_result_complete(pv)) {
-            return false;
-        }
-
-        bool has_exact_incumbent = false;
-        int exact_incumbent_score = -kInfinity;
-        for (std::size_t index = 0; index < root_move_score_count; ++index) {
-            const RootMoveScore& root_score = root_move_scores[index];
-            if (root_score.exact) {
-                has_exact_incumbent = true;
-                exact_incumbent_score = std::max(exact_incumbent_score, root_score.score);
-            }
-        }
-
-        // A fully covered root pass is useful heuristic progress when every
-        // line is selective. Once an exact incumbent exists, an unresolved
-        // selective challenger must not be allowed to disappear behind it.
-        return std::all_of(
-            root_move_scores.begin(), root_move_scores.begin() + root_move_score_count,
-            [has_exact_incumbent, exact_incumbent_score](const RootMoveScore& root_score) {
-                if (!has_exact_incumbent) {
-                    return true;
-                }
-                return root_score.exact || root_score.safe_upper_bound ||
-                    (root_score.selective_bound && root_score.selective_upper_bound &&
-                     root_score.score <= exact_incumbent_score);
-            });
-    }
-
     [[nodiscard]] std::optional<RootMoveScore> best_completed_root_move(
         const GameState& root, const bool avoid_check_exposure) const noexcept {
         if (root_move_score_count == 0) {
@@ -374,7 +351,8 @@ struct SearchContext {
                                          verification.pv, std::nullopt, true,
                                          kMaximumCheckExtensionsPerPath, Move::no_move(),
                                          nullptr, &selective_bound);
-            verification.authoritative = !selective_bound && !aborted;
+            verification.line_complete = root_result_complete(verification.pv);
+            verification.authoritative = verification.line_complete && !selective_bound;
         } catch (...) {
             root_moves = saved_root_moves;
             table_access.set_enabled(saved_use_transposition_table);
