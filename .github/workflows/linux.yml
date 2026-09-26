@@ -450,6 +450,7 @@ jobs:
           python3 - <<"PY"
           import hashlib
           import json
+          import os
           import pathlib
           import re
           root = pathlib.Path("/tmp/koi-v1.0.0-package")
@@ -457,6 +458,8 @@ jobs:
           assert manifest["version"] == "1.0.0", manifest["version"]
           assert manifest["platform"] == "linux-x86_64", manifest["platform"]
           assert re.fullmatch(r"[0-9a-f]{40,64}", manifest["provenance"]["source_commit"]), manifest["provenance"]
+          assert manifest["provenance"]["source_commit"] == os.environ["GITHUB_SHA"], manifest["provenance"]
+          assert manifest["provenance"]["source_dirty"] is False, manifest["provenance"]
           for item in manifest["files"]:
               path = (root / item["path"]).resolve()
               assert root.resolve() in path.parents, item["path"]
