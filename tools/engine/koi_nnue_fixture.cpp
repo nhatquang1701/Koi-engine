@@ -1,3 +1,5 @@
+#include <cstddef>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -11,11 +13,32 @@ namespace {
 
 constexpr std::string_view kUsage =
     "usage: koi-nnue-fixture --arch v4|v5 --output <path>\n";
+constexpr std::uint32_t kGpuV5HiddenUnits = 1'536;
+constexpr std::uint32_t kGpuV5L1Units = 32;
 
 struct Arguments {
     std::string_view arch;
     std::filesystem::path output;
 };
+
+koi::NnueNetwork gpu_compatible_v5_fixture() {
+    koi::NnueNetwork network = koi::NnueNetwork::synthetic_v5();
+    // Keep the seed weights while value-initializing the added dimensions.
+    // The same synthetic network then satisfies the GPU kernel's fixed shape.
+    network.manifest.layer_sizes[1] = kGpuV5HiddenUnits;
+    network.manifest.layer_sizes[3] = kGpuV5L1Units;
+
+    const std::size_t input_units = network.manifest.layer_sizes[0];
+    const std::size_t hidden_units = network.manifest.layer_sizes[1];
+    const std::size_t output_buckets = network.manifest.layer_sizes[2];
+    const std::size_t l1_units = network.manifest.layer_sizes[3];
+    network.feature_weights.resize(input_units * hidden_units);
+    network.hidden_bias.resize(hidden_units);
+    network.l1_weights.resize(l1_units * hidden_units);
+    network.l1_bias.resize(l1_units);
+    network.bottleneck_weights.resize(output_buckets * l1_units);
+    return network;
+}
 
 std::optional<Arguments> parse_arguments(int argc, char** argv) {
     std::optional<std::string_view> arch;
@@ -55,7 +78,7 @@ int main(int argc, char** argv) {
 
     const koi::NnueNetwork network = arguments->arch == "v4"
                                          ? koi::NnueNetwork::synthetic_v4()
-                                         : koi::NnueNetwork::synthetic_v5();
+                                         : gpu_compatible_v5_fixture();
     const auto encoded = koi::NnueLoader::serialize(network);
     if (!encoded.has_value()) {
         std::cerr << "unable to serialize NNUE fixture: " << encoded.error().message << '\n';
