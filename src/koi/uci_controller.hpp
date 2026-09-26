@@ -107,7 +107,7 @@ private:
     bool analyse_mode_ = false;
     std::size_t multi_pv_ = 1;
     bool ponder_enabled_ = false;
-    bool own_book_ = true;
+    bool own_book_ = false;
     bool book_random_ = false;
     bool book_safety_ = true;
     std::uint8_t book_safety_depth_ = 2;

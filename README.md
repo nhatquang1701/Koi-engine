@@ -890,9 +890,10 @@ Reduce `Hash` or `Threads` if other applications need the memory or CPU.
 
 ### Lucas Chess workflows
 
-Koi enables its Polyglot opening book by default. Place `book.bin` beside
-`koi-engine.exe`; a relative `BookFile` is resolved from that executable
-directory, not Lucas Chess's working directory. The relevant UCI options are:
+Koi disables its Polyglot opening book by default. To use one, place a licensed
+`book.bin` beside `koi-engine.exe`; a relative `BookFile` is resolved from that
+executable directory, not Lucas Chess's working directory. Enable the book
+with `OwnBook=true` using these UCI options:
 
 ```text
 setoption name OwnBook value true
@@ -980,7 +981,7 @@ archive itself.
 Koi has no required configuration file. En Croissant or another UCI GUI sends
 the options at session start; the portable release defaults are `RandomSeed=0`,
 `Hash=512`, `Threads=1`, `Speed=100`, `UCI_AnalyseMode=false`, `MultiPV=1`,
-`Ponder=false`, `OwnBook=true`, `BookFile=book.bin`, `BookDepth=16`,
+`Ponder=false`, `OwnBook=false`, `BookFile=book.bin`, `BookDepth=16`,
 `BookRandom=false`, `BookSafety=true`, `BookSafetyDepth=2`,
 `UCI_ShowWDL=false`, `Move Overhead=30`, `Slow Mover=100`, `StrengthMode=false`,
 `SyzygyPath=""`, `SyzygyProbeDepth=1`, `SyzygyProbeLimit=7`,

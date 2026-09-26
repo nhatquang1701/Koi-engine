@@ -182,7 +182,7 @@ constexpr std::array<UciOptionDescriptor, 26> kUciOptions{{
     {"MultiPV", UciOptionKind::spin, UciOptionId::multi_pv, "1", kMinimumMultiPv,
      kMaximumMultiPv, false, true},
     {"Ponder", UciOptionKind::check, UciOptionId::ponder, "false", 0, 0, false, true},
-    {"OwnBook", UciOptionKind::check, UciOptionId::own_book, "true", 0, 0, false, true},
+    {"OwnBook", UciOptionKind::check, UciOptionId::own_book, "false", 0, 0, false, true},
     {"BookFile", UciOptionKind::string, UciOptionId::book_file, "book.bin", 0, 0, false, true},
     {"BookDepth", UciOptionKind::spin, UciOptionId::book_depth, "16", 0, kMaximumBookDepth,
      false, true},

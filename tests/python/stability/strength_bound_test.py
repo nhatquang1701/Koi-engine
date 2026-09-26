@@ -41,7 +41,7 @@ def match(koi_color: str, results: list[str], *, candidate_hash: str = CANDIDATE
                  "option name Hash type spin default 512 min 1 max 4096",
                  "option name Threads type spin default 1 min 1 max 8",
                  "option name Speed type spin default 100 min 1 max 100",
-                 "option name OwnBook type check default true",
+                 "option name OwnBook type check default false",
                  "option name BookFile type string default book.bin",
                  "option name BookDepth type spin default 16 min 0 max 40",
                  "option name BookRandom type check default false",
@@ -54,7 +54,7 @@ def match(koi_color: str, results: list[str], *, candidate_hash: str = CANDIDATE
                  "option name Hash type spin default 512 min 1 max 4096",
                  "option name Threads type spin default 1 min 1 max 8",
                  "option name Speed type spin default 100 min 1 max 100",
-                 "option name OwnBook type check default true",
+                 "option name OwnBook type check default false",
                  "option name BookFile type string default book.bin",
                  "option name BookDepth type spin default 16 min 0 max 40",
                  "option name BookRandom type check default false",
@@ -239,7 +239,7 @@ class StrengthBoundTests(unittest.TestCase):
             black = write_match(root, "black", ["0-1"])
             white_data = json.loads(white.read_text(encoding="utf-8"))
             white_data["engines"][0]["handshake"] = [
-                "option name OwnBook type check default true",
+                "option name OwnBook type check default false",
                 "option name RandomSeed type spin default 0 min 0 max 9",
             ]
             white_data["engines"][1]["handshake"] = list(white_data["engines"][0]["handshake"])

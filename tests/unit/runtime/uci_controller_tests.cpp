@@ -553,6 +553,7 @@ void test_en_croissant_option_names_are_case_insensitive() {
                        polyglot_move("e2", "e4"), 100, 0}});
 
     const ControllerResult book_file = run_controller_in_directory(
+        "setoption name OwnBook value true\n"
         "setoption name bookfile value en-croissant-book.bin\n"
         "position startpos\n"
         "go depth 1\n"
@@ -769,6 +770,29 @@ void test_book_options_emit_one_seeded_marker_and_bestmove_for_normal_play() {
             "every book bestmove must be the legal selected move");
 }
 
+void test_opening_book_is_disabled_by_default() {
+    koi::test::TempDirectory files;
+    const std::filesystem::path book = files.path() / "book.bin";
+    const koi::GameState start = koi::GameState::startpos();
+    write_book(book, {{start.polyglot_key(), polyglot_move("e2", "e4"), 1, 0}});
+
+    const ControllerResult result = run_controller_in_directory(
+        "setoption name BookFile value book.bin\n"
+        "position startpos\n"
+        "go depth 1\n"
+        "stop\n"
+        "quit\n",
+        files.path());
+    const std::vector<std::string> lines = output_lines(result.output);
+
+    require(result.exit_code == 0 && result.diagnostics.empty(),
+            "a default search with an available book must remain protocol-clean");
+    require(lines_starting_with(lines, "info string book move ").empty(),
+            "an available Polyglot book must not be selected until OwnBook is enabled");
+    require(lines_starting_with(lines, "bestmove ").size() == 1,
+            "the default search must still return one bestmove");
+}
+
 void test_book_random_option_accepts_valid_values_and_ignores_invalid_values() {
     koi::test::TempDirectory files;
     const std::filesystem::path book = files.path() / "deterministic-controller-book.bin";
@@ -780,6 +804,7 @@ void test_book_random_option_accepts_valid_values_and_ignores_invalid_values() {
 
     const ControllerResult result = run_controller(
         "setoption name BookFile value " + book.string() + "\n"
+        "setoption name OwnBook value true\n"
         "setoption name BookRandom value false\n"
         "setoption name BookRandom value invalid\n"
         "position startpos\n"
@@ -808,6 +833,7 @@ void test_book_safety_options_reject_poisoned_moves_and_fallback_to_search() {
 
     const ControllerResult safe = run_controller(
         "setoption name BookFile value " + book.string() + "\n"
+        "setoption name OwnBook value true\n"
         "setoption name BookSafety value true\n"
         "setoption name BookSafetyDepth value 2\n"
         "position fen k3r3/8/8/8/4Q3/8/8/K7 w - - 0 1\n"
@@ -816,6 +842,7 @@ void test_book_safety_options_reject_poisoned_moves_and_fallback_to_search() {
         "quit\n");
     const ControllerResult disabled = run_controller(
         "setoption name BookFile value " + book.string() + "\n"
+        "setoption name OwnBook value true\n"
         "setoption name BookSafety value false\n"
         "setoption name BookSafetyDepth value 9\n"
         "position fen k3r3/8/8/8/4Q3/8/8/K7 w - - 0 1\n"
@@ -1025,6 +1052,7 @@ void test_book_depth_boundaries_and_invalid_values_preserve_the_previous_limit()
 
     const ControllerResult result = run_controller(
         "setoption name BookFile value " + book.string() + "\n"
+        "setoption name OwnBook value true\n"
         "setoption name BookDepth value 16\n"
         "position startpos moves " + join_moves(first_fifteen) + "\n"
         "go depth 1\n"
@@ -2069,6 +2097,7 @@ int main(int argc, char** argv) {
         {"public option replacement", test_public_option_change_emits_exactly_one_bestmove},
         {"Task 6 StrengthMode", test_task6_strength_mode_is_case_insensitive_and_cancels_active_search},
         {"opening-book normal play", test_book_options_emit_one_seeded_marker_and_bestmove_for_normal_play},
+        {"opening-book disabled by default", test_opening_book_is_disabled_by_default},
         {"opening-book random option", test_book_random_option_accepts_valid_values_and_ignores_invalid_values},
         {"opening-book safety option", test_book_safety_options_reject_poisoned_moves_and_fallback_to_search},
         {"opening-book fallback and bypass", test_book_fallback_and_analysis_style_commands_search_without_markers},

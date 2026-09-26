@@ -38,7 +38,7 @@ FAKE_ENGINE_SOURCE = textwrap.dedent(
             emit("id author Task 1 test")
             emit("option name Threads type spin default 1 min 1 max 64")
             if role == "koi":
-                emit("option name OwnBook type check default true")
+                emit("option name OwnBook type check default false")
                 emit("option name BookFile type string default book.bin")
                 emit("option name BookDepth type spin default 16 min 0 max 40")
                 emit("option name BookRandom type check default false")

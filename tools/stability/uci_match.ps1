@@ -31,7 +31,7 @@ param(
     [uint64]$KoiRandomSeed = 1,
 
     [ValidateSet('true', 'false', '1', '0')]
-    [string]$KoiOwnBook = 'true',
+    [string]$KoiOwnBook = 'false',
 
     [string]$KoiBookFile = 'book.bin',
 

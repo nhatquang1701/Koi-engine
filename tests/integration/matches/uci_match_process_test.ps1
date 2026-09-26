@@ -38,7 +38,7 @@ function Invoke-ScriptedMatch([string]$KoiPath, [string]$OpponentPath, [string]$
                                [int]$Games, [int]$MaxPlies, [int]$TimeoutMilliseconds = 5000,
                                [string]$OpeningFile = '', [string]$TimeControl = '',
                                [string]$KoiColor = 'white', [uint64]$KoiRandomSeed = 1,
-                               [bool]$KoiOwnBook = $true, [string]$KoiBookFile = 'book.bin',
+                               [bool]$KoiOwnBook = $false, [string]$KoiBookFile = 'book.bin',
                                [int]$KoiBookDepth = 16, [string]$OpponentOwnBook = '',
                                 [switch]$Sprt, [int]$SprtMinGames = 20, [int]$SprtMaxGames = 2000,
                                 [double]$SprtElo1 = 5.0) {
@@ -81,7 +81,7 @@ $fenFile = Join-Path $outputDirectory 'terminal.fen'
 try {
     $output = & $PowerShellExecutable -NoProfile -ExecutionPolicy Bypass -File $matchScript `
         -KoiPath $EnginePath -OpponentPath $EnginePath -Depth 1 -Games 1 `
-        -MaxPlies 2 -KoiOwnBook false -OutputDirectory $outputDirectory
+        -MaxPlies 2 -OutputDirectory $outputDirectory
     if ($LASTEXITCODE -ne 0) {
         throw "UCI match script exited with ${LASTEXITCODE}: $($output -join ' | ')"
     }
@@ -108,12 +108,17 @@ try {
         $game.process_status.opponent -ne 'clean shutdown') {
         throw 'UCI match JSON must record clean process shutdown for both engines.'
     }
-    if ($report.measurement.network.state -ne 'disabled' -or
+    if ($report.configuration.koi_own_book -ne $false -or
+        $report.measurement.network.state -ne 'disabled' -or
         $report.measurement.book.state -ne 'disabled' -or
         $report.measurement.tablebase.state -ne 'disabled' -or
         $report.hardware.cpu_count -lt 1 -or
         $report.configuration.run_label -ne 'measurement') {
         throw 'UCI match JSON must record disabled network/book/tablebase state and hardware/run metadata.'
+    }
+    $koiEngine = @($report.engines | Where-Object { $_.label -eq 'Koi' })[0]
+    if ($koiEngine.options -notcontains 'setoption name OwnBook value false') {
+        throw 'The default match harness must send OwnBook=false to Koi.'
     }
     foreach ($engine in @($report.engines)) {
         if ([string]::IsNullOrWhiteSpace($engine.version) -or

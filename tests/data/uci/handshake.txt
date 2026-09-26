@@ -7,7 +7,7 @@ option name Speed type spin default 100 min 1 max 100
 option name UCI_AnalyseMode type check default false
 option name MultiPV type spin default 1 min 1 max 16
 option name Ponder type check default false
-option name OwnBook type check default true
+option name OwnBook type check default false
 option name BookFile type string default book.bin
 option name BookDepth type spin default 16 min 0 max 40
 option name BookRandom type check default false

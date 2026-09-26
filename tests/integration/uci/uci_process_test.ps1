@@ -94,6 +94,7 @@ try {
             throw "Unexpected book-session handshake line. Expected '$expected'."
         }
     }
+    Send-UciCommand $bookSession 'setoption name OwnBook value true'
     Send-UciCommand $bookSession 'setoption name RandomSeed value 29'
     Send-UciCommand $bookSession "setoption name BookFile value $bookFileName"
     Send-UciCommand $bookSession 'setoption name BookDepth value 16'

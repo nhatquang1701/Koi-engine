@@ -115,7 +115,7 @@ Recommended starting options:
   Hash=512
   Threads=1
   Speed=100
-  OwnBook=true
+  OwnBook=false
   BookFile=book.bin
   BookDepth=16
   BookRandom=false
