@@ -51,7 +51,8 @@ jobs:
       fail-fast: false
       matrix:
         # 128 + 128 + 32 + 32 = 320 games. Cute Chess -maxmoves counts full
-        # moves after the opening: 6 means up to 12 plies, 30 up to 60.
+        # moves after the opening. Its depth-dependent adjudicator can delay
+        # the cap by one ply: the validator allows 13 for 6 and 61 for 30.
         include:
           - leg: short-white
             games: 128
@@ -158,8 +159,8 @@ jobs:
               "threads": int(os.environ["THREADS"]),
               "own_book": False,
               "max_full_moves": int(os.environ["MAX_FULL_MOVES"]),
-              "max_plies": 2 * int(os.environ["MAX_FULL_MOVES"]),
-              "max_plies_semantics": "Cute Chess -maxmoves full-move cap after the curated opening position",
+              "max_plies": 2 * int(os.environ["MAX_FULL_MOVES"]) + 1,
+              "max_plies_semantics": "Maximum engine plies after the opening; the validator allows one delayed Cute Chess -maxmoves adjudication check when an engine reports no search depth",
               "opening_file": "tests/data/openings/openings-curated-32.txt",
               "opening_count": 32,
               "package_archive_sha256": archive_sha256,

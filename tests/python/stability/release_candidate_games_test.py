@@ -12,7 +12,7 @@ import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "tools" / "stability"))
-from validate_release_candidate_games import main, validate_match_artifacts  # noqa: E402
+from validate_release_candidate_games import chess, main, validate_match_artifacts  # noqa: E402
 
 
 class ReleaseCandidateGamesTest(unittest.TestCase):
@@ -65,6 +65,31 @@ class ReleaseCandidateGamesTest(unittest.TestCase):
         }
         self.report.write_text(json.dumps(data), encoding="utf-8")
 
+    def write_knight_shuffle_pgn(self, opening_moves: tuple[str, ...], engine_plies: int):
+        self.openings.write_text(
+            "test-opening | " + " ".join(opening_moves) + "\n", encoding="utf-8"
+        )
+        board = chess.Board()
+        for move_text in opening_moves:
+            board.push(chess.Move.from_uci(move_text))
+        initial_fen = board.fen()
+        cycle = (
+            ("g1f3", "g8f6", "f3g1", "f6g8") if board.turn else
+            ("g8f6", "g1f3", "f6g8", "f3g1")
+        )
+        tokens = []
+        for index in range(engine_plies):
+            move = chess.Move.from_uci(cycle[index % len(cycle)])
+            self.assertTrue(board.is_legal(move))
+            tokens.append(f"{board.fullmove_number}{'.' if board.turn else '...'} {board.san(move)}")
+            board.push(move)
+        self.pgn.write_text(
+            '[Event "release candidate"]\n[White "Koi"]\n[Black "Stockfish"]\n'
+            '[Result "1/2-1/2"]\n[Termination "adjudication"]\n[SetUp "1"]\n'
+            f'[FEN "{initial_fen}"]\n\n' + " ".join(tokens) + " 1/2-1/2\n",
+            encoding="utf-8",
+        )
+
     def validate(self, **overrides):
         options = {
             "expected_games": 1,
@@ -116,6 +141,20 @@ class ReleaseCandidateGamesTest(unittest.TestCase):
         self.write_report(max_moves=1)
         self.assertEqual(self.validate(expected_max_moves=1), [])
 
+    def test_black_to_move_opening_allows_one_delayed_cap_ply(self):
+        self.write_report(max_moves=30)
+        self.write_knight_shuffle_pgn(("e2e4",), 61)
+        self.assertEqual(self.validate(expected_max_moves=30), [])
+
+    def test_full_move_cap_allows_one_delay_but_rejects_two_for_either_side(self):
+        self.write_report(max_moves=30)
+        self.write_knight_shuffle_pgn(("e2e4",), 62)
+        self.assertTrue(any("at most 61" in error for error in self.validate(expected_max_moves=30)))
+        self.write_knight_shuffle_pgn(("e2e4", "e7e5"), 61)
+        self.assertEqual(self.validate(expected_max_moves=30), [])
+        self.write_knight_shuffle_pgn(("e2e4", "e7e5"), 62)
+        self.assertTrue(any("at most 61" in error for error in self.validate(expected_max_moves=30)))
+
     def test_rejects_actual_color_counts_that_disagree_with_requested_color(self):
         self.write_report(koi_white=0, koi_black=1)
         errors = self.validate()
@@ -137,6 +176,7 @@ class ReleaseCandidateGamesTest(unittest.TestCase):
             ])
         self.assertEqual(result, 0)
         self.assertIn("max full moves=1", output.getvalue())
+        self.assertIn("up to 3 plies with one cap-check delay", output.getvalue())
 
     def write_uci_match(self, *, termination="max plies", result="*",
                          process="clean shutdown", bestmove="bestmove e2e4"):

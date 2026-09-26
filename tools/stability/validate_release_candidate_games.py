@@ -431,10 +431,15 @@ def validate_match_artifacts(
         ply_count = sum(1 for _ in game.mainline()) - opening_plies_in_movetext
         if ply_count < 1:
             errors.append(f"PGN game {index} has no engine moves after its opening")
-        if ply_count > 2 * expected_max_moves:
+        # Cute Chess 1.5.1's GameAdjudicator::addEval returns before checking
+        # -maxmoves when an engine reports no search depth. Real completed
+        # matches can thus contain one extra ply from either starting side.
+        # Permit one delayed check, but still reject a longer overrun.
+        max_engine_plies = 2 * expected_max_moves + 1
+        if ply_count > max_engine_plies:
             errors.append(
                 f"PGN game {index} has {ply_count} plies after its opening; "
-                f"expected at most {2 * expected_max_moves}"
+                f"expected at most {max_engine_plies}"
             )
 
     missing_openings = sorted(set(openings) - set(opening_counts))
@@ -479,7 +484,11 @@ def main(argv: list[str] | None = None) -> int:
     schema = json.loads(args.report.read_text(encoding="utf-8-sig")).get("schema")
     limit_description = (
         f"max plies={args.expected_max_moves}" if schema == "koi-uci-match-v2"
-        else f"max full moves={args.expected_max_moves} (up to {2 * args.expected_max_moves} plies)"
+        else (
+            f"max full moves={args.expected_max_moves} "
+            f"(up to {2 * args.expected_max_moves + 1} "
+            "plies with one cap-check delay)"
+        )
     )
     summary = (
         f"PASS: {args.expected_games} legal, completed games; "
