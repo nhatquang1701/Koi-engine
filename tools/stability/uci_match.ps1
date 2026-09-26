@@ -575,7 +575,23 @@ function Initialize-UciEngine($Engine) {
         }
     }
     Send-UciLine $Engine 'isready'
-    while ((Read-UciLine $Engine 'readyok') -cne 'readyok') {
+    # A full-width NNUE v5 network is over 100 MiB. On a loaded Debug host,
+    # installing it can exceed the ordinary protocol timeout even though the
+    # engine remains responsive and eventually confirms the exact EvalFile.
+    # Keep the longer wait local to Koi's NNUE readiness; move deadlines and
+    # the opponent's protocol timeout retain their configured limits.
+    $readinessWaitMilliseconds = if ($Engine.Label -ceq 'Koi' -and
+        $KoiEvaluatorMode -ne 'classical') {
+        $minimumReadinessWait = if ((Get-Item -LiteralPath $resolvedKoiEvalFile).Length -ge 64MB) {
+            120000
+        } else {
+            30000
+        }
+        [Math]::Max($TimeoutMilliseconds, $minimumReadinessWait)
+    } else {
+        $TimeoutMilliseconds
+    }
+    while ((Read-UciLine $Engine 'readyok' $readinessWaitMilliseconds) -cne 'readyok') {
     }
 
     $identity = @($Engine.Handshake | Where-Object { $_ -match '^id name (.+)$' } | Select-Object -First 1)
