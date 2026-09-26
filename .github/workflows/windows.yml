@@ -55,6 +55,58 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  windows-flake:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - name: Configure x64 MSVC environment and build Release
+        shell: cmd
+        run: |
+          if not exist "%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" exit /b 1
+          for /f "usebackq delims=" %%I in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do set "VSINSTALL=%%I"
+          if not defined VSINSTALL exit /b 1
+          set "VSDEVCMD=%VSINSTALL%\Common7\Tools\VsDevCmd.bat"
+          if not exist "%VSDEVCMD%" exit /b 1
+          call "%VSDEVCMD%" -arch=x64 -host_arch=x64
+          if errorlevel 1 exit /b 1
+          where cl
+          cl 2>&1 | findstr /C:"x64" >nul
+          if errorlevel 1 exit /b 1
+          cmake -S . -B build/ci-flake -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=cl
+          if errorlevel 1 exit /b 1
+          cmake --build build/ci-flake --config Release
+          if errorlevel 1 exit /b 1
+      # Three explicit runs with one in-process attempt ensure the job exposes
+      # timing-sensitive failures instead of allowing retries to hide them.
+      - name: Repeat timing-sensitive search and process tests without retries
+        shell: cmd
+        env:
+          KOI_TEST_RETRIES: "1"
+        run: |
+          set "STATUS=0"
+          for /L %%A in (1,1,3) do call :run-flake-attempt %%A
+          exit /b %STATUS%
+          :run-flake-attempt
+          set "ATTEMPT=%1"
+          ctest --test-dir build/ci-flake -C Release -j 1 --timeout 900 -R "^(koi_search_tests_[1-4]of4|transposition_table_tests|uci_controller_tests|search_service_tests|time_manager_tests|koi_engine_process|koi_engine_variant_process|koi_engine_en_croissant_process|koi_engine_time_safety_process)$" --output-on-failure --output-junit "build/ci-flake/ctest-flake-%ATTEMPT%.xml" > "build/ci-flake/ctest-flake-%ATTEMPT%.log" 2>&1
+          set "ATTEMPT_STATUS=%ERRORLEVEL%"
+          type "build/ci-flake/ctest-flake-%ATTEMPT%.log"
+          echo Flake attempt %ATTEMPT% exit=%ATTEMPT_STATUS%
+          if not "%ATTEMPT_STATUS%"=="0" set "STATUS=1"
+          exit /b 0
+      - name: Upload Windows flake diagnostics
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: windows-flake-test-diagnostics
+          path: |
+            build/ci-flake/ctest-flake-*.log
+            build/ci-flake/ctest-flake-*.xml
+            build/ci-flake/Testing/Temporary/LastTest.log
+          if-no-files-found: ignore
+          retention-days: 7
+
   debug-smoke:
     runs-on: windows-latest
     timeout-minutes: 60

@@ -16,6 +16,11 @@ if (-not (Test-Path -LiteralPath $candidateWorkflow -PathType Leaf)) {
 }
 
 $content = Get-Content -LiteralPath $workflow -Raw
+$windowsFlakeMatch = [regex]::Match($content, '(?ms)^  windows-flake:\s*.*?(?=^  [a-z0-9_-]+:\s*$|\z)')
+if (-not $windowsFlakeMatch.Success) {
+    throw 'Windows CI workflow must define an independent Windows flake job.'
+}
+$windowsFlakeContent = $windowsFlakeMatch.Value
 $linuxContent = Get-Content -LiteralPath $linuxWorkflow -Raw
 $candidateContent = Get-Content -LiteralPath $candidateWorkflow -Raw
 $cmakeContent = Get-Content -LiteralPath $cmake -Raw
@@ -58,6 +63,18 @@ function Require-CMakePattern([string]$Pattern, [string]$Description) {
 function Deny-WorkflowPattern([string]$Pattern, [string]$Description) {
     if ($content -match $Pattern) {
         throw "Windows CI workflow must not define $Description."
+    }
+}
+
+function Require-WindowsFlakePattern([string]$Pattern, [string]$Description) {
+    if ($windowsFlakeContent -notmatch $Pattern) {
+        throw "Windows flake job must define $Description."
+    }
+}
+
+function Deny-WindowsFlakePattern([string]$Pattern, [string]$Description) {
+    if ($windowsFlakeContent -match $Pattern) {
+        throw "Windows flake job must not define $Description."
     }
 }
 
@@ -166,3 +183,21 @@ Require-LinuxWorkflowPattern '(?i)grep\s+-q\s+"legal\s+1"' 'acceptance of legal 
 Require-LinuxWorkflowPattern '(?i)-DKOI_ENABLE_GPU_NNUE=OFF' 'the CPU-only tarball configure switch'
 Require-LinuxWorkflowPattern '(?i)KOI_CPU_VARIANT=generic' 'the forced generic UCI smoke'
 Require-LinuxWorkflowPattern '(?i)actions/upload-artifact@v5' 'test diagnostic artifact upload'
+
+# The Windows no-retry flake gate must run repeated serial CTest selections
+# independently so timing failures remain visible instead of being retried away.
+Require-WindowsFlakePattern '(?m)^  windows-flake:\s*$' 'the independent job identity'
+Require-WindowsFlakePattern '(?m)^    runs-on:\s*windows-latest\s*$' 'a Windows runner'
+Require-WindowsFlakePattern '(?m)^\s*call\s+"%VSDEVCMD%"\s+-arch=x64\s+-host_arch=x64\s*$' 'x64 MSVC environment setup'
+Require-WindowsFlakePattern '(?m)^\s*cl\s+2>&1\s+\|\s+findstr\s+/C:"x64"\s+>nul\s*$' 'the x64 compiler assertion'
+Require-WindowsFlakePattern '(?m)^\s*cmake\s+-S\s+\.\s+-B\s+build/ci-flake\s+-G\s+Ninja\s+-DCMAKE_BUILD_TYPE=Release\s+-DCMAKE_CXX_COMPILER=cl\s*$' 'the Ninja MSVC Release configure command'
+Require-WindowsFlakePattern '(?m)^\s*cmake\s+--build\s+build/ci-flake\s+--config\s+Release\s*$' 'the Release build command'
+Require-WindowsFlakePattern '(?i)KOI_TEST_RETRIES:\s*"1"' 'the no-retry in-process setting'
+Require-WindowsFlakePattern '(?i)for\s+/L\s+%%A\s+in\s+\(1,1,3\)' 'three serial CTest attempts'
+Require-WindowsFlakePattern '(?i)ctest\s+--test-dir\s+build/ci-flake\s+-C\s+Release\s+-j\s+1' 'serial CTest execution'
+Require-WindowsFlakePattern '(?i)koi_search_tests_\[1-4\]of4' 'the search shards'
+Require-WindowsFlakePattern '(?i)koi_engine_time_safety_process|koi_engine_process' 'timing-sensitive process selections'
+Require-WindowsFlakePattern '(?i)--timeout\s+900' 'bounded CTest tests'
+Require-WindowsFlakePattern '(?i)windows-flake-test-diagnostics' 'a diagnostics artifact upload'
+Require-WindowsFlakePattern '(?i)ctest-flake-.*\.log' 'per-attempt log upload'
+Deny-WindowsFlakePattern '(?i)--repeat' 'CTest retry behavior'
