@@ -86,11 +86,25 @@ jobs:
       - name: Install match tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends ca-certificates wget cutechess stockfish
+          sudo apt-get install -y --no-install-recommends ca-certificates wget stockfish
           wget -q https://packages.microsoft.com/config/ubuntu/24.04/packages-microsoft-prod.deb -O /tmp/packages-microsoft-prod.deb
           sudo dpkg -i /tmp/packages-microsoft-prod.deb
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends powershell
+          # Ubuntu 24.04 no longer provides a cutechess apt package. Pin the
+          # upstream AppImage and run its CLI in extract mode, which needs no FUSE.
+          appimage="$RUNNER_TEMP/Cute_Chess-1.5.1-x86_64.AppImage"
+          wget -q https://github.com/cutechess/cutechess/releases/download/v1.5.1/Cute_Chess-1.5.1-x86_64.AppImage -O "$appimage"
+          printf '%s  %s\n' d9448693e45bd57f1aeb32c46e94466894cd7cc5b6937effd285a02e871387b5 "$appimage" | sha256sum -c -
+          chmod +x "$appimage"
+          cat > "$RUNNER_TEMP/cutechess-cli" <<'SH'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          export APPIMAGE_EXTRACT_AND_RUN=1
+          exec "$RUNNER_TEMP/Cute_Chess-1.5.1-x86_64.AppImage" cli "$@"
+          SH
+          chmod +x "$RUNNER_TEMP/cutechess-cli"
+          "$RUNNER_TEMP/cutechess-cli" -help > /dev/null
       - name: Extract the packaged engine and check package files
         shell: bash
         run: |
@@ -167,7 +181,7 @@ jobs:
           set -euo pipefail
           engine="$PWD/artifacts/release-candidate/$LEG/engine"
           output="$PWD/artifacts/release-candidate/$LEG"
-          cutechess="$(command -v cutechess-cli || printf /usr/games/cutechess-cli)"
+          cutechess="$RUNNER_TEMP/cutechess-cli"
           stockfish="$(command -v stockfish || printf /usr/games/stockfish)"
           test -x "$cutechess"
           test -x "$stockfish"

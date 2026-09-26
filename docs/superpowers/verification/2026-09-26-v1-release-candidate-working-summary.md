@@ -76,3 +76,10 @@
 - The settled-source Windows Release CTest passed 71/71 without retry in 219.73 s; the settled-source Debug CTest passed 71/71 without retry in 882.69 s. Full logs are in ignored `artifacts/verification/v1-release-candidate/ctest-release-settled.log` and `ctest-debug-settled.log`.
 - The final rebuilt Windows candidate launcher SHA-256 is `133832CFB5B642F49958A303AC97847B5EA663299E7C2501BE8486EABF9AAAF1`. Its fresh 64-position tactical benchmark profile is identical, position for position, to the frozen baseline; `artifacts/verification/v1-release-candidate/tactical-parity-final.json` records the exact binary and profile hashes.
 - Local Docker Desktop's Linux daemon is unavailable (`docker version` cannot connect to `dockerDesktopLinuxEngine`); WSL2 virtualization was already found disabled. Fresh Linux candidate evidence still requires the remote runner and a branch push outside this plan's authorized scope.
+
+## GitHub pre-release continuation
+
+- The user authorized a GitHub pre-release titled `1.0.0` and then requested a push to the main branch. This repository has no `main` branch: `koi-engine` is its GitHub default branch. Commit `b71b35d` was pushed there by fast-forward; the original checkout's untracked exploration summary remains untouched.
+- GitHub Actions run `36232853578` built and packaged Linux successfully at `b71b35d`, but all four game cells failed while installing the `cutechess` apt package, which Ubuntu 24.04 does not provide. No games ran in that attempt.
+- Ruling: Obtain Cute Chess 1.5.1 from its upstream x86-64 AppImage and verify the upstream SHA-256 `d9448693e45bd57f1aeb32c46e94466894cd7cc5b6937effd285a02e871387b5`; invoke its bundled CLI through the AppImage's documented `cli` dispatch in extract mode. This retains a pinned binary and avoids FUSE. Cost if wrong: the runner may still lack a runtime dependency, so the workflow's CLI smoke must prove launch before games run.
+- The focused CI-configuration regression failed on the old apt install command, then passed after the pinned AppImage workflow change. Fresh Linux package, game, and general CI evidence is required for the eventual release commit.

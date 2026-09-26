@@ -25,6 +25,18 @@ if (-not (Test-Path -LiteralPath $requirements -PathType Leaf)) {
 }
 $requirementsContent = Get-Content -LiteralPath $requirements -Raw
 
+# Ubuntu 24.04 runners do not provide a cutechess apt package. Use a pinned,
+# hash-checked upstream CLI bundle rather than relying on the runner image.
+if ($candidateContent -match '(?m)^\s*sudo apt-get install[^\r\n]*\bcutechess\b') {
+    throw 'Release candidate workflow must not install the unavailable cutechess apt package.'
+}
+if (-not $candidateContent.Contains('Cute_Chess-1.5.1-x86_64.AppImage') -or
+    -not $candidateContent.Contains('d9448693e45bd57f1aeb32c46e94466894cd7cc5b6937effd285a02e871387b5') -or
+    -not $candidateContent.Contains('APPIMAGE_EXTRACT_AND_RUN=1') -or
+    -not $candidateContent.Contains('cli "$@"')) {
+    throw 'Release candidate workflow must run the SHA-256-pinned Cute Chess AppImage CLI without FUSE.'
+}
+
 # Bash expands an unquoted $false before PowerShell receives the switch. Keep
 # the switch literal in the Linux matrix invocation.
 if (-not $candidateContent.Contains("'-OwnBook:`$false'")) {
