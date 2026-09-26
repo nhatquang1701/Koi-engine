@@ -17,6 +17,12 @@ param(
 
     [string]$OutputDirectory = '',
 
+    # Optional release-package provenance. Supply both the extracted
+    # package.json and the exact archive from which it came.
+    [string]$PackageManifestPath = '',
+
+    [string]$PackageArchivePath = '',
+
     [ValidateRange(1, 64)]
     [int]$Depth = 4,
 
@@ -271,6 +277,74 @@ function Resolve-Executable([string]$Path, [string]$Label) {
         throw "${Label} executable is missing: $Path"
     }
     return (Resolve-Path -LiteralPath $Path).Path
+}
+
+function Read-KoiPackageBindingInput {
+    if ([string]::IsNullOrWhiteSpace($PackageManifestPath) -and
+        [string]::IsNullOrWhiteSpace($PackageArchivePath)) {
+        return $null
+    }
+    if ([string]::IsNullOrWhiteSpace($PackageManifestPath) -or
+        [string]::IsNullOrWhiteSpace($PackageArchivePath)) {
+        throw 'Package binding requires both -PackageManifestPath and -PackageArchivePath.'
+    }
+
+    foreach ($path in @($PackageManifestPath, $PackageArchivePath)) {
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+            throw "Package binding file is missing: $path"
+        }
+    }
+    $manifestPath = (Resolve-Path -LiteralPath $PackageManifestPath).Path
+    $archivePath = (Resolve-Path -LiteralPath $PackageArchivePath).Path
+    try {
+        $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+    } catch {
+        throw "Package manifest is not valid JSON: $manifestPath"
+    }
+    if ($manifest.schema -cne 'koi-engine-package-v1') {
+        throw 'Package manifest has an unsupported schema.'
+    }
+    $provenance = $manifest.provenance
+    if ($null -eq $provenance -or
+        [string]$provenance.source_commit -notmatch '^(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})$') {
+        throw 'Package manifest must contain a valid source commit.'
+    }
+    if ($provenance.source_dirty -isnot [bool] -or $provenance.source_dirty -ne $false) {
+        throw 'Package manifest source provenance must be clean.'
+    }
+
+    $manifestRoot = (Resolve-Path -LiteralPath (Split-Path -Parent $manifestPath)).Path
+    $rootPrefix = $manifestRoot.TrimEnd([char[]]@('\', '/')) + [System.IO.Path]::DirectorySeparatorChar
+    $pathComparison = if ($env:OS -eq 'Windows_NT') {
+        [System.StringComparison]::OrdinalIgnoreCase
+    } else {
+        [System.StringComparison]::Ordinal
+    }
+    if (-not $koiExecutable.StartsWith($rootPrefix, $pathComparison)) {
+        throw 'Koi executable must be inside the package-manifest directory.'
+    }
+    $relativePath = $koiExecutable.Substring($rootPrefix.Length)
+    $relativePath = $relativePath.Replace('\', '/')
+    $entries = @($manifest.files | Where-Object { ([string]$_.path).Replace('\', '/') -ceq $relativePath })
+    if ($entries.Count -ne 1 -or
+        [string]$entries[0].sha256 -notmatch '^[0-9a-fA-F]{64}$') {
+        throw "Package manifest must contain one SHA-256 entry for Koi executable '$relativePath'."
+    }
+    $executableSha256 = (Get-FileHash -LiteralPath $koiExecutable -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ([string]$entries[0].sha256 -ine $executableSha256) {
+        throw 'Package manifest executable SHA-256 does not match the Koi executable.'
+    }
+
+    return [ordered]@{
+        package_manifest_path = $manifestPath
+        package_manifest_sha256 = (Get-FileHash -LiteralPath $manifestPath -Algorithm SHA256).Hash.ToLowerInvariant()
+        package_archive_path = $archivePath
+        package_archive_sha256 = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash.ToLowerInvariant()
+        source_commit = ([string]$provenance.source_commit).ToLowerInvariant()
+        source_dirty = $false
+        executable_package_relative_path = $relativePath
+        executable_sha256 = $executableSha256
+    }
 }
 
 function Read-PositionSpecs {
@@ -902,6 +976,7 @@ $opponentExecutable = Resolve-Executable $OpponentPath 'opponent'
 $binarySuffix = if ($env:OS -eq 'Windows_NT') { '.exe' } else { '' }
 $defaultReplayPath = Join-Path (Split-Path -Parent $koiExecutable) "koi-replay$binarySuffix"
 $replayExecutable = Resolve-Executable $(if ([string]::IsNullOrWhiteSpace($ReplayPath)) { $defaultReplayPath } else { $ReplayPath }) 'koi-replay'
+$packageBindingInput = Read-KoiPackageBindingInput
 $positions = Read-OpeningSpecs
 if ($null -eq $positions) {
     $positions = Read-PositionSpecs
@@ -1196,6 +1271,27 @@ $engineSummary = @(
     }
 )
 
+$packageBinding = if ($null -eq $packageBindingInput) {
+    $null
+} else {
+    [ordered]@{
+        schema = 'koi-package-binding-v1'
+        package_manifest_filename = [System.IO.Path]::GetFileName($packageBindingInput.package_manifest_path)
+        package_manifest_sha256 = $packageBindingInput.package_manifest_sha256
+        package_archive_filename = [System.IO.Path]::GetFileName($packageBindingInput.package_archive_path)
+        package_archive_sha256 = $packageBindingInput.package_archive_sha256
+        source_commit = $packageBindingInput.source_commit
+        source_dirty = $packageBindingInput.source_dirty
+        executable_identity = [ordered]@{
+            path = $engineSummary[0].path
+            package_relative_path = $packageBindingInput.executable_package_relative_path
+            name = $engineSummary[0].name
+            version = $engineSummary[0].version
+            sha256 = $packageBindingInput.executable_sha256
+        }
+    }
+}
+
 $measurement = [ordered]@{
     network = [ordered]@{
         enabled = $false
@@ -1282,6 +1378,7 @@ $report = [ordered]@{
         time_control_metadata = $measurement.time_control
     }
     engines = $engineSummary
+    package_binding = $packageBinding
     positions = @($positions)
     games = @($gameRecords)
     sprt = $sprtSummary

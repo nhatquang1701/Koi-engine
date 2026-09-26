@@ -114,6 +114,88 @@ def _uci_pgn_games(path: pathlib.Path, errors: list[str]):
     return parsed
 
 
+def _validate_package_binding(
+    report: dict,
+    errors: list[str],
+    *,
+    expected_candidate_executable_sha256: str | None,
+    expected_package_archive_sha256: str | None,
+    expected_source_commit: str | None,
+) -> None:
+    has_expectations = any(value is not None for value in (
+        expected_candidate_executable_sha256,
+        expected_package_archive_sha256,
+        expected_source_commit,
+    ))
+
+    binding = report.get("package_binding")
+    if binding is None and not has_expectations:
+        return
+    if not isinstance(binding, dict):
+        errors.append("report has no package binding for the expected executable/package/source")
+        return
+    if binding.get("schema") != "koi-package-binding-v1":
+        errors.append("package binding has an unsupported schema")
+
+    manifest_sha256 = binding.get("package_manifest_sha256")
+    if not isinstance(manifest_sha256, str) or not SHA256_HEX.fullmatch(manifest_sha256):
+        errors.append("package binding has no valid package manifest SHA-256")
+    archive_sha256 = binding.get("package_archive_sha256")
+    if not isinstance(archive_sha256, str) or not SHA256_HEX.fullmatch(archive_sha256):
+        errors.append("package binding has no valid package archive SHA-256")
+    elif (expected_package_archive_sha256 is not None and
+          archive_sha256.casefold() != expected_package_archive_sha256.casefold()):
+        errors.append("package archive SHA-256 does not match the expected archive")
+
+    source_commit = binding.get("source_commit")
+    if not isinstance(source_commit, str) or re.fullmatch(r"(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})", source_commit) is None:
+        errors.append("package binding has no valid source commit")
+    elif (expected_source_commit is not None and
+          source_commit.casefold() != expected_source_commit.casefold()):
+        errors.append("package source commit does not match the expected source commit")
+    if binding.get("source_dirty") is not False:
+        errors.append("package source provenance is dirty or unverified")
+
+    identity = binding.get("executable_identity")
+    if not isinstance(identity, dict):
+        errors.append("package binding has no executable identity")
+        return
+    executable_sha256 = identity.get("sha256")
+    if not isinstance(executable_sha256, str) or not SHA256_HEX.fullmatch(executable_sha256):
+        errors.append("package binding has no valid executable SHA-256")
+    elif (expected_candidate_executable_sha256 is not None and
+          executable_sha256.casefold() != expected_candidate_executable_sha256.casefold()):
+        errors.append("candidate executable SHA-256 does not match the expected executable")
+
+    relative_path = identity.get("package_relative_path")
+    normalized_relative_path = relative_path.replace("\\", "/") if isinstance(relative_path, str) else ""
+    if (not normalized_relative_path or normalized_relative_path.startswith("/") or
+            ".." in normalized_relative_path.split("/")):
+        errors.append("package binding has an invalid executable package-relative path")
+
+    engines = report.get("engines")
+    koi_engines = [engine for engine in engines if isinstance(engine, dict) and engine.get("label") == "Koi"] if isinstance(engines, list) else []
+    if len(koi_engines) != 1:
+        errors.append("package binding requires exactly one Koi engine identity")
+        return
+    koi = koi_engines[0]
+    hashes = koi.get("hashes")
+    reported_sha256 = hashes.get("executable_sha256") if isinstance(hashes, dict) else None
+    for field in ("path", "name", "version"):
+        if not isinstance(identity.get(field), str) or not identity.get(field):
+            errors.append(f"package binding has no executable {field}")
+        elif identity.get(field) != koi.get(field):
+            errors.append(f"package binding executable {field} does not match the Koi engine report")
+    if (not isinstance(reported_sha256, str) or not SHA256_HEX.fullmatch(reported_sha256) or
+            not isinstance(executable_sha256, str) or
+            reported_sha256.casefold() != executable_sha256.casefold()):
+        errors.append("package binding executable hash does not match the Koi engine report")
+    if (expected_candidate_executable_sha256 is not None and
+            (not isinstance(reported_sha256, str) or
+             reported_sha256.casefold() != expected_candidate_executable_sha256.casefold())):
+        errors.append("Koi engine executable SHA-256 does not match the expected executable")
+
+
 def _validate_uci_match(
     pgn_file: pathlib.Path,
     report: dict,
@@ -127,8 +209,18 @@ def _validate_uci_match(
     expected_opening_count: int,
     expected_evaluator_mode: str | None,
     expected_evalfile_sha256: str | None,
+    expected_candidate_executable_sha256: str | None,
+    expected_package_archive_sha256: str | None,
+    expected_source_commit: str | None,
 ) -> list[str]:
     errors: list[str] = []
+    _validate_package_binding(
+        report,
+        errors,
+        expected_candidate_executable_sha256=expected_candidate_executable_sha256,
+        expected_package_archive_sha256=expected_package_archive_sha256,
+        expected_source_commit=expected_source_commit,
+    )
     openings = _read_openings(openings_file, errors) if expected_opening_count else {}
     if len(openings) != expected_opening_count:
         errors.append(
@@ -390,6 +482,9 @@ def validate_match_artifacts(
     expected_opening_count: int = 32,
     expected_evaluator_mode: str | None = None,
     expected_evalfile_sha256: str | None = None,
+    expected_candidate_executable_sha256: str | None = None,
+    expected_package_archive_sha256: str | None = None,
+    expected_source_commit: str | None = None,
 ) -> list[str]:
     """Return every artifact inconsistency; an empty list means the leg passed."""
     pgn_file = pathlib.Path(pgn_path)
@@ -410,7 +505,24 @@ def validate_match_artifacts(
             expected_opening_count=expected_opening_count,
             expected_evaluator_mode=expected_evaluator_mode,
             expected_evalfile_sha256=expected_evalfile_sha256,
+            expected_candidate_executable_sha256=expected_candidate_executable_sha256,
+            expected_package_archive_sha256=expected_package_archive_sha256,
+            expected_source_commit=expected_source_commit,
         )
+    if isinstance(report, dict):
+        _validate_package_binding(
+            report,
+            errors,
+            expected_candidate_executable_sha256=expected_candidate_executable_sha256,
+            expected_package_archive_sha256=expected_package_archive_sha256,
+            expected_source_commit=expected_source_commit,
+        )
+    if any(value is not None for value in (
+        expected_candidate_executable_sha256,
+        expected_package_archive_sha256,
+        expected_source_commit,
+    )) and not (isinstance(report, dict) and report.get("schema") == "koi-uci-match-v2"):
+        errors.append("package binding expectations require a koi-uci-match-v2 report")
     if expected_evaluator_mode is not None and isinstance(report, dict):
         errors.append("evaluator-mode attestation requires a koi-uci-match-v2 report")
     if report is not None and not isinstance(report, dict):
@@ -548,6 +660,18 @@ def main(argv: list[str] | None = None) -> int:
         default=32,
         help="require this many distinct opening roots; pass 0 to disable opening coverage",
     )
+    parser.add_argument(
+        "--expected-candidate-executable-sha256",
+        help="require the packaged Koi executable SHA-256 in a koi-uci-match-v2 report",
+    )
+    parser.add_argument(
+        "--expected-package-archive-sha256",
+        help="require the package archive SHA-256 from a package binding",
+    )
+    parser.add_argument(
+        "--expected-source-commit",
+        help="require the clean packaged source commit (40- or 64-character Git SHA)",
+    )
     args = parser.parse_args(argv)
 
     if args.expected_evalfile_sha256 is not None and not SHA256_HEX.fullmatch(args.expected_evalfile_sha256):
@@ -558,6 +682,15 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--expected-evaluator-mode is required with --expected-evalfile-sha256")
     if args.expected_evaluator_mode == "classical" and args.expected_evalfile_sha256 is not None:
         parser.error("classical evaluator mode does not accept --expected-evalfile-sha256")
+    if (args.expected_candidate_executable_sha256 is not None and
+            not SHA256_HEX.fullmatch(args.expected_candidate_executable_sha256)):
+        parser.error("--expected-candidate-executable-sha256 must contain 64 hexadecimal characters")
+    if (args.expected_package_archive_sha256 is not None and
+            not SHA256_HEX.fullmatch(args.expected_package_archive_sha256)):
+        parser.error("--expected-package-archive-sha256 must contain 64 hexadecimal characters")
+    if (args.expected_source_commit is not None and
+            re.fullmatch(r"(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})", args.expected_source_commit) is None):
+        parser.error("--expected-source-commit must contain a 40- or 64-character Git SHA")
 
     errors = validate_match_artifacts(
         args.pgn,
@@ -571,6 +704,9 @@ def main(argv: list[str] | None = None) -> int:
         expected_opening_count=args.expected_opening_count,
         expected_evaluator_mode=args.expected_evaluator_mode,
         expected_evalfile_sha256=args.expected_evalfile_sha256,
+        expected_candidate_executable_sha256=args.expected_candidate_executable_sha256,
+        expected_package_archive_sha256=args.expected_package_archive_sha256,
+        expected_source_commit=args.expected_source_commit,
     )
     if errors:
         for error in errors:

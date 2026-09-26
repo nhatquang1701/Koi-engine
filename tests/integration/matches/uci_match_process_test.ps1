@@ -40,6 +40,7 @@ function Invoke-ScriptedMatch([string]$KoiPath, [string]$OpponentPath, [string]$
                                [string]$KoiColor = 'white', [uint64]$KoiRandomSeed = 1,
                                [bool]$KoiOwnBook = $false, [string]$KoiBookFile = 'book.bin',
                                [int]$KoiBookDepth = 16, [string]$OpponentOwnBook = '',
+                               [string]$PackageManifestPath = '', [string]$PackageArchivePath = '',
                                 [switch]$Sprt, [int]$SprtMinGames = 20, [int]$SprtMaxGames = 2000,
                                 [double]$SprtElo1 = 5.0) {
     $optionalArguments = @()
@@ -56,12 +57,18 @@ function Invoke-ScriptedMatch([string]$KoiPath, [string]$OpponentPath, [string]$
     if (-not [string]::IsNullOrWhiteSpace($OpponentOwnBook)) {
         $optionalArguments += @('-OpponentOwnBook', $OpponentOwnBook)
     }
+    if (-not [string]::IsNullOrWhiteSpace($PackageManifestPath)) {
+        $optionalArguments += @('-PackageManifestPath', $PackageManifestPath)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($PackageArchivePath)) {
+        $optionalArguments += @('-PackageArchivePath', $PackageArchivePath)
+    }
     $output = & $PowerShellExecutable -NoProfile -ExecutionPolicy Bypass -File $matchScript `
         -KoiPath $KoiPath -OpponentPath $OpponentPath -ReplayPath $replayPath `
         -KoiColor $KoiColor -Depth 1 -Games $Games -MaxPlies $MaxPlies `
         -TimeoutMilliseconds $TimeoutMilliseconds -OutputDirectory $OutputDirectory `
         -KoiRandomSeed $KoiRandomSeed -KoiOwnBook $KoiOwnBook.ToString().ToLowerInvariant() `
-        -KoiBookFile $KoiBookFile -KoiBookDepth $KoiBookDepth @optionalArguments
+        -KoiBookFile $KoiBookFile -KoiBookDepth $KoiBookDepth @optionalArguments 2>&1
     if ($LASTEXITCODE -ne 0) {
         throw "scripted UCI match exited with ${LASTEXITCODE}: $($output -join ' | ')"
     }
@@ -74,6 +81,30 @@ function Invoke-ScriptedMatch([string]$KoiPath, [string]$OpponentPath, [string]$
         report = Get-Content -LiteralPath $jsonFiles[0].FullName -Raw | ConvertFrom-Json
         pgn = Get-Content -LiteralPath $pgnFiles[0].FullName -Raw
     }
+}
+
+function Write-PackageBindingInputs([string]$PackageEnginePath, [string]$ManifestPath, [string]$ArchivePath,
+                                    $SourceDirty = $false,
+                                    [string]$ManifestExecutableHash = '') {
+    $engineHash = (Get-FileHash -LiteralPath $PackageEnginePath -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ([string]::IsNullOrWhiteSpace($ManifestExecutableHash)) {
+        $ManifestExecutableHash = $engineHash
+    }
+    $manifest = [ordered]@{
+        schema = 'koi-engine-package-v1'
+        files = @(@{
+            path = [System.IO.Path]::GetFileName($PackageEnginePath)
+            size_bytes = (Get-Item -LiteralPath $PackageEnginePath).Length
+            sha256 = $ManifestExecutableHash
+        })
+        provenance = @{
+            source_commit = '0123456789abcdef0123456789abcdef01234567'
+            source_dirty = $SourceDirty
+        }
+    }
+    $manifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $ManifestPath -Encoding UTF8
+    [System.IO.File]::WriteAllText($ArchivePath, 'package archive fixture')
+    return [pscustomobject]@{ executable_sha256 = $engineHash }
 }
 
 function Invoke-EvaluatorMatch([string]$Mode, [string]$EvalFile, [string]$OutputDirectory,
@@ -239,6 +270,64 @@ try {
             $evidence.nnue_enabled_confirmation -notmatch '^info string NNUE enabled from ' -or
             @($evidence.evalfile_rejections).Count -ne 0) {
             throw "Attested $($modeCase.mode) report must bind the selected mode and EvalFile hash to engine confirmation."
+        }
+    }
+
+    $boundDirectory = Join-Path $outputDirectory 'package-bound'
+    New-Item -ItemType Directory -Path $boundDirectory -Force | Out-Null
+    $packageEnginePath = Join-Path $boundDirectory ([System.IO.Path]::GetFileName($EnginePath))
+    Copy-Item -LiteralPath $EnginePath -Destination $packageEnginePath
+    Copy-Item -LiteralPath $replayPath -Destination (Join-Path $boundDirectory ([System.IO.Path]::GetFileName($replayPath)))
+    $boundManifestPath = Join-Path $boundDirectory 'package.json'
+    $boundArchivePath = Join-Path $boundDirectory 'candidate.zip'
+    $boundInputs = Write-PackageBindingInputs $packageEnginePath $boundManifestPath $boundArchivePath
+    $boundMatch = Invoke-ScriptedMatch -KoiPath $packageEnginePath -OpponentPath $EnginePath `
+        -OutputDirectory (Join-Path $boundDirectory 'valid') -Games 1 -MaxPlies 2 `
+        -PackageManifestPath $boundManifestPath -PackageArchivePath $boundArchivePath
+    $boundReport = $boundMatch.report
+    $expectedArchiveHash = (Get-FileHash -LiteralPath $boundArchivePath -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($boundReport.package_binding.source_dirty -ne $false -or
+        $boundReport.package_binding.source_commit -ne '0123456789abcdef0123456789abcdef01234567' -or
+        $boundReport.package_binding.package_archive_sha256 -ne $expectedArchiveHash -or
+        $boundReport.package_binding.executable_identity.sha256 -ne $boundInputs.executable_sha256 -or
+        $boundReport.package_binding.executable_identity.package_relative_path -ne [System.IO.Path]::GetFileName($packageEnginePath)) {
+        throw 'UCI match JSON must bind the package archive and clean source manifest to the actual Koi executable.'
+    }
+
+    foreach ($case in @(
+        @{ name = 'dirty provenance'; dirty = $true; hash = ''; expected_error = 'source provenance must be clean' },
+        @{ name = 'non-Boolean dirty provenance'; dirty = 'false'; hash = ''; expected_error = 'source provenance must be clean' },
+        @{ name = 'executable manifest mismatch'; dirty = $false; hash = ('f' * 64); expected_error = 'executable SHA-256 does not match' }
+    )) {
+        $caseDirectory = Join-Path $boundDirectory ($case.name -replace '\s+', '-')
+        New-Item -ItemType Directory -Path $caseDirectory -Force | Out-Null
+        $caseEnginePath = Join-Path $caseDirectory ([System.IO.Path]::GetFileName($EnginePath))
+        Copy-Item -LiteralPath $EnginePath -Destination $caseEnginePath
+        Copy-Item -LiteralPath $replayPath -Destination (Join-Path $caseDirectory ([System.IO.Path]::GetFileName($replayPath)))
+        $caseManifest = Join-Path $caseDirectory 'package.json'
+        $caseArchive = Join-Path $caseDirectory 'candidate.zip'
+        [void](Write-PackageBindingInputs $caseEnginePath $caseManifest $caseArchive $case.dirty $case.hash)
+        if ($case.dirty -is [string]) {
+            $writtenManifest = Get-Content -LiteralPath $caseManifest -Raw | ConvertFrom-Json
+            if ($writtenManifest.provenance.source_dirty -isnot [string]) {
+                throw 'The non-Boolean provenance test input must remain a JSON string.'
+            }
+        }
+        $failed = $false
+        $failureMessage = ''
+        try {
+            [void](Invoke-ScriptedMatch -KoiPath $caseEnginePath -OpponentPath $EnginePath `
+                -OutputDirectory (Join-Path $caseDirectory 'output') -Games 1 -MaxPlies 2 `
+                -PackageManifestPath $caseManifest -PackageArchivePath $caseArchive)
+        } catch {
+            $failed = $true
+            $failureMessage = $_.Exception.Message
+        }
+        if (-not $failed) {
+            throw "UCI match harness must reject $($case.name)."
+        }
+        if ($failureMessage -notmatch [regex]::Escape($case.expected_error)) {
+            throw "UCI match harness rejected $($case.name) for an unexpected reason: $failureMessage"
         }
     }
 

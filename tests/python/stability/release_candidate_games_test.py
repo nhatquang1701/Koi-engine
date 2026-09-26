@@ -102,6 +102,43 @@ class ReleaseCandidateGamesTest(unittest.TestCase):
         options.update(overrides)
         return validate_match_artifacts(self.pgn, self.report, self.openings, **options)
 
+    def write_package_binding(self, *, archive_sha256="b" * 64,
+                              source_commit="a" * 40, source_dirty=False,
+                              executable_sha256="c" * 64):
+        self.write_uci_match()
+        data = json.loads(self.report.read_text(encoding="utf-8"))
+        data["engines"] = [
+            {
+                "label": "Koi",
+                "path": "C:/package/koi-engine.exe",
+                "name": "Koi Engine",
+                "version": "1.0.0",
+                "hashes": {"executable_sha256": executable_sha256},
+            },
+            {
+                "label": "Opponent",
+                "path": "C:/opponent/engine.exe",
+                "name": "Opponent",
+                "version": "1.0",
+                "hashes": {"executable_sha256": "d" * 64},
+            },
+        ]
+        data["package_binding"] = {
+            "schema": "koi-package-binding-v1",
+            "package_manifest_sha256": "e" * 64,
+            "package_archive_sha256": archive_sha256,
+            "source_commit": source_commit,
+            "source_dirty": source_dirty,
+            "executable_identity": {
+                "path": "C:/package/koi-engine.exe",
+                "package_relative_path": "koi-engine.exe",
+                "name": "Koi Engine",
+                "version": "1.0.0",
+                "sha256": executable_sha256,
+            },
+        }
+        self.report.write_text(json.dumps(data), encoding="utf-8")
+
     def write_evaluator_attestation(
         self,
         *,
@@ -343,6 +380,75 @@ class ReleaseCandidateGamesTest(unittest.TestCase):
         self.assertEqual(result, 0)
         self.assertIn("evaluator=nnue-v5", output.getvalue())
         self.assertIn(f"EvalFile SHA-256={expected_hash}", output.getvalue())
+
+    def test_package_expectations_accept_a_clean_matching_candidate_binding(self):
+        executable_sha256 = "c" * 64
+        archive_sha256 = "b" * 64
+        source_commit = "a" * 40
+        self.write_package_binding(
+            archive_sha256=archive_sha256,
+            source_commit=source_commit,
+            executable_sha256=executable_sha256,
+        )
+        self.assertEqual(
+            self.validate(
+                expected_max_moves=1,
+                expected_opening_count=0,
+                expected_candidate_executable_sha256=executable_sha256,
+                expected_package_archive_sha256=archive_sha256,
+                expected_source_commit=source_commit,
+            ),
+            [],
+        )
+
+    def test_package_expectations_reject_forged_archive_source_dirty_and_executable(self):
+        expected = {
+            "expected_max_moves": 1,
+            "expected_opening_count": 0,
+            "expected_candidate_executable_sha256": "c" * 64,
+            "expected_package_archive_sha256": "b" * 64,
+            "expected_source_commit": "a" * 40,
+        }
+        for description, overrides, fragment in (
+            ("archive", {"archive_sha256": "f" * 64}, "archive sha-256"),
+            ("source", {"source_commit": "f" * 40}, "source commit"),
+            ("dirty", {"source_dirty": True}, "dirty"),
+            ("executable", {"executable_sha256": "f" * 64}, "executable"),
+        ):
+            with self.subTest(description=description):
+                self.write_package_binding(**overrides)
+                errors = self.validate(**expected)
+                self.assertTrue(any(fragment in error.lower() for error in errors), errors)
+
+    def test_rejects_a_malformed_present_package_binding_without_expectations(self):
+        self.write_package_binding()
+        data = json.loads(self.report.read_text(encoding="utf-8"))
+        data["package_binding"]["package_archive_sha256"] = "not-a-sha256"
+        self.report.write_text(json.dumps(data), encoding="utf-8")
+        errors = self.validate(expected_max_moves=1, expected_opening_count=0)
+        self.assertTrue(any("valid package archive sha-256" in error.lower() for error in errors), errors)
+
+    def test_package_expectation_flags_are_available_through_cli(self):
+        executable_sha256 = "c" * 64
+        archive_sha256 = "b" * 64
+        source_commit = "a" * 40
+        self.write_package_binding(
+            archive_sha256=archive_sha256,
+            source_commit=source_commit,
+            executable_sha256=executable_sha256,
+        )
+        with contextlib.redirect_stdout(io.StringIO()):
+            result = main([
+                "--pgn", str(self.pgn), "--report", str(self.report),
+                "--openings", str(self.openings), "--expected-games", "1",
+                "--expected-color", "white", "--expected-time-control", "1+0",
+                "--expected-threads", "1", "--expected-max-moves", "1",
+                "--expected-opening-count", "0",
+                "--expected-candidate-executable-sha256", executable_sha256,
+                "--expected-package-archive-sha256", archive_sha256,
+                "--expected-source-commit", source_commit,
+            ])
+        self.assertEqual(result, 0)
 
     def test_accepts_harness_rule_draw_termination(self):
         self.write_uci_match(termination="rule draw", result="1/2-1/2")
