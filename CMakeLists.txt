@@ -57,8 +57,36 @@ endif()
 # MSVC only: the ASan runtime ships as a DLL, so the static CRT is impossible,
 # and /RTC (a Debug default) as well as LTCG must be disabled.
 option(KOI_SANITIZE "Build with AddressSanitizer (MSVC only)" OFF)
+
 if(KOI_SANITIZE AND NOT MSVC)
     message(FATAL_ERROR "KOI_SANITIZE is currently wired for MSVC builds only")
+endif()
+
+# --- Profile-guided optimization (Windows/MSVC) --------------------------------
+# KOI_PGO=generate builds Release with /GENPROFILE and links with /LTCG:PGI to
+# emit a .pgd next to each binary; KOI_PGO=use rebuilds Release with /USEPROFILE
+# and links with /LTCG:PGO. The .pgd is a build artifact: the training recipe in
+# tools/README.md regenerates it and the file itself is never committed.
+set(KOI_PGO "OFF" CACHE STRING "Profile-guided optimization mode (OFF, generate, use)")
+set_property(CACHE KOI_PGO PROPERTY STRINGS OFF generate use)
+if(KOI_PGO AND NOT MSVC)
+    message(FATAL_ERROR "KOI_PGO is currently wired for MSVC builds only")
+endif()
+if(KOI_PGO AND KOI_SANITIZE)
+    message(FATAL_ERROR "KOI_PGO and KOI_SANITIZE cannot be combined")
+endif()
+if(KOI_PGO STREQUAL "generate")
+    add_compile_options("$<$<CONFIG:Release>:/GL>")
+    # /LTCG:PGI is the linker alias for "/LTCG /GENPROFILE"; /GENPROFILE and
+    # /USEPROFILE are link.exe options and are rejected by cl.exe (D9002).
+    add_link_options("$<$<CONFIG:Release>:/LTCG:PGI>")
+    message(STATUS "Koi Engine PGO instrumentation enabled (Release)")
+elseif(KOI_PGO STREQUAL "use")
+    add_compile_options("$<$<CONFIG:Release>:/GL>")
+    add_link_options("$<$<CONFIG:Release>:/LTCG>" "$<$<CONFIG:Release>:/USEPROFILE>")
+    message(STATUS "Koi Engine PGO optimization enabled (Release)")
+elseif(NOT KOI_PGO STREQUAL "OFF")
+    message(FATAL_ERROR "KOI_PGO must be OFF, generate, or use")
 endif()
 
 if(MSVC)
@@ -114,8 +142,10 @@ endif()
 
 include(CheckIPOSupported)
 check_ipo_supported(RESULT KOI_IPO_SUPPORTED OUTPUT KOI_IPO_ERROR LANGUAGES CXX)
-if(KOI_IPO_SUPPORTED AND NOT KOI_SANITIZE)
+if(KOI_IPO_SUPPORTED AND NOT KOI_SANITIZE AND NOT KOI_PGO)
     set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
+elseif(KOI_PGO)
+    message(STATUS "Koi Engine PGO manages the Release IPO/LTO flags")
 elseif(KOI_IPO_SUPPORTED)
     message(STATUS "Koi Engine Release IPO/LTO is disabled for the sanitizer build")
 else()

@@ -1,6 +1,6 @@
 # Engine speed program: nodes per second and time to depth
 
-Status: Phases 0-4 complete (2026-09-25); Phase 5 next. Owner: Koi Engine.
+Status: Phases 0-5 complete (2026-09-25); Phase 6 next. Owner: Koi Engine.
 
 ## Goal
 
@@ -582,3 +582,42 @@ scope - they belong to a strength plan, not this program.
   incrementally from move metadata rather than recomputing them per commit.
 - Git: `src/koi/position.cpp` plus this plan record; evidence untracked under
   `artifacts/verification/speed-program/phase-4/`.
+
+## Phase 5 record (2026-09-25)
+
+- Build wiring: `KOI_PGO` is a Release-only, MSVC-only cache option with
+  `generate` and `use` modes. `generate` adds `/GL` at compile time and
+  `/LTCG:PGI` at link time; `use` adds `/GL` and `/LTCG /USEPROFILE`. The
+  Release IPO path is skipped while `KOI_PGO` is set, because the PGO link
+  owns the `/GL` and `/LTCG` flags; `KOI_SANITIZE` and non-MSVC builds are
+  rejected with a fatal error.
+- First wiring bug: the initial draft put `/GENPROFILE` and `/USEPROFILE` on
+  the compile line, where cl 19.44 rejects them with `D9002`. They are
+  link.exe options; moving them to the link line (via the `/LTCG:PGI` and
+  `/LTCG /USEPROFILE` aliases) made the instrumented build produce
+  `koi-bench.pgd` and `koi-engine.pgd` with no compiler warnings.
+- Training recipe: configure `build/pgo-generate` with `KOI_PGO=generate`,
+  build `koi_bench` and `koi_engine`, copy `pgort140.dll` next to the
+  binaries, run the bench suites (default, optional, endgames 2..5, openings
+  2..4) plus five UCI jobs through the instrumented engine (startpos,
+  Kiwipete and an endgame at `go movetime 2000`, `go depth 7`, and
+  `go nodes 500000`), merge every `<binary>!N.pgc` into `<binary>.pgd` with
+  `pgomgr /merge`, then reconfigure the same directory with `KOI_PGO=use`
+  and relink. The databases stay untracked (`/build/` is ignored) and CI
+  leaves `KOI_PGO` at its default.
+- Behavior: the PGO `koi-bench` binary is byte-identical to the plain
+  Release build in every gate we have (default stdout sha256
+  `6F7D8FF5...A7F8`, identical timed rows, `koi_bench_process_test.ps1`
+  exit 0).
+- Measured result: the PGO binaries are consistently slower here. Against the
+  Phase 4 release binary, the updated flags plus richer training still read
+  -8.87% (T1 endgames 2..5, Runs=5) and -7.07% (T1 cold default, Runs=9);
+  an earlier modern-flag run read -2.17% on endgames. A control build of the
+  same directory with `KOI_PGO=OFF` (IPO back on) measured +4.93% on the
+  endgames gate, so the build directory and toolchain are at parity and the
+  regression belongs to the use-mode PGO link on this compiler/workload.
+- Decision: keep the `KOI_PGO` infrastructure and the documented recipe with
+  `OFF` as the default, record the negative result here, and leave the
+  optimization for a future compiler/profile-set revisit.
+- Git: `CMakeLists.txt`, `tools/README.md` plus this plan record; evidence
+  untracked under `artifacts/verification/speed-program/phase-5/`.

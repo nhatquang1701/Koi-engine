@@ -121,6 +121,54 @@ python -m pip install -r .\tools\measurement\requirements.txt
 python -m unittest .\tests\python\measurement\elo_oracle_test.py -v
 ```
 
+## Profile-guided optimization
+
+`KOI_PGO` is a Release-only, MSVC-only CMake option that wires the standard
+two-pass PGO flow. `-DKOI_PGO=generate` compiles with `/GL` and links with
+`/LTCG:PGI`, so each linked binary gets a `.pgd` next to it and writes
+`<binary>!N.pgc` counter files into its working directory when it runs.
+`-DKOI_PGO=use` compiles with `/GL` and links with `/LTCG /USEPROFILE`, which
+consumes the `.pgd` and emits the optimized binary. CMake's
+`INTERPROCEDURAL_OPTIMIZATION_RELEASE` is skipped while `KOI_PGO` is set,
+because the PGO link owns the `/GL` and `/LTCG` flags. The databases are build
+artifacts (`/build/` keeps them out of the repository) and CI never sets
+`KOI_PGO`.
+
+Recipe (Windows, VS 2022 BuildTools shell, from the repository root):
+
+```powershell
+# 1. Instrumented build.
+cmake -S . -B build/pgo-generate -G Ninja -DCMAKE_BUILD_TYPE=Release -DKOI_PGO=generate
+cmake --build build/pgo-generate --target koi_bench koi_engine
+
+# 2. Train.  Counter files land in the process working directory, so run the
+#    instrumented binaries from the build directory and copy pgort140.dll from
+#    the MSVC bin directory beside them.
+Set-Location build/pgo-generate
+.\koi-bench.exe --threads 1 --speed 100
+.\koi-bench.exe --threads 1 --speed 100 --optional
+.\koi-bench.exe --threads 1 --speed 100 --timed `
+  --fen-file "<repo>\tests\data\endgames\endgame-positions.txt" --depth-sweep 2..5
+# Drive koi-engine.exe with a short UCI workload: startpos/Kiwipete/endgame
+# `go movetime 2000`, startpos `go depth 7`, startpos `go nodes 500000`.
+
+# 3. Merge the counters into the databases (pgomgr ships with MSVC).
+pgomgr /merge koi-bench!1.pgc koi-bench.pgd
+pgomgr /merge koi-engine!1.pgc koi-engine.pgd
+
+# 4. Optimized rebuild in the same directory.
+cmake -S <repo> -B . -DKOI_PGO=use
+cmake --build . --target koi_bench koi_engine
+```
+
+Measured result on this machine (2026-09-25): the PGO `koi-bench` binary was
+byte-identical in behavior to the plain Release build but consistently
+**slower** (-2% to -9% on the endgames and cold-default speed gates). A control
+build of the same directory with `KOI_PGO=OFF` matched the Release binary, so
+the regression belongs to the use-mode PGO link itself. The option therefore
+stays `OFF` by default; the recipe above is kept so the experiment can be
+repeated with another compiler or training set.
+
 ## Classical evaluation term tuning
 
 `koi-eval-features` (built as `build/release/koi-eval-features.exe`) reads FEN
