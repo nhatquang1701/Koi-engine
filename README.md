@@ -580,12 +580,9 @@ full inventory, how to run the whole suite or a single test (`KOI_TEST_FILTER`,
 `--filter`, `--shard`), the environment variables (`KOI_TEST_RETRIES`,
 `KOI_ALLOW_XPASS`, `KOI_TEST_TIMEOUT_SECONDS`, `KOI_UCI_TIMEOUT_MS`,
 `KOI_REPLAY_PATH`, `PYTHONDONTWRITEBYTECODE`, `KOI_NNUE_BOUNDARY_EXE`),
-optional-dependency skips, and per-test timeouts. `koi_search_tests` keeps a
-`known_failures` list for behavior expectations that the in-progress search
-rewrite does not meet yet; those are reported as `XFAIL` so the suite stays
-deterministic and green while the gaps remain visible, and an unexpected pass
-(`XPASS`) now fails the run so the list cannot go stale (see
-`tests/README.md`). The dated counts in the
+optional-dependency skips, and per-test timeouts. The search suite's
+`known_failures` and `intermittent` registries are empty for v1.0.0; all 152
+search behavior cases run as ordinary fatal tests. The dated counts in the
 verification snapshots below ("17 targets", "26 tests") are historical records
 from the 2026-09-05 and 2026-09-06 runs, not the current inventory.
 
@@ -783,8 +780,9 @@ every `go` is answered. `time_manager_tests` and
 
 ### WDL and strength controls
 
-`UCI_ShowWDL` defaults to false. When enabled, ordinary `info` lines append a
-deterministic `wdl W D L` triplet; it is omitted when disabled. Koi v1.0.0
+`UCI_ShowWDL` defaults to false. When enabled, scored `info` lines append a
+deterministic `wdl W D L` triplet. A selective iteration with no proven score
+direction still reports depth, nodes, and PV, but omits score and WDL. Koi v1.0.0
 does not advertise `UCI_LimitStrength` or `UCI_Elo`: the previous node-cap
 mapping was not calibrated to an actual rating. A GUI that sends those legacy
 options receives normal full-strength play. Stockfish's separate Elo controls
@@ -971,8 +969,8 @@ transcript but cannot automate a locally installed Lucas Chess GUI.
 
 ## Configuration and release packaging
 
-The current release candidate is Koi Engine v1.0.0. Windows packages use
-`koi-engine-v1.0.0.zip`; the portable Linux archive is
+The Koi Engine v1.0.0 Windows package is `koi-engine-v1.0.0.zip`; the portable
+Linux archive is
 `koi-engine-v1.0.0-linux-x86_64.tar.gz`. Each archive retains this README, the
 project MIT license, required third-party licenses, and a `package.json` manifest with per-file
 SHA-256 hashes and source commit provenance. A `.sha256` sidecar verifies the
