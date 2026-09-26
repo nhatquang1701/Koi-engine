@@ -718,6 +718,16 @@ add_test(
     COMMAND koi_replay_tests "$<TARGET_FILE:koi_replay>"
 )
 
+add_executable(koi_nnue_fixture_tests
+    tests/integration/tools/koi_nnue_fixture_tests.cpp
+)
+target_link_libraries(koi_nnue_fixture_tests PRIVATE koi_core)
+add_test(
+    NAME koi_nnue_fixture_tests
+    COMMAND koi_nnue_fixture_tests
+            "$<TARGET_FILE:koi_nnue_fixture>"
+)
+
 add_executable(uci_match_fixture
     tests/integration/tools/uci_match_fixture.cpp
 )
@@ -749,6 +759,13 @@ add_executable(koi_eval_features
 
 target_link_libraries(koi_eval_features PRIVATE koi_core)
 set_target_properties(koi_eval_features PROPERTIES OUTPUT_NAME "koi-eval-features")
+
+add_executable(koi_nnue_fixture
+    tools/engine/koi_nnue_fixture.cpp
+)
+target_link_libraries(koi_nnue_fixture PRIVATE koi_core)
+set_target_properties(koi_nnue_fixture PROPERTIES OUTPUT_NAME "koi-nnue-fixture")
+add_dependencies(koi_nnue_fixture_tests koi_nnue_fixture)
 
 # Three engine flavors: the baseline `koi-engine.exe` selects the best sibling
 # at startup, while the AVX2/AVX-512 binaries gate themselves when launched
@@ -815,6 +832,7 @@ set(KOI_TEST_SUPPORT_TARGETS
     koi_strength_tests
     perft_tests
     koi_replay_tests
+    koi_nnue_fixture_tests
 )
 
 if(TARGET koi_module_tests)
@@ -1173,7 +1191,7 @@ set_tests_properties(
     PROPERTIES PROCESSORS 2
 )
 set_tests_properties(koi_strength_tests PROPERTIES LABELS "unit;search;heavy")
-set_tests_properties(koi_replay_tests PROPERTIES LABELS "integration;tools")
+set_tests_properties(koi_replay_tests koi_nnue_fixture_tests PROPERTIES LABELS "integration;tools")
 if(POWERSHELL_EXECUTABLE)
     set_tests_properties(koi_engine_process koi_engine_variant_process koi_engine_en_croissant_process
         PROPERTIES LABELS "process;uci")
