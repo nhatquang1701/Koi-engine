@@ -102,6 +102,37 @@ class ReleaseCandidateGamesTest(unittest.TestCase):
         options.update(overrides)
         return validate_match_artifacts(self.pgn, self.report, self.openings, **options)
 
+    def write_evaluator_attestation(
+        self,
+        *,
+        mode="nnue-v4",
+        sha256="a" * 64,
+        path="C:/nets/fixture.nnue",
+        confirmation="info string NNUE enabled from C:/nets/fixture.nnue",
+        rejections=(),
+        gpu_marker=None,
+        gpu_fallbacks=(),
+        gpu_requested=None,
+        threads=1,
+    ):
+        self.write_uci_match()
+        data = json.loads(self.report.read_text(encoding="utf-8"))
+        configuration = data["configuration"]
+        configuration.update({
+            "threads": threads,
+            "koi_evaluator_mode": mode,
+            "koi_evalfile_path": path,
+            "koi_evalfile_sha256": sha256,
+            "koi_gpu_nnue_requested": mode == "gpu-v5" if gpu_requested is None else gpu_requested,
+            "koi_evaluator_attestation": {
+                "nnue_enabled_confirmation": confirmation,
+                "evalfile_rejections": list(rejections),
+                "gpu_enabled_marker": gpu_marker,
+                "gpu_unavailable_fallbacks": list(gpu_fallbacks),
+            },
+        })
+        self.report.write_text(json.dumps(data), encoding="utf-8")
+
     def test_accepts_a_complete_legal_match_bundle(self):
         self.assertEqual(self.validate(), [])
 
@@ -223,6 +254,95 @@ class ReleaseCandidateGamesTest(unittest.TestCase):
         self.assertEqual(
             self.validate(expected_max_moves=1, expected_opening_count=0), []
         )
+
+    def test_accepts_attested_nnue_mode_when_expected_hash_matches(self):
+        expected_hash = "a" * 64
+        self.write_evaluator_attestation(mode="nnue-v4", sha256=expected_hash)
+        self.assertEqual(
+            self.validate(
+                expected_max_moves=1,
+                expected_opening_count=0,
+                expected_evaluator_mode="nnue-v4",
+                expected_evalfile_sha256=expected_hash,
+            ),
+            [],
+        )
+
+    def test_rejects_missing_or_rejected_nnue_attestation(self):
+        expected_hash = "a" * 64
+        cases = (
+            {"confirmation": None},
+            {"rejections": ["info string EvalFile rejected: checksum mismatch"]},
+            {"sha256": "b" * 64},
+            {"mode": "nnue-v5"},
+        )
+        for override in cases:
+            with self.subTest(override=override):
+                self.write_evaluator_attestation(**override)
+                errors = self.validate(
+                    expected_max_moves=1,
+                    expected_opening_count=0,
+                    expected_evaluator_mode="nnue-v4",
+                    expected_evalfile_sha256=expected_hash,
+                )
+                self.assertTrue(errors)
+
+    def test_gpu_v5_requires_requested_gpu_marker_threads_and_no_fallback(self):
+        expected_hash = "c" * 64
+        valid = {
+            "mode": "gpu-v5",
+            "sha256": expected_hash,
+            "confirmation": "info string NNUE enabled from C:/nets/fixture.nnue",
+            "gpu_marker": "koi-engine: GPU NNUE inference enabled.",
+            "gpu_requested": True,
+            "threads": 2,
+        }
+        self.write_evaluator_attestation(**valid)
+        self.assertEqual(
+            self.validate(
+                expected_max_moves=1,
+                expected_threads=2,
+                expected_opening_count=0,
+                expected_evaluator_mode="gpu-v5",
+                expected_evalfile_sha256=expected_hash,
+            ),
+            [],
+        )
+
+        invalid_cases = (
+            {"gpu_marker": None},
+            {"gpu_fallbacks": ["koi-engine: GPU NNUE unavailable (no device); using the CPU network."]},
+            {"gpu_requested": False},
+            {"threads": 1},
+        )
+        for override in invalid_cases:
+            with self.subTest(override=override):
+                self.write_evaluator_attestation(**(valid | override))
+                errors = self.validate(
+                    expected_max_moves=1,
+                    expected_threads=2,
+                    expected_opening_count=0,
+                    expected_evaluator_mode="gpu-v5",
+                    expected_evalfile_sha256=expected_hash,
+                )
+                self.assertTrue(errors)
+
+    def test_cli_accepts_explicit_evaluator_mode_and_hash(self):
+        expected_hash = "d" * 64
+        self.write_evaluator_attestation(mode="nnue-v5", sha256=expected_hash)
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            result = main([
+                "--pgn", str(self.pgn), "--report", str(self.report),
+                "--openings", str(self.openings), "--expected-games", "1",
+                "--expected-color", "white", "--expected-time-control", "1+0",
+                "--expected-threads", "1", "--expected-max-moves", "1",
+                "--expected-opening-count", "0", "--expected-evaluator-mode", "nnue-v5",
+                "--expected-evalfile-sha256", expected_hash,
+            ])
+        self.assertEqual(result, 0)
+        self.assertIn("evaluator=nnue-v5", output.getvalue())
+        self.assertIn(f"EvalFile SHA-256={expected_hash}", output.getvalue())
 
     def test_accepts_harness_rule_draw_termination(self):
         self.write_uci_match(termination="rule draw", result="1/2-1/2")

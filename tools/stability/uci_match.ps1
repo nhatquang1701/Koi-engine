@@ -45,6 +45,14 @@ param(
     # Keys are sent sorted so transcripts stay reproducible.
     [hashtable]$KoiOptions = @{},
 
+    # Optional evaluator attestation. For nnue-v4, nnue-v5, or gpu-v5 pass an
+    # existing network with -KoiEvalFile; gpu-v5 also requires KOI_GPU_NNUE=1
+    # and at least two -Threads. Existing KoiOptions EvalFile remains supported.
+    [ValidateSet('classical', 'nnue-v4', 'nnue-v5', 'gpu-v5')]
+    [string]$KoiEvaluatorMode = 'classical',
+
+    [string]$KoiEvalFile = '',
+
     # Additional opponent setoption lines, e.g. @{ EvalFile = 'C:\nets\koi.nnue' }.
     # Keys are sent sorted so transcripts stay reproducible.
     [hashtable]$OpponentOptions = @{},
@@ -132,6 +140,58 @@ if ($Sprt -and $SprtElo1 -le $SprtElo0) {
 }
 if ($Sprt -and $SprtMaxGames -lt $SprtMinGames) {
     throw 'SPRT requires -SprtMaxGames greater than or equal to -SprtMinGames.'
+}
+
+$KoiEvaluatorMode = $KoiEvaluatorMode.ToLowerInvariant()
+$koiEvalFileOption = @($KoiOptions.Keys | Where-Object { ([string]$_) -ieq 'EvalFile' })
+if (-not [string]::IsNullOrWhiteSpace($KoiEvalFile)) {
+    if ($koiEvalFileOption.Count -gt 0 -and
+        [string]$KoiOptions[$koiEvalFileOption[0]] -cne $KoiEvalFile) {
+        throw 'Choose one Koi EvalFile value through -KoiEvalFile or -KoiOptions.'
+    }
+    $KoiOptions['EvalFile'] = $KoiEvalFile
+    $koiEvalFileOption = @('EvalFile')
+}
+
+$koiEvalFileSha256 = $null
+$resolvedKoiEvalFile = $null
+$reportedKoiEvaluatorMode = $KoiEvaluatorMode
+if ($KoiEvaluatorMode -eq 'classical' -and $koiEvalFileOption.Count -gt 0) {
+    # Preserve legacy KoiOptions EvalFile calls without claiming that this
+    # optional attestation verified the selected network.
+    $reportedKoiEvaluatorMode = 'unattested'
+}
+if ($KoiEvaluatorMode -ne 'classical') {
+    if ($koiEvalFileOption.Count -ne 1 -or
+        [string]::IsNullOrWhiteSpace([string]$KoiOptions[$koiEvalFileOption[0]])) {
+        throw "Koi evaluator mode '$KoiEvaluatorMode' requires -KoiEvalFile or -KoiOptions EvalFile."
+    }
+    $evalFileValue = [string]$KoiOptions[$koiEvalFileOption[0]]
+    if (-not (Test-Path -LiteralPath $evalFileValue -PathType Leaf)) {
+        throw "Koi EvalFile is missing: $evalFileValue"
+    }
+    $resolvedKoiEvalFile = (Resolve-Path -LiteralPath $evalFileValue).Path
+    $KoiOptions['EvalFile'] = $resolvedKoiEvalFile
+    $header = New-Object byte[] 12
+    $stream = [System.IO.File]::OpenRead($resolvedKoiEvalFile)
+    try {
+        $headerBytesRead = $stream.Read($header, 0, $header.Length)
+    } finally {
+        $stream.Dispose()
+    }
+    if ($headerBytesRead -lt 12 -or
+        [System.Text.Encoding]::ASCII.GetString($header, 0, 8) -cne 'KOI-NNUE') {
+        throw "Koi EvalFile is not a Koi NNUE container: $resolvedKoiEvalFile"
+    }
+    $networkVersion = [System.BitConverter]::ToUInt32($header, 8)
+    $expectedNetworkVersion = switch ($KoiEvaluatorMode) {
+        'nnue-v4' { 4 }
+        { $_ -in @('nnue-v5', 'gpu-v5') } { 5 }
+    }
+    if ($networkVersion -ne $expectedNetworkVersion) {
+        throw "Koi EvalFile for '$KoiEvaluatorMode' does not contain NNUE v$expectedNetworkVersion."
+    }
+    $koiEvalFileSha256 = (Get-FileHash -LiteralPath $resolvedKoiEvalFile -Algorithm SHA256).Hash.ToLowerInvariant()
 }
 
 # Pure sequential-testing state for the logistic SPRT (draw-aware trinomial
@@ -286,6 +346,11 @@ function Start-UciEngine([string]$Path, [string]$Label) {
     $startInfo.RedirectStandardInput = $true
     $startInfo.RedirectStandardOutput = $true
     $startInfo.RedirectStandardError = $true
+    if ($Label -ceq 'Koi' -and $KoiEvaluatorMode -in @('nnue-v4', 'nnue-v5')) {
+        # Keep CPU v4/v5 attestations explicit even when the parent shell asked
+        # the engine to prefer GPU inference for unrelated runs.
+        $startInfo.EnvironmentVariables['KOI_GPU_NNUE'] = '0'
+    }
 
     $process = [System.Diagnostics.Process]::new()
     $process.StartInfo = $startInfo
@@ -442,6 +507,59 @@ function Initialize-UciEngine($Engine) {
     $identity = @($Engine.Handshake | Where-Object { $_ -match '^id name (.+)$' } | Select-Object -First 1)
     if ($identity.Count -eq 1) {
         $Engine.Name = ($identity[0] -replace '^id name ', '').Trim()
+    }
+}
+
+function Assert-KoiEvalFileAccepted($Engine) {
+    if ($KoiEvaluatorMode -eq 'classical') {
+        return
+    }
+    $rejections = @($Engine.Output | Where-Object {
+        $_ -match '^info string EvalFile (?:rejected|installation failed)'
+    })
+    if ($rejections.Count -gt 0) {
+        throw "Koi EvalFile rejected: $($rejections -join ' | ')"
+    }
+    $expectedConfirmation = "info string NNUE enabled from $resolvedKoiEvalFile"
+    if (@($Engine.Output | Where-Object { $_ -ceq $expectedConfirmation }).Count -eq 0) {
+        throw "Koi did not confirm NNUE enabled from the requested EvalFile '$resolvedKoiEvalFile'."
+    }
+}
+
+function Get-KoiEvaluatorAttestation($Engine, $StopResult) {
+    $stdoutLines = @($Engine.Output)
+    $stderrLines = @($StopResult.stderr -split "`r?`n" | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    $allLines = @($stdoutLines) + @($stderrLines)
+    $confirmations = @($stdoutLines | Where-Object { $_ -match '^info string NNUE enabled from ' })
+    $rejections = @($allLines | Where-Object {
+        $_ -match 'EvalFile (?:rejected|installation failed)'
+    })
+    $gpuMarkers = @($stderrLines | Where-Object { $_ -ceq 'koi-engine: GPU NNUE inference enabled.' })
+    $gpuFallbacks = @($stderrLines | Where-Object { $_ -match '^koi-engine: GPU NNUE unavailable \(' })
+
+    if ($KoiEvaluatorMode -ne 'classical') {
+        if ($rejections.Count -gt 0) {
+            throw "Koi EvalFile rejection observed during attestation: $($rejections -join ' | ')"
+        }
+        $expectedConfirmation = "info string NNUE enabled from $resolvedKoiEvalFile"
+        if (@($confirmations | Where-Object { $_ -ceq $expectedConfirmation }).Count -eq 0) {
+            throw 'Koi NNUE-enabled confirmation was missing from UCI output.'
+        }
+    }
+    if ($KoiEvaluatorMode -eq 'gpu-v5') {
+        if ($gpuFallbacks.Count -gt 0) {
+            throw "GPU v5 attestation rejected CPU fallback: $($gpuFallbacks -join ' | ')"
+        }
+        if ($gpuMarkers.Count -eq 0) {
+            throw 'GPU v5 attestation requires the GPU NNUE inference enabled marker on stderr.'
+        }
+    }
+
+    return [ordered]@{
+        nnue_enabled_confirmation = if ($confirmations.Count -gt 0) { $confirmations[0] } else { $null }
+        evalfile_rejections = @($rejections)
+        gpu_enabled_marker = if ($gpuMarkers.Count -gt 0) { $gpuMarkers[0] } else { $null }
+        gpu_unavailable_fallbacks = @($gpuFallbacks)
     }
 }
 
@@ -791,6 +909,14 @@ if ($null -eq $positions) {
 $KoiColor = $KoiColor.ToLowerInvariant()
 $maximumThreads = [Math]::Max(1, [Math]::Min(64, [Environment]::ProcessorCount))
 $Threads = [Math]::Max(1, [Math]::Min($Threads, $maximumThreads))
+if ($KoiEvaluatorMode -eq 'gpu-v5') {
+    if ($Threads -lt 2) {
+        throw 'GPU v5 evaluator attestation requires -Threads of at least 2.'
+    }
+    if ($env:KOI_GPU_NNUE -cne '1') {
+        throw 'GPU v5 evaluator attestation requires KOI_GPU_NNUE=1.'
+    }
+}
 $pgnTimeControl = if (-not [string]::IsNullOrWhiteSpace($TimeControl)) { $TimeControl } elseif ($MovetimeMs -gt 0) { "movetime $MovetimeMs" } elseif ($Nodes -gt 0) {
     "nodes $Nodes"
 } else {
@@ -824,6 +950,7 @@ try {
     $koiEngine = Start-UciEngine $koiExecutable 'Koi'
     $opponentEngine = Start-UciEngine $opponentExecutable 'Opponent'
     Initialize-UciEngine $koiEngine
+    Assert-KoiEvalFileAccepted $koiEngine
     Initialize-UciEngine $opponentEngine
     $stopMatches = $false
 
@@ -1033,6 +1160,8 @@ finally {
     }
 }
 
+$koiEvaluatorAttestation = Get-KoiEvaluatorAttestation $koiEngine $koiStop
+
 New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
 $resolvedOutputDirectory = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $stamp = (Get-Date).ToUniversalTime().ToString('yyyyMMdd-HHmmss-fff')
@@ -1145,6 +1274,11 @@ $report = [ordered]@{
         opponent_elo = $OpponentEloAnchor
         batch_id = $BatchId
         run_label = $RunLabel
+        koi_evaluator_mode = $reportedKoiEvaluatorMode
+        koi_evalfile_path = $resolvedKoiEvalFile
+        koi_evalfile_sha256 = $koiEvalFileSha256
+        koi_gpu_nnue_requested = ($KoiEvaluatorMode -eq 'gpu-v5')
+        koi_evaluator_attestation = $koiEvaluatorAttestation
         time_control_metadata = $measurement.time_control
     }
     engines = $engineSummary

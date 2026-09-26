@@ -25,6 +25,8 @@ OPENING_LINE = re.compile(
 )
 RESULTS = {"1-0", "0-1", "1/2-1/2"}
 UCI_MOVE = re.compile(r"^[a-h][1-8][a-h][1-8][nbrq]?$")
+EVALUATOR_MODES = {"classical", "nnue-v4", "nnue-v5", "gpu-v5"}
+SHA256_HEX = re.compile(r"^[0-9a-fA-F]{64}$")
 
 
 def _read_openings(path: pathlib.Path, errors: list[str]) -> dict[str, tuple[str, ...]]:
@@ -123,6 +125,8 @@ def _validate_uci_match(
     expected_threads: int,
     expected_max_moves: int,
     expected_opening_count: int,
+    expected_evaluator_mode: str | None,
+    expected_evalfile_sha256: str | None,
 ) -> list[str]:
     errors: list[str] = []
     openings = _read_openings(openings_file, errors) if expected_opening_count else {}
@@ -150,6 +154,71 @@ def _validate_uci_match(
     for key, value in expected_configuration.items():
         if configuration.get(key) != value:
             errors.append(f"configuration {key} is {configuration.get(key)!r}; expected {value!r}")
+
+    if expected_evalfile_sha256 is not None and expected_evaluator_mode is None:
+        errors.append("expected evaluator mode is required with an expected EvalFile SHA-256")
+    if expected_evaluator_mode is not None:
+        if expected_evaluator_mode not in EVALUATOR_MODES:
+            errors.append(f"unsupported expected evaluator mode {expected_evaluator_mode!r}")
+        elif configuration.get("koi_evaluator_mode") != expected_evaluator_mode:
+            errors.append(
+                "configuration koi_evaluator_mode is "
+                f"{configuration.get('koi_evaluator_mode')!r}; expected {expected_evaluator_mode!r}"
+            )
+
+        if expected_evaluator_mode == "classical":
+            if expected_evalfile_sha256 is not None:
+                errors.append("classical evaluator mode must not specify an expected EvalFile SHA-256")
+            if configuration.get("koi_evalfile_sha256") not in (None, ""):
+                errors.append("classical evaluator report must not claim an EvalFile SHA-256")
+        elif expected_evaluator_mode in EVALUATOR_MODES:
+            if expected_evalfile_sha256 is None:
+                errors.append("expected EvalFile SHA-256 is required for a nonclassical evaluator mode")
+            elif not SHA256_HEX.fullmatch(expected_evalfile_sha256):
+                errors.append("expected EvalFile SHA-256 must contain 64 hexadecimal characters")
+
+            actual_hash = configuration.get("koi_evalfile_sha256")
+            if not isinstance(actual_hash, str) or not SHA256_HEX.fullmatch(actual_hash):
+                errors.append("configuration has no valid koi_evalfile_sha256")
+            elif expected_evalfile_sha256 is not None and actual_hash.casefold() != expected_evalfile_sha256.casefold():
+                errors.append("configuration koi_evalfile_sha256 does not match the expected EvalFile hash")
+
+            evalfile_path = configuration.get("koi_evalfile_path")
+            if not isinstance(evalfile_path, str) or not evalfile_path.strip():
+                errors.append("configuration has no koi_evalfile_path")
+
+            attestation = configuration.get("koi_evaluator_attestation")
+            if not isinstance(attestation, dict):
+                errors.append("configuration has no koi_evaluator_attestation object")
+                attestation = {}
+            confirmation = attestation.get("nnue_enabled_confirmation")
+            expected_confirmation = f"info string NNUE enabled from {evalfile_path}"
+            if not isinstance(confirmation, str) or confirmation.casefold() != expected_confirmation.casefold():
+                errors.append("Koi did not confirm NNUE enabled from the reported EvalFile path")
+            rejections = attestation.get("evalfile_rejections")
+            if not isinstance(rejections, list):
+                errors.append("Koi evaluator attestation has no EvalFile rejection list")
+            elif rejections:
+                errors.append("Koi evaluator attestation records an EvalFile rejection")
+
+            requested_gpu = configuration.get("koi_gpu_nnue_requested")
+            fallbacks = attestation.get("gpu_unavailable_fallbacks")
+            if not isinstance(fallbacks, list):
+                errors.append("Koi evaluator attestation has no GPU fallback list")
+                fallbacks = []
+            elif fallbacks:
+                errors.append("Koi evaluator attestation records a GPU unavailable fallback")
+            if expected_evaluator_mode == "gpu-v5":
+                if requested_gpu is not True:
+                    errors.append("GPU v5 report does not confirm KOI_GPU_NNUE=1")
+                if not isinstance(expected_threads, int) or expected_threads < 2:
+                    errors.append("GPU v5 requires at least two expected threads")
+                marker = attestation.get("gpu_enabled_marker")
+                if marker != "koi-engine: GPU NNUE inference enabled.":
+                    errors.append("GPU v5 report is missing the GPU NNUE inference enabled stderr marker")
+            else:
+                if requested_gpu is not False:
+                    errors.append("CPU NNUE report must record GPU inference as not requested")
 
     pgn_games = _uci_pgn_games(pgn_file, errors)
     if len(pgn_games) != expected_games:
@@ -319,6 +388,8 @@ def validate_match_artifacts(
     expected_threads: int,
     expected_max_moves: int,
     expected_opening_count: int = 32,
+    expected_evaluator_mode: str | None = None,
+    expected_evalfile_sha256: str | None = None,
 ) -> list[str]:
     """Return every artifact inconsistency; an empty list means the leg passed."""
     pgn_file = pathlib.Path(pgn_path)
@@ -337,7 +408,11 @@ def validate_match_artifacts(
             expected_threads=expected_threads,
             expected_max_moves=expected_max_moves,
             expected_opening_count=expected_opening_count,
+            expected_evaluator_mode=expected_evaluator_mode,
+            expected_evalfile_sha256=expected_evalfile_sha256,
         )
+    if expected_evaluator_mode is not None and isinstance(report, dict):
+        errors.append("evaluator-mode attestation requires a koi-uci-match-v2 report")
     if report is not None and not isinstance(report, dict):
         errors.append("stability report root must be a JSON object")
         report = None
@@ -459,12 +534,30 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--expected-threads", required=True, type=int)
     parser.add_argument("--expected-max-moves", required=True, type=int)
     parser.add_argument(
+        "--expected-evaluator-mode",
+        choices=sorted(EVALUATOR_MODES),
+        help="require evaluator-mode attestation in a koi-uci-match-v2 report",
+    )
+    parser.add_argument(
+        "--expected-evalfile-sha256",
+        help="require the selected NNUE EvalFile hash (required for v4/v5 evaluator modes)",
+    )
+    parser.add_argument(
         "--expected-opening-count",
         type=int,
         default=32,
         help="require this many distinct opening roots; pass 0 to disable opening coverage",
     )
     args = parser.parse_args(argv)
+
+    if args.expected_evalfile_sha256 is not None and not SHA256_HEX.fullmatch(args.expected_evalfile_sha256):
+        parser.error("--expected-evalfile-sha256 must contain 64 hexadecimal characters")
+    if args.expected_evaluator_mode in {"nnue-v4", "nnue-v5", "gpu-v5"} and args.expected_evalfile_sha256 is None:
+        parser.error("--expected-evalfile-sha256 is required for a nonclassical evaluator mode")
+    if args.expected_evalfile_sha256 is not None and args.expected_evaluator_mode is None:
+        parser.error("--expected-evaluator-mode is required with --expected-evalfile-sha256")
+    if args.expected_evaluator_mode == "classical" and args.expected_evalfile_sha256 is not None:
+        parser.error("classical evaluator mode does not accept --expected-evalfile-sha256")
 
     errors = validate_match_artifacts(
         args.pgn,
@@ -476,6 +569,8 @@ def main(argv: list[str] | None = None) -> int:
         expected_threads=args.expected_threads,
         expected_max_moves=args.expected_max_moves,
         expected_opening_count=args.expected_opening_count,
+        expected_evaluator_mode=args.expected_evaluator_mode,
+        expected_evalfile_sha256=args.expected_evalfile_sha256,
     )
     if errors:
         for error in errors:
@@ -498,6 +593,10 @@ def main(argv: list[str] | None = None) -> int:
     )
     if args.expected_opening_count:
         summary += f"; all {args.expected_opening_count} curated openings covered"
+    if args.expected_evaluator_mode is not None:
+        summary += f"; evaluator={args.expected_evaluator_mode}"
+        if args.expected_evalfile_sha256 is not None:
+            summary += f"; EvalFile SHA-256={args.expected_evalfile_sha256.lower()}"
     print(summary)
     return 0
 

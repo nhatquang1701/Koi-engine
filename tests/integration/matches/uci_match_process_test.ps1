@@ -76,6 +76,28 @@ function Invoke-ScriptedMatch([string]$KoiPath, [string]$OpponentPath, [string]$
     }
 }
 
+function Invoke-EvaluatorMatch([string]$Mode, [string]$EvalFile, [string]$OutputDirectory,
+                              [int]$Threads = 1) {
+    $arguments = @(
+        '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $matchScript,
+        '-KoiPath', $EnginePath, '-OpponentPath', $EnginePath, '-ReplayPath', $replayPath,
+        '-KoiEvaluatorMode', $Mode, '-Threads', "$Threads", '-Depth', '1', '-Games', '1',
+        '-MaxPlies', '1', '-TimeoutMilliseconds', '5000', '-OutputDirectory', $OutputDirectory
+    )
+    if (-not [string]::IsNullOrWhiteSpace($EvalFile)) {
+        $arguments += @('-KoiEvalFile', $EvalFile)
+    }
+    $output = @(& $PowerShellExecutable @arguments 2>&1 | ForEach-Object { $_.ToString() })
+    $exitCode = $LASTEXITCODE
+    $reports = @(Get-ChildItem -LiteralPath $OutputDirectory -Filter '*.json' -File -ErrorAction SilentlyContinue)
+    $report = if ($reports.Count -eq 1) {
+        Get-Content -LiteralPath $reports[0].FullName -Raw | ConvertFrom-Json
+    } else {
+        $null
+    }
+    return [pscustomobject]@{ exit_code = $exitCode; output = $output; report = $report }
+}
+
 $outputDirectory = Join-Path ([System.IO.Path]::GetTempPath()) ("koi-match-test-" + [guid]::NewGuid().ToString('N'))
 $fenFile = Join-Path $outputDirectory 'terminal.fen'
 try {
@@ -112,9 +134,11 @@ try {
         $report.measurement.network.state -ne 'disabled' -or
         $report.measurement.book.state -ne 'disabled' -or
         $report.measurement.tablebase.state -ne 'disabled' -or
+        $report.configuration.koi_evaluator_mode -ne 'classical' -or
+        $null -ne $report.configuration.koi_evalfile_sha256 -or
         $report.hardware.cpu_count -lt 1 -or
         $report.configuration.run_label -ne 'measurement') {
-        throw 'UCI match JSON must record disabled network/book/tablebase state and hardware/run metadata.'
+        throw 'UCI match JSON must preserve classical defaults and record disabled measurement state and run metadata.'
     }
     $koiEngine = @($report.engines | Where-Object { $_.label -eq 'Koi' })[0]
     if ($koiEngine.options -notcontains 'setoption name OwnBook value false') {
@@ -167,6 +191,110 @@ try {
         $pgn -notmatch '\[Result "\*"\]' -or
         $pgn -notmatch '\[MoveFormat "UCI coordinate notation"\]') {
         throw 'UCI match PGN must contain reproducibility headers.'
+    }
+
+    $nnueDirectory = Join-Path $outputDirectory 'nnue-attestation'
+    New-Item -ItemType Directory -Path $nnueDirectory -Force | Out-Null
+    $nnueFixturePath = Join-Path (Split-Path -Parent $EnginePath) "koi-nnue-fixture$binarySuffix"
+    if (-not (Test-Path -LiteralPath $nnueFixturePath -PathType Leaf)) {
+        throw "NNUE fixture generator is missing: $nnueFixturePath"
+    }
+    $v4Path = Join-Path $nnueDirectory 'fixture-v4.nnue'
+    $v5Path = Join-Path $nnueDirectory 'fixture-v5.nnue'
+    & $nnueFixturePath --arch v4 --output $v4Path
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Could not generate the v4 NNUE process-test fixture.'
+    }
+    & $nnueFixturePath --arch v5 --output $v5Path
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Could not generate the v5 NNUE process-test fixture.'
+    }
+
+    $missingEvalFile = Invoke-EvaluatorMatch 'nnue-v4' '' (Join-Path $nnueDirectory 'missing-file')
+    if ($missingEvalFile.exit_code -eq 0 -or
+        ($missingEvalFile.output -join ' ') -notmatch 'requires -KoiEvalFile') {
+        throw 'A nonclassical evaluator mode must require an EvalFile argument.'
+    }
+    $absentEvalFile = Invoke-EvaluatorMatch 'nnue-v4' `
+        (Join-Path $nnueDirectory 'absent.nnue') (Join-Path $nnueDirectory 'absent-file')
+    if ($absentEvalFile.exit_code -eq 0 -or
+        ($absentEvalFile.output -join ' ') -notmatch 'Koi EvalFile is missing') {
+        throw 'A nonclassical evaluator mode must reject a missing EvalFile path.'
+    }
+
+    foreach ($modeCase in @(
+        @{ mode = 'nnue-v4'; path = $v4Path },
+        @{ mode = 'nnue-v5'; path = $v5Path }
+    )) {
+        $modeDirectory = Join-Path $nnueDirectory $modeCase.mode
+        $modeMatch = Invoke-EvaluatorMatch $modeCase.mode $modeCase.path $modeDirectory
+        if ($modeMatch.exit_code -ne 0 -or $null -eq $modeMatch.report) {
+            throw "Attested $($modeCase.mode) match failed: $($modeMatch.output -join ' | ')"
+        }
+        $configuration = $modeMatch.report.configuration
+        $evidence = $configuration.koi_evaluator_attestation
+        $expectedHash = (Get-FileHash -LiteralPath $modeCase.path -Algorithm SHA256).Hash.ToLowerInvariant()
+        if ($configuration.koi_evaluator_mode -ne $modeCase.mode -or
+            $configuration.koi_evalfile_sha256 -ne $expectedHash -or
+            $evidence.nnue_enabled_confirmation -notmatch '^info string NNUE enabled from ' -or
+            @($evidence.evalfile_rejections).Count -ne 0) {
+            throw "Attested $($modeCase.mode) report must bind the selected mode and EvalFile hash to engine confirmation."
+        }
+    }
+
+    $wrongModeDirectory = Join-Path $nnueDirectory 'wrong-mode'
+    $wrongModeMatch = Invoke-EvaluatorMatch 'nnue-v5' $v4Path $wrongModeDirectory
+    if ($wrongModeMatch.exit_code -eq 0 -or
+        ($wrongModeMatch.output -join ' ') -notmatch 'does not contain NNUE v5') {
+        throw 'An NNUE v4 file must be rejected when v5 attestation was requested.'
+    }
+
+    $truncatedPath = Join-Path $nnueDirectory 'truncated-v4.nnue'
+    $v4Bytes = [System.IO.File]::ReadAllBytes($v4Path)
+    [System.IO.File]::WriteAllBytes($truncatedPath, [byte[]]$v4Bytes[0..11])
+    $rejectedDirectory = Join-Path $nnueDirectory 'rejected-file'
+    $rejectedMatch = Invoke-EvaluatorMatch 'nnue-v4' $truncatedPath $rejectedDirectory
+    if ($rejectedMatch.exit_code -eq 0 -or
+        ($rejectedMatch.output -join ' ') -notmatch 'EvalFile rejected') {
+        throw 'An EvalFile rejection must fail the attested match instead of silently falling back.'
+    }
+
+    $previousGpuSetting = $env:KOI_GPU_NNUE
+    try {
+        $env:KOI_GPU_NNUE = '1'
+        $singleThreadGpu = Invoke-EvaluatorMatch 'gpu-v5' $v5Path `
+            (Join-Path $nnueDirectory 'gpu-single-thread') 1
+        if ($singleThreadGpu.exit_code -eq 0 -or
+            ($singleThreadGpu.output -join ' ') -notmatch 'requires -Threads of at least 2') {
+            throw 'GPU v5 attestation must reject a single-thread configuration.'
+        }
+
+        Remove-Item Env:\KOI_GPU_NNUE -ErrorAction SilentlyContinue
+        $missingGpuRequest = Invoke-EvaluatorMatch 'gpu-v5' $v5Path `
+            (Join-Path $nnueDirectory 'gpu-not-requested') 2
+        if ($missingGpuRequest.exit_code -eq 0 -or
+            ($missingGpuRequest.output -join ' ') -notmatch 'requires KOI_GPU_NNUE=1') {
+            throw 'GPU v5 attestation must reject a missing GPU request environment variable.'
+        }
+
+        $env:KOI_GPU_NNUE = '1'
+        $gpuMatch = Invoke-EvaluatorMatch 'gpu-v5' $v5Path `
+            (Join-Path $nnueDirectory 'gpu-marker') 2
+        if ($gpuMatch.exit_code -eq 0) {
+            $gpuEvidence = $gpuMatch.report.configuration.koi_evaluator_attestation
+            if ($gpuEvidence.gpu_enabled_marker -ne 'koi-engine: GPU NNUE inference enabled.' -or
+                @($gpuEvidence.gpu_unavailable_fallbacks).Count -ne 0) {
+                throw 'A successful GPU v5 report must contain the enabled marker without CPU fallback.'
+            }
+        } elseif (($gpuMatch.output -join ' ') -notmatch 'GPU NNUE unavailable|GPU NNUE inference enabled marker') {
+            throw "GPU v5 must fail only when actual GPU inference could not be attested: $($gpuMatch.output -join ' | ')"
+        }
+    } finally {
+        if ($null -eq $previousGpuSetting) {
+            Remove-Item Env:\KOI_GPU_NNUE -ErrorAction SilentlyContinue
+        } else {
+            $env:KOI_GPU_NNUE = $previousGpuSetting
+        }
     }
 
     New-Item -ItemType Directory -Path $outputDirectory -Force | Out-Null
