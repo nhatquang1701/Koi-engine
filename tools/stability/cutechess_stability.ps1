@@ -472,6 +472,9 @@ $matchArguments = @(
     '-pgnout', $pgnPath,
     '-event', 'Koi stability compatibility'
 )
+if ($KoiColor -ne 'auto') {
+    $matchArguments += '-noswap'
+}
 if ($null -ne $openingForMatch) {
     $matchArguments += @('-openings', "file=$openingForMatch", "format=$openingFormat", 'order=sequential', 'policy=round')
 }
@@ -603,6 +606,11 @@ $finishedLines = @($lines | Where-Object { $_ -match '^Finished game ' })
 $koiWhite = @($startedLines | Where-Object { $_ -match '\(Koi vs ' }).Count
 $koiBlack = @($startedLines | Where-Object { $_ -match '\(.* vs Koi\)' }).Count
 $colorBalanceDelta = [math]::Abs($koiWhite - $koiBlack)
+$colorContractFailed = switch ($KoiColor) {
+    'white' { $koiWhite -ne $Games -or $koiBlack -ne 0 }
+    'black' { $koiBlack -ne $Games -or $koiWhite -ne 0 }
+    default { $colorBalanceDelta -gt 1 }
+}
 
 $terminationClassification = if ($run.timed_out) {
     'timeout'
@@ -616,7 +624,7 @@ $terminationClassification = if ($run.timed_out) {
     'crash'
 } elseif ($finishedLines.Count -eq 0) {
     'no-result'
-} elseif ($finishedLines.Count -ne $Games -or $failureLines.Count -ne 0) {
+} elseif ($finishedLines.Count -ne $Games -or $failureLines.Count -ne 0 -or $colorContractFailed) {
     'incomplete'
 } else {
     'completed'
@@ -733,6 +741,7 @@ $report = [ordered]@{
         koi_black = $koiBlack
         color_balance_delta = $colorBalanceDelta
         color_balanced = $colorBalanceDelta -le 1
+        color_contract_satisfied = -not $colorContractFailed
         failure_lines = @($failureLines + $runErrorLines)
     }
     artifacts = [ordered]@{
@@ -838,7 +847,7 @@ Write-Output "games started=$($startedLines.Count) finished=$($finishedLines.Cou
 Write-Output "failures=$($failureLines.Count) exit_code=$exitCode"
 
 if ($exitCode -ne 0 -or $startedLines.Count -ne $Games -or $finishedLines.Count -ne $Games -or
-    $failureLines.Count -ne 0 -or $colorBalanceDelta -gt 1) {
+    $failureLines.Count -ne 0 -or $colorContractFailed) {
     exit 1
 }
 exit 0

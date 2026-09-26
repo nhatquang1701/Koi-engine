@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.31)
 
-project(koi_engine VERSION 1.1.0 LANGUAGES CXX)
+project(koi_engine VERSION 1.0.0 LANGUAGES CXX)
 
 # Koi Engine supports Windows x64 with MSVC (the primary development platform)
 # and x86-64 Linux with GCC 14+ or Clang 18+.
@@ -913,6 +913,14 @@ add_test(
 
 koi_set_timeout(koi_uci_match_clock 120)
 
+add_test(
+    NAME koi_sprt_compare_decision
+    COMMAND ${POWERSHELL_EXECUTABLE} -NoProfile -ExecutionPolicy Bypass -File
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/matches/sprt_compare_decision_test.ps1"
+)
+
+koi_set_timeout(koi_sprt_compare_decision 30)
+
 # The Windows-only harnesses: Cutechess fake engines are .cmd files, the memory
 # soak reads Windows process counters, and the packaging tests exercise the
 # MSVC-specific release layout.
@@ -990,6 +998,24 @@ endif() # POWERSHELL_EXECUTABLE
 
 find_package(Python3 COMPONENTS Interpreter QUIET)
 if(Python3_Interpreter_FOUND)
+    add_test(
+        NAME release_candidate_games_python
+        COMMAND "${Python3_EXECUTABLE}" -m unittest tests/python/stability/release_candidate_games_test.py -v
+    )
+    add_test(
+        NAME release_strength_openings_python
+        COMMAND "${Python3_EXECUTABLE}" -m unittest tests/python/stability/release_strength_openings_test.py -v
+    )
+    add_test(
+        NAME strength_bound_python
+        COMMAND "${Python3_EXECUTABLE}" -m unittest tests/python/stability/strength_bound_test.py -v
+    )
+    set_tests_properties(
+        release_candidate_games_python release_strength_openings_python strength_bound_python
+        PROPERTIES
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+            ENVIRONMENT "PYTHONDONTWRITEBYTECODE=1"
+    )
     add_test(
         NAME elo_oracle_python
         COMMAND "${Python3_EXECUTABLE}" -m unittest tests/python/measurement/elo_oracle_test.py -v
@@ -1102,7 +1128,7 @@ if(Python3_Interpreter_FOUND)
         koi_chess_python koi_chess_pgn_python koi_chess_engine_python
         measurement_phase_python measurement_forensics_python
         strength_report_python nnue_studio_python nnue_studio_ui_python tune_classical_python
-        bullet_data_python
+        bullet_data_python release_candidate_games_python release_strength_openings_python strength_bound_python
         PROPERTIES
             WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
             ENVIRONMENT "PYTHONDONTWRITEBYTECODE=1"
@@ -1156,7 +1182,7 @@ if(POWERSHELL_EXECUTABLE)
         PROPERTIES LABELS "process;uci;heavy" PROCESSORS 2)
     set_tests_properties(koi_benchmark_process
         PROPERTIES LABELS "process;tools;heavy" PROCESSORS 2)
-    set_tests_properties(koi_uci_match_process koi_uci_match_clock
+    set_tests_properties(koi_uci_match_process koi_uci_match_clock koi_sprt_compare_decision
         PROPERTIES LABELS "process;matches")
     set_tests_properties(koi_uci_match_clock PROPERTIES PROCESSORS 2)
     set_tests_properties(koi_stockfish_strength_option PROPERTIES LABELS "process;matches")
@@ -1185,7 +1211,7 @@ if(Python3_Interpreter_FOUND)
         koi_chess_python koi_chess_pgn_python koi_chess_engine_python
         measurement_phase_python measurement_forensics_python strength_report_python
         nnue_studio_python koi_trainer_python tune_classical_python nnue_studio_ui_python
-        bullet_data_python
+        bullet_data_python release_candidate_games_python release_strength_openings_python strength_bound_python
         PROPERTIES LABELS "python"
     )
     if(TEST elo_oracle_python)

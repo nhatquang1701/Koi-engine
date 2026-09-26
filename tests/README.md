@@ -56,7 +56,7 @@ ctest --test-dir build\release -N
 ctest --test-dir build\release -C Release -R koi_strength_tests --output-on-failure
 ```
 
-The default Release configuration with Python 3 registers **67 tests**
+The default Release configuration with Python 3 registers **71 tests**
 (`KOI_BUILD_SHADOW_DIFF=OFF`). The count varies
 with optional dependencies:
 `koi_shadow_diff_tests` requires `-DKOI_BUILD_SHADOW_DIFF=ON`, and
@@ -143,6 +143,9 @@ the repository root as the working directory:
 
 - Measurement: `elo_oracle_python`, `elo_estimate_python`, `stockfish_match_python`,
   `elo_openings_python`, `measurement_phase_python`, `measurement_forensics_python`.
+- Release evidence: `release_candidate_games_python` validates recorded game
+  artifacts, `release_strength_openings_python` checks the fixed opening sample,
+  and `strength_bound_python` checks the paired strength decision and provenance.
 - Evaluation/NNUE: `tune_eval_python`, `nnue_training_python`, `nnue_wrapper_python`,
   `strength_report_python`, `koi_dataset_python` (koi-dataset-v1 and v2 encoders
   with four-group records), `gen_training_data_python`,
@@ -196,9 +199,9 @@ Current entries: `single-PV root forcing extension`, `depth-one forcing check`,
 `threaded depth-one forcing check`, `root king safety escape`, `threaded multipv
 ordered root ties`, `threaded multipv warmed hash`, `sparse phase-rich null
 safety`, `king-zone LMR exclusion`, `opening central break`, `late move
-full-depth verification`, `committed PGN tactical fixtures`, `poisoned
-capture quiescence`, and `true internal iterative deepening` (open engine-v2
-task in `docs/superpowers/plans/2026-09-19-engine-v2.md`).
+full-depth verification`, `committed PGN tactical fixtures`, and `poisoned
+capture quiescence` (open engine-v2 task in
+`docs/superpowers/plans/2026-09-19-engine-v2.md`).
 
 A second, deliberately tiny list (`intermittent`) holds cases whose outcome
 flips with host scheduling. Both their `XFAIL` and `XPASS` are reported but
@@ -320,6 +323,7 @@ cancellation):
   and time-manager suites three times with `KOI_TEST_RETRIES=1` and no
   `--repeat`, so a first-attempt flake cannot hide behind a retry.
 - `linux-tarball` builds inside an Ubuntu 22.04 container, packages the
-  portable `koi-engine-v1.1-linux-x86_64.tar.gz` with
-  `tools/build/package_release.ps1`, and runs UCI smokes with the automatic and
-  `KOI_CPU_VARIANT=generic` variants.
+  portable `koi-engine-v1.0.0-linux-x86_64.tar.gz` with
+  `tools/build/package_release.ps1`, verifies and extracts the archive, then
+  runs bounded UCI smokes with the automatic and `KOI_CPU_VARIANT=generic`
+  variants.

@@ -49,6 +49,9 @@ param(
     # Keys are sent sorted so transcripts stay reproducible.
     [hashtable]$OpponentOptions = @{},
 
+    [ValidatePattern('^(?:true|false|1|0)?$')]
+    [string]$OpponentOwnBook = '',
+
     [ValidateRange(1, 64)]
     [int]$Threads = 1,
 
@@ -109,6 +112,7 @@ if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
 }
 $KoiOwnBookEnabled = $KoiOwnBook -in @('true', '1')
 $KoiBookRandomEnabled = $KoiBookRandom -in @('true', '1')
+$OpponentOwnBookEnabled = if ($OpponentOwnBook -eq '') { $null } else { $OpponentOwnBook -in @('true', '1') }
 $OpponentEloAnchor = $null
 if ($null -ne $OpponentElo) {
     $OpponentEloAnchor = [Math]::Max(1320, [Math]::Min(3190, $OpponentElo))
@@ -420,6 +424,11 @@ function Initialize-UciEngine($Engine) {
         }
     }
     if ($Engine.Label -ceq 'Opponent') {
+        if ($null -ne $OpponentOwnBookEnabled) {
+            $option = "setoption name OwnBook value $($OpponentOwnBookEnabled.ToString().ToLowerInvariant())"
+            Send-UciLine $Engine $option
+            $Engine.SentOptions.Add($option)
+        }
         foreach ($name in @($OpponentOptions.Keys | Sort-Object)) {
             $option = "setoption name $name value $($OpponentOptions[$name])"
             Send-UciLine $Engine $option
@@ -1131,6 +1140,7 @@ $report = [ordered]@{
         koi_book_file = $KoiBookFile
         koi_book_depth = $KoiBookDepth
         koi_book_random = $KoiBookRandomEnabled
+        opponent_own_book = $OpponentOwnBookEnabled
         opponent_limit_strength = ($null -ne $OpponentEloAnchor)
         opponent_elo = $OpponentEloAnchor
         batch_id = $BatchId

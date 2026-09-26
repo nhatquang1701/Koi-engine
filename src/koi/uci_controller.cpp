@@ -31,8 +31,6 @@ constexpr std::uint64_t kMaximumSpeedPercent = 100;
 constexpr std::uint64_t kMinimumSlowMoverPercent = 10;
 constexpr std::uint64_t kMaximumSlowMoverPercent = 1'000;
 constexpr std::uint64_t kMaximumMoveOverheadMs = 5'000;
-constexpr std::uint64_t kMinimumElo = 1'320;
-constexpr std::uint64_t kMaximumElo = 3'190;
 constexpr std::uint64_t kMinimumMultiPv = 1;
 constexpr std::uint64_t kMaximumMultiPv = 16;
 constexpr std::uint64_t kMaximumBookDepth = 40;
@@ -145,8 +143,6 @@ enum class UciOptionId {
     show_wdl,
     move_overhead,
     slow_mover,
-    limit_strength,
-    elo,
     strength_mode,
     syzygy_path,
     syzygy_probe_depth,
@@ -173,7 +169,7 @@ struct UciOptionDescriptor {
 // and `handle_setoption` consume this table, so an advertised option can never
 // drift out of sync with the option the controller actually applies. The order
 // of the entries is the order advertised to a GUI and must stay stable.
-constexpr std::array<UciOptionDescriptor, 28> kUciOptions{{
+constexpr std::array<UciOptionDescriptor, 26> kUciOptions{{
     {"RandomSeed", UciOptionKind::spin, UciOptionId::random_seed, "0", 0,
      kMaximumRandomSeed, false, true},
     {"Hash", UciOptionKind::spin, UciOptionId::hash, "512", kMinimumHashMegabytes,
@@ -200,10 +196,6 @@ constexpr std::array<UciOptionDescriptor, 28> kUciOptions{{
      kMaximumMoveOverheadMs, false, true},
     {"Slow Mover", UciOptionKind::spin, UciOptionId::slow_mover, "100", kMinimumSlowMoverPercent,
      kMaximumSlowMoverPercent, false, true},
-    {"UCI_LimitStrength", UciOptionKind::check, UciOptionId::limit_strength, "false", 0, 0, false,
-     true},
-    {"UCI_Elo", UciOptionKind::spin, UciOptionId::elo, "1320", kMinimumElo, kMaximumElo, false,
-     true},
     {"StrengthMode", UciOptionKind::check, UciOptionId::strength_mode, "false", 0, 0, false, true},
     {"SyzygyPath", UciOptionKind::string, UciOptionId::syzygy_path, "", 0, 0, false, true},
     {"SyzygyProbeDepth", UciOptionKind::spin, UciOptionId::syzygy_probe_depth, "1",
@@ -396,22 +388,6 @@ std::uint64_t legal_move_digest(const std::vector<Move>& legal_moves) {
 template <typename T>
 std::string debug_optional(const std::optional<T>& value) {
     return value.has_value() ? std::to_string(*value) : "-";
-}
-
-// Uncalibrated strength limiter: UCI_LimitStrength turns UCI_Elo into a
-// per-move node budget for time-controlled games. The mapping is deliberately
-// monotone and simple (100 nodes at 500 Elo, one doubling every 250 Elo up to
-// a 25k-node cap); it bounds the search instead of promising a rating, and
-// 2600 Elo or more leaves the search unlimited.
-[[nodiscard]] std::uint64_t strength_node_limit(std::uint32_t elo) noexcept {
-    constexpr std::uint32_t kFullStrengthElo = 2600;
-    if (elo >= kFullStrengthElo) {
-        return 0;
-    }
-    const std::uint32_t clamped = std::max<std::uint32_t>(elo, 500);
-    const std::uint32_t steps = (clamped - 500) / 250;
-    const std::uint64_t nodes = 100ull << std::min<std::uint32_t>(steps, 8);
-    return std::min<std::uint64_t>(nodes, 25'000);
 }
 
 std::string debug_limits(const SearchLimits& limits) {
@@ -945,16 +921,6 @@ void UciController::handle_setoption(std::istream& command) {
         });
         break;
 
-    case UciOptionId::limit_strength:
-        apply_boolean(limit_strength_, [this](bool limit_strength) { limit_strength_ = limit_strength; });
-        break;
-
-    case UciOptionId::elo:
-        apply_unsigned(*option, elo_, [this](std::uint64_t elo) {
-            elo_ = static_cast<std::uint32_t>(elo);
-        });
-        break;
-
     case UciOptionId::strength_mode: {
         bool strength_mode = false;
         if (parse_boolean(value, strength_mode) && strength_mode_ != strength_mode) {
@@ -1099,16 +1065,6 @@ void UciController::handle_go(std::istream& command) {
         // TimeManager intentionally leaves a clock for the other side unset;
         // the controller supplies the same bounded fallback as bare `go`.
         limits.movetime = kBareGoFallback;
-    }
-    if (limit_strength_ && !has_explicit_limit && !limits.nodes.has_value()) {
-        // UCI_LimitStrength turns UCI_Elo into a per-move node budget for
-        // time-controlled games. An explicit work limit (depth/nodes/movetime/
-        // infinite/ponder) is always honoured as sent, so analysis and tests
-        // keep their exact semantics.
-        const std::uint64_t cap = strength_node_limit(elo_);
-        if (cap != 0) {
-            limits.nodes = cap;
-        }
     }
     stop_and_suppress_active_search();
 
@@ -1393,8 +1349,6 @@ void UciController::start_search(GameState root, SearchLimits limits, bool skip_
     options.show_wdl = show_wdl_;
     options.move_overhead_ms = move_overhead_ms_;
     options.slow_mover_percent = slow_mover_percent_;
-    options.limit_strength = limit_strength_;
-    options.elo = elo_;
     options.generation = generation;
     options.strength_mode = strength_mode_;
     options.syzygy = syzygy_;

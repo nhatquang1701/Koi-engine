@@ -184,7 +184,7 @@ $timedJson = Get-Content -LiteralPath $timedProfile -Raw | ConvertFrom-Json
 if ((Get-Content -LiteralPath $coldProfile -Raw) -cne $coldReplayText) {
     throw 'untimed profile JSON must be byte-identical across repeated runs.'
 }
-if ($coldJson.build -cne 'Koi Engine 1.1.0') {
+if ($coldJson.build -cne 'Koi Engine 1.0.0') {
     throw "untimed profile JSON must expose a stable build identity, got: $($coldJson.build)"
 }
 if ($warm.Stdout -notmatch '(?m)^config threads 1 speed 100 timed 0 hash warm\r?$') {

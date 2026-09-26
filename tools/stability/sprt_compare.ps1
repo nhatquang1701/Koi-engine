@@ -30,6 +30,19 @@ $ErrorActionPreference = 'Stop'
 $acceptThreshold = [Math]::Log(19.0)   # ln((1 - beta) / alpha)
 $rejectThreshold = -$acceptThreshold
 
+function Get-CombinedSprtResult([double]$WhiteLlr, [double]$BlackLlr,
+                                [double]$AcceptThreshold, [double]$RejectThreshold) {
+    $llr = $WhiteLlr + $BlackLlr
+    $decision = if ($llr -ge $AcceptThreshold) {
+        'accept'
+    } elseif ($llr -le $RejectThreshold) {
+        'reject'
+    } else {
+        'inconclusive'
+    }
+    return [pscustomobject]@{ llr = $llr; decision = $decision }
+}
+
 function Assert-FileExists([string]$Path, [string]$Description) {
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
         throw "$Description is missing: $Path"
@@ -60,7 +73,9 @@ function Start-ColorRun([string]$Color) {
         '-OpeningFile', (& $quote (Resolve-Path -LiteralPath $OpeningFile).Path),
         '-Threads', "$Threads",
         '-Hash', "$Hash",
+        '-KoiRandomSeed', '0',
         '-KoiOwnBook', 'false',
+        '-OpponentOwnBook', 'false',
         '-Games', "$Games",
         '-Sprt', '-SprtElo0', "$Elo0", '-SprtElo1', "$Elo1",
         '-SprtMinGames', "$MinGames", '-SprtMaxGames', "$MaxGames",
@@ -113,23 +128,16 @@ $games = [int]$white.games + [int]$black.games
 $wins = [int]$white.wins + [int]$black.wins
 $draws = [int]$white.draws + [int]$black.draws
 $losses = [int]$white.losses + [int]$black.losses
-$combinedLlr = [double]$white.llr + [double]$black.llr
+$combined = Get-CombinedSprtResult -WhiteLlr ([double]$white.llr) -BlackLlr ([double]$black.llr) `
+    -AcceptThreshold $acceptThreshold -RejectThreshold $rejectThreshold
+$combinedLlr = [double]$combined.llr
 
 Write-Output ("white: {0} games {1}W/{2}D/{3}L elo {4} llr {5} decision {6}" -f `
     $white.games, $white.wins, $white.draws, $white.losses, $white.elo, $white.llr, $white.decision)
 Write-Output ("black: {0} games {1}W/{2}D/{3}L elo {4} llr {5} decision {6}" -f `
     $black.games, $black.wins, $black.draws, $black.losses, $black.elo, $black.llr, $black.decision)
 
-$decision = 'inconclusive'
-if ($white.decision -eq 'accept' -or $black.decision -eq 'accept') {
-    $decision = 'accept'
-} elseif ($white.decision -eq 'reject' -or $black.decision -eq 'reject') {
-    $decision = 'reject'
-} elseif ($combinedLlr -ge $acceptThreshold) {
-    $decision = 'accept'
-} elseif ($combinedLlr -le $rejectThreshold) {
-    $decision = 'reject'
-}
+$decision = [string]$combined.decision
 
 $score = if ($games -gt 0) { ([double]$wins + 0.5 * [double]$draws) / [double]$games } else { 0.0 }
 $combinedElo = ([double]$white.elo + [double]$black.elo) / 2.0

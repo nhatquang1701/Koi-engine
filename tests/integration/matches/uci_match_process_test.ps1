@@ -39,7 +39,7 @@ function Invoke-ScriptedMatch([string]$KoiPath, [string]$OpponentPath, [string]$
                                [string]$OpeningFile = '', [string]$TimeControl = '',
                                [string]$KoiColor = 'white', [uint64]$KoiRandomSeed = 1,
                                [bool]$KoiOwnBook = $true, [string]$KoiBookFile = 'book.bin',
-                               [int]$KoiBookDepth = 16,
+                               [int]$KoiBookDepth = 16, [string]$OpponentOwnBook = '',
                                 [switch]$Sprt, [int]$SprtMinGames = 20, [int]$SprtMaxGames = 2000,
                                 [double]$SprtElo1 = 5.0) {
     $optionalArguments = @()
@@ -52,6 +52,9 @@ function Invoke-ScriptedMatch([string]$KoiPath, [string]$OpponentPath, [string]$
     if ($Sprt) {
         $optionalArguments += @('-Sprt', '-SprtMinGames', $SprtMinGames, '-SprtMaxGames', $SprtMaxGames,
             '-SprtElo1', $SprtElo1)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($OpponentOwnBook)) {
+        $optionalArguments += @('-OpponentOwnBook', $OpponentOwnBook)
     }
     $output = & $PowerShellExecutable -NoProfile -ExecutionPolicy Bypass -File $matchScript `
         -KoiPath $KoiPath -OpponentPath $OpponentPath -ReplayPath $replayPath `
@@ -271,6 +274,15 @@ try {
     $opponentOptions = @($openingReport.engines | Where-Object { $_.label -eq 'Opponent' })[0].options
     if (@($opponentOptions | Where-Object { $_ -match '^setoption name (RandomSeed|OwnBook|BookFile|BookDepth) value ' }).Count -ne 0) {
         throw 'Koi-specific seed and book options must not be sent to the opponent.'
+    }
+    $equalOptionsDirectory = Join-Path $outputDirectory 'equal-baseline-options'
+    New-Item -ItemType Directory -Path $equalOptionsDirectory -Force | Out-Null
+    $equalOptionsMatch = Invoke-ScriptedMatch $EnginePath $EnginePath $equalOptionsDirectory 1 2 `
+        -KoiRandomSeed 0 -KoiOwnBook $false -OpponentOwnBook 'false'
+    $equalOpponentOptions = @($equalOptionsMatch.report.engines | Where-Object { $_.label -eq 'Opponent' })[0].options
+    if ($equalOpponentOptions -notcontains 'setoption name OwnBook value false' -or
+        $equalOptionsMatch.report.configuration.opponent_own_book -ne $false) {
+        throw 'Explicit baseline book setting must be sent to the opponent.'
     }
     if ($e4Game.moves[1].book_used -ne $true -or $e4Game.moves[1].book_move -ne 'e7e5' -or
         $e4Game.moves[1].final_info -ne $null -or

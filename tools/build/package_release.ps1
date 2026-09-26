@@ -11,11 +11,12 @@ $outputRoot = [System.IO.Path]::GetFullPath($OutputDirectory)
 $isWindowsHost = $env:OS -eq 'Windows_NT'
 $binarySuffix = if ($isWindowsHost) { '.exe' } else { '' }
 $platformTag = if ($isWindowsHost) { '' } else { '-linux-x86_64' }
-$packageDirectory = Join-Path $outputRoot "koi-engine-v1.1$platformTag"
+$packageName = "koi-engine-v1.0.0$platformTag"
+$packageDirectory = Join-Path $outputRoot $packageName
 $archivePath = if ($isWindowsHost) {
-    Join-Path $outputRoot 'koi-engine-v1.1.zip'
+    Join-Path $outputRoot "$packageName.zip"
 } else {
-    Join-Path $outputRoot "koi-engine-v1.1$platformTag.tar.gz"
+    Join-Path $outputRoot "$packageName.tar.gz"
 }
 
 function Get-Sha256Hex {
@@ -84,6 +85,8 @@ foreach ($name in $requiredExecutables) {
     Copy-Item -LiteralPath (Join-Path $binaryDirectory $name) -Destination (Join-Path $packageDirectory $name)
 }
 Copy-Item -LiteralPath $readmePath -Destination (Join-Path $packageDirectory 'README.md')
+Copy-Item -LiteralPath (Join-Path $repositoryRoot 'LICENSE') `
+    -Destination (Join-Path $packageDirectory 'LICENSE')
 
 $licenseDirectory = Join-Path $packageDirectory 'licenses'
 New-Item -ItemType Directory -Path $licenseDirectory -Force | Out-Null
@@ -96,7 +99,7 @@ $engineName = "koi-engine$binarySuffix"
 $avx2Name = "koi-engine-avx2$binarySuffix"
 $avx512Name = "koi-engine-avx512$binarySuffix"
 @"
-Koi Engine v1.1 installation
+Koi Engine v1.0.0 installation
 
 Run $engineName as a UCI engine from En Croissant or another UCI GUI.
 $engineName starts the fastest build this CPU supports: it launches the
@@ -124,17 +127,51 @@ sm_61 or newer) with a CUDA 12.x-capable driver and is opt-in with
 KOI_GPU_NNUE=1.
 "@ | Set-Content -LiteralPath (Join-Path $packageDirectory 'INSTALL.txt') -Encoding UTF8
 
+$sourceCommit = $env:GITHUB_SHA
+if ($sourceCommit -notmatch '^[0-9a-f]{40,64}$') {
+    $sourceCommitOutput = @(& git -C $repositoryRoot rev-parse HEAD 2>$null)
+    $gitExitCode = $LASTEXITCODE
+    $sourceCommit = if ($sourceCommitOutput.Count -gt 0) { $sourceCommitOutput[0].Trim() } else { 'unknown' }
+    if ($gitExitCode -ne 0 -or $sourceCommit -notmatch '^[0-9a-f]{40,64}$') {
+        $sourceCommit = 'unknown'
+    }
+}
+if ($sourceCommit -notmatch '^[0-9a-f]{40,64}$') {
+    throw 'Release packaging requires a source commit; set GITHUB_SHA or run from a Git checkout.'
+}
+$statusOutput = @(& git -C $repositoryRoot status --porcelain --untracked-files=all 2>$null)
+$gitStatusExitCode = $LASTEXITCODE
+if ($gitStatusExitCode -ne 0) {
+    throw 'Unable to determine whether the source checkout is dirty.'
+}
+$sourceDirty = $statusOutput.Count -gt 0
+$packageFiles = @(Get-ChildItem -LiteralPath $packageDirectory -File -Recurse |
+    Where-Object { $_.FullName -ne (Join-Path $packageDirectory 'package.json') } |
+    Sort-Object { $_.FullName.Substring($packageDirectory.Length + 1).Replace('\', '/') } |
+    ForEach-Object {
+        $relativePath = $_.FullName.Substring($packageDirectory.Length + 1).Replace('\', '/')
+        [ordered]@{
+            path = $relativePath
+            size_bytes = $_.Length
+            sha256 = Get-Sha256Hex $_.FullName
+        }
+    })
 $manifest = [ordered]@{
     schema = 'koi-engine-package-v1'
-    version = '1.1.0'
-    build_directory = $buildRoot
-    executables = @($requiredExecutables | ForEach-Object {
-        [ordered]@{ name = $_; sha256 = Get-Sha256Hex (Join-Path $packageDirectory $_) }
-    })
+    version = '1.0.0'
+    platform = if ($isWindowsHost) { 'windows-x86_64' } else { 'linux-x86_64' }
+    build_configuration = 'Release'
+    files = $packageFiles
     book_included = $false
     tablebases_included = $false
+    provenance = [ordered]@{
+        source_commit = $sourceCommit
+        source_dirty = [bool]$sourceDirty
+        source_ref = if (-not [string]::IsNullOrWhiteSpace($env:GITHUB_REF)) { $env:GITHUB_REF } else { $null }
+        created_utc = [DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ssZ')
+    }
 }
-$manifest | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $packageDirectory 'package.json') -Encoding UTF8
+$manifest | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $packageDirectory 'package.json') -Encoding UTF8
 
 if (Test-Path -LiteralPath $archivePath) {
     Remove-Item -LiteralPath $archivePath -Force
@@ -147,7 +184,10 @@ if ($isWindowsHost) {
         throw "tar failed with exit code $LASTEXITCODE."
     }
 }
+$archiveHash = Get-Sha256Hex -Path $archivePath
+Set-Content -LiteralPath "$archivePath.sha256" -Value "$archiveHash  $([System.IO.Path]::GetFileName($archivePath))" -Encoding ASCII
 
 Write-Output "package_directory=$packageDirectory"
 Write-Output "archive=$archivePath"
+Write-Output "archive_sha256=$archiveHash"
 Write-Output "book_included=false"

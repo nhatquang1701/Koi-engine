@@ -222,7 +222,7 @@ sample as the primary result and retaining every sample in the profile's `runs`
 array. Combine all three for steady-state throughput comparisons. `--timed` is
 opt-in and adds wall-clock `elapsed_ms` and measured NPS to text and JSON; it is
 intentionally absent from the default CI-shaped output. Untimed JSON profiles use
-the stable `Koi Engine 1.1.0` build identity, set `timed` to `false`, and record
+the stable `Koi Engine 1.0.0` build identity, set `timed` to `false`, and record
 `nps` as unmeasured (`0`). Each profile carries `hash_state` (`cold` or `warm`) at
 the top level and on every position. It is a separate process and never writes to
 the UCI engine's stdout.
@@ -453,9 +453,12 @@ ignore those UCI options safely.
 `tools/stability/sprt_compare.ps1` wraps `uci_match.ps1` for candidate-versus-baseline
 acceptance testing: it launches the white and black SPRT runs concurrently, reads both
 reports, and prints per-color and combined results. The combined decision accepts when
-either color accepts, rejects when either color rejects, and otherwise compares the sum
-of the two independent LLRs against the alpha = beta = 0.05 bounds. It exits 0 on
+the sum of the two color LLRs crosses the alpha = beta = 0.05 acceptance bound,
+and rejects when it crosses the rejection bound. Both Koi binaries use seed 0
+with their opening books disabled. The script exits 0 on
 accept, 1 on reject, and 2 when more games are needed.
+The v1.0.0 release comparison uses the fixed, color-reversed opening sample and
+exact bound described in the release evidence report; this SPRT utility is exploratory.
 
 ```powershell
 .\tools\stability\sprt_compare.ps1 `
@@ -781,16 +784,11 @@ every `go` is answered. `time_manager_tests` and
 ### WDL and strength controls
 
 `UCI_ShowWDL` defaults to false. When enabled, ordinary `info` lines append a
-deterministic `wdl W D L` triplet; it is omitted when disabled. `UCI_LimitStrength`
-defaults to false and `UCI_Elo` defaults to 1320 with a 1320..3190 range; they
-are Stockfish-compatible configuration controls. When `UCI_LimitStrength` is
-enabled, clock searches receive a monotone node cap derived from `UCI_Elo`
-(100 nodes at 500 Elo, doubling every 250 Elo up to 25 000, and unlimited at
-2600 and above), so weaker settings visibly search less. Explicit `go depth`,
-`go nodes`, `go movetime`, `go infinite`, and `go ponder` limits are always
-honoured exactly as sent, which keeps analysis and pinned tests deterministic.
-The mapping is deliberately uncalibrated until a recorded strength profile
-exists; it is a play-strength limiter, not an Elo-accurate handicap.
+deterministic `wdl W D L` triplet; it is omitted when disabled. Koi v1.0.0
+does not advertise `UCI_LimitStrength` or `UCI_Elo`: the previous node-cap
+mapping was not calibrated to an actual rating. A GUI that sends those legacy
+options receives normal full-strength play. Stockfish's separate Elo controls
+remain available to the measurement tools when Stockfish is the opponent.
 
 ### Optional Syzygy tablebases
 
@@ -972,13 +970,19 @@ transcript but cannot automate a locally installed Lucas Chess GUI.
 
 ## Configuration and release packaging
 
+The current release candidate is Koi Engine v1.0.0. Windows packages use
+`koi-engine-v1.0.0.zip`; the portable Linux archive is
+`koi-engine-v1.0.0-linux-x86_64.tar.gz`. Each archive retains this README, the
+project MIT license, required third-party licenses, and a `package.json` manifest with per-file
+SHA-256 hashes and source commit provenance. A `.sha256` sidecar verifies the
+archive itself.
+
 Koi has no required configuration file. En Croissant or another UCI GUI sends
 the options at session start; the portable release defaults are `RandomSeed=0`,
 `Hash=512`, `Threads=1`, `Speed=100`, `UCI_AnalyseMode=false`, `MultiPV=1`,
 `Ponder=false`, `OwnBook=true`, `BookFile=book.bin`, `BookDepth=16`,
 `BookRandom=false`, `BookSafety=true`, `BookSafetyDepth=2`,
-`UCI_ShowWDL=false`, `Move Overhead=30`, `Slow Mover=100`,
-`UCI_LimitStrength=false`, `UCI_Elo=1320`, `StrengthMode=false`,
+`UCI_ShowWDL=false`, `Move Overhead=30`, `Slow Mover=100`, `StrengthMode=false`,
 `SyzygyPath=""`, `SyzygyProbeDepth=1`, `SyzygyProbeLimit=7`,
 `Syzygy50MoveRule=true`, `SyzygyInteriorDepth=0`, and `EvalFile=""`
 (empty keeps the boot-time evaluator).

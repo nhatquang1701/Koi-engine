@@ -27,7 +27,7 @@ if (-not (Test-Path -LiteralPath $CampaignScript -PathType Leaf)) {
     throw "Cutechess stability campaign script is missing: $CampaignScript"
 }
 
-function New-FakeCutechess([string]$Path, [ValidateSet('success', 'one', 'crash', 'disconnect', 'no-result', 'timeout', 'time-forfeit')][string]$Mode) {
+function New-FakeCutechess([string]$Path, [ValidateSet('success', 'one', 'fixed-white', 'fixed-black', 'crash', 'disconnect', 'no-result', 'timeout', 'time-forfeit')][string]$Mode) {
     $lines = switch ($Mode) {
         'success' {
             @(
@@ -44,6 +44,26 @@ function New-FakeCutechess([string]$Path, [ValidateSet('success', 'one', 'crash'
                 '@echo off',
                 'echo Started game 1 (Koi vs Opponent)',
                 'echo Finished game 1 (Koi vs Opponent)',
+                'exit /b 0'
+            )
+        }
+        'fixed-white' {
+            @(
+                '@echo off',
+                'echo Started game 1 (Koi vs Opponent)',
+                'echo Finished game 1 (Koi vs Opponent)',
+                'echo Started game 2 (Koi vs Opponent)',
+                'echo Finished game 2 (Koi vs Opponent)',
+                'exit /b 0'
+            )
+        }
+        'fixed-black' {
+            @(
+                '@echo off',
+                'echo Started game 1 (Opponent vs Koi)',
+                'echo Finished game 1 (Opponent vs Koi)',
+                'echo Started game 2 (Opponent vs Koi)',
+                'echo Finished game 2 (Opponent vs Koi)',
                 'exit /b 0'
             )
         }
@@ -178,6 +198,26 @@ function Assert-DiagnosticHarnessArtifacts {
         if ($oneReport.results.started_games -ne 1 -or $oneReport.results.finished_games -ne 1 -or
             [math]::Abs([int]$oneReport.results.koi_white - [int]$oneReport.results.koi_black) -gt 1) {
             throw 'An odd one-game run must retain its actual color assignment without claiming imbalance.'
+        }
+
+        foreach ($fixedColor in @('white', 'black')) {
+            New-FakeCutechess $fakeCutechess "fixed-$fixedColor"
+            $fixedDirectory = Join-Path $fixtureRoot "fixed-$fixedColor"
+            $fixedOutput = @(& $StabilityScript -KoiPath $fixtureKoi -OpponentPath $fixtureOpponent `
+                -CutechessPath $fakeCutechess -OutputDirectory $fixedDirectory -Games 2 -MaxMoves 4 `
+                -TimeControl '1+0' -Hash 16 -Threads 1 -Speed 100 -KoiColor $fixedColor `
+                -OwnBook:$false -TimeoutMilliseconds 5000)
+            if ($LASTEXITCODE -ne 0) {
+                throw "A fixed-$fixedColor two-game run must accept both games in the requested color: $($fixedOutput -join ' | ')"
+            }
+            $fixedReport = Get-Content -LiteralPath (Get-ReportPath $fixedOutput) -Raw | ConvertFrom-Json
+            $expectedWhite = if ($fixedColor -eq 'white') { 2 } else { 0 }
+            $expectedBlack = if ($fixedColor -eq 'black') { 2 } else { 0 }
+            if ($fixedReport.results.koi_white -ne $expectedWhite -or
+                $fixedReport.results.koi_black -ne $expectedBlack -or
+                @($fixedReport.configuration.arguments | Where-Object { $_ -ceq '-noswap' }).Count -ne 1) {
+                throw "The fixed-$fixedColor run must pass -noswap and record only the requested Koi color."
+            }
         }
 
         New-FakeCutechess $fakeCutechess 'success'

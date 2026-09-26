@@ -3,6 +3,7 @@ $ErrorActionPreference = 'Stop'
 $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../../..'))
 $workflow = Join-Path $repositoryRoot '.github/workflows/windows.yml'
 $linuxWorkflow = Join-Path $repositoryRoot '.github/workflows/linux.yml'
+$candidateWorkflow = Join-Path $repositoryRoot '.github/workflows/release-candidate-games.yml'
 $cmake = Join-Path $repositoryRoot 'CMakeLists.txt'
 if (-not (Test-Path -LiteralPath $workflow -PathType Leaf)) {
     throw "Windows CI workflow is missing: $workflow"
@@ -10,15 +11,25 @@ if (-not (Test-Path -LiteralPath $workflow -PathType Leaf)) {
 if (-not (Test-Path -LiteralPath $linuxWorkflow -PathType Leaf)) {
     throw "Linux CI workflow is missing: $linuxWorkflow"
 }
+if (-not (Test-Path -LiteralPath $candidateWorkflow -PathType Leaf)) {
+    throw "Release candidate game workflow is missing: $candidateWorkflow"
+}
 
 $content = Get-Content -LiteralPath $workflow -Raw
 $linuxContent = Get-Content -LiteralPath $linuxWorkflow -Raw
+$candidateContent = Get-Content -LiteralPath $candidateWorkflow -Raw
 $cmakeContent = Get-Content -LiteralPath $cmake -Raw
 $requirements = Join-Path $repositoryRoot 'tools/measurement/requirements.txt'
 if (-not (Test-Path -LiteralPath $requirements -PathType Leaf)) {
     throw "Python requirements file is missing: $requirements"
 }
 $requirementsContent = Get-Content -LiteralPath $requirements -Raw
+
+# Bash expands an unquoted $false before PowerShell receives the switch. Keep
+# the switch literal in the Linux matrix invocation.
+if (-not $candidateContent.Contains("'-OwnBook:`$false'")) {
+    throw 'Release candidate workflow must quote the OwnBook false switch for Bash.'
+}
 
 function Require-WorkflowPattern([string]$Pattern, [string]$Description) {
     if ($content -notmatch $Pattern) {
@@ -99,7 +110,7 @@ Require-CMakePattern '(?i)KOI_GPU_PTX_ARCHS' 'the embedded GPU PTX architecture 
 Require-CMakePattern '(?i)CONFIG:Release.*:/O2' 'the Release compiler optimization level'
 Require-CMakePattern '(?i)CONFIG:Release.*:/DNDEBUG' 'the Release assertion configuration'
 Require-CMakePattern '(?i)CONFIG:Release' 'a Release-only AVX2 configuration guard'
-Require-CMakePattern '(?i)project\s*\(\s*koi_engine\s+VERSION\s+1\.1\.0' 'the v1.1.0 project identity'
+Require-CMakePattern '(?i)project\s*\(\s*koi_engine\s+VERSION\s+1\.0\.0' 'the v1.0.0 project identity'
 Require-CMakePattern '(?i)CMAKE_MSVC_RUNTIME_LIBRARY' 'the static MSVC runtime policy'
 Require-CMakePattern '(?i)FILE_SET\s+CXX_MODULES' 'the C++26 named-module source set'
 Require-CMakePattern '(?i)KOI_BUILD_SHADOW_DIFF' 'the opt-in differential test switch'
@@ -130,7 +141,16 @@ Require-LinuxWorkflowPattern '(?i)koi_module_tests' 'the modules-off assertion o
 Require-LinuxWorkflowPattern '(?i)ctest\s+--test-dir\s+build/ci-release\s+-C\s+Release' 'the Linux CTest invocation'
 Require-LinuxWorkflowPattern '(?i)ubuntu:22\.04' 'the Ubuntu 22.04 tarball container'
 Require-LinuxWorkflowPattern '(?i)tools/build/package_release\.ps1' 'the shared packaging script'
-Require-LinuxWorkflowPattern '(?i)koi-engine-v1\.1-linux-x86_64\.tar\.gz' 'the Linux tarball name'
+Require-LinuxWorkflowPattern '(?i)tests/integration/packaging/package_release_test\.ps1' 'the packaging manifest and archive smoke test'
+Require-LinuxWorkflowPattern '(?i)koi-engine-v1\.0\.0-linux-x86_64\.tar\.gz' 'the Linux tarball name'
+Require-LinuxWorkflowPattern '(?i)sha256sum\s+-c' 'archive checksum verification'
+Require-LinuxWorkflowPattern '(?i)tar\s+-xzf\s+"\$archive"' 'extraction of the release archive'
+Require-LinuxWorkflowPattern '(?i)test\s+-x\s+"\$extracted/\$executable"' 'preservation of executable permissions in the archive'
+Require-LinuxWorkflowPattern '(?i)timeout\s+15' 'bounded extracted-engine smoke runs'
+Require-LinuxWorkflowPattern '(?i)bestmove\s+\[a-h\]\[1-8\]\[a-h\]\[1-8\]' 'legal bestmove validation for extracted engines'
+Require-LinuxWorkflowPattern '(?i)grep\s+-Ec\s+"\^bestmove\s+"' 'exactly one bestmove in each extracted-engine smoke'
+Require-LinuxWorkflowPattern '(?i)"\$extracted/koi-replay"\s+startpos\s+moves\s+"\$bestmove"' 'legality validation through the extracted replay executable'
+Require-LinuxWorkflowPattern '(?i)grep\s+-q\s+"legal\s+1"' 'acceptance of legal extracted-engine moves'
 Require-LinuxWorkflowPattern '(?i)-DKOI_ENABLE_GPU_NNUE=OFF' 'the CPU-only tarball configure switch'
 Require-LinuxWorkflowPattern '(?i)KOI_CPU_VARIANT=generic' 'the forced generic UCI smoke'
 Require-LinuxWorkflowPattern '(?i)actions/upload-artifact@v5' 'test diagnostic artifact upload'

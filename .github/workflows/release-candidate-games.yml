@@ -1,0 +1,216 @@
+name: Linux Release Candidate Games
+
+on:
+  push:
+    branches:
+      - codex/v1-release-candidate
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build and package the portable v1.0.0 Linux release
+        run: |
+          docker run --rm -e GITHUB_SHA -e GITHUB_REF -v "$PWD":/work -w /work ubuntu:22.04 bash -euxo pipefail -c '
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates gnupg wget software-properties-common python3-pip git
+          git config --global --add safe.directory /work
+          add-apt-repository -y ppa:ubuntu-toolchain-r/test
+          wget -q https://packages.microsoft.com/config/ubuntu/22.04/packages-microsoft-prod.deb -O /tmp/packages-microsoft-prod.deb
+          dpkg -i /tmp/packages-microsoft-prod.deb
+          apt-get update
+          apt-get install -y --no-install-recommends g++-14 powershell
+          python3 -m pip install --disable-pip-version-check --quiet --upgrade cmake ninja
+          cmake -S . -B build/ci-release -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=gcc-14 -DCMAKE_CXX_COMPILER=g++-14 -DKOI_BUILD_MODULES=OFF -DKOI_ENABLE_GPU_NNUE=OFF
+          cmake --build build/ci-release --config Release -j 4
+          pwsh -NoProfile -File tools/build/package_release.ps1 -BuildDirectory build/ci-release -OutputDirectory artifacts/packages
+          pwsh -NoProfile -File tests/integration/packaging/package_release_test.ps1 -BuildDirectory build/ci-release -PackageScript tools/build/package_release.ps1
+          (cd artifacts/packages && sha256sum -c koi-engine-v1.0.0-linux-x86_64.tar.gz.sha256)
+          '
+      - uses: actions/upload-artifact@v5
+        with:
+          name: release-candidate-linux-package
+          path: |
+            artifacts/packages/koi-engine-v1.0.0-linux-x86_64.tar.gz
+            artifacts/packages/koi-engine-v1.0.0-linux-x86_64.tar.gz.sha256
+          if-no-files-found: error
+          retention-days: 7
+
+  match:
+    needs: package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        # 128 + 128 + 32 + 32 = 320 games. Cute Chess -maxmoves counts full
+        # moves after the opening: 6 means up to 12 plies, 30 up to 60.
+        include:
+          - leg: short-white
+            games: 128
+            color: white
+            time_control: 1+0
+            threads: 1
+            max_moves: 30
+          - leg: short-black
+            games: 128
+            color: black
+            time_control: 1+0
+            threads: 1
+            max_moves: 30
+          - leg: long-white
+            games: 32
+            color: white
+            time_control: 5+3
+            threads: 4
+            max_moves: 6
+          - leg: long-black
+            games: 32
+            color: black
+            time_control: 5+3
+            threads: 4
+            max_moves: 6
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v5
+        with:
+          name: release-candidate-linux-package
+          path: artifacts/packages
+      - name: Install match tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ca-certificates wget cutechess stockfish
+          wget -q https://packages.microsoft.com/config/ubuntu/24.04/packages-microsoft-prod.deb -O /tmp/packages-microsoft-prod.deb
+          sudo dpkg -i /tmp/packages-microsoft-prod.deb
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends powershell
+      - name: Extract the packaged engine and check package files
+        shell: bash
+        run: |
+          archive=artifacts/packages/koi-engine-v1.0.0-linux-x86_64.tar.gz
+          (cd artifacts/packages && sha256sum -c koi-engine-v1.0.0-linux-x86_64.tar.gz.sha256)
+          mkdir -p artifacts/release-candidate/${{ matrix.leg }}/engine
+          tar -xzf "$archive" -C artifacts/release-candidate/${{ matrix.leg }}/engine
+          extracted="$PWD/artifacts/release-candidate/${{ matrix.leg }}/engine"
+          test -x "$extracted/koi-engine"
+          test -x "$extracted/koi-replay"
+      - name: Record the game cell contract
+        env:
+          GAMES: ${{ matrix.games }}
+          KOI_COLOR: ${{ matrix.color }}
+          TIME_CONTROL: ${{ matrix.time_control }}
+          THREADS: ${{ matrix.threads }}
+          MAX_FULL_MOVES: ${{ matrix.max_moves }}
+          LEG: ${{ matrix.leg }}
+          EXPECTED_SOURCE_COMMIT: ${{ github.sha }}
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          import pathlib
+
+          output = pathlib.Path("artifacts/release-candidate") / os.environ["LEG"]
+          archive_checksum = pathlib.Path("artifacts/packages/koi-engine-v1.0.0-linux-x86_64.tar.gz.sha256")
+          archive_sha256 = archive_checksum.read_text(encoding="utf-8").split()[0]
+          package_manifest = json.loads((output / "engine" / "package.json").read_text(encoding="utf-8-sig"))
+          package_source_commit = package_manifest["provenance"]["source_commit"]
+          if package_source_commit != os.environ["EXPECTED_SOURCE_COMMIT"]:
+              raise SystemExit(f"package source commit {package_source_commit} differs from {os.environ['EXPECTED_SOURCE_COMMIT']}")
+          if package_manifest["provenance"]["source_dirty"] is not False:
+              raise SystemExit("release candidate package was built from a dirty checkout")
+          engine_path = output / "engine" / "koi-engine"
+          engine_sha256 = hashlib.sha256(engine_path.read_bytes()).hexdigest()
+          manifest_engine_sha256 = next(
+              entry["sha256"] for entry in package_manifest["files"]
+              if entry["path"] == "koi-engine"
+          )
+          if engine_sha256 != manifest_engine_sha256:
+              raise SystemExit("extracted engine hash differs from package manifest")
+          metadata = {
+              "schema": "koi-release-candidate-game-cell-v1",
+              "engine": "extracted koi-engine-v1.0.0-linux-x86_64 package",
+              "opponent": "Ubuntu stockfish package",
+              "games": int(os.environ["GAMES"]),
+              "koi_color": os.environ["KOI_COLOR"],
+              "time_control": os.environ["TIME_CONTROL"],
+              "threads": int(os.environ["THREADS"]),
+              "own_book": False,
+              "max_full_moves": int(os.environ["MAX_FULL_MOVES"]),
+              "max_plies": 2 * int(os.environ["MAX_FULL_MOVES"]),
+              "max_plies_semantics": "Cute Chess -maxmoves full-move cap after the curated opening position",
+              "opening_file": "tests/data/openings/openings-curated-32.txt",
+              "opening_count": 32,
+              "package_archive_sha256": archive_sha256,
+              "engine_sha256": engine_sha256,
+              "package_source_commit": package_source_commit,
+          }
+          (output / "game-cell.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
+          PY
+      - name: Run packaged Koi against stockfish
+        shell: bash
+        env:
+          GAMES: ${{ matrix.games }}
+          KOI_COLOR: ${{ matrix.color }}
+          TIME_CONTROL: ${{ matrix.time_control }}
+          THREADS: ${{ matrix.threads }}
+          MAX_MOVES: ${{ matrix.max_moves }}
+          LEG: ${{ matrix.leg }}
+        run: |
+          set -euo pipefail
+          engine="$PWD/artifacts/release-candidate/$LEG/engine"
+          output="$PWD/artifacts/release-candidate/$LEG"
+          cutechess="$(command -v cutechess-cli || printf /usr/games/cutechess-cli)"
+          stockfish="$(command -v stockfish || printf /usr/games/stockfish)"
+          test -x "$cutechess"
+          test -x "$stockfish"
+          pwsh -NoProfile -File tools/stability/cutechess_stability.ps1 \
+            -KoiPath "$engine/koi-engine" \
+            -OpponentPath "$stockfish" \
+            -CutechessPath "$cutechess" \
+            -ReplayPath "$engine/koi-replay" \
+            -OutputDirectory "$output/match" \
+            -Games "$GAMES" \
+            -MaxMoves "$MAX_MOVES" \
+            -TimeControl "$TIME_CONTROL" \
+            -Threads "$THREADS" \
+            -KoiColor "$KOI_COLOR" \
+            -OpeningFile tests/data/openings/openings-curated-32.txt \
+            '-OwnBook:$false' \
+            -TimeoutMilliseconds 21000000
+      - name: Validate match counts, configuration, legality, and opening coverage
+        shell: bash
+        env:
+          GAMES: ${{ matrix.games }}
+          KOI_COLOR: ${{ matrix.color }}
+          TIME_CONTROL: ${{ matrix.time_control }}
+          THREADS: ${{ matrix.threads }}
+          MAX_MOVES: ${{ matrix.max_moves }}
+          LEG: ${{ matrix.leg }}
+        run: |
+          python tools/stability/validate_release_candidate_games.py \
+            --pgn "artifacts/release-candidate/$LEG/match/games.pgn" \
+            --report "artifacts/release-candidate/$LEG/match/stability-report.json" \
+            --openings tests/data/openings/openings-curated-32.txt \
+            --expected-games "$GAMES" \
+            --expected-color "$KOI_COLOR" \
+            --expected-time-control "$TIME_CONTROL" \
+            --expected-threads "$THREADS" \
+            --expected-max-moves "$MAX_MOVES" \
+            --expected-opening-count 32
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: release-candidate-${{ matrix.leg }}-games
+          path: |
+            artifacts/release-candidate/${{ matrix.leg }}/game-cell.json
+            artifacts/release-candidate/${{ matrix.leg }}/match
+          if-no-files-found: ignore
+          retention-days: 14

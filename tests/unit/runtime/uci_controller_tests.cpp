@@ -504,22 +504,29 @@ void test_syzygy_options_accept_valid_values_and_ignore_invalid_values() {
     require(result.diagnostics.empty(), "Syzygy option handling must keep diagnostics clean");
 }
 
-void test_task1_handshake_appends_exact_compatibility_options() {
+void test_legacy_strength_options_are_not_advertised() {
     const ControllerResult result = run_controller("uci\nquit\n");
-    const std::string expected =
-        "option name UCI_ShowWDL type check default false\n"
-                    "option name Move Overhead type spin default 30 min 0 max 5000\n"
-        "option name Slow Mover type spin default 100 min 10 max 1000\n"
-        "option name UCI_LimitStrength type check default false\n"
-        "option name UCI_Elo type spin default 1320 min 1320 max 3190\n";
-    const std::size_t clear_hash = result.output.find("option name Clear Hash type button\n");
-    const std::size_t appended = clear_hash == std::string::npos ? clear_hash : clear_hash +
-        std::string("option name Clear Hash type button\n").size();
-    require(appended != std::string::npos && result.output.substr(appended).starts_with(expected),
-            "Task 1 public options must be appended after the existing handshake options");
+    require(result.output.find("option name UCI_LimitStrength ") == std::string::npos,
+            "the uncalibrated UCI_LimitStrength option must not be advertised");
+    require(result.output.find("option name UCI_Elo ") == std::string::npos,
+            "the uncalibrated UCI_Elo option must not be advertised");
 }
 
-void test_task1_public_options_accept_valid_and_ignore_invalid_values() {
+void test_legacy_strength_options_are_quiet_unknown_options() {
+    const ControllerResult result = run_controller(
+        "setoption name UCI_LimitStrength value true\n"
+        "setoption name UCI_Elo value 3190\n"
+        "position startpos\n"
+        "go depth 1\n"
+        "stop\n"
+        "quit\n");
+    require(result.exit_code == 0, "unknown legacy options must not crash the controller");
+    require(lines_starting_with(output_lines(result.output), "bestmove ").size() == 1,
+            "unknown legacy options must leave ordinary searches usable");
+    require(result.diagnostics.empty(), "unknown legacy options must remain quiet");
+}
+
+void test_surviving_uci_strength_options_accept_valid_and_ignore_invalid_values() {
     const ControllerResult result = run_controller(
         "setoption name UCI_ShowWDL value true\n"
         "setoption name UCI_ShowWDL value invalid\n"
@@ -527,16 +534,16 @@ void test_task1_public_options_accept_valid_and_ignore_invalid_values() {
         "setoption name Move Overhead value 5001\n"
         "setoption name Slow Mover value 10\n"
         "setoption name Slow Mover value 9\n"
-        "setoption name UCI_LimitStrength value true\n"
-        "setoption name UCI_LimitStrength value maybe\n"
-        "setoption name UCI_Elo value 3190\n"
-        "setoption name UCI_Elo value 3191\n"
         "position startpos\n"
-        "go depth 1\nquit\n");
-    require(result.exit_code == 0, "Task 1 option values must never crash the controller");
-    require(lines_starting_with(output_lines(result.output), "bestmove ").size() <= 1,
-            "option parsing must not duplicate a search completion");
-    require(result.diagnostics.empty(), "valid and invalid Task 1 options must be quiet");
+        "go depth 1\n"
+        "stop\n"
+        "quit\n");
+    require(result.exit_code == 0,
+            "valid and invalid values for surviving UCI options must not crash the controller");
+    require(lines_starting_with(output_lines(result.output), "bestmove ").size() == 1,
+            "surviving option values must leave ordinary searches usable");
+    require(result.diagnostics.empty(),
+            "valid and invalid values for surviving UCI options must remain quiet");
 }
 
 void test_en_croissant_option_names_are_case_insensitive() {
@@ -679,19 +686,17 @@ void test_task1_hidden_debug_file_is_relative_rotated_and_off_stdio() {
             "debug rotation must not create a fourth backup file");
 }
 
-void test_task1_option_change_emits_exactly_one_bestmove() {
+void test_public_option_change_emits_exactly_one_bestmove() {
     const ControllerResult result = run_controller(
         "setoption name OwnBook value false\n"
         "position startpos\n"
         "go infinite\n"
         "setoption name Move Overhead value 20\n"
         "setoption name Slow Mover value 200\n"
-        "setoption name UCI_LimitStrength value true\n"
-        "setoption name UCI_Elo value 1500\n"
         "go depth 1\n"
         "stop\nquit\n");
     require(lines_starting_with(output_lines(result.output), "bestmove ").size() == 1,
-            "changing Task 1 options must stop and join the replaced search once");
+            "changing public options must stop and join the replaced search once");
 }
 
 void test_task6_strength_mode_is_case_insensitive_and_cancels_active_search() {
@@ -1431,20 +1436,6 @@ void test_deterministic_search_repeats_the_best_move_with_compatibility_seed() {
             "the deterministic start-position move must be legal");
 }
 
-void test_task1_disabled_strength_limit_preserves_fixed_depth_output() {
-    const ControllerResult result = run_controller(
-        "setoption name UCI_LimitStrength value false\n"
-        "setoption name UCI_Elo value 3190\n"
-        "position startpos\n"
-        "go depth 2\nstop\n"
-        "position startpos\n"
-        "go depth 2\nstop\nquit\n");
-    const std::vector<std::string> bestmoves =
-        lines_starting_with(output_lines(result.output), "bestmove ");
-    require(bestmoves.size() == 2 && bestmoves[0] == bestmoves[1],
-            "UCI_LimitStrength=false must preserve repeated fixed-depth output regardless of UCI_Elo");
-}
-
 void test_startpos_and_fen_move_lists_define_the_search_root() {
     const ControllerResult result = run_controller(
         "position startpos moves e2e4 e7e5 g1f3\n"
@@ -1792,7 +1783,7 @@ void test_handshake_option_table_is_unique_and_well_formed() {
             "a handshake-only transcript must stay clean");
     const std::vector<std::string> options =
         lines_starting_with(output_lines(handshake.output), "option name ");
-    require(options.size() == 26, "the handshake must advertise exactly 26 options");
+    require(options.size() == 24, "the handshake must advertise exactly 24 options");
 
     const std::string prefix = "option name ";
     std::vector<std::string> names;
@@ -1959,51 +1950,28 @@ void test_go_mate_searches_the_proving_depth() {
     require(is_legal_move(Position{}, best), "the go mate bestmove must be legal at the root");
 }
 
-// Runs a transcript whose second stage (usually stop/quit) is released as soon
-// as the first bestmove appears, so a bounded search must finish on its own.
-std::string run_gated_until_bestmove(std::string prefix, std::string suffix) {
-    StagedGatedInputBuffer input({std::move(prefix), std::move(suffix)});
-    std::istream input_stream(&input);
-    ReleaseOnBestmoveCountBuffer output_buffer(input, 1);
-    std::ostream output(&output_buffer);
-    std::ostringstream diagnostics;
-    std::thread controller_thread([&] {
-        UciController controller(input_stream, output, diagnostics);
-        (void)controller.run();
-    });
-    const bool marker_seen = input.wait_for_release_count(2, std::chrono::seconds(10));
-    if (!marker_seen) {
-        input.release_all();
-    }
-    controller_thread.join();
-    return output_buffer.str();
-}
-
-void test_strength_limit_caps_clock_searches_but_honours_explicit_limits() {
-    const std::string capped = run_gated_until_bestmove(
+void test_legacy_strength_options_do_not_cap_clock_searches() {
+    koi::test::TempDirectory files;
+    const ControllerResult result = run_controller_in_directory(
+        "setoption name Debug value true\n"
+        "setoption name DebugFile value legacy-strength.log\n"
         "setoption name UCI_LimitStrength value true\n"
         "setoption name UCI_Elo value 1320\n"
         "position startpos\n"
-        "go wtime 10000 btime 10000\n",
-        "stop\nquit\n");
+        "go wtime 10000 btime 10000\n"
+        "stop\nquit\n", files.path());
 
-    const std::uint64_t capped_nodes = max_reported_value(capped, "nodes");
-    require(lines_starting_with(output_lines(capped), "bestmove ").size() == 1,
-            "a limited strength search must still publish one result");
-    require(capped_nodes > 0 && capped_nodes <= 800,
-            "UCI_Elo 1320 must cap a clock search near the documented node budget");
-
-    const std::string explicit_depth = run_gated_until_bestmove(
-        "setoption name UCI_LimitStrength value true\n"
-        "setoption name UCI_Elo value 1320\n"
-        "position startpos\n"
-        "go depth 3\n",
-        "stop\nquit\n");
-
-    require(lines_starting_with(output_lines(explicit_depth), "bestmove ").size() == 1,
-            "an explicit depth must still publish one result under the strength cap");
-    require(max_reported_value(explicit_depth, "nodes") > 800,
-            "an explicit depth must be searched without the strength node cap");
+    require(result.exit_code == 0 && result.diagnostics.empty(),
+            "unknown legacy strength options must leave the controller clean");
+    require(lines_starting_with(output_lines(result.output), "bestmove ").size() == 1,
+            "unknown legacy strength options must still complete a clock search");
+    std::ifstream log_stream(files.path() / "legacy-strength.log");
+    const std::string log((std::istreambuf_iterator<char>(log_stream)),
+                          std::istreambuf_iterator<char>());
+    require(log.find("\"event\":\"go\"") != std::string::npos &&
+                log.find("\"limits\":\"depth=-,nodes=-,movetime_ms=-,wtime_ms=10000,btime_ms=10000,") !=
+                    std::string::npos,
+            "legacy UCI_Elo settings must not add a node cap to a clock search");
 }
 
 void test_reapplying_the_current_option_value_keeps_the_search_alive() {
@@ -2091,12 +2059,14 @@ int main(int argc, char** argv) {
     const std::vector<koi::test::TestCase> tests{
         {"uci handshake and options", test_uci_handshake_has_identity_and_supported_options_in_order},
         {"Syzygy option values", test_syzygy_options_accept_valid_values_and_ignore_invalid_values},
-        {"Task 1 handshake", test_task1_handshake_appends_exact_compatibility_options},
-        {"Task 1 option values", test_task1_public_options_accept_valid_and_ignore_invalid_values},
+        {"legacy strength handshake", test_legacy_strength_options_are_not_advertised},
+        {"legacy strength unknown options", test_legacy_strength_options_are_quiet_unknown_options},
+        {"surviving UCI strength options",
+         test_surviving_uci_strength_options_accept_valid_and_ignore_invalid_values},
         {"En Croissant option casing", test_en_croissant_option_names_are_case_insensitive},
         {"Task 1 WDL", test_task1_wdl_output_is_optional_and_mate_scores_are_converted},
         {"Task 1 hidden diagnostics", test_task1_hidden_debug_file_is_relative_rotated_and_off_stdio},
-        {"Task 1 option replacement", test_task1_option_change_emits_exactly_one_bestmove},
+        {"public option replacement", test_public_option_change_emits_exactly_one_bestmove},
         {"Task 6 StrengthMode", test_task6_strength_mode_is_case_insensitive_and_cancels_active_search},
         {"opening-book normal play", test_book_options_emit_one_seeded_marker_and_bestmove_for_normal_play},
         {"opening-book random option", test_book_random_option_accepts_valid_values_and_ignores_invalid_values},
@@ -2123,7 +2093,6 @@ int main(int argc, char** argv) {
         {"ponder terminal result", test_stopping_terminal_ponder_search_emits_0000},
         {"ready response", test_isready_writes_readyok},
         {"deterministic search", test_deterministic_search_repeats_the_best_move_with_compatibility_seed},
-        {"disabled strength limit", test_task1_disabled_strength_limit_preserves_fixed_depth_output},
         {"position startpos and FEN", test_startpos_and_fen_move_lists_define_the_search_root},
         {"go limits and malformed values", test_all_go_limits_and_malformed_values_are_accepted_without_crashing},
         {"go limit parser exact mapping", test_go_limit_parser_maps_each_supported_limit_exactly},
@@ -2145,7 +2114,7 @@ int main(int argc, char** argv) {
         {"promptly flushed responses", test_protocol_responses_flush_promptly},
         {"go perft output", test_go_perft_writes_move_counts_without_a_search},
         {"go mate mapping", test_go_mate_searches_the_proving_depth},
-        {"strength limiter node cap", test_strength_limit_caps_clock_searches_but_honours_explicit_limits},
+        {"legacy strength node cap", test_legacy_strength_options_do_not_cap_clock_searches},
         {"same-value option reapplication", test_reapplying_the_current_option_value_keeps_the_search_alive},
         {"ponder move without the option", test_bestmove_reports_the_ponder_move_without_the_option},
     };
