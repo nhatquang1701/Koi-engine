@@ -1117,6 +1117,10 @@ if(Python3_Interpreter_FOUND)
         COMMAND "${Python3_EXECUTABLE}" -m unittest tests/python/measurement/policy_value_dataset_test.py -v
     )
     add_test(
+        NAME policy_value_model_python
+        COMMAND "${Python3_EXECUTABLE}" -m unittest tests/python/measurement/policy_value_model_test.py -v
+    )
+    add_test(
         NAME strength_report_python
         COMMAND "${Python3_EXECUTABLE}" -m unittest tests/python/evaluation/strength_report_test.py -v
     )
@@ -1153,7 +1157,7 @@ if(Python3_Interpreter_FOUND)
         nnue_training_python nnue_wrapper_python koi_dataset_python gen_training_data_python
         koi_chess_python koi_chess_pgn_python koi_chess_engine_python
         measurement_phase_python measurement_forensics_python
-        uci_benchmark_python policy_value_dataset_python
+        uci_benchmark_python policy_value_dataset_python policy_value_model_python
         strength_report_python nnue_studio_python nnue_studio_ui_python tune_classical_python
         bullet_data_python release_candidate_games_python release_strength_openings_python strength_bound_python
         PROPERTIES
@@ -1237,7 +1241,7 @@ if(Python3_Interpreter_FOUND)
         koi_dataset_python gen_training_data_python
         koi_chess_python koi_chess_pgn_python koi_chess_engine_python
         measurement_phase_python measurement_forensics_python strength_report_python
-        uci_benchmark_python policy_value_dataset_python
+        uci_benchmark_python policy_value_dataset_python policy_value_model_python
         nnue_studio_python koi_trainer_python tune_classical_python nnue_studio_ui_python
         bullet_data_python release_candidate_games_python release_strength_openings_python strength_bound_python
         PROPERTIES LABELS "python"
@@ -1246,7 +1250,7 @@ if(Python3_Interpreter_FOUND)
         set_tests_properties(elo_oracle_python PROPERTIES LABELS "python;measurement")
     endif()
     set_tests_properties(
-        uci_benchmark_python policy_value_dataset_python
+        uci_benchmark_python policy_value_dataset_python policy_value_model_python
         PROPERTIES LABELS "python;measurement"
     )
 endif()
