@@ -117,11 +117,12 @@ pwsh -NoProfile -File .\tools\build\speed_gate.ps1 `
 ```
 
 `koi-bench --profile-json` also records search-work counters per position:
-quiescence-cache hits, full `PositionFeatures` extractions, reused LMR parent
-features, and evaluator-cache hits. These counters help identify repeated work
-and cache effectiveness; they are not per-function CPU timings. Repeated runs
-retain the same counters with each run so a median profile can be compared with
-its samples.
+quiescence-cache hits, quiescence TT cutoffs, quiescence move-generation calls,
+full `PositionFeatures` extractions, reused LMR parent features, and
+evaluator-cache hits. These counters help identify repeated work and cache
+effectiveness; they are not per-function CPU timings. Repeated runs retain the
+same counters with each run so a median profile can be compared with its
+samples.
 
 ## Cross-engine UCI throughput benchmark
 

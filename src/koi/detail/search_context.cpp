@@ -106,6 +106,7 @@ int SearchContext::quiescence(GameState& state, int alpha, int beta, int ply,
         // deeper recursive ply onto that same frame: terminal and draw
         // handling still has to run before the static horizon fallback.
         if (ply >= static_cast<int>(SearchStack::kCapacity) - 1) {
+            ++stats.qsearch_move_generations;
             const std::vector<Move> legal_moves = state.legal_moves();
             if (legal_moves.empty()) {
                 return terminal_score(state, 0, ply);
@@ -164,6 +165,7 @@ int SearchContext::quiescence(GameState& state, int alpha, int beta, int ply,
         // another recursive call.  This keeps the safety check ahead of both
         // the qsearch move list and TT bookkeeping.
         if (checked && qdepth >= kMaximumQuiescenceSafetyDepth) {
+            ++stats.qsearch_move_generations;
             const std::vector<Move> legal_moves = state.legal_moves();
             // Checkmate takes precedence over automatic draw clocks, but a
             // checked position with a legal evasion is still a draw when the
@@ -193,7 +195,43 @@ int SearchContext::quiescence(GameState& state, int alpha, int beta, int ply,
             tt_entry = entry;
             ++stats.tt_hits;
         }
+
+        const DrawStatus draw_status = state.draw_status();
+        // A non-checked forced draw has the same zero score as stalemate and
+        // can be returned without generating the tactical frontier. Checked
+        // positions still need legal evasions first so checkmate keeps
+        // precedence over automatic draw rules.
+        if (!checked && is_forced_draw_status(draw_status)) {
+            return 0;
+        }
+        const bool claimable_draw = is_claimable_draw_status(draw_status);
+
+        // A depth-valid TT entry can short-circuit the tactical frontier.
+        // Check terminal/rule state before accepting it, and keep checked,
+        // claimable-draw, and repetition-sensitive positions on the full path.
+        // A qsearch entry is stored at depth zero, and any deeper regular
+        // entry is at least as strong for this horizon. Exact values are
+        // authoritative; a proven lower bound may cut a fail-high only for a
+        // null window.
+        if (!checked && !claimable_draw && !repetition_sensitive && tt_entry.has_value()) {
+            const TranspositionEntry& entry = *tt_entry;
+            const bool horizon_matches = entry.depth >= 0 ||
+                entry.depth == qsearch_table_depth(qdepth);
+            if (horizon_matches && entry.bound == TranspositionBound::exact) {
+                ++stats.qsearch_tt_cutoffs;
+                return entry.score;
+            }
+            if (horizon_matches && beta - alpha <= 1 &&
+                entry.bound == TranspositionBound::lower && entry.score >= beta) {
+                ++stats.qsearch_tt_cutoffs;
+                path_selective_bound = true;
+                path_lower_bound = true;
+                return entry.score;
+            }
+        }
+
         MoveMetadataList moves;
+        ++stats.qsearch_move_generations;
         const bool has_legal_move = checked ?
             (state.legal_moves_with_metadata(moves, true, false), !moves.empty()) :
             state.legal_tactical_moves_with_metadata(
@@ -205,36 +243,8 @@ int SearchContext::quiescence(GameState& state, int alpha, int beta, int ply,
             }
             return score;
         }
-        const DrawStatus draw_status = state.draw_status();
         if (is_forced_draw_status(draw_status)) {
             return 0;
-        }
-        const bool claimable_draw = is_claimable_draw_status(draw_status);
-
-        // A depth-valid TT entry can short-circuit the tactical frontier.  A
-        // qsearch entry is stored at depth zero, and any deeper regular entry
-        // is at least as strong for this horizon.  Exact values are
-        // authoritative; a proven lower bound may cut a fail-high.  Claimable
-        // draws and repetition-sensitive paths stay on the full search
-        // because their value depends on the rule state that produced it, and
-        // a wide (PV-like) window does not accept a bound cutoff.
-        if (!checked && !claimable_draw && !repetition_sensitive && tt_entry.has_value()) {
-            const TranspositionEntry& entry = *tt_entry;
-            // A quiescence entry is only valid for the exact frontier that
-            // produced it (its depth is stored negated); a regular entry was
-            // searched with the full move generator and is at least as strong
-            // at any frontier.
-            const bool horizon_matches = entry.depth >= 0 ||
-                entry.depth == qsearch_table_depth(qdepth);
-            if (horizon_matches && entry.bound == TranspositionBound::exact) {
-                return entry.score;
-            }
-            if (horizon_matches && beta - alpha <= 1 &&
-                entry.bound == TranspositionBound::lower && entry.score >= beta) {
-                path_selective_bound = true;
-                path_lower_bound = true;
-                return entry.score;
-            }
         }
 
         // At this boundary the tactical generator deliberately stops probing
@@ -262,6 +272,7 @@ int SearchContext::quiescence(GameState& state, int alpha, int beta, int ply,
         if (!checked && qdepth >= kNarrowQuietCheckProbeStartDepth &&
             qdepth < kMaximumQuiescenceNarrowQuietCheckDepth) {
             MoveMetadataList quiet_check_candidates;
+            ++stats.qsearch_move_generations;
             state.legal_moves_with_metadata(
                 quiet_check_candidates, true, false, CheckFlagMode::quiet_moves_only);
             int quiet_checks_added = 0;

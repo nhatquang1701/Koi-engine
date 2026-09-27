@@ -3845,6 +3845,114 @@ void test_reduced_late_move_is_verified_at_full_child_depth() {
             "the full root search must retain the reviewed safe baseline at score zero");
 }
 
+void test_qsearch_exact_tt_cutoff_precedes_tactical_move_generation() {
+    koi::ClassicalEvaluator evaluator;
+    koi::SearchLimits limits;
+    limits.depth = 1;
+    koi::GameState state = koi::GameState::startpos();
+    koi::TimeManager time_manager(limits, state.side_to_move());
+    koi::TranspositionTable table(1);
+    const std::uint64_t key = koi::detail::search_transposition_key(state);
+    table.store(key, 1, 137, koi::TranspositionBound::exact, koi::Move::no_move());
+    std::atomic_bool stop_requested = false;
+    koi::detail::SearchContext context(evaluator, table, time_manager, stop_requested);
+    context.begin_iteration(nullptr);
+
+    const int score = context.quiescence(
+        state, -koi::detail::kInfinity, koi::detail::kInfinity, 0);
+
+    require(score == 137, "a depth-valid exact TT entry must retain its qsearch score");
+    require(context.stats.qsearch_tt_cutoffs == 1,
+            "the eligible exact qsearch TT entry must be reported as a cutoff");
+    require(context.stats.qsearch_move_generations == 0,
+            "an exact qsearch TT cutoff must skip tactical move generation");
+}
+
+void test_qsearch_lower_tt_cutoff_is_limited_to_null_windows() {
+    koi::ClassicalEvaluator evaluator;
+    koi::SearchLimits limits;
+    limits.depth = 1;
+    koi::GameState narrow_state = koi::GameState::startpos();
+    koi::TimeManager narrow_time_manager(limits, narrow_state.side_to_move());
+    koi::TranspositionTable narrow_table(1);
+    narrow_table.store(koi::detail::search_transposition_key(narrow_state), 1, 41,
+                       koi::TranspositionBound::lower, koi::Move::no_move());
+    std::atomic_bool narrow_stop_requested = false;
+    koi::detail::SearchContext narrow_context(
+        evaluator, narrow_table, narrow_time_manager, narrow_stop_requested);
+    narrow_context.begin_iteration(nullptr);
+    bool narrow_selective_bound = false;
+    bool narrow_lower_bound = false;
+
+    const int narrow_score = narrow_context.quiescence(
+        narrow_state, 0, 1, 0, 0, std::nullopt, nullptr,
+        &narrow_selective_bound, &narrow_lower_bound);
+
+    require(narrow_score == 41 && narrow_selective_bound && narrow_lower_bound,
+            "a matching lower TT bound must preserve fail-high provenance in a null window");
+    require(narrow_context.stats.qsearch_tt_cutoffs == 1 &&
+                narrow_context.stats.qsearch_move_generations == 0,
+            "an eligible qsearch lower bound must return before tactical generation");
+
+    koi::GameState wide_state = koi::GameState::startpos();
+    koi::TimeManager wide_time_manager(limits, wide_state.side_to_move());
+    koi::TranspositionTable wide_table(1);
+    wide_table.store(koi::detail::search_transposition_key(wide_state), 1, 41,
+                     koi::TranspositionBound::lower, koi::Move::no_move());
+    std::atomic_bool wide_stop_requested = false;
+    koi::detail::SearchContext wide_context(
+        evaluator, wide_table, wide_time_manager, wide_stop_requested);
+    wide_context.begin_iteration(nullptr);
+    (void)wide_context.quiescence(wide_state, 0, 50, 0);
+
+    require(wide_context.stats.qsearch_tt_cutoffs == 0 &&
+                wide_context.stats.qsearch_move_generations > 0,
+            "a lower TT bound must not cut off a wide qsearch window");
+}
+
+void test_qsearch_tt_cutoffs_preserve_forced_draw_and_checkmate_precedence() {
+    koi::ClassicalEvaluator evaluator;
+    koi::SearchLimits limits;
+    limits.depth = 1;
+
+    koi::GameState drawn = require_state("7k/8/6K1/8/8/8/8/8 w - - 0 1");
+    require(drawn.draw_status() == koi::DrawStatus::dead_position,
+            "the qsearch draw-precedence fixture must be an automatic dead-position draw");
+    koi::TimeManager draw_time_manager(limits, drawn.side_to_move());
+    koi::TranspositionTable draw_table(1);
+    draw_table.store(koi::detail::search_transposition_key(drawn), 1, 41,
+                     koi::TranspositionBound::lower, koi::Move::no_move());
+    std::atomic_bool draw_stop_requested = false;
+    koi::detail::SearchContext draw_context(
+        evaluator, draw_table, draw_time_manager, draw_stop_requested);
+    draw_context.begin_iteration(nullptr);
+
+    const int draw_score = draw_context.quiescence(drawn, 0, 1, 0);
+
+    require(draw_score == 0 && draw_context.stats.qsearch_tt_cutoffs == 0,
+            "a stored fail-high must not override an automatic draw");
+
+    koi::GameState checkmate = require_state("7k/6Q1/5K2/8/8/8/8/8 b - - 0 1");
+    require(checkmate.in_check(koi::Color::black) && checkmate.legal_moves().empty(),
+            "the qsearch mate-precedence fixture must be checkmate");
+    koi::TimeManager mate_time_manager(limits, checkmate.side_to_move());
+    koi::TranspositionTable mate_table(1);
+    mate_table.store(koi::detail::search_transposition_key(checkmate), 1, 41,
+                     koi::TranspositionBound::exact, koi::Move::no_move());
+    std::atomic_bool mate_stop_requested = false;
+    koi::detail::SearchContext mate_context(
+        evaluator, mate_table, mate_time_manager, mate_stop_requested);
+    mate_context.begin_iteration(nullptr);
+
+    const int mate_score = mate_context.quiescence(
+        checkmate, -koi::detail::kInfinity, koi::detail::kInfinity, 0);
+
+    require(mate_score <= -koi::detail::kMateThreshold &&
+                mate_context.stats.qsearch_tt_cutoffs == 0 &&
+                mate_context.stats.qsearch_move_generations > 0,
+            "a checked node must establish checkmate before accepting a TT cutoff");
+}
+
 void test_quiescence_keeps_searching_checked_evasions_past_normal_cap() {
     auto evaluator = std::make_shared<CheckedPositionEvaluator>();
     koi::SearchService service(evaluator);
@@ -4568,6 +4676,9 @@ int main(int argc, char** argv) {
         {"near-root quiet forcing extension", test_near_root_quiet_knight_fork_receives_forcing_extension},
         {"near-root pawn king-ring extension", test_near_root_pawn_attack_on_king_ring_receives_forcing_extension},
         {"near-root pawn break extension", test_near_root_central_pawn_break_receives_forcing_extension},
+        {"qsearch exact TT cutoff ordering", test_qsearch_exact_tt_cutoff_precedes_tactical_move_generation},
+        {"qsearch lower TT cutoff window", test_qsearch_lower_tt_cutoff_is_limited_to_null_windows},
+        {"qsearch TT terminal precedence", test_qsearch_tt_cutoffs_preserve_forced_draw_and_checkmate_precedence},
         {"checked quiescence cap", test_quiescence_keeps_searching_checked_evasions_past_normal_cap},
         {"poisoned capture quiescence", test_quiescence_rejects_the_poisoned_knight_capture_at_shallow_depth},
         {"bounded quiescence checks", test_quiescence_keeps_bounded_checking_continuations},

@@ -537,6 +537,10 @@ void write_run_metrics(std::ostream& output, const BenchmarkRun& run, bool timed
            << ", \"lmr_reductions\": " << result.stats.lmr_reductions
            << "}, \"feature_work\": {\"qsearch_cache_hits\": "
            << result.stats.qsearch_cache_hits
+           << ", \"qsearch_tt_cutoffs\": "
+           << result.stats.qsearch_tt_cutoffs
+           << ", \"qsearch_move_generations\": "
+           << result.stats.qsearch_move_generations
            << ", \"position_feature_extractions\": "
            << result.stats.position_feature_extractions
            << ", \"lmr_parent_feature_reuses\": "

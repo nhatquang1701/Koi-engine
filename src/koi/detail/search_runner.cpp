@@ -124,6 +124,8 @@ void accumulate_stats(SearchStats& total, const SearchStats& partial) noexcept {
     total.nodes += partial.nodes;
     total.qnodes += partial.qnodes;
     total.qsearch_cache_hits += partial.qsearch_cache_hits;
+    total.qsearch_tt_cutoffs += partial.qsearch_tt_cutoffs;
+    total.qsearch_move_generations += partial.qsearch_move_generations;
     total.position_feature_extractions += partial.position_feature_extractions;
     total.lmr_parent_feature_reuses += partial.lmr_parent_feature_reuses;
     total.evaluation_cache_hits += partial.evaluation_cache_hits;

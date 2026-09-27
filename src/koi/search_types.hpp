@@ -85,6 +85,10 @@ struct SearchStats {
     // entries are intentionally not shared through the regular TT because
     // their frontier includes q-depth and predecessor context.
     std::uint64_t qsearch_cache_hits = 0;
+    // Diagnostic counters for regular-TT short circuits in quiescence and the
+    // tactical generator calls they can avoid.
+    std::uint64_t qsearch_tt_cutoffs = 0;
+    std::uint64_t qsearch_move_generations = 0;
     // Number of full PositionFeatures snapshots requested by the search
     // context. This is diagnostic-only and helps keep expensive feature
     // extraction out of nodes that do not need it.

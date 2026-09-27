@@ -219,7 +219,8 @@ foreach ($position in $coldJson.positions) {
     if ([uint64]$position.nps -ne 0) {
         throw 'untimed profile JSON must mark NPS as unmeasured.'
     }
-    foreach ($field in @('qsearch_cache_hits', 'position_feature_extractions',
+    foreach ($field in @('qsearch_cache_hits', 'qsearch_tt_cutoffs',
+                         'qsearch_move_generations', 'position_feature_extractions',
                          'lmr_parent_feature_reuses', 'evaluation_cache_hits')) {
         if ($null -eq $position.feature_work.$field) {
             throw "profile JSON must expose feature/cache counter $field"
@@ -290,7 +291,8 @@ foreach ($position in $steadyJson.positions) {
         throw "steady-state profile positions must retain every repeated run, got $($position.runs.Count)."
     }
     foreach ($run in @($position) + @($position.runs)) {
-        foreach ($field in @('qsearch_cache_hits', 'position_feature_extractions',
+        foreach ($field in @('qsearch_cache_hits', 'qsearch_tt_cutoffs',
+                             'qsearch_move_generations', 'position_feature_extractions',
                              'lmr_parent_feature_reuses', 'evaluation_cache_hits')) {
             if ($null -eq $run.feature_work.$field) {
                 throw "profile samples must expose feature/cache counter $field"
