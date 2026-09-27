@@ -1,46 +1,68 @@
-# Koi Engine
+<h1 align="center">Koi Engine</h1>
 
-Koi Engine is a Windows x64 and Linux x86-64 UCI chess engine for standard
-chess, written in C++26. It combines iterative-deepening alpha-beta search, a
-persistent transposition table, a classical evaluator, and an optional native
-NNUE pipeline.
+<p align="center">
+  A free, open-source UCI chess engine for standard chess.<br>
+  <a href="https://nhatquang1701.github.io/Koi-engine/"><strong>Explore the documentation »</strong></a>
+</p>
 
-[Read the documentation site](https://nhatquang1701.github.io/Koi-engine/) for
-installation, GUI setup, UCI options, development guidance, release notes, and
-the project archive.
+<p align="center">
+  <a href="docs/USER_GUIDE.md#supported-uci-behavior"><img src="https://img.shields.io/badge/PROTOCOL-UCI-2e9d59?style=for-the-badge" alt="Protocol: UCI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/LICENSE-MIT-2e9d59?style=for-the-badge" alt="License: MIT"></a>
+  <img src="https://img.shields.io/badge/LANGUAGE-C%2B%2B26-2e9d59?style=for-the-badge" alt="Language: C++26">
+  <img src="https://img.shields.io/badge/PLATFORMS-Windows%20x64%20%7C%20Linux%20x86_64-2e9d59?style=for-the-badge" alt="Platforms: Windows x64 and Linux x86-64">
+</p>
+
+<p align="center">
+  <a href="https://github.com/nhatquang1701/Koi-engine/issues/new">Report an issue</a>
+  ·
+  <a href="https://github.com/nhatquang1701/Koi-engine/releases">Releases</a>
+</p>
+
+## About Koi
+
+Koi is a C++26 chess engine for Windows x64 and Linux x86-64. Its search uses
+iterative-deepening alpha-beta with a persistent transposition table. A
+classical evaluator works out of the box; a Koi-native NNUE network can be
+enabled when available.
+
+| Engine area | What Koi provides |
+| --- | --- |
+| Search | Alpha-beta; Lazy SMP when using multiple threads |
+| Evaluation | Classical by default, with optional Koi NNUE and GPU NNUE |
+| Chess support | Standard chess over the UCI protocol |
+| Optional assets | User-supplied Polyglot opening books and Syzygy tablebases |
 
 ## Download
 
-Release archives and checksum sidecars are published on the
-[GitHub Releases page](https://github.com/nhatquang1701/Koi-engine/releases).
-The Windows archive is `koi-engine-v1.0.0.zip`; the Linux x86-64 archive is
-`koi-engine-v1.0.0-linux-x86_64.tar.gz`.
+Get the Windows and Linux x86-64 packages and their checksum sidecars from
+[GitHub Releases](https://github.com/nhatquang1701/Koi-engine/releases).
+
+- Windows: `koi-engine-v1.0.0.zip`
+- Linux x86-64: `koi-engine-v1.0.0-linux-x86_64.tar.gz`
 
 ## Get started
 
-1. Extract the release archive.
-2. Add `koi-engine.exe` on Windows, or `koi-engine` on Linux, as a UCI engine
-   in En Croissant or another compatible GUI.
-3. Start with `Hash=512`, `Threads=1`, and `Speed=100`. `Threads=1` is the
-   deterministic configuration; higher values use Lazy SMP and may produce
-   different valid principal variations between runs.
+1. Download and extract the archive for your system.
+2. Add `koi-engine.exe` (Windows) or `koi-engine` (Linux) as a UCI engine in
+   En Croissant or another compatible chess GUI.
+3. Start with `Hash=512`, `Threads=1`, and `Speed=100`.
 
-Koi has no required configuration file. The classical evaluator is the default.
-NNUE networks, GPU NNUE inference, Polyglot opening books, and Syzygy
-tablebases are optional. Opening books are disabled by default
-(`OwnBook=false`); enable one only after placing a licensed `book.bin` beside
-the executable and setting `OwnBook=true`.
+Koi needs no configuration file or extra assets. `Threads=1` gives deterministic
+search; multiple threads use Lazy SMP and can produce different valid
+principal variations. Opening books are disabled by default (`OwnBook=false`).
+The classical evaluator remains available when no NNUE network is loaded.
 
-## Documentation
+## Explore
 
-- [User guide](docs/USER_GUIDE.md) — build instructions, UCI behavior, GUI
-  setup, optional assets, and developer tools.
+- [Documentation site](https://nhatquang1701.github.io/Koi-engine/) — installation,
+  UCI options, GUI setup, development guidance, and project archive.
+- [User guide](docs/USER_GUIDE.md) — build instructions, protocol behavior,
+  optional assets, and tools.
 - [Developer and agent guide](AGENTS.md) — architecture contracts, source map,
-  tests, artifact policy, and contribution workflow.
-- [Documentation map](docs/README.md) — repository documentation and archive
-  entry points.
+  testing, and contribution workflow.
+- [Documentation map](docs/README.md) — maintained documentation and history.
 
 ## License
 
 Koi Engine is released under the [MIT License](LICENSE). Release packages also
-retain the licenses for the vendored chess-library and optional Fathom adapter.
+include the required licenses for vendored components.
