@@ -287,6 +287,17 @@ class PolicyValueSelfPlayTests(unittest.TestCase):
         self.assertEqual(fake.options["SearchAlgorithm"], "MCTS")
         self.assertEqual(fake.options["PolicyValueFile"], "model.kpv")
         self.assertTrue(fake.options["MCTSVisitOutput"])
+        self.assertTrue(fake.options["MCTSSelfPlay"])
+        self.assertEqual(fake.options["RandomSeed"], 19)
+        self.assertEqual(
+            record["search_provenance"]["options"]["mcts_root_noise_seed"], 19
+        )
+        self.assertEqual(
+            record["search_provenance"]["options"]["mcts_root_noise_alpha"], 0.3
+        )
+        self.assertEqual(
+            record["search_provenance"]["options"]["mcts_root_noise_epsilon"], 0.25
+        )
         self.assertFalse(fake.options["OwnBook"])
         self.assertEqual(fake.options["Threads"], 1)
 

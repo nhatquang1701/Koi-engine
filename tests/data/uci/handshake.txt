@@ -27,4 +27,5 @@ option name EvalFile type string default {empty}
 option name SearchAlgorithm type string default AlphaBeta
 option name PolicyValueFile type string default {empty}
 option name MCTSVisitOutput type check default false
+option name MCTSSelfPlay type check default false
 uciok

@@ -726,6 +726,10 @@ from the starting position (for example, `bestmove e2e4`).
   move allowed for that search and its visit count. This extension is intended
   for self-play data generation; it does not change move selection and is
   absent from normal UCI output by default.
+- `MCTSSelfPlay` defaults to `false`. When enabled with MCTS, it mixes seeded
+  Dirichlet noise into root priors (`alpha=0.3`, `epsilon=0.25`). The normal
+  MCTS search remains deterministic when this option is off. `RandomSeed`
+  controls the root-noise seed for self-play.
 - With `SearchAlgorithm=MCTS`, `go nodes N` bounds root visits and `go depth N`
   caps the tree ply. Movetime and clock deadlines, `searchmoves`, MultiPV,
   `stop`, `quit`, and `ponderhit` continue to use the shared UCI search
@@ -1013,7 +1017,7 @@ the options at session start; the portable release defaults are `RandomSeed=0`,
 `SyzygyPath=""`, `SyzygyProbeDepth=1`, `SyzygyProbeLimit=7`,
 `Syzygy50MoveRule=true`, `SyzygyInteriorDepth=0`, and `EvalFile=""`
 (empty keeps the boot-time evaluator), `SearchAlgorithm=AlphaBeta`,
-`PolicyValueFile=""`, and `MCTSVisitOutput=false`.
+`PolicyValueFile=""`, `MCTSVisitOutput=false`, and `MCTSSelfPlay=false`.
 For the recommended En Croissant smoke scenario, use `Hash=512`, `Threads=4`, and
 `Speed=100`, then keep the book and Syzygy paths explicitly configured if those
 assets are available.

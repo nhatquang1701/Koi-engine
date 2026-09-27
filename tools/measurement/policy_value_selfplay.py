@@ -246,6 +246,8 @@ def generate_records(
     """
     if games < 1 or nodes < 1 or max_plies < 1:
         raise SelfPlayError("games, nodes, and max_plies must be positive")
+    if seed < 0:
+        raise SelfPlayError("seed must be non-negative")
     if len(openings) < games:
         raise SelfPlayError(
             f"requested {games} games but the opening corpus has only {len(openings)} entries"
@@ -267,10 +269,12 @@ def generate_records(
             engine.configure({
                 "OwnBook": False,
                 "Threads": 1,
+                "RandomSeed": seed % 2_147_483_648,
                 "MultiPV": 1,
                 "SearchAlgorithm": "MCTS",
                 "PolicyValueFile": str(policy_value_file),
                 "MCTSVisitOutput": True,
+                "MCTSSelfPlay": True,
             })
         except (AttributeError, chess.engine.EngineError) as error:
             raise SelfPlayError(f"cannot configure Koi for MCTS self-play: {error}") from error
@@ -296,6 +300,12 @@ def generate_records(
         "policy_value_file": Path(policy_value_file).name if policy_value_file is not None else None,
         "policy_value_sha256": policy_value_sha256,
         "mcts_visit_output": search_algorithm == "MCTS",
+        "mcts_root_noise": search_algorithm == "MCTS",
+        "mcts_root_noise_alpha": 0.3 if search_algorithm == "MCTS" else None,
+        "mcts_root_noise_epsilon": 0.25 if search_algorithm == "MCTS" else None,
+        "mcts_root_noise_seed": (
+            seed % 2_147_483_648 if search_algorithm == "MCTS" else None
+        ),
         "policy_temperature": temperature if search_algorithm == "MCTS" else None,
         "engine_sha256": engine_sha256,
         "opening_corpus_sha256": opening_corpus_sha256,
@@ -636,6 +646,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.games < 1 or args.nodes < 1 or args.max_plies < 1 or args.hash_mb < 1:
             raise SelfPlayError("games, nodes, max_plies, and hash_mb must be positive")
+        if args.seed < 0:
+            raise SelfPlayError("seed must be non-negative")
         if not math.isfinite(args.temperature) or args.temperature < 0.0:
             raise SelfPlayError("temperature must be finite and non-negative")
         if args.algorithm == "MCTS" and args.policy_value_file is None:
@@ -683,6 +695,7 @@ def main(argv: list[str] | None = None) -> int:
             engine.configure({
                 "OwnBook": False,
                 "Threads": 1,
+                "RandomSeed": args.seed % 2_147_483_648,
                 "Hash": args.hash_mb,
                 "Speed": 100,
                 "MultiPV": 1,
@@ -711,6 +724,12 @@ def main(argv: list[str] | None = None) -> int:
                     "own_book": False,
                     "search_algorithm": args.algorithm,
                     "mcts_visit_output": args.algorithm == "MCTS",
+                    "mcts_root_noise": args.algorithm == "MCTS",
+                    "mcts_root_noise_alpha": 0.3 if args.algorithm == "MCTS" else None,
+                    "mcts_root_noise_epsilon": 0.25 if args.algorithm == "MCTS" else None,
+                    "mcts_root_noise_seed": (
+                        args.seed % 2_147_483_648 if args.algorithm == "MCTS" else None
+                    ),
                     "policy_temperature": (
                         args.temperature if args.algorithm == "MCTS" else None
                     ),

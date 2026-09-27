@@ -2772,6 +2772,9 @@ void SearchRunner::run() {
                     // keep exploring until ponderhit, then apply its converted
                     // depth/time/node limits to the warmed tree.
                     config.max_depth = limits.ponder ? 0 : limits.depth.value_or(0);
+                    config.enable_root_noise = options.mcts_self_play;
+                    config.root_noise_seed =
+                        static_cast<std::uint64_t>(options.random_seed) ^ root.position_key();
                     PolicyValueMctsTree mcts_tree(root, legal_moves, config,
                                                   policy_value_evaluator);
                     const auto initialized = mcts_tree.initialize();

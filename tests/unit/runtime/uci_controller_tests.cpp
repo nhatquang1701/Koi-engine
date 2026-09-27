@@ -1957,7 +1957,7 @@ void test_handshake_option_table_is_unique_and_well_formed() {
             "a handshake-only transcript must stay clean");
     const std::vector<std::string> options =
         lines_starting_with(output_lines(handshake.output), "option name ");
-    require(options.size() == 27, "the handshake must advertise exactly 27 options");
+    require(options.size() == 28, "the handshake must advertise exactly 28 options");
     require(handshake.output.find("option name SearchAlgorithm type string default AlphaBeta") !=
                 std::string::npos,
             "AlphaBeta must remain the advertised default search algorithm");
@@ -1967,6 +1967,9 @@ void test_handshake_option_table_is_unique_and_well_formed() {
     require(handshake.output.find("option name MCTSVisitOutput type check default false") !=
                 std::string::npos,
             "MCTS visit export must stay opt-in");
+    require(handshake.output.find("option name MCTSSelfPlay type check default false") !=
+                std::string::npos,
+            "MCTS root noise must stay in explicit self-play mode");
 
     const std::string prefix = "option name ";
     std::vector<std::string> names;
@@ -2156,6 +2159,23 @@ void test_mcts_visit_output_contains_the_full_root_distribution_when_enabled() {
             "root visit counts must sum to the completed MCTS simulation budget");
     require(lines_starting_with(lines, "bestmove ").size() == 1,
             "visit export must preserve exactly-once bestmove completion");
+
+    const ControllerResult self_play_result = run_controller_in_directory_until_bestmove(
+        "setoption name PolicyValueFile value uniform.kpv\n"
+        "setoption name SearchAlgorithm value MCTS\n"
+        "setoption name MCTSVisitOutput value true\n"
+        "setoption name MCTSSelfPlay value true\n"
+        "setoption name RandomSeed value 12345\n"
+        "position startpos\n"
+        "go nodes 24\n",
+        files.path());
+    const std::vector<std::string> self_play_visit_lines = lines_starting_with(
+        output_lines(self_play_result.output), "info string koi_mcts_visits_v1 ");
+    require(self_play_result.exit_code == 0 && self_play_result.diagnostics.empty() &&
+                self_play_visit_lines.size() == 1,
+            "explicit self-play mode must retain a complete visit export");
+    require(self_play_visit_lines.front() != visit_lines.front(),
+            "MCTSSelfPlay must mix seeded root noise into root visit selection");
 }
 
 void test_mcts_preserves_the_searchmoves_root_filter() {

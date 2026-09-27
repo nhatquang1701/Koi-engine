@@ -293,6 +293,8 @@ struct SearchOptions {
     std::uint32_t elo = 1320;
     SearchAlgorithm search_algorithm = SearchAlgorithm::alpha_beta;
     bool collect_mcts_visit_counts = false;
+    bool mcts_self_play = false;
+    std::uint32_t random_seed = 0;
     std::shared_ptr<const PolicyValueModel> policy_value_model;
     std::string policy_value_load_error;
     // Protocol generation copied from UciController::generation_ so a result

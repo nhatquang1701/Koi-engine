@@ -582,7 +582,10 @@ training corpus separate from validation and match openings.
 
 MCTS mode enables the opt-in `MCTSVisitOutput` UCI option and fails if the
 engine cannot return a complete root visit map or the map does not match Koi's
-native legal move list. It uses one search thread and `OwnBook=false`.
+native legal move list. It also enables `MCTSSelfPlay`, which mixes Dirichlet
+noise (`alpha=0.3`, `epsilon=0.25`) into root priors using the recorded
+`RandomSeed`. It uses one search thread and `OwnBook=false`; ordinary MCTS play
+keeps root noise off.
 AlphaBeta remains the default until a trained model and MCTS clear the equal-time
 strength gates.
 

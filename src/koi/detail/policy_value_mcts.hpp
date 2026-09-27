@@ -33,6 +33,10 @@ struct PolicyValueMctsConfig {
     std::size_t max_tree_nodes = 32'768;
     std::size_t max_tree_edges = 262'144;
     double cpuct = 1.5;
+    bool enable_root_noise = false;
+    double root_noise_alpha = 0.3;
+    double root_noise_epsilon = 0.25;
+    std::uint64_t root_noise_seed = 0;
 };
 
 struct PolicyValueMctsRootMove {

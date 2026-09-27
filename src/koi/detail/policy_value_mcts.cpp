@@ -5,6 +5,7 @@
 #include <cmath>
 #include <limits>
 #include <new>
+#include <random>
 #include <utility>
 
 namespace koi::detail {
@@ -217,6 +218,14 @@ std::expected<void, std::string> PolicyValueMctsTree::initialize() {
         impl_->config.cpuct < 0.0) {
         return std::unexpected("MCTS depth and PUCT configuration are invalid");
     }
+    if (impl_->config.enable_root_noise &&
+        (!std::isfinite(impl_->config.root_noise_alpha) ||
+         impl_->config.root_noise_alpha <= 0.0 ||
+         !std::isfinite(impl_->config.root_noise_epsilon) ||
+         impl_->config.root_noise_epsilon < 0.0 ||
+         impl_->config.root_noise_epsilon > 1.0)) {
+        return std::unexpected("MCTS root-noise parameters are invalid");
+    }
     if (impl_->root_moves.size() > impl_->config.max_tree_edges) {
         return std::unexpected("MCTS edge capacity cannot hold the legal root moves");
     }
@@ -232,6 +241,38 @@ std::expected<void, std::string> PolicyValueMctsTree::initialize() {
         return std::unexpected(expanded.error());
     }
     Impl::Node& root = impl_->nodes[0];
+    if (impl_->config.enable_root_noise && root.edge_count > 0 &&
+        impl_->config.root_noise_epsilon > 0.0) {
+        std::mt19937_64 random(impl_->config.root_noise_seed);
+        std::gamma_distribution<double> gamma(impl_->config.root_noise_alpha, 1.0);
+        std::array<double, kMaximumLegalMoves> noise{};
+        double noise_sum = 0.0;
+        for (std::size_t index = 0; index < root.edge_count; ++index) {
+            const double sample = gamma(random);
+            if (!std::isfinite(sample) || sample < 0.0) {
+                return std::unexpected("MCTS root-noise sampler returned an invalid sample");
+            }
+            noise[index] = sample;
+            noise_sum += sample;
+        }
+        if (!(noise_sum > 0.0) || !std::isfinite(noise_sum)) {
+            return std::unexpected("MCTS root-noise sampler returned an empty distribution");
+        }
+        const double prior_fraction = 1.0 - impl_->config.root_noise_epsilon;
+        double mixed_sum = 0.0;
+        for (std::size_t index = 0; index < root.edge_count; ++index) {
+            Impl::Edge& edge = impl_->edges[root.first_edge + index];
+            edge.prior = prior_fraction * edge.prior +
+                impl_->config.root_noise_epsilon * noise[index] / noise_sum;
+            mixed_sum += edge.prior;
+        }
+        if (!(mixed_sum > 0.0) || !std::isfinite(mixed_sum)) {
+            return std::unexpected("MCTS root-noise mix returned an invalid distribution");
+        }
+        for (std::size_t index = 0; index < root.edge_count; ++index) {
+            impl_->edges[root.first_edge + index].prior /= mixed_sum;
+        }
+    }
     root.visits = 1;
     root.value_sum = root.leaf.value;
     for (std::size_t index = 0; index < root.wdl_sum.size(); ++index) {

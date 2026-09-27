@@ -166,6 +166,7 @@ enum class UciOptionId {
     search_algorithm,
     policy_value_file,
     mcts_visit_output,
+    mcts_self_play,
     debug,
     debug_file,
 };
@@ -185,7 +186,7 @@ struct UciOptionDescriptor {
 // and `handle_setoption` consume this table, so an advertised option can never
 // drift out of sync with the option the controller actually applies. The order
 // of the entries is the order advertised to a GUI and must stay stable.
-constexpr std::array<UciOptionDescriptor, 29> kUciOptions{{
+constexpr std::array<UciOptionDescriptor, 30> kUciOptions{{
     {"RandomSeed", UciOptionKind::spin, UciOptionId::random_seed, "0", 0,
      kMaximumRandomSeed, false, true},
     {"Hash", UciOptionKind::spin, UciOptionId::hash, "512", kMinimumHashMegabytes,
@@ -236,6 +237,8 @@ constexpr std::array<UciOptionDescriptor, 29> kUciOptions{{
     {"PolicyValueFile", UciOptionKind::string, UciOptionId::policy_value_file,
      "", 0, 0, false, true},
     {"MCTSVisitOutput", UciOptionKind::check, UciOptionId::mcts_visit_output,
+     "false", 0, 0, false, true},
+    {"MCTSSelfPlay", UciOptionKind::check, UciOptionId::mcts_self_play,
      "false", 0, 0, false, true},
     // Developer diagnostics stay settable but are intentionally not advertised.
     {"Debug", UciOptionKind::check, UciOptionId::debug, "false", 0, 0, false, false},
@@ -1063,6 +1066,12 @@ void UciController::handle_setoption(std::istream& command) {
         });
         break;
 
+    case UciOptionId::mcts_self_play:
+        apply_boolean(mcts_self_play_, [this](bool enabled) {
+            mcts_self_play_ = enabled;
+        });
+        break;
+
     case UciOptionId::policy_value_file: {
         if (value == policy_value_file_.string()) {
             break;
@@ -1432,6 +1441,8 @@ void UciController::start_search(GameState root, SearchLimits limits, bool skip_
     options.multi_pv = multi_pv_;
     options.search_algorithm = search_algorithm_;
     options.collect_mcts_visit_counts = mcts_visit_output_;
+    options.mcts_self_play = mcts_self_play_;
+    options.random_seed = random_seed_;
     options.policy_value_model = policy_value_model_;
     options.policy_value_load_error = policy_value_load_error_;
     options.analyse_mode = analyse_mode_;

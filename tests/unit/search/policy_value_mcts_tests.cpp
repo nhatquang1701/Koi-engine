@@ -1,8 +1,10 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <map>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -15,6 +17,7 @@ namespace koi {
 using detail::PolicyValueMctsConfig;
 using detail::PolicyValueMctsEvaluation;
 using detail::PolicyValueMctsEvaluator;
+using detail::PolicyValueMctsSnapshot;
 using detail::PolicyValueMctsTree;
 } // namespace koi
 
@@ -114,6 +117,74 @@ void test_mcts_visit_limit_depth_cap_and_deterministic_root_choice() {
     require(first_result.root_moves.front().move == second_result.root_moves.front().move &&
                 first_result.root_moves.front().visits == second_result.root_moves.front().visits,
             "single-thread MCTS tie-breaking and root selection must be deterministic");
+}
+
+void test_mcts_self_play_root_noise_is_normalized_and_seeded() {
+    koi::GameState root = koi::GameState::startpos();
+    const koi::MoveMetadataList moves = legal_root_moves(root);
+    const auto priors_by_move = [](const koi::PolicyValueMctsSnapshot& snapshot) {
+        std::map<std::string, double> priors;
+        for (const auto& line : snapshot.root_moves) {
+            priors[line.move.uci()] = line.prior;
+        }
+        return priors;
+    };
+    const auto prior_sum = [](const std::map<std::string, double>& priors) {
+        double sum = 0.0;
+        for (const auto& [move, prior] : priors) {
+            (void)move;
+            sum += prior;
+        }
+        return sum;
+    };
+
+    koi::PolicyValueMctsConfig normal_config;
+    koi::PolicyValueMctsTree normal_tree(
+        root, moves, normal_config, uniform_draw_evaluator());
+    require(normal_tree.initialize().has_value(),
+            "normal MCTS must initialize without self-play noise");
+    const auto normal_priors = priors_by_move(normal_tree.snapshot(moves.size()));
+
+    koi::PolicyValueMctsConfig noisy_config = normal_config;
+    noisy_config.enable_root_noise = true;
+    noisy_config.root_noise_seed = 0x12345678ULL;
+    koi::PolicyValueMctsTree noisy_first(
+        root, moves, noisy_config, uniform_draw_evaluator());
+    koi::PolicyValueMctsTree noisy_second(
+        root, moves, noisy_config, uniform_draw_evaluator());
+    require(noisy_first.initialize().has_value() && noisy_second.initialize().has_value(),
+            "self-play MCTS must initialize with seeded root noise");
+    const auto first_priors = priors_by_move(noisy_first.snapshot(moves.size()));
+    const auto repeated_priors = priors_by_move(noisy_second.snapshot(moves.size()));
+
+    require(normal_priors.size() == moves.size() && first_priors.size() == moves.size(),
+            "root snapshots must preserve the complete legal move distribution");
+    require(std::abs(prior_sum(first_priors) - 1.0) < 1e-6,
+            "Dirichlet root noise must preserve normalized priors");
+    bool changed_from_normal = false;
+    for (const auto& [move, prior] : first_priors) {
+        require(std::abs(prior - repeated_priors.at(move)) < 1e-12,
+                "the same self-play seed must reproduce root noise");
+        if (std::abs(prior - normal_priors.at(move)) > 1e-5) {
+            changed_from_normal = true;
+        }
+    }
+    require(changed_from_normal,
+            "self-play root noise must perturb the evaluator's uniform prior");
+
+    noisy_config.root_noise_seed += 1;
+    koi::PolicyValueMctsTree noisy_other_seed(
+        root, moves, noisy_config, uniform_draw_evaluator());
+    require(noisy_other_seed.initialize().has_value(),
+            "a second self-play seed must initialize");
+    const auto other_seed_priors = priors_by_move(noisy_other_seed.snapshot(moves.size()));
+    bool changed_with_seed = false;
+    for (const auto& [move, prior] : first_priors) {
+        if (std::abs(prior - other_seed_priors.at(move)) > 1e-5) {
+            changed_with_seed = true;
+        }
+    }
+    require(changed_with_seed, "different self-play seeds must vary root noise");
 }
 
 void test_mcts_checkmate_leaf_backs_up_to_the_winning_side() {
@@ -288,9 +359,10 @@ void test_mcts_claimable_root_draw_floors_losing_moves_but_keeps_wins() {
 } // namespace
 
 int main(int argc, char** argv) {
-    const std::array<koi::test::TestCase, 6> tests{{
+    const std::array<koi::test::TestCase, 7> tests{{
         {"MCTS visits, depth and deterministic prior selection",
          test_mcts_visit_limit_depth_cap_and_deterministic_root_choice},
+        {"MCTS self-play root noise", test_mcts_self_play_root_noise_is_normalized_and_seeded},
         {"MCTS checkmate WDL backup", test_mcts_checkmate_leaf_backs_up_to_the_winning_side},
         {"MCTS bounded tree capacity", test_mcts_tree_and_edge_capacity_are_bounded},
         {"MCTS stop and evaluator failure", test_mcts_observes_cancellation_and_propagates_evaluator_errors},
