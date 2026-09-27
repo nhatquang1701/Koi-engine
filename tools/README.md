@@ -127,7 +127,10 @@ executable and corpus hashes, host details, and peak RSS when the OS exposes
 it. The tool requires both engines to advertise compatible `Threads` and
 `Hash` spin options before it starts. NPS is a within-engine throughput measure;
 this report is not an Elo or playing-strength comparison. Use matched games at
-equal time controls for strength work.
+equal time controls for strength work. In fixed-movetime mode the runner sends
+`go infinite`, issues `stop` at the requested wall-clock deadline, and records
+search elapsed time and stop latency so engines cannot choose different time
+budgets by ending early.
 
 ```powershell
 $revision = git rev-parse HEAD

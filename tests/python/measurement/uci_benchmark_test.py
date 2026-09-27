@@ -65,6 +65,17 @@ for line in sys.stdin:
             print("info depth 2 time 5 nodes 30 nps 6000", flush=True)
             print("info depth 2 currmove e2e4 currmovenumber 1", flush=True)
             print("bestmove e2e4", flush=True)
+    elif command == "go infinite":
+        if mode == "invalid-position":
+            print("info string invalid position", flush=True)
+        elif mode == "chatter-search":
+            start_chatter()
+        else:
+            print("info depth 1 time 2 nodes 10 nps 5000", flush=True)
+            print("info depth 2 time 5 nodes 30 nps 6000", flush=True)
+    elif command == "stop":
+        stop_chatter.set()
+        print("bestmove e2e4", flush=True)
     elif command == "quit":
         stop_chatter.set()
         break
@@ -100,6 +111,7 @@ class UciBenchmarkReportTest(unittest.TestCase):
             self.assertEqual(report["corpus"]["sha256"], hashlib.sha256(corpus_bytes).hexdigest())
             self.assertEqual(report["settings"], {
                 "hash_mb": 512, "depth": 12, "movetime_ms": None,
+                "movetime_policy": None,
                 "threads": [1, 4], "timeout_seconds": 30,
             })
             self.assertEqual([run["engine"] for run in report["runs"]],
@@ -137,7 +149,7 @@ class UciBenchmarkReportTest(unittest.TestCase):
             ])
             self.assertEqual(json.loads(output_path.read_text(encoding="utf-8")), report)
 
-    def test_fixed_movetime_runs_send_go_movetime_and_record_the_limit(self):
+    def test_fixed_movetime_stops_infinite_search_at_the_requested_deadline(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             temp = Path(temp_dir)
             engine_path = temp / "fake_uci_engine.py"
@@ -151,19 +163,29 @@ class UciBenchmarkReportTest(unittest.TestCase):
                     engines=[("koi", [sys.executable, str(engine_path)])],
                     corpus_path=corpus_path,
                     source_revision="abc1234",
-                    movetime_ms=1000,
+                    movetime_ms=50,
                 )
 
             self.assertEqual(report["schema"], "koi-uci-benchmark-v2")
             self.assertEqual(report["settings"], {
-                "hash_mb": 512, "depth": None, "movetime_ms": 1000,
+                "hash_mb": 512, "depth": None, "movetime_ms": 50,
+                "movetime_policy": "external_stop",
                 "threads": [1, 4], "timeout_seconds": 30,
             })
             events = event_log.read_text(encoding="utf-8").splitlines()
-            self.assertEqual(events.count("go movetime 1000"), 2)
+            self.assertEqual(events.count("go infinite"), 2)
+            self.assertEqual(events.count("stop"), 2)
+            self.assertTrue(all(position["stop_sent"] for run in report["runs"]
+                                for position in run["positions"]))
+            self.assertTrue(all(40 <= position["search_elapsed_ms"] < 200
+                                for run in report["runs"] for position in run["positions"]))
+            self.assertTrue(all(position["time_to_bestmove_ms"] < 500
+                                for run in report["runs"] for position in run["positions"]))
+            self.assertTrue(all(position["stop_latency_ms"] < 500
+                                for run in report["runs"] for position in run["positions"]))
             self.assertNotIn("go depth 12", events)
             self.assertTrue(all(run["positions"][0]["bestmove"] == "e2e4" for run in report["runs"]))
-            self.assertTrue(all(run["positions"][0]["go_command"] == "go movetime 1000"
+            self.assertTrue(all(run["positions"][0]["go_command"] == "go infinite"
                                 for run in report["runs"]))
 
     def test_named_fen_corpus_is_normalized_before_engine_launch(self):

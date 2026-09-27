@@ -254,17 +254,45 @@ def _parse_info(line: str) -> dict[str, int | None] | None:
 
 
 def _search_position(process: subprocess.Popen[str], lines: queue.Queue[Any], fen: str,
-                     go_command: str, timeout: float) -> dict[str, Any]:
+                     go_command: str, timeout: float,
+                     movetime_ms: int | None = None) -> dict[str, Any]:
     _send(process, "ucinewgame")
     _ready(process, lines, timeout)
     _send(process, f"position fen {fen}")
+    started = time.monotonic()
     _send(process, go_command)
-    deadline = time.monotonic() + timeout
+    search_deadline = started + (movetime_ms / 1000.0 if movetime_ms is not None else timeout)
+    stop_sent_at: float | None = None
     depth_rows: dict[int, dict[str, int | None]] = {}
     bestmove: str | None = None
     ponder: str | None = None
+    bestmove_at: float | None = None
     while bestmove is None:
-        line = _next_before_deadline(process, lines, deadline)
+        now = time.monotonic()
+        if movetime_ms is not None and stop_sent_at is None and now >= search_deadline:
+            stop_sent_at = now
+            _send(process, "stop")
+            continue
+        deadline = search_deadline if stop_sent_at is None else stop_sent_at + timeout
+        remaining = deadline - now
+        if remaining <= 0:
+            if movetime_ms is not None and stop_sent_at is None:
+                stop_sent_at = time.monotonic()
+                _send(process, "stop")
+                continue
+            if stop_sent_at is not None:
+                raise TimeoutError("timed out waiting for bestmove after stop")
+            raise TimeoutError("timed out waiting for UCI engine output")
+        try:
+            line = _next_line(process, lines, remaining)
+        except TimeoutError as exc:
+            if movetime_ms is not None and stop_sent_at is None:
+                stop_sent_at = time.monotonic()
+                _send(process, "stop")
+                continue
+            if stop_sent_at is not None:
+                raise TimeoutError("timed out waiting for bestmove after stop") from exc
+            raise
         if line.casefold().startswith("info string invalid position"):
             raise RuntimeError(f"engine rejected FEN: {fen}")
         row = _parse_info(line)
@@ -284,11 +312,20 @@ def _search_position(process: subprocess.Popen[str], lines: queue.Queue[Any], fe
         elif line.startswith("bestmove "):
             tokens = line.split()
             bestmove = tokens[1] if len(tokens) > 1 else None
+            bestmove_at = time.monotonic()
             if len(tokens) >= 4 and tokens[2] == "ponder":
                 ponder = tokens[3]
+    assert bestmove_at is not None
+    search_finished_at = stop_sent_at if stop_sent_at is not None else bestmove_at
     return {
         "fen": fen,
         "go_command": go_command,
+        "requested_movetime_ms": movetime_ms,
+        "stop_sent": stop_sent_at is not None,
+        "search_elapsed_ms": int(round((search_finished_at - started) * 1000)),
+        "stop_latency_ms": int(round((bestmove_at - stop_sent_at) * 1000))
+        if stop_sent_at is not None else 0,
+        "time_to_bestmove_ms": int(round((bestmove_at - started) * 1000)),
         "depth_rows": [depth_rows[key] for key in sorted(depth_rows)],
         "completed_depth": max(depth_rows, default=0),
         "bestmove": bestmove,
@@ -329,11 +366,13 @@ def _run_one(engine_name: str, command: list[str], executable: Path, threads: in
         _send(process, f"setoption name Hash value {hash_mb}")
         _send(process, f"setoption name Threads value {threads}")
         _ready(process, lines, timeout)
-        go_command = f"go depth {depth}" if depth is not None else f"go movetime {movetime_ms}"
+        go_command = f"go depth {depth}" if depth is not None else "go infinite"
         results = []
         for index, fen in enumerate(positions, start=1):
             try:
-                results.append(_search_position(process, lines, fen, go_command, timeout))
+                results.append(_search_position(
+                    process, lines, fen, go_command, timeout, movetime_ms
+                ))
             except TimeoutError as exc:
                 raise TimeoutError(
                     f"{engine_name} Threads={threads} position {index}/{len(positions)} timed out: {exc}"
@@ -406,6 +445,7 @@ def run_benchmark(*, engines: list[tuple[str, list[str]]], corpus_path: Path | s
             "hash_mb": hash_mb,
             "depth": depth,
             "movetime_ms": movetime_ms,
+            "movetime_policy": "external_stop" if movetime_ms is not None else None,
             "threads": list(THREAD_COUNTS),
             "timeout_seconds": timeout_seconds,
         },
