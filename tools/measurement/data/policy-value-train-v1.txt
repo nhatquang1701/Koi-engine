@@ -1,0 +1,10 @@
+# Koi policy/value training openings v1.
+# Keep these roots separate from validation and Elo-match corpora.
+train-f3-d5 | f2f3 d7d5 e2e4
+train-nc3-d5 | b1c3 d7d5 e2e4 d5d4
+train-grob | g2g4 d7d5 f1g2 c8g4
+train-polish | b2b4 e7e5 c1b2 f8b4
+train-clemenz | h2h3 d7d5 d2d4 g8f6
+train-anderssen | a2a3 e7e5 a3a4 d7d5
+train-van-t-kruijs | c2c3 e7e5 d2d4 e5e4
+train-zukertort | g1h3 d7d5 g2g3 e7e5

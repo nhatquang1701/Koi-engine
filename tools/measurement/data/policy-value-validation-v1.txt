@@ -1,0 +1,10 @@
+# Koi policy/value validation openings v1.
+# Keep these roots separate from training and Elo-match corpora.
+validation-open-game | e2e3 d7d5 d2d4 g8f6
+validation-mieses | d2d3 e7e5 g2g3 d7d5
+validation-saragossa | c2c3 d7d5 d2d4 g8f6
+validation-larsen | b2b3 d7d5 c1b2 g8f6
+validation-fianchetto | g2g3 e7e5 f1g2 d7d5
+validation-queenside | b1a3 d7d5 d2d4 g8f6
+validation-h4 | h2h4 g8f6 h4h5 g7g6
+validation-a4 | a2a4 g8f6 d2d4 d7d5

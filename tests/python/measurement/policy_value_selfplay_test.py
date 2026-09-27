@@ -80,6 +80,45 @@ class MctsFakeEngine:
 
 
 class PolicyValueSelfPlayTests(unittest.TestCase):
+    def test_training_and_validation_openings_are_separate_from_match_positions(self):
+        train_path = _REPOSITORY_ROOT / "tools/measurement/data/policy-value-train-v1.txt"
+        validation_path = _REPOSITORY_ROOT / "tools/measurement/data/policy-value-validation-v1.txt"
+        match_path = _REPOSITORY_ROOT / "tests/data/openings/openings-curated-32.txt"
+        self.assertEqual(policy_value_selfplay._DEFAULT_OPENINGS_PATH, train_path)
+        train = policy_value_selfplay.read_openings(train_path)
+        validation = policy_value_selfplay.read_openings(validation_path)
+        matches = policy_value_selfplay.read_openings(match_path)
+
+        train_ids = {opening.opening_id for opening in train}
+        validation_ids = {opening.opening_id for opening in validation}
+        match_ids = {opening.opening_id for opening in matches}
+        self.assertFalse(train_ids & validation_ids)
+        self.assertFalse(train_ids & match_ids)
+        self.assertFalse(validation_ids & match_ids)
+
+        def root_state(opening):
+            board = chess.Board()
+            policy_value_selfplay._apply_opening(board, opening)
+            return tuple(board.fen().split()[:5])
+
+        def match_prefix_states(openings):
+            states = set()
+            for opening in openings:
+                board = chess.Board()
+                for token in opening.moves:
+                    move = Move.from_uci(token)
+                    self.assertTrue(board.is_legal(move), f"illegal corpus move {token}")
+                    board.push(move)
+                    states.add(tuple(board.fen().split()[:5]))
+            return states
+
+        train_roots = {root_state(opening) for opening in train}
+        validation_roots = {root_state(opening) for opening in validation}
+        match_states = match_prefix_states(matches)
+        self.assertFalse(train_roots & validation_roots)
+        self.assertFalse(train_roots & match_states)
+        self.assertFalse(validation_roots & match_states)
+
     def test_source_provenance_includes_local_chess_rules_imports(self):
         _, source_hashes = policy_value_selfplay._source_provenance(_REPOSITORY_ROOT)
 

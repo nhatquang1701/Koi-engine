@@ -558,7 +558,7 @@ disjoint so `train_policy_value.py` can enforce the split.
 ```powershell
 python .\tools\measurement\policy_value_selfplay.py `
   --engine .\build\release\koi-engine.exe `
-  --openings .\tests\data\openings\openings-curated-32.txt `
+  --openings .\tools\measurement\data\policy-value-train-v1.txt `
   --games 8 --nodes 20000 --seed 1 --cpu-variant generic `
   --output .\artifacts\training\policy-value-ab-selfplay.jsonl
 ```
@@ -572,13 +572,28 @@ python .\tools\measurement\policy_value_selfplay.py `
   --engine .\build\release\koi-engine.exe `
   --algorithm MCTS `
   --policy-value-file .\artifacts\training\policy-value-v1.kpv `
-  --openings .\artifacts\training\train-openings.txt `
+  --openings .\tools\measurement\data\policy-value-train-v1.txt `
   --games 8 --nodes 20000 --seed 1 --temperature 1.0 `
   --output .\artifacts\training\policy-value-mcts-selfplay.jsonl
 ```
 
-The `--openings` file uses `opening_id | UCI move prefix` lines. Supply a
-training corpus separate from validation and match openings.
+The default training corpus is
+`tools/measurement/data/policy-value-train-v1.txt`. Its root positions are
+separate from `policy-value-validation-v1.txt` and the Elo match corpus
+`tests/data/openings/openings-curated-32.txt`. To generate a validation split,
+use the validation corpus and a separate output:
+
+```powershell
+python .\tools\measurement\policy_value_selfplay.py `
+  --engine .\build\release\koi-engine.exe `
+  --algorithm AlphaBeta `
+  --openings .\tools\measurement\data\policy-value-validation-v1.txt `
+  --games 8 --nodes 20000 --seed 1 `
+  --output .\artifacts\training\policy-value-validation-v1.jsonl
+```
+
+`train_policy_value.py` rejects duplicated rules-relevant FEN states between
+training and validation outputs, even if their game/opening IDs differ.
 
 MCTS mode enables the opt-in `MCTSVisitOutput` UCI option and fails if the
 engine cannot return a complete root visit map or the map does not match Koi's
