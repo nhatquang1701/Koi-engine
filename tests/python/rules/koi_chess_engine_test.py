@@ -45,6 +45,10 @@ for line in sys.stdin:
         print("readyok", flush=True)
     elif line.startswith("setoption"):
         pass
+    elif line == "go perft 1" and scenario == "perft":
+        print("info string e2e4: 1", flush=True)
+        print("info string d2d4: 1", flush=True)
+        print("info string Nodes searched: 2", flush=True)
     elif line.startswith("go"):
         if scenario == "terminate":
             sys.exit(0)
@@ -184,6 +188,12 @@ class EngineSessionTests(FakeEngineMixin):
         session = self.spawn()
         session.analyse(chess.Board(), engine.Limit(depth=2), multipv=3)
         self.assertIn("setoption name MultiPV value 3", self.commands())
+
+    def test_legal_moves_preserve_native_perft_order(self):
+        session = self.spawn("perft")
+        moves = session.legal_moves(chess.Board())
+        self.assertEqual([move.uci() for move in moves], ["e2e4", "d2d4"])
+        self.assertIn("go perft 1", self.commands())
 
     def test_play_returns_move_and_ponder(self):
         session = self.spawn("cp")

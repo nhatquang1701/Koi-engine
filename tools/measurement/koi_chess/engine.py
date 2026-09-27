@@ -1,10 +1,11 @@
 """Minimal UCI engine client for koi_chess.
 
 This module covers the subset of :mod:`chess.engine` used by Koi's
-training-data tooling: ``SimpleEngine.popen_uci``, ``configure``, ``analyse``,
-``play`` and ``Limit(depth=...)``.  Scores are reported relative to the side
-to move and wrapped in :class:`PovScore` so ``info["score"].pov(board.turn)``
-behaves like python-chess.
+training-data tooling: ``SimpleEngine.popen_uci``, ``configure``,
+``legal_moves``, ``analyse``, ``play`` and ``Limit(depth=...)``. ``legal_moves``
+returns the ordered native action list from the engine's UCI ``go perft 1``
+path. Scores are reported relative to the side to move and wrapped in
+:class:`PovScore` so ``info["score"].pov(board.turn)`` behaves like python-chess.
 """
 
 from __future__ import annotations
@@ -375,6 +376,44 @@ class SimpleEngine:
     def _send_position(self, board):
         fen = board.fen()
         self._send(f"position fen {fen}")
+
+    def legal_moves(self, board, *, timeout: float = 10.0):
+        """Read the ordered legal root actions from Koi's native ``go perft 1`` path."""
+        if timeout <= 0:
+            raise EngineError("legal-move timeout must be positive")
+        with self._lock:
+            self._send_position(board)
+            self._send("go perft 1")
+            moves = []
+            total = None
+            while total is None:
+                line = self._read_line(timeout=timeout)
+                prefix = "info string "
+                if not line.startswith(prefix):
+                    continue
+                payload = line[len(prefix):]
+                if payload.startswith("Nodes searched:"):
+                    try:
+                        total = int(payload.partition(":")[2].strip())
+                    except ValueError as error:
+                        raise EngineError("Koi returned an invalid perft total") from error
+                    break
+                move_text, separator, count_text = payload.rpartition(":")
+                if not separator:
+                    continue
+                try:
+                    count = int(count_text.strip())
+                    move = Move.from_uci(move_text.strip())
+                except ValueError as error:
+                    raise EngineError("Koi returned an invalid perft move line") from error
+                if count != 1:
+                    raise EngineError("go perft 1 returned a non-unit child count")
+                moves.append(move)
+            if total != len(moves):
+                raise EngineError(
+                    f"Koi perft total {total} disagrees with {len(moves)} root moves"
+                )
+            return moves
 
     def analyse(self, board, limit: Limit, multipv=None) -> dict:
         if multipv is not None:

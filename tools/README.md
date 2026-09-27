@@ -541,6 +541,33 @@ write_jsonl("artifacts/training/policy-value-v1.jsonl", records)
 records = list(read_jsonl("artifacts/training/policy-value-v1.jsonl"))
 ```
 
+## Alpha-beta self-play distillation
+
+`tools/measurement/policy_value_selfplay.py` plays deterministic, node-limited
+Koi-vs-Koi games from a named opening-move corpus. It records each position's
+complete legal-action list in native `go perft 1` order, a one-hot AlphaBeta PV
+target (falling back to UCI `bestmove` when a bounded search has no info PV),
+the eventual side-to-move game outcome, and a value target from an unbounded
+AlphaBeta score (`tanh(cp/400)`, with game-outcome fallback when no score is
+available). It also records opening/game identity, seed, termination reason,
+and engine/opening/source hashes. The v1 JSONL dataset and content-hashed
+manifest are written atomically. Generated files belong under
+`artifacts/training/`; keep train and validation opening corpora disjoint so
+`train_policy_value.py` can enforce the split.
+
+```powershell
+python .\tools\measurement\policy_value_selfplay.py `
+  --engine .\build\release\koi-engine.exe `
+  --openings .\tests\data\openings\openings-curated-32.txt `
+  --games 8 --nodes 20000 --seed 1 --cpu-variant generic `
+  --output .\artifacts\training\policy-value-ab-selfplay.jsonl
+```
+
+This bootstrap producer is tagged `alpha-beta-distillation` and stores no model
+hash. It uses one-hot search targets and does not claim to provide MCTS visit
+distributions. Keep the AlphaBeta backend as the default until a trained model
+and MCTS clear the equal-time strength gates.
+
 ## Policy/value v1 training
 
 `tools/measurement/train_policy_value.py` trains the fixed v1 CPU reference

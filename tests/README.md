@@ -56,7 +56,7 @@ ctest --test-dir build\release -N
 ctest --test-dir build\release -C Release -R koi_strength_tests --output-on-failure
 ```
 
-The current Windows Release configuration with Python 3 registers **79 tests**
+The current Windows Release configuration with Python 3 registers **80 tests**
 (`KOI_BUILD_SHADOW_DIFF=OFF`). The count varies
 with optional dependencies:
 `koi_shadow_diff_tests` requires `-DKOI_BUILD_SHADOW_DIFF=ON`, and
@@ -163,9 +163,10 @@ the repository root as the working directory:
   telemetry helpers, validation gating, network naming, numeric guards), and
   `bullet_data_python` (bulletformat conversion, exporter weight layouts for v4
   and v5, and wrapper line parsing).
-- Policy/value: `policy_value_dataset_python`, `policy_value_model_python`, and
-  `policy_value_trainer_python` (versioned data/model contracts and CPU training
-  smoke coverage).
+- Policy/value: `policy_value_dataset_python`, `policy_value_model_python`,
+  `policy_value_trainer_python`, and `policy_value_selfplay_python` (versioned
+  data/model contracts, deterministic self-play labels, and CPU training smoke
+  coverage).
 
 ## Labels and scheduling
 
