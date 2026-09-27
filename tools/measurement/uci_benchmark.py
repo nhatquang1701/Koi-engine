@@ -179,9 +179,11 @@ def _send(process: subprocess.Popen[str], command: str) -> None:
     process.stdin.flush()
 
 
-def _handshake(process: subprocess.Popen[str], lines: queue.Queue[Any], timeout: float) -> dict[str, str | None]:
+def _handshake(process: subprocess.Popen[str], lines: queue.Queue[Any], timeout: float
+               ) -> tuple[dict[str, str | None], list[str]]:
     _send(process, "uci")
     identity: dict[str, str | None] = {"name": None, "author": None}
+    options: list[str] = []
     deadline = time.monotonic() + timeout
     while True:
         line = _next_line(process, lines, max(0.001, deadline - time.monotonic()))
@@ -189,8 +191,10 @@ def _handshake(process: subprocess.Popen[str], lines: queue.Queue[Any], timeout:
             identity["name"] = line[8:]
         elif line.startswith("id author "):
             identity["author"] = line[10:]
+        elif line.startswith("option name ") and " type " in line:
+            options.append(line[len("option name "):].split(" type ", 1)[0])
         elif line == "uciok":
-            return identity
+            return identity, options
 
 
 def _ready(process: subprocess.Popen[str], lines: queue.Queue[Any], timeout: float) -> None:
@@ -218,6 +222,8 @@ def _parse_info(line: str) -> dict[str, int | None] | None:
 
 def _search_position(process: subprocess.Popen[str], lines: queue.Queue[Any], fen: str,
                      depth: int, timeout: float) -> dict[str, Any]:
+    _send(process, "ucinewgame")
+    _ready(process, lines, timeout)
     _send(process, f"position fen {fen}")
     _send(process, f"go depth {depth}")
     deadline = time.monotonic() + timeout
@@ -228,7 +234,18 @@ def _search_position(process: subprocess.Popen[str], lines: queue.Queue[Any], fe
         line = _next_line(process, lines, max(0.001, deadline - time.monotonic()))
         row = _parse_info(line)
         if row:
-            depth_rows[int(row["depth"])] = row
+            row_depth = int(row["depth"])
+            previous = depth_rows.get(row_depth)
+            row_complete = all(row[field] is not None for field in ("nodes", "nps", "time_ms"))
+            previous_complete = previous is not None and all(
+                previous[field] is not None for field in ("nodes", "nps", "time_ms"))
+            if previous is None or row_complete:
+                depth_rows[row_depth] = row
+            elif not previous_complete:
+                depth_rows[row_depth] = {
+                    field: row[field] if row[field] is not None else previous[field]
+                    for field in ("depth", "nodes", "nps", "time_ms")
+                }
         elif line.startswith("bestmove "):
             tokens = line.split()
             bestmove = tokens[1] if len(tokens) > 1 else None
@@ -253,7 +270,13 @@ def _run_one(engine_name: str, command: list[str], executable: Path, threads: in
     reader = threading.Thread(target=_read_lines, args=(process, lines), daemon=True)
     reader.start()
     try:
-        identity = _handshake(process, lines, timeout)
+        identity, advertised_options = _handshake(process, lines, timeout)
+        advertised_option_keys = {option.casefold() for option in advertised_options}
+        missing_options = [name for name in ("Threads", "Hash") if name.casefold() not in advertised_option_keys]
+        if missing_options:
+            raise RuntimeError(
+                f"{engine_name} engine does not advertise required UCI option(s): {', '.join(missing_options)}"
+            )
         _send(process, f"setoption name Hash value {hash_mb}")
         _send(process, f"setoption name Threads value {threads}")
         _ready(process, lines, timeout)
@@ -279,6 +302,7 @@ def _run_one(engine_name: str, command: list[str], executable: Path, threads: in
     return {
         "engine": engine_name,
         "engine_id": identity,
+        "advertised_options": advertised_options,
         "executable": {"path": str(executable), "sha256": _sha256(executable)},
         "options": {"Hash": hash_mb, "Threads": threads},
         "peak_rss_bytes": peak_rss["bytes"],
