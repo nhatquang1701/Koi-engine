@@ -1,4 +1,4 @@
-"""Measure UCI search throughput at fixed depth; this is not a strength test."""
+"""Measure UCI throughput at fixed depth or movetime; this is not a strength test."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ import time
 from typing import Any
 
 
-SCHEMA = "koi-uci-benchmark-v1"
+SCHEMA = "koi-uci-benchmark-v2"
 THREAD_COUNTS = (1, 4)
 _EOF = object()
 
@@ -37,8 +37,17 @@ def _read_corpus(path: Path) -> list[str]:
         text = data.decode("utf-8-sig")
     except UnicodeDecodeError as exc:
         raise ValueError(f"FEN corpus is not UTF-8: {path}") from exc
-    positions = [line.strip() for line in text.splitlines()
-                 if line.strip() and not line.lstrip().startswith("#")]
+    positions: list[str] = []
+    for line_number, raw_line in enumerate(text.splitlines(), start=1):
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if "|" in line:
+            name, _, fen = line.partition("|")
+            if not name.strip() or not fen.strip():
+                raise ValueError(f"malformed named FEN at {path}:{line_number}")
+            line = fen.strip()
+        positions.append(line)
     if not positions:
         raise ValueError(f"no FEN positions in corpus: {path}")
     return positions
@@ -245,17 +254,19 @@ def _parse_info(line: str) -> dict[str, int | None] | None:
 
 
 def _search_position(process: subprocess.Popen[str], lines: queue.Queue[Any], fen: str,
-                     depth: int, timeout: float) -> dict[str, Any]:
+                     go_command: str, timeout: float) -> dict[str, Any]:
     _send(process, "ucinewgame")
     _ready(process, lines, timeout)
     _send(process, f"position fen {fen}")
-    _send(process, f"go depth {depth}")
+    _send(process, go_command)
     deadline = time.monotonic() + timeout
     depth_rows: dict[int, dict[str, int | None]] = {}
     bestmove: str | None = None
     ponder: str | None = None
     while bestmove is None:
         line = _next_before_deadline(process, lines, deadline)
+        if line.casefold().startswith("info string invalid position"):
+            raise RuntimeError(f"engine rejected FEN: {fen}")
         row = _parse_info(line)
         if row:
             row_depth = int(row["depth"])
@@ -277,6 +288,7 @@ def _search_position(process: subprocess.Popen[str], lines: queue.Queue[Any], fe
                 ponder = tokens[3]
     return {
         "fen": fen,
+        "go_command": go_command,
         "depth_rows": [depth_rows[key] for key in sorted(depth_rows)],
         "completed_depth": max(depth_rows, default=0),
         "bestmove": bestmove,
@@ -285,7 +297,8 @@ def _search_position(process: subprocess.Popen[str], lines: queue.Queue[Any], fe
 
 
 def _run_one(engine_name: str, command: list[str], executable: Path, threads: int,
-             positions: list[str], hash_mb: int, depth: int, timeout: float) -> dict[str, Any]:
+             positions: list[str], hash_mb: int, depth: int | None,
+             movetime_ms: int | None, timeout: float) -> dict[str, Any]:
     process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                stderr=subprocess.DEVNULL, text=True, encoding="utf-8",
                                errors="replace", bufsize=1)
@@ -316,7 +329,19 @@ def _run_one(engine_name: str, command: list[str], executable: Path, threads: in
         _send(process, f"setoption name Hash value {hash_mb}")
         _send(process, f"setoption name Threads value {threads}")
         _ready(process, lines, timeout)
-        results = [_search_position(process, lines, fen, depth, timeout) for fen in positions]
+        go_command = f"go depth {depth}" if depth is not None else f"go movetime {movetime_ms}"
+        results = []
+        for index, fen in enumerate(positions, start=1):
+            try:
+                results.append(_search_position(process, lines, fen, go_command, timeout))
+            except TimeoutError as exc:
+                raise TimeoutError(
+                    f"{engine_name} Threads={threads} position {index}/{len(positions)} timed out: {exc}"
+                ) from exc
+            except RuntimeError as exc:
+                raise RuntimeError(
+                    f"{engine_name} Threads={threads} position {index}/{len(positions)} failed: {exc}"
+                ) from exc
     finally:
         if process.poll() is None:
             try:
@@ -352,14 +377,21 @@ def _run_one(engine_name: str, command: list[str], executable: Path, threads: in
 
 def run_benchmark(*, engines: list[tuple[str, list[str]]], corpus_path: Path | str,
                   source_revision: str, output_path: Path | str | None = None,
-                  hash_mb: int = 512, depth: int = 12, timeout_seconds: float = 30) -> dict[str, Any]:
-    """Run each engine, in order, with one and four threads over the same corpus."""
+                  hash_mb: int = 512, depth: int | None = None,
+                  movetime_ms: int | None = None,
+                  timeout_seconds: float = 30) -> dict[str, Any]:
+    """Run each engine at one and four threads using a shared depth or movetime."""
     corpus_path = Path(corpus_path).resolve()
     positions = _read_corpus(corpus_path)
     if not engines:
         raise ValueError("at least one engine is required")
-    if hash_mb <= 0 or depth <= 0 or timeout_seconds <= 0:
-        raise ValueError("Hash, depth, and timeout must be positive")
+    if depth is None and movetime_ms is None:
+        depth = 12
+    if depth is not None and movetime_ms is not None:
+        raise ValueError("specify either depth or movetime_ms, not both")
+    if hash_mb <= 0 or (depth is not None and depth <= 0) or \
+            (movetime_ms is not None and movetime_ms <= 0) or timeout_seconds <= 0:
+        raise ValueError("Hash, search limit, and timeout must be positive")
     if any(not name or not command for name, command in engines):
         raise ValueError("each engine requires a name and command")
 
@@ -370,7 +402,13 @@ def run_benchmark(*, engines: list[tuple[str, list[str]]], corpus_path: Path | s
         "created_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "host": _host_info(),
         "corpus": {"path": str(corpus_path), "sha256": _sha256(corpus_path), "position_count": len(positions)},
-        "settings": {"hash_mb": hash_mb, "depth": depth, "threads": list(THREAD_COUNTS)},
+        "settings": {
+            "hash_mb": hash_mb,
+            "depth": depth,
+            "movetime_ms": movetime_ms,
+            "threads": list(THREAD_COUNTS),
+            "timeout_seconds": timeout_seconds,
+        },
         "runs": [],
     }
     # The outer order is deliberate: each engine finishes its 1-thread and
@@ -379,7 +417,7 @@ def run_benchmark(*, engines: list[tuple[str, list[str]]], corpus_path: Path | s
         executable = _resolve_executable(command)
         for threads in THREAD_COUNTS:
             report["runs"].append(_run_one(name, command, executable, threads, positions,
-                                            hash_mb, depth, timeout_seconds))
+                                            hash_mb, depth, movetime_ms, timeout_seconds))
     if output_path is not None:
         output_path = Path(output_path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -395,13 +433,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--source-revision", required=True, help="source revision recorded in the report")
     parser.add_argument("--output", required=True, type=Path, help="JSON report destination")
     parser.add_argument("--hash-mb", type=int, default=512)
-    parser.add_argument("--depth", type=int, default=12)
+    search_limit = parser.add_mutually_exclusive_group()
+    search_limit.add_argument("--depth", type=int, help="search to this depth (default: 12)")
+    search_limit.add_argument("--movetime-ms", type=int, help="search each position for this many milliseconds")
     parser.add_argument("--timeout-seconds", type=float, default=30)
     args = parser.parse_args(argv)
     try:
         run_benchmark(engines=[("koi", [args.koi]), ("stockfish", [args.stockfish])],
                       corpus_path=args.fen_corpus, source_revision=args.source_revision,
                       output_path=args.output, hash_mb=args.hash_mb, depth=args.depth,
+                      movetime_ms=args.movetime_ms,
                       timeout_seconds=args.timeout_seconds)
     except (OSError, RuntimeError, TimeoutError, ValueError) as exc:
         parser.exit(2, f"uci_benchmark: {exc}\n")

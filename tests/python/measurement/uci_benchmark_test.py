@@ -55,8 +55,10 @@ for line in sys.stdin:
             start_chatter()
         else:
             print("readyok", flush=True)
-    elif command.startswith("go depth "):
-        if mode == "chatter-search":
+    elif command.startswith("go depth ") or command.startswith("go movetime "):
+        if mode == "invalid-position":
+            print("info string invalid position", flush=True)
+        elif mode == "chatter-search":
             start_chatter()
         else:
             print("info depth 1 time 2 nodes 10 nps 5000", flush=True)
@@ -93,10 +95,13 @@ class UciBenchmarkReportTest(unittest.TestCase):
                     output_path=output_path,
                 )
 
-            self.assertEqual(report["schema"], "koi-uci-benchmark-v1")
+            self.assertEqual(report["schema"], "koi-uci-benchmark-v2")
             self.assertEqual(report["source_revision"], "abc1234")
             self.assertEqual(report["corpus"]["sha256"], hashlib.sha256(corpus_bytes).hexdigest())
-            self.assertEqual(report["settings"], {"hash_mb": 512, "depth": 12, "threads": [1, 4]})
+            self.assertEqual(report["settings"], {
+                "hash_mb": 512, "depth": 12, "movetime_ms": None,
+                "threads": [1, 4], "timeout_seconds": 30,
+            })
             self.assertEqual([run["engine"] for run in report["runs"]],
                              ["koi", "koi", "stockfish", "stockfish"])
             self.assertEqual([run["options"]["Threads"] for run in report["runs"]], [1, 4, 1, 4])
@@ -107,6 +112,7 @@ class UciBenchmarkReportTest(unittest.TestCase):
             self.assertEqual(run["executable"]["sha256"], hashlib.sha256(executable_path.read_bytes()).hexdigest())
             self.assertEqual(run["completed_depth"], 2)
             self.assertEqual(run["positions"][0]["bestmove"], "e2e4")
+            self.assertEqual(run["positions"][0]["go_command"], "go depth 12")
             self.assertEqual(run["positions"][0]["depth_rows"], [
                 {"depth": 1, "nodes": 10, "nps": 5000, "time_ms": 2},
                 {"depth": 2, "nodes": 30, "nps": 6000, "time_ms": 5},
@@ -130,6 +136,67 @@ class UciBenchmarkReportTest(unittest.TestCase):
                 "go depth 12",
             ])
             self.assertEqual(json.loads(output_path.read_text(encoding="utf-8")), report)
+
+    def test_fixed_movetime_runs_send_go_movetime_and_record_the_limit(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = Path(temp_dir)
+            engine_path = temp / "fake_uci_engine.py"
+            engine_path.write_text(FAKE_ENGINE, encoding="utf-8")
+            corpus_path = temp / "positions.fen"
+            corpus_path.write_text("8/8/8/8/8/8/8/K6k w - - 0 1\n", encoding="utf-8")
+            event_log = temp / "uci-events.log"
+
+            with mock.patch.dict(os.environ, {"FAKE_UCI_EVENT_LOG": str(event_log)}):
+                report = uci_benchmark.run_benchmark(
+                    engines=[("koi", [sys.executable, str(engine_path)])],
+                    corpus_path=corpus_path,
+                    source_revision="abc1234",
+                    movetime_ms=1000,
+                )
+
+            self.assertEqual(report["schema"], "koi-uci-benchmark-v2")
+            self.assertEqual(report["settings"], {
+                "hash_mb": 512, "depth": None, "movetime_ms": 1000,
+                "threads": [1, 4], "timeout_seconds": 30,
+            })
+            events = event_log.read_text(encoding="utf-8").splitlines()
+            self.assertEqual(events.count("go movetime 1000"), 2)
+            self.assertNotIn("go depth 12", events)
+            self.assertTrue(all(run["positions"][0]["bestmove"] == "e2e4" for run in report["runs"]))
+            self.assertTrue(all(run["positions"][0]["go_command"] == "go movetime 1000"
+                                for run in report["runs"]))
+
+    def test_named_fen_corpus_is_normalized_before_engine_launch(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            corpus_path = Path(temp_dir) / "named-positions.txt"
+            fen_one = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+            fen_two = "8/8/8/8/8/8/8/K6k w - - 0 1"
+            corpus_path.write_text(
+                f"# name|FEN\nopening|{fen_one}\nendgame|{fen_two}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(uci_benchmark._read_corpus(corpus_path), [fen_one, fen_two])
+
+    def test_engine_fen_rejection_fails_with_position_context(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = Path(temp_dir)
+            engine_path = temp / "fake_uci_engine.py"
+            engine_path.write_text(FAKE_ENGINE, encoding="utf-8")
+            corpus_path = temp / "one.fen"
+            corpus_path.write_text("8/8/8/8/8/8/8/K6k w - - 0 1\n", encoding="utf-8")
+
+            with mock.patch.dict(os.environ, {"FAKE_UCI_MODE": "invalid-position"}):
+                with self.assertRaisesRegex(
+                    RuntimeError,
+                    r"koi Threads=1 position 1/1.*rejected FEN",
+                ):
+                    uci_benchmark.run_benchmark(
+                        engines=[("koi", [sys.executable, str(engine_path)])],
+                        corpus_path=corpus_path,
+                        source_revision="abc1234",
+                        timeout_seconds=0.5,
+                    )
 
     def test_refuses_to_search_when_engine_does_not_advertise_required_options(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -200,14 +267,16 @@ class UciBenchmarkReportTest(unittest.TestCase):
                         "FAKE_UCI_MODE": mode,
                     }):
                         started = time.monotonic()
-                        with self.assertRaises(TimeoutError):
+                        with self.assertRaises(TimeoutError) as caught:
                             uci_benchmark.run_benchmark(
                                 engines=[("koi", [sys.executable, str(engine_path)])],
                                 corpus_path=corpus_path,
                                 source_revision="abc1234",
                                 timeout_seconds=0.08,
                             )
-                        elapsed = time.monotonic() - started
+                    if mode == "chatter-search":
+                        self.assertIn("koi Threads=1 position 1/1", str(caught.exception))
+                    elapsed = time.monotonic() - started
                     self.assertLess(elapsed, 0.7, f"{mode} exceeded its protocol deadline: {elapsed:.3f}s")
                     self.assertIn("quit", event_log.read_text(encoding="utf-8"),
                                   f"runner did not cleanly stop engine in {mode}")

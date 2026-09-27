@@ -119,13 +119,15 @@ pwsh -NoProfile -File .\tools\build\speed_gate.ps1 `
 ## Cross-engine UCI throughput benchmark
 
 `tools/measurement/uci_benchmark.py` runs Koi and Stockfish-style UCI engines
-sequentially on the same FEN file at one and four threads. It performs a
-depth-limited search per position and records the time, nodes, NPS, completed
-depth, best move, executable and corpus hashes, host details, and peak RSS when
-the OS exposes it. The tool requires both engines to advertise compatible
-`Threads` and `Hash` spin options before it starts. NPS is a within-engine
-throughput measure; this report is not an Elo or playing-strength comparison.
-Use matched games at equal time controls for strength work.
+sequentially on the same corpus at one and four threads. Choose either a fixed
+depth or a fixed movetime for every position. The corpus accepts one FEN per
+line or the repository's `name|FEN` format. The version 2 report records each
+iteration's time, nodes, NPS, completed depth, best move, search command,
+executable and corpus hashes, host details, and peak RSS when the OS exposes
+it. The tool requires both engines to advertise compatible `Threads` and
+`Hash` spin options before it starts. NPS is a within-engine throughput measure;
+this report is not an Elo or playing-strength comparison. Use matched games at
+equal time controls for strength work.
 
 ```powershell
 $revision = git rev-parse HEAD
@@ -134,9 +136,14 @@ python .\tools\measurement\uci_benchmark.py `
   --stockfish .\third_party\stockfish-19\stockfish-windows-x86-64-universal\stockfish\stockfish-windows-x86-64-universal.exe `
   --fen-corpus .\tests\data\positions\evaluation-positions.txt `
   --source-revision $revision `
-  --hash-mb 512 --depth 12 `
+  --hash-mb 512 --movetime-ms 1000 --timeout-seconds 15 `
   --output .\artifacts\verification\uci-throughput\report.json
 ```
+
+Use `--depth 12` instead for fixed-depth measurements; when neither limit is
+supplied, depth 12 is the default. `--timeout-seconds` bounds each UCI
+handshake and search. Invalid named FEN rows are rejected by the target engine
+with a position-specific diagnostic.
 
 Linux builds use the same command with their engine and corpus paths. The
 report records the supplied revision, so pass the revision that produced the
