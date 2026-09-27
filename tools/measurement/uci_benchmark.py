@@ -173,6 +173,13 @@ def _next_line(process: subprocess.Popen[str], lines: queue.Queue[Any], timeout:
     return str(item)
 
 
+def _next_before_deadline(process: subprocess.Popen[str], lines: queue.Queue[Any], deadline: float) -> str:
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        raise TimeoutError("timed out waiting for UCI engine output")
+    return _next_line(process, lines, remaining)
+
+
 def _send(process: subprocess.Popen[str], command: str) -> None:
     assert process.stdin is not None
     process.stdin.write(command + "\n")
@@ -180,19 +187,36 @@ def _send(process: subprocess.Popen[str], command: str) -> None:
 
 
 def _handshake(process: subprocess.Popen[str], lines: queue.Queue[Any], timeout: float
-               ) -> tuple[dict[str, str | None], list[str]]:
+               ) -> tuple[dict[str, str | None], list[dict[str, Any]]]:
     _send(process, "uci")
     identity: dict[str, str | None] = {"name": None, "author": None}
-    options: list[str] = []
+    options: list[dict[str, Any]] = []
     deadline = time.monotonic() + timeout
     while True:
-        line = _next_line(process, lines, max(0.001, deadline - time.monotonic()))
+        line = _next_before_deadline(process, lines, deadline)
         if line.startswith("id name "):
             identity["name"] = line[8:]
         elif line.startswith("id author "):
             identity["author"] = line[10:]
         elif line.startswith("option name ") and " type " in line:
-            options.append(line[len("option name "):].split(" type ", 1)[0])
+            definition = line[len("option name "):]
+            option_name, _, remainder = definition.partition(" type ")
+            tokens = remainder.split()
+            if not tokens:
+                continue
+
+            def integer_after(key: str) -> int | None:
+                try:
+                    return int(tokens[tokens.index(key) + 1])
+                except (ValueError, IndexError):
+                    return None
+
+            options.append({
+                "name": option_name,
+                "type": tokens[0],
+                "min": integer_after("min"),
+                "max": integer_after("max"),
+            })
         elif line == "uciok":
             return identity, options
 
@@ -201,7 +225,7 @@ def _ready(process: subprocess.Popen[str], lines: queue.Queue[Any], timeout: flo
     _send(process, "isready")
     deadline = time.monotonic() + timeout
     while True:
-        if _next_line(process, lines, max(0.001, deadline - time.monotonic())) == "readyok":
+        if _next_before_deadline(process, lines, deadline) == "readyok":
             return
 
 
@@ -231,7 +255,7 @@ def _search_position(process: subprocess.Popen[str], lines: queue.Queue[Any], fe
     bestmove: str | None = None
     ponder: str | None = None
     while bestmove is None:
-        line = _next_line(process, lines, max(0.001, deadline - time.monotonic()))
+        line = _next_before_deadline(process, lines, deadline)
         row = _parse_info(line)
         if row:
             row_depth = int(row["depth"])
@@ -270,13 +294,25 @@ def _run_one(engine_name: str, command: list[str], executable: Path, threads: in
     reader = threading.Thread(target=_read_lines, args=(process, lines), daemon=True)
     reader.start()
     try:
-        identity, advertised_options = _handshake(process, lines, timeout)
-        advertised_option_keys = {option.casefold() for option in advertised_options}
-        missing_options = [name for name in ("Threads", "Hash") if name.casefold() not in advertised_option_keys]
+        identity, option_specs = _handshake(process, lines, timeout)
+        options_by_name = {option["name"].casefold(): option for option in option_specs}
+        requested_options = {"Threads": threads, "Hash": hash_mb}
+        missing_options = [name for name in requested_options if name.casefold() not in options_by_name]
         if missing_options:
             raise RuntimeError(
                 f"{engine_name} engine does not advertise required UCI option(s): {', '.join(missing_options)}"
             )
+        for name, value in requested_options.items():
+            option = options_by_name[name.casefold()]
+            if option["type"].casefold() != "spin":
+                raise RuntimeError(f"{engine_name} UCI option {name} must be a spin option")
+            minimum, maximum = option["min"], option["max"]
+            if minimum is None or maximum is None or minimum > maximum:
+                raise RuntimeError(f"{engine_name} UCI option {name} must advertise a valid spin range")
+            if not minimum <= value <= maximum:
+                raise RuntimeError(
+                    f"{engine_name} requested {name} value {value} is outside advertised range {minimum}..{maximum}"
+                )
         _send(process, f"setoption name Hash value {hash_mb}")
         _send(process, f"setoption name Threads value {threads}")
         _ready(process, lines, timeout)
@@ -302,7 +338,8 @@ def _run_one(engine_name: str, command: list[str], executable: Path, threads: in
     return {
         "engine": engine_name,
         "engine_id": identity,
-        "advertised_options": advertised_options,
+        "advertised_options": [option["name"] for option in option_specs],
+        "option_specs": option_specs,
         "executable": {"path": str(executable), "sha256": _sha256(executable)},
         "options": {"Hash": hash_mb, "Threads": threads},
         "peak_rss_bytes": peak_rss["bytes"],

@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import sys
 import tempfile
+import time
 import unittest
 from unittest import mock
 
@@ -18,6 +19,20 @@ SPEC.loader.exec_module(uci_benchmark)
 
 FAKE_ENGINE = r'''import sys
 import os
+import threading
+import time
+
+mode = os.environ.get("FAKE_UCI_MODE", "normal")
+ready_count = 0
+stop_chatter = threading.Event()
+
+def start_chatter():
+    stop_chatter.clear()
+    def write_lines():
+        deadline = time.monotonic() + 2.0
+        while not stop_chatter.is_set() and time.monotonic() < deadline:
+            print("info string still working", flush=True)
+    threading.Thread(target=write_lines, daemon=True).start()
 
 print("id name Fake UCI Engine", flush=True)
 print("id author Koi benchmark test", flush=True)
@@ -30,15 +45,26 @@ for line in sys.stdin:
     if command == "uci":
         print("option name Hash type spin default 16 min 1 max 65536", flush=True)
         print("option name Threads type spin default 1 min 1 max 512", flush=True)
-        print("uciok", flush=True)
+        if mode == "chatter-handshake":
+            start_chatter()
+        else:
+            print("uciok", flush=True)
     elif command == "isready":
-        print("readyok", flush=True)
+        ready_count += 1
+        if mode == "chatter-ready" and ready_count == 2:
+            start_chatter()
+        else:
+            print("readyok", flush=True)
     elif command.startswith("go depth "):
-        print("info depth 1 time 2 nodes 10 nps 5000", flush=True)
-        print("info depth 2 time 5 nodes 30 nps 6000", flush=True)
-        print("info depth 2 currmove e2e4 currmovenumber 1", flush=True)
-        print("bestmove e2e4", flush=True)
+        if mode == "chatter-search":
+            start_chatter()
+        else:
+            print("info depth 1 time 2 nodes 10 nps 5000", flush=True)
+            print("info depth 2 time 5 nodes 30 nps 6000", flush=True)
+            print("info depth 2 currmove e2e4 currmovenumber 1", flush=True)
+            print("bestmove e2e4", flush=True)
     elif command == "quit":
+        stop_chatter.set()
         break
 '''
 
@@ -126,6 +152,65 @@ class UciBenchmarkReportTest(unittest.TestCase):
                     )
 
             self.assertNotIn("go depth", event_log.read_text(encoding="utf-8"))
+
+    def test_rejects_engine_options_with_wrong_type_or_out_of_range_values(self):
+        invalid_declarations = [
+            (
+                "threads-wrong-type",
+                'option name Threads type spin default 1 min 1 max 512',
+                'option name Threads type check default true',
+            ),
+            (
+                "threads-out-of-range",
+                'option name Threads type spin default 1 min 1 max 512',
+                'option name Threads type spin default 2 min 2 max 4',
+            ),
+        ]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = Path(temp_dir)
+            corpus_path = temp / "one.fen"
+            corpus_path.write_text("8/8/8/8/8/8/8/K6k w - - 0 1\n", encoding="utf-8")
+            for name, old_declaration, invalid_declaration in invalid_declarations:
+                with self.subTest(name=name):
+                    engine_path = temp / f"{name}.py"
+                    engine_path.write_text(FAKE_ENGINE.replace(old_declaration, invalid_declaration), encoding="utf-8")
+                    event_log = temp / f"{name}.log"
+                    with mock.patch.dict(os.environ, {"FAKE_UCI_EVENT_LOG": str(event_log)}):
+                        with self.assertRaisesRegex(RuntimeError, "Threads.*(spin|range|value)"):
+                            uci_benchmark.run_benchmark(
+                                engines=[("koi", [sys.executable, str(engine_path)])],
+                                corpus_path=corpus_path,
+                                source_revision="abc1234",
+                            )
+                    self.assertNotIn("go depth", event_log.read_text(encoding="utf-8"))
+
+    def test_continuous_engine_output_cannot_extend_protocol_deadlines(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = Path(temp_dir)
+            engine_path = temp / "chattering_engine.py"
+            engine_path.write_text(FAKE_ENGINE, encoding="utf-8")
+            corpus_path = temp / "one.fen"
+            corpus_path.write_text("8/8/8/8/8/8/8/K6k w - - 0 1\n", encoding="utf-8")
+
+            for mode in ("chatter-handshake", "chatter-ready", "chatter-search"):
+                with self.subTest(mode=mode):
+                    event_log = temp / f"{mode}.log"
+                    with mock.patch.dict(os.environ, {
+                        "FAKE_UCI_EVENT_LOG": str(event_log),
+                        "FAKE_UCI_MODE": mode,
+                    }):
+                        started = time.monotonic()
+                        with self.assertRaises(TimeoutError):
+                            uci_benchmark.run_benchmark(
+                                engines=[("koi", [sys.executable, str(engine_path)])],
+                                corpus_path=corpus_path,
+                                source_revision="abc1234",
+                                timeout_seconds=0.08,
+                            )
+                        elapsed = time.monotonic() - started
+                    self.assertLess(elapsed, 0.7, f"{mode} exceeded its protocol deadline: {elapsed:.3f}s")
+                    self.assertIn("quit", event_log.read_text(encoding="utf-8"),
+                                  f"runner did not cleanly stop engine in {mode}")
 
     def test_rejects_an_empty_fen_corpus_before_starting_an_engine(self):
         with tempfile.TemporaryDirectory() as temp_dir:
