@@ -535,6 +535,14 @@ void write_run_metrics(std::ostream& output, const BenchmarkRun& run, bool timed
            << ", \"delta_prunes\": " << result.stats.delta_prunes
            << ", \"null_cutoffs\": " << result.stats.null_cutoffs
            << ", \"lmr_reductions\": " << result.stats.lmr_reductions
+           << "}, \"feature_work\": {\"qsearch_cache_hits\": "
+           << result.stats.qsearch_cache_hits
+           << ", \"position_feature_extractions\": "
+           << result.stats.position_feature_extractions
+           << ", \"lmr_parent_feature_reuses\": "
+           << result.stats.lmr_parent_feature_reuses
+           << ", \"evaluation_cache_hits\": "
+           << result.stats.evaluation_cache_hits
            << "}, \"nps\": " << nps;
     if (timed) {
         output << ", \"elapsed_ms\": " << run.wall_time.count();

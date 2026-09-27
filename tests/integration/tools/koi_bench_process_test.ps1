@@ -219,6 +219,12 @@ foreach ($position in $coldJson.positions) {
     if ([uint64]$position.nps -ne 0) {
         throw 'untimed profile JSON must mark NPS as unmeasured.'
     }
+    foreach ($field in @('qsearch_cache_hits', 'position_feature_extractions',
+                         'lmr_parent_feature_reuses', 'evaluation_cache_hits')) {
+        if ($null -eq $position.feature_work.$field) {
+            throw "profile JSON must expose feature/cache counter $field"
+        }
+    }
 }
 if (-not @($coldJson.positions | Where-Object { $_.pv.Count -gt 1 })) {
     throw 'profile JSON must retain at least one completed multi-move principal variation.'
@@ -282,6 +288,14 @@ foreach ($position in $steadyJson.positions) {
     }
     if ($position.runs.Count -ne 2) {
         throw "steady-state profile positions must retain every repeated run, got $($position.runs.Count)."
+    }
+    foreach ($run in @($position) + @($position.runs)) {
+        foreach ($field in @('qsearch_cache_hits', 'position_feature_extractions',
+                             'lmr_parent_feature_reuses', 'evaluation_cache_hits')) {
+            if ($null -eq $run.feature_work.$field) {
+                throw "profile samples must expose feature/cache counter $field"
+            }
+        }
     }
     $primary = "$($position.nodes)|$($position.qnodes)|$($position.score_cp)"
     $sample = @($position.runs | Where-Object { "$($_.nodes)|$($_.qnodes)|$($_.score_cp)" -ceq $primary })
