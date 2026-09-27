@@ -27,7 +27,18 @@ class TrainPolicyValueTests(unittest.TestCase):
 
     def records(self, prefix):
         rows = []
-        for index, fen in enumerate((chess.STARTING_FEN, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1")):
+        if prefix == "validation":
+            e4 = chess.Board()
+            e4.push(chess.Move.from_uci("e2e4"))
+            d4 = chess.Board()
+            d4.push(chess.Move.from_uci("d2d4"))
+            fens = (e4.fen(), d4.fen())
+        else:
+            fens = (
+                chess.STARTING_FEN,
+                "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1",
+            )
+        for index, fen in enumerate(fens):
             board = chess.Board(fen)
             actions = []
             legal_moves = list(board.legal_moves)
@@ -79,6 +90,31 @@ class TrainPolicyValueTests(unittest.TestCase):
             self.write_records(validation_path, validation)
             with self.assertRaisesRegex(ValueError, "opening_id overlap"):
                 self.trainer.train_policy_value(train_path, validation_path, Path(temporary) / "x.kpv", Path(temporary) / "x.json", epochs=1, device="cpu")
+
+    def test_rejects_position_leakage_even_when_split_ids_and_fullmove_differ(self):
+        train = self.records("train")
+        validation = self.records("validation")
+        train_fen = train[0]["position"]["fen"]
+        validation[0]["position"]["fen"] = train_fen.rsplit(" ", 1)[0] + " 99"
+
+        self.assertNotEqual(train[0]["game_id"], validation[0]["game_id"])
+        self.assertNotEqual(train[0]["opening_id"], validation[0]["opening_id"])
+        with self.assertRaisesRegex(ValueError, "position overlap"):
+            self.trainer._check_disjoint(train, validation)
+
+    def test_position_identity_keeps_the_halfmove_clock(self):
+        record = self.records("train")[0]
+        changed = dict(record)
+        changed_position = dict(record["position"])
+        fen_fields = changed_position["fen"].split()
+        fen_fields[4] = "1"
+        changed_position["fen"] = " ".join(fen_fields)
+        changed["position"] = changed_position
+
+        self.assertNotEqual(
+            self.trainer._position_state_hash(record),
+            self.trainer._position_state_hash(changed),
+        )
 
     def test_rejects_incomplete_legal_move_list(self):
         if self.trainer.torch is None:

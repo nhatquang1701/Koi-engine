@@ -590,8 +590,10 @@ strength gates.
 
 `tools/measurement/train_policy_value.py` trains the fixed v1 CPU reference
 architecture from separate train and validation JSONL files. It rejects game
-or opening overlap, requires complete legal-action lists, and exports the
-versioned model plus an atomic metadata sidecar with dataset/model/source
+or opening overlap and canonical FEN-state overlap across splits. The overlap
+key includes side, castling, en passant, and halfmove state, but ignores the
+fullmove counter. The trainer requires complete legal-action lists and exports
+the versioned model plus an atomic metadata sidecar with dataset/model/source
 hashes, metrics, host details, and measured training throughput. PyTorch is an
 optional training dependency; importing the tools does not require it. CPU is
 the default. Select `--device cuda` explicitly to use a CUDA-enabled PyTorch

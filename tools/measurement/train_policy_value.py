@@ -94,6 +94,25 @@ def _check_disjoint(train: list[dict[str, Any]], validation: list[dict[str, Any]
         if overlap:
             raise ValueError(f"train and validation datasets have {field} overlap: {sorted(overlap)[0]}")
 
+    train_positions = {_position_state_hash(record) for record in train}
+    for index, record in enumerate(validation, 1):
+        if _position_state_hash(record) in train_positions:
+            raise ValueError(
+                f"train and validation datasets have position overlap at validation record {index}"
+            )
+
+
+def _position_state_hash(record: dict[str, Any]) -> bytes:
+    """Hash the rules-relevant FEN state, ignoring only the fullmove counter."""
+    position = record["position"]
+    try:
+        board = chess.Board(position["fen"])
+    except (TypeError, ValueError) as error:
+        raise ValueError(f"cannot identify the training position: {error}") from error
+    canonical_fields = board.fen().split()
+    identity = "\0".join((position["variant"], *canonical_fields[:5]))
+    return hashlib.sha256(identity.encode("ascii")).digest()
+
 
 def _digest(path: str | Path) -> str:
     digest = hashlib.sha256()
