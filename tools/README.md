@@ -116,6 +116,33 @@ pwsh -NoProfile -File .\tools\build\speed_gate.ps1 `
   -OutputDirectory .\artifacts\verification\speed-program\speed-gate\phase-1
 ```
 
+## Cross-engine UCI throughput benchmark
+
+`tools/measurement/uci_benchmark.py` runs Koi and Stockfish-style UCI engines
+sequentially on the same FEN file at one and four threads. It performs a
+depth-limited search per position and records the time, nodes, NPS, completed
+depth, best move, executable and corpus hashes, host details, and peak RSS when
+the OS exposes it. The tool requires both engines to advertise compatible
+`Threads` and `Hash` spin options before it starts. NPS is a within-engine
+throughput measure; this report is not an Elo or playing-strength comparison.
+Use matched games at equal time controls for strength work.
+
+```powershell
+$revision = git rev-parse HEAD
+python .\tools\measurement\uci_benchmark.py `
+  --koi .\build\release\koi-engine.exe `
+  --stockfish .\third_party\stockfish-19\stockfish-windows-x86-64-universal\stockfish\stockfish-windows-x86-64-universal.exe `
+  --fen-corpus .\tests\data\positions\evaluation-positions.txt `
+  --source-revision $revision `
+  --hash-mb 512 --depth 12 `
+  --output .\artifacts\verification\uci-throughput\report.json
+```
+
+Linux builds use the same command with their engine and corpus paths. The
+report records the supplied revision, so pass the revision that produced the
+engine binaries. Windows reports `PeakWorkingSetSize`; Linux reports
+`VmHWM`. Unsupported operating systems are marked explicitly.
+
 Install the measurement dependencies from the repository root:
 
 ```powershell
@@ -474,6 +501,27 @@ one, and the trainer's `--wdl` weight (default `0.5`) blends it with the
 centipawn target; `--wdl 0` reproduces the pure evaluation blend.
 `koi-dataset-v2` encodes four index groups (`A_stm`, `B_stm`, `A_opp`, `B_opp`)
 per record.
+
+## Policy/value self-play dataset format
+
+`tools/measurement/policy_value_dataset.py` defines a separate
+`koi-policy-value-dataset-v1` JSONL contract for future MCTS distillation and
+self-play. It keeps each position's FEN and variant, native-order legal UCI
+actions with explicit from/to/promotion fields, aligned policy targets and
+optional visit counts, side-to-move value and outcome, game/opening identity,
+seed and ply, feature schema, producer/search provenance, network hash, and
+termination reason. The reader validates records and the writer produces
+canonical JSONL through an atomic replacement. Keep generated datasets under
+`artifacts/training/`; do not reuse or modify `koi-dataset-v2`, which remains
+the value-NNUE format. Action legality and ordering must come from Koi's native
+position API, not from this serialization module.
+
+```python
+from tools.measurement.policy_value_dataset import read_jsonl, write_jsonl
+
+write_jsonl("artifacts/training/policy-value-v1.jsonl", records)
+records = list(read_jsonl("artifacts/training/policy-value-v1.jsonl"))
+```
 
 Typical commands:
 
