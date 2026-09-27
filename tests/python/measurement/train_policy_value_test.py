@@ -6,6 +6,7 @@ import platform
 import subprocess
 import sys
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest import mock
 from pathlib import Path
@@ -179,13 +180,17 @@ else:
             self.assertEqual(self.trainer._cuda_driver_version(), "555.42.02")
         self.assertEqual(run.call_args.kwargs["timeout"], 2.0)
         self.assertEqual(run.call_args.args[0][0], "nvidia-smi")
-        with mock.patch.object(self.trainer, "_cuda_driver_version", return_value=None):
+        fake_torch = SimpleNamespace(version=SimpleNamespace(cuda=None))
+        with mock.patch.object(self.trainer, "torch", fake_torch), \
+             mock.patch.object(self.trainer, "_cuda_driver_version", return_value=None):
             metadata = self.trainer._cuda_provenance()
         self.assertIn("cuda_build_version", metadata)
         self.assertIn("cuda_driver_version", metadata)
         self.assertIsNone(metadata["cuda_driver_version"])
 
     def test_cpu_training_exports_reloadable_model_and_reproducible_metadata(self):
+        if self.trainer.torch is None:
+            self.skipTest("PyTorch is not installed")
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             train_path, validation_path = root / "train.jsonl", root / "validation.jsonl"

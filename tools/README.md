@@ -551,9 +551,12 @@ hashes, metrics, host details, and measured training throughput. PyTorch is an
 optional training dependency; importing the tools does not require it. CPU is
 the default. Select `--device cuda` explicitly to use a CUDA-enabled PyTorch
 build. Keep datasets, model files, and metadata under `artifacts/training/`.
-The `.kpv` container is separate from NNUE `EvalFile`. Its Python reference
-format is implemented ahead of the C++ loader and MCTS backend, so this stage
-does not make the network selectable in UCI.
+The `.kpv` container is separate from NNUE `EvalFile`. The Python reference
+and C++ CPU loader validate its 40-byte little-endian header, fixed dimensions,
+payload length, CRC32, and finite float32 weights. C++ inference consumes the
+native v5 sparse feature list and caller-provided legal moves/output storage.
+UCI selection and the MCTS backend are separate roadmap steps, so this does
+not change the default alpha-beta search.
 
 ```powershell
 python .\tools\measurement\train_policy_value.py `

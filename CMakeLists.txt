@@ -259,6 +259,7 @@ set(KOI_CORE_SOURCES
     src/koi/nnue.cpp
     src/koi/opening_book.cpp
     src/koi/perft.cpp
+    src/koi/policy_value_model.cpp
     src/koi/position.cpp
     src/koi/search_service.cpp
     src/koi/search_ordering.cpp
@@ -683,6 +684,14 @@ target_link_libraries(evaluation_features_tests PRIVATE koi_core)
 
 add_test(NAME evaluation_features_tests COMMAND evaluation_features_tests)
 
+add_executable(policy_value_model_tests
+    tests/unit/evaluation/policy_value_model_tests.cpp
+)
+
+target_link_libraries(policy_value_model_tests PRIVATE koi_core)
+
+add_test(NAME policy_value_model_tests COMMAND policy_value_model_tests)
+
 add_executable(time_manager_tests
     tests/unit/search/time_manager_tests.cpp
 )
@@ -828,6 +837,7 @@ set(KOI_TEST_SUPPORT_TARGETS
     koi_soak_tests
     classical_evaluator_tests
     evaluation_features_tests
+    policy_value_model_tests
     time_manager_tests
     koi_strength_tests
     perft_tests
@@ -1192,7 +1202,7 @@ if(TARGET koi_module_tests)
 endif()
 set_tests_properties(
     evaluation_boundary_tests evaluation_architecture_tests nnue_boundary_tests
-    classical_evaluator_tests evaluation_features_tests
+    classical_evaluator_tests evaluation_features_tests policy_value_model_tests
     PROPERTIES LABELS "unit;evaluation"
 )
 set_tests_properties(transposition_table_tests PROPERTIES LABELS "unit;runtime")

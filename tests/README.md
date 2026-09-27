@@ -104,13 +104,15 @@ $env:KOI_TEST_FILTER = "medium timed forcing root"
 
 ## Inventory
 
-C++ unit / integration tests (28 executables under `tests/unit/` and
+C++ unit / integration tests (29 executables under `tests/unit/` and
 `tests/integration/`):
 
 - Rules and state: `koi_core_tests`, `koi_rules_tests`, `native_rule_state_tests`,
   `perft_tests`, `koi_shadow_diff_tests` (opt-in via `KOI_BUILD_SHADOW_DIFF`).
 - Evaluation: `evaluation_boundary_tests`, `evaluation_architecture_tests`,
-  `nnue_boundary_tests`, `classical_evaluator_tests`, `evaluation_features_tests`.
+  `nnue_boundary_tests`, `classical_evaluator_tests`, `evaluation_features_tests`,
+  `policy_value_model_tests` (versioned C++ loader, corruption checks, and CPU
+  inference reference cases).
 - Search: `koi_search_tests` (four CTest shards), `search_ordering_tests`,
   `search_architecture_tests`, `search_policy_tests`, `search_runtime_tests`,
   `search_service_tests`, `static_exchange_tests`, `time_manager_tests`,
@@ -158,6 +160,9 @@ the repository root as the working directory:
   telemetry helpers, validation gating, network naming, numeric guards), and
   `bullet_data_python` (bulletformat conversion, exporter weight layouts for v4
   and v5, and wrapper line parsing).
+- Policy/value: `policy_value_dataset_python`, `policy_value_model_python`, and
+  `policy_value_trainer_python` (versioned data/model contracts and CPU training
+  smoke coverage).
 
 ## Labels and scheduling
 
