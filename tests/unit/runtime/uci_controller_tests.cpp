@@ -1957,13 +1957,16 @@ void test_handshake_option_table_is_unique_and_well_formed() {
             "a handshake-only transcript must stay clean");
     const std::vector<std::string> options =
         lines_starting_with(output_lines(handshake.output), "option name ");
-    require(options.size() == 26, "the handshake must advertise exactly 26 options");
+    require(options.size() == 27, "the handshake must advertise exactly 27 options");
     require(handshake.output.find("option name SearchAlgorithm type string default AlphaBeta") !=
                 std::string::npos,
             "AlphaBeta must remain the advertised default search algorithm");
     require(handshake.output.find("option name PolicyValueFile type string default \n") !=
                 std::string::npos,
             "a policy/value model must remain an explicit optional asset");
+    require(handshake.output.find("option name MCTSVisitOutput type check default false") !=
+                std::string::npos,
+            "MCTS visit export must stay opt-in");
 
     const std::string prefix = "option name ";
     std::vector<std::string> names;
@@ -2078,6 +2081,8 @@ void test_mcts_valid_model_publishes_legal_multipv_and_estimated_wdl() {
             "a valid CPU MCTS search must complete through the UCI controller");
     require(result.output.find("info string MCTS unavailable:") == std::string::npos,
             "a compatible model must not fall back from MCTS");
+    require(result.output.find("info string koi_mcts_visits_v1 ") == std::string::npos,
+            "MCTS root visits must not extend normal UCI output by default");
     require(infos.size() == 3,
             "the final MCTS snapshot must publish the requested root MultiPV lines");
     bool saw_first = false;
@@ -2105,6 +2110,52 @@ void test_mcts_valid_model_publishes_legal_multipv_and_estimated_wdl() {
     require(bestmoves.size() == 1 && is_legal_move(Position{},
                                                    first_bestmove_move(bestmoves.front())),
             "a valid MCTS search must publish exactly one legal bestmove");
+}
+
+void test_mcts_visit_output_contains_the_full_root_distribution_when_enabled() {
+    const koi::test::TempDirectory files;
+    write_zero_policy_value_model(files.path() / "uniform.kpv");
+    const ControllerResult result = run_controller_in_directory_until_bestmove(
+        "setoption name PolicyValueFile value uniform.kpv\n"
+        "setoption name SearchAlgorithm value MCTS\n"
+        "setoption name MCTSVisitOutput value true\n"
+        "position startpos\n"
+        "go nodes 24\n",
+        files.path());
+    const std::vector<std::string> lines = output_lines(result.output);
+    const std::vector<std::string> visit_lines =
+        lines_starting_with(lines, "info string koi_mcts_visits_v1 ");
+
+    require(result.exit_code == 0 && result.diagnostics.empty(),
+            "an enabled MCTS visit export must keep UCI stdio clean");
+    require(visit_lines.size() == 1,
+            "an enabled MCTS search must emit exactly one final root-visit distribution");
+
+    std::istringstream fields(visit_lines.front().substr(
+        std::string("info string koi_mcts_visits_v1 ").size()));
+    std::string item;
+    std::size_t action_count = 0;
+    std::uint64_t visit_total = 0;
+    while (fields >> item) {
+        const std::size_t separator = item.find(':');
+        require(separator != std::string::npos,
+                "each exported root visit must use move:count encoding");
+        const std::string move_text = item.substr(0, separator);
+        require(is_legal_move(Position{}, move_text),
+                "each exported root visit must name a legal move");
+        std::size_t consumed = 0;
+        const std::uint64_t visits = std::stoull(item.substr(separator + 1), &consumed);
+        require(consumed == item.size() - separator - 1,
+                "each exported visit count must be an integer");
+        visit_total += visits;
+        ++action_count;
+    }
+    require(action_count == 20,
+            "the visit extension must include every legal starting-position action");
+    require(visit_total == 24,
+            "root visit counts must sum to the completed MCTS simulation budget");
+    require(lines_starting_with(lines, "bestmove ").size() == 1,
+            "visit export must preserve exactly-once bestmove completion");
 }
 
 void test_mcts_preserves_the_searchmoves_root_filter() {
@@ -2527,6 +2578,8 @@ int main(int argc, char** argv) {
         {"MCTS corrupt-model fallback", test_mcts_rejects_a_corrupt_model_and_falls_back_to_alphabeta},
         {"MCTS legal MultiPV and WDL",
          test_mcts_valid_model_publishes_legal_multipv_and_estimated_wdl},
+        {"MCTS opt-in root visit output",
+         test_mcts_visit_output_contains_the_full_root_distribution_when_enabled},
         {"MCTS searchmoves root filter", test_mcts_preserves_the_searchmoves_root_filter},
         {"MCTS stop, quit and EOF lifecycle",
          test_mcts_stop_quit_and_eof_obey_the_uci_lifecycle},

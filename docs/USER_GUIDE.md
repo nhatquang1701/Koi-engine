@@ -721,6 +721,11 @@ from the starting position (for example, `bestmove e2e4`).
   configurations report an `info string` diagnostic and fall back to
   alpha-beta. Changing either option stops and joins the active search before
   replacing the selected backend or model.
+- `MCTSVisitOutput` defaults to `false`. When enabled and MCTS completes, Koi
+  adds one final `info string koi_mcts_visits_v1` line containing every root
+  move allowed for that search and its visit count. This extension is intended
+  for self-play data generation; it does not change move selection and is
+  absent from normal UCI output by default.
 - With `SearchAlgorithm=MCTS`, `go nodes N` bounds root visits and `go depth N`
   caps the tree ply. Movetime and clock deadlines, `searchmoves`, MultiPV,
   `stop`, `quit`, and `ponderhit` continue to use the shared UCI search
@@ -1007,8 +1012,8 @@ the options at session start; the portable release defaults are `RandomSeed=0`,
 `UCI_ShowWDL=false`, `Move Overhead=30`, `Slow Mover=100`, `StrengthMode=false`,
 `SyzygyPath=""`, `SyzygyProbeDepth=1`, `SyzygyProbeLimit=7`,
 `Syzygy50MoveRule=true`, `SyzygyInteriorDepth=0`, and `EvalFile=""`
-(empty keeps the boot-time evaluator), `SearchAlgorithm=AlphaBeta`, and
-`PolicyValueFile=""`.
+(empty keeps the boot-time evaluator), `SearchAlgorithm=AlphaBeta`,
+`PolicyValueFile=""`, and `MCTSVisitOutput=false`.
 For the recommended En Croissant smoke scenario, use `Hash=512`, `Threads=4`, and
 `Speed=100`, then keep the book and Syzygy paths explicitly configured if those
 assets are available.

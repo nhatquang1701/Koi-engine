@@ -114,6 +114,7 @@ private:
     std::uint8_t book_depth_ = 16;
     std::uint32_t random_seed_ = 0;
     SearchAlgorithm search_algorithm_ = SearchAlgorithm::alpha_beta;
+    bool mcts_visit_output_ = false;
     std::filesystem::path policy_value_file_;
     std::shared_ptr<const PolicyValueModel> policy_value_model_;
     std::string policy_value_load_error_;

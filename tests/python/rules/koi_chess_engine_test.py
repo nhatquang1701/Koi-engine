@@ -61,6 +61,10 @@ for line in sys.stdin:
         elif scenario == "nomove":
             print("info depth 1 score cp 0", flush=True)
             print("bestmove 0000", flush=True)
+        elif scenario == "mcts_visits":
+            print("info depth 3 nodes 24 pv e2e4", flush=True)
+            print("info string koi_mcts_visits_v1 e2e4:24 d2d4:0", flush=True)
+            print("bestmove e2e4", flush=True)
         else:
             print("info depth 3 seldepth 5 score cp 42 nodes 1234 pv e2e4 e7e5 g1f3", flush=True)
             print("bestmove e2e4 ponder e7e5", flush=True)
@@ -175,6 +179,14 @@ class EngineSessionTests(FakeEngineMixin):
         self.assertEqual(score.mate(), 2)
         self.assertIsNone(score.score())
         self.assertEqual([move.uci() for move in info["pv"]], ["g1d4", "h8g8"])
+
+    def test_analyse_preserves_the_mcts_root_visit_extension(self):
+        session = self.spawn("mcts_visits")
+        info = session.analyse(chess.Board(), engine.Limit(nodes=24))
+
+        self.assertEqual(info["nodes"], 24)
+        self.assertEqual(info["mcts_root_visits"], {"e2e4": 24, "d2d4": 0})
+        self.assertEqual([move.uci() for move in info["pv"]], ["e2e4"])
 
     def test_analyse_score_is_relative_to_the_side_to_move(self):
         session = self.spawn("negative")

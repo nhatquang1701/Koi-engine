@@ -165,8 +165,8 @@ the repository root as the working directory:
   and v5, and wrapper line parsing).
 - Policy/value: `policy_value_dataset_python`, `policy_value_model_python`,
   `policy_value_trainer_python`, and `policy_value_selfplay_python` (versioned
-  data/model contracts, deterministic self-play labels, and CPU training smoke
-  coverage).
+  data/model contracts, AlphaBeta distillation and MCTS visit targets, and CPU
+  training smoke coverage).
 
 ## Labels and scheduling
 

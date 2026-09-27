@@ -541,19 +541,19 @@ write_jsonl("artifacts/training/policy-value-v1.jsonl", records)
 records = list(read_jsonl("artifacts/training/policy-value-v1.jsonl"))
 ```
 
-## Alpha-beta self-play distillation
+## Policy/value self-play generation
 
-`tools/measurement/policy_value_selfplay.py` plays deterministic, node-limited
-Koi-vs-Koi games from a named opening-move corpus. It records each position's
-complete legal-action list in native `go perft 1` order, a one-hot AlphaBeta PV
-target (falling back to UCI `bestmove` when a bounded search has no info PV),
-the eventual side-to-move game outcome, and a value target from an unbounded
-AlphaBeta score (`tanh(cp/400)`, with game-outcome fallback when no score is
-available). It also records opening/game identity, seed, termination reason,
-and engine/opening/source hashes. The v1 JSONL dataset and content-hashed
-manifest are written atomically. Generated files belong under
-`artifacts/training/`; keep train and validation opening corpora disjoint so
-`train_policy_value.py` can enforce the split.
+`tools/measurement/policy_value_selfplay.py` plays node-limited Koi self-play
+games from a named opening-move corpus. Both modes record the complete legal
+action list in native `go perft 1` order, eventual side-to-move outcomes,
+opening/game identity, seed, termination reason, and engine/opening/source
+hashes. AlphaBeta uses a one-hot PV target (falling back to UCI `bestmove`)
+and an unbounded score target when available. MCTS records the full root visit
+count for every legal move, normalizes those counts into soft policy targets,
+and samples its played move from the visit distribution. Its records include
+the source `.kpv` hash and use game results as value targets. Keep generated
+files under `artifacts/training/` and keep training and validation openings
+disjoint so `train_policy_value.py` can enforce the split.
 
 ```powershell
 python .\tools\measurement\policy_value_selfplay.py `
@@ -564,9 +564,27 @@ python .\tools\measurement\policy_value_selfplay.py `
 ```
 
 This bootstrap producer is tagged `alpha-beta-distillation` and stores no model
-hash. It uses one-hot search targets and does not claim to provide MCTS visit
-distributions. Keep the AlphaBeta backend as the default until a trained model
-and MCTS clear the equal-time strength gates.
+hash. It uses one-hot search targets. For MCTS self-play, provide a trained
+model and sampling temperature:
+
+```powershell
+python .\tools\measurement\policy_value_selfplay.py `
+  --engine .\build\release\koi-engine.exe `
+  --algorithm MCTS `
+  --policy-value-file .\artifacts\training\policy-value-v1.kpv `
+  --openings .\artifacts\training\train-openings.txt `
+  --games 8 --nodes 20000 --seed 1 --temperature 1.0 `
+  --output .\artifacts\training\policy-value-mcts-selfplay.jsonl
+```
+
+The `--openings` file uses `opening_id | UCI move prefix` lines. Supply a
+training corpus separate from validation and match openings.
+
+MCTS mode enables the opt-in `MCTSVisitOutput` UCI option and fails if the
+engine cannot return a complete root visit map or the map does not match Koi's
+native legal move list. It uses one search thread and `OwnBook=false`.
+AlphaBeta remains the default until a trained model and MCTS clear the equal-time
+strength gates.
 
 ## Policy/value v1 training
 

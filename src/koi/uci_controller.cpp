@@ -165,6 +165,7 @@ enum class UciOptionId {
     eval_file,
     search_algorithm,
     policy_value_file,
+    mcts_visit_output,
     debug,
     debug_file,
 };
@@ -184,7 +185,7 @@ struct UciOptionDescriptor {
 // and `handle_setoption` consume this table, so an advertised option can never
 // drift out of sync with the option the controller actually applies. The order
 // of the entries is the order advertised to a GUI and must stay stable.
-constexpr std::array<UciOptionDescriptor, 28> kUciOptions{{
+constexpr std::array<UciOptionDescriptor, 29> kUciOptions{{
     {"RandomSeed", UciOptionKind::spin, UciOptionId::random_seed, "0", 0,
      kMaximumRandomSeed, false, true},
     {"Hash", UciOptionKind::spin, UciOptionId::hash, "512", kMinimumHashMegabytes,
@@ -234,6 +235,8 @@ constexpr std::array<UciOptionDescriptor, 28> kUciOptions{{
      "AlphaBeta", 0, 0, false, true},
     {"PolicyValueFile", UciOptionKind::string, UciOptionId::policy_value_file,
      "", 0, 0, false, true},
+    {"MCTSVisitOutput", UciOptionKind::check, UciOptionId::mcts_visit_output,
+     "false", 0, 0, false, true},
     // Developer diagnostics stay settable but are intentionally not advertised.
     {"Debug", UciOptionKind::check, UciOptionId::debug, "false", 0, 0, false, false},
     {"DebugFile", UciOptionKind::string, UciOptionId::debug_file, "koi-debug.log", 0, 0, false,
@@ -1054,6 +1057,12 @@ void UciController::handle_setoption(std::istream& command) {
         break;
     }
 
+    case UciOptionId::mcts_visit_output:
+        apply_boolean(mcts_visit_output_, [this](bool enabled) {
+            mcts_visit_output_ = enabled;
+        });
+        break;
+
     case UciOptionId::policy_value_file: {
         if (value == policy_value_file_.string()) {
             break;
@@ -1422,6 +1431,7 @@ void UciController::start_search(GameState root, SearchLimits limits, bool skip_
     options.speed_percent = speed_percent_;
     options.multi_pv = multi_pv_;
     options.search_algorithm = search_algorithm_;
+    options.collect_mcts_visit_counts = mcts_visit_output_;
     options.policy_value_model = policy_value_model_;
     options.policy_value_load_error = policy_value_load_error_;
     options.analyse_mode = analyse_mode_;
@@ -1659,6 +1669,14 @@ void UciController::write_search_completion(std::uint64_t generation,
 
     if (!result.backend_diagnostic.empty()) {
         output_ << "info string " << result.backend_diagnostic << '\n';
+    }
+
+    if (!result.mcts_root_visits.empty()) {
+        output_ << "info string koi_mcts_visits_v1";
+        for (const MctsRootVisit& visit : result.mcts_root_visits) {
+            output_ << ' ' << visit.move.uci() << ':' << visit.visits;
+        }
+        output_ << '\n';
     }
 
     output_ << "bestmove "

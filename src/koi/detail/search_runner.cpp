@@ -2900,6 +2900,16 @@ void SearchRunner::run() {
                             }
                             mcts_completed = true;
                         }
+                        if (mcts_completed && options.collect_mcts_visit_counts) {
+                            const PolicyValueMctsSnapshot visit_snapshot =
+                                mcts_tree.snapshot(legal_moves.size());
+                            result.mcts_root_visits.reserve(visit_snapshot.root_moves.size());
+                            for (const PolicyValueMctsRootMove& root_move :
+                                 visit_snapshot.root_moves) {
+                                result.mcts_root_visits.push_back(
+                                    MctsRootVisit{root_move.move, root_move.visits});
+                            }
+                        }
                     }
                 } catch (const std::exception& error) {
                     unavailable_reason = "MCTS failed: " + std::string(error.what());

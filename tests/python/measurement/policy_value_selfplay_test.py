@@ -59,6 +59,26 @@ class ScoredFakeEngine(FakeEngine):
         return result
 
 
+class MctsFakeEngine:
+    def __init__(self, visits_by_uci):
+        self.visits_by_uci = dict(visits_by_uci)
+        self.options = {}
+
+    def configure(self, options):
+        self.options.update(options)
+
+    def legal_moves(self, board):
+        return list(reversed(list(board.legal_moves)))
+
+    def analyse(self, board, limit):
+        if limit.nodes != 100:
+            raise AssertionError("MCTS self-play must pass the configured node limit")
+        return {
+            "nodes": sum(self.visits_by_uci.values()),
+            "mcts_root_visits": dict(self.visits_by_uci),
+        }
+
+
 class PolicyValueSelfPlayTests(unittest.TestCase):
     def test_source_provenance_includes_local_chess_rules_imports(self):
         _, source_hashes = policy_value_selfplay._source_provenance(_REPOSITORY_ROOT)
@@ -229,6 +249,65 @@ class PolicyValueSelfPlayTests(unittest.TestCase):
             records[0]["search_provenance"]["options"]["value_target_source"],
             "alphabeta-score",
         )
+
+    def test_mcts_selfplay_records_visit_targets_and_uses_them_for_move_selection(self):
+        board = chess.Board()
+        native_moves = [move.uci() for move in reversed(list(board.legal_moves))]
+        visits_by_uci = {move: 0 for move in native_moves}
+        visits_by_uci[native_moves[0]] = 7
+        visits_by_uci[native_moves[1]] = 3
+        fake = MctsFakeEngine(visits_by_uci)
+        records = list(policy_value_selfplay.generate_records(
+            fake,
+            [policy_value_selfplay.Opening("mcts-opening", ())],
+            games=1,
+            nodes=100,
+            seed=19,
+            max_plies=1,
+            engine_sha256="a" * 64,
+            opening_corpus_sha256="b" * 64,
+            source_revision="c" * 40,
+            engine_version="test-build",
+            search_algorithm="MCTS",
+            policy_value_file="model.kpv",
+            policy_value_sha256="f" * 64,
+            temperature=0.0,
+        ))
+
+        record = records[0]
+        policy_value_dataset.validate_record(record)
+        self.assertEqual(record["search_provenance"]["algorithm"], "MCTS")
+        self.assertEqual(record["producer"]["kind"], "mcts-self-play")
+        self.assertEqual(record["network_sha256"], "f" * 64)
+        self.assertEqual(record["visit_counts"], [visits_by_uci[action["uci"]] for action in record["legal_actions"]])
+        self.assertEqual(record["policy_targets"], [count / 10 for count in record["visit_counts"]])
+        self.assertEqual(record["search_provenance"]["options"]["policy_target_source"], "mcts-root-visits")
+        self.assertEqual(record["search_provenance"]["options"]["sampled_move"], native_moves[0])
+        self.assertEqual(record["search_provenance"]["options"]["move_sampling_seed"], 20)
+        self.assertEqual(fake.options["SearchAlgorithm"], "MCTS")
+        self.assertEqual(fake.options["PolicyValueFile"], "model.kpv")
+        self.assertTrue(fake.options["MCTSVisitOutput"])
+        self.assertFalse(fake.options["OwnBook"])
+        self.assertEqual(fake.options["Threads"], 1)
+
+    def test_mcts_selfplay_rejects_incomplete_visit_maps(self):
+        fake = MctsFakeEngine({"e2e4": 1})
+        with self.assertRaisesRegex(policy_value_selfplay.SelfPlayError, "complete legal action set"):
+            list(policy_value_selfplay.generate_records(
+                fake,
+                [policy_value_selfplay.Opening("mcts-opening", ())],
+                games=1,
+                nodes=100,
+                seed=19,
+                max_plies=1,
+                engine_sha256="a" * 64,
+                opening_corpus_sha256="b" * 64,
+                source_revision="c" * 40,
+                engine_version="test-build",
+                search_algorithm="MCTS",
+                policy_value_file="model.kpv",
+                policy_value_sha256="f" * 64,
+            ))
 
     def test_dataset_and_manifest_are_written_with_stable_hashes(self):
         fake = FakeEngine(["f2f3", "e7e5", "g2g4", "d8h4"])

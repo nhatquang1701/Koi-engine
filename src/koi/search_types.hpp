@@ -186,6 +186,11 @@ struct SearchInfo {
     std::optional<std::array<int, 3>> estimated_wdl;
 };
 
+struct MctsRootVisit {
+    Move move = Move::no_move();
+    std::uint64_t visits = 0;
+};
+
 // Identity of one controller request as seen by the completion pipeline.
 //
 // "Generation" names three unrelated concepts in this codebase:
@@ -235,6 +240,9 @@ struct SearchResult {
     // Controller-owned `info string` diagnostic for an explicitly requested
     // backend that fell back before publishing its search result.
     std::string backend_diagnostic;
+    // Full root visit distribution is populated only when explicitly requested
+    // for MCTS self-play data export.
+    std::vector<MctsRootVisit> mcts_root_visits;
 };
 
 struct SearchEventSink {
@@ -284,6 +292,7 @@ struct SearchOptions {
     bool limit_strength = false;
     std::uint32_t elo = 1320;
     SearchAlgorithm search_algorithm = SearchAlgorithm::alpha_beta;
+    bool collect_mcts_visit_counts = false;
     std::shared_ptr<const PolicyValueModel> policy_value_model;
     std::string policy_value_load_error;
     // Protocol generation copied from UciController::generation_ so a result

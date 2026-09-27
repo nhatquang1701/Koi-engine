@@ -1,9 +1,10 @@
-"""Generate local Koi alpha-beta self-play data for policy/value distillation.
+"""Generate local Koi alpha-beta or MCTS self-play data for policy/value training.
 
-The JSONL records use the versioned policy/value v1 contract. Policy targets
-are one-hot AlphaBeta principal moves; value and outcome targets come from the
-completed self-play game. Datasets and manifests should stay under
-``artifacts/training/`` and must not be committed or packaged.
+The JSONL records use the versioned policy/value v1 contract. AlphaBeta policy
+targets are one-hot principal moves; MCTS targets are normalized root visits
+and its moves are sampled from those visits. Game outcomes supply side-to-move
+labels. Datasets and manifests stay under ``artifacts/training/`` and must not
+be committed or packaged.
 """
 
 from __future__ import annotations
@@ -149,6 +150,71 @@ def _score_value_target(analysis: Any, side_to_move: bool) -> float | None:
     return math.tanh(float(centipawns) / _VALUE_SCORE_CP_SCALE)
 
 
+def _mcts_visit_targets(
+    actions: list[dict[str, str | None]], analysis: Any, *, game_number: int, ply: int
+) -> tuple[list[int], list[float]]:
+    """Align a complete UCI visit map with legal actions and normalize targets."""
+    visit_map = analysis.get("mcts_root_visits") if isinstance(analysis, dict) else None
+    if not isinstance(visit_map, dict):
+        raise SelfPlayError(
+            f"MCTS root visit data is missing in game {game_number}, ply {ply}; "
+            "check the model and MCTSVisitOutput option"
+        )
+    action_uci = [action["uci"] for action in actions]
+    if set(visit_map) != set(action_uci) or len(visit_map) != len(action_uci):
+        raise SelfPlayError(
+            f"MCTS root visit data does not match the complete legal action set "
+            f"in game {game_number}, ply {ply}"
+        )
+    visits: list[int] = []
+    for move in action_uci:
+        count = visit_map[move]
+        if type(count) is not int or count < 0:
+            raise SelfPlayError(
+                f"MCTS root visits for {move} must be a non-negative integer "
+                f"in game {game_number}, ply {ply}"
+            )
+        visits.append(count)
+    total = sum(visits)
+    if total <= 0:
+        raise SelfPlayError(
+            f"MCTS produced no root visits in game {game_number}, ply {ply}"
+        )
+    reported_nodes = analysis.get("nodes")
+    if reported_nodes is not None and reported_nodes != total:
+        raise SelfPlayError(
+            f"MCTS root visits sum to {total}, but search reported {reported_nodes} nodes "
+            f"in game {game_number}, ply {ply}"
+        )
+    return visits, [count / total for count in visits]
+
+
+def _sample_visit_index(visit_counts: list[int], temperature: float, rng: random.Random) -> int:
+    """Sample from root visits; zero temperature selects the first maximum."""
+    if not visit_counts or any(count < 0 for count in visit_counts):
+        raise SelfPlayError("MCTS visit counts must be a non-empty list of non-negative integers")
+    if temperature == 0.0:
+        return max(range(len(visit_counts)), key=visit_counts.__getitem__)
+    if not math.isfinite(temperature) or temperature < 0.0:
+        raise SelfPlayError("policy temperature must be finite and non-negative")
+    nonzero_logs = [math.log(count) for count in visit_counts if count > 0]
+    if not nonzero_logs:
+        raise SelfPlayError("cannot sample an MCTS policy with no root visits")
+    largest_log = max(nonzero_logs)
+    weights = [
+        math.exp((math.log(count) - largest_log) / temperature) if count > 0 else 0.0
+        for count in visit_counts
+    ]
+    total_weight = sum(weights)
+    target = rng.random() * total_weight
+    cumulative = 0.0
+    for index, weight in enumerate(weights):
+        cumulative += weight
+        if target < cumulative:
+            return index
+    return max(index for index, weight in enumerate(weights) if weight > 0.0)
+
+
 def generate_records(
     engine: Any,
     openings: list[Opening],
@@ -165,14 +231,18 @@ def generate_records(
     nnue_sha256: str | None = None,
     source_dirty: bool = False,
     source_sha256: dict[str, str] | None = None,
+    search_algorithm: str = "AlphaBeta",
+    policy_value_file: str | Path | None = None,
+    policy_value_sha256: str | None = None,
+    temperature: float = 1.0,
     stats: GenerationStats | None = None,
 ) -> Iterator[dict[str, Any]]:
-    """Play bounded Koi-vs-Koi games and emit validated v1 records.
+    """Play bounded Koi self-play games and emit validated v1 records.
 
-    The AlphaBeta PV's first move supplies a one-hot distillation target. The
-    game result supplies side-to-move outcome/value labels. A seeded sample
-    selects openings without replacement, so separate train and validation
-    runs can use disjoint corpora and retain the trainer's leakage check.
+    AlphaBeta uses the PV's first move as a one-hot distillation target; MCTS
+    uses normalized root visits as soft policy targets and samples game moves
+    from that distribution. Completed game results supply side-to-move outcome
+    labels. Seeded opening and move sampling keeps runs reproducible.
     """
     if games < 1 or nodes < 1 or max_plies < 1:
         raise SelfPlayError("games, nodes, and max_plies must be positive")
@@ -182,6 +252,30 @@ def generate_records(
         )
     if not engine_sha256 or not opening_corpus_sha256 or not source_revision or not engine_version:
         raise SelfPlayError("engine, opening, source, and version identities are required")
+    if search_algorithm not in {"AlphaBeta", "MCTS"}:
+        raise SelfPlayError("search_algorithm must be AlphaBeta or MCTS")
+    if search_algorithm == "MCTS":
+        if policy_value_file is None or not str(policy_value_file):
+            raise SelfPlayError("MCTS self-play requires a PolicyValueFile")
+        if not isinstance(policy_value_sha256, str) or re.fullmatch(
+            r"[0-9a-f]{64}", policy_value_sha256
+        ) is None:
+            raise SelfPlayError("MCTS self-play requires the policy/value model SHA-256")
+        if not math.isfinite(temperature) or temperature < 0.0:
+            raise SelfPlayError("policy temperature must be finite and non-negative")
+        try:
+            engine.configure({
+                "OwnBook": False,
+                "Threads": 1,
+                "MultiPV": 1,
+                "SearchAlgorithm": "MCTS",
+                "PolicyValueFile": str(policy_value_file),
+                "MCTSVisitOutput": True,
+            })
+        except (AttributeError, chess.engine.EngineError) as error:
+            raise SelfPlayError(f"cannot configure Koi for MCTS self-play: {error}") from error
+    elif policy_value_file is not None or policy_value_sha256 is not None:
+        raise SelfPlayError("a policy/value model can be specified only for MCTS self-play")
 
     run_stats = stats if stats is not None else GenerationStats()
     selected = random.Random(seed).sample(openings, games)
@@ -191,8 +285,18 @@ def generate_records(
         "threads": 1,
         "multi_pv": 1,
         "own_book": False,
-        "search_algorithm": "AlphaBeta",
-        "value_target_transform": "tanh(cp/400) when an unbounded score is present; otherwise game result",
+        "search_algorithm": search_algorithm,
+        "value_target_transform": (
+            "game result" if search_algorithm == "MCTS" else
+            "tanh(cp/400) when an unbounded score is present; otherwise game result"
+        ),
+        "policy_target_source": (
+            "normalized root visits" if search_algorithm == "MCTS" else "AlphaBeta principal move"
+        ),
+        "policy_value_file": Path(policy_value_file).name if policy_value_file is not None else None,
+        "policy_value_sha256": policy_value_sha256,
+        "mcts_visit_output": search_algorithm == "MCTS",
+        "policy_temperature": temperature if search_algorithm == "MCTS" else None,
         "engine_sha256": engine_sha256,
         "opening_corpus_sha256": opening_corpus_sha256,
         "source_revision": source_revision,
@@ -206,6 +310,7 @@ def generate_records(
 
     for game_number, opening in enumerate(selected, 1):
         board = chess.Board()
+        move_rng = random.Random(seed + game_number)
         _apply_opening(board, opening)
         if len(board.move_stack) >= max_plies:
             raise SelfPlayError(
@@ -243,47 +348,66 @@ def generate_records(
                 analysis = engine.analyse(board, chess.engine.Limit(nodes=nodes))
             except chess.engine.EngineError as error:
                 raise SelfPlayError(
-                    f"AlphaBeta search failed in game {game_number}, ply {len(board.move_stack)}: {error}"
+                    f"{search_algorithm} search failed in game {game_number}, "
+                    f"ply {len(board.move_stack)}: {error}"
                 ) from error
-            principal_variation = analysis.get("pv") if isinstance(analysis, dict) else None
-            if not principal_variation:
-                try:
-                    play_result = engine.play(board, chess.engine.Limit(nodes=nodes))
-                except chess.engine.EngineError as error:
-                    raise SelfPlayError(
-                        f"AlphaBeta bestmove fallback failed in game {game_number}, ply {len(board.move_stack)}: {error}"
-                    ) from error
-                best_move = getattr(play_result, "move", None)
-                policy_target_source = "bestmove-fallback"
-                if best_move is None:
-                    raise SelfPlayError(
-                        f"AlphaBeta returned neither a PV nor bestmove in game {game_number}, ply {len(board.move_stack)}"
-                    )
-                run_stats.bestmove_fallbacks += 1
+            visit_counts: list[int] | None = None
+            sampled_move: str | None = None
+            if search_algorithm == "MCTS":
+                visit_counts, policy_targets = _mcts_visit_targets(
+                    actions, analysis, game_number=game_number,
+                    ply=len(board.move_stack),
+                )
+                best_action_index = _sample_visit_index(visit_counts, temperature, move_rng)
+                best_move = chess.Move.from_uci(actions[best_action_index]["uci"])
+                sampled_move = best_move.uci()
+                policy_target_source = "mcts-root-visits"
+                score_value_target = None
+                value_target_source = "game-result"
             else:
-                best_move = principal_variation[0]
-                policy_target_source = "pv"
-            score_value_target = _score_value_target(analysis, board.turn)
-            value_target_source = (
-                "alphabeta-score" if score_value_target is not None else "game-result-fallback"
-            )
+                principal_variation = analysis.get("pv") if isinstance(analysis, dict) else None
+                if not principal_variation:
+                    try:
+                        play_result = engine.play(board, chess.engine.Limit(nodes=nodes))
+                    except chess.engine.EngineError as error:
+                        raise SelfPlayError(
+                            f"AlphaBeta bestmove fallback failed in game {game_number}, "
+                            f"ply {len(board.move_stack)}: {error}"
+                        ) from error
+                    best_move = getattr(play_result, "move", None)
+                    policy_target_source = "bestmove-fallback"
+                    if best_move is None:
+                        raise SelfPlayError(
+                            f"AlphaBeta returned neither a PV nor bestmove in game {game_number}, "
+                            f"ply {len(board.move_stack)}"
+                        )
+                    run_stats.bestmove_fallbacks += 1
+                else:
+                    best_move = principal_variation[0]
+                    policy_target_source = "pv"
+                score_value_target = _score_value_target(analysis, board.turn)
+                value_target_source = (
+                    "alphabeta-score" if score_value_target is not None else "game-result-fallback"
+                )
             if best_move not in python_legal_moves:
                 raise SelfPlayError(
-                    f"AlphaBeta returned illegal move {best_move} in game {game_number}, ply {len(board.move_stack)}"
+                    f"{search_algorithm} returned illegal move {best_move} in game {game_number}, "
+                    f"ply {len(board.move_stack)}"
                 )
-            best_uci = best_move.uci()
-            try:
-                best_action_index = next(
-                    index for index, action in enumerate(actions)
-                    if action["uci"] == best_uci
-                )
-            except StopIteration as error:
-                raise SelfPlayError(
-                    f"AlphaBeta move {best_uci!r} is absent from the complete legal action list"
-                ) from error
-            policy_targets = [0.0] * len(actions)
-            policy_targets[best_action_index] = 1.0
-            pending.append({
+            if search_algorithm == "AlphaBeta":
+                best_uci = best_move.uci()
+                try:
+                    best_action_index = next(
+                        index for index, action in enumerate(actions)
+                        if action["uci"] == best_uci
+                    )
+                except StopIteration as error:
+                    raise SelfPlayError(
+                        f"AlphaBeta move {best_uci!r} is absent from the complete legal action list"
+                    ) from error
+                policy_targets = [0.0] * len(actions)
+                policy_targets[best_action_index] = 1.0
+            position_record = {
                 "position": {"fen": board.fen(), "variant": "standard"},
                 "legal_actions": actions,
                 "policy_targets": policy_targets,
@@ -294,7 +418,12 @@ def generate_records(
                 "policy_target_source": policy_target_source,
                 "score_value_target": score_value_target,
                 "value_target_source": value_target_source,
-            })
+                "sampled_move": sampled_move,
+                "move_sampling_seed": seed + game_number if search_algorithm == "MCTS" else None,
+            }
+            if visit_counts is not None:
+                position_record["visit_counts"] = visit_counts
+            pending.append(position_record)
             board.push(best_move)
 
         if not pending:
@@ -314,12 +443,15 @@ def generate_records(
             )
 
         game_slug = re.sub(r"[^A-Za-z0-9_.-]+", "-", opening.opening_id).strip("-")[:48]
-        game_id = f"ab-{seed}-{game_slug or 'opening'}-{game_number:06d}"
+        game_prefix = "mcts" if search_algorithm == "MCTS" else "ab"
+        game_id = f"{game_prefix}-{seed}-{game_slug or 'opening'}-{game_number:06d}"
         for position in pending:
             outcome, value = _side_to_move_result(winner, position.pop("side_to_move"))
             policy_target_source = position.pop("policy_target_source")
             score_value_target = position.pop("score_value_target")
             value_target_source = position.pop("value_target_source")
+            sampled_move = position.pop("sampled_move")
+            move_sampling_seed = position.pop("move_sampling_seed")
             record = {
                 "schema": policy_value_dataset.SCHEMA,
                 "action_encoding": policy_value_dataset.ACTION_ENCODING,
@@ -329,19 +461,25 @@ def generate_records(
                 "game_id": game_id,
                 "feature_schema": "halfka-threat-v5",
                 "producer": {
-                    "kind": "alpha-beta-distillation",
+                    "kind": (
+                        "mcts-self-play" if search_algorithm == "MCTS" else
+                        "alpha-beta-distillation"
+                    ),
                     "name": "Koi Engine",
                     "version": engine_version,
                 },
                 "search_provenance": {
-                    "algorithm": "AlphaBeta",
+                    "algorithm": search_algorithm,
                     "options": {
                         **search_options,
                         "policy_target_source": policy_target_source,
                         "value_target_source": value_target_source,
+                        **({"sampled_move": sampled_move} if sampled_move is not None else {}),
+                        **({"move_sampling_seed": move_sampling_seed}
+                           if move_sampling_seed is not None else {}),
                     },
                 },
-                "network_sha256": None,
+                "network_sha256": policy_value_sha256,
                 "termination_reason": termination_reason,
             }
             policy_value_dataset.validate_record(record)
@@ -472,20 +610,25 @@ def main(argv: list[str] | None = None) -> int:
         help="opening_id | UCI-move-prefix corpus (default: tests/data/openings/openings-curated-32.txt)",
     )
     parser.add_argument("--games", type=int, default=1, help="number of distinct openings to self-play")
-    parser.add_argument("--nodes", type=int, default=20_000, help="AlphaBeta nodes per move")
+    parser.add_argument("--nodes", type=int, default=20_000, help="search nodes per move")
     parser.add_argument("--max-plies", type=int, default=256, help="maximum total plies per game")
     parser.add_argument("--seed", type=int, default=1, help="opening-sample seed stored in every record")
     parser.add_argument("--hash-mb", type=int, default=512)
+    parser.add_argument(
+        "--algorithm", choices=("AlphaBeta", "MCTS"), default="AlphaBeta",
+        help="AlphaBeta distillation or MCTS self-play (requires --policy-value-file)",
+    )
+    parser.add_argument("--policy-value-file", type=Path, help="versioned .kpv model required by MCTS")
+    parser.add_argument(
+        "--temperature", type=float, default=1.0,
+        help="MCTS visit-sampling temperature; 0 selects the highest-visit move",
+    )
     parser.add_argument(
         "--cpu-variant", choices=("generic", "avx2", "avx512"), default="generic",
         help="force the engine CPU variant for reproducible runs",
     )
     parser.add_argument("--engine-version", default="source-" + _source_revision(_REPOSITORY_ROOT)[:12])
-    parser.add_argument(
-        "--output", type=Path,
-        default=_REPOSITORY_ROOT / "artifacts/training/policy-value-ab-selfplay-v1.jsonl",
-        help="local JSONL output; keep generated data under artifacts/training/",
-    )
+    parser.add_argument("--output", type=Path, help="local JSONL output under artifacts/training/")
     parser.add_argument("--manifest", type=Path, help="manifest path (defaults beside the JSONL output)")
     parser.add_argument("--overwrite", action="store_true", help="replace existing local output files")
     args = parser.parse_args(argv)
@@ -493,6 +636,23 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.games < 1 or args.nodes < 1 or args.max_plies < 1 or args.hash_mb < 1:
             raise SelfPlayError("games, nodes, max_plies, and hash_mb must be positive")
+        if not math.isfinite(args.temperature) or args.temperature < 0.0:
+            raise SelfPlayError("temperature must be finite and non-negative")
+        if args.algorithm == "MCTS" and args.policy_value_file is None:
+            raise SelfPlayError("MCTS self-play requires --policy-value-file")
+        if args.algorithm == "AlphaBeta" and args.policy_value_file is not None:
+            raise SelfPlayError("--policy-value-file is valid only with --algorithm MCTS")
+        policy_value_file = args.policy_value_file.resolve() if args.policy_value_file else None
+        if policy_value_file is not None and not policy_value_file.is_file():
+            raise SelfPlayError(f"policy/value model does not exist: {policy_value_file}")
+        policy_value_sha256 = (
+            _sha256_file(policy_value_file) if policy_value_file is not None else None
+        )
+        default_output_name = "ab" if args.algorithm == "AlphaBeta" else "mcts"
+        output_path = args.output or (
+            _REPOSITORY_ROOT / "artifacts/training" /
+            f"policy-value-{default_output_name}-selfplay-v1.jsonl"
+        )
         openings = read_openings(args.openings)
         if args.games > len(openings):
             raise SelfPlayError(
@@ -507,10 +667,15 @@ def main(argv: list[str] | None = None) -> int:
         environment["KOI_CPU_VARIANT"] = args.cpu_variant
         nnue_environment_path = environment.get("KOI_NNUE_PATH", "")
         nnue_path = Path(nnue_environment_path) if nnue_environment_path else engine_path.parent / "koi.nnue"
-        nnue_sha256 = _sha256_file(nnue_path) if nnue_path.is_file() else None
-        manifest_path = args.manifest or args.output.with_suffix(args.output.suffix + ".manifest.json")
+        nnue_sha256 = (
+            _sha256_file(nnue_path)
+            if args.algorithm == "AlphaBeta" and nnue_path.is_file() else None
+        )
+        manifest_path = args.manifest or output_path.with_suffix(
+            output_path.suffix + ".manifest.json"
+        )
 
-        if not args.overwrite and (args.output.exists() or manifest_path.exists()):
+        if not args.overwrite and (output_path.exists() or manifest_path.exists()):
             raise SelfPlayError("dataset or manifest already exists; choose new paths or pass --overwrite")
 
         stats = GenerationStats()
@@ -534,6 +699,8 @@ def main(argv: list[str] | None = None) -> int:
                 "cpu_variant": args.cpu_variant,
                 "boot_nnue_path": str(nnue_path) if nnue_sha256 else None,
                 "nnue_sha256": nnue_sha256,
+                "policy_value_file": str(policy_value_file) if policy_value_file else None,
+                "policy_value_sha256": policy_value_sha256,
                 "seed": args.seed,
                 "games_requested": args.games,
                 "search_options": {
@@ -542,8 +709,15 @@ def main(argv: list[str] | None = None) -> int:
                     "hash_mb": args.hash_mb,
                     "multi_pv": 1,
                     "own_book": False,
-                    "search_algorithm": "AlphaBeta",
-                        "value_target_transform": "tanh(cp/400) when an unbounded score is present; otherwise game result",
+                    "search_algorithm": args.algorithm,
+                    "mcts_visit_output": args.algorithm == "MCTS",
+                    "policy_temperature": (
+                        args.temperature if args.algorithm == "MCTS" else None
+                    ),
+                    "value_target_transform": (
+                        "game result" if args.algorithm == "MCTS" else
+                        "tanh(cp/400) when an unbounded score is present; otherwise game result"
+                    ),
                     "max_plies": args.max_plies,
                 },
             }
@@ -564,6 +738,10 @@ def main(argv: list[str] | None = None) -> int:
                     nnue_sha256=nnue_sha256,
                     source_dirty=source_dirty,
                     source_sha256=source_sha256,
+                    search_algorithm=args.algorithm,
+                    policy_value_file=policy_value_file,
+                    policy_value_sha256=policy_value_sha256,
+                    temperature=args.temperature,
                     stats=stats,
                 )
                 manifest_fields.update({
@@ -576,7 +754,7 @@ def main(argv: list[str] | None = None) -> int:
                 })
 
             manifest = write_dataset(
-                args.output,
+                output_path,
                 manifest_path,
                 records_with_manifest_stats(),
                 manifest_fields,
