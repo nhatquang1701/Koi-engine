@@ -1,6 +1,7 @@
 # Koi Engine documentation site design
 
-**Status:** Approved direction; written for review before implementation planning.
+**Status:** Approved and implemented by
+[`2026-09-27-koi-documentation-site.md`](../plans/2026-09-27-koi-documentation-site.md).
 
 ## Purpose
 

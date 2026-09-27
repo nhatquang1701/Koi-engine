@@ -113,7 +113,7 @@ deployment.
   the spec and excludes third-party and untracked files.
 - [x] Open the local build in a browser and review landing, sidebar, search,
   archive navigation, and a nested relative link.
-- [ ] Verify the Pages workflow source is Actions, commit on `koi-engine`, push
+- [x] Verify the Pages workflow source is Actions, commit on `koi-engine`, push
   the requested site change, and confirm the project Pages URL serves the new
   landing page.
 
