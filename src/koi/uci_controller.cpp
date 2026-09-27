@@ -18,6 +18,7 @@
 #include "koi/classical_evaluator.hpp"
 #include "koi/nnue.hpp"
 #include "koi/perft.hpp"
+#include "koi/policy_value_model.hpp"
 
 namespace koi {
 
@@ -118,6 +119,18 @@ bool equals_ignore_case(std::string_view left, std::string_view right) {
     return true;
 }
 
+bool parse_search_algorithm(std::string_view value, SearchAlgorithm& algorithm) {
+    if (equals_ignore_case(value, "AlphaBeta")) {
+        algorithm = SearchAlgorithm::alpha_beta;
+        return true;
+    }
+    if (equals_ignore_case(value, "MCTS")) {
+        algorithm = SearchAlgorithm::mcts;
+        return true;
+    }
+    return false;
+}
+
 enum class UciOptionKind {
     check,
     spin,
@@ -150,6 +163,8 @@ enum class UciOptionId {
     syzygy_interior_depth,
     syzygy_50_move_rule,
     eval_file,
+    search_algorithm,
+    policy_value_file,
     debug,
     debug_file,
 };
@@ -169,7 +184,7 @@ struct UciOptionDescriptor {
 // and `handle_setoption` consume this table, so an advertised option can never
 // drift out of sync with the option the controller actually applies. The order
 // of the entries is the order advertised to a GUI and must stay stable.
-constexpr std::array<UciOptionDescriptor, 26> kUciOptions{{
+constexpr std::array<UciOptionDescriptor, 28> kUciOptions{{
     {"RandomSeed", UciOptionKind::spin, UciOptionId::random_seed, "0", 0,
      kMaximumRandomSeed, false, true},
     {"Hash", UciOptionKind::spin, UciOptionId::hash, "512", kMinimumHashMegabytes,
@@ -213,6 +228,12 @@ constexpr std::array<UciOptionDescriptor, 26> kUciOptions{{
     // advertised with KOI_NNUE_PATH).  A non-empty path loads and activates a
     // Koi NNUE network, with the classical evaluator retained as a fallback.
     {"EvalFile", UciOptionKind::string, UciOptionId::eval_file, "", 0, 0, false, true},
+    // AlphaBeta remains the portable default. MCTS requires an explicitly
+    // loaded versioned policy/value model and falls back to AlphaBeta otherwise.
+    {"SearchAlgorithm", UciOptionKind::string, UciOptionId::search_algorithm,
+     "AlphaBeta", 0, 0, false, true},
+    {"PolicyValueFile", UciOptionKind::string, UciOptionId::policy_value_file,
+     "", 0, 0, false, true},
     // Developer diagnostics stay settable but are intentionally not advertised.
     {"Debug", UciOptionKind::check, UciOptionId::debug, "false", 0, 0, false, false},
     {"DebugFile", UciOptionKind::string, UciOptionId::debug_file, "koi-debug.log", 0, 0, false,
@@ -421,6 +442,10 @@ std::string debug_limits(const SearchLimits& limits) {
 Wdl score_to_wdl(const SearchInfo& info) noexcept {
     if (info.exact_wdl.has_value()) {
         const std::array<int, 3>& triplet = *info.exact_wdl;
+        return Wdl{triplet[0], triplet[1], triplet[2]};
+    }
+    if (info.estimated_wdl.has_value()) {
+        const std::array<int, 3>& triplet = *info.estimated_wdl;
         return Wdl{triplet[0], triplet[1], triplet[2]};
     }
     if (info.mate.has_value()) {
@@ -1020,6 +1045,57 @@ void UciController::handle_setoption(std::istream& command) {
         break;
     }
 
+    case UciOptionId::search_algorithm: {
+        SearchAlgorithm algorithm = SearchAlgorithm::alpha_beta;
+        if (parse_search_algorithm(value, algorithm) && algorithm != search_algorithm_) {
+            stop_and_suppress_active_search();
+            search_algorithm_ = algorithm;
+        }
+        break;
+    }
+
+    case UciOptionId::policy_value_file: {
+        if (value == policy_value_file_.string()) {
+            break;
+        }
+        stop_and_suppress_active_search();
+        policy_value_file_ = value;
+        policy_value_model_.reset();
+        policy_value_load_error_.clear();
+        if (value.empty()) {
+            break;
+        }
+
+        std::filesystem::path resolved = value;
+        if (resolved.is_relative() && !executable_directory_.empty()) {
+            resolved = executable_directory_ / resolved;
+        }
+        auto loaded = PolicyValueModel::load_file(resolved);
+        if (!loaded.has_value()) {
+            policy_value_load_error_ = loaded.error().message;
+            debug_event("PolicyValueFile rejected " + resolved.string() + ": " +
+                        policy_value_load_error_);
+            std::lock_guard lock(output_mutex_);
+            output_ << "info string PolicyValueFile rejected: " << policy_value_load_error_
+                    << '\n' << std::flush;
+            break;
+        }
+        try {
+            policy_value_model_ = std::make_shared<const PolicyValueModel>(std::move(*loaded));
+        } catch (const std::exception& install_error) {
+            policy_value_load_error_ = install_error.what();
+            debug_event("PolicyValueFile installation failed " + resolved.string() + ": " +
+                        policy_value_load_error_);
+            std::lock_guard lock(output_mutex_);
+            output_ << "info string PolicyValueFile rejected: " << policy_value_load_error_
+                    << '\n' << std::flush;
+            break;
+        }
+        debug_json_event("policy_value_file", "\"path\":" + debug_quoted(resolved.string()) +
+                                              ",\"enabled\":true");
+        break;
+    }
+
     case UciOptionId::debug:
         apply_boolean(debug_enabled_, [this](bool debug) {
             debug_enabled_ = debug;
@@ -1345,6 +1421,9 @@ void UciController::start_search(GameState root, SearchLimits limits, bool skip_
     options.threads = threads_;
     options.speed_percent = speed_percent_;
     options.multi_pv = multi_pv_;
+    options.search_algorithm = search_algorithm_;
+    options.policy_value_model = policy_value_model_;
+    options.policy_value_load_error = policy_value_load_error_;
     options.analyse_mode = analyse_mode_;
     options.show_wdl = show_wdl_;
     options.move_overhead_ms = move_overhead_ms_;
@@ -1534,10 +1613,11 @@ void UciController::write_search_info(std::uint64_t generation, const SearchInfo
         } else if (info.bound == SearchInfo::Bound::upper) {
             output_ << " upperbound";
         }
-        if (show_wdl_) {
-            const Wdl wdl = score_to_wdl(info);
-            output_ << " wdl " << wdl.win << ' ' << wdl.draw << ' ' << wdl.loss;
-        }
+    }
+    if (show_wdl_ &&
+        (info.bound != SearchInfo::Bound::estimate || info.estimated_wdl.has_value())) {
+        const Wdl wdl = score_to_wdl(info);
+        output_ << " wdl " << wdl.win << ' ' << wdl.draw << ' ' << wdl.loss;
     }
     output_ << " nodes " << info.nodes << " nps " << info.nps
             << " hashfull " << search_service_.hashfull_permill()
@@ -1575,6 +1655,10 @@ void UciController::write_search_completion(std::uint64_t generation,
     std::lock_guard lock(output_mutex_);
     if (generation != generation_) {
         return;
+    }
+
+    if (!result.backend_diagnostic.empty()) {
+        output_ << "info string " << result.backend_diagnostic << '\n';
     }
 
     output_ << "bestmove "

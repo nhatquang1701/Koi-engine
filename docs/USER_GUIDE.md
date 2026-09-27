@@ -714,6 +714,21 @@ from the starting position (for example, `bestmove e2e4`).
   never triggers a load). A rejected or missing file leaves the current
   evaluator in place and reports `info string EvalFile rejected: ...`. Running
   searches keep the evaluator they started with.
+- `SearchAlgorithm` defaults to `AlphaBeta`. `MCTS` is an experimental,
+  single-thread CPU backend and requires a compatible policy/value model loaded
+  with `PolicyValueFile`; Koi does not bundle a trained model. Missing,
+  malformed, or incompatible models, `Threads > 1`, and unsupported search
+  configurations report an `info string` diagnostic and fall back to
+  alpha-beta. Changing either option stops and joins the active search before
+  replacing the selected backend or model.
+- With `SearchAlgorithm=MCTS`, `go nodes N` bounds root visits and `go depth N`
+  caps the tree ply. Movetime and clock deadlines, `searchmoves`, MultiPV,
+  `stop`, `quit`, and `ponderhit` continue to use the shared UCI search
+  lifecycle. A bounded request without an explicit node or time limit uses a
+  4096-visit ceiling; `go infinite` without a node limit remains unbounded until
+  stopped. Root Syzygy results retain precedence. MCTS WDL is an estimate and
+  is shown only when `UCI_ShowWDL` is enabled; it is not an exact tablebase
+  result.
 - `setoption name BookRandom value false` (the default) selects the highest-
   weight legal Polyglot move, using deterministic coordinate ordering for equal
   weights. `BookRandom true` enables weighted random selection; the default
@@ -786,13 +801,15 @@ every `go` is answered. `time_manager_tests` and
 
 ### WDL and strength controls
 
-`UCI_ShowWDL` defaults to false. When enabled, scored `info` lines append a
-deterministic `wdl W D L` triplet. A selective iteration with no proven score
-direction still reports depth, nodes, and PV, but omits score and WDL. Koi v1.0.0
-does not advertise `UCI_LimitStrength` or `UCI_Elo`: the previous node-cap
-mapping was not calibrated to an actual rating. A GUI that sends those legacy
-options receives normal full-strength play. Stockfish's separate Elo controls
-remain available to the measurement tools when Stockfish is the opponent.
+`UCI_ShowWDL` defaults to false. When enabled, scored alpha-beta `info` lines
+append a deterministic `wdl W D L` triplet. An alpha-beta selective iteration
+with no proven score direction reports depth, nodes, and PV but omits score and
+WDL; MCTS reports its estimated WDL without presenting it as a proven score or
+exact result. Koi v1.0.0 does not advertise `UCI_LimitStrength` or `UCI_Elo`:
+the previous node-cap mapping was not calibrated to an actual rating. A GUI
+that sends those legacy options receives normal full-strength play.
+Stockfish's separate Elo controls remain available to the measurement tools
+when Stockfish is the opponent.
 
 ### Optional Syzygy tablebases
 
@@ -990,7 +1007,8 @@ the options at session start; the portable release defaults are `RandomSeed=0`,
 `UCI_ShowWDL=false`, `Move Overhead=30`, `Slow Mover=100`, `StrengthMode=false`,
 `SyzygyPath=""`, `SyzygyProbeDepth=1`, `SyzygyProbeLimit=7`,
 `Syzygy50MoveRule=true`, `SyzygyInteriorDepth=0`, and `EvalFile=""`
-(empty keeps the boot-time evaluator).
+(empty keeps the boot-time evaluator), `SearchAlgorithm=AlphaBeta`, and
+`PolicyValueFile=""`.
 For the recommended En Croissant smoke scenario, use `Hash=512`, `Threads=4`, and
 `Speed=100`, then keep the book and Syzygy paths explicitly configured if those
 assets are available.

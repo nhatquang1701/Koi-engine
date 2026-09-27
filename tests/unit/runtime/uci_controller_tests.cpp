@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <atomic>
+#include <array>
 #include <chrono>
 #include <condition_variable>
 #include <cstdint>
@@ -8,6 +9,7 @@
 #include <iterator>
 #include <limits>
 #include <mutex>
+#include <span>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -19,6 +21,7 @@
 #include "koi/position.hpp"
 #include "koi/classical_evaluator.hpp"
 #include "koi/time_manager.hpp"
+#include "koi/policy_value_model.hpp"
 #include "koi/uci_controller.hpp"
 
 #include "koi_test_support.hpp"
@@ -61,6 +64,59 @@ ControllerResult run_controller_in_directory(std::string_view transcript,
     UciController controller(input, output, diagnostics, koi::SearchService{
         std::make_shared<koi::ClassicalEvaluator>()}, directory);
     return {controller.run(), output.str(), diagnostics.str()};
+}
+
+constexpr std::size_t kPolicyValuePayloadFloatCount =
+    koi::kPolicyValueFeatureCount * koi::kPolicyValueHiddenSize +
+    koi::kPolicyValueHiddenSize + 64 * koi::kPolicyValueHiddenSize +
+    64 * koi::kPolicyValueHiddenSize + 5 * koi::kPolicyValueHiddenSize + 1 +
+    3 * koi::kPolicyValueHiddenSize + 3;
+constexpr std::size_t kPolicyValuePayloadBytes =
+    kPolicyValuePayloadFloatCount * sizeof(std::uint32_t);
+
+void write_u32_le(std::vector<std::uint8_t>& bytes, const std::size_t offset,
+                  const std::uint32_t value) {
+    for (std::size_t index = 0; index < sizeof(value); ++index) {
+        bytes[offset + index] = static_cast<std::uint8_t>(value >> (index * 8U));
+    }
+}
+
+void write_u64_le(std::vector<std::uint8_t>& bytes, const std::size_t offset,
+                  const std::uint64_t value) {
+    for (std::size_t index = 0; index < sizeof(value); ++index) {
+        bytes[offset + index] = static_cast<std::uint8_t>(value >> (index * 8U));
+    }
+}
+
+[[nodiscard]] std::uint32_t policy_value_crc32(
+    const std::span<const std::uint8_t> bytes) noexcept {
+    std::uint32_t checksum = 0xffffffffU;
+    for (const std::uint8_t byte : bytes) {
+        checksum ^= byte;
+        for (int bit = 0; bit < 8; ++bit) {
+            const std::uint32_t mask = 0U - (checksum & 1U);
+            checksum = (checksum >> 1U) ^ (0xedb88320U & mask);
+        }
+    }
+    return checksum ^ 0xffffffffU;
+}
+
+void write_zero_policy_value_model(const std::filesystem::path& path) {
+    std::vector<std::uint8_t> bytes(koi::kPolicyValueHeaderSize + kPolicyValuePayloadBytes, 0);
+    constexpr std::array<std::uint8_t, 8> magic{'K', 'O', 'I', 'P', 'V', '1', 0, 0};
+    std::copy(magic.begin(), magic.end(), bytes.begin());
+    write_u32_le(bytes, 8, koi::kPolicyValueModelVersion);
+    write_u32_le(bytes, 12, koi::kPolicyValueFeatureSchemaId);
+    write_u32_le(bytes, 16, koi::kPolicyValueActionEncodingId);
+    write_u32_le(bytes, 20, static_cast<std::uint32_t>(koi::kPolicyValueHiddenSize));
+    write_u32_le(bytes, 24, static_cast<std::uint32_t>(koi::kPolicyValueFeatureCount));
+    write_u64_le(bytes, 28, kPolicyValuePayloadBytes);
+    write_u32_le(bytes, 36, policy_value_crc32(
+        std::span<const std::uint8_t>(bytes).subspan(koi::kPolicyValueHeaderSize)));
+    std::ofstream output(path, std::ios::binary | std::ios::trunc);
+    output.write(reinterpret_cast<const char*>(bytes.data()),
+                 static_cast<std::streamsize>(bytes.size()));
+    require(output.good(), "the synthetic policy/value model must be written completely");
 }
 
 koi::GameState position_after(const std::vector<std::string_view>& moves) {
@@ -169,18 +225,18 @@ bool is_valid_search_info(std::string_view line) {
                 return false;
             }
         }
-        if (next_name == "wdl") {
-            int win = 0;
-            int draw = 0;
-            int loss = 0;
-            if (!(stream >> win >> draw >> loss >> next_name) ||
-                win < 0 || draw < 0 || loss < 0 || win + draw + loss != 1000) {
-                return false;
-            }
-        }
     }
     // A complete selective iteration may publish legal PV progress without a
-    // score; UCI has no token for an estimate with unknown bound direction.
+    // score; a model estimate may still include its separately identified WDL.
+    if (next_name == "wdl") {
+        int win = 0;
+        int draw = 0;
+        int loss = 0;
+        if (!(stream >> win >> draw >> loss >> next_name) ||
+            win < 0 || draw < 0 || loss < 0 || win + draw + loss != 1000) {
+            return false;
+        }
+    }
     nodes_name = next_name;
     if (!(stream >> nodes >> nps_name >> nps >> hashfull_name >> hashfull >>
           time_name >> time >> pv_name)) {
@@ -328,6 +384,52 @@ private:
     int depth_;
 };
 
+class ReleaseOnSearchInfoBuffer final : public std::stringbuf {
+public:
+    explicit ReleaseOnSearchInfoBuffer(GatedInputBuffer& input) : input_(input) {}
+
+    int sync() override {
+        if (str().find("info depth ") != std::string::npos) {
+            input_.mark_marker();
+        }
+        return std::stringbuf::sync();
+    }
+
+private:
+    GatedInputBuffer& input_;
+};
+
+class ReleaseOnMinimumSelDepthBuffer final : public std::stringbuf {
+public:
+    ReleaseOnMinimumSelDepthBuffer(GatedInputBuffer& input, const int minimum_seldepth)
+        : input_(input), minimum_seldepth_(minimum_seldepth) {}
+
+    int sync() override {
+        for (const std::string& line : output_lines(str())) {
+            if (!line.starts_with("info depth ")) {
+                continue;
+            }
+            std::istringstream fields(line);
+            std::string info_name;
+            std::string depth_name;
+            std::string seldepth_name;
+            int depth = 0;
+            int seldepth = 0;
+            if ((fields >> info_name >> depth_name >> depth >> seldepth_name >> seldepth) &&
+                info_name == "info" && depth_name == "depth" &&
+                seldepth_name == "seldepth" && seldepth >= minimum_seldepth_) {
+                input_.mark_marker();
+                break;
+            }
+        }
+        return std::stringbuf::sync();
+    }
+
+private:
+    GatedInputBuffer& input_;
+    int minimum_seldepth_;
+};
+
 // Streams a transcript in stages so a gated command is sent only after the
 // previous search has finished publishing its best move. Stage 0 is available
 // immediately; each release_stage() call makes the next stage readable.
@@ -419,6 +521,30 @@ private:
     std::size_t expected_;
     std::size_t released_ = 0;
 };
+
+ControllerResult run_controller_in_directory_until_bestmove(
+    std::string transcript, const std::filesystem::path& directory) {
+    StagedGatedInputBuffer input({std::move(transcript), "quit\n"});
+    std::istream input_stream(&input);
+    ReleaseOnBestmoveCountBuffer output_buffer(input, 1);
+    std::ostream output(&output_buffer);
+    std::ostringstream diagnostics;
+    int exit_code = -1;
+    std::thread controller_thread([&] {
+        UciController controller(input_stream, output, diagnostics,
+                                 koi::SearchService{
+                                     std::make_shared<koi::ClassicalEvaluator>()},
+                                 directory);
+        exit_code = controller.run();
+    });
+    const bool completed = input.wait_for_release_count(2, std::chrono::seconds(20));
+    if (!completed) {
+        input.release_all();
+    }
+    controller_thread.join();
+    require(completed, "the gated UCI search must publish its bestmove before timeout");
+    return {exit_code, output_buffer.str(), diagnostics.str()};
+}
 
 class PonderGateEvaluator final : public koi::Evaluator {
 public:
@@ -1831,7 +1957,13 @@ void test_handshake_option_table_is_unique_and_well_formed() {
             "a handshake-only transcript must stay clean");
     const std::vector<std::string> options =
         lines_starting_with(output_lines(handshake.output), "option name ");
-    require(options.size() == 24, "the handshake must advertise exactly 24 options");
+    require(options.size() == 26, "the handshake must advertise exactly 26 options");
+    require(handshake.output.find("option name SearchAlgorithm type string default AlphaBeta") !=
+                std::string::npos,
+            "AlphaBeta must remain the advertised default search algorithm");
+    require(handshake.output.find("option name PolicyValueFile type string default \n") !=
+                std::string::npos,
+            "a policy/value model must remain an explicit optional asset");
 
     const std::string prefix = "option name ";
     std::vector<std::string> names;
@@ -1876,6 +2008,209 @@ void test_handshake_option_table_is_unique_and_well_formed() {
             "setting every advertised default must still answer isready");
     require(lines_starting_with(lines, "bestmove ").empty(),
             "setting options must never start or complete a search");
+}
+
+void test_mcts_without_a_model_falls_back_to_alphabeta_once() {
+    const koi::test::TempDirectory files;
+    const ControllerResult result = run_controller_in_directory_until_bestmove(
+        "setoption name SearchAlgorithm value MCTS\n"
+        "position startpos\n"
+        "go depth 2\n",
+        files.path());
+    const std::vector<std::string> lines = output_lines(result.output);
+    const std::vector<std::string> bestmoves = lines_starting_with(lines, "bestmove ");
+    const std::vector<std::string> backend_messages =
+        lines_starting_with(lines, "info string MCTS unavailable:");
+
+    require(result.exit_code == 0 && result.diagnostics.empty(),
+            "a missing MCTS model must leave the UCI controller usable");
+    require(backend_messages.size() == 1,
+            "a model-less MCTS request must explain its AlphaBeta fallback exactly once");
+    require(bestmoves.size() == 1 && is_legal_move(Position{},
+                                                   first_bestmove_move(bestmoves.front())),
+            "the model-less fallback must publish exactly one legal bestmove");
+}
+
+void test_mcts_rejects_a_corrupt_model_and_falls_back_to_alphabeta() {
+    const koi::test::TempDirectory files;
+    {
+        std::ofstream corrupt(files.path() / "broken.kpv", std::ios::binary);
+        corrupt << "not a policy/value model";
+    }
+    const ControllerResult result = run_controller_in_directory_until_bestmove(
+        "setoption name PolicyValueFile value broken.kpv\n"
+        "setoption name SearchAlgorithm value MCTS\n"
+        "position startpos\n"
+        "go depth 2\n",
+        files.path());
+    const std::vector<std::string> lines = output_lines(result.output);
+    const std::vector<std::string> bestmoves = lines_starting_with(lines, "bestmove ");
+    const std::vector<std::string> backend_messages =
+        lines_starting_with(lines, "info string MCTS unavailable:");
+
+    require(result.exit_code == 0 && result.diagnostics.empty(),
+            "a corrupt MCTS model must not poison the UCI session");
+    require(result.output.find("info string PolicyValueFile rejected:") != std::string::npos,
+            "the controller must identify the rejected model file");
+    require(backend_messages.size() == 1,
+            "a corrupt model must be reported when the MCTS search falls back");
+    require(bestmoves.size() == 1 && is_legal_move(Position{},
+                                                   first_bestmove_move(bestmoves.front())),
+            "a corrupt-model fallback must publish exactly one legal bestmove");
+}
+
+void test_mcts_valid_model_publishes_legal_multipv_and_estimated_wdl() {
+    const koi::test::TempDirectory files;
+    write_zero_policy_value_model(files.path() / "uniform.kpv");
+    const ControllerResult result = run_controller_in_directory_until_bestmove(
+        "setoption name PolicyValueFile value uniform.kpv\n"
+        "setoption name SearchAlgorithm value MCTS\n"
+        "setoption name MultiPV value 3\n"
+        "setoption name UCI_ShowWDL value true\n"
+        "position startpos\n"
+        "go nodes 1 depth 1\n",
+        files.path());
+    const std::vector<std::string> lines = output_lines(result.output);
+    const std::vector<std::string> infos = lines_starting_with(lines, "info depth ");
+    const std::vector<std::string> bestmoves = lines_starting_with(lines, "bestmove ");
+
+    require(result.exit_code == 0 && result.diagnostics.empty(),
+            "a valid CPU MCTS search must complete through the UCI controller");
+    require(result.output.find("info string MCTS unavailable:") == std::string::npos,
+            "a compatible model must not fall back from MCTS");
+    require(infos.size() == 3,
+            "the final MCTS snapshot must publish the requested root MultiPV lines");
+    bool saw_first = false;
+    bool saw_second = false;
+    bool saw_third = false;
+    for (const std::string& info : infos) {
+        require(is_valid_search_info(info),
+                "MCTS info lines must retain valid UCI fields and legal move tokens");
+        const std::size_t wdl_at = info.find(" wdl ");
+        require(wdl_at != std::string::npos,
+                "MCTS must publish estimated WDL when UCI_ShowWDL is enabled");
+        std::istringstream fields(info.substr(wdl_at + 5));
+        int win = 0;
+        int draw = 0;
+        int loss = 0;
+        require(static_cast<bool>(fields >> win >> draw >> loss) &&
+                    win + draw + loss == 1'000,
+                "estimated MCTS WDL values must sum to 1000 permill");
+        saw_first = saw_first || info.find(" multipv 1 ") != std::string::npos;
+        saw_second = saw_second || info.find(" multipv 2 ") != std::string::npos;
+        saw_third = saw_third || info.find(" multipv 3 ") != std::string::npos;
+    }
+    require(saw_first && saw_second && saw_third,
+            "MCTS MultiPV must identify all requested principal variations");
+    require(bestmoves.size() == 1 && is_legal_move(Position{},
+                                                   first_bestmove_move(bestmoves.front())),
+            "a valid MCTS search must publish exactly one legal bestmove");
+}
+
+void test_mcts_preserves_the_searchmoves_root_filter() {
+    const koi::test::TempDirectory files;
+    write_zero_policy_value_model(files.path() / "uniform.kpv");
+    const ControllerResult result = run_controller_in_directory_until_bestmove(
+        "setoption name PolicyValueFile value uniform.kpv\n"
+        "setoption name SearchAlgorithm value MCTS\n"
+        "position startpos\n"
+        "go nodes 2 depth 2 searchmoves e2e4\n",
+        files.path());
+    const std::vector<std::string> lines = output_lines(result.output);
+    const std::vector<std::string> infos = lines_starting_with(lines, "info depth ");
+    const std::vector<std::string> bestmoves = lines_starting_with(lines, "bestmove ");
+
+    require(result.exit_code == 0 && result.diagnostics.empty(),
+            "an MCTS searchmoves request must complete cleanly");
+    require(!infos.empty() && std::all_of(infos.begin(), infos.end(), [](const std::string& info) {
+                return info.find(" pv e2e4") != std::string::npos;
+            }),
+            "every MCTS principal variation must stay inside the filtered root move set");
+    require(bestmoves.size() == 1 && first_bestmove_move(bestmoves.front()) == "e2e4",
+            "MCTS must preserve a single allowed searchmoves root move");
+}
+
+void test_mcts_stop_quit_and_eof_obey_the_uci_lifecycle() {
+    const koi::test::TempDirectory files;
+    write_zero_policy_value_model(files.path() / "uniform.kpv");
+    const std::string setup =
+        "setoption name PolicyValueFile value uniform.kpv\n"
+        "setoption name SearchAlgorithm value MCTS\n"
+        "position startpos\n";
+
+    GatedInputBuffer input(setup + "go infinite\n", "stop\nquit\n");
+    std::istream input_stream(&input);
+    ReleaseOnSearchInfoBuffer output_buffer(input);
+    std::ostream output(&output_buffer);
+    std::ostringstream diagnostics;
+    int exit_code = -1;
+    std::thread controller_thread([&] {
+        UciController controller(input_stream, output, diagnostics,
+                                 koi::SearchService{
+                                     std::make_shared<koi::ClassicalEvaluator>()},
+                                 files.path());
+        exit_code = controller.run();
+    });
+    const bool search_reported = input.wait_for_marker(std::chrono::seconds(20));
+    if (!search_reported) {
+        input.release();
+    }
+    controller_thread.join();
+    const std::vector<std::string> stopped_bestmoves =
+        lines_starting_with(output_lines(output_buffer.str()), "bestmove ");
+
+    const ControllerResult quit =
+        run_controller_in_directory(setup + "go infinite\nquit\n", files.path());
+    const ControllerResult eof = run_controller_in_directory(setup + "go infinite\n", files.path());
+    require(search_reported && exit_code == 0 && diagnostics.str().empty(),
+            "MCTS must publish progress and shut down cleanly after stop");
+    require(stopped_bestmoves.size() == 1 &&
+                is_legal_move(Position{}, first_bestmove_move(stopped_bestmoves.front())),
+            "stopping active MCTS must return exactly one legal bestmove");
+    require(lines_starting_with(output_lines(quit.output), "bestmove ").empty() &&
+                lines_starting_with(output_lines(eof.output), "bestmove ").empty(),
+            "quit and EOF must suppress active MCTS completion output");
+    require(quit.diagnostics.empty() && eof.diagnostics.empty(),
+            "MCTS shutdown paths must not leak diagnostics to stderr");
+}
+
+void test_mcts_ponder_depth_continues_deepening_past_initial_target() {
+    const koi::test::TempDirectory files;
+    write_zero_policy_value_model(files.path() / "uniform.kpv");
+    GatedInputBuffer input(
+        "setoption name PolicyValueFile value uniform.kpv\n"
+        "setoption name SearchAlgorithm value MCTS\n"
+        "position startpos\n"
+        "go ponder depth 1\n",
+        "stop\nquit\n");
+    std::istream input_stream(&input);
+    ReleaseOnMinimumSelDepthBuffer output_buffer(input, 2);
+    std::ostream output(&output_buffer);
+    std::ostringstream diagnostics;
+    int exit_code = -1;
+    std::thread controller_thread([&] {
+        UciController controller(input_stream, output, diagnostics,
+                                 koi::SearchService{
+                                     std::make_shared<koi::ClassicalEvaluator>()},
+                                 files.path());
+        exit_code = controller.run();
+    });
+    const bool deeper_iteration_reported =
+        input.wait_for_marker(std::chrono::seconds(20));
+    if (!deeper_iteration_reported) {
+        input.release();
+    }
+    controller_thread.join();
+    const std::vector<std::string> bestmoves =
+        lines_starting_with(output_lines(output_buffer.str()), "bestmove ");
+
+    require(deeper_iteration_reported,
+            "go ponder depth 1 must keep deepening beyond its initial tree-ply target");
+    require(exit_code == 0 && diagnostics.str().empty(),
+            "the ponder-depth MCTS search must stop cleanly");
+    require(bestmoves.size() == 1 && is_legal_move(Position{},
+                                                   first_bestmove_move(bestmoves.front())),
+            "stopping the ponder-depth MCTS search must return one legal bestmove");
 }
 
 void test_quit_and_eof_join_without_late_bestmove() {
@@ -2188,6 +2523,15 @@ int main(int argc, char** argv) {
         {"ucinewgame clears the hash", test_ucinewgame_clears_the_transposition_table_and_records_it},
         {"debug command toggle", test_debug_command_toggles_hidden_diagnostics},
         {"handshake option table", test_handshake_option_table_is_unique_and_well_formed},
+        {"MCTS missing-model fallback", test_mcts_without_a_model_falls_back_to_alphabeta_once},
+        {"MCTS corrupt-model fallback", test_mcts_rejects_a_corrupt_model_and_falls_back_to_alphabeta},
+        {"MCTS legal MultiPV and WDL",
+         test_mcts_valid_model_publishes_legal_multipv_and_estimated_wdl},
+        {"MCTS searchmoves root filter", test_mcts_preserves_the_searchmoves_root_filter},
+        {"MCTS stop, quit and EOF lifecycle",
+         test_mcts_stop_quit_and_eof_obey_the_uci_lifecycle},
+        {"MCTS ponder depth deepening",
+         test_mcts_ponder_depth_continues_deepening_past_initial_target},
         {"quit and EOF cleanup", test_quit_and_eof_join_without_late_bestmove},
         {"unknown stop quit", test_unknown_stop_and_blank_commands_are_quiet_and_quit},
         {"protocol-clean output", test_protocol_output_contains_only_valid_uci_responses},

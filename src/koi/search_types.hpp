@@ -18,6 +18,7 @@
 namespace koi {
 
 class SyzygyTablebase;
+class PolicyValueModel;
 
 struct ClockLimit {
     std::chrono::milliseconds remaining{0};
@@ -152,13 +153,13 @@ struct SearchInfo {
     //
     //   exact - the score comes from a full-window root pass, so it is the
     //           engine's value for the position;
-    //   estimate - a complete selective root pass supplies a useful score
-    //              and PV but has no proven bound direction;
+    //   estimate - a selective search or policy/value backend supplies a
+    //              useful line without a proven alpha-beta bound direction;
     //   lower - the search proved that the value is at least the score;
     //   upper - the search proved that the value is at most the score.
-    // UCI has no estimate marker, so an estimated info line carries depth,
-    // nodes, and PV but omits score and WDL. Estimates must never be treated
-    // as exact inside the search.
+    // UCI has no estimate marker, so an estimated info line omits the score.
+    // A non-tablebase backend may still provide estimated_wdl separately.
+    // Estimates must never be treated as exact inside the search.
     enum class Bound : std::uint8_t { exact = 0, lower = 1, upper = 2, estimate = 3 };
 
     int depth = 0;
@@ -179,6 +180,10 @@ struct SearchInfo {
     // nullopt means the UCI layer derives the heuristic WDL triplet from the
     // score instead.
     std::optional<std::array<int, 3>> exact_wdl;
+    // Estimated WDL from a non-tablebase backend such as policy/value MCTS.
+    // Keep this separate from exact_wdl so UCI never labels a neural estimate
+    // as a Syzygy-exact result.
+    std::optional<std::array<int, 3>> estimated_wdl;
 };
 
 // Identity of one controller request as seen by the completion pipeline.
@@ -227,6 +232,9 @@ struct SearchResult {
     bool completed = false;
     bool cancelled = false;
     bool failed = false;
+    // Controller-owned `info string` diagnostic for an explicitly requested
+    // backend that fell back before publishing its search result.
+    std::string backend_diagnostic;
 };
 
 struct SearchEventSink {
@@ -240,6 +248,11 @@ struct SearchEventSink {
 struct TablebaseProbeResult {
     int score_cp = 0;
     std::optional<int> mate;
+};
+
+enum class SearchAlgorithm : std::uint8_t {
+    alpha_beta,
+    mcts,
 };
 
 struct SearchOptions {
@@ -270,6 +283,9 @@ struct SearchOptions {
     std::uint32_t slow_mover_percent = 100;
     bool limit_strength = false;
     std::uint32_t elo = 1320;
+    SearchAlgorithm search_algorithm = SearchAlgorithm::alpha_beta;
+    std::shared_ptr<const PolicyValueModel> policy_value_model;
+    std::string policy_value_load_error;
     // Protocol generation copied from UciController::generation_ so a result
     // can be matched back to the request that started the search.  This is
     // request identity, not the transposition table's replacement epoch (see

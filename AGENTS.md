@@ -18,6 +18,12 @@ can be loaded through `EvalFile`; GPU NNUE is an optional runtime capability.
 Polyglot books and Syzygy tablebases are optional user-provided assets. Neither
 the engine nor ordinary builds require those files.
 
+An experimental Koi-native policy/value MCTS backend can be selected with
+`SearchAlgorithm=MCTS` when a compatible versioned `.kpv` model is explicitly
+loaded through `PolicyValueFile`. Alpha-beta remains the default and fallback;
+the current CPU MCTS path requires one search thread and has not passed the
+matched-play promotion gates. No trained policy/value model is bundled.
+
 ## Architecture contracts
 
 - `src/koi/position.*` is the production authority for legality, position keys,
@@ -36,6 +42,10 @@ the engine nor ordinary builds require those files.
   `detail::SearchSession` owns a request snapshot, cancellation, worker
   lifetime, and the exactly-once completion claim. Search-local recursive state
   belongs to `detail::SearchContext` and its fixed-capacity stack.
+- `SearchRunner` owns backend dispatch. Alpha-beta is the default; policy/value
+  MCTS consumes an immutable model snapshot and the native `GameState` rules
+  path. Unsupported configurations and model failures fall back to alpha-beta
+  with a controller-owned UCI diagnostic.
 - `TranspositionTable` owns physical storage, locking, generations, clearing,
   resizing, and mate-score normalization. Search accesses it through the
   private `detail::SearchTableAccess` seam.

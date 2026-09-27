@@ -555,8 +555,12 @@ The `.kpv` container is separate from NNUE `EvalFile`. The Python reference
 and C++ CPU loader validate its 40-byte little-endian header, fixed dimensions,
 payload length, CRC32, and finite float32 weights. C++ inference consumes the
 native v5 sparse feature list and caller-provided legal moves/output storage.
-UCI selection and the MCTS backend are separate roadmap steps, so this does
-not change the default alpha-beta search.
+The bounded, tree-only CPU MCTS backend is now selectable through
+`SearchAlgorithm=MCTS` when a compatible model is explicitly loaded with
+`PolicyValueFile`. It currently requires `Threads=1`; unsupported selections
+fall back to alpha-beta with a UCI diagnostic. Alpha-beta remains the default,
+and MCTS remains strength-unvalidated until it passes the documented equal-time
+matched-play gates. Training loss alone does not promote a model or backend.
 
 ```powershell
 python .\tools\measurement\train_policy_value.py `

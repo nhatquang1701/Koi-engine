@@ -4,6 +4,7 @@
 #include <array>
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <condition_variable>
 #include <cstdint>
 #include <exception>
@@ -12,6 +13,7 @@
 #include <mutex>
 #include <stdexcept>
 #include <string>
+#include <span>
 #include <thread>
 #include <utility>
 #include <vector>
@@ -19,11 +21,14 @@
 #include "koi/detail/root_coordinator.hpp"
 #include "koi/detail/search_context.hpp"
 #include "koi/detail/search_ordering.hpp"
+#include "koi/detail/policy_value_mcts.hpp"
 #include "koi/detail/search_session.hpp"
 #include "koi/detail/search_stack.hpp"
 #include "koi/detail/search_table_access.hpp"
 #include "koi/evaluator.hpp"
+#include "koi/evaluation_features.hpp"
 #include "koi/game_state.hpp"
+#include "koi/policy_value_model.hpp"
 #include "koi/syzygy_tablebase.hpp"
 #include "koi/gpu/nnue_gpu_evaluator.hpp"
 #include "koi/time_manager.hpp"
@@ -73,6 +78,37 @@ constexpr int kEmergencySafeExchangeTieMargin = 80;
 // completed search and ordinary pawn evaluation are unchanged.
 constexpr int kEmergencyUnsafePawnQuietPenalty = 75;
 constexpr std::size_t kMaximumEmergencyForcingCheckEvasions = 3;
+constexpr std::uint64_t kDefaultMctsVisitBudget = 4'096;
+
+[[nodiscard]] std::array<int, 3> policy_value_wdl_permill(
+    const std::array<float, 3>& wdl) noexcept {
+    std::array<int, 3> result{};
+    std::array<double, 3> fractions{};
+    int assigned = 0;
+    for (std::size_t index = 0; index < wdl.size(); ++index) {
+        const double scaled = std::clamp(static_cast<double>(wdl[index]), 0.0, 1.0) * 1'000.0;
+        result[index] = static_cast<int>(std::floor(scaled));
+        fractions[index] = scaled - static_cast<double>(result[index]);
+        assigned += result[index];
+    }
+    while (assigned < 1'000) {
+        const auto best = std::max_element(fractions.begin(), fractions.end());
+        const std::size_t index = static_cast<std::size_t>(best - fractions.begin());
+        ++result[index];
+        *best = -1.0;
+        ++assigned;
+    }
+    while (assigned > 1'000) {
+        const auto least = std::min_element(fractions.begin(), fractions.end());
+        const std::size_t index = static_cast<std::size_t>(least - fractions.begin());
+        if (result[index] > 0) {
+            --result[index];
+            --assigned;
+        }
+        *least = 2.0;
+    }
+    return result;
+}
 constexpr std::size_t kMaximumEmergencyQuietForcingResearches = 16;
 constexpr std::size_t kMaximumEmergencyRootEvasionReplies = 6;
 // The emergency static fallback is deliberately limited to the middle of the
@@ -2540,15 +2576,39 @@ void SearchRunner::run() {
         if (result.best_move.has_value()) {
             result.pv = {*result.best_move};
         }
-        if (evaluator_mutex_ptr != nullptr) {
-            std::lock_guard lock(*evaluator_mutex_ptr);
-            result.score_cp = evaluator->evaluate(root, root.side_to_move());
-        } else {
-            result.score_cp = evaluator->evaluate(root, root.side_to_move());
-        }
-        const int root_static_eval = result.score_cp;
         const bool root_is_claimable_draw = root.is_claimable_draw();
         const bool root_is_forced_draw = root.is_forced_draw();
+        int root_static_eval = 0;
+        bool root_static_eval_ready = false;
+        const bool mcts_root_candidate =
+            options.search_algorithm == SearchAlgorithm::mcts &&
+            options.policy_value_model != nullptr && options.threads == 1 &&
+            !root_is_forced_draw && !legal_moves.empty() &&
+            !(options.syzygy_interior_depth > 0 &&
+              (options.syzygy != nullptr || options.tablebase_probe_hook));
+        const auto initialize_root_static_eval = [&] {
+            if (root_static_eval_ready) {
+                return;
+            }
+            if (evaluator_mutex_ptr != nullptr) {
+                std::lock_guard lock(*evaluator_mutex_ptr);
+                result.score_cp = evaluator->evaluate(root, root.side_to_move());
+            } else {
+                result.score_cp = evaluator->evaluate(root, root.side_to_move());
+            }
+            root_static_eval = result.score_cp;
+            if (root_is_claimable_draw || root_is_forced_draw) {
+                result.score_cp = std::max(0, result.score_cp);
+                if (root_is_forced_draw) {
+                    result.score_cp = 0;
+                }
+                result.mate.reset();
+            }
+            root_static_eval_ready = true;
+        };
+        if (!mcts_root_candidate) {
+            initialize_root_static_eval();
+        }
 
         // Interior tablebase probing is opt-in, off by default, and mirrors
         // the root probe restrictions except for ponder: a pondering search is
@@ -2573,17 +2633,6 @@ void SearchRunner::run() {
                 }
                 return root_is_claimable_draw ? std::max(0, score) : score;
             };
-        if (root_is_claimable_draw || root_is_forced_draw) {
-            // A claim is an available zero-valued root option, but legal
-            // continuations may still win. Automatic/dead draws remain
-            // terminal; keep both depth-zero fallbacks neutral.
-            result.score_cp = std::max(0, result.score_cp);
-            if (root_is_forced_draw) {
-                result.score_cp = 0;
-            }
-            result.mate.reset();
-        }
-
         std::optional<SyzygyRootResult> tablebase_result;
         // SyzygyProbeDepth is a minimum search depth.  A declared depth limit is
         // compared against it directly; a time or node search has no declared
@@ -2676,6 +2725,196 @@ void SearchRunner::run() {
                 options.quiet_history_side_hook, tablebase_binding);
         }
 
+        bool mcts_completed = false;
+        if (options.search_algorithm == SearchAlgorithm::mcts && !legal_moves.empty() &&
+            !tablebase_result.has_value()) {
+            std::string unavailable_reason;
+            if (options.policy_value_model == nullptr) {
+                unavailable_reason = options.policy_value_load_error.empty() ?
+                    "no compatible PolicyValueFile is loaded" :
+                    "PolicyValueFile rejected: " + options.policy_value_load_error;
+            } else if (options.threads != 1) {
+                unavailable_reason = "the CPU MCTS backend currently requires Threads=1";
+            } else if (root_is_forced_draw) {
+                unavailable_reason = "the root position is an automatic draw";
+            } else if (options.syzygy_interior_depth > 0 &&
+                       (options.syzygy != nullptr || options.tablebase_probe_hook)) {
+                unavailable_reason = "the CPU MCTS backend does not use interior Syzygy probes";
+            } else {
+                const std::shared_ptr<const PolicyValueModel> model =
+                    options.policy_value_model;
+                const PolicyValueMctsEvaluator policy_value_evaluator =
+                    [model](const GameState& position, const MoveMetadataList& moves,
+                            const std::span<float> priors)
+                        -> std::expected<PolicyValueMctsEvaluation, std::string> {
+                        std::array<Move, kMaximumLegalMoves> actions{};
+                        for (std::size_t index = 0; index < moves.size(); ++index) {
+                            actions[index] = moves[index].move;
+                        }
+                        const EvaluationFeatures features =
+                            EvaluationFeatureExtractor::extract(position);
+                        const NnueSparseFeaturesV5 sparse_features =
+                            EvaluationFeatureExtractor::encode_sparse_v5(features);
+                        std::array<float, 3> wdl{};
+                        const auto value = model->evaluate(
+                            sparse_features, position.side_to_move(),
+                            std::span<const Move>(actions.data(), moves.size()), priors, wdl);
+                        if (!value.has_value()) {
+                            return std::unexpected(value.error().message);
+                        }
+                        return PolicyValueMctsEvaluation{*value, wdl};
+                    };
+
+                try {
+                    PolicyValueMctsConfig config;
+                    // A ponder depth is an initial target, not a tree cap for
+                    // the entire ponder phase. Match alpha-beta's lifecycle:
+                    // keep exploring until ponderhit, then apply its converted
+                    // depth/time/node limits to the warmed tree.
+                    config.max_depth = limits.ponder ? 0 : limits.depth.value_or(0);
+                    PolicyValueMctsTree mcts_tree(root, legal_moves, config,
+                                                  policy_value_evaluator);
+                    const auto initialized = mcts_tree.initialize();
+                    if (!initialized.has_value()) {
+                        unavailable_reason = "MCTS initialization failed: " +
+                            initialized.error();
+                    } else {
+                        const auto default_visit_limit_for = [](const SearchLimits& current)
+                            -> std::optional<std::uint64_t> {
+                            const bool has_clock = current.movetime.has_value() ||
+                                current.white_clock.has_value() ||
+                                current.black_clock.has_value();
+                            if (!current.nodes.has_value() && !has_clock &&
+                                !current.infinite && !current.ponder) {
+                                return kDefaultMctsVisitBudget;
+                            }
+                            return std::nullopt;
+                        };
+                        std::optional<std::uint64_t> default_visit_limit =
+                            default_visit_limit_for(limits);
+                        std::uint64_t reported_visits = 0;
+                        std::uint64_t next_report_at = 128;
+                        std::optional<Move> last_reported_best;
+                        std::vector<Move> last_reported_pv;
+
+                        const auto publish_mcts_snapshot = [&] {
+                            const PolicyValueMctsSnapshot snapshot =
+                                mcts_tree.snapshot(options.multi_pv);
+                            if (snapshot.simulations == 0 || snapshot.root_moves.empty()) {
+                                return;
+                            }
+                            const auto elapsed = std::chrono::duration_cast<
+                                std::chrono::milliseconds>(
+                                    std::chrono::steady_clock::now() - started);
+                            const std::uint64_t nps = elapsed.count() > 0 ?
+                                snapshot.simulations * 1000 /
+                                    static_cast<std::uint64_t>(elapsed.count()) :
+                                snapshot.simulations;
+                            const PolicyValueMctsRootMove& best = snapshot.root_moves.front();
+                            result.best_move = best.move;
+                            result.pv = best.pv.empty() ? std::vector<Move>{best.move} : best.pv;
+                            result.ponder_move = result.pv.size() > 1 ?
+                                std::optional<Move>{result.pv[1]} : std::nullopt;
+                            result.score_cp = static_cast<int>(std::lround(
+                                static_cast<double>(best.value) * 1'000.0));
+                            result.completed_depth = std::max(1, snapshot.seldepth);
+                            result.stats.nodes = snapshot.simulations;
+                            result.stats.seldepth = snapshot.seldepth;
+
+                            for (std::size_t index = 0;
+                                 index < snapshot.root_moves.size(); ++index) {
+                                const PolicyValueMctsRootMove& line =
+                                    snapshot.root_moves[index];
+                                SearchInfo info;
+                                info.depth = result.completed_depth;
+                                info.score_cp = static_cast<int>(std::lround(
+                                    static_cast<double>(line.value) * 1'000.0));
+                                info.nodes = snapshot.simulations;
+                                info.nps = nps;
+                                info.elapsed = elapsed;
+                                info.pv = line.pv.empty() ? std::vector<Move>{line.move} :
+                                                          line.pv;
+                                info.seldepth = std::max(info.depth, snapshot.seldepth);
+                                info.multipv = static_cast<int>(index + 1);
+                                info.bound = SearchInfo::Bound::estimate;
+                                info.estimated_wdl = policy_value_wdl_permill(line.wdl);
+                                safely_report_info(sink, info);
+                            }
+
+                            time_manager.observe_iteration(SearchIterationObservation{
+                                result.completed_depth,
+                                result.score_cp,
+                                last_reported_best.has_value() &&
+                                    last_reported_best != result.best_move,
+                                !last_reported_pv.empty() && last_reported_pv != result.pv,
+                                false,
+                                snapshot.simulations});
+                            last_reported_best = result.best_move;
+                            last_reported_pv = result.pv;
+                            reported_visits = snapshot.simulations;
+                        };
+                        const PolicyValueMctsStop mcts_stop_predicate = [&] {
+                            return time_manager.should_stop(mcts_tree.simulations());
+                        };
+
+                        for (;;) {
+                            if (auto conversion = session->take_ponderhit_limits();
+                                conversion.has_value()) {
+                                limits = std::move(*conversion);
+                                time_manager.reconfigure(
+                                    limits, root.side_to_move(), options.speed_percent,
+                                    options.move_overhead_ms, options.slow_mover_percent,
+                                    timing_context);
+                                mcts_tree.set_max_depth(limits.depth.value_or(0));
+                                default_visit_limit = default_visit_limit_for(limits);
+                            }
+                            const std::uint64_t visits = mcts_tree.simulations();
+                            if (session->stop_requested().load(std::memory_order_relaxed) ||
+                                time_manager.should_stop(visits) ||
+                                (default_visit_limit.has_value() &&
+                                 visits >= *default_visit_limit)) {
+                                break;
+                            }
+                            const auto simulated = mcts_tree.simulate(
+                                session->stop_requested(), mcts_stop_predicate);
+                            if (!simulated.has_value()) {
+                                unavailable_reason = "MCTS simulation failed: " +
+                                    simulated.error();
+                                break;
+                            }
+                            if (!simulated.value()) {
+                                break;
+                            }
+                            if (mcts_tree.simulations() >= next_report_at) {
+                                publish_mcts_snapshot();
+                                next_report_at += 128;
+                                if (time_manager.should_stop_after_iteration()) {
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (unavailable_reason.empty()) {
+                            if (reported_visits != mcts_tree.simulations()) {
+                                publish_mcts_snapshot();
+                            }
+                            mcts_completed = true;
+                        }
+                    }
+                } catch (const std::exception& error) {
+                    unavailable_reason = "MCTS failed: " + std::string(error.what());
+                } catch (...) {
+                    unavailable_reason = "MCTS failed with an unknown error";
+                }
+            }
+
+            if (!mcts_completed) {
+                result.backend_diagnostic = "MCTS unavailable: " + unavailable_reason +
+                    "; using AlphaBeta";
+                initialize_root_static_eval();
+            }
+        }
+
         if (legal_moves.empty()) {
             result.score_cp = root.in_check() ? -kMateScore : 0;
             result.mate = mate_from_score(result.score_cp);
@@ -2692,6 +2931,8 @@ void SearchRunner::run() {
                             {result.best_move.value()}, 0, 0, 0, 1, 1};
             info.exact_wdl = syzygy_wdl_permill(tablebase_result->wdl);
             safely_report_info(sink, info);
+        } else if (mcts_completed) {
+            // The policy/value tree owns the root lines for this search.
         } else if (root_is_claimable_draw || root_is_forced_draw || use_lazy_smp ||
                    (options.threads == 1 && options.multi_pv == 1) || legal_moves.size() < 2 ||
                    (time_manager.node_limit().has_value() && options.multi_pv == 1) ||

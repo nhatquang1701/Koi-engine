@@ -240,6 +240,7 @@ set(KOI_CORE_SOURCES
     src/koi/detail/attack_tables.cpp
     src/koi/detail/evaluation_context.cpp
     src/koi/detail/feature_state.cpp
+    src/koi/detail/policy_value_mcts.cpp
     src/koi/detail/root_coordinator.cpp
     src/koi/detail/search_context.cpp
     src/koi/detail/search_context_support.cpp
@@ -631,6 +632,14 @@ target_link_libraries(search_runtime_tests PRIVATE koi_core)
 
 add_test(NAME search_runtime_tests COMMAND search_runtime_tests)
 
+add_executable(policy_value_mcts_tests
+    tests/unit/search/policy_value_mcts_tests.cpp
+)
+
+target_link_libraries(policy_value_mcts_tests PRIVATE koi_core)
+
+add_test(NAME policy_value_mcts_tests COMMAND policy_value_mcts_tests)
+
 add_executable(static_exchange_tests
     tests/unit/search/static_exchange_tests.cpp
 )
@@ -831,6 +840,7 @@ set(KOI_TEST_SUPPORT_TARGETS
     search_architecture_tests
     search_policy_tests
     search_runtime_tests
+    policy_value_mcts_tests
     static_exchange_tests
     transposition_table_tests
     search_service_tests
@@ -1194,7 +1204,7 @@ set_tests_properties(
     koi_core_tests koi_cpu_features_tests koi_cpu_variant_tests syzygy_tablebase_tests
     koi_rules_tests native_rule_state_tests opening_book_tests completion_gate_tests
     search_ordering_tests search_architecture_tests search_policy_tests
-    search_runtime_tests static_exchange_tests time_manager_tests perft_tests
+    search_runtime_tests policy_value_mcts_tests static_exchange_tests time_manager_tests perft_tests
     PROPERTIES LABELS "unit"
 )
 if(TARGET koi_module_tests)
