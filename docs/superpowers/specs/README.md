@@ -21,3 +21,4 @@ intentionally stable because plans and verification records link to them.
 | `2026-09-18-nnue-bullet-training-design.md` | Bullet trainer contract: dependencies, feature parity, quantization export, progress, CI refresh. |
 | `2026-09-19-engine-v2-design.md` | Engine v2 contracts: SPRT, adoption policy, themes, NNUE hot path, Lazy SMP, search and movegen gates. |
 | `2026-09-19-nnue-v5-threat-architecture-design.md` | NNUE v5: threat-pair features, dual-perspective MLP head, container v5, dataset v2, and trainer contracts. |
+| `2026-09-27-documentation-site-design.md` | Developer-focused GitHub Pages site, tracked Markdown corpus, archive navigation, and agent context. |
