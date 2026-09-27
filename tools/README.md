@@ -523,6 +523,33 @@ write_jsonl("artifacts/training/policy-value-v1.jsonl", records)
 records = list(read_jsonl("artifacts/training/policy-value-v1.jsonl"))
 ```
 
+## Policy/value v1 training
+
+`tools/measurement/train_policy_value.py` trains the fixed v1 CPU reference
+architecture from separate train and validation JSONL files. It rejects game
+or opening overlap, requires complete legal-action lists, and exports the
+versioned model plus an atomic metadata sidecar with dataset/model/source
+hashes, metrics, host details, and measured training throughput. PyTorch is an
+optional training dependency; importing the tools does not require it. CPU is
+the default. Select `--device cuda` explicitly to use a CUDA-enabled PyTorch
+build. Keep datasets, model files, and metadata under `artifacts/training/`.
+The `.kpv` container is separate from NNUE `EvalFile`. Its Python reference
+format is implemented ahead of the C++ loader and MCTS backend, so this stage
+does not make the network selectable in UCI.
+
+```powershell
+python .\tools\measurement\train_policy_value.py `
+  --train .\artifacts\training\policy-value-train.jsonl `
+  --validation .\artifacts\training\policy-value-validation.jsonl `
+  --output-model .\artifacts\training\policy-value-v1.kpv `
+  --metadata .\artifacts\training\policy-value-v1-metadata.json `
+  --epochs 10 --batch-size 32 --seed 1
+```
+
+The training loss is a development metric. Model adoption still requires
+held-out position validation and equal-time matched play against the current
+alpha-beta engine; it does not promote MCTS or make an Elo claim by itself.
+
 Typical commands:
 
 ```powershell
