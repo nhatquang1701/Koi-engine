@@ -215,6 +215,7 @@ def write_jsonl(path: str | os.PathLike[str], records: Iterable[dict[str, Any]])
     destination = Path(path)
     temporary_path: Path | None = None
     try:
+        destination.parent.mkdir(parents=True, exist_ok=True)
         with tempfile.NamedTemporaryFile(
             mode="w", encoding="utf-8", newline="\n", dir=destination.parent,
             prefix=f".{destination.name}.", suffix=".tmp", delete=False,

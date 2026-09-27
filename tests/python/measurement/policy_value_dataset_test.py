@@ -62,6 +62,16 @@ class PolicyValueDatasetTests(unittest.TestCase):
         self.assertEqual(loaded, [sample_record()])
         self.assertEqual([item["uci"] for item in loaded[0]["legal_actions"]], ["e2e4", "d2d4"])
 
+    def test_writer_creates_missing_parent_directories(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            path = Path(temporary_directory) / "artifacts" / "training" / "samples.jsonl"
+            self.assertFalse(path.parent.exists())
+
+            self.dataset.write_jsonl(path, [sample_record()])
+
+            self.assertTrue(path.parent.is_dir())
+            self.assertEqual(list(self.dataset.read_jsonl(path)), [sample_record()])
+
     def test_jsonl_output_is_canonical_and_has_no_generated_metadata(self):
         record = sample_record()
         with tempfile.TemporaryDirectory() as temporary_directory:
