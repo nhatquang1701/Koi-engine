@@ -478,6 +478,12 @@ batches (128 games); adaptive batches may extend the run to 192, 256, or 320 gam
 The estimator uses 2,000 paired-opening bootstrap samples and rejects incomplete,
 illegal, timed-out, or malformed match evidence.
 
+The default schedule samples the two anchors around `--prior-elo`. Use
+`--all-anchors` for a calibration sweep: it runs one initial 64-game paired
+batch for every anchor in the manifest and writes a version-2 schedule record.
+Set `--max-games` to at least 64 times the number of anchors; further batches
+remain adaptive.
+
 Create an external `koi-elo-anchor-manifest-v1` JSON manifest. Its `stockfish`
 object must contain the existing executable `path`, at least two unique
 `elos` in the Stockfish `UCI_Elo` range 1320..3190, and a `rating_source` such as

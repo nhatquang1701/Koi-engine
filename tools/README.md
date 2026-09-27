@@ -391,6 +391,12 @@ contain at least two unique Stockfish `UCI_Elo` values in 1320..3190; and
 `path`, positive `rating`, and `rating_source`, and is required to bracket a
 `--prior-elo` below the Stockfish floor. All anchors must bracket the prior.
 
+The default schedule tests the two anchors surrounding `--prior-elo`. For a
+calibration sweep, pass `--all-anchors`; this schedules one initial 64-game
+paired batch for every manifest anchor and exports a `koi-elo-schedule-v2`
+artifact. Set `--max-games` to at least 64 times the number of anchors; any
+remaining batches adapt around the fitted estimate.
+
 Use this exact no-book dry-run CLI from the repository root:
 
 ```powershell

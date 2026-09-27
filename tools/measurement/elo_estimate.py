@@ -23,6 +23,7 @@ SCHEMA = "koi-rough-elo-estimate-v1"
 ANCHOR_SCHEMA = "koi-elo-anchor-manifest-v1"
 MATCH_SCHEMA = "koi-uci-match-v2"
 SCHEDULE_SCHEMA = "koi-elo-schedule-v1"
+ALL_ANCHOR_SCHEDULE_SCHEMA = "koi-elo-schedule-v2"
 BATCH_GAMES = 64
 OPENING_COUNT = 32
 BOOTSTRAP_SAMPLES = 2000
@@ -275,16 +276,23 @@ def plan_schedule(
     target_games: int,
     observed_scores: Optional[Mapping[int, Sequence[float]]] = None,
     opening_names: Optional[Sequence[str]] = None,
+    include_all_anchors: bool = False,
 ) -> tuple[BatchPlan, ...]:
     """Plan 64-game paired batches; unobserved dry runs are deterministic."""
 
     if target_games not in {128, 192, 256, 320}:
         raise EloEstimateError("target games must be exactly one of 128, 192, 256, or 320")
     normalized_openings = _normalize_opening_names(opening_names)
-    lower, upper = _initial_anchors(anchors, prior_elo)
+    ordered_anchors = tuple(sorted(anchors, key=lambda anchor: (anchor.rating, anchor.id)))
+    if include_all_anchors:
+        if target_games < len(ordered_anchors) * BATCH_GAMES:
+            raise EloEstimateError("all-anchor calibration requires one initial batch per anchor")
+        initial_anchors = ordered_anchors
+    else:
+        initial_anchors = _initial_anchors(ordered_anchors, prior_elo)
     schedule = [
-        BatchPlan(1, lower, "initial", BATCH_GAMES, normalized_openings, "batch-01"),
-        BatchPlan(2, upper, "initial", BATCH_GAMES, normalized_openings, "batch-02"),
+        BatchPlan(index, anchor, "initial", BATCH_GAMES, normalized_openings, f"batch-{index:02d}")
+        for index, anchor in enumerate(initial_anchors, start=1)
     ]
     target = float(prior_elo)
     if observed_scores:
@@ -331,6 +339,7 @@ def build_schedule_manifest(
     prior_elo: int,
     opening_names: Optional[Sequence[str]] = None,
     run_labels: Sequence[str] = ("before", "after"),
+    include_all_anchors: bool = False,
 ) -> dict[str, Any]:
     """Build a portable paired schedule manifest for before/after runs."""
 
@@ -349,20 +358,33 @@ def build_schedule_manifest(
         raise EloEstimateError("schedule run labels must be exactly before and after")
     if [batch.ordinal for batch in batches] != list(range(1, len(batches) + 1)):
         raise EloEstimateError("schedule batch ordinals must be contiguous")
-    if [batch.phase for batch in batches[:2]] != ["initial", "initial"] or any(
-        batch.phase != "adaptive" for batch in batches[2:]
+    initial_batches = tuple(batch for batch in batches if batch.phase == "initial")
+    initial_count = len(initial_batches)
+    if initial_count < 2 or any(batch.phase != "initial" for batch in batches[:initial_count]) or any(
+        batch.phase != "adaptive" for batch in batches[initial_count:]
     ):
-        raise EloEstimateError("schedule must begin with two initial batches followed by adaptive batches")
+        raise EloEstimateError("schedule must begin with initial batches followed by adaptive batches")
+    initial_anchor_ids = {batch.anchor.id for batch in initial_batches}
+    if len(initial_anchor_ids) != initial_count:
+        raise EloEstimateError("initial schedule batches must use unique anchors")
+    if include_all_anchors and len(initial_batches) < 2:
+        raise EloEstimateError("all-anchor calibration requires one initial batch per anchor")
+    schema = ALL_ANCHOR_SCHEDULE_SCHEMA if include_all_anchors else SCHEDULE_SCHEMA
+    measurement = {
+        "prior_elo": int(prior_elo),
+        "target_games": sum(batch.games for batch in batches),
+        "initial_games": initial_count * BATCH_GAMES,
+        "adaptive_batch_games": BATCH_GAMES,
+        "max_games": 320,
+    }
+    if include_all_anchors:
+        measurement.update({"all_anchors": True, "initial_batch_count": initial_count})
+    elif initial_count != 2:
+        raise EloEstimateError("pair-bracketing schedules must have exactly two initial batches")
     payload: dict[str, Any] = {
-        "schema": SCHEDULE_SCHEMA,
-        "schema_version": 1,
-        "measurement": {
-            "prior_elo": int(prior_elo),
-            "target_games": sum(batch.games for batch in batches),
-            "initial_games": 128,
-            "adaptive_batch_games": BATCH_GAMES,
-            "max_games": 320,
-        },
+        "schema": schema,
+        "schema_version": 2 if include_all_anchors else 1,
+        "measurement": measurement,
         "pairing": {
             "unit": "one opening played once with Koi White and once with Koi Black",
             "opening_count": OPENING_COUNT,
@@ -382,6 +404,7 @@ def export_schedule(
     prior_elo: int,
     opening_names: Optional[Sequence[str]] = None,
     run_labels: Sequence[str] = ("before", "after"),
+    include_all_anchors: bool = False,
 ) -> dict[str, Any]:
     """Write an external schedule artifact that can be reused for both runs."""
 
@@ -391,6 +414,7 @@ def export_schedule(
         prior_elo=prior_elo,
         opening_names=opening_names,
         run_labels=run_labels,
+        include_all_anchors=include_all_anchors,
     )
     try:
         destination.parent.mkdir(parents=True, exist_ok=True)
@@ -406,6 +430,7 @@ def import_schedule(
     *,
     expected_openings: Optional[Sequence[str]] = None,
     prior_elo: Optional[int] = None,
+    require_all_anchors: bool = False,
 ) -> tuple[BatchPlan, ...]:
     """Load and validate an exported schedule before launching any engines."""
 
@@ -414,8 +439,14 @@ def import_schedule(
         payload = json.loads(schedule_path.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
         raise EloEstimateError(f"invalid schedule artifact: {schedule_path}") from error
-    if not isinstance(payload, Mapping) or payload.get("schema") != SCHEDULE_SCHEMA:
-        raise EloEstimateError(f"schedule schema must be {SCHEDULE_SCHEMA}")
+    if not isinstance(payload, Mapping) or payload.get("schema") not in {
+        SCHEDULE_SCHEMA,
+        ALL_ANCHOR_SCHEDULE_SCHEMA,
+    }:
+        raise EloEstimateError(
+            f"schedule schema must be {SCHEDULE_SCHEMA} or {ALL_ANCHOR_SCHEDULE_SCHEMA}"
+        )
+    all_anchor_schedule = payload["schema"] == ALL_ANCHOR_SCHEDULE_SCHEMA
     supplied_hash = payload.get("schedule_sha256")
     without_hash = dict(payload)
     without_hash.pop("schedule_sha256", None)
@@ -429,10 +460,28 @@ def import_schedule(
     target_games = measurement.get("target_games")
     if type(target_games) is not int or target_games not in {128, 192, 256, 320}:
         raise EloEstimateError("schedule target_games must be 128, 192, 256, or 320")
-    if measurement.get("initial_games") != 128 or measurement.get("adaptive_batch_games") != BATCH_GAMES or measurement.get("max_games") != 320:
+    if measurement.get("adaptive_batch_games") != BATCH_GAMES or measurement.get("max_games") != 320:
         raise EloEstimateError("schedule measurement contract is invalid")
+    if all_anchor_schedule:
+        initial_batch_count = measurement.get("initial_batch_count")
+        if (
+            measurement.get("all_anchors") is not True
+            or type(initial_batch_count) is not int
+            or initial_batch_count < 2
+            or initial_batch_count > len(anchors)
+            or measurement.get("initial_games") != initial_batch_count * BATCH_GAMES
+        ):
+            raise EloEstimateError("all-anchor schedule measurement contract is invalid")
+    else:
+        initial_batch_count = 2
+        if measurement.get("initial_games") != 128:
+            raise EloEstimateError("schedule measurement contract is invalid")
+    if require_all_anchors and not all_anchor_schedule:
+        raise EloEstimateError("schedule does not include an initial batch for every anchor")
     if len(raw_batches) not in {2, 3, 4, 5} or target_games != len(raw_batches) * BATCH_GAMES:
         raise EloEstimateError("schedule target_games does not match its batches")
+    if len(raw_batches) < initial_batch_count:
+        raise EloEstimateError("schedule has fewer batches than its initial anchor coverage")
     if pairing.get("opening_count") != OPENING_COUNT:
         raise EloEstimateError("schedule opening_count must be 32")
     stored_prior = measurement.get("prior_elo")
@@ -445,6 +494,16 @@ def import_schedule(
     if pairing.get("run_labels") != ["before", "after"]:
         raise EloEstimateError("schedule must declare before and after run labels")
     anchor_by_id = {anchor.id: anchor for anchor in anchors}
+    if all_anchor_schedule:
+        initial_ids = [
+            raw_batch.get("anchor", {}).get("id")
+            for raw_batch in raw_batches[:initial_batch_count]
+            if isinstance(raw_batch, Mapping) and isinstance(raw_batch.get("anchor"), Mapping)
+        ]
+        if len(initial_ids) != initial_batch_count or len(set(initial_ids)) != initial_batch_count:
+            raise EloEstimateError("all-anchor schedule initial batches must use unique anchors")
+        if set(initial_ids) != set(anchor_by_id):
+            raise EloEstimateError("all-anchor schedule must include every manifest anchor once initially")
     batches: list[BatchPlan] = []
     for index, raw_batch in enumerate(raw_batches, start=1):
         if not isinstance(raw_batch, Mapping) or not isinstance(raw_batch.get("anchor"), Mapping):
@@ -466,7 +525,7 @@ def import_schedule(
             raise EloEstimateError(f"malformed schedule batch identity {index}")
         if raw_batch.get("games") != BATCH_GAMES:
             raise EloEstimateError("schedule batches must contain exactly 64 games")
-        expected_phase = "initial" if index <= 2 else "adaptive"
+        expected_phase = "initial" if index <= initial_batch_count else "adaptive"
         if raw_batch.get("phase") != expected_phase:
             raise EloEstimateError(f"malformed schedule phase for batch {index}")
         batches.append(
@@ -945,6 +1004,11 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--schedule-export", type=Path, help="write the paired schedule artifact")
     parser.add_argument("--schedule-import", type=Path, help="reuse a previously exported paired schedule")
+    parser.add_argument(
+        "--all-anchors",
+        action="store_true",
+        help="calibration sweep: run one initial paired batch for every anchor",
+    )
     parser.add_argument("--run-label", choices=("measurement", "before", "after"), default="measurement")
     parser.add_argument("--dry-run", action="store_true")
     return parser
@@ -974,6 +1038,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     try:
         koi, replay, stockfish, openings_path, openings, manifest, time_control, movetime_ms, options, output, hashes = _validate_arguments(args)
         opening_names = tuple(opening.name for opening in openings)
+        all_anchor_schedule = args.all_anchors
         if args.schedule_import is not None:
             _output_is_external(args.schedule_import)
             planned_schedule = import_schedule(
@@ -981,8 +1046,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 manifest.anchors,
                 expected_openings=opening_names,
                 prior_elo=args.prior_elo,
+                require_all_anchors=args.all_anchors,
             )
             imported_schedule = True
+            all_anchor_schedule = all_anchor_schedule or sum(
+                batch.phase == "initial" for batch in planned_schedule
+            ) > 2
             if sum(batch.games for batch in planned_schedule) > args.max_games:
                 raise EloEstimateError("imported schedule exceeds --max-games")
             if sum(batch.games for batch in planned_schedule) < args.min_games:
@@ -993,12 +1062,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 args.prior_elo,
                 args.max_games,
                 opening_names=opening_names,
+                include_all_anchors=args.all_anchors,
             )
             imported_schedule = False
         schedule_manifest = build_schedule_manifest(
             planned_schedule,
             prior_elo=args.prior_elo,
             opening_names=opening_names,
+            include_all_anchors=all_anchor_schedule,
         )
         exported_schedule_path: Optional[Path] = None
         if args.schedule_export is not None:
@@ -1008,6 +1079,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 planned_schedule,
                 prior_elo=args.prior_elo,
                 opening_names=opening_names,
+                include_all_anchors=all_anchor_schedule,
             )
         opening_sequences = {opening.name: opening.moves for opening in openings}
         artifacts: list[dict[str, str]] = []
@@ -1064,6 +1136,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                     "prior_elo": args.prior_elo,
                     "min_games": args.min_games,
                     "max_games": args.max_games,
+                    "all_anchors": all_anchor_schedule,
                 },
                 "mode": args.mode,
                 "time_control": time_control,

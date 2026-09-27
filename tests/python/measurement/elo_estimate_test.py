@@ -129,6 +129,78 @@ class EloEstimateTests(unittest.TestCase):
                 self.assertEqual([batch.anchor.rating for batch in schedule[:2]], [1600, 1800])
                 self.assertTrue(all(batch.games == 64 for batch in schedule))
 
+    def test_calibration_sweep_includes_each_anchor_before_adaptive_sampling(self):
+        anchors = tuple(elo_estimate.Anchor(f"stockfish-{rating}", Path(f"C:/{rating}.exe"), rating, "test", rating)
+                        for rating in (1400, 1600, 1800))
+        schedule = elo_estimate.plan_schedule(
+            anchors, prior_elo=1600, target_games=192, include_all_anchors=True
+        )
+        self.assertEqual([batch.anchor.rating for batch in schedule], [1400, 1600, 1800])
+        self.assertTrue(all(batch.phase == "initial" for batch in schedule))
+        self.assertEqual(sum(batch.games for batch in schedule), 192)
+
+    def test_calibration_sweep_requires_one_initial_batch_for_each_anchor(self):
+        anchors = tuple(elo_estimate.Anchor(f"stockfish-{rating}", Path(f"C:/{rating}.exe"), rating, "test", rating)
+                        for rating in (1400, 1600, 1800))
+        with self.assertRaisesRegex(elo_estimate.EloEstimateError, "one initial batch per anchor"):
+            elo_estimate.plan_schedule(
+                anchors, prior_elo=1600, target_games=128, include_all_anchors=True
+            )
+
+    def test_all_anchor_schedule_exports_and_imports_every_initial_anchor(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            directory = Path(temporary_directory)
+            paths = make_paths(directory)
+            manifest_path = write_anchor_manifest(directory, paths)
+            manifest = elo_estimate.load_anchor_manifest(manifest_path, paths["stockfish.exe"], 1600)
+            schedule = elo_estimate.plan_schedule(
+                manifest.anchors,
+                prior_elo=1600,
+                target_games=192,
+                opening_names=tuple(opening_map()),
+                include_all_anchors=True,
+            )
+            schedule_path = directory / "all-anchors-schedule.json"
+            payload = elo_estimate.export_schedule(
+                schedule_path,
+                schedule,
+                prior_elo=1600,
+                opening_names=tuple(opening_map()),
+                include_all_anchors=True,
+            )
+            restored = elo_estimate.import_schedule(
+                schedule_path,
+                manifest.anchors,
+                expected_openings=tuple(opening_map()),
+                prior_elo=1600,
+                require_all_anchors=True,
+            )
+            self.assertEqual(payload["schema"], "koi-elo-schedule-v2")
+            self.assertEqual([batch.anchor.rating for batch in restored], [1400, 1600, 1800])
+
+    def test_all_anchor_dry_run_records_sweep_and_schedule_provenance(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            directory = Path(temporary_directory)
+            paths = make_paths(directory)
+            manifest_path = write_anchor_manifest(directory, paths)
+            output_path = directory / "dry-run.json"
+            schedule_path = directory / "schedule.json"
+            arguments = requested_args(
+                paths,
+                manifest_path,
+                output_path,
+                "--min-games", "192",
+                "--max-games", "192",
+                "--all-anchors",
+                "--schedule-export", str(schedule_path),
+                "--dry-run",
+            )
+            self.assertEqual(elo_estimate.main(arguments), 0)
+            report = json.loads(output_path.read_text(encoding="utf-8"))
+            self.assertEqual([batch["anchor_rating"] for batch in report["batches"]], [1400, 1600, 1800])
+            self.assertTrue(report["configuration"]["measurement"]["all_anchors"])
+            self.assertEqual(report["schedule"]["schema"], "koi-elo-schedule-v2")
+
     def test_result_normalization_and_report_validation_rejects_bad_game_evidence(self):
         self.assertEqual(elo_estimate.normalize_result("1-0", "white"), 1.0)
         self.assertEqual(elo_estimate.normalize_result("1-0", "black"), 0.0)
@@ -262,6 +334,7 @@ class EloEstimateTests(unittest.TestCase):
                 "prior_elo": 1500,
                 "min_games": 128,
                 "max_games": 320,
+                "all_anchors": False,
             })
             for field, changed_value in (("prior_elo", 1501), ("min_games", 192), ("max_games", 192)):
                 changed_schedule = json.loads(json.dumps(report))
@@ -330,9 +403,10 @@ class EloEstimateTests(unittest.TestCase):
             "--stockfish", "C:/Engines/stockfish.exe", "--anchors", "C:/inputs/anchors.json",
             "--openings", "C:/inputs/openings.txt", "--prior-elo", "1500",
             "--output", "C:/results/report.json", "--schedule-export", "C:/results/schedule.json",
-            "--schedule-import", "C:/inputs/schedule.json", "--run-label", "after", "--dry-run",
+            "--schedule-import", "C:/inputs/schedule.json", "--run-label", "after", "--all-anchors", "--dry-run",
         ])
         self.assertEqual(arguments.run_label, "after")
+        self.assertTrue(arguments.all_anchors)
         self.assertEqual(arguments.schedule_export, Path("C:/results/schedule.json"))
         self.assertEqual(arguments.schedule_import, Path("C:/inputs/schedule.json"))
 
