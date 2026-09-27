@@ -64,16 +64,16 @@ deployment.
 - Modify: `docs/superpowers/specs/README.md`
 - Modify: `docs/superpowers/plans/README.md`
 
-- [ ] Move the long user-facing material from the current README into
+- [x] Move the long user-facing material from the current README into
   `docs/USER_GUIDE.md`, preserving GUI, UCI, NNUE, GPU, book, tablebase, build,
   and tooling guidance with correct relative links.
-- [ ] Replace `README.md` with a concise engine description, release/download
+- [x] Replace `README.md` with a concise engine description, release/download
   links, short getting-started section, and links to the user guide and site.
-- [ ] Write `AGENTS.md` with stable architecture contracts, file map, build/test
+- [x] Write `AGENTS.md` with stable architecture contracts, file map, build/test
   commands, data/artifact policies, and contributor/release guidance.
-- [ ] Add `docs/index.md` for the developer-focused site landing and navigation
+- [x] Add `docs/index.md` for the developer-focused site landing and navigation
   into user, developer, reference, and archive content.
-- [ ] Update documentation maps to expose the new user guide, agent guide, and
+- [x] Update documentation maps to expose the new user guide, agent guide, and
   site design/plan.
 
 ### Task 2: Build the tracked Markdown site corpus
@@ -83,35 +83,35 @@ deployment.
 - Create: `mkdocs.yml`
 - Create: `requirements-docs.txt`
 
-- [ ] Implement staging from `git ls-files '*.md'`, preserving source-relative
+- [x] Implement staging from `git ls-files '*.md'`, preserving source-relative
   paths, copying the root README and AGENTS guide, and excluding third-party
   Markdown and non-document assets.
-- [ ] Generate a stable MkDocs navigation grouped by Start Here, Using Koi,
+- [x] Generate a stable MkDocs navigation grouped by Start Here, Using Koi,
   Developing Koi, Reference, and Project Archive; include every eligible tracked
   Markdown file in the archive/search corpus.
-- [ ] Configure MkDocs Material search, responsive sidebar, code-copy, light/dark
+- [x] Configure MkDocs Material search, responsive sidebar, code-copy, light/dark
   palette, and the project Pages base URL.
-- [ ] Keep staged inputs and generated site output under ignored `build/` paths.
+- [x] Keep staged inputs and generated site output under ignored `build/` paths.
 
 ### Task 3: Deploy the site through GitHub Pages Actions
 
 **Files:**
 - Create: `.github/workflows/docs.yml`
 
-- [ ] Add a workflow for pushes to `koi-engine` and manual dispatch that installs
+- [x] Add a workflow for pushes to `koi-engine` and manual dispatch that installs
   pinned documentation dependencies, stages tracked Markdown, and runs
   `mkdocs build --strict`.
-- [ ] Upload only the generated static site and deploy it through the official
+- [x] Upload only the generated static site and deploy it through the official
   GitHub Pages Actions flow with `contents: read`, `pages: write`, and
   `id-token: write` permissions.
-- [ ] Use a deployment concurrency group to prevent stale competing builds.
+- [x] Use a deployment concurrency group to prevent stale competing builds.
 
 ### Task 4: Review and deploy
 
-- [ ] Build the staged site locally in strict mode.
-- [ ] Check that the corpus includes every tracked Koi Markdown file intended by
+- [x] Build the staged site locally in strict mode.
+- [x] Check that the corpus includes every tracked Koi Markdown file intended by
   the spec and excludes third-party and untracked files.
-- [ ] Open the local build in a browser and review landing, sidebar, search,
+- [x] Open the local build in a browser and review landing, sidebar, search,
   archive navigation, and a nested relative link.
 - [ ] Verify the Pages workflow source is Actions, commit on `koi-engine`, push
   the requested site change, and confirm the project Pages URL serves the new

@@ -1,0 +1,64 @@
+site_name: Koi Engine
+site_description: Documentation for the Koi UCI chess engine
+site_url: https://nhatquang1701.github.io/Koi-engine/
+repo_url: https://github.com/nhatquang1701/Koi-engine
+repo_name: nhatquang1701/Koi-engine
+docs_dir: build/pages-src
+site_dir: build/pages-site
+
+theme:
+  name: material
+  language: en
+  features:
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - navigation.tracking
+    - content.code.copy
+    - content.code.annotate
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Use dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Use light mode
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - tables
+
+nav:
+  - Start here:
+      - Home: index.md
+      - Repository README: repository.md
+  - Using Koi:
+      - User guide: docs/USER_GUIDE.md
+  - Developing Koi:
+      - Agent guide: AGENTS.md
+      - Contributing: CONTRIBUTING.md
+      - Tests: tests/README.md
+      - Developer tools: tools/README.md
+  - Reference:
+      - Documentation map: docs/overview.md
+      - Release notes: docs/releases/v1.0.0.md
+      - Generated artifacts: artifacts/README.md
+  - Project archive:
+      - Browse the archive: archive/index.md
