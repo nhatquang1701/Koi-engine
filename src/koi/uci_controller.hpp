@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
@@ -10,6 +11,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <thread>
 
 #include "koi/game_state.hpp"
 #include "koi/completion_gate.hpp"
@@ -56,6 +58,8 @@ private:
     void start_search(GameState root, SearchLimits limits, bool skip_book = false);
     void stop_active_search();
     void stop_and_suppress_active_search();
+    void start_perft(int depth);
+    void stop_active_perft();
     void clear_ponder_state();
     [[nodiscard]] std::uint64_t begin_generation();
     void write_handshake();
@@ -67,7 +71,8 @@ private:
                                std::uint32_t root_ply,
                                const std::shared_ptr<CompletionOnce>& completion_once);
     void write_position_error(const char* message);
-    void write_perft_results(int depth);
+    void write_perft_results(GameState root, int depth, std::stop_token stop_token,
+                             std::uint64_t generation);
     void debug_event(std::string message) noexcept;
     void debug_json_event(std::string event, std::string fields) noexcept;
     void configure_debug_file();
@@ -88,6 +93,8 @@ private:
     OpeningBook opening_book_;
     SearchService search_service_;
     std::optional<SearchHandle> active_search_;
+    std::jthread active_perft_;
+    std::atomic_bool perft_running_{false};
     std::optional<GameState> ponder_origin_;
     std::optional<GameState> ponder_root_;
     std::optional<SearchLimits> ponder_limits_;

@@ -887,6 +887,15 @@ add_test(
 koi_set_timeout(koi_engine_process 60)
 
 add_test(
+    NAME koi_engine_perft_responsiveness
+    COMMAND ${POWERSHELL_EXECUTABLE} -NoProfile -ExecutionPolicy Bypass -File
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/uci/perft_responsiveness_test.ps1"
+            -EnginePath "$<TARGET_FILE:koi_engine>"
+)
+
+koi_set_timeout(koi_engine_perft_responsiveness 15)
+
+add_test(
     NAME koi_engine_variant_process
     COMMAND ${POWERSHELL_EXECUTABLE} -NoProfile -ExecutionPolicy Bypass -File
             "${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/uci/engine_variant_process_test.ps1"
@@ -1239,9 +1248,10 @@ set_tests_properties(
 set_tests_properties(koi_strength_tests PROPERTIES LABELS "unit;search;heavy")
 set_tests_properties(koi_replay_tests koi_nnue_fixture_tests PROPERTIES LABELS "integration;tools")
 if(POWERSHELL_EXECUTABLE)
-    set_tests_properties(koi_engine_process koi_engine_variant_process koi_engine_en_croissant_process
+    set_tests_properties(koi_engine_process koi_engine_perft_responsiveness
+        koi_engine_variant_process koi_engine_en_croissant_process
         PROPERTIES LABELS "process;uci")
-    set_tests_properties(koi_engine_process PROPERTIES RUN_SERIAL TRUE)
+    set_tests_properties(koi_engine_process koi_engine_perft_responsiveness PROPERTIES RUN_SERIAL TRUE)
     set_tests_properties(koi_engine_time_safety_process
         PROPERTIES LABELS "process;uci;heavy" PROCESSORS 2)
     set_tests_properties(koi_benchmark_process

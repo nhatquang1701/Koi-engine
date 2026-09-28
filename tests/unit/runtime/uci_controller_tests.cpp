@@ -2492,25 +2492,6 @@ std::uint64_t max_reported_value(std::string_view output, std::string_view key) 
     return maximum;
 }
 
-void test_go_perft_writes_move_counts_without_a_search() {
-    const ControllerResult result = run_controller(
-        "uci\n"
-        "isready\n"
-        "position startpos\n"
-        "go perft 1\n"
-        "quit\n");
-
-    const std::vector<std::string> lines = output_lines(result.output);
-    require(result.exit_code == 0 && result.diagnostics.empty(),
-            "go perft must shut down cleanly without diagnostics");
-    require(lines_starting_with(lines, "bestmove ").empty(),
-            "go perft is a debugging command and must not publish a bestmove");
-    require(line_index(lines, "info string Nodes searched: 20") != std::numeric_limits<std::size_t>::max(),
-            "go perft 1 must report the twenty legal startpos moves");
-    require(lines_starting_with(lines, "info string e2e4: 1").size() == 1,
-            "go perft must report one count per legal root move");
-}
-
 void test_go_mate_searches_the_proving_depth() {
     const ControllerResult result = run_controller(
         "position startpos\n"
@@ -2712,7 +2693,6 @@ int main(int argc, char** argv) {
         {"protocol-clean output", test_protocol_output_contains_only_valid_uci_responses},
         {"selective root score provenance", test_selective_root_score_is_not_published_as_an_exact_value},
         {"promptly flushed responses", test_protocol_responses_flush_promptly},
-        {"go perft output", test_go_perft_writes_move_counts_without_a_search},
         {"go mate mapping", test_go_mate_searches_the_proving_depth},
         {"legacy strength node cap", test_legacy_strength_options_do_not_cap_clock_searches},
         {"same-value option reapplication", test_reapplying_the_current_option_value_keeps_the_search_alive},

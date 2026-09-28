@@ -134,7 +134,8 @@ C++ unit / integration executables under `tests/unit/` and `tests/integration/`:
 PowerShell process tests (`tests/integration/**/*.ps1`), driven through
 `pwsh` with the built engine path:
 
-- `koi_engine_process`, `koi_engine_variant_process` (three engine binaries,
+- `koi_engine_process`, `koi_engine_perft_responsiveness`,
+  `koi_engine_variant_process` (three engine binaries,
   automatic selection, and the `KOI_CPU_VARIANT` overrides),
   `koi_engine_en_croissant_process`,
   `koi_engine_time_safety_process`, `koi_benchmark_process`,
@@ -184,8 +185,9 @@ Every test carries CTest labels; combine them with `-L`/`-LE`, for example
   `koi_engine_time_safety_process`, `koi_benchmark_process`, and
   `cutechess_stability_smoke`. `koi_uci_match_clock` and the heavy tests declare
   `PROCESSORS 2` so an oversubscribed `ctest -j` still schedules them sanely.
-- `koi_engine_process` declares `RUN_SERIAL TRUE` because it installs a
-  temporary `book.bin` next to the engine binary.
+- `koi_engine_process` and `koi_engine_perft_responsiveness` declare
+  `RUN_SERIAL TRUE`; the former installs a temporary `book.bin` next to the
+  engine binary, and the latter runs a cancellable deep perft process.
 
 ## Search failure reporting
 

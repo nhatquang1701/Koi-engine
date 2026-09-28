@@ -1138,9 +1138,10 @@ void UciController::handle_go(std::istream& command) {
 
     if (limits.perft.has_value()) {
         // `go perft N` is a debugging command, not a search: answer with the
-        // per-move node counts and the total, and no bestmove.
+        // per-move node counts and the total, and no bestmove. Run it outside
+        // the protocol loop so readiness and cancellation remain responsive.
         stop_and_suppress_active_search();
-        write_perft_results(*limits.perft);
+        start_perft(*limits.perft);
         return;
     }
     if (limits.mate.has_value() && !limits.depth.has_value()) {
@@ -1494,6 +1495,7 @@ void UciController::stop_active_search() {
             state_ = ControllerState::Stopping;
         }
     }
+    stop_active_perft();
     if (!active_search_.has_value()) {
         clear_ponder_state();
         std::lock_guard lock(output_mutex_);
@@ -1519,6 +1521,7 @@ void UciController::stop_and_suppress_active_search() {
         }
     }
     debug_event("search cancellation requested with generation suppression");
+    stop_active_perft();
     if (active_search_.has_value()) {
         active_search_->stop();
         active_search_->wait();
@@ -1528,6 +1531,56 @@ void UciController::stop_and_suppress_active_search() {
     {
         std::lock_guard lock(output_mutex_);
         if (state_ != ControllerState::ShuttingDown) state_ = ControllerState::Idle;
+    }
+}
+
+void UciController::start_perft(const int depth) {
+    const std::uint64_t generation = begin_generation();
+    {
+        std::lock_guard lock(output_mutex_);
+        if (state_ == ControllerState::ShuttingDown) {
+            return;
+        }
+        state_ = ControllerState::Searching;
+    }
+
+    try {
+        perft_running_.store(true, std::memory_order_release);
+        active_perft_ = std::jthread(
+            [this, root = position_, depth, generation](const std::stop_token stop_token) mutable {
+                struct RunningFlagReset {
+                    std::atomic_bool& flag;
+                    ~RunningFlagReset() {
+                        flag.store(false, std::memory_order_release);
+                    }
+                } running_flag_reset{perft_running_};
+                try {
+                    write_perft_results(std::move(root), depth, stop_token, generation);
+                } catch (...) {
+                    debug_event("perft worker failed");
+                    std::lock_guard lock(output_mutex_);
+                    if (generation == generation_ &&
+                        state_ != ControllerState::ShuttingDown) {
+                        output_ << "info string perft failed\n" << std::flush;
+                        state_ = ControllerState::Idle;
+                    }
+                }
+            });
+    } catch (...) {
+        perft_running_.store(false, std::memory_order_release);
+        debug_event("perft worker failed to start");
+        std::lock_guard lock(output_mutex_);
+        if (state_ != ControllerState::ShuttingDown) {
+            output_ << "info string perft could not start\n" << std::flush;
+            state_ = ControllerState::Idle;
+        }
+    }
+}
+
+void UciController::stop_active_perft() {
+    if (active_perft_.joinable()) {
+        active_perft_.request_stop();
+        active_perft_.join();
     }
 }
 
@@ -1582,7 +1635,8 @@ void UciController::write_readyok() {
     // so a large default hash cannot consume a fast game's clock before the
     // GUI has delivered its options. Materialize the requested table while the
     // engine is idle; explicit Hash options have already resized it here.
-    if (!active_search_.has_value()) {
+    if (!active_search_.has_value() &&
+        !perft_running_.load(std::memory_order_acquire)) {
         try {
             (void)search_service_.set_hash_size_mb(hash_mb_);
         } catch (...) {
@@ -1593,25 +1647,41 @@ void UciController::write_readyok() {
     output_ << "readyok\n" << std::flush;
 }
 
-void UciController::write_perft_results(int depth) {
-    const GameState root = position_;
+void UciController::write_perft_results(GameState root, const int depth,
+                                        const std::stop_token stop_token,
+                                        const std::uint64_t generation) {
     std::vector<std::pair<Move, std::uint64_t>> counts;
+    const std::vector<Move> legal_moves = root.legal_moves();
+    counts.reserve(legal_moves.size());
     std::uint64_t total = 0;
-    for (const Move& move : root.legal_moves()) {
+    for (const Move& move : legal_moves) {
+        if (stop_token.stop_requested()) {
+            debug_event("perft cancelled before completion");
+            return;
+        }
         GameState child = root;
         if (!child.make_move(move)) {
             continue;
         }
-        const std::uint64_t nodes = koi::perft(child, depth - 1);
-        total += nodes;
-        counts.emplace_back(move, nodes);
+        const PerftResult result = koi::perft_interruptible(child, depth - 1, stop_token);
+        if (result.cancelled) {
+            debug_event("perft cancelled before completion");
+            return;
+        }
+        total += result.nodes;
+        counts.emplace_back(move, result.nodes);
     }
     debug_event("perft depth " + std::to_string(depth) + " nodes " + std::to_string(total));
     std::lock_guard lock(output_mutex_);
+    if (stop_token.stop_requested() || generation != generation_ ||
+        state_ == ControllerState::ShuttingDown) {
+        return;
+    }
     for (const auto& [move, nodes] : counts) {
         output_ << "info string " << move.uci() << ": " << nodes << '\n';
     }
     output_ << "info string Nodes searched: " << total << '\n' << std::flush;
+    state_ = ControllerState::Idle;
 }
 
 void UciController::write_search_info(std::uint64_t generation, const SearchInfo& info) {
