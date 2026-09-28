@@ -1,0 +1,37 @@
+{
+  "algorithm": "seeded-legal-random-walk-v1",
+  "generator": "policy_value_openings.py",
+  "generator_sha256": "be4deb7ef285a734e0910e743801ea2c3910d0735ef7091898a40369fcb74a4a",
+  "heldout_state_count": 237,
+  "heldout_states_sha256": "e90e9e89f3276dc0b996f7df70f5e805ff00a19915af1e59d45f11ee8b0427be",
+  "match_corpora": [
+    {
+      "opening_count": 32,
+      "path": "tests/data/openings/openings-curated-32.txt",
+      "sha256": "1e2dcccfabb9bf5fa4aa28df6c5b23c81e9feeb782aecd7d5722298d4f235e79"
+    },
+    {
+      "opening_count": 160,
+      "path": "tests/data/openings/openings-release-strength-160.txt",
+      "sha256": "d4e7335ff7d69c86941ab1c8354903e89b17aa8fb13fdb569e76656c047e5e1f"
+    }
+  ],
+  "max_attempts_per_split": 4096,
+  "prefix_plies": {
+    "maximum": 18,
+    "minimum": 6
+  },
+  "root_identity": "standard plus canonical FEN fields 1-5; fullmove omitted",
+  "schema": "koi-policy-value-openings-v2",
+  "seed": 20260928,
+  "train": {
+    "opening_count": 64,
+    "path": "tools/measurement/data/policy-value-train-v2.txt",
+    "sha256": "2b44b430c26055ce3fbb896fd60a5044a03bc714063524a9f9fe72f6de3e527a"
+  },
+  "validation": {
+    "opening_count": 32,
+    "path": "tools/measurement/data/policy-value-validation-v2.txt",
+    "sha256": "d0ed74bb936966f1167152c77573332fb90af3caf55ffb81e07bd79e159ab721"
+  }
+}

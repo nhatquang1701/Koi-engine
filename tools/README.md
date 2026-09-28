@@ -558,7 +558,7 @@ disjoint so `train_policy_value.py` can enforce the split.
 ```powershell
 python .\tools\measurement\policy_value_selfplay.py `
   --engine .\build\release\koi-engine.exe `
-  --openings .\tools\measurement\data\policy-value-train-v1.txt `
+  --openings .\tools\measurement\data\policy-value-train-v2.txt `
   --games 8 --nodes 20000 --seed 1 --cpu-variant generic `
   --output .\artifacts\training\policy-value-ab-selfplay.jsonl
 ```
@@ -572,25 +572,32 @@ python .\tools\measurement\policy_value_selfplay.py `
   --engine .\build\release\koi-engine.exe `
   --algorithm MCTS `
   --policy-value-file .\artifacts\training\policy-value-v1.kpv `
-  --openings .\tools\measurement\data\policy-value-train-v1.txt `
+  --openings .\tools\measurement\data\policy-value-train-v2.txt `
   --games 8 --nodes 20000 --seed 1 --temperature 1.0 `
   --output .\artifacts\training\policy-value-mcts-selfplay.jsonl
 ```
 
 The default training corpus is
-`tools/measurement/data/policy-value-train-v1.txt`. Its root positions are
-separate from `policy-value-validation-v1.txt` and the Elo match corpus
-`tests/data/openings/openings-curated-32.txt` and strength corpus
-`tests/data/openings/openings-release-strength-160.txt`. To generate a
+`tools/measurement/data/policy-value-train-v2.txt`; its 64 seeded legal
+opening prefixes are separated from 32 validation prefixes and from both
+Elo match corpora. Regenerate the checked-in v2 corpora with the pinned seed
+and held-out hashes by running:
+
+```powershell
+python .\tools\measurement\policy_value_openings.py --overwrite
+```
+
+The corpus roots are separate from `tests/data/openings/openings-curated-32.txt`
+and `tests/data/openings/openings-release-strength-160.txt`. To generate a
 validation split, use the validation corpus and a separate output:
 
 ```powershell
 python .\tools\measurement\policy_value_selfplay.py `
   --engine .\build\release\koi-engine.exe `
   --algorithm AlphaBeta `
-  --openings .\tools\measurement\data\policy-value-validation-v1.txt `
+  --openings .\tools\measurement\data\policy-value-validation-v2.txt `
   --games 8 --nodes 20000 --seed 1 `
-  --output .\artifacts\training\policy-value-validation-v1.jsonl
+  --output .\artifacts\training\policy-value-validation-v2.jsonl
 ```
 
 `train_policy_value.py` rejects duplicated rules-relevant FEN states between

@@ -141,6 +141,14 @@ def validate_record(record: Any) -> None:
         _require(isinstance(counts, list) and len(counts) == len(actions), "visit_counts must align with legal_actions")
         for index, count in enumerate(counts):
             _require(isinstance(count, int) and not isinstance(count, bool) and count >= 0, f"visit_counts[{index}] must be a non-negative integer")
+        count_total = sum(counts)
+        _require(count_total > 0, "visit_counts must have a positive total")
+        for index, (count, target) in enumerate(zip(counts, targets)):
+            normalized_count = count / count_total
+            _require(
+                math.isclose(target, normalized_count, rel_tol=0.0, abs_tol=1e-6),
+                f"policy_targets[{index}] must equal normalized visit_counts",
+            )
 
     value = record["value_target"]
     _require(isinstance(value, (int, float)) and not isinstance(value, bool), "value_target must be a number")

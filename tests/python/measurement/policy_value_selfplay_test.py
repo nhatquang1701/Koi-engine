@@ -81,8 +81,8 @@ class MctsFakeEngine:
 
 class PolicyValueSelfPlayTests(unittest.TestCase):
     def test_training_and_validation_openings_are_separate_from_match_positions(self):
-        train_path = _REPOSITORY_ROOT / "tools/measurement/data/policy-value-train-v1.txt"
-        validation_path = _REPOSITORY_ROOT / "tools/measurement/data/policy-value-validation-v1.txt"
+        train_path = _REPOSITORY_ROOT / "tools/measurement/data/policy-value-train-v2.txt"
+        validation_path = _REPOSITORY_ROOT / "tools/measurement/data/policy-value-validation-v2.txt"
         match_path = _REPOSITORY_ROOT / "tests/data/openings/openings-curated-32.txt"
         strength_match_path = _REPOSITORY_ROOT / "tests/data/openings/openings-release-strength-160.txt"
         self.assertEqual(policy_value_selfplay._DEFAULT_OPENINGS_PATH, train_path)

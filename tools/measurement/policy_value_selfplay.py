@@ -28,7 +28,7 @@ from typing import Any, Iterable, Iterator
 _HERE = Path(__file__).resolve().parent
 _REPOSITORY_ROOT = _HERE.parents[1]
 _DEFAULT_OPENINGS_PATH = (
-    _REPOSITORY_ROOT / "tools/measurement/data/policy-value-train-v1.txt"
+    _REPOSITORY_ROOT / "tools/measurement/data/policy-value-train-v2.txt"
 )
 _SOURCE_PATHS = (
     "tools/measurement/policy_value_selfplay.py",
@@ -643,7 +643,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--openings", type=Path,
         default=_DEFAULT_OPENINGS_PATH,
-        help="opening_id | UCI-move-prefix training corpus (default: tools/measurement/data/policy-value-train-v1.txt)",
+        help="opening_id | UCI-move-prefix training corpus (default: tools/measurement/data/policy-value-train-v2.txt)",
     )
     parser.add_argument("--games", type=int, default=1, help="number of distinct openings to self-play")
     parser.add_argument("--nodes", type=int, default=20_000, help="search nodes per move")

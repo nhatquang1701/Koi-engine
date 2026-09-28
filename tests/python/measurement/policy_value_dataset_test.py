@@ -121,6 +121,21 @@ class PolicyValueDatasetTests(unittest.TestCase):
             with self.assertRaises(self.dataset.DatasetError):
                 self.dataset.validate_record(record)
 
+    def test_visit_counts_must_match_the_normalized_policy_targets(self):
+        invalid_pairs = (
+            ([3, 1], [0.5, 0.5]),
+            ([0, 0], [0.75, 0.25]),
+            ([2, 2], [0.75, 0.25]),
+        )
+        for counts, targets in invalid_pairs:
+            record = sample_record()
+            record["visit_counts"] = counts
+            record["policy_targets"] = targets
+            with self.subTest(counts=counts, targets=targets), self.assertRaises(
+                self.dataset.DatasetError
+            ):
+                self.dataset.validate_record(record)
+
     def test_rejects_invalid_uci_fields_and_duplicate_legal_actions(self):
         bad_actions = (
             [{"uci": "e2e5", "from": "e2", "to": "e4", "promotion": None},
