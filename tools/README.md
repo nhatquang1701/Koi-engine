@@ -580,8 +580,9 @@ python .\tools\measurement\policy_value_selfplay.py `
 The default training corpus is
 `tools/measurement/data/policy-value-train-v1.txt`. Its root positions are
 separate from `policy-value-validation-v1.txt` and the Elo match corpus
-`tests/data/openings/openings-curated-32.txt`. To generate a validation split,
-use the validation corpus and a separate output:
+`tests/data/openings/openings-curated-32.txt` and strength corpus
+`tests/data/openings/openings-release-strength-160.txt`. To generate a
+validation split, use the validation corpus and a separate output:
 
 ```powershell
 python .\tools\measurement\policy_value_selfplay.py `
@@ -639,6 +640,45 @@ python .\tools\measurement\train_policy_value.py `
 The training loss is a development metric. Model adoption still requires
 held-out position validation and equal-time matched play against the current
 alpha-beta engine; it does not promote MCTS or make an Elo claim by itself.
+
+### AlphaBeta versus MCTS strength gate
+
+Use `tools/stability/sprt_compare.ps1` for paired, color-balanced games. The
+candidate and baseline UCI options are supplied as JSON objects so the same
+binary can run both backends. Keep `MCTSSelfPlay=false` during matches so root
+noise is disabled; the candidate model hash and engine hashes are retained in
+the match reports.
+
+```powershell
+$engine = (Resolve-Path .\build\release\koi-engine.exe).Path
+$replay = (Resolve-Path .\build\release\koi-replay.exe).Path
+$model = (Resolve-Path .\artifacts\training\policy-value-mcts.kpv).Path
+$candidateOptions = .\artifacts\training\mcts-candidate-options.json
+$baselineOptions = .\artifacts\training\mcts-baseline-options.json
+
+@{ SearchAlgorithm = 'MCTS'; PolicyValueFile = $model; MCTSSelfPlay = 'false'; MCTSVisitOutput = 'false' } |
+  ConvertTo-Json -Compress | Set-Content -Encoding UTF8 $candidateOptions
+@{ SearchAlgorithm = 'AlphaBeta'; PolicyValueFile = ''; MCTSSelfPlay = 'false'; MCTSVisitOutput = 'false' } |
+  ConvertTo-Json -Compress | Set-Content -Encoding UTF8 $baselineOptions
+
+pwsh -NoProfile -File .\tools\stability\sprt_compare.ps1 `
+  -CandidatePath $engine -BaselinePath $engine -ReplayPath $replay `
+  -CandidateOptionsJsonPath $candidateOptions -BaselineOptionsJsonPath $baselineOptions `
+  -OpeningFile .\tests\data\openings\openings-release-strength-160.txt `
+  -TimeControl '1+0' -Elo0 0 -Elo1 10 -Games 1 -MinGames 40 -MaxGames 160 `
+  -Threads 1 -Hash 512 -OutputDirectory .\artifacts\matches\mcts-sprt
+
+pwsh -NoProfile -File .\tools\stability\sprt_compare.ps1 `
+  -CandidatePath $engine -BaselinePath $engine -ReplayPath $replay `
+  -CandidateOptionsJsonPath $candidateOptions -BaselineOptionsJsonPath $baselineOptions `
+  -OpeningFile .\tests\data\openings\openings-release-strength-160.txt `
+  -TimeControl '3+2' -Elo0 0 -Elo1 10 -Games 1 -MinGames 40 -MaxGames 160 `
+  -Threads 1 -Hash 512 -OutputDirectory .\artifacts\matches\mcts-sprt
+```
+
+Run the gate separately at both controls. An inconclusive result is not a pass;
+use a larger disjoint match corpus before deciding. Keep the AlphaBeta default
+unless both SPRTs favor MCTS by at least +10 Elo at `alpha=beta=0.05`.
 
 Typical commands:
 

@@ -84,14 +84,17 @@ class PolicyValueSelfPlayTests(unittest.TestCase):
         train_path = _REPOSITORY_ROOT / "tools/measurement/data/policy-value-train-v1.txt"
         validation_path = _REPOSITORY_ROOT / "tools/measurement/data/policy-value-validation-v1.txt"
         match_path = _REPOSITORY_ROOT / "tests/data/openings/openings-curated-32.txt"
+        strength_match_path = _REPOSITORY_ROOT / "tests/data/openings/openings-release-strength-160.txt"
         self.assertEqual(policy_value_selfplay._DEFAULT_OPENINGS_PATH, train_path)
         train = policy_value_selfplay.read_openings(train_path)
         validation = policy_value_selfplay.read_openings(validation_path)
         matches = policy_value_selfplay.read_openings(match_path)
+        strength_matches = policy_value_selfplay.read_openings(strength_match_path)
 
         train_ids = {opening.opening_id for opening in train}
         validation_ids = {opening.opening_id for opening in validation}
         match_ids = {opening.opening_id for opening in matches}
+        match_ids.update(opening.opening_id for opening in strength_matches)
         self.assertFalse(train_ids & validation_ids)
         self.assertFalse(train_ids & match_ids)
         self.assertFalse(validation_ids & match_ids)
@@ -114,7 +117,7 @@ class PolicyValueSelfPlayTests(unittest.TestCase):
 
         train_roots = {root_state(opening) for opening in train}
         validation_roots = {root_state(opening) for opening in validation}
-        match_states = match_prefix_states(matches)
+        match_states = match_prefix_states([*matches, *strength_matches])
         self.assertFalse(train_roots & validation_roots)
         self.assertFalse(train_roots & match_states)
         self.assertFalse(validation_roots & match_states)

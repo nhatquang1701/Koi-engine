@@ -42,7 +42,8 @@ function Invoke-ScriptedMatch([string]$KoiPath, [string]$OpponentPath, [string]$
                                [int]$KoiBookDepth = 16, [string]$OpponentOwnBook = '',
                                [string]$PackageManifestPath = '', [string]$PackageArchivePath = '',
                                 [switch]$Sprt, [int]$SprtMinGames = 20, [int]$SprtMaxGames = 2000,
-                                [double]$SprtElo1 = 5.0) {
+                                [double]$SprtElo1 = 5.0,
+                                [string]$KoiOptionsJsonPath = '', [string]$OpponentOptionsJsonPath = '') {
     $optionalArguments = @()
     if (-not [string]::IsNullOrWhiteSpace($OpeningFile)) {
         $optionalArguments += @('-OpeningFile', $OpeningFile)
@@ -62,6 +63,12 @@ function Invoke-ScriptedMatch([string]$KoiPath, [string]$OpponentPath, [string]$
     }
     if (-not [string]::IsNullOrWhiteSpace($PackageArchivePath)) {
         $optionalArguments += @('-PackageArchivePath', $PackageArchivePath)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($KoiOptionsJsonPath)) {
+        $optionalArguments += @('-KoiOptionsJsonPath', $KoiOptionsJsonPath)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($OpponentOptionsJsonPath)) {
+        $optionalArguments += @('-OpponentOptionsJsonPath', $OpponentOptionsJsonPath)
     }
     $output = & $PowerShellExecutable -NoProfile -ExecutionPolicy Bypass -File $matchScript `
         -KoiPath $KoiPath -OpponentPath $OpponentPath -ReplayPath $replayPath `
@@ -222,6 +229,104 @@ try {
         $pgn -notmatch '\[Result "\*"\]' -or
         $pgn -notmatch '\[MoveFormat "UCI coordinate notation"\]') {
         throw 'UCI match PGN must contain reproducibility headers.'
+    }
+
+    $jsonOptionsDirectory = Join-Path $outputDirectory 'json-options'
+    $jsonOptionsMatchDirectory = Join-Path $outputDirectory 'json-options-match'
+    New-Item -ItemType Directory -Path $jsonOptionsDirectory -Force | Out-Null
+    $koiOptionsJsonPath = Join-Path $jsonOptionsDirectory 'koi-options.json'
+    $opponentOptionsJsonPath = Join-Path $jsonOptionsDirectory 'opponent-options.json'
+    @{ MCTSSelfPlay = 'true'; RandomSeed = '42' } |
+        ConvertTo-Json -Compress |
+        Set-Content -LiteralPath $koiOptionsJsonPath -Encoding UTF8
+    @{ SearchAlgorithm = 'AlphaBeta'; MCTSSelfPlay = 'false' } |
+        ConvertTo-Json -Compress |
+        Set-Content -LiteralPath $opponentOptionsJsonPath -Encoding UTF8
+    $jsonOptionsMatch = Invoke-ScriptedMatch $EnginePath $EnginePath $jsonOptionsMatchDirectory `
+        1 2 -KoiOptionsJsonPath $koiOptionsJsonPath -OpponentOptionsJsonPath $opponentOptionsJsonPath
+    $jsonKoiEngine = @($jsonOptionsMatch.report.engines | Where-Object { $_.label -eq 'Koi' })[0]
+    $jsonOpponentEngine = @($jsonOptionsMatch.report.engines | Where-Object { $_.label -eq 'Opponent' })[0]
+    if ($jsonKoiEngine.options -notcontains 'setoption name MCTSSelfPlay value true' -or
+        $jsonKoiEngine.options -notcontains 'setoption name RandomSeed value 42' -or
+        $jsonOpponentEngine.options -notcontains 'setoption name SearchAlgorithm value AlphaBeta' -or
+        $jsonOpponentEngine.options -notcontains 'setoption name MCTSSelfPlay value false') {
+        throw 'JSON UCI options must be applied to the selected engine role and recorded in match provenance.'
+    }
+
+    $missingPolicyValueOptionsPath = Join-Path $jsonOptionsDirectory 'missing-model-options.json'
+    $missingPolicyValuePath = Join-Path $jsonOptionsDirectory 'missing-model.kpv'
+    @{ SearchAlgorithm = 'MCTS'; PolicyValueFile = $missingPolicyValuePath; MCTSSelfPlay = 'false' } |
+        ConvertTo-Json -Compress |
+        Set-Content -LiteralPath $missingPolicyValueOptionsPath -Encoding UTF8
+    $missingModelFailedClosed = $false
+    try {
+        $null = Invoke-ScriptedMatch $EnginePath $EnginePath `
+            (Join-Path $outputDirectory 'missing-mcts-model') 1 2 `
+            -KoiOptionsJsonPath $missingPolicyValueOptionsPath `
+            -OpponentOptionsJsonPath $opponentOptionsJsonPath
+    } catch {
+        $missingModelFailedClosed = $_.Exception.Message -match 'MCTS PolicyValueFile is missing'
+    }
+    if (-not $missingModelFailedClosed) {
+        throw 'An MCTS strength match must fail before play when its policy/value model is missing.'
+    }
+
+    $corruptPolicyValuePath = Join-Path $jsonOptionsDirectory 'corrupt-policy-value.kpv'
+    $corruptPolicyValueOptionsPath = Join-Path $jsonOptionsDirectory 'corrupt-policy-value-options.json'
+    [System.IO.File]::WriteAllText($corruptPolicyValuePath, 'not a policy/value model')
+    @{ SearchAlgorithm = 'MCTS'; PolicyValueFile = $corruptPolicyValuePath; MCTSSelfPlay = 'false' } |
+        ConvertTo-Json -Compress |
+        Set-Content -LiteralPath $corruptPolicyValueOptionsPath -Encoding UTF8
+    $corruptMctsModelRejected = $false
+    try {
+        $null = Invoke-ScriptedMatch $EnginePath $EnginePath `
+            (Join-Path $outputDirectory 'corrupt-mcts-model') 1 2 `
+            -KoiOptionsJsonPath $corruptPolicyValueOptionsPath
+    } catch {
+        $corruptMctsModelRejected = $_.Exception.Message -match 'PolicyValueFile rejected'
+    }
+    if (-not $corruptMctsModelRejected) {
+        throw 'An MCTS strength match must fail when the policy/value model is rejected by the engine.'
+    }
+
+    $sprtCompareScript = Join-Path $repositoryRoot 'tools/stability/sprt_compare.ps1'
+    $sprtOpeningPath = Join-Path $jsonOptionsDirectory 'sprt-opening.txt'
+    [System.IO.File]::WriteAllText(
+        $sprtOpeningPath, "sprt-smoke | e2e4`n", [System.Text.UTF8Encoding]::new($false))
+    $sprtOutputDirectory = Join-Path $outputDirectory 'sprt-json-options'
+    $sprtCompareOutput = @(& $PowerShellExecutable -NoProfile -ExecutionPolicy Bypass `
+        -File $sprtCompareScript `
+        -CandidatePath $EnginePath -BaselinePath $EnginePath -ReplayPath $replayPath `
+        -OpeningFile $sprtOpeningPath -Nodes 1 -Games 1 -MinGames 2 -MaxGames 2 `
+        -MaxPlies 2 -Elo0 0 -Elo1 10 -Threads 1 -Hash 16 `
+        -CandidateOptionsJsonPath $koiOptionsJsonPath `
+        -BaselineOptionsJsonPath $opponentOptionsJsonPath `
+        -OutputDirectory $sprtOutputDirectory -Label 'options-smoke' 2>&1)
+    $sprtCompareExitCode = $LASTEXITCODE
+    if ($sprtCompareExitCode -ne 2) {
+        throw "A one-opening SPRT smoke must be inconclusive (exit 2), got ${sprtCompareExitCode}: $($sprtCompareOutput -join ' | ')"
+    }
+    $sprtRoot = Get-ChildItem -LiteralPath $sprtOutputDirectory -Directory | Select-Object -First 1
+    if ($null -eq $sprtRoot -or
+        -not (Test-Path -LiteralPath (Join-Path $sprtRoot.FullName 'candidate-options.json')) -or
+        -not (Test-Path -LiteralPath (Join-Path $sprtRoot.FullName 'baseline-options.json'))) {
+        throw 'SPRT comparison must preserve candidate and baseline option snapshots.'
+    }
+    $sprtReports = @(Get-ChildItem -LiteralPath $sprtRoot.FullName -Filter '*.json' -File -Recurse |
+        Where-Object { $_.Directory.Name -in @('white', 'black') })
+    if ($sprtReports.Count -ne 2) {
+        throw 'SPRT comparison must emit one match report for each color.'
+    }
+    foreach ($sprtReportFile in $sprtReports) {
+        $sprtReport = Get-Content -LiteralPath $sprtReportFile.FullName -Raw | ConvertFrom-Json
+        $candidateEngine = @($sprtReport.engines | Where-Object { $_.label -eq 'Koi' })[0]
+        $baselineEngine = @($sprtReport.engines | Where-Object { $_.label -eq 'Opponent' })[0]
+        if ($candidateEngine.options -notcontains 'setoption name MCTSSelfPlay value true' -or
+            $candidateEngine.options -notcontains 'setoption name RandomSeed value 42' -or
+            $baselineEngine.options -notcontains 'setoption name SearchAlgorithm value AlphaBeta' -or
+            $baselineEngine.options -notcontains 'setoption name MCTSSelfPlay value false') {
+            throw 'SPRT color runs must apply and record the candidate/baseline UCI option snapshots.'
+        }
     }
 
     $nnueDirectory = Join-Path $outputDirectory 'nnue-attestation'

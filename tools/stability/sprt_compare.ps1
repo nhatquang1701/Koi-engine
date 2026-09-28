@@ -15,7 +15,11 @@ param(
     [int]$Threads = 1,
     [int]$Hash = 64,
     [string]$OutputDirectory = 'artifacts/matches/sprt-compare',
-    [string]$Label = 'compare'
+    [string]$Label = 'compare',
+    [string]$CandidateOptionsJsonPath = '',
+    [string]$BaselineOptionsJsonPath = '',
+    [ValidateRange(1, 512)]
+    [int]$MaxPlies = 512
 )
 
 $binarySuffix = if ($env:OS -eq 'Windows_NT') { '.exe' } else { '' }
@@ -53,12 +57,31 @@ Assert-FileExists $CandidatePath 'candidate engine'
 Assert-FileExists $BaselinePath 'baseline engine'
 Assert-FileExists $ReplayPath 'replay tool'
 Assert-FileExists $OpeningFile 'opening file'
+if (-not [string]::IsNullOrWhiteSpace($CandidateOptionsJsonPath)) {
+    Assert-FileExists $CandidateOptionsJsonPath 'candidate UCI options JSON'
+}
+if (-not [string]::IsNullOrWhiteSpace($BaselineOptionsJsonPath)) {
+    Assert-FileExists $BaselineOptionsJsonPath 'baseline UCI options JSON'
+}
 
 $matchScript = Join-Path $PSScriptRoot 'uci_match.ps1'
 Assert-FileExists $matchScript 'match harness'
 
-$root = Join-Path $OutputDirectory ("{0}-{1}" -f $Label, (Get-Date -Format 'yyyyMMdd-HHmmss'))
+$root = [System.IO.Path]::GetFullPath(
+    (Join-Path $OutputDirectory ("{0}-{1}" -f $Label, (Get-Date -Format 'yyyyMMdd-HHmmss'))))
 New-Item -ItemType Directory -Path $root -Force | Out-Null
+$candidateOptionsCopy = ''
+$baselineOptionsCopy = ''
+if (-not [string]::IsNullOrWhiteSpace($CandidateOptionsJsonPath)) {
+    $candidateOptionsCopy = Join-Path $root 'candidate-options.json'
+    Copy-Item -LiteralPath (Resolve-Path -LiteralPath $CandidateOptionsJsonPath).Path `
+        -Destination $candidateOptionsCopy
+}
+if (-not [string]::IsNullOrWhiteSpace($BaselineOptionsJsonPath)) {
+    $baselineOptionsCopy = Join-Path $root 'baseline-options.json'
+    Copy-Item -LiteralPath (Resolve-Path -LiteralPath $BaselineOptionsJsonPath).Path `
+        -Destination $baselineOptionsCopy
+}
 
 function Start-ColorRun([string]$Color) {
     $colorDirectory = Join-Path $root $Color
@@ -76,6 +99,7 @@ function Start-ColorRun([string]$Color) {
         '-KoiRandomSeed', '0',
         '-KoiOwnBook', 'false',
         '-OpponentOwnBook', 'false',
+        '-MaxPlies', "$MaxPlies",
         '-Games', "$Games",
         '-Sprt', '-SprtElo0', "$Elo0", '-SprtElo1', "$Elo1",
         '-SprtMinGames', "$MinGames", '-SprtMaxGames', "$MaxGames",
@@ -86,6 +110,12 @@ function Start-ColorRun([string]$Color) {
         $arguments += @('-TimeControl', (& $quote $TimeControl))
     } else {
         $arguments += @('-Nodes', "$Nodes")
+    }
+    if (-not [string]::IsNullOrWhiteSpace($candidateOptionsCopy)) {
+        $arguments += @('-KoiOptionsJsonPath', (& $quote $candidateOptionsCopy))
+    }
+    if (-not [string]::IsNullOrWhiteSpace($baselineOptionsCopy)) {
+        $arguments += @('-OpponentOptionsJsonPath', (& $quote $baselineOptionsCopy))
     }
     $logBase = Join-Path $root $Color
     return Start-Process pwsh -ArgumentList $arguments -PassThru -WindowStyle Hidden `
