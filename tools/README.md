@@ -656,6 +656,13 @@ binary can run both backends. Keep `MCTSSelfPlay=false` during matches so root
 noise is disabled; the candidate model hash and engine hashes are retained in
 the match reports.
 
+Long SPRT comparisons use compact search-info capture to keep memory bounded.
+Each move still records its final evaluation and semantic `info string`
+diagnostics, including book and MCTS fallback messages, but omits the full
+per-depth info stream. Reports mark this with
+`configuration.compact_search_info=true`. Direct `uci_match.ps1` runs retain
+full search info by default; pass `-CompactSearchInfo` for longer local matches.
+
 ```powershell
 $engine = (Resolve-Path .\build\release\koi-engine.exe).Path
 $replay = (Resolve-Path .\build\release\koi-replay.exe).Path

@@ -18,6 +18,12 @@ std::string lower(std::string value) {
 }
 
 std::vector<std::string> moves_for(std::string_view name) {
+    if (name.contains("info-chatter") && name.contains("koi")) {
+        return {"e2e4"};
+    }
+    if (name.contains("info-chatter") && name.contains("opponent")) {
+        return {"e7e5"};
+    }
     if (name.contains("mate-white")) {
         // Scholar's mate: 1.e4 e5 2.Bc4 Nc6 3.Qh5 Nf6 4.Qxf7#.
         return {"e2e4", "f1c4", "d1h5", "h5f7"};
@@ -105,6 +111,17 @@ int main(int argument_count, char* arguments[]) {
                 }
             }
             const std::size_t index = std::min(go_count, active_moves.size() - 1);
+            if (name.contains("mcts-fallback")) {
+                std::cout << "info string MCTS unavailable: fixture fallback\n";
+            }
+            if (name.contains("info-chatter")) {
+                for (std::size_t depth = 1; depth <= 128; ++depth) {
+                    std::cout << "info depth " << depth << " seldepth " << depth
+                              << " score cp " << depth << " nodes " << depth * 100
+                              << " nps " << depth * 1000 << " time " << depth
+                              << " pv " << active_moves[index] << '\n';
+                }
+            }
             if (name.contains("book-koi")) {
                 std::cout << "info string book move " << active_moves[index] << " depth 1\n";
             }

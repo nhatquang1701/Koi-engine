@@ -43,7 +43,8 @@ function Invoke-ScriptedMatch([string]$KoiPath, [string]$OpponentPath, [string]$
                                [string]$PackageManifestPath = '', [string]$PackageArchivePath = '',
                                 [switch]$Sprt, [int]$SprtMinGames = 20, [int]$SprtMaxGames = 2000,
                                 [double]$SprtElo1 = 5.0,
-                                [string]$KoiOptionsJsonPath = '', [string]$OpponentOptionsJsonPath = '') {
+                                [string]$KoiOptionsJsonPath = '', [string]$OpponentOptionsJsonPath = '',
+                                [switch]$CompactSearchInfo) {
     $optionalArguments = @()
     if (-not [string]::IsNullOrWhiteSpace($OpeningFile)) {
         $optionalArguments += @('-OpeningFile', $OpeningFile)
@@ -69,6 +70,9 @@ function Invoke-ScriptedMatch([string]$KoiPath, [string]$OpponentPath, [string]$
     }
     if (-not [string]::IsNullOrWhiteSpace($OpponentOptionsJsonPath)) {
         $optionalArguments += @('-OpponentOptionsJsonPath', $OpponentOptionsJsonPath)
+    }
+    if ($CompactSearchInfo) {
+        $optionalArguments += '-CompactSearchInfo'
     }
     $output = & $PowerShellExecutable -NoProfile -ExecutionPolicy Bypass -File $matchScript `
         -KoiPath $KoiPath -OpponentPath $OpponentPath -ReplayPath $replayPath `
@@ -224,6 +228,50 @@ try {
     if ($firstPly.evaluation -eq $null) {
         throw 'UCI match JSON must record the final per-move evaluation.'
     }
+
+    $chatterDirectory = Join-Path $outputDirectory 'compact-search-info'
+    New-Item -ItemType Directory -Path $chatterDirectory -Force | Out-Null
+    $chatterKoi = New-ScriptedUciEngine -FixturePath $fixturePath -Directory $chatterDirectory 'info-chatter-koi'
+    $chatterOpponent = New-ScriptedUciEngine -FixturePath $fixturePath -Directory $chatterDirectory 'info-chatter-opponent'
+    $fullInfoMatch = Invoke-ScriptedMatch $chatterKoi.path $chatterOpponent.path `
+        (Join-Path $chatterDirectory 'full') 1 2
+    $compactInfoMatch = Invoke-ScriptedMatch $chatterKoi.path $chatterOpponent.path `
+        (Join-Path $chatterDirectory 'compact') 1 2 -CompactSearchInfo
+    $fullInfoPly = $fullInfoMatch.report.games[0].moves[0]
+    $compactInfoPly = $compactInfoMatch.report.games[0].moves[0]
+    if (@($fullInfoPly.all_info_lines).Count -ne 128 -or
+        @($fullInfoPly.infos).Count -ne 128 -or
+        $fullInfoPly.evaluation.depth -ne 128) {
+        throw 'Full UCI match reports must preserve every search info line and the final evaluation.'
+    }
+    if ($compactInfoMatch.report.configuration.compact_search_info -ne $true -or
+        @($compactInfoPly.all_info_lines).Count -ne 0 -or
+        @($compactInfoPly.infos).Count -ne 1 -or
+        $compactInfoPly.evaluation.depth -ne 128 -or
+        [string]$compactInfoPly.evaluation.pv -ne 'e2e4') {
+        throw 'Compact UCI match reports must retain the final evaluation without retaining the full info stream.'
+    }
+
+    $fallbackDirectory = Join-Path $chatterDirectory 'mcts-fallback'
+    New-Item -ItemType Directory -Path $fallbackDirectory -Force | Out-Null
+    $fallbackKoi = New-ScriptedUciEngine -FixturePath $fixturePath -Directory $fallbackDirectory 'info-chatter-mcts-fallback-koi'
+    $fixtureModelPath = Join-Path $fallbackDirectory 'fixture.kpv'
+    [System.IO.File]::WriteAllText($fixtureModelPath, 'fixture policy/value model')
+    $fallbackOptionsPath = Join-Path $fallbackDirectory 'mcts-options.json'
+    @{ SearchAlgorithm = 'MCTS'; PolicyValueFile = $fixtureModelPath; MCTSSelfPlay = 'false' } |
+        ConvertTo-Json -Compress | Set-Content -LiteralPath $fallbackOptionsPath -Encoding UTF8
+    $mctsFallbackRejected = $false
+    try {
+        [void](Invoke-ScriptedMatch $fallbackKoi.path $chatterOpponent.path `
+            (Join-Path $fallbackDirectory 'output') 1 2 `
+            -KoiOptionsJsonPath $fallbackOptionsPath -CompactSearchInfo)
+    } catch {
+        $mctsFallbackRejected = $_.Exception.Message -match 'fell back to AlphaBeta'
+    }
+    if (-not $mctsFallbackRejected) {
+        throw 'Compact reports must still reject an MCTS search that falls back to AlphaBeta.'
+    }
+
     $pgn = Get-Content -LiteralPath $pgnFiles[0].FullName -Raw
     if ($pgn -notmatch '\[Event "Koi Engine UCI match"\]' -or
         $pgn -notmatch '\[Result "\*"\]' -or
@@ -324,7 +372,9 @@ try {
         if ($candidateEngine.options -notcontains 'setoption name MCTSSelfPlay value true' -or
             $candidateEngine.options -notcontains 'setoption name RandomSeed value 42' -or
             $baselineEngine.options -notcontains 'setoption name SearchAlgorithm value AlphaBeta' -or
-            $baselineEngine.options -notcontains 'setoption name MCTSSelfPlay value false') {
+            $baselineEngine.options -notcontains 'setoption name MCTSSelfPlay value false' -or
+            $sprtReport.configuration.compact_search_info -ne $true -or
+            @($sprtReport.games[0].moves | Where-Object { @($_.infos).Count -gt 1 }).Count -gt 0) {
             throw 'SPRT color runs must apply and record the candidate/baseline UCI option snapshots.'
         }
     }

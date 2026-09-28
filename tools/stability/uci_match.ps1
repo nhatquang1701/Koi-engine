@@ -17,6 +17,11 @@ param(
 
     [string]$OutputDirectory = '',
 
+    # Long SPRT runs can emit hundreds of info lines per search. Compact mode
+    # records only the final parsed evaluation plus semantic info-string
+    # diagnostics in each move record.
+    [switch]$CompactSearchInfo,
+
     # Optional release-package provenance. Supply both the extracted
     # package.json and the exact archive from which it came.
     [string]$PackageManifestPath = '',
@@ -617,7 +622,9 @@ function Read-UciLine($Engine, [string]$Description, [int]$WaitMilliseconds = $T
     if ($null -eq $line) {
         throw "${Engine.Label} closed stdout while waiting for ${Description}."
     }
-    $Engine.Output.Add($line)
+    if ($line -match '^info string(?:\s|$)') {
+        $Engine.Output.Add($line)
+    }
     return $line
 }
 
@@ -855,6 +862,7 @@ function Search-UciEngine($Engine, $Position, $Moves, $Clock, [string]$Side) {
 
     $infos = [System.Collections.Generic.List[object]]::new()
     $allInfoLines = [System.Collections.Generic.List[string]]::new()
+    $lastInfo = $null
     $bestMove = $null
     $bestMoveLine = $null
     $bookUsed = $false
@@ -884,8 +892,16 @@ function Search-UciEngine($Engine, $Position, $Moves, $Clock, [string]$Side) {
         }
         $info = Parse-InfoLine $line
         if ($null -ne $info) {
-            $infos.Add($info)
-            $allInfoLines.Add($line)
+            if ($CompactSearchInfo) {
+                if ($line -match '^info string(?:\s|$)') {
+                    $allInfoLines.Add($line)
+                } else {
+                    $lastInfo = $info
+                }
+            } else {
+                $infos.Add($info)
+                $allInfoLines.Add($line)
+            }
             continue
         }
         $bestMatch = [regex]::Match($line, '^bestmove\s+(\S+)')
@@ -902,8 +918,7 @@ function Search-UciEngine($Engine, $Position, $Moves, $Clock, [string]$Side) {
     }
     $started.Stop()
 
-    $lastInfo = $null
-    if ($infos.Count -gt 0) {
+    if (-not $CompactSearchInfo -and $infos.Count -gt 0) {
         $lastInfo = $infos[$infos.Count - 1]
     }
     return [pscustomobject]@{
@@ -911,7 +926,11 @@ function Search-UciEngine($Engine, $Position, $Moves, $Clock, [string]$Side) {
         go_command = $goCommand
         elapsed_ms = [int64]$started.ElapsedMilliseconds
         evaluation = $lastInfo
-        infos = @($infos)
+        infos = if ($CompactSearchInfo) {
+            if ($null -eq $lastInfo) { @() } else { @($lastInfo) }
+        } else {
+            @($infos)
+        }
         all_info_lines = @($allInfoLines)
         bestmove_line = $bestMoveLine
         book_used = $bookUsed
@@ -1519,6 +1538,7 @@ $report = [ordered]@{
         koi_policy_value_sha256 = $KoiPolicyValueAsset.sha256
         opponent_policy_value_file = $OpponentPolicyValueAsset.path
         opponent_policy_value_sha256 = $OpponentPolicyValueAsset.sha256
+        compact_search_info = [bool]$CompactSearchInfo
         batch_id = $BatchId
         run_label = $RunLabel
         koi_evaluator_mode = $reportedKoiEvaluatorMode

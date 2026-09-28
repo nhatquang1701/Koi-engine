@@ -104,6 +104,7 @@ function Start-ColorRun([string]$Color) {
         '-Sprt', '-SprtElo0', "$Elo0", '-SprtElo1', "$Elo1",
         '-SprtMinGames', "$MinGames", '-SprtMaxGames', "$MaxGames",
         '-RunLabel', 'after', '-KoiColor', $Color,
+        '-CompactSearchInfo',
         '-OutputDirectory', (& $quote $colorDirectory)
     )
     if ($TimeControl -ne '') {
