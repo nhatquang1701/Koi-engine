@@ -1,10 +1,11 @@
 """Generate local Koi alpha-beta or MCTS self-play data for policy/value training.
 
 The JSONL records use the versioned policy/value v1 contract. AlphaBeta policy
-targets are one-hot principal moves; MCTS targets are normalized root visits
-and its moves are sampled from those visits. Game outcomes supply side-to-move
-labels. Datasets and manifests stay under ``artifacts/training/`` and must not
-be committed or packaged.
+targets are one-hot principal moves; MCTS targets are normalized root visits.
+MCTS samples moves from root visits for the configured initial game plies (30
+by default), then selects the highest-visit move. Game outcomes supply
+side-to-move labels. Datasets and manifests stay under ``artifacts/training/``
+and must not be committed or packaged.
 """
 
 from __future__ import annotations
@@ -238,14 +239,17 @@ def generate_records(
     policy_value_file: str | Path | None = None,
     policy_value_sha256: str | None = None,
     temperature: float = 1.0,
+    temperature_plies: int = 30,
     stats: GenerationStats | None = None,
 ) -> Iterator[dict[str, Any]]:
     """Play bounded Koi self-play games and emit validated v1 records.
 
     AlphaBeta uses the PV's first move as a one-hot distillation target; MCTS
     uses normalized root visits as soft policy targets and samples game moves
-    from that distribution. Completed game results supply side-to-move outcome
-    labels. Seeded opening and move sampling keeps runs reproducible.
+    from that distribution for the first ``temperature_plies`` game plies,
+    then selects the highest-visit move. Opening moves count toward this
+    cutoff. Completed game results supply side-to-move outcome labels. Seeded
+    opening and move sampling keeps runs reproducible.
     """
     if games < 1 or nodes < 1 or max_plies < 1:
         raise SelfPlayError("games, nodes, and max_plies must be positive")
@@ -268,6 +272,12 @@ def generate_records(
             raise SelfPlayError("MCTS self-play requires the policy/value model SHA-256")
         if not math.isfinite(temperature) or temperature < 0.0:
             raise SelfPlayError("policy temperature must be finite and non-negative")
+        if (
+            isinstance(temperature_plies, bool)
+            or not isinstance(temperature_plies, int)
+            or temperature_plies < 0
+        ):
+            raise SelfPlayError("temperature_plies must be a non-negative integer")
         try:
             engine.configure({
                 "OwnBook": False,
@@ -310,6 +320,9 @@ def generate_records(
             seed % 2_147_483_648 if search_algorithm == "MCTS" else None
         ),
         "policy_temperature": temperature if search_algorithm == "MCTS" else None,
+        "policy_temperature_plies": (
+            temperature_plies if search_algorithm == "MCTS" else None
+        ),
         "engine_sha256": engine_sha256,
         "opening_corpus_sha256": opening_corpus_sha256,
         "source_revision": source_revision,
@@ -366,12 +379,18 @@ def generate_records(
                 ) from error
             visit_counts: list[int] | None = None
             sampled_move: str | None = None
+            sampling_temperature: float | None = None
             if search_algorithm == "MCTS":
                 visit_counts, policy_targets = _mcts_visit_targets(
                     actions, analysis, game_number=game_number,
                     ply=len(board.move_stack),
                 )
-                best_action_index = _sample_visit_index(visit_counts, temperature, move_rng)
+                sampling_temperature = (
+                    temperature if len(board.move_stack) < temperature_plies else 0.0
+                )
+                best_action_index = _sample_visit_index(
+                    visit_counts, sampling_temperature, move_rng
+                )
                 best_move = chess.Move.from_uci(actions[best_action_index]["uci"])
                 sampled_move = best_move.uci()
                 policy_target_source = "mcts-root-visits"
@@ -432,6 +451,7 @@ def generate_records(
                 "score_value_target": score_value_target,
                 "value_target_source": value_target_source,
                 "sampled_move": sampled_move,
+                "sampling_temperature": sampling_temperature,
                 "move_sampling_seed": seed + game_number if search_algorithm == "MCTS" else None,
             }
             if visit_counts is not None:
@@ -464,6 +484,7 @@ def generate_records(
             score_value_target = position.pop("score_value_target")
             value_target_source = position.pop("value_target_source")
             sampled_move = position.pop("sampled_move")
+            sampling_temperature = position.pop("sampling_temperature")
             move_sampling_seed = position.pop("move_sampling_seed")
             record = {
                 "schema": policy_value_dataset.SCHEMA,
@@ -488,6 +509,8 @@ def generate_records(
                         "policy_target_source": policy_target_source,
                         "value_target_source": value_target_source,
                         **({"sampled_move": sampled_move} if sampled_move is not None else {}),
+                        **({"sampling_temperature": sampling_temperature}
+                           if sampling_temperature is not None else {}),
                         **({"move_sampling_seed": move_sampling_seed}
                            if move_sampling_seed is not None else {}),
                     },
@@ -634,7 +657,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--policy-value-file", type=Path, help="versioned .kpv model required by MCTS")
     parser.add_argument(
         "--temperature", type=float, default=1.0,
-        help="MCTS visit-sampling temperature; 0 selects the highest-visit move",
+        help=(
+            "MCTS visit-sampling temperature during the initial plies; "
+            "0 selects the highest-visit move"
+        ),
+    )
+    parser.add_argument(
+        "--temperature-plies", type=int, default=30,
+        help=(
+            "game plies to sample from visits before switching to the "
+            "highest-visit move (default: 30)"
+        ),
     )
     parser.add_argument(
         "--cpu-variant", choices=("generic", "avx2", "avx512"), default="generic",
@@ -653,6 +686,8 @@ def main(argv: list[str] | None = None) -> int:
             raise SelfPlayError("seed must be non-negative")
         if not math.isfinite(args.temperature) or args.temperature < 0.0:
             raise SelfPlayError("temperature must be finite and non-negative")
+        if args.temperature_plies < 0:
+            raise SelfPlayError("temperature-plies must be non-negative")
         if args.algorithm == "MCTS" and args.policy_value_file is None:
             raise SelfPlayError("MCTS self-play requires --policy-value-file")
         if args.algorithm == "AlphaBeta" and args.policy_value_file is not None:
@@ -736,6 +771,9 @@ def main(argv: list[str] | None = None) -> int:
                     "policy_temperature": (
                         args.temperature if args.algorithm == "MCTS" else None
                     ),
+                    "policy_temperature_plies": (
+                        args.temperature_plies if args.algorithm == "MCTS" else None
+                    ),
                     "value_target_transform": (
                         "game result" if args.algorithm == "MCTS" else
                         "tanh(cp/400) when an unbounded score is present; otherwise game result"
@@ -764,6 +802,7 @@ def main(argv: list[str] | None = None) -> int:
                     policy_value_file=policy_value_file,
                     policy_value_sha256=policy_value_sha256,
                     temperature=args.temperature,
+                    temperature_plies=args.temperature_plies,
                     stats=stats,
                 )
                 manifest_fields.update({

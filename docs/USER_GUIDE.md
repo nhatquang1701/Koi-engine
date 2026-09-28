@@ -337,6 +337,30 @@ The version 5 architecture ships with loader, inference, incremental, dataset, a
 trainer support only: no version 5 network has been trained or strength-validated, so
 every probe number above still describes version 4 networks.
 
+### Generating policy/value self-play data
+
+The policy/value generator records AlphaBeta distillation data by default. To
+generate MCTS self-play data, provide a versioned `.kpv` model and select the
+MCTS algorithm. The first 30 game plies sample from root visits at temperature
+1.0 by default; after that, the generator always selects the highest-visit
+move. Opening-prefix moves count toward the cutoff. Set `--temperature-plies 0`
+to select the highest-visit move throughout, or choose another non-negative
+cutoff. Each record stores the effective sampling temperature, and the
+manifest stores the configured temperature and cutoff.
+
+```powershell
+python .\tools\measurement\policy_value_selfplay.py `
+  --engine .\build\release\koi-engine.exe `
+  --algorithm MCTS `
+  --policy-value-file .\artifacts\training\policy-value.kpv `
+  --temperature 1.0 --temperature-plies 30
+```
+
+Generated JSONL data and manifests belong under the ignored
+`artifacts/training/` directory. Keep training, validation, and match corpora
+separate; the checked-in default opening corpus is for training only. These
+datasets and training runs are not strength evidence.
+
 ### Training a network with the NNUE Studio
 
 `Koi NNUE Studio.cmd` in the repository root opens a small tkinter GUI (Data,

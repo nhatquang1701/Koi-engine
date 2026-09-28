@@ -362,6 +362,86 @@ class PolicyValueSelfPlayTests(unittest.TestCase):
                 policy_value_sha256="f" * 64,
             ))
 
+    def test_mcts_move_sampling_switches_to_argmax_after_temperature_plies(self):
+        board = chess.Board()
+        board.push(Move.from_uci("e2e4"))
+        native_moves = [move.uci() for move in reversed(list(board.legal_moves))]
+        fake = MctsFakeEngine({move: 1 for move in native_moves})
+        records = list(policy_value_selfplay.generate_records(
+            fake,
+            [policy_value_selfplay.Opening("late-temperature", ("e2e4",))],
+            games=1,
+            nodes=100,
+            seed=29,
+            max_plies=2,
+            engine_sha256="a" * 64,
+            opening_corpus_sha256="b" * 64,
+            source_revision="c" * 40,
+            engine_version="test-build",
+            search_algorithm="MCTS",
+            policy_value_file="model.kpv",
+            policy_value_sha256="f" * 64,
+            temperature=1.0,
+            temperature_plies=1,
+        ))
+
+        record = records[0]
+        options = record["search_provenance"]["options"]
+        self.assertEqual(record["ply"], 1)
+        self.assertEqual(options["sampling_temperature"], 0.0)
+        self.assertEqual(options["sampled_move"], native_moves[0])
+
+    def test_mcts_move_sampling_records_temperature_before_cutoff(self):
+        board = chess.Board()
+        native_moves = [move.uci() for move in reversed(list(board.legal_moves))]
+        visits = {move: 0 for move in native_moves}
+        visits[native_moves[0]] = 8
+        visits[native_moves[1]] = 2
+        records = list(policy_value_selfplay.generate_records(
+            MctsFakeEngine(visits),
+            [policy_value_selfplay.Opening("early-temperature", ())],
+            games=1,
+            nodes=100,
+            seed=31,
+            max_plies=1,
+            engine_sha256="a" * 64,
+            opening_corpus_sha256="b" * 64,
+            source_revision="c" * 40,
+            engine_version="test-build",
+            search_algorithm="MCTS",
+            policy_value_file="model.kpv",
+            policy_value_sha256="f" * 64,
+            temperature=1.0,
+            temperature_plies=1,
+        ))
+
+        options = records[0]["search_provenance"]["options"]
+        self.assertEqual(options["sampling_temperature"], 1.0)
+        self.assertEqual(options["policy_temperature_plies"], 1)
+
+    def test_mcts_temperature_plies_must_be_non_negative_integer(self):
+        fake = MctsFakeEngine({"e2e4": 1})
+        with self.assertRaisesRegex(
+            policy_value_selfplay.SelfPlayError,
+            "temperature_plies must be a non-negative integer",
+        ):
+            list(policy_value_selfplay.generate_records(
+                fake,
+                [policy_value_selfplay.Opening("invalid-temperature", ())],
+                games=1,
+                nodes=100,
+                seed=37,
+                max_plies=1,
+                engine_sha256="a" * 64,
+                opening_corpus_sha256="b" * 64,
+                source_revision="c" * 40,
+                engine_version="test-build",
+                search_algorithm="MCTS",
+                policy_value_file="model.kpv",
+                policy_value_sha256="f" * 64,
+                temperature_plies=-1,
+            ))
+
     def test_dataset_and_manifest_are_written_with_stable_hashes(self):
         fake = FakeEngine(["f2f3", "e7e5", "g2g4", "d8h4"])
         stats = policy_value_selfplay.GenerationStats()
