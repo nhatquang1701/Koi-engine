@@ -51,6 +51,90 @@ using koi::test::require;
     };
 }
 
+[[nodiscard]] std::expected<koi::PolicyValueMctsEvaluation, std::string>
+side_relative_multi_ply_fixture(
+    const koi::GameState& state, const koi::MoveMetadataList& legal,
+    const std::span<float> priors, const koi::Move preferred_black_reply) {
+    if (legal.empty() || priors.size() != legal.size()) {
+        return std::unexpected("invalid multi-ply MCTS evaluator inputs");
+    }
+    if (legal.size() == 1) {
+        priors[0] = 1.0F;
+        return koi::PolicyValueMctsEvaluation{
+            0.0F, {1.0F / 3.0F, 1.0F / 3.0F, 1.0F / 3.0F}};
+    }
+
+    if (state.side_to_move() == koi::Color::black) {
+        std::size_t preferred_index = legal.size();
+        const float remainder = 0.01F / static_cast<float>(legal.size() - 1);
+        for (std::size_t index = 0; index < legal.size(); ++index) {
+            priors[index] = remainder;
+            if (legal[index].move == preferred_black_reply) {
+                preferred_index = index;
+            }
+        }
+        if (preferred_index == legal.size()) {
+            return std::unexpected("the black reply is absent from legal MCTS actions");
+        }
+        priors[preferred_index] = 0.99F;
+        return koi::PolicyValueMctsEvaluation{0.6F, {0.7F, 0.2F, 0.1F}};
+    }
+
+    std::fill(priors.begin(), priors.end(), 1.0F / static_cast<float>(legal.size()));
+    return koi::PolicyValueMctsEvaluation{0.7F, {0.8F, 0.1F, 0.1F}};
+}
+
+[[nodiscard]] koi::MoveMetadataList one_legal_root_move(
+    koi::GameState& root, const std::string_view uci) {
+    const auto move = koi::Move::parse_uci(uci);
+    require(move.has_value() && root.is_legal(*move),
+            "the restricted MCTS root move must be legal");
+    const auto metadata = root.describe_move(*move);
+    require(metadata.has_value(), "the restricted MCTS root metadata must exist");
+    koi::MoveMetadataList result;
+    require(result.push_back(*metadata), "the restricted MCTS move must fit fixed storage");
+    return result;
+}
+
+void require_one_ply_backup_result(const koi::PolicyValueMctsSnapshot& snapshot) {
+    require(snapshot.root_moves.size() == 1 && snapshot.root_moves[0].visits == 1,
+            "the leaf must contribute one visit to the restricted root edge");
+    const auto& move = snapshot.root_moves[0];
+    const std::string failure =
+        "one edge must flip value and WDL from the black leaf to the white root; got value=" +
+        std::to_string(move.value) + ", WDL=" + std::to_string(move.wdl[0]) + "/" +
+        std::to_string(move.wdl[1]) + "/" + std::to_string(move.wdl[2]);
+    require(std::abs(move.value + 0.6F) < 1e-4F &&
+                std::abs(move.wdl[0] - 0.1F) < 1e-4F &&
+                std::abs(move.wdl[1] - 0.2F) < 1e-4F &&
+                std::abs(move.wdl[2] - 0.7F) < 1e-4F,
+            failure);
+}
+
+void require_two_ply_backup_result(const koi::PolicyValueMctsSnapshot& snapshot) {
+    require(snapshot.root_moves.size() == 1 && snapshot.root_moves[0].visits == 1,
+            "the two-ply leaf must contribute one visit to the restricted root edge");
+    const auto& move = snapshot.root_moves[0];
+    require(std::abs(move.value - 0.7F) < 1e-4F &&
+                std::abs(move.wdl[0] - 0.8F) < 1e-4F &&
+                std::abs(move.wdl[1] - 0.1F) < 1e-4F &&
+                std::abs(move.wdl[2] - 0.1F) < 1e-4F,
+            "two edge flips must preserve the white leaf value and WDL");
+}
+
+void require_batched_multi_ply_backup_result(
+    const koi::PolicyValueMctsSnapshot& after_one,
+    const koi::PolicyValueMctsSnapshot& after_two) {
+    require_one_ply_backup_result(after_one);
+    require(after_two.root_moves.size() == 1 && after_two.root_moves[0].visits == 2,
+            "the second leaf must extend the same root edge through a second ply");
+    require(std::abs(after_two.root_moves[0].value - 0.05F) < 1e-4F &&
+                std::abs(after_two.root_moves[0].wdl[0] - 0.45F) < 1e-4F &&
+                std::abs(after_two.root_moves[0].wdl[1] - 0.15F) < 1e-4F &&
+                std::abs(after_two.root_moves[0].wdl[2] - 0.4F) < 1e-4F,
+            "two edge flips must preserve the white leaf value and average root-relative WDL");
+}
+
 void test_mcts_visit_limit_depth_cap_and_deterministic_root_choice() {
     koi::GameState root = koi::GameState::startpos();
     const auto preferred = koi::Move::parse_uci("e2e4");
@@ -218,6 +302,97 @@ void test_mcts_checkmate_leaf_backs_up_to_the_winning_side() {
     require(result.root_moves[0].value > 0.99F && result.value > 0.0F &&
                 result.wdl[0] > result.wdl[2],
             "a checked node with no legal evasions must back up a win for the mover");
+}
+
+void test_mcts_multi_ply_value_and_wdl_perspective_across_serial_edges() {
+    koi::GameState root = koi::GameState::startpos();
+    const koi::MoveMetadataList root_moves = one_legal_root_move(root, "e2e4");
+    const auto black_reply = koi::Move::parse_uci("e7e5");
+    require(black_reply.has_value(), "the black MCTS reply fixture must parse");
+    const auto evaluator = [reply = *black_reply](
+                               const koi::GameState& state,
+                               const koi::MoveMetadataList& legal,
+                               const std::span<float> priors) {
+        return side_relative_multi_ply_fixture(state, legal, priors, reply);
+    };
+
+    koi::PolicyValueMctsConfig one_ply_config;
+    one_ply_config.max_depth = 1;
+    one_ply_config.max_tree_nodes = 32;
+    one_ply_config.max_tree_edges = 256;
+    koi::PolicyValueMctsTree one_ply_tree(root, root_moves, one_ply_config, evaluator);
+    require(one_ply_tree.initialize().has_value(),
+            "the one-ply serial MCTS tree must initialize");
+    std::atomic_bool stop_requested = false;
+    const auto one_ply = one_ply_tree.simulate(stop_requested);
+    require(one_ply.has_value() && one_ply.value(),
+            "the one-ply serial MCTS visit must complete");
+    require_one_ply_backup_result(one_ply_tree.snapshot(1));
+
+    koi::PolicyValueMctsConfig two_ply_config = one_ply_config;
+    two_ply_config.max_depth = 2;
+    koi::PolicyValueMctsTree two_ply_tree(root, root_moves, two_ply_config, evaluator);
+    require(two_ply_tree.initialize().has_value(),
+            "the two-ply serial MCTS tree must initialize");
+    const auto two_ply = two_ply_tree.simulate(stop_requested);
+    require(two_ply.has_value() && two_ply.value(),
+            "the two-ply serial MCTS visit must complete");
+    require_two_ply_backup_result(two_ply_tree.snapshot(1));
+}
+
+void test_mcts_multi_ply_value_and_wdl_perspective_across_batched_edges() {
+    koi::GameState root = koi::GameState::startpos();
+    const koi::MoveMetadataList root_moves = one_legal_root_move(root, "e2e4");
+    const auto black_reply = koi::Move::parse_uci("e7e5");
+    require(black_reply.has_value(), "the batched black MCTS reply fixture must parse");
+    std::size_t batch_calls = 0;
+    koi::Color evaluated_side = koi::Color::white;
+    std::size_t evaluated_legal_count = 0;
+    const koi::PolicyValueMctsBatchEvaluator batch_evaluator =
+        [reply = *black_reply, &batch_calls, &evaluated_side, &evaluated_legal_count](
+            const std::span<koi::PolicyValueMctsLeafRequest> requests)
+            -> std::expected<void, std::string> {
+        for (koi::PolicyValueMctsLeafRequest& request : requests) {
+            if (request.position == nullptr || request.legal_moves == nullptr) {
+                return std::unexpected("invalid multi-ply MCTS batch request");
+            }
+            ++batch_calls;
+            evaluated_side = request.position->side_to_move();
+            evaluated_legal_count = request.legal_moves->size();
+            auto evaluation = side_relative_multi_ply_fixture(
+                *request.position, *request.legal_moves, request.priors, reply);
+            if (!evaluation.has_value()) {
+                return std::unexpected(evaluation.error());
+            }
+            request.evaluation = *evaluation;
+        }
+        return {};
+    };
+
+    koi::PolicyValueMctsConfig config;
+    config.max_depth = 2;
+    config.max_tree_nodes = 32;
+    config.max_tree_edges = 256;
+    koi::PolicyValueMctsTree tree(
+        root, root_moves, config, uniform_draw_evaluator(), batch_evaluator);
+    require(tree.initialize().has_value(), "the batched multi-ply MCTS tree must initialize");
+    std::atomic_bool stop_requested = false;
+    const auto first = tree.simulate_batch(2, stop_requested);
+    require(first.has_value() && first.value() == 1,
+            "the first batched MCTS visit must complete");
+    const std::string batch_input_failure =
+        "the first batch must evaluate the black-to-move child with its legal replies; got calls=" +
+        std::to_string(batch_calls) + ", side=" +
+        (evaluated_side == koi::Color::black ? "black" : "white") + ", legal=" +
+        std::to_string(evaluated_legal_count);
+    require(batch_calls == 1 && evaluated_side == koi::Color::black &&
+                evaluated_legal_count > 1,
+            batch_input_failure);
+    const auto after_one = tree.snapshot(1);
+    const auto second = tree.simulate_batch(2, stop_requested);
+    require(second.has_value() && second.value() == 1,
+            "the second batched MCTS visit must complete");
+    require_batched_multi_ply_backup_result(after_one, tree.snapshot(1));
 }
 
 void test_mcts_tree_and_edge_capacity_are_bounded() {
@@ -538,11 +713,15 @@ void test_mcts_batch_deadline_aborts_before_running_inference() {
 } // namespace
 
 int main(int argc, char** argv) {
-    const std::array<koi::test::TestCase, 11> tests{{
+    const std::array<koi::test::TestCase, 13> tests{{
         {"MCTS visits, depth and deterministic prior selection",
          test_mcts_visit_limit_depth_cap_and_deterministic_root_choice},
         {"MCTS self-play root noise", test_mcts_self_play_root_noise_is_normalized_and_seeded},
         {"MCTS checkmate WDL backup", test_mcts_checkmate_leaf_backs_up_to_the_winning_side},
+        {"MCTS multi-ply serial value and WDL backup",
+         test_mcts_multi_ply_value_and_wdl_perspective_across_serial_edges},
+        {"MCTS multi-ply batch value and WDL backup",
+         test_mcts_multi_ply_value_and_wdl_perspective_across_batched_edges},
         {"MCTS bounded tree capacity", test_mcts_tree_and_edge_capacity_are_bounded},
         {"MCTS stop and evaluator failure", test_mcts_observes_cancellation_and_propagates_evaluator_errors},
         {"MCTS deadline interruption and recovery",
