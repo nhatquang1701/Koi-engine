@@ -16,6 +16,29 @@ from koi_chess import Move
 
 
 class PolicyValueOpeningGenerationTests(unittest.TestCase):
+    def test_checked_in_v2_corpora_match_the_generation_manifest(self):
+        root = _REPOSITORY_ROOT / "tools/measurement/data"
+        train_path = root / "policy-value-train-v2.txt"
+        validation_path = root / "policy-value-validation-v2.txt"
+        manifest_path = root / "policy-value-openings-v2.manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(manifest["seed"], 20260928)
+        self.assertEqual(manifest["train"]["opening_count"], 64)
+        self.assertEqual(manifest["validation"]["opening_count"], 32)
+        self.assertEqual(
+            manifest["train"]["sha256"],
+            hashlib.sha256(train_path.read_bytes()).hexdigest(),
+        )
+        self.assertEqual(
+            manifest["validation"]["sha256"],
+            hashlib.sha256(validation_path.read_bytes()).hexdigest(),
+        )
+        self.assertEqual(
+            manifest["generator_sha256"],
+            hashlib.sha256(Path(policy_value_openings.__file__).read_bytes()).hexdigest(),
+        )
+
     def test_generation_is_repeatable_legal_and_disjoint_from_heldout_prefixes(self):
         with tempfile.TemporaryDirectory() as directory:
             match_corpus = Path(directory) / "heldout.txt"

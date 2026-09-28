@@ -118,6 +118,8 @@ class PolicyValueSelfPlayTests(unittest.TestCase):
         train_roots = {root_state(opening) for opening in train}
         validation_roots = {root_state(opening) for opening in validation}
         match_states = match_prefix_states([*matches, *strength_matches])
+        self.assertEqual(len(train_roots), len(train))
+        self.assertEqual(len(validation_roots), len(validation))
         self.assertFalse(train_roots & validation_roots)
         self.assertFalse(train_roots & match_states)
         self.assertFalse(validation_roots & match_states)
