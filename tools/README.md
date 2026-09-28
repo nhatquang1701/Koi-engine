@@ -644,6 +644,14 @@ python .\tools\measurement\train_policy_value.py `
   --epochs 10 --batch-size 32 --seed 1
 ```
 
+Fixed-epoch training remains the default. To select and restore the best
+validation checkpoint, add `--early-stopping-patience 3`; optionally set
+`--early-stopping-min-delta 0.001` to require that much improvement in the
+composite validation objective before resetting patience. The metadata sidecar
+records the validation metrics for each evaluated epoch, the best epoch, and
+the actual number of training epochs. This objective is a model-selection
+diagnostic, not an engine-strength result.
+
 The training loss is a development metric. Model adoption still requires
 held-out position validation and equal-time matched play against the current
 alpha-beta engine; it does not promote MCTS or make an Elo claim by itself.

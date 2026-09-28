@@ -143,6 +143,25 @@ class TrainPolicyValueTests(unittest.TestCase):
                 self.trainer.train_policy_value(train_path, validation_path, root / "." / "train.jsonl", root / "meta.json", epochs=1)
             self.assertEqual(train_path.read_bytes(), original)
 
+    def test_rejects_invalid_early_stopping_parameters(self):
+        if self.trainer.torch is None:
+            self.skipTest("PyTorch is not installed")
+        with self.assertRaisesRegex(ValueError, "patience must be positive"):
+            self.trainer.train_policy_value(
+                "unused-train.jsonl", "unused-validation.jsonl", "unused.kpv", "unused.json",
+                epochs=1, early_stopping_patience=0,
+            )
+        with self.assertRaisesRegex(ValueError, "min_delta must be finite and non-negative"):
+            self.trainer.train_policy_value(
+                "unused-train.jsonl", "unused-validation.jsonl", "unused.kpv", "unused.json",
+                epochs=1, early_stopping_patience=1, early_stopping_min_delta=-0.1,
+            )
+        with self.assertRaisesRegex(ValueError, "requires early_stopping_patience"):
+            self.trainer.train_policy_value(
+                "unused-train.jsonl", "unused-validation.jsonl", "unused.kpv", "unused.json",
+                epochs=1, early_stopping_min_delta=0.1,
+            )
+
     def test_missing_torch_has_a_clear_training_error(self):
         with mock.patch.object(self.trainer, "torch", None):
             with self.assertRaisesRegex(RuntimeError, "PyTorch is required to train"):
@@ -172,6 +191,82 @@ else:
             capture_output=True, text=True, check=False,
         )
         self.assertEqual(completed.returncode, 0, completed.stderr)
+
+    def test_cli_accepts_and_forwards_early_stopping_controls(self):
+        arguments = [
+            "--train", "train.jsonl",
+            "--validation", "validation.jsonl",
+            "--output-model", "output.kpv",
+            "--metadata", "metadata.json",
+            "--epochs", "8",
+            "--early-stopping-patience", "2",
+            "--early-stopping-min-delta", "0.01",
+        ]
+        with mock.patch.object(self.trainer, "train_policy_value", return_value={"ok": True}) as train:
+            try:
+                result = self.trainer.main(arguments)
+            except SystemExit as error:
+                result = error.code
+
+        self.assertEqual(result, 0, "the trainer CLI should accept the early-stopping options")
+        self.assertEqual(train.call_args.kwargs["epochs"], 8)
+        self.assertEqual(train.call_args.kwargs["early_stopping_patience"], 2)
+        self.assertEqual(train.call_args.kwargs["early_stopping_min_delta"], 0.01)
+
+    def test_early_stopping_restores_best_validation_checkpoint(self):
+        if self.trainer.torch is None:
+            self.skipTest("PyTorch is not installed")
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            train_path, validation_path = root / "train.jsonl", root / "validation.jsonl"
+            self.write_records(train_path, self.records("train"))
+            self.write_records(validation_path, self.records("validation"))
+            validation_curve = [
+                {"objective": 1.0, "policy_ce": 0.7, "wdl_ce": 0.2, "value_mse": 0.1},
+                {"objective": 0.7, "policy_ce": 0.4, "wdl_ce": 0.2, "value_mse": 0.1},
+                {"objective": 0.65, "policy_ce": 0.35, "wdl_ce": 0.2, "value_mse": 0.1},
+            ]
+            validation_index = 0
+            evaluate = self.trainer._evaluate
+
+            def evaluate_with_curve(model, records, device, value_loss_weight):
+                nonlocal validation_index
+                if records[0]["game_id"].startswith("validation-"):
+                    index = min(validation_index, len(validation_curve) - 1)
+                    validation_index += 1
+                    return dict(validation_curve[index])
+                return evaluate(model, records, device, value_loss_weight)
+
+            best_model = root / "best.kpv"
+            best_metadata = root / "best.json"
+            with mock.patch.object(self.trainer, "_evaluate", side_effect=evaluate_with_curve):
+                try:
+                    metrics = self.trainer.train_policy_value(
+                        train_path, validation_path, best_model, best_metadata,
+                        epochs=5, batch_size=2, seed=17,
+                        early_stopping_patience=1, early_stopping_min_delta=0.1,
+                    )
+                except TypeError as error:
+                    self.fail(f"training should support validation-guided early stopping: {error}")
+
+            metadata = json.loads(best_metadata.read_bytes())
+            early_stopping = metadata["early_stopping"]
+            self.assertEqual(early_stopping["requested_epochs"], 5)
+            self.assertEqual(early_stopping["actual_epochs"], 3)
+            self.assertTrue(early_stopping["stopped_early"])
+            self.assertEqual(early_stopping["best_epoch"], 2)
+            self.assertEqual(early_stopping["min_delta"], 0.1)
+            self.assertEqual(early_stopping["best_validation_objective"], 0.7)
+            self.assertEqual(len(early_stopping["validation_history"]), 3)
+            self.assertEqual(metrics["validation"], validation_curve[1])
+
+            reference_model = root / "two-epochs.kpv"
+            reference_metadata = root / "two-epochs.json"
+            self.trainer.train_policy_value(
+                train_path, validation_path, reference_model, reference_metadata,
+                epochs=2, batch_size=2, seed=17,
+            )
+            self.assertEqual(best_model.read_bytes(), reference_model.read_bytes())
 
     def test_metadata_replace_failure_preserves_previous_file_and_cleans_temp(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -259,6 +354,9 @@ else:
                     self.assertEqual(metadata["model_sha256"], hashlib.sha256(model_path.read_bytes()).hexdigest())
                     self.assertEqual(metadata["device"], "cpu")
                     self.assertEqual(metadata["metrics"], metrics)
+                    self.assertFalse(metadata["early_stopping"]["enabled"])
+                    self.assertEqual(metadata["early_stopping"]["actual_epochs"], 1)
+                    self.assertIsNone(metadata["early_stopping"]["best_epoch"])
                     counts = metadata["dataset_counts"]
                     self.assertEqual(counts, {"train": 2, "validation": 2})
                     timing = metadata["timing"]
@@ -289,7 +387,7 @@ else:
                         key: metadata[key] for key in (
                             "schema", "train_sha256", "validation_sha256", "source_revision",
                             "source_dirty", "source_sha256", "model_sha256", "hyperparameters",
-                            "device", "metrics",
+                            "early_stopping", "device", "metrics",
                         )
                     }
                     outputs.append((model_path.read_bytes(), deterministic))

@@ -339,8 +339,10 @@ def train_policy_value(
     value_loss_weight: float = 0.1,
     seed: int = 1,
     device: str = "cpu",
+    early_stopping_patience: int | None = None,
+    early_stopping_min_delta: float = 0.0,
 ) -> dict[str, Any]:
-    """Fit a model, validate on a disjoint split, and write model plus metadata."""
+    """Fit and validate a disjoint model split, optionally restoring its best epoch."""
     _require_torch()
     if epochs < 1 or batch_size < 1:
         raise ValueError("epochs and batch_size must be positive")
@@ -350,6 +352,12 @@ def train_policy_value(
         raise ValueError("value_loss_weight must be finite and non-negative")
     if device not in {"auto", "cpu", "cuda"}:
         raise ValueError("device must be auto, cpu, or cuda")
+    if early_stopping_patience is not None and early_stopping_patience < 1:
+        raise ValueError("early_stopping_patience must be positive when enabled")
+    if early_stopping_min_delta < 0 or not np.isfinite(early_stopping_min_delta):
+        raise ValueError("early_stopping_min_delta must be finite and non-negative")
+    if early_stopping_patience is None and early_stopping_min_delta != 0.0:
+        raise ValueError("early_stopping_min_delta requires early_stopping_patience")
     selected_device = "cuda" if device == "cuda" else "cpu"
     if selected_device == "cuda":
         _configure_cuda_determinism()
@@ -379,7 +387,16 @@ def train_policy_value(
     rng = random.Random(seed)
     _synchronize_device(target_device)
     training_start = time.perf_counter()
-    for _epoch in range(epochs):
+    training_seconds = 0.0
+    validation_seconds = 0.0
+    validation_history: list[dict[str, Any]] = []
+    best_validation_metrics: dict[str, float] | None = None
+    best_state: dict[str, torch.Tensor] | None = None
+    best_epoch: int | None = None
+    consecutive_non_improving_epochs = 0
+    early_stopping_enabled = early_stopping_patience is not None
+    for epoch_index in range(epochs):
+        epoch_training_start = time.perf_counter()
         order = list(range(len(train_records)))
         rng.shuffle(order)
         model.train()
@@ -391,16 +408,57 @@ def train_policy_value(
             torch.stack(losses).mean().backward()
             state_optimizer.step()
             dense_optimizer.step()
-    _synchronize_device(target_device)
-    training_seconds = time.perf_counter() - training_start
+
+        if early_stopping_enabled:
+            _synchronize_device(target_device)
+            training_seconds += time.perf_counter() - epoch_training_start
+            model.eval()
+            epoch_validation_start = time.perf_counter()
+            epoch_validation_metrics = _evaluate(
+                model, validation_records, target_device, value_loss_weight
+            )
+            _synchronize_device(target_device)
+            validation_seconds += time.perf_counter() - epoch_validation_start
+            objective = epoch_validation_metrics["objective"]
+            if not np.isfinite(objective):
+                raise ValueError(f"validation objective is not finite at epoch {epoch_index + 1}")
+            validation_history.append({"epoch": epoch_index + 1, **epoch_validation_metrics})
+            improved = (
+                best_validation_metrics is None
+                or objective < best_validation_metrics["objective"] - early_stopping_min_delta
+            )
+            if improved:
+                best_validation_metrics = dict(epoch_validation_metrics)
+                best_epoch = epoch_index + 1
+                best_state = {
+                    name: value.detach().cpu().clone()
+                    for name, value in model.state_dict().items()
+                }
+                consecutive_non_improving_epochs = 0
+            else:
+                consecutive_non_improving_epochs += 1
+                if consecutive_non_improving_epochs >= early_stopping_patience:
+                    break
+
+    actual_epochs = len(validation_history) if early_stopping_enabled else epochs
+    if not early_stopping_enabled:
+        _synchronize_device(target_device)
+        training_seconds = time.perf_counter() - training_start
 
     model.eval()
+    if early_stopping_enabled:
+        if best_state is None or best_validation_metrics is None or best_epoch is None:
+            raise RuntimeError("early stopping completed without a validated checkpoint")
+        model.load_state_dict(best_state)
     train_metrics = _evaluate(model, train_records, target_device, value_loss_weight)
     _synchronize_device(target_device)
-    validation_start = time.perf_counter()
-    validation_metrics = _evaluate(model, validation_records, target_device, value_loss_weight)
-    _synchronize_device(target_device)
-    validation_seconds = time.perf_counter() - validation_start
+    if early_stopping_enabled:
+        validation_metrics = dict(best_validation_metrics)
+    else:
+        validation_start = time.perf_counter()
+        validation_metrics = _evaluate(model, validation_records, target_device, value_loss_weight)
+        _synchronize_device(target_device)
+        validation_seconds = time.perf_counter() - validation_start
     metrics = {
         "train": train_metrics,
         "validation": validation_metrics,
@@ -418,6 +476,21 @@ def train_policy_value(
         "hyperparameters": {
             "epochs": epochs, "batch_size": batch_size, "learning_rate": learning_rate,
             "value_loss_weight": value_loss_weight, "seed": seed,
+            "early_stopping_patience": early_stopping_patience,
+            "early_stopping_min_delta": early_stopping_min_delta,
+        },
+        "early_stopping": {
+            "enabled": early_stopping_enabled,
+            "patience": early_stopping_patience,
+            "min_delta": early_stopping_min_delta,
+            "requested_epochs": epochs,
+            "actual_epochs": actual_epochs,
+            "stopped_early": actual_epochs < epochs,
+            "best_epoch": best_epoch,
+            "best_validation_objective": (
+                best_validation_metrics["objective"] if best_validation_metrics is not None else None
+            ),
+            "validation_history": validation_history,
         },
         "device": selected_device,
         "metrics": metrics,
@@ -428,10 +501,13 @@ def train_policy_value(
         "timing": {
             "training_seconds": training_seconds,
             "validation_seconds": validation_seconds,
-            "training_positions": len(train_records) * epochs,
-            "validation_positions": len(validation_records),
-            "train_positions_per_second": len(train_records) * epochs / training_seconds,
-            "validation_positions_per_second": len(validation_records) / validation_seconds,
+            "training_positions": len(train_records) * actual_epochs,
+            "validation_positions": len(validation_records) * (actual_epochs if early_stopping_enabled else 1),
+            "train_positions_per_second": len(train_records) * actual_epochs / training_seconds,
+            "validation_positions_per_second": (
+                len(validation_records) * (actual_epochs if early_stopping_enabled else 1)
+                / validation_seconds
+            ),
         },
         "environment": {
             "host": {
@@ -472,12 +548,22 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--value-loss-weight", type=float, default=0.1)
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--device", choices=("auto", "cpu", "cuda"), default="cpu", help="CPU is the default; select cuda explicitly to opt in")
+    parser.add_argument(
+        "--early-stopping-patience", type=int, default=None,
+        help="stop after this many non-improving validation epochs; disabled by default",
+    )
+    parser.add_argument(
+        "--early-stopping-min-delta", type=float, default=0.0,
+        help="minimum validation-objective improvement required to reset patience",
+    )
     args = parser.parse_args(argv)
     metrics = train_policy_value(
         args.train, args.validation, args.output_model, args.metadata,
         epochs=args.epochs, batch_size=args.batch_size,
         learning_rate=args.learning_rate, value_loss_weight=args.value_loss_weight,
         seed=args.seed, device=args.device,
+        early_stopping_patience=args.early_stopping_patience,
+        early_stopping_min_delta=args.early_stopping_min_delta,
     )
     print(json.dumps(metrics, sort_keys=True))
     return 0
