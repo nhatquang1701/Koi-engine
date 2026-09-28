@@ -13,6 +13,7 @@
 #include <mutex>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <span>
 #include <thread>
 #include <utility>
@@ -2456,6 +2457,192 @@ private:
     bool stopping_ = false;
 };
 
+// The MCTS tree remains single-owner: the search coordinator selects and
+// commits every simulation. This pool evaluates the bounded leaf wave in
+// parallel, so workers never touch tree storage or mutable GameState history.
+class PolicyValueMctsInferencePool {
+public:
+    PolicyValueMctsInferencePool(
+        std::shared_ptr<const PolicyValueModel> model, const std::size_t requested_workers)
+        : model_(std::move(model)),
+          worker_count_(std::clamp<std::size_t>(
+              requested_workers, 1, kMaximumPolicyValueMctsBatchSize)) {
+        if (model_ == nullptr) {
+            throw std::invalid_argument("MCTS inference pool requires a loaded model");
+        }
+        workers_.reserve(worker_count_ - 1);
+        try {
+            for (std::size_t index = 1; index < worker_count_; ++index) {
+                workers_.emplace_back(&PolicyValueMctsInferencePool::worker_loop, this);
+            }
+        } catch (...) {
+            shutdown();
+            throw;
+        }
+    }
+
+    PolicyValueMctsInferencePool(const PolicyValueMctsInferencePool&) = delete;
+    PolicyValueMctsInferencePool& operator=(const PolicyValueMctsInferencePool&) = delete;
+
+    ~PolicyValueMctsInferencePool() {
+        shutdown();
+    }
+
+    [[nodiscard]] std::expected<void, std::string> evaluate(
+        const std::span<PolicyValueMctsLeafRequest> requests) {
+        if (requests.empty()) {
+            return {};
+        }
+        std::shared_ptr<Job> job;
+        try {
+            job = std::make_shared<Job>();
+        } catch (const std::bad_alloc&) {
+            return std::unexpected("unable to allocate an MCTS inference batch");
+        }
+        job->requests = requests;
+        {
+            std::lock_guard lock(mutex_);
+            ++sequence_;
+            job->sequence = sequence_;
+            finished_workers_ = 0;
+            job_ = job;
+        }
+        work_available_.notify_all();
+
+        evaluate_available(*job);
+        if (!workers_.empty()) {
+            std::unique_lock lock(mutex_);
+            work_finished_.wait(lock, [this] {
+                return finished_workers_ == workers_.size();
+            });
+        }
+        if (job->failed.load(std::memory_order_acquire)) {
+            std::lock_guard lock(job->error_mutex);
+            return std::unexpected(job->error.empty() ?
+                "MCTS inference batch failed" : job->error);
+        }
+        return {};
+    }
+
+private:
+    struct Job {
+        std::span<PolicyValueMctsLeafRequest> requests;
+        std::atomic<std::size_t> next_request = 0;
+        std::atomic_bool failed = false;
+        std::mutex error_mutex;
+        std::string error;
+        std::uint64_t sequence = 0;
+    };
+
+    [[nodiscard]] std::expected<void, std::string> evaluate_one(
+        PolicyValueMctsLeafRequest& request) const {
+        if (request.position == nullptr || request.legal_moves == nullptr ||
+            request.legal_moves->empty() ||
+            request.priors.size() != request.legal_moves->size()) {
+            return std::unexpected("MCTS inference received an invalid leaf request");
+        }
+        std::array<Move, kMaximumLegalMoves> actions{};
+        for (std::size_t index = 0; index < request.legal_moves->size(); ++index) {
+            actions[index] = (*request.legal_moves)[index].move;
+        }
+        const EvaluationFeatures features =
+            EvaluationFeatureExtractor::extract(*request.position);
+        const NnueSparseFeaturesV5 sparse_features =
+            EvaluationFeatureExtractor::encode_sparse_v5(features);
+        std::array<float, 3> wdl{};
+        const auto value = model_->evaluate(
+            sparse_features, request.position->side_to_move(),
+            std::span<const Move>(actions.data(), request.legal_moves->size()),
+            request.priors, wdl);
+        if (!value.has_value()) {
+            return std::unexpected(value.error().message);
+        }
+        request.evaluation = PolicyValueMctsEvaluation{*value, wdl};
+        return {};
+    }
+
+    void fail_job(Job& job, const std::string_view message) const noexcept {
+        bool expected = false;
+        if (job.failed.compare_exchange_strong(
+                expected, true, std::memory_order_acq_rel)) {
+            std::lock_guard lock(job.error_mutex);
+            try {
+                job.error.assign(message);
+            } catch (...) {
+            }
+        }
+    }
+
+    void evaluate_available(Job& job) const noexcept {
+        while (!job.failed.load(std::memory_order_acquire)) {
+            const std::size_t index =
+                job.next_request.fetch_add(1, std::memory_order_relaxed);
+            if (index >= job.requests.size()) {
+                break;
+            }
+            try {
+                auto evaluated = evaluate_one(job.requests[index]);
+                if (!evaluated.has_value()) {
+                    fail_job(job, evaluated.error());
+                }
+            } catch (const std::exception& error) {
+                fail_job(job, error.what());
+            } catch (...) {
+                fail_job(job, "MCTS inference failed with an unknown error");
+            }
+        }
+    }
+
+    void worker_loop() {
+        std::uint64_t seen_sequence = 0;
+        for (;;) {
+            std::shared_ptr<Job> job;
+            {
+                std::unique_lock lock(mutex_);
+                work_available_.wait(lock, [this, seen_sequence] {
+                    return stopping_ || (job_ != nullptr &&
+                                         job_->sequence != seen_sequence);
+                });
+                if (stopping_) {
+                    return;
+                }
+                job = job_;
+            }
+            seen_sequence = job->sequence;
+            evaluate_available(*job);
+            {
+                std::lock_guard lock(mutex_);
+                ++finished_workers_;
+            }
+            work_finished_.notify_one();
+        }
+    }
+
+    void shutdown() noexcept {
+        {
+            std::lock_guard lock(mutex_);
+            stopping_ = true;
+        }
+        work_available_.notify_all();
+        for (std::thread& worker : workers_) {
+            if (worker.joinable()) {
+                worker.join();
+            }
+        }
+    }
+
+    std::shared_ptr<const PolicyValueModel> model_;
+    const std::size_t worker_count_;
+    std::vector<std::thread> workers_;
+    std::mutex mutex_;
+    std::condition_variable work_available_;
+    std::condition_variable work_finished_;
+    std::shared_ptr<Job> job_;
+    std::size_t finished_workers_ = 0;
+    std::uint64_t sequence_ = 0;
+    bool stopping_ = false;
+};
+
 void safely_report_info(const SearchEventSink& sink, const SearchInfo& info) {
     if (!sink.on_info) {
         return;
@@ -2582,7 +2769,7 @@ void SearchRunner::run() {
         bool root_static_eval_ready = false;
         const bool mcts_root_candidate =
             options.search_algorithm == SearchAlgorithm::mcts &&
-            options.policy_value_model != nullptr && options.threads == 1 &&
+            options.policy_value_model != nullptr &&
             !root_is_forced_draw && !legal_moves.empty() &&
             !(options.syzygy_interior_depth > 0 &&
               (options.syzygy != nullptr || options.tablebase_probe_hook));
@@ -2708,13 +2895,13 @@ void SearchRunner::run() {
         const bool ultra_short_nonchecking_parallel = limits.movetime.has_value() &&
             *limits.movetime < kShortTimedFallbackMinimum && !timing_context.in_check;
 
-        // Lazy SMP replaces the root-splitting pool for the common
-        // Threads > 1 configuration: the main thread keeps the deterministic
-        // root driver and publishes the result, while helpers search the same
-        // root against the shared transposition table. Node-limited, MultiPV,
-        // forced-draw and short-tactical searches keep the existing
-        // root-parallel path because their accounting must stay exact.
-        const bool use_lazy_smp = options.threads > 1 && options.multi_pv == 1 &&
+        // Lazy SMP replaces the root-splitting pool for the common AlphaBeta
+        // Threads > 1 configuration. MCTS uses its own single-owner tree and
+        // bounded inference pool; it must not start Lazy SMP helpers here.
+        // AlphaBeta node-limited, MultiPV, forced-draw and short-tactical
+        // searches keep the root-parallel path so their accounting stays exact.
+        const bool use_lazy_smp = options.search_algorithm != SearchAlgorithm::mcts &&
+            options.threads > 1 && options.multi_pv == 1 &&
             !time_manager.node_limit().has_value() && !short_tactical_budget &&
             !root_is_claimable_draw && !root_is_forced_draw && legal_moves.size() >= 2;
         std::unique_ptr<LazySmpPool> lazy_pool;
@@ -2733,8 +2920,6 @@ void SearchRunner::run() {
                 unavailable_reason = options.policy_value_load_error.empty() ?
                     "no compatible PolicyValueFile is loaded" :
                     "PolicyValueFile rejected: " + options.policy_value_load_error;
-            } else if (options.threads != 1) {
-                unavailable_reason = "the CPU MCTS backend currently requires Threads=1";
             } else if (root_is_forced_draw) {
                 unavailable_reason = "the root position is an automatic draw";
             } else if (options.syzygy_interior_depth > 0 &&
@@ -2765,7 +2950,17 @@ void SearchRunner::run() {
                         return PolicyValueMctsEvaluation{*value, wdl};
                     };
 
+                std::unique_ptr<PolicyValueMctsInferencePool> inference_pool;
+                PolicyValueMctsBatchEvaluator batch_evaluator;
                 try {
+                    if (options.threads > 1) {
+                        inference_pool = std::make_unique<PolicyValueMctsInferencePool>(
+                            model, options.threads);
+                        batch_evaluator = [&inference_pool](
+                            const std::span<PolicyValueMctsLeafRequest> requests) {
+                            return inference_pool->evaluate(requests);
+                        };
+                    }
                     PolicyValueMctsConfig config;
                     // A ponder depth is an initial target, not a tree cap for
                     // the entire ponder phase. Match alpha-beta's lifecycle:
@@ -2776,7 +2971,7 @@ void SearchRunner::run() {
                     config.root_noise_seed =
                         static_cast<std::uint64_t>(options.random_seed) ^ root.position_key();
                     PolicyValueMctsTree mcts_tree(root, legal_moves, config,
-                                                  policy_value_evaluator);
+                                                  policy_value_evaluator, batch_evaluator);
                     const auto initialized = mcts_tree.initialize();
                     if (!initialized.has_value()) {
                         unavailable_reason = "MCTS initialization failed: " +
@@ -2878,14 +3073,35 @@ void SearchRunner::run() {
                                  visits >= *default_visit_limit)) {
                                 break;
                             }
-                            const auto simulated = mcts_tree.simulate(
-                                session->stop_requested(), mcts_stop_predicate);
+                            std::size_t batch_limit = std::min(
+                                options.threads, kMaximumPolicyValueMctsBatchSize);
+                            const auto restrict_batch = [&batch_limit, visits](
+                                const std::optional<std::uint64_t> limit) {
+                                if (!limit.has_value()) {
+                                    return;
+                                }
+                                if (visits >= *limit) {
+                                    batch_limit = 0;
+                                    return;
+                                }
+                                const std::uint64_t remaining = *limit - visits;
+                                if (remaining < batch_limit) {
+                                    batch_limit = static_cast<std::size_t>(remaining);
+                                }
+                            };
+                            restrict_batch(time_manager.node_limit());
+                            restrict_batch(default_visit_limit);
+                            if (batch_limit == 0) {
+                                break;
+                            }
+                            const auto simulated = mcts_tree.simulate_batch(
+                                batch_limit, session->stop_requested(), mcts_stop_predicate);
                             if (!simulated.has_value()) {
                                 unavailable_reason = "MCTS simulation failed: " +
                                     simulated.error();
                                 break;
                             }
-                            if (!simulated.value()) {
+                            if (simulated.value() == 0) {
                                 break;
                             }
                             if (mcts_tree.simulations() >= next_report_at) {

@@ -2178,6 +2178,58 @@ void test_mcts_visit_output_contains_the_full_root_distribution_when_enabled() {
             "MCTSSelfPlay must mix seeded root noise into root visit selection");
 }
 
+void test_mcts_threads_batch_leaf_evaluations_without_fallback() {
+    const koi::test::TempDirectory files;
+    write_zero_policy_value_model(files.path() / "uniform.kpv");
+    const ControllerResult result = run_controller_in_directory_until_bestmove(
+        "setoption name Threads value 4\n"
+        "setoption name PolicyValueFile value uniform.kpv\n"
+        "setoption name SearchAlgorithm value MCTS\n"
+        "setoption name MCTSVisitOutput value true\n"
+        "position startpos\n"
+        "go nodes 25\n",
+        files.path());
+    const std::vector<std::string> lines = output_lines(result.output);
+    const std::vector<std::string> visit_lines =
+        lines_starting_with(lines, "info string koi_mcts_visits_v1 ");
+    const std::vector<std::string> bestmoves = lines_starting_with(lines, "bestmove ");
+
+    require(result.exit_code == 0 && result.diagnostics.empty(),
+            "multi-threaded MCTS must keep UCI output clean");
+    require(result.output.find("info string MCTS unavailable:") == std::string::npos,
+            "a valid threaded MCTS request must not fall back to AlphaBeta");
+    require(visit_lines.size() == 1 && bestmoves.size() == 1 &&
+                is_legal_move(Position{}, first_bestmove_move(bestmoves.front())),
+            "threaded MCTS must emit one complete root map and one legal bestmove");
+
+    std::istringstream fields(visit_lines.front().substr(
+        std::string("info string koi_mcts_visits_v1 ").size()));
+    std::string item;
+    std::uint64_t visits = 0;
+    while (fields >> item) {
+        const std::size_t separator = item.find(':');
+        require(separator != std::string::npos,
+                "threaded MCTS visits must use move:count encoding");
+        visits += std::stoull(item.substr(separator + 1));
+    }
+    require(visits == 25,
+            "batched leaf evaluation must not exceed the exact go nodes budget");
+
+    const ControllerResult repeated = run_controller_in_directory_until_bestmove(
+        "setoption name Threads value 4\n"
+        "setoption name PolicyValueFile value uniform.kpv\n"
+        "setoption name SearchAlgorithm value MCTS\n"
+        "setoption name MCTSVisitOutput value true\n"
+        "position startpos\n"
+        "go nodes 25\n",
+        files.path());
+    const std::vector<std::string> repeated_visits = lines_starting_with(
+        output_lines(repeated.output), "info string koi_mcts_visits_v1 ");
+    require(repeated.exit_code == 0 && repeated.diagnostics.empty() &&
+                repeated_visits.size() == 1 && repeated_visits.front() == visit_lines.front(),
+            "ordered MCTS batch commits must make fixed-seed multi-thread searches repeatable");
+}
+
 void test_mcts_preserves_the_searchmoves_root_filter() {
     const koi::test::TempDirectory files;
     write_zero_policy_value_model(files.path() / "uniform.kpv");
@@ -2243,6 +2295,52 @@ void test_mcts_stop_quit_and_eof_obey_the_uci_lifecycle() {
             "quit and EOF must suppress active MCTS completion output");
     require(quit.diagnostics.empty() && eof.diagnostics.empty(),
             "MCTS shutdown paths must not leak diagnostics to stderr");
+}
+
+void test_threaded_mcts_stop_quit_and_eof_join_inference_workers() {
+    const koi::test::TempDirectory files;
+    write_zero_policy_value_model(files.path() / "uniform.kpv");
+    const std::string setup =
+        "setoption name Threads value 4\n"
+        "setoption name PolicyValueFile value uniform.kpv\n"
+        "setoption name SearchAlgorithm value MCTS\n"
+        "position startpos\n";
+
+    GatedInputBuffer input(setup + "go infinite\n", "stop\nquit\n");
+    std::istream input_stream(&input);
+    ReleaseOnSearchInfoBuffer output_buffer(input);
+    std::ostream output(&output_buffer);
+    std::ostringstream diagnostics;
+    int exit_code = -1;
+    std::thread controller_thread([&] {
+        UciController controller(input_stream, output, diagnostics,
+                                 koi::SearchService{
+                                     std::make_shared<koi::ClassicalEvaluator>()},
+                                 files.path());
+        exit_code = controller.run();
+    });
+    const bool search_reported = input.wait_for_marker(std::chrono::seconds(20));
+    if (!search_reported) {
+        input.release();
+    }
+    controller_thread.join();
+    const std::vector<std::string> stopped_bestmoves =
+        lines_starting_with(output_lines(output_buffer.str()), "bestmove ");
+
+    const ControllerResult quit =
+        run_controller_in_directory(setup + "go infinite\nquit\n", files.path());
+    const ControllerResult eof =
+        run_controller_in_directory(setup + "go infinite\n", files.path());
+    require(search_reported && exit_code == 0 && diagnostics.str().empty(),
+            "threaded MCTS must stop after draining its active inference batch");
+    require(stopped_bestmoves.size() == 1 &&
+                is_legal_move(Position{}, first_bestmove_move(stopped_bestmoves.front())),
+            "threaded MCTS stop must return exactly one legal bestmove");
+    require(lines_starting_with(output_lines(quit.output), "bestmove ").empty() &&
+                lines_starting_with(output_lines(eof.output), "bestmove ").empty(),
+            "threaded MCTS quit and EOF must suppress late completion output");
+    require(quit.diagnostics.empty() && eof.diagnostics.empty(),
+            "threaded MCTS workers must join without stderr diagnostics");
 }
 
 void test_mcts_ponder_depth_continues_deepening_past_initial_target() {
@@ -2600,9 +2698,13 @@ int main(int argc, char** argv) {
          test_mcts_valid_model_publishes_legal_multipv_and_estimated_wdl},
         {"MCTS opt-in root visit output",
          test_mcts_visit_output_contains_the_full_root_distribution_when_enabled},
+        {"MCTS threaded leaf evaluation",
+         test_mcts_threads_batch_leaf_evaluations_without_fallback},
         {"MCTS searchmoves root filter", test_mcts_preserves_the_searchmoves_root_filter},
         {"MCTS stop, quit and EOF lifecycle",
          test_mcts_stop_quit_and_eof_obey_the_uci_lifecycle},
+        {"threaded MCTS lifecycle",
+         test_threaded_mcts_stop_quit_and_eof_join_inference_workers},
         {"MCTS ponder depth deepening",
          test_mcts_ponder_depth_continues_deepening_past_initial_target},
         {"quit and EOF cleanup", test_quit_and_eof_join_without_late_bestmove},

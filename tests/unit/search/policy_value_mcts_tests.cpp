@@ -17,6 +17,8 @@ namespace koi {
 using detail::PolicyValueMctsConfig;
 using detail::PolicyValueMctsEvaluation;
 using detail::PolicyValueMctsEvaluator;
+using detail::PolicyValueMctsBatchEvaluator;
+using detail::PolicyValueMctsLeafRequest;
 using detail::PolicyValueMctsSnapshot;
 using detail::PolicyValueMctsTree;
 } // namespace koi
@@ -356,10 +358,187 @@ void test_mcts_claimable_root_draw_floors_losing_moves_but_keeps_wins() {
             "a winning continuation must remain above the draw-claim baseline");
 }
 
+void test_mcts_batch_evaluates_distinct_leaves_and_commits_exact_visits() {
+    koi::GameState root = koi::GameState::startpos();
+    const koi::MoveMetadataList moves = legal_root_moves(root);
+    std::size_t batch_calls = 0;
+    std::size_t largest_batch = 0;
+    koi::PolicyValueMctsBatchEvaluator batch_evaluator =
+        [&batch_calls, &largest_batch](
+            const std::span<koi::PolicyValueMctsLeafRequest> requests)
+            -> std::expected<void, std::string> {
+        ++batch_calls;
+        largest_batch = std::max(largest_batch, requests.size());
+        for (koi::PolicyValueMctsLeafRequest& request : requests) {
+            if (request.position == nullptr || request.legal_moves == nullptr ||
+                request.legal_moves->empty() ||
+                request.priors.size() != request.legal_moves->size()) {
+                return std::unexpected("invalid batched MCTS leaf request");
+            }
+            const float prior = 1.0F / static_cast<float>(request.legal_moves->size());
+            std::fill(request.priors.begin(), request.priors.end(), prior);
+            request.evaluation = koi::PolicyValueMctsEvaluation{
+                0.0F, {1.0F / 3.0F, 1.0F / 3.0F, 1.0F / 3.0F}};
+        }
+        return {};
+    };
+
+    koi::PolicyValueMctsConfig config;
+    config.max_depth = 4;
+    config.max_tree_nodes = 64;
+    config.max_tree_edges = 512;
+    koi::PolicyValueMctsTree tree(
+        root, moves, config, uniform_draw_evaluator(), batch_evaluator);
+    require(tree.initialize().has_value(), "batched MCTS root must initialize");
+    std::atomic_bool stop_requested = false;
+    const auto simulated = tree.simulate_batch(4, stop_requested);
+    require(simulated.has_value() && simulated.value() == 4,
+            "one leaf-evaluation wave must commit exactly four simulations");
+    require(batch_calls == 1 && largest_batch == 4,
+            "the evaluator must receive one bounded batch containing four leaves");
+
+    const koi::PolicyValueMctsSnapshot snapshot = tree.snapshot(moves.size());
+    require(snapshot.simulations == 4,
+            "batched MCTS must count only committed simulations");
+    std::uint64_t root_visits = 0;
+    for (const auto& line : snapshot.root_moves) {
+        root_visits += line.visits;
+    }
+    require(root_visits == 4,
+            "the complete legal root distribution must sum to the exact batch budget");
+    require(std::count_if(snapshot.root_moves.begin(), snapshot.root_moves.end(),
+                          [](const auto& line) { return line.visits == 1; }) == 4,
+            "virtual reservations must spread a batch across four distinct root moves");
+}
+
+void test_mcts_batch_failure_discards_partial_visits_and_recovers() {
+    koi::GameState root = koi::GameState::startpos();
+    const koi::MoveMetadataList moves = legal_root_moves(root);
+    bool fail_first_batch = true;
+    koi::PolicyValueMctsBatchEvaluator batch_evaluator =
+        [&fail_first_batch](
+            const std::span<koi::PolicyValueMctsLeafRequest> requests)
+            -> std::expected<void, std::string> {
+        if (fail_first_batch) {
+            fail_first_batch = false;
+            return std::unexpected("synthetic batched inference failure");
+        }
+        for (koi::PolicyValueMctsLeafRequest& request : requests) {
+            const float prior = 1.0F / static_cast<float>(request.legal_moves->size());
+            std::fill(request.priors.begin(), request.priors.end(), prior);
+            request.evaluation = koi::PolicyValueMctsEvaluation{
+                0.0F, {1.0F / 3.0F, 1.0F / 3.0F, 1.0F / 3.0F}};
+        }
+        return {};
+    };
+
+    koi::PolicyValueMctsConfig config;
+    config.max_depth = 3;
+    config.max_tree_nodes = 64;
+    config.max_tree_edges = 512;
+    koi::PolicyValueMctsTree tree(
+        root, moves, config, uniform_draw_evaluator(), batch_evaluator);
+    require(tree.initialize().has_value(), "failure-test MCTS root must initialize");
+    std::atomic_bool stop_requested = false;
+    const auto failed = tree.simulate_batch(4, stop_requested);
+    require(!failed.has_value() && failed.error() == "synthetic batched inference failure",
+            "a failed batch must report its inference error");
+    const koi::PolicyValueMctsSnapshot untouched = tree.snapshot(moves.size());
+    require(untouched.simulations == 0 &&
+                std::all_of(untouched.root_moves.begin(), untouched.root_moves.end(),
+                            [](const auto& line) { return line.visits == 0; }),
+            "a failed batch must not back up partial root visits");
+
+    const auto retried = tree.simulate_batch(2, stop_requested);
+    require(retried.has_value() && retried.value() == 2 && tree.simulations() == 2,
+            "a batch failure must release reservations so a later batch can recover");
+}
+
+void test_mcts_batch_cancellation_discards_wave_and_can_resume() {
+    koi::GameState root = koi::GameState::startpos();
+    const koi::MoveMetadataList moves = legal_root_moves(root);
+    std::atomic_bool stop_requested = false;
+    bool cancel_first_batch = true;
+    koi::PolicyValueMctsBatchEvaluator batch_evaluator =
+        [&stop_requested, &cancel_first_batch](
+            const std::span<koi::PolicyValueMctsLeafRequest> requests)
+            -> std::expected<void, std::string> {
+        for (koi::PolicyValueMctsLeafRequest& request : requests) {
+            const float prior = 1.0F / static_cast<float>(request.legal_moves->size());
+            std::fill(request.priors.begin(), request.priors.end(), prior);
+            request.evaluation = koi::PolicyValueMctsEvaluation{
+                0.0F, {1.0F / 3.0F, 1.0F / 3.0F, 1.0F / 3.0F}};
+        }
+        if (cancel_first_batch) {
+            cancel_first_batch = false;
+            stop_requested.store(true, std::memory_order_relaxed);
+        }
+        return {};
+    };
+
+    koi::PolicyValueMctsConfig config;
+    config.max_depth = 3;
+    config.max_tree_nodes = 64;
+    config.max_tree_edges = 512;
+    koi::PolicyValueMctsTree tree(
+        root, moves, config, uniform_draw_evaluator(), batch_evaluator);
+    require(tree.initialize().has_value(), "cancellation-test MCTS root must initialize");
+    const auto cancelled = tree.simulate_batch(4, stop_requested);
+    require(cancelled.has_value() && cancelled.value() == 0,
+            "a stop during batch inference must discard the active wave");
+    const koi::PolicyValueMctsSnapshot untouched = tree.snapshot(moves.size());
+    require(untouched.simulations == 0 &&
+                std::all_of(untouched.root_moves.begin(), untouched.root_moves.end(),
+                            [](const auto& line) { return line.visits == 0; }),
+            "a cancelled batch must not publish partial visits");
+
+    stop_requested.store(false, std::memory_order_relaxed);
+    const auto resumed = tree.simulate_batch(2, stop_requested);
+    require(resumed.has_value() && resumed.value() == 2 && tree.simulations() == 2,
+            "cancellation must clear reservations so a later batch can resume");
+}
+
+void test_mcts_batch_deadline_aborts_before_running_inference() {
+    koi::GameState root = koi::GameState::startpos();
+    const koi::MoveMetadataList moves = legal_root_moves(root);
+    std::size_t batch_calls = 0;
+    koi::PolicyValueMctsBatchEvaluator batch_evaluator =
+        [&batch_calls](const std::span<koi::PolicyValueMctsLeafRequest> requests)
+            -> std::expected<void, std::string> {
+        ++batch_calls;
+        for (koi::PolicyValueMctsLeafRequest& request : requests) {
+            const float prior = 1.0F / static_cast<float>(request.legal_moves->size());
+            std::fill(request.priors.begin(), request.priors.end(), prior);
+            request.evaluation = koi::PolicyValueMctsEvaluation{
+                0.0F, {1.0F / 3.0F, 1.0F / 3.0F, 1.0F / 3.0F}};
+        }
+        return {};
+    };
+    koi::PolicyValueMctsConfig config;
+    config.max_depth = 4;
+    config.max_tree_nodes = 64;
+    config.max_tree_edges = 512;
+    koi::PolicyValueMctsTree tree(
+        root, moves, config, uniform_draw_evaluator(), batch_evaluator);
+    require(tree.initialize().has_value(), "deadline-test MCTS root must initialize");
+    std::atomic_bool stop_requested = false;
+    std::size_t stop_checks = 0;
+    const auto should_stop = [&stop_checks] { return ++stop_checks >= 6; };
+    const auto stopped = tree.simulate_batch(4, stop_requested, should_stop);
+    require(stopped.has_value() && stopped.value() == 0,
+            "a deadline reached while forming a wave must discard its reservations");
+    require(batch_calls == 0 && tree.simulations() == 0,
+            "MCTS must not launch inference after the deadline is observed");
+    const koi::PolicyValueMctsSnapshot snapshot = tree.snapshot(moves.size());
+    require(std::all_of(snapshot.root_moves.begin(), snapshot.root_moves.end(),
+                        [](const auto& line) { return line.visits == 0; }),
+            "a deadline-aborted wave must leave no published root visits");
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
-    const std::array<koi::test::TestCase, 7> tests{{
+    const std::array<koi::test::TestCase, 11> tests{{
         {"MCTS visits, depth and deterministic prior selection",
          test_mcts_visit_limit_depth_cap_and_deterministic_root_choice},
         {"MCTS self-play root noise", test_mcts_self_play_root_noise_is_normalized_and_seeded},
@@ -370,6 +549,14 @@ int main(int argc, char** argv) {
          test_mcts_deadline_interrupts_a_partial_simulation_and_recovers},
         {"MCTS claimable root draw ranking",
          test_mcts_claimable_root_draw_floors_losing_moves_but_keeps_wins},
+        {"MCTS bounded leaf batches",
+         test_mcts_batch_evaluates_distinct_leaves_and_commits_exact_visits},
+        {"MCTS failed batch rollback",
+         test_mcts_batch_failure_discards_partial_visits_and_recovers},
+        {"MCTS batch cancellation rollback",
+         test_mcts_batch_cancellation_discards_wave_and_can_resume},
+        {"MCTS batch deadline rollback",
+         test_mcts_batch_deadline_aborts_before_running_inference},
     }};
     return koi::test::run_tests(tests, argc, argv);
 }

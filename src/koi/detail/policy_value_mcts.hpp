@@ -21,10 +21,21 @@ struct PolicyValueMctsEvaluation {
     std::array<float, 3> wdl{0.0F, 1.0F, 0.0F};
 };
 
+struct PolicyValueMctsLeafRequest {
+    const GameState* position = nullptr;
+    const MoveMetadataList* legal_moves = nullptr;
+    std::span<float> priors;
+    PolicyValueMctsEvaluation evaluation{};
+};
+
 using PolicyValueMctsEvaluator = std::function<
     std::expected<PolicyValueMctsEvaluation, std::string>(
         const GameState&, const MoveMetadataList&, std::span<float> priors)>;
+using PolicyValueMctsBatchEvaluator = std::function<
+    std::expected<void, std::string>(std::span<PolicyValueMctsLeafRequest>)>;
 using PolicyValueMctsStop = std::function<bool()>;
+
+inline constexpr std::size_t kMaximumPolicyValueMctsBatchSize = 8;
 
 struct PolicyValueMctsConfig {
     // 0 disables the explicit tree-ply cap; a fixed implementation safety cap
@@ -66,7 +77,8 @@ class PolicyValueMctsTree final {
 public:
     PolicyValueMctsTree(GameState root, MoveMetadataList legal_root_moves,
                         PolicyValueMctsConfig config,
-                        PolicyValueMctsEvaluator evaluator);
+                        PolicyValueMctsEvaluator evaluator,
+                        PolicyValueMctsBatchEvaluator batch_evaluator = {});
     ~PolicyValueMctsTree();
 
     PolicyValueMctsTree(const PolicyValueMctsTree&) = delete;
@@ -77,6 +89,9 @@ public:
     [[nodiscard]] std::expected<void, std::string> initialize();
     [[nodiscard]] std::expected<bool, std::string> simulate(
         const std::atomic_bool& stop_requested,
+        const PolicyValueMctsStop& should_stop = {});
+    [[nodiscard]] std::expected<std::size_t, std::string> simulate_batch(
+        std::size_t max_simulations, const std::atomic_bool& stop_requested,
         const PolicyValueMctsStop& should_stop = {});
     [[nodiscard]] PolicyValueMctsSnapshot snapshot(std::size_t multipv) const;
     void set_max_depth(int max_depth) noexcept;

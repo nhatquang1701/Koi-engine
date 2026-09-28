@@ -725,24 +725,29 @@ from the starting position (for example, `bestmove e2e4`).
   `setoption name Clear Hash` clears it. Either command stops and joins an
   active search before changing the table.
 - `setoption name Threads value <N>` selects the worker count. `Threads 1`
-  keeps the deterministic serial search; `Threads > 1` adds Lazy SMP helper
-  threads and is intentionally nondeterministic (helpers share the
-  transposition table, so repeated searches at the same thread count may
-  publish different equally valid moves or scores). `setoption name Speed value
-  <1..100>` scales only movetime and clock-derived budgets; explicit depth,
-  node, and infinite searches are unchanged. Changing either option stops and
-  joins the active search before the new snapshot is used by the next `go`
-  command.
+  keeps the deterministic serial search. With AlphaBeta, `Threads > 1` adds
+  Lazy SMP helpers and is intentionally nondeterministic because helpers share
+  the transposition table. With MCTS, `Threads > 1` evaluates bounded waves of
+  policy/value leaves in parallel while one coordinator owns tree selection,
+  mutation, and ordered backup; the batch is capped at eight leaves. `setoption
+  name Speed value <1..100>` scales only movetime and clock-derived budgets;
+  explicit depth, node, and infinite searches are unchanged. Changing either
+  option stops and joins the active search before the new snapshot is used by
+  the next `go` command.
 - `setoption name EvalFile value <path>` loads a Koi NNUE network for the next
   search (an empty value keeps the boot-time evaluator, so replaying defaults
   never triggers a load). A rejected or missing file leaves the current
   evaluator in place and reports `info string EvalFile rejected: ...`. Running
   searches keep the evaluator they started with.
-- `SearchAlgorithm` defaults to `AlphaBeta`. `MCTS` is an experimental,
-  single-thread CPU backend and requires a compatible policy/value model loaded
-  with `PolicyValueFile`; Koi does not bundle a trained model. Missing,
-  malformed, or incompatible models, `Threads > 1`, and unsupported search
-  configurations report an `info string` diagnostic and fall back to
+- `SearchAlgorithm` defaults to `AlphaBeta`. `MCTS` is an experimental CPU
+  backend and requires a compatible policy/value model loaded with
+  `PolicyValueFile`; Koi does not bundle a trained model. `Threads 1` uses the
+  serial reference path. `Threads > 1` selects and backs up MCTS paths on one
+  coordinator while a bounded pool evaluates leaves; at most eight inference
+  workers are used even if a larger thread count is configured. Batches are
+  shortened to honor node limits, and completed results are committed in
+  selection order. Missing, malformed, or incompatible models and unsupported
+  search configurations report an `info string` diagnostic and fall back to
   alpha-beta. Changing either option stops and joins the active search before
   replacing the selected backend or model.
 - `MCTSVisitOutput` defaults to `false`. When enabled and MCTS completes, Koi

@@ -5,6 +5,7 @@
 #include <cmath>
 #include <limits>
 #include <new>
+#include <optional>
 #include <random>
 #include <utility>
 
@@ -78,9 +79,11 @@ struct PolicyValueMctsTree::Impl {
         std::size_t first_edge = 0;
         std::size_t edge_count = 0;
         std::size_t depth = 0;
+        std::uint64_t pending_visits = 0;
         PolicyValueMctsEvaluation leaf{};
         bool expanded = false;
         bool leaf_only = false;
+        bool evaluation_pending = false;
     };
 
     struct Edge {
@@ -90,14 +93,18 @@ struct PolicyValueMctsTree::Impl {
         double value_sum = 0.0;
         std::array<double, 3> wdl_sum{};
         std::size_t child = kNoMctsNode;
+        std::uint64_t pending_visits = 0;
+        double pending_value_sum = 0.0;
         PolicyValueMctsEvaluation cached_leaf{};
         bool has_cached_leaf = false;
+        bool evaluation_pending = false;
     };
 
     GameState position;
     MoveMetadataList root_moves;
     PolicyValueMctsConfig config;
     PolicyValueMctsEvaluator evaluator;
+    PolicyValueMctsBatchEvaluator batch_evaluator;
     std::vector<Node> nodes;
     std::vector<Edge> edges;
     std::uint64_t simulations = 0;
@@ -109,9 +116,11 @@ struct PolicyValueMctsTree::Impl {
     bool initialized = false;
 
     Impl(GameState root, MoveMetadataList legal_root_moves,
-         PolicyValueMctsConfig search_config, PolicyValueMctsEvaluator evaluate)
+         PolicyValueMctsConfig search_config, PolicyValueMctsEvaluator evaluate,
+         PolicyValueMctsBatchEvaluator evaluate_batch)
         : position(std::move(root)), root_moves(std::move(legal_root_moves)),
-          config(search_config), evaluator(std::move(evaluate)) {
+          config(search_config), evaluator(std::move(evaluate)),
+          batch_evaluator(std::move(evaluate_batch)) {
         position.detach_mirror();
         config.max_tree_nodes = std::min(config.max_tree_nodes, kMaximumMctsTreeNodes);
         config.max_tree_edges = std::min(config.max_tree_edges, kMaximumMctsTreeEdges);
@@ -191,9 +200,11 @@ struct PolicyValueMctsTree::Impl {
 
 PolicyValueMctsTree::PolicyValueMctsTree(
     GameState root, MoveMetadataList legal_root_moves,
-    PolicyValueMctsConfig config, PolicyValueMctsEvaluator evaluator)
+    PolicyValueMctsConfig config, PolicyValueMctsEvaluator evaluator,
+    PolicyValueMctsBatchEvaluator batch_evaluator)
     : impl_(std::make_unique<Impl>(std::move(root), std::move(legal_root_moves),
-                                   config, std::move(evaluator))) {}
+                                   config, std::move(evaluator),
+                                   std::move(batch_evaluator))) {}
 
 PolicyValueMctsTree::~PolicyValueMctsTree() = default;
 PolicyValueMctsTree::PolicyValueMctsTree(PolicyValueMctsTree&&) noexcept = default;
@@ -467,6 +478,478 @@ std::expected<bool, std::string> PolicyValueMctsTree::simulate(
     unmake_path();
     ++impl_->simulations;
     return true;
+}
+
+std::expected<std::size_t, std::string> PolicyValueMctsTree::simulate_batch(
+    std::size_t max_simulations, const std::atomic_bool& stop_requested,
+    const PolicyValueMctsStop& should_stop) {
+    if (!impl_->initialized) {
+        return std::unexpected("MCTS tree must be initialized before simulation");
+    }
+    if (max_simulations == 0) {
+        return std::size_t{0};
+    }
+    max_simulations = std::min(max_simulations, kMaximumPolicyValueMctsBatchSize);
+    if (!impl_->batch_evaluator || max_simulations == 1) {
+        std::size_t completed = 0;
+        for (; completed < max_simulations; ++completed) {
+            auto simulated = simulate(stop_requested, should_stop);
+            if (!simulated.has_value()) {
+                return std::unexpected(simulated.error());
+            }
+            if (!simulated.value()) {
+                break;
+            }
+        }
+        return completed;
+    }
+    if (impl_->nodes.empty() || impl_->nodes[0].leaf_only ||
+        impl_->nodes[0].edge_count == 0) {
+        return std::size_t{0};
+    }
+
+    enum class ExpansionTarget : std::uint8_t { none, node, cached_edge };
+    struct PendingSimulation {
+        std::array<std::size_t, kMaximumMctsPly + 1> path_nodes{};
+        std::array<std::size_t, kMaximumMctsPly> path_edges{};
+        std::size_t path_node_count = 1;
+        std::size_t path_edge_count = 0;
+        std::size_t depth = 0;
+        std::size_t target_index = kNoMctsNode;
+        ExpansionTarget target = ExpansionTarget::none;
+        bool has_leaf_node = false;
+        bool leaf_visit_reserved = false;
+        bool requires_evaluation = false;
+        bool allow_children = false;
+        bool terminal = false;
+        std::optional<GameState> leaf_position;
+        MoveMetadataList legal_moves;
+        std::array<float, kMaximumLegalMoves> priors{};
+        PolicyValueMctsEvaluation leaf{};
+    };
+
+    std::vector<PendingSimulation> pending;
+    try {
+        pending.reserve(max_simulations);
+    } catch (const std::bad_alloc&) {
+        return std::unexpected("unable to allocate a bounded MCTS evaluation batch");
+    }
+
+    const auto check_stop = [&]() -> std::expected<bool, std::string> {
+        if (stop_requested.load(std::memory_order_relaxed)) {
+            return true;
+        }
+        if (!should_stop) {
+            return false;
+        }
+        try {
+            return should_stop();
+        } catch (...) {
+            return std::unexpected("MCTS stop predicate failed");
+        }
+    };
+
+    const auto clear_reservations = [this](PendingSimulation& simulation) noexcept {
+        for (std::size_t index = 0; index < simulation.path_edge_count; ++index) {
+            Impl::Edge& edge = impl_->edges[simulation.path_edges[index]];
+            if (edge.pending_visits > 0) {
+                --edge.pending_visits;
+                edge.pending_value_sum += 1.0;
+            }
+            Impl::Node& parent = impl_->nodes[simulation.path_nodes[index]];
+            if (parent.pending_visits > 0) {
+                --parent.pending_visits;
+            }
+        }
+        if (simulation.leaf_visit_reserved && simulation.path_node_count > 0) {
+            Impl::Node& leaf = impl_->nodes[simulation.path_nodes[
+                simulation.path_node_count - 1]];
+            if (leaf.pending_visits > 0) {
+                --leaf.pending_visits;
+            }
+        }
+        if (simulation.target == ExpansionTarget::node &&
+            simulation.target_index < impl_->nodes.size()) {
+            impl_->nodes[simulation.target_index].evaluation_pending = false;
+        } else if (simulation.target == ExpansionTarget::cached_edge &&
+                   simulation.target_index < impl_->edges.size()) {
+            impl_->edges[simulation.target_index].evaluation_pending = false;
+        }
+    };
+    const auto rollback_batch = [&] {
+        for (PendingSimulation& simulation : pending) {
+            clear_reservations(simulation);
+        }
+    };
+    const auto unmake_path = [this](std::size_t& moves_made) noexcept {
+        while (moves_made > 0) {
+            (void)impl_->position.unmake_move();
+            --moves_made;
+        }
+    };
+
+    for (std::size_t slot = 0; slot < max_simulations; ++slot) {
+        auto stopped = check_stop();
+        if (!stopped.has_value()) {
+            rollback_batch();
+            return std::unexpected(stopped.error());
+        }
+        if (stopped.value()) {
+            rollback_batch();
+            return std::size_t{0};
+        }
+
+        PendingSimulation candidate;
+        candidate.path_nodes[0] = 0;
+        std::size_t moves_made = 0;
+        bool complete = false;
+        bool blocked = false;
+        bool deadline_reached = false;
+        std::string candidate_error;
+
+        for (;;) {
+            stopped = check_stop();
+            if (!stopped.has_value()) {
+                candidate_error = stopped.error();
+                break;
+            }
+            if (stopped.value()) {
+                blocked = true;
+                deadline_reached = true;
+                break;
+            }
+
+            const std::size_t node_index =
+                candidate.path_nodes[candidate.path_node_count - 1];
+            Impl::Node& node = impl_->nodes[node_index];
+            if (node.evaluation_pending) {
+                blocked = true;
+                break;
+            }
+            if (impl_->config.max_depth > 0 &&
+                candidate.depth >= static_cast<std::size_t>(impl_->config.max_depth) &&
+                node.expanded) {
+                candidate.leaf = node.leaf;
+                candidate.has_leaf_node = true;
+                complete = true;
+                break;
+            }
+            if (!node.expanded) {
+                candidate.target = ExpansionTarget::node;
+                candidate.target_index = node_index;
+                candidate.has_leaf_node = true;
+                candidate.leaf_visit_reserved = true;
+                candidate.allow_children =
+                    !(impl_->config.max_depth > 0 &&
+                      candidate.depth >= static_cast<std::size_t>(impl_->config.max_depth)) &&
+                    candidate.depth < kMaximumMctsPly;
+                impl_->position.legal_moves_with_metadata(
+                    candidate.legal_moves, false, false);
+                if (candidate.legal_moves.empty()) {
+                    candidate.terminal = true;
+                    candidate.leaf = impl_->position.in_check() ?
+                        checkmate_evaluation() : draw_evaluation();
+                } else if (impl_->position.is_forced_draw()) {
+                    candidate.terminal = true;
+                    candidate.leaf = draw_evaluation();
+                } else {
+                    try {
+                        candidate.leaf_position.emplace(impl_->position);
+                    } catch (const std::bad_alloc&) {
+                        candidate_error =
+                            "unable to snapshot a bounded MCTS leaf position";
+                        break;
+                    }
+                    candidate.requires_evaluation = true;
+                }
+                node.evaluation_pending = true;
+                complete = true;
+                break;
+            }
+
+            if (node.leaf_only || node.edge_count == 0) {
+                candidate.leaf = node.leaf;
+                candidate.has_leaf_node = true;
+                complete = true;
+                break;
+            }
+
+            const double exploration_scale = std::sqrt(
+                static_cast<double>(node.visits + node.pending_visits) + 1.0);
+            std::size_t selected_edge_index = node.first_edge;
+            double selected_score = -std::numeric_limits<double>::infinity();
+            for (std::size_t offset = 0; offset < node.edge_count; ++offset) {
+                const std::size_t edge_index = node.first_edge + offset;
+                const Impl::Edge& edge = impl_->edges[edge_index];
+                double exploitation = edge.visits == 0 ? 0.0 :
+                    edge.value_sum / static_cast<double>(edge.visits);
+                if (node_index == 0 && impl_->root_claimable_draw) {
+                    exploitation = std::max(0.0, exploitation);
+                }
+                const std::uint64_t effective_visits =
+                    edge.visits + edge.pending_visits;
+                if (effective_visits > 0 && edge.pending_visits > 0) {
+                    exploitation += edge.pending_value_sum /
+                        static_cast<double>(effective_visits);
+                }
+                const double exploration = impl_->config.cpuct * edge.prior *
+                    exploration_scale / (1.0 + static_cast<double>(effective_visits));
+                const double score = exploitation + exploration;
+                if (score > selected_score) {
+                    selected_score = score;
+                    selected_edge_index = edge_index;
+                }
+            }
+
+            if (candidate.path_edge_count >= candidate.path_edges.size()) {
+                candidate_error = "MCTS search path exceeded its fixed safety bound";
+                break;
+            }
+            Impl::Edge& selected_edge = impl_->edges[selected_edge_index];
+            if (selected_edge.evaluation_pending) {
+                blocked = true;
+                break;
+            }
+            if (!impl_->position.make_search_move(selected_edge.metadata)) {
+                candidate_error =
+                    "native GameState rejected an MCTS-generated legal move";
+                break;
+            }
+            ++moves_made;
+            candidate.path_edges[candidate.path_edge_count++] = selected_edge_index;
+            ++selected_edge.pending_visits;
+            selected_edge.pending_value_sum -= 1.0;
+            ++node.pending_visits;
+            ++candidate.depth;
+
+            if (selected_edge.has_cached_leaf) {
+                candidate.leaf = selected_edge.cached_leaf;
+                candidate.has_leaf_node = false;
+                complete = true;
+                break;
+            }
+
+            if (selected_edge.child == kNoMctsNode &&
+                impl_->nodes.size() >= impl_->config.max_tree_nodes) {
+                candidate.target = ExpansionTarget::cached_edge;
+                candidate.target_index = selected_edge_index;
+                candidate.has_leaf_node = false;
+                candidate.legal_moves.resize(0);
+                impl_->position.legal_moves_with_metadata(
+                    candidate.legal_moves, false, false);
+                if (candidate.legal_moves.empty()) {
+                    candidate.terminal = true;
+                    candidate.leaf = impl_->position.in_check() ?
+                        checkmate_evaluation() : draw_evaluation();
+                } else if (impl_->position.is_forced_draw()) {
+                    candidate.terminal = true;
+                    candidate.leaf = draw_evaluation();
+                } else {
+                    try {
+                        candidate.leaf_position.emplace(impl_->position);
+                    } catch (const std::bad_alloc&) {
+                        candidate_error =
+                            "unable to snapshot a bounded MCTS leaf position";
+                        break;
+                    }
+                    candidate.requires_evaluation = true;
+                }
+                selected_edge.evaluation_pending = true;
+                complete = true;
+                break;
+            }
+
+            if (selected_edge.child == kNoMctsNode) {
+                try {
+                    Impl::Node child;
+                    child.depth = candidate.depth;
+                    selected_edge.child = impl_->nodes.size();
+                    impl_->nodes.push_back(child);
+                } catch (const std::bad_alloc&) {
+                    candidate_error = "unable to allocate an MCTS child node";
+                    break;
+                }
+            }
+            if (candidate.path_node_count >= candidate.path_nodes.size()) {
+                candidate_error = "MCTS node path exceeded its fixed safety bound";
+                break;
+            }
+            candidate.path_nodes[candidate.path_node_count++] = selected_edge.child;
+        }
+
+        unmake_path(moves_made);
+        if (!candidate_error.empty()) {
+            clear_reservations(candidate);
+            rollback_batch();
+            return std::unexpected(std::move(candidate_error));
+        }
+        if (blocked || !complete) {
+            clear_reservations(candidate);
+            if (stop_requested.load(std::memory_order_relaxed) || deadline_reached) {
+                rollback_batch();
+                return std::size_t{0};
+            }
+            break;
+        }
+        if (candidate.has_leaf_node && candidate.leaf_visit_reserved) {
+            ++impl_->nodes[candidate.path_nodes[
+                candidate.path_node_count - 1]].pending_visits;
+        }
+        pending.push_back(std::move(candidate));
+    }
+
+    if (pending.empty()) {
+        return std::size_t{0};
+    }
+
+    std::vector<PolicyValueMctsLeafRequest> requests;
+    std::vector<std::size_t> request_to_pending;
+    try {
+        requests.reserve(pending.size());
+        request_to_pending.reserve(pending.size());
+        for (std::size_t index = 0; index < pending.size(); ++index) {
+            PendingSimulation& simulation = pending[index];
+            if (!simulation.requires_evaluation) {
+                continue;
+            }
+            if (!simulation.leaf_position.has_value()) {
+                rollback_batch();
+                return std::unexpected("MCTS batch leaf is missing its position snapshot");
+            }
+            requests.push_back(PolicyValueMctsLeafRequest{
+                &*simulation.leaf_position,
+                &simulation.legal_moves,
+                std::span<float>(simulation.priors.data(), simulation.legal_moves.size()),
+                {},
+            });
+            request_to_pending.push_back(index);
+        }
+    } catch (const std::bad_alloc&) {
+        rollback_batch();
+        return std::unexpected("unable to stage bounded MCTS leaf requests");
+    }
+
+    if (!requests.empty()) {
+        std::expected<void, std::string> evaluated;
+        try {
+            evaluated = impl_->batch_evaluator(
+                std::span<PolicyValueMctsLeafRequest>(requests));
+        } catch (const std::exception& error) {
+            rollback_batch();
+            return std::unexpected("MCTS batch evaluator failed: " +
+                                   std::string(error.what()));
+        } catch (...) {
+            rollback_batch();
+            return std::unexpected("MCTS batch evaluator failed with an unknown error");
+        }
+        if (!evaluated.has_value()) {
+            rollback_batch();
+            return std::unexpected(evaluated.error());
+        }
+        for (std::size_t request_index = 0;
+             request_index < requests.size(); ++request_index) {
+            PolicyValueMctsLeafRequest& request = requests[request_index];
+            auto normalized = normalize_evaluation(request.evaluation, request.priors);
+            if (!normalized.has_value()) {
+                rollback_batch();
+                return std::unexpected(normalized.error());
+            }
+            PendingSimulation& simulation = pending[request_to_pending[request_index]];
+            simulation.leaf = *normalized;
+            if (simulation.leaf_position->is_claimable_draw() &&
+                simulation.leaf.value < 0.0F) {
+                simulation.leaf = draw_evaluation();
+            }
+        }
+    }
+
+    auto stopped = check_stop();
+    if (!stopped.has_value()) {
+        rollback_batch();
+        return std::unexpected(stopped.error());
+    }
+    if (stopped.value()) {
+        rollback_batch();
+        return std::size_t{0};
+    }
+
+    const auto expand_from_pending = [this](PendingSimulation& simulation) {
+        if (simulation.target == ExpansionTarget::node) {
+            Impl::Node& node = impl_->nodes[simulation.target_index];
+            node.evaluation_pending = false;
+            node.expanded = true;
+            node.leaf = simulation.leaf;
+            if (simulation.terminal || !simulation.allow_children) {
+                node.leaf_only = true;
+                return;
+            }
+            if (simulation.legal_moves.size() >
+                impl_->config.max_tree_edges - impl_->edges.size()) {
+                impl_->tree_capped = true;
+                node.leaf_only = true;
+                return;
+            }
+            node.first_edge = impl_->edges.size();
+            node.edge_count = simulation.legal_moves.size();
+            for (std::size_t index = 0; index < node.edge_count; ++index) {
+                Impl::Edge edge;
+                edge.metadata = simulation.legal_moves[index];
+                edge.prior = static_cast<double>(simulation.priors[index]);
+                impl_->edges.push_back(edge);
+            }
+        } else if (simulation.target == ExpansionTarget::cached_edge) {
+            Impl::Edge& edge = impl_->edges[simulation.target_index];
+            edge.evaluation_pending = false;
+            edge.cached_leaf = simulation.leaf;
+            edge.has_cached_leaf = true;
+            if (impl_->nodes.size() >= impl_->config.max_tree_nodes) {
+                impl_->tree_capped = true;
+            }
+        }
+    };
+
+    for (PendingSimulation& simulation : pending) {
+        expand_from_pending(simulation);
+        impl_->maximum_depth = std::max(impl_->maximum_depth, simulation.depth);
+    }
+    impl_->leaf_evaluations += requests.size();
+
+    const auto back_up = [this](PendingSimulation& simulation) {
+        if (simulation.has_leaf_node) {
+            Impl::Node& leaf_node = impl_->nodes[
+                simulation.path_nodes[simulation.path_node_count - 1]];
+            ++leaf_node.visits;
+            leaf_node.value_sum += static_cast<double>(simulation.leaf.value);
+            for (std::size_t result = 0; result < simulation.leaf.wdl.size(); ++result) {
+                leaf_node.wdl_sum[result] += simulation.leaf.wdl[result];
+            }
+        }
+        PolicyValueMctsEvaluation parent_value = simulation.leaf;
+        for (std::size_t offset = simulation.path_edge_count; offset > 0; --offset) {
+            const std::size_t edge_index = simulation.path_edges[offset - 1];
+            parent_value = flipped(parent_value);
+            Impl::Edge& edge = impl_->edges[edge_index];
+            ++edge.visits;
+            edge.value_sum += parent_value.value;
+            for (std::size_t result = 0; result < parent_value.wdl.size(); ++result) {
+                edge.wdl_sum[result] += parent_value.wdl[result];
+            }
+
+            Impl::Node& parent = impl_->nodes[simulation.path_nodes[offset - 1]];
+            ++parent.visits;
+            parent.value_sum += parent_value.value;
+            for (std::size_t result = 0; result < parent_value.wdl.size(); ++result) {
+                parent.wdl_sum[result] += parent_value.wdl[result];
+            }
+        }
+    };
+
+    for (PendingSimulation& simulation : pending) {
+        clear_reservations(simulation);
+        back_up(simulation);
+        ++impl_->simulations;
+    }
+    return pending.size();
 }
 
 PolicyValueMctsSnapshot PolicyValueMctsTree::snapshot(const std::size_t multipv) const {
