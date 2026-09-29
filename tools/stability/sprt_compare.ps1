@@ -119,8 +119,17 @@ function Start-ColorRun([string]$Color) {
         $arguments += @('-OpponentOptionsJsonPath', (& $quote $baselineOptionsCopy))
     }
     $logBase = Join-Path $root $Color
-    return Start-Process pwsh -ArgumentList $arguments -PassThru -WindowStyle Hidden `
-        -RedirectStandardOutput "$logBase.out.log" -RedirectStandardError "$logBase.err.log"
+    $startParameters = @{
+        FilePath = 'pwsh'
+        ArgumentList = $arguments
+        PassThru = $true
+        RedirectStandardOutput = "$logBase.out.log"
+        RedirectStandardError = "$logBase.err.log"
+    }
+    if ($env:OS -eq 'Windows_NT') {
+        $startParameters.WindowStyle = 'Hidden'
+    }
+    return Start-Process @startParameters
 }
 
 function Read-ColorResult([string]$Color) {
