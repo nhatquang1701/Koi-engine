@@ -27,9 +27,8 @@ struct ClockLimit {
 
 struct SearchLimits {
     std::optional<int> depth;
-    // `go mate N` asks for a mate in at most N moves. The controller turns it
-    // into the depth that is needed to prove it (2N - 1 plies) so the ordinary
-    // iterative deepening contract stays unchanged.
+    // `go mate N` asks for a mate in at most N moves. The UCI limit parser
+    // combines its 2N - 1 ply proof horizon with any explicit depth limit.
     std::optional<int> mate;
     // `go perft N` is a debugging command: the controller answers with the
     // per-move node counts and total instead of starting a search.

@@ -1692,6 +1692,18 @@ void test_go_limit_parser_maps_each_supported_limit_exactly() {
     require(!limits.infinite, "ordinary limits must not enable infinite search");
 }
 
+void test_go_mate_depth_combines_with_explicit_depth() {
+    const koi::SearchLimits mate_is_tighter =
+        koi::uci::parse_go_limits("mate 2 depth 5");
+    require(mate_is_tighter.mate == 2 && mate_is_tighter.depth == 3,
+            "mate 2 must cap a deeper explicit depth at three plies");
+
+    const koi::SearchLimits depth_is_tighter =
+        koi::uci::parse_go_limits("depth 1 mate 2");
+    require(depth_is_tighter.mate == 2 && depth_is_tighter.depth == 1,
+            "a shallower explicit depth must remain the effective limit");
+}
+
 void test_go_limit_parser_uses_a_scaled_bare_go_fallback_and_independent_clocks() {
     using namespace std::chrono_literals;
 
@@ -2661,6 +2673,7 @@ int main(int argc, char** argv) {
         {"position startpos and FEN", test_startpos_and_fen_move_lists_define_the_search_root},
         {"go limits and malformed values", test_all_go_limits_and_malformed_values_are_accepted_without_crashing},
         {"go limit parser exact mapping", test_go_limit_parser_maps_each_supported_limit_exactly},
+        {"go mate and depth limits", test_go_mate_depth_combines_with_explicit_depth},
         {"go limit fallback and clocks", test_go_limit_parser_uses_a_scaled_bare_go_fallback_and_independent_clocks},
         {"go limit parser Lucas root options", test_go_limit_parser_supports_lucas_root_options_and_value_defaults},
         {"go limit parser fallback", test_go_limit_parser_uses_fallback_for_missing_malformed_and_overflow_values},

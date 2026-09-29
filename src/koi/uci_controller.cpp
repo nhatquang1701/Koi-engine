@@ -597,6 +597,16 @@ SearchLimits parse_go_limits(std::string_view arguments) {
                                         black_increment.value_or(std::chrono::milliseconds::zero())};
     }
 
+    if (limits.mate.has_value()) {
+        // A UCI go command may provide several limits; the first reached ends
+        // the search. Keep the stricter of explicit depth and the mate proof
+        // horizon so `mate N` is not discarded when `depth` is also present.
+        const int mate_depth = 2 * *limits.mate - 1;
+        if (!limits.depth.has_value() || mate_depth < *limits.depth) {
+            limits.depth = mate_depth;
+        }
+    }
+
     const bool has_usable_limit = limits.depth.has_value() || limits.nodes.has_value() ||
         limits.movetime.has_value() || limits.white_clock.has_value() ||
         limits.black_clock.has_value() || limits.infinite || limits.ponder ||
@@ -1144,13 +1154,6 @@ void UciController::handle_go(std::istream& command) {
         start_perft(*limits.perft);
         return;
     }
-    if (limits.mate.has_value() && !limits.depth.has_value()) {
-        // `go mate N` proves a mate in at most N moves with an ordinary
-        // depth-limited search: 2N - 1 plies is exactly the horizon that can
-        // see every mating line of that length.
-        limits.depth = std::max(1, 2 * *limits.mate - 1);
-    }
-
     const bool has_explicit_limit = limits.depth.has_value() || limits.nodes.has_value() ||
         limits.movetime.has_value() || limits.infinite || limits.ponder;
     const bool has_side_to_move_clock = position_.side_to_move() == Color::white ?
