@@ -15,7 +15,7 @@ $outputDirectory = [System.IO.Path]::GetFullPath((Join-Path $repositoryRoot $rel
 $junitPath = Join-Path $outputDirectory 'ctest-junit.xml'
 $lastTestPath = Join-Path $outputDirectory 'LastTest.log'
 $fakeCTestPath = Join-Path $temporaryRoot 'fake-ctest.ps1'
-$powerShellPath = (Get-Command pwsh.exe -ErrorAction Stop).Source
+$powerShellPath = (Get-Process -Id $PID -ErrorAction Stop).Path
 
 function Assert-ContainedPath([string]$Path, [string]$Parent) {
     $fullPath = [System.IO.Path]::GetFullPath($Path)

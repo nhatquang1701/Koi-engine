@@ -129,6 +129,22 @@ jobs:
           ctest --test-dir build/ci-release -C Release -j 1 -R "^koi_uci_match_clock$" \
             --repeat until-pass:2 \
             --output-on-failure --output-junit build/ci-release/ctest-process-7-junit.xml
+      - name: Process suite - koi_engine_perft_responsiveness
+        env:
+          KOI_TEST_RETRIES: "3"
+        timeout-minutes: 6
+        run: |
+          ctest --test-dir build/ci-release -C Release -j 1 -R "^koi_engine_perft_responsiveness$" \
+            --repeat until-pass:2 \
+            --output-on-failure --output-junit build/ci-release/ctest-process-8-junit.xml
+      - name: Tool integration suite - run_tests_artifact_path
+        env:
+          KOI_TEST_RETRIES: "3"
+        timeout-minutes: 6
+        run: |
+          ctest --test-dir build/ci-release -C Release -j 1 -R "^run_tests_artifact_path$" \
+            --repeat until-pass:2 \
+            --output-on-failure --output-junit build/ci-release/ctest-process-9-junit.xml
       - name: Run the Python suite
         env:
           KOI_TEST_RETRIES: "3"
@@ -283,6 +299,14 @@ jobs:
           ctest --test-dir build/ci-release -C Release -j 1 -R "^koi_uci_match_clock$" \
             --repeat until-pass:2 \
             --output-on-failure --output-junit build/ci-release/ctest-process-7-junit.xml
+      - name: Process suite - koi_engine_perft_responsiveness
+        env:
+          KOI_TEST_RETRIES: "3"
+        timeout-minutes: 6
+        run: |
+          ctest --test-dir build/ci-release -C Release -j 1 -R "^koi_engine_perft_responsiveness$" \
+            --repeat until-pass:2 \
+            --output-on-failure --output-junit build/ci-release/ctest-process-8-junit.xml
       - name: Run the Python suite
         env:
           KOI_TEST_RETRIES: "3"
