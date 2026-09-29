@@ -201,9 +201,12 @@ jobs:
           # Clang 18 with libstdc++ cannot see <expected>: libstdc++ gates it on
           # __cpp_concepts >= 202002L, which Clang 17/18 report as 201907L.  This
           # leg therefore uses libc++ and skips the GCC-only static runtime flags.
+          # Ubuntu's libc++ 18 also gates std::jthread/std::stop_token behind its
+          # experimental-library opt-in, needed by the cancellable perft worker.
           cmake -S . -B build/ci-release -G Ninja -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_C_COMPILER=clang-18 -DCMAKE_CXX_COMPILER=clang++-18 \
-            -DCMAKE_CXX_FLAGS=-stdlib=libc++ -DCMAKE_EXE_LINKER_FLAGS=-stdlib=libc++ \
+            -DCMAKE_CXX_FLAGS="-stdlib=libc++ -D_LIBCPP_ENABLE_EXPERIMENTAL" \
+            -DCMAKE_EXE_LINKER_FLAGS=-stdlib=libc++ \
             -DKOI_STATIC_RUNTIME=OFF -DKOI_TEST_TIMEOUT_SECONDS=300 \
             -DPython3_EXECUTABLE="$(command -v python)"
           cmake --build build/ci-release --config Release -j 4

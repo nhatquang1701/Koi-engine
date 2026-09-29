@@ -528,6 +528,13 @@ if(KOI_BUILD_MODULES)
     )
 
     target_link_libraries(koi_module_tests PRIVATE koi_core)
+    # The default koi_core module BMI is built with AVX2 in Release. Clang
+    # rejects imports into a translation unit with a different target feature,
+    # so compile the module consumer for the same ISA (Debug stays baseline).
+    koi_arch_compile_option("/arch:AVX2" KOI_MODULE_TEST_ARCH_OPTION)
+    target_compile_options(koi_module_tests PRIVATE
+        "$<$<CONFIG:Release>:${KOI_MODULE_TEST_ARCH_OPTION}>"
+    )
 
     add_test(NAME koi_module_tests COMMAND koi_module_tests)
 endif()
