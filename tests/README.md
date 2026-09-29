@@ -56,7 +56,7 @@ ctest --test-dir build\release -N
 ctest --test-dir build\release -C Release -R koi_strength_tests --output-on-failure
 ```
 
-The current Windows Release configuration with Python 3 registers **80 tests**
+The current Windows Release configuration with Python 3 registers **81 tests**
 (`KOI_BUILD_SHADOW_DIFF=OFF`). The count varies
 with optional dependencies:
 `koi_shadow_diff_tests` requires `-DKOI_BUILD_SHADOW_DIFF=ON`, and
@@ -141,7 +141,8 @@ PowerShell process tests (`tests/integration/**/*.ps1`), driven through
   `koi_engine_time_safety_process`, `koi_benchmark_process`,
   `koi_uci_match_process`, `koi_stockfish_strength_option`, `koi_uci_match_clock`,
   `cutechess_stability_diagnostics`, `cutechess_stability_smoke`,
-  `hash_memory_stability`, `windows_ci_configuration`, `install_book_script`,
+  `run_tests_artifact_path`, `hash_memory_stability`, `windows_ci_configuration`,
+  `install_book_script`,
   `package_release_layout`.
 
 Python tooling tests (`tests/python/**/*.py`), run as `python -m unittest` with

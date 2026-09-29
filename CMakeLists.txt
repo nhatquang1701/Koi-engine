@@ -896,6 +896,20 @@ add_test(
 koi_set_timeout(koi_engine_perft_responsiveness 15)
 
 add_test(
+    NAME run_tests_artifact_path
+    COMMAND ${POWERSHELL_EXECUTABLE} -NoProfile -ExecutionPolicy Bypass -File
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/tools/run_tests_artifact_path_test.ps1"
+            -RunTestsPath "${CMAKE_CURRENT_SOURCE_DIR}/tools/test/run_tests.ps1"
+            -CMakePath "${CMAKE_COMMAND}"
+)
+
+koi_set_timeout(run_tests_artifact_path 30)
+set_tests_properties(run_tests_artifact_path PROPERTIES
+    LABELS "integration;tools"
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+)
+
+add_test(
     NAME koi_engine_variant_process
     COMMAND ${POWERSHELL_EXECUTABLE} -NoProfile -ExecutionPolicy Bypass -File
             "${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/uci/engine_variant_process_test.ps1"

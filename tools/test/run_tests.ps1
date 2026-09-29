@@ -97,6 +97,7 @@ if (-not $OutputDirectory) {
     $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
     $OutputDirectory = Join-Path "artifacts/verification/test-suite-hardening" "run-$stamp"
 }
+$OutputDirectory = [System.IO.Path]::GetFullPath($OutputDirectory)
 New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
 
 $arguments = @("--test-dir", $BuildDirectory, "-C", $Configuration, "--output-on-failure", "-j", "$Parallel")
