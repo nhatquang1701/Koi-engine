@@ -345,6 +345,20 @@ void test_sparse_piece_set_preserves_ascending_source_square_order() {
     }
 }
 
+void test_sparse_black_piece_set_preserves_ascending_source_square_order() {
+    const koi::Position position("r3k3/8/8/8/8/8/8/4K3 b - - 0 1");
+    const std::vector<std::string> expected{
+        "a8b8", "a8c8", "a8d8", "a8a7", "a8a6", "a8a5", "a8a4", "a8a3",
+        "a8a2", "a8a1", "e8f8", "e8f7", "e8e7", "e8d7", "e8d8"};
+    const std::vector<Move> actual = position.legal_moves();
+    require(actual.size() == expected.size(),
+            "sparse black position must generate all rook and king moves");
+    for (std::size_t index = 0; index < expected.size(); ++index) {
+        require(actual[index].uci() == expected[index],
+                "black piece iteration must preserve ascending source-square move order");
+    }
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -362,6 +376,7 @@ int main(int argc, char** argv) {
         {"search move transaction", test_search_move_transaction_preserves_shadow_consistency},
         {"fixed-buffer legal generation", test_fixed_buffer_legal_generation_matches_vector_api},
         {"sparse piece move ordering", test_sparse_piece_set_preserves_ascending_source_square_order},
+        {"sparse black piece move ordering", test_sparse_black_piece_set_preserves_ascending_source_square_order},
     };
     return koi::test::run_tests(tests, argc, argv);
 }

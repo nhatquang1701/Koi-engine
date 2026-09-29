@@ -1242,7 +1242,11 @@ private:
     template <bool TacticalOnly = false, typename MoveContainer>
     void generate_pseudo(MoveContainer& moves) {
         const Color side = state.side;
-        for (int from = 0; from < 64; ++from) {
+        const std::size_t side_index = side == Color::white ? 0U : 1U;
+        std::uint64_t origins = state.occupancy[side_index];
+        while (origins != 0) {
+            const int from = static_cast<int>(std::countr_zero(origins));
+            origins &= origins - 1;
             const Piece piece = state.board[static_cast<std::size_t>(from)];
             if (piece.empty() || piece.color != side) continue;
             const int file = file_of(from);
