@@ -249,6 +249,43 @@ void test_king_move_legality_ignores_the_vacated_origin() {
             "an attacked transit square must keep kingside castling illegal");
 }
 
+void test_check_evasions_are_screened_before_the_probe() {
+    // A rook checks along the first rank; only the interposition on f1 and
+    // king steps off the rank answer it.  Everything else must be rejected
+    // without applying the move.
+    const GameState blocked = require_state("4k3/8/8/8/8/3B4/8/4K2r w - - 0 1");
+    require(blocked.is_legal(require_move("d3f1")),
+            "an interposition on the checking ray must stay legal");
+    require(!blocked.is_legal(require_move("d3e4")) && !blocked.is_legal(require_move("d3c4")),
+            "bishop moves off the checking ray must stay illegal");
+    require(blocked.is_legal(require_move("e1d2")) && blocked.is_legal(require_move("e1e2")) &&
+                blocked.is_legal(require_move("e1f2")),
+            "king steps off the checking rank must stay legal");
+    require(!blocked.is_legal(require_move("e1d1")) && !blocked.is_legal(require_move("e1f1")),
+            "king steps along the checking rank must stay illegal");
+
+    // A pawn check can be answered by an en-passant capture of the checker
+    // even though the capture lands behind it.
+    const GameState pawn_check = require_state("4k3/8/8/3pP3/4K3/8/8/8 w - d6 0 1");
+    require(pawn_check.is_legal(require_move("e5d6")),
+            "capturing the checking pawn en passant must stay legal");
+    require(!pawn_check.is_legal(require_move("e5e6")),
+            "a pawn push that ignores the check must stay illegal");
+    require(pawn_check.is_legal(require_move("e4d5")),
+            "capturing the checking pawn with the king must stay legal");
+
+    // A double check can only be answered by a king move; the knight cannot
+    // capture or block both checkers.
+    const GameState double_check = require_state("4k3/8/8/8/8/8/1q6/K1r2N2 w - - 0 1");
+    require(double_check.is_legal(require_move("a1b2")),
+            "capturing one checker of a double check must stay legal");
+    require(!double_check.is_legal(require_move("f1e3")) &&
+                !double_check.is_legal(require_move("f1d2")) &&
+                !double_check.is_legal(require_move("a1b1")) &&
+                !double_check.is_legal(require_move("a1a2")),
+            "non-king moves against a double check must stay illegal");
+}
+
 void test_en_passant_identity_requires_a_legal_capture() {
     GameState pinned = require_state("7k/5p2/8/r5PK/8/8/8/8 b - - 0 1");
     const Move double_push = require_move("f7f5");
@@ -459,6 +496,7 @@ int main(int argc, char** argv) {
         {"clock, checkmate, and dead positions", test_move_clock_checkmate_and_dead_position_rules},
         {"make/unmake and special moves", test_make_unmake_and_special_move_rules},
         {"king move legality direct test", test_king_move_legality_ignores_the_vacated_origin},
+        {"check evasions screened", test_check_evasions_are_screened_before_the_probe},
         {"legal en-passant repetition identity", test_en_passant_identity_requires_a_legal_capture},
         {"unusable en-passant repetition identity", test_illegal_en_passant_identity_repeats_with_the_shadow},
         {"long replay history window", test_long_replays_keep_the_recent_history_window},

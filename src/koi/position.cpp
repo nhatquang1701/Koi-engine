@@ -799,13 +799,50 @@ bool move_requires_legality_probe(const Move& move) const noexcept {
     }
 
     // Full legality resolution for a move the cheap filter could not accept:
-    // king moves use the direct destination test, everything else applies the
-    // move and checks the mover's king.
+    // king moves use the direct destination test; a non-king move in check is
+    // first screened against the check, and everything else applies the move
+    // and checks the mover's king.
     [[nodiscard]] bool resolve_move_legality(const Move& move, Color mover) {
         const int from = move.from().index();
+        const int to = move.to().index();
         if (valid_square(from) &&
             state.board[static_cast<std::size_t>(from)].type == PieceType::king) {
             return king_move_is_legal(move);
+        }
+        const std::size_t side_index = mover == Color::white ? 0U : 1U;
+        const std::uint64_t checkers = state.checkers[side_index];
+        if (checkers != 0) {
+            // Only a capture of the single checker or an interposition on its
+            // ray can answer a check with a non-king move; a double check can
+            // only be answered by the king.  En passant is the one capture
+            // whose target square is not the checker's square.
+            if (!valid_square(to) || (checkers & (checkers - 1)) != 0) {
+                return false;
+            }
+            if ((bit(to) & checkers) == 0) {
+                const int king = king_square(state, mover);
+                const int checker = static_cast<int>(std::countr_zero(checkers));
+                bool answers = false;
+                if (king >= 0) {
+                    const std::uint64_t between =
+                        (detail::bishop_attacks(king, checkers) &
+                         detail::bishop_attacks(checker, bit(king))) |
+                        (detail::rook_attacks(king, checkers) &
+                         detail::rook_attacks(checker, bit(king)));
+                    answers = (bit(to) & between) != 0;
+                }
+                if (!answers && valid_square(from) &&
+                    state.board[static_cast<std::size_t>(from)].type == PieceType::pawn &&
+                    state.en_passant.index() < Square::kInvalid &&
+                    to == state.en_passant.index() &&
+                    state.board[static_cast<std::size_t>(to)].empty()) {
+                    const int captured = mover == Color::white ? to - 8 : to + 8;
+                    answers = captured == checker;
+                }
+                if (!answers) {
+                    return false;
+                }
+            }
         }
         const Snapshot saved = snapshot();
         apply_unchecked(move);
