@@ -353,6 +353,42 @@ void test_metadata_ordering_score_is_cached_with_see() {
             "ordering must publish its computed score into move metadata");
 }
 
+void test_picker_emitted_scores_match_recomputed_priority() {
+    // The picker stages each candidate with one stored priority and emits it
+    // later.  Whenever the emitted metadata cannot differ from the staged
+    // metadata, the emitted score must still equal a fresh computation with
+    // the same ordering tables and history context.
+    constexpr std::string_view fens[] = {
+        "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1",
+        "4k3/8/8/8/8/8/8/R3K3 w - - 0 1",
+        "8/2b1k3/7p/p1p1p2P/PpP1P3/1P1BK3/8/8 w - - 0 1",
+    };
+    for (const std::string_view fen : fens) {
+        const koi::GameState state = require_state(fen);
+        koi::detail::SearchMoveOrdering ordering;
+        const koi::detail::SearchHistoryContext context{};
+        for (const auto mode : {koi::detail::SearchMovePicker::Mode::main,
+                                koi::detail::SearchMovePicker::Mode::quiescence}) {
+            koi::MoveMetadataList moves;
+            if (mode == koi::detail::SearchMovePicker::Mode::quiescence) {
+                static_cast<void>(
+                    state.legal_tactical_moves_with_metadata(moves, true, false));
+            } else {
+                state.legal_moves_with_metadata(moves, true, false);
+            }
+            koi::detail::SearchMovePicker picker(ordering, state, moves, std::nullopt,
+                                                 context, 0, mode);
+            while (const std::optional<koi::MoveMetadata> emitted = picker.next()) {
+                koi::MoveMetadataList single;
+                static_cast<void>(single.push_back(*emitted));
+                ordering.order(state, single, std::nullopt, context);
+                require(single[0].ordering_score == emitted->ordering_score,
+                        "emitted picker scores must match a fresh priority computation");
+            }
+        }
+    }
+}
+
 void test_search_move_generation_can_defer_see() {
     const koi::GameState state = require_state(
         "4k3/8/8/3q4/4Q3/8/8/4K3 w - - 0 1");
@@ -458,6 +494,7 @@ int main(int argc, char** argv) {
         {"history saturation overflow safety", test_history_saturation_does_not_overflow_signed_intermediates},
         {"parent move feedback", test_parent_move_feedback_rewards_fail_low_and_penalizes_refutation},
         {"cached move scores", test_metadata_ordering_score_is_cached_with_see},
+        {"picker emitted scores", test_picker_emitted_scores_match_recomputed_priority},
         {"deferred SEE generation", test_search_move_generation_can_defer_see},
         {"quiet-only check metadata", test_search_move_generation_can_skip_capture_check_analysis},
         {"deferred SEE ordering", test_ordering_resolves_deferred_see_for_search_moves},

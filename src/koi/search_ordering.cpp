@@ -613,8 +613,17 @@ std::optional<MoveMetadata> SearchMovePicker::next() {
                 }
                 continue;
             }
-            metadata.ordering_score = ordering_.priority(
-                state_, metadata, std::nullopt, history_context_);
+            // The staged priority is reusable unless emitting the metadata
+            // could still change what the priority depends on: materializing a
+            // main-mode capture or promotion may resolve the lazy capture
+            // check, so those keep recomputing.  Evasion, quiescence, and
+            // quiet-stage candidates were fully materialized before ranking.
+            const bool materialization_can_alter_priority =
+                mode_ == Mode::main &&
+                (metadata.is_capture() || metadata.move.promotion() != Promotion::none);
+            metadata.ordering_score = materialization_can_alter_priority
+                ? ordering_.priority(state_, metadata, std::nullopt, history_context_)
+                : candidate.priority;
             return metadata;
         }
         if (stage_ == Stage::bad_captures) {
