@@ -1745,6 +1745,9 @@ bool GameState::legal_tactical_moves_with_metadata(MoveMetadataList& moves,
                                                     CheckFlagMode check_flag_mode) const noexcept {
     moves.clear();
     const std::uint64_t key = position_key();
+    // The tactical path selects its own check-probe mode per move, so the
+    // caller-supplied mode is retained only for interface compatibility.
+    (void)check_flag_mode;
     bool has_legal_moves = false;
     try {
         // Only the first `legal_count` entries are read; the generator writes
@@ -1763,20 +1766,21 @@ bool GameState::legal_tactical_moves_with_metadata(MoveMetadataList& moves,
             (tactical_only && impl_->native_position.has_legal_move());
         for (std::size_t index = 0; index < legal_count; ++index) {
             const Move& move = legal[index];
-            auto metadata = metadata_for_native_move(move, false, check_flag_mode);
+            const bool capture_or_promotion = impl_->native_position.is_capture(move) ||
+                move.promotion() != Promotion::none;
+            const bool needs_check_probe = checked || capture_or_promotion || include_quiet_checks;
+            if (!needs_check_probe) {
+                // A quiet, non-checking move outside checked play is never
+                // part of the tactical list, so do not build metadata for it.
+                continue;
+            }
+            const CheckFlagMode probe_mode = checked || capture_or_promotion ?
+                CheckFlagMode::all_moves : CheckFlagMode::quiet_moves_only;
+            const auto metadata = metadata_for_native_move(move, true, probe_mode);
             if (!metadata.has_value()) {
                 continue;
             }
-
-            const bool capture_or_promotion = metadata->is_capture() ||
-                metadata->move.promotion() != Promotion::none;
-            const bool needs_check_probe = checked || capture_or_promotion || include_quiet_checks;
-            if (needs_check_probe) {
-                const CheckFlagMode probe_mode = checked || capture_or_promotion ?
-                    CheckFlagMode::all_moves : CheckFlagMode::quiet_moves_only;
-                metadata = metadata_for_native_move(move, true, probe_mode);
-            }
-            if (checked || capture_or_promotion || (include_quiet_checks && metadata->gives_check)) {
+            if (checked || capture_or_promotion || metadata->gives_check) {
                 (void)moves.push_back(*metadata);
             }
         }

@@ -758,6 +758,52 @@ void test_fast_quiet_check_flags_match_exhaustive_move_descriptions() {
     }
 }
 
+void test_tactical_generation_matches_the_filtered_full_list() {
+    const std::array<std::string_view, 7> fixtures{
+        kInitialFen,
+        "k7/8/8/8/8/8/4Q3/4K3 w - - 0 1",
+        "k7/8/8/3q4/4Q3/8/8/4K3 w - - 0 1",
+        "4k3/P7/8/8/8/8/8/4K3 w - - 0 1",
+        "k3r3/8/8/8/8/8/8/4K3 w - - 0 1",
+        "7k/8/8/5pP1/7K/8/8/8 w - f6 0 2",
+        "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1",
+    };
+
+    for (const std::string_view fen : fixtures) {
+        const auto state_result = koi::GameState::from_fen(fen);
+        require(state_result.has_value(), "tactical list differential fixture must be valid");
+        const koi::GameState& state = *state_result;
+        koi::MoveMetadataList full;
+        state.legal_moves_with_metadata(full, true, false, koi::CheckFlagMode::all_moves);
+        const bool checked = state.in_check();
+        for (const bool include_quiet_checks : {false, true}) {
+            koi::MoveMetadataList tactical;
+            const bool has_legal_moves =
+                state.legal_tactical_moves_with_metadata(tactical, include_quiet_checks, false);
+            require(has_legal_moves, "tactical list differential fixture must have legal moves");
+
+            std::vector<const koi::MoveMetadata*> expected;
+            for (const koi::MoveMetadata& metadata : full) {
+                if (checked || metadata.is_capture() ||
+                    metadata.move.promotion() != koi::Promotion::none ||
+                    (include_quiet_checks && metadata.gives_check)) {
+                    expected.push_back(&metadata);
+                }
+            }
+
+            require(tactical.size() == expected.size(),
+                    "tactical generation must match the filtered full move list");
+            for (std::size_t index = 0; index < tactical.size(); ++index) {
+                require(tactical[index].move.uci() == expected[index]->move.uci() &&
+                        tactical[index].gives_check == expected[index]->gives_check &&
+                        tactical[index].kind == expected[index]->kind &&
+                        tactical[index].captured_piece == expected[index]->captured_piece,
+                        "tactical metadata must match the filtered full move list");
+            }
+        }
+    }
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -789,6 +835,7 @@ int main(int argc, char** argv) {
         {"fabricated metadata rejection", test_fabricated_metadata_is_rejected_by_native_legality},
         {"tactical quiet-check probe budget", test_tactical_generation_skips_quiet_check_probes_when_disabled},
         {"fast quiet-check differential", test_fast_quiet_check_flags_match_exhaustive_move_descriptions},
+        {"tactical list differential", test_tactical_generation_matches_the_filtered_full_list},
     };
 
     return koi::test::run_tests(tests, argc, argv);
