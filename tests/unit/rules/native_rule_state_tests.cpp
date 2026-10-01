@@ -178,6 +178,24 @@ void test_move_clock_checkmate_and_dead_position_rules() {
     require(!live.is_dead_position(), "a mobile pawn position must remain live");
 }
 
+void test_locked_wall_dead_position_survives_make_unmake() {
+    // Every make/unmake round trip must restore the wall board, the
+    // dead-position verdict, and the maintained position state together.
+    GameState state = require_state("8/2b1k3/7p/p1p1p2P/PpP1P3/1P1BK3/8/8 w - - 0 1");
+    require(state.is_dead_position() && state.draw_status() == koi::DrawStatus::dead_position,
+            "the locked pawn wall must be a dead position before any move");
+    const std::string original_fen = state.fen();
+    const std::vector<koi::Move> moves = state.legal_moves();
+    require(!moves.empty(), "the locked wall still has legal moves");
+    for (const koi::Move move : moves) {
+        require(state.make_move(move), "wall move must be legal");
+        require(state.unmake_move(), "wall move must unmake");
+        require(state.fen() == original_fen && state.is_dead_position() &&
+                    state.draw_status() == koi::DrawStatus::dead_position,
+                "unmake must restore the dead wall and its maintained occupancy");
+    }
+}
+
 void test_make_unmake_and_special_move_rules() {
     GameState state = require_state("r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 17 42");
     const std::string original_fen = state.fen();
@@ -417,6 +435,7 @@ int main(int argc, char** argv) {
         {"sparse piece move ordering", test_sparse_piece_set_preserves_ascending_source_square_order},
         {"sparse black piece move ordering", test_sparse_black_piece_set_preserves_ascending_source_square_order},
         {"occupied squares transactions", test_occupied_squares_track_make_unmake_transactions},
+        {"locked wall survives make/unmake", test_locked_wall_dead_position_survives_make_unmake},
     };
     return koi::test::run_tests(tests, argc, argv);
 }
