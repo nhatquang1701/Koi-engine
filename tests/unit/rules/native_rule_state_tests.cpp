@@ -359,6 +359,45 @@ void test_sparse_black_piece_set_preserves_ascending_source_square_order() {
     }
 }
 
+std::uint64_t piece_bitboard_union(const koi::Position& position) {
+    std::uint64_t occupied = 0;
+    for (const koi::Color color : {koi::Color::white, koi::Color::black}) {
+        for (const koi::PieceType type : {koi::PieceType::pawn, koi::PieceType::knight,
+                                          koi::PieceType::bishop, koi::PieceType::rook,
+                                          koi::PieceType::queen, koi::PieceType::king}) {
+            occupied |= position.piece_bitboard(type, color);
+        }
+    }
+    return occupied;
+}
+
+void test_occupied_squares_track_make_unmake_transactions() {
+    const std::vector<std::string> fens{
+        "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+        "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1",
+        "4k3/8/8/8/8/8/8/R3K3 w - - 0 1",
+        "k7/1P6/8/8/8/8/8/7K w - - 0 1",
+        "7k/8/8/5pP1/7K/8/8/8 w - f6 0 2",
+    };
+    for (const std::string& fen : fens) {
+        const GameState root = require_state(fen);
+        koi::Position native(fen);
+        require(native.occupied_squares() == piece_bitboard_union(native),
+                "fresh native occupancy must match the piece-bitboard union");
+        const std::vector<koi::MoveMetadata> moves = root.legal_moves_with_metadata();
+        for (const koi::MoveMetadata& metadata : moves) {
+            koi::Position child(native);
+            require(child.make_generated_move(metadata.move),
+                    "generated moves must apply to the native position");
+            require(child.occupied_squares() == piece_bitboard_union(child),
+                    "native occupancy must match the piece-bitboard union after a made move");
+            require(child.unmake_move(), "made moves must unmake");
+            require(child.occupied_squares() == piece_bitboard_union(child),
+                    "native occupancy must be restored by unmake");
+        }
+    }
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -377,6 +416,7 @@ int main(int argc, char** argv) {
         {"fixed-buffer legal generation", test_fixed_buffer_legal_generation_matches_vector_api},
         {"sparse piece move ordering", test_sparse_piece_set_preserves_ascending_source_square_order},
         {"sparse black piece move ordering", test_sparse_black_piece_set_preserves_ascending_source_square_order},
+        {"occupied squares transactions", test_occupied_squares_track_make_unmake_transactions},
     };
     return koi::test::run_tests(tests, argc, argv);
 }

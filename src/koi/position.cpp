@@ -993,6 +993,8 @@ std::vector<Move> legal_moves() {
         return state.piece_bitboards[color == Color::white ? 0 : 1][type_index];
     }
 
+    [[nodiscard]] std::uint64_t occupied_squares() const noexcept { return state.occupied; }
+
     [[nodiscard]] bool in_check() const noexcept { return is_checked(state, state.side); }
 
     [[nodiscard]] bool in_check(Color color) const noexcept { return is_checked(state, color); }
@@ -1577,6 +1579,10 @@ std::size_t Position::piece_count() const noexcept { return impl_->position.piec
 
 std::uint64_t Position::piece_bitboard(PieceType type, Color color) const noexcept {
     return impl_->position.piece_bitboard(type, color);
+}
+
+std::uint64_t Position::occupied_squares() const noexcept {
+    return impl_->position.occupied_squares();
 }
 
 bool Position::in_check() const noexcept { return impl_->position.in_check(); }

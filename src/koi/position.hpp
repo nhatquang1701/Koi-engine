@@ -71,6 +71,8 @@ public:
     [[nodiscard]] std::uint64_t pawn_key() const noexcept;
     [[nodiscard]] std::size_t piece_count() const noexcept;
     [[nodiscard]] std::uint64_t piece_bitboard(PieceType type, Color color) const noexcept;
+    // Combined occupancy of both colors, maintained by native make/unmake.
+    [[nodiscard]] std::uint64_t occupied_squares() const noexcept;
     [[nodiscard]] bool in_check() const noexcept;
     [[nodiscard]] bool in_check(Color color) const noexcept;
     [[nodiscard]] bool has_non_pawn_material(Color color) const noexcept;

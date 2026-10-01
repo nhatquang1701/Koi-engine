@@ -1082,13 +1082,9 @@ bool native_move_gives_check(const Position& position, const Move& move) noexcep
         return false;
     }
 
-    std::uint64_t occupied = 0;
-    for (const Color color : {Color::white, Color::black}) {
-        for (const PieceType type : {PieceType::pawn, PieceType::knight, PieceType::bishop,
-                                     PieceType::rook, PieceType::queen, PieceType::king}) {
-            occupied |= position.piece_bitboard(type, color);
-        }
-    }
+    // The native position maintains combined occupancy through make and
+    // unmake, so reuse it instead of rebuilding it from the piece bitboards.
+    std::uint64_t occupied = position.occupied_squares();
 
     const std::uint64_t source_bit = std::uint64_t{1} << source;
     const std::uint64_t destination_bit = std::uint64_t{1} << destination;
