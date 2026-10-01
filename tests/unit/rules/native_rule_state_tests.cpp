@@ -217,6 +217,38 @@ void test_make_unmake_and_special_move_rules() {
             "en-passant exposing the king to a rook must be rejected");
 }
 
+void test_king_move_legality_ignores_the_vacated_origin() {
+    // The rook on a2 checks the king on b2.  After b2c2 the b2 square is
+    // empty, so the rook attacks c2 even though the current occupancy still
+    // shows the king blocking the ray; the direct king-move test must reject
+    // it while keeping the capture and the steps off the ray legal.
+    const GameState checked = require_state("7k/8/8/8/8/8/rK6/8 w - - 0 1");
+    require(!checked.is_legal(require_move("b2c2")),
+            "a king must not step along the checking ray it vacates");
+    require(checked.is_legal(require_move("b2a2")),
+            "capturing the checking rook must stay legal");
+    require(checked.is_legal(require_move("b2b3")) && checked.is_legal(require_move("b2c1")),
+            "king steps off the checking ray must stay legal");
+    require(!checked.is_legal(require_move("b2a1")) && !checked.is_legal(require_move("b2a3")),
+            "king steps onto the rook's file must stay illegal");
+
+    // Quiet positions exercise the same direct test without a check.
+    const GameState quiet = require_state("7k/8/8/8/8/8/r7/1K6 w - - 0 1");
+    require(quiet.is_legal(require_move("b1c1")) && quiet.is_legal(require_move("b1a2")),
+            "quiet king moves away from the rook must stay legal");
+    require(!quiet.is_legal(require_move("b1b2")) && !quiet.is_legal(require_move("b1c2")) &&
+                !quiet.is_legal(require_move("b1a1")),
+            "quiet king moves onto attacked squares must stay illegal");
+
+    // Castling is validated during generation and must keep working.
+    const GameState castling = require_state("r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1");
+    require(castling.is_legal(require_move("e1g1")) && castling.is_legal(require_move("e1c1")),
+            "castling must stay legal on both sides");
+    const GameState blocked = require_state("r3k2r/8/8/8/8/8/6b1/R3K2R w KQkq - 0 1");
+    require(!blocked.is_legal(require_move("e1g1")) && blocked.is_legal(require_move("e1c1")),
+            "an attacked transit square must keep kingside castling illegal");
+}
+
 void test_en_passant_identity_requires_a_legal_capture() {
     GameState pinned = require_state("7k/5p2/8/r5PK/8/8/8/8 b - - 0 1");
     const Move double_push = require_move("f7f5");
@@ -426,6 +458,7 @@ int main(int argc, char** argv) {
         {"repetition thresholds", test_claimable_and_automatic_repetition_thresholds},
         {"clock, checkmate, and dead positions", test_move_clock_checkmate_and_dead_position_rules},
         {"make/unmake and special moves", test_make_unmake_and_special_move_rules},
+        {"king move legality direct test", test_king_move_legality_ignores_the_vacated_origin},
         {"legal en-passant repetition identity", test_en_passant_identity_requires_a_legal_capture},
         {"unusable en-passant repetition identity", test_illegal_en_passant_identity_repeats_with_the_shadow},
         {"long replay history window", test_long_replays_keep_the_recent_history_window},

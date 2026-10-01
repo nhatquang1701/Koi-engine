@@ -774,6 +774,46 @@ bool move_requires_legality_probe(const Move& move) const noexcept {
     return false;
 }
 
+    // King moves are decided directly: after the king vacates `from`, the
+    // destination must not be attacked.  Castling is already fully validated
+    // during generation (path clear, not in check, transit and destination
+    // safe), so it needs no probe at all.  Clearing `from` from the occupancy
+    // is what makes the ray the king steps along visible; without it a
+    // checking slider behind the king would be missed.
+    [[nodiscard]] bool king_move_is_legal(const Move& move) noexcept {
+        const int from = move.from().index();
+        const int to = move.to().index();
+        if (!valid_square(from) || !valid_square(to)) {
+            return false;
+        }
+        const int from_file = file_of(from);
+        const int to_file = file_of(to);
+        if (from_file - to_file == 2 || to_file - from_file == 2) {
+            return true;
+        }
+        const std::uint64_t saved_occupied = state.occupied;
+        state.occupied &= ~bit(from);
+        const bool attacked = square_attacked(state, to, opposite(state.side));
+        state.occupied = saved_occupied;
+        return !attacked;
+    }
+
+    // Full legality resolution for a move the cheap filter could not accept:
+    // king moves use the direct destination test, everything else applies the
+    // move and checks the mover's king.
+    [[nodiscard]] bool resolve_move_legality(const Move& move, Color mover) {
+        const int from = move.from().index();
+        if (valid_square(from) &&
+            state.board[static_cast<std::size_t>(from)].type == PieceType::king) {
+            return king_move_is_legal(move);
+        }
+        const Snapshot saved = snapshot();
+        apply_unchecked(move);
+        const bool legal = !is_checked(state, mover);
+        restore(saved);
+        return legal;
+    }
+
 std::vector<Move> legal_moves() {
     const Color mover = state.side;
     MoveBuffer pseudo;
@@ -783,10 +823,7 @@ std::vector<Move> legal_moves() {
     for (const Move& move : pseudo) {
         bool legal = !move_requires_legality_probe(move);
         if (!legal) {
-            const Snapshot saved = snapshot();
-            apply_unchecked(move);
-            legal = !is_checked(state, mover);
-            restore(saved);
+            legal = resolve_move_legality(move, mover);
         }
         if (legal) {
             result.push_back(move);
@@ -804,10 +841,7 @@ std::vector<Move> legal_moves() {
     for (const Move& move : pseudo) {
         bool legal = !move_requires_legality_probe(move);
         if (!legal) {
-            const Snapshot saved = snapshot();
-            apply_unchecked(move);
-            legal = !is_checked(state, mover);
-            restore(saved);
+            legal = resolve_move_legality(move, mover);
         }
         if (legal) {
             // Count every legal move; a too-small span only drops moves.
@@ -838,10 +872,7 @@ std::vector<Move> legal_moves() {
         for (const Move& move : pseudo) {
             bool legal = !move_requires_legality_probe(move);
             if (!legal) {
-                const Snapshot saved = snapshot();
-                apply_unchecked(move);
-                legal = !is_checked(state, mover);
-                restore(saved);
+                legal = resolve_move_legality(move, mover);
             }
             if (legal) {
                 return true;
