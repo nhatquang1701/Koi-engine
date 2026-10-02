@@ -3,7 +3,8 @@
 This directory vendors the upstream Stockfish 19 source tree for two
 non-production purposes:
 
-- **Search guidance.** `docs/superpowers/plans/` plans reference the Stockfish 19
+- **Search guidance.** Historical design and planning records referenced the
+  Stockfish 19
   source under
   `stockfish-windows-x86-64-universal/stockfish/src` when comparing search
   heuristics. Koi does not compile, link, or include any of this code.

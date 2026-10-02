@@ -99,10 +99,9 @@ search or changing the public `SearchService` contract.
 
 Stages 1 through 5 cover native state ownership, search lifecycle and stack,
 ordering/policy, evaluation/NNUE worker state, and TT/budget runtime resources.
-The final Stage 6 review records the module/tooling alignment, Release and
+The final Stage 6 review recorded the module/tooling alignment, Release and
 Debug evidence, Stockfish-informed self-review, future-change test, and the
-known short-clock/Debug limitations:
-[final architecture review](superpowers/verification/2026-09-12-koi-architecture-stage6-final-review.md).
+known short-clock/Debug limitations.
 The architecture is accepted as the baseline for future strength work. Lazy
 SMP has since landed for `Threads > 1` (see the search section above); shared
 histories across helper threads remain deliberately future work.

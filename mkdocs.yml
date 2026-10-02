@@ -59,6 +59,3 @@ nav:
   - Reference:
       - Documentation map: docs/overview.md
       - Release notes: docs/releases/v1.0.0.md
-      - Generated artifacts: artifacts/README.md
-  - Project archive:
-      - Browse the archive: archive/index.md

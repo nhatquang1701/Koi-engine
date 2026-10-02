@@ -39,17 +39,12 @@ workflow. The guide complements these repository references:
 
 - [Test layout](../tests/README.md)
 - [Developer tools](../tools/README.md)
-- [Generated artifacts](../artifacts/README.md)
 - [Contributing](../CONTRIBUTING.md)
 
-## Reference and archive
+## Reference
 
 [Release notes](releases/v1.0.0.md) document the current package. The
 [documentation map](README.md) links the maintained repository documentation.
-The project archive preserves [design specifications](superpowers/specs/README.md),
-[implementation plans](superpowers/plans/README.md), and
-[verification records](superpowers/verification/README.md) as searchable
-historical context.
 
 For the GitHub repository entry point, see the concise
 [root README](../README.md).

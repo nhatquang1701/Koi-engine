@@ -1,8 +1,8 @@
 .superpowers/
+docs/superpowers/
 /build/
 /out/
 /artifacts/*
-!/artifacts/README.md
 
 **/__pycache__/
 *.py[cod]
