@@ -30,7 +30,7 @@ TRAINER = REPO_ROOT / "tools" / "measurement" / "train_nnue_koi.py"
 
 DEFAULT_HIDDEN_UNITS = 1024
 DEFAULT_HIDDEN_SHIFTS = (6, 7, 8)
-DEFAULT_OUTPUT_SHIFTS = (12, 14, 16, 18, 20)
+DEFAULT_OUTPUT_SHIFTS = (4, 5, 6, 7, 8)
 
 
 class KoiBackend:

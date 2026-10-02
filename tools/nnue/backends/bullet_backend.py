@@ -112,7 +112,7 @@ class BulletBackend:
             "--val-fraction", repr(config.get("val_fraction", 0.05)),
             "--data-dir", str(config.get("bullet_data_dir", DEFAULT_DATA_DIR)),
             "--hidden-shifts", *[str(value) for value in config.get("koi_hidden_shifts", [6, 7, 8])],
-            "--output-shifts", *[str(value) for value in config.get("koi_output_shifts", [12, 14, 16, 18, 20])],
+            "--output-shifts", *[str(value) for value in config.get("bullet_output_shifts", [12, 14, 16, 18, 20])],
         ]
         if arch == "v5":
             command += [

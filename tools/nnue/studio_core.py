@@ -110,7 +110,7 @@ def default_config() -> dict[str, Any]:
         "output_shifts": [3, 4, 5, 6],
         "koi_hidden_units": 1536,
         "koi_hidden_shifts": [6, 7, 8],
-        "koi_output_shifts": [12, 14, 16, 18, 20],
+        "koi_output_shifts": [4, 5, 6, 7, 8],
         "bullet_hidden_units": 1536,
         "bullet_l1_units": 32,
         "bullet_l1_shifts": [6, 7, 8],
