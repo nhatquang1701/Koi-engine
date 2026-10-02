@@ -1727,9 +1727,9 @@ void GameState::legal_moves_with_metadata(MoveMetadataList& moves,
         const std::size_t legal_count = impl_->native_position.legal_moves_into(legal);
         for (std::size_t index = 0; index < legal_count; ++index) {
             const Move& move = legal[index];
-            const auto metadata = metadata_for_native_move(move, include_check_flags,
-                                                           check_flag_mode);
-            if (!metadata.has_value() || !moves.push_back(*metadata)) {
+            MoveMetadata metadata{};
+            if (!fill_native_move_metadata(move, include_check_flags, check_flag_mode, metadata) ||
+                !moves.push_back(metadata)) {
                 break;
             }
         }
@@ -1776,12 +1776,12 @@ bool GameState::legal_tactical_moves_with_metadata(MoveMetadataList& moves,
             }
             const CheckFlagMode probe_mode = checked || capture_or_promotion ?
                 CheckFlagMode::all_moves : CheckFlagMode::quiet_moves_only;
-            const auto metadata = metadata_for_native_move(move, true, probe_mode);
-            if (!metadata.has_value()) {
+            MoveMetadata metadata{};
+            if (!fill_native_move_metadata(move, true, probe_mode, metadata)) {
                 continue;
             }
-            if (checked || capture_or_promotion || metadata->gives_check) {
-                (void)moves.push_back(*metadata);
+            if (checked || capture_or_promotion || metadata.gives_check) {
+                (void)moves.push_back(metadata);
             }
         }
     } catch (...) {
@@ -1811,20 +1811,20 @@ std::optional<MoveMetadata> GameState::describe_move(const Move& move) const noe
     return metadata;
 }
 
-std::optional<MoveMetadata> GameState::metadata_for_native_move(
+bool GameState::fill_native_move_metadata(
     const Move& move, const bool include_check_flags,
-    const CheckFlagMode check_flag_mode) const noexcept {
+    const CheckFlagMode check_flag_mode, MoveMetadata& metadata) const noexcept {
     if (move.is_no_move() || move.from().index() >= Square::kInvalid ||
         move.to().index() >= Square::kInvalid) {
-        return std::nullopt;
+        return false;
     }
     const Piece moving = impl_->native_position.piece_at(move.from());
     if (moving.empty() || moving.color != side_to_move()) {
-        return std::nullopt;
+        return false;
     }
 
     const Piece target = impl_->native_position.piece_at(move.to());
-    MoveMetadata metadata{};
+    metadata = MoveMetadata{};
     metadata.move = move;
     metadata.moving_piece = moving.type;
     metadata.captured_piece = target.empty() ? PieceType::none : target.type;
@@ -1851,6 +1851,16 @@ std::optional<MoveMetadata> GameState::metadata_for_native_move(
         } else {
             metadata.gives_check = impl_->compatibility_mirror.gives_check(move);
         }
+    }
+    return true;
+}
+
+std::optional<MoveMetadata> GameState::metadata_for_native_move(
+    const Move& move, const bool include_check_flags,
+    const CheckFlagMode check_flag_mode) const noexcept {
+    MoveMetadata metadata{};
+    if (!fill_native_move_metadata(move, include_check_flags, check_flag_mode, metadata)) {
+        return std::nullopt;
     }
     return metadata;
 }

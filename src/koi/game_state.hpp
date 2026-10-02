@@ -350,6 +350,12 @@ public:
 
 private:
     [[nodiscard]] int direct_static_exchange_gain(const MoveMetadata&) const noexcept;
+    // Shared body of metadata_for_native_move. Fills `out` and returns false
+    // when the move cannot be described; the optional-returning wrapper stays
+    // for non-hot callers.
+    [[nodiscard]] bool fill_native_move_metadata(
+        const Move&, bool include_check_flags, CheckFlagMode check_flag_mode,
+        MoveMetadata& out) const noexcept;
     [[nodiscard]] std::optional<MoveMetadata> metadata_for_native_move(
         const Move&, bool include_check_flags, CheckFlagMode check_flag_mode) const noexcept;
     bool apply_generated_move(const MoveMetadata&, bool verify_shadow_legality,
