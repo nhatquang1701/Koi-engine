@@ -463,7 +463,10 @@ void SearchMovePicker::prepare_candidates() {
         if (is_excluded(index)) {
             continue;
         }
-        MoveMetadata metadata = moves_[index];
+        // Rank from the stored metadata directly; only the materialize path
+        // needs a mutable copy.
+        MoveMetadata materialized{};
+        const MoveMetadata* metadata = &moves_[index];
 
         Stage candidate_stage = Stage::done;
         if (mode_ == Mode::evasion) {
@@ -472,12 +475,12 @@ void SearchMovePicker::prepare_candidates() {
             // Stockfish's qsearch capture stage emits the complete capture
             // list and lets qsearch SEE/delta pruning decide what is safe;
             // do not discard a mildly losing recapture in the picker.
-            if (metadata.is_capture() || metadata.move.promotion() != Promotion::none) {
+            if (metadata->is_capture() || metadata->move.promotion() != Promotion::none) {
                 candidate_stage = Stage::good_captures;
-            } else if (metadata.gives_check) {
+            } else if (metadata->gives_check) {
                 candidate_stage = Stage::quiet_checks;
             }
-        } else if (metadata.move.promotion() != Promotion::none || metadata.is_capture()) {
+        } else if (metadata->move.promotion() != Promotion::none || metadata->is_capture()) {
             candidate_stage = Stage::good_captures;
         } else {
             // Quiet checks, killers, counter moves, and ordinary quiets all
@@ -498,18 +501,19 @@ void SearchMovePicker::prepare_candidates() {
         // This remains fixed-storage and computes SEE only for candidates
         // entering a tactical stage.
         if (mode_ == Mode::quiescence &&
-            (metadata.is_capture() || metadata.move.promotion() != Promotion::none)) {
-            metadata = materialize(index);
+            (metadata->is_capture() || metadata->move.promotion() != Promotion::none)) {
+            materialized = materialize(index);
+            metadata = &materialized;
         }
         const int priority = ordering_.priority(
-            state_, metadata, std::nullopt, history_context_);
+            state_, *metadata, std::nullopt, history_context_);
         if (mode_ == Mode::main && candidate_stage == Stage::good_quiets &&
             priority <= kGoodQuietPriorityThreshold) {
             candidate_stage = Stage::bad_quiets;
         }
         staged_[candidate_count_++] = Candidate{
             static_cast<std::uint16_t>(index), static_cast<std::uint8_t>(candidate_stage),
-            priority, move_tie_break_key(metadata.move)};
+            priority, move_tie_break_key(metadata->move)};
     }
 
     std::sort(staged_.begin(), staged_.begin() + candidate_count_,
