@@ -43,6 +43,7 @@ import argparse
 import hashlib
 import json
 import math
+import os
 import pathlib
 import struct
 import sys
@@ -470,7 +471,7 @@ def batches_dual(own_indices, own_offsets, opp_indices, opp_offsets, buckets, ta
 
 
 def validate_v5(model, own_indices, own_offsets, opp_indices, opp_offsets, buckets,
-                scores, order, batch_size, pad_length) -> np.ndarray:
+                scores, order, batch_size, pad_length, device=None) -> np.ndarray:
     model.eval()
     prediction = np.empty(order.size, dtype=np.float64)
     position = 0
@@ -479,8 +480,14 @@ def validate_v5(model, own_indices, own_offsets, opp_indices, opp_offsets, bucke
             own_indices, own_offsets, opp_indices, opp_offsets, buckets, scores,
             order, batch_size, pad_length
         ):
+            if device is not None:
+                own_flat = own_flat.to(device)
+                own_weights = own_weights.to(device)
+                opp_flat = opp_flat.to(device)
+                opp_weights = opp_weights.to(device)
+                batch_buckets = batch_buckets.to(device)
             value = model(own_flat, own_weights, opp_flat, opp_weights, batch_buckets)
-            prediction[position : position + own_flat.shape[0]] = value.numpy()
+            prediction[position : position + own_flat.shape[0]] = value.cpu().numpy()
             position += own_flat.shape[0]
     return prediction * TARGET_SCALE
 
@@ -701,6 +708,16 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def resolve_training_device() -> "torch.device":
+    """Select the training device; set KOI_NNUE_DEVICE=cpu|cuda to override."""
+    preference = os.environ.get("KOI_NNUE_DEVICE", "auto").strip().lower()
+    if preference == "cuda" and not torch.cuda.is_available():
+        raise TrainerError("KOI_NNUE_DEVICE=cuda was set but CUDA is not available")
+    if preference == "cpu" or not torch.cuda.is_available():
+        return torch.device("cpu")
+    return torch.device("cuda")
+
+
 def main_v5(args, rng) -> int:
     """Train, quantize, and export a v5 network (threats + dual-perspective head)."""
     if torch is None:  # pragma: no cover - environment dependent
@@ -708,6 +725,8 @@ def main_v5(args, rng) -> int:
     if not args.dataset and not args.corpus:
         raise TrainerError("either --dataset or --corpus is required")
     torch.set_num_threads(max(1, args.threads))
+    device = resolve_training_device()
+    log(f"training device {device} (torch {torch.__version__}, cuda {torch.version.cuda})")
     hidden_units = args.hidden_units
     if hidden_units < 32 or hidden_units % 2 != 0:
         raise TrainerError("hidden units must be even and at least 32")
@@ -741,6 +760,7 @@ def main_v5(args, rng) -> int:
     if args.float_in:
         model.load_state_dict(torch.load(args.float_in, map_location="cpu"))
         log(f"loaded float checkpoint from {args.float_in}")
+    model.to(device)
     epochs = 0 if args.float_in else max(1, args.epochs)
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate,
                                   weight_decay=args.weight_decay)
@@ -755,6 +775,12 @@ def main_v5(args, rng) -> int:
              batch_targets) in batches_dual(
                 own_indices, own_offsets, opp_indices, opp_offsets, buckets, targets,
                 train_order, args.batch_size, pad_length):
+            own_flat = own_flat.to(device)
+            own_weights = own_weights.to(device)
+            opp_flat = opp_flat.to(device)
+            opp_weights = opp_weights.to(device)
+            batch_buckets = batch_buckets.to(device)
+            batch_targets = batch_targets.to(device)
             optimizer.zero_grad()
             prediction = model(own_flat, own_weights, opp_flat, opp_weights, batch_buckets)
             loss = loss_fn(prediction, batch_targets)
@@ -766,12 +792,18 @@ def main_v5(args, rng) -> int:
         train_loss = loss_total / max(1, seen)
         val_prediction = validate_v5(model, own_indices, own_offsets, opp_indices,
                                      opp_offsets, buckets, targets, val_order,
-                                     args.batch_size, pad_length)
+                                     args.batch_size, pad_length, device)
         val_loss = float(np.mean(np.abs(val_prediction / TARGET_SCALE - targets[val_order])))
         val_mae = float(np.mean(np.abs(val_prediction - scores[val_order])))
         log(f"epoch {epoch}/{epochs} train_loss {train_loss:.5f} val_loss {val_loss:.5f} "
             f"val_mae_cp {val_mae:.2f} time {time.perf_counter() - epoch_started:.1f}s")
+    if device.type == "cuda":
+        torch.cuda.synchronize()
+    model.to("cpu")
+    if device.type == "cuda":
+        torch.cuda.empty_cache()
     if args.float_out:
+        pathlib.Path(args.float_out).parent.mkdir(parents=True, exist_ok=True)
         torch.save(model.state_dict(), args.float_out)
         log(f"saved float checkpoint to {args.float_out}")
 
