@@ -158,8 +158,15 @@ struct SearchContext {
         }
     };
 
-    static constexpr std::size_t kEvaluationCacheSize = 32 * 1024;
-    static constexpr std::size_t kQSearchCacheSize = 4 * 1024;
+    // Direct-mapped static-evaluation cache.  Iterative deepening re-evaluates
+    // the same subtree repeatedly, so collisions between distinct positions
+    // cost real evaluator work; 64K entries keep the working set of a search
+    // comfortably inside the table on this hardware.
+    static constexpr std::size_t kEvaluationCacheSize = 64 * 1024;
+    // 16K entries (256 KiB) keeps the direct-mapped quotient-cache collision
+    // rate low across iterative deepening; the entries are exact-key checked,
+    // so the size only trades memory for hit rate.
+    static constexpr std::size_t kQSearchCacheSize = 16 * 1024;
     // Upper bound on how many `interrupted()` calls may skip the wall-clock
     // read. Every call still inspects the atomic stop flags, so an external
     // stop is immediate; only a timer deadline can be observed a few hundred

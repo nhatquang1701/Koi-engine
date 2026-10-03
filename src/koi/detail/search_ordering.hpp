@@ -130,11 +130,15 @@ private:
         std::uint32_t tie_break;
     };
 
+    static constexpr std::size_t kStageRankCount =
+        static_cast<std::size_t>(Stage::done) + 1U;
+
     [[nodiscard]] bool is_excluded(std::size_t index) const noexcept;
     [[nodiscard]] bool is_good_capture(const MoveMetadata& metadata) const noexcept;
     [[nodiscard]] Stage first_stage() const noexcept;
     [[nodiscard]] MoveMetadata materialize(std::size_t index);
     void prepare_candidates();
+    void ensure_stage_sorted() noexcept;
     void advance_stage() noexcept;
     [[nodiscard]] std::optional<MoveMetadata> emit_tt();
 
@@ -157,6 +161,12 @@ private:
     std::bitset<kMaximumLegalMoves> capture_checks_{};
     std::array<std::int16_t, kMaximumLegalMoves> see_scores_;
     std::array<Candidate, kMaximumLegalMoves> staged_;
+    // Candidates are grouped by stage rank once per preparation; each group is
+    // sorted with the full comparator only when its stage is first reached, so
+    // stages that pruning skips never pay for a sort.
+    std::array<std::uint16_t, kStageRankCount> stage_begin_{};
+    std::array<std::uint16_t, kStageRankCount> stage_end_{};
+    std::bitset<kStageRankCount> stage_sorted_{};
     // The good-capture pass is already ordered by the same history/MVV score
     // used by the bad-capture pass. Keep only source indices for deferred
     // captures instead of copying the complete Candidate record a second time.

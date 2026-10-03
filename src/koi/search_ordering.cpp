@@ -516,11 +516,35 @@ void SearchMovePicker::prepare_candidates() {
             priority, move_tie_break_key(metadata->move)};
     }
 
+    // Partition by stage rank and sort each stage lazily.  The previous
+    // whole-array comparator's first key was the stage rank itself, so
+    // grouping by rank and then sorting each group with the remaining keys
+    // produces exactly the same emission order; stages that pruning never
+    // reaches are never sorted at all.
     std::sort(staged_.begin(), staged_.begin() + candidate_count_,
               [](const Candidate& lhs, const Candidate& rhs) {
-                  if (lhs.stage_rank != rhs.stage_rank) {
-                      return lhs.stage_rank < rhs.stage_rank;
-                  }
+                  return lhs.stage_rank < rhs.stage_rank;
+              });
+    std::size_t stage_offset = 0;
+    for (std::size_t rank = 0; rank < kStageRankCount; ++rank) {
+        stage_begin_[rank] = static_cast<std::uint16_t>(stage_offset);
+        while (stage_offset < candidate_count_ &&
+               staged_[stage_offset].stage_rank == rank) {
+            ++stage_offset;
+        }
+        stage_end_[rank] = static_cast<std::uint16_t>(stage_offset);
+    }
+    stage_sorted_.reset();
+}
+
+void SearchMovePicker::ensure_stage_sorted() noexcept {
+    const std::size_t rank = static_cast<std::size_t>(stage_);
+    if (rank >= kStageRankCount || stage_sorted_.test(rank)) {
+        return;
+    }
+    stage_sorted_.set(rank);
+    std::sort(staged_.begin() + stage_begin_[rank], staged_.begin() + stage_end_[rank],
+              [](const Candidate& lhs, const Candidate& rhs) {
                   if (lhs.priority != rhs.priority) {
                       return lhs.priority > rhs.priority;
                   }
@@ -599,6 +623,7 @@ std::optional<MoveMetadata> SearchMovePicker::next() {
         if (!candidates_prepared_) {
             prepare_candidates();
         }
+        ensure_stage_sorted();
         while (candidate_index_ < candidate_count_ &&
                staged_[candidate_index_].stage_rank < static_cast<std::uint8_t>(stage_)) {
             ++candidate_index_;
