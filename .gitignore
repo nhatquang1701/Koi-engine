@@ -18,6 +18,7 @@ tools/nnue/bullet_train/target/
 *.dll
 
 .opencode/
+.dsh-outputs/
 book.bin
 *.nnue
 *.pt
