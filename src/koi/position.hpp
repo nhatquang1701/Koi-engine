@@ -41,6 +41,27 @@ public:
     [[nodiscard]] bool has_legal_move() const noexcept;
     [[nodiscard]] bool is_legal(const Move& move) const noexcept;
     [[nodiscard]] bool is_capture(const Move& move) const noexcept;
+    // Per-move board facts resolved in one pass: the origin and destination
+    // occupants, the en-passant target comparison, and the capture verdict.
+    // Hot metadata callers need all of them for the same move, so resolving
+    // them once replaces up to six independent piece/en-passant lookups.
+    struct MoveFacts {
+        bool valid = false;              // endpoints are on-board and not a null move
+        bool occupied_from = false;      // the origin square holds a piece
+        bool occupied_to = false;        // the destination square holds a piece
+        bool own_piece_on_from = false;  // the origin piece belongs to the side to move
+        bool en_passant_target = false;  // the destination is the en-passant target square
+        Piece from{};
+        Piece to{};
+
+        // Identical verdict to is_capture() for the move these facts describe.
+        [[nodiscard]] constexpr bool is_capture() const noexcept {
+            return own_piece_on_from &&
+                ((!to.empty() && to.color != from.color) ||
+                 (from.type == PieceType::pawn && to.empty() && en_passant_target));
+        }
+    };
+    [[nodiscard]] MoveFacts move_facts(const Move& move) const noexcept;
     bool make_move(const Move& move) noexcept;
     // Applies a move that came from this position's legal move generator.
     // Callers must not use this for unvalidated external input.

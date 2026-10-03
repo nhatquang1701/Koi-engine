@@ -88,6 +88,19 @@ FeatureMasks feature_masks(const PositionFeatures& features) noexcept {
     return masks;
 }
 
+// Ascending-square iteration over a feature bitboard. `std::countr_zero` yields
+// the lowest set bit first, which reproduces the `for (square = 0; ...)` board
+// scans it replaces, so per-piece accumulation order stays bit-identical.
+// Callers keep their own board scan as the `occupied == 0` fallback.
+template <typename Fn>
+void for_each_feature_square(std::uint64_t bits, Fn&& visit) noexcept {
+    while (bits != 0) {
+        const int square = static_cast<int>(std::countr_zero(bits));
+        bits &= bits - 1;
+        visit(square);
+    }
+}
+
 int sliding_mobility(const PositionFeatures& features, std::uint8_t square,
                      PieceType type) noexcept {
     if (square >= 64) {
@@ -157,25 +170,38 @@ int development_for(const EvaluationFeatures& extracted, Color color) noexcept {
     if (phase >= 16 && features.fullmove_number <= 6 && features.development[own] < 3) {
         const std::uint8_t home_square = color == Color::white ? 3 : 59;
         int queen_development_penalty = 0;
-        const bool queen_on_early_square = [&]() noexcept {
-            for (std::uint8_t square = 0; square < 64; ++square) {
-                const Piece piece = features.board[square];
-                if (piece.type != PieceType::queen || piece.color != color) {
-                    continue;
-                }
-                const int rank = square / 8;
-                const bool on_own_half = color == Color::white ? rank <= 3 : rank >= 4;
-                if (square == home_square || !on_own_half) {
-                    return false;
-                }
-                const int file = square % 8;
-                queen_development_penalty = file <= 1 || file >= 6 ?
-                    kEvaluation.early_queen_development_penalty :
-                    kEvaluation.central_queen_development_penalty;
-                return true;
+        // The scan stops at the first queen of `color` in ascending square
+        // order, so the visited set is iterated in the same order it was
+        // scanned. `decided` stops the bitboard walk once that queen is seen.
+        bool decided = false;
+        bool queen_on_early_square = false;
+        const auto inspect_queen = [&](const int square) noexcept {
+            if (decided) {
+                return;
             }
-            return false;
-        }();
+            const Piece piece = features.board[static_cast<std::size_t>(square)];
+            if (piece.type != PieceType::queen || piece.color != color) {
+                return;
+            }
+            decided = true;
+            const int rank = square / 8;
+            const bool on_own_half = color == Color::white ? rank <= 3 : rank >= 4;
+            if (square == home_square || !on_own_half) {
+                return;
+            }
+            const int file = square % 8;
+            queen_development_penalty = file <= 1 || file >= 6 ?
+                kEvaluation.early_queen_development_penalty :
+                kEvaluation.central_queen_development_penalty;
+            queen_on_early_square = true;
+        };
+        if (features.occupied != 0) {
+            for_each_feature_square(features.occupied, inspect_queen);
+        } else {
+            for (std::uint8_t square = 0; square < 64 && !decided; ++square) {
+                inspect_queen(square);
+            }
+        }
         if (queen_on_early_square) {
             opening_development -= queen_development_penalty;
         }
@@ -241,11 +267,19 @@ int king_ring_attack_units(const PositionFeatures& features, Color color) noexce
     // is too noisy; the tapered king-activity and passed-pawn terms are the
     // authoritative signals there.  Keep this middlegame safety feature out
     // of bare-queen/king tactical references as well as practical endgames.
-    const auto piece_count = static_cast<int>(std::count_if(
-        features.board.begin(), features.board.end(), [](const Piece piece) {
-            return !piece.empty();
-        }));
-    if (features.game_phase < 8 || piece_count <= 8 || features.fullmove_number <= 10) {
+    // Cheap gates first: the phase and move-number tests reject most positions
+    // before the occupancy count, and a stored occupancy makes that count a
+    // single popcount instead of a 64-square scan.
+    if (features.game_phase < 8 || features.fullmove_number <= 10) {
+        return 0;
+    }
+    const int piece_count = features.occupied != 0
+        ? std::popcount(features.occupied)
+        : static_cast<int>(std::count_if(
+              features.board.begin(), features.board.end(), [](const Piece piece) {
+                  return !piece.empty();
+              }));
+    if (piece_count <= 8) {
         return 0;
     }
 
@@ -286,14 +320,21 @@ int king_ring_attack_units(const PositionFeatures& features, Color color) noexce
     const int king_file = king % 8;
     const int king_rank = king / 8;
     const Color attacker = opposite(color);
+
+    // `attacked_squares[attacker]` is the union of the attacker's masks built
+    // from the same tables this loop queries, and the ring is exactly
+    // `king_attacks(king)` (the loop skips the king square and off-board
+    // squares), so an empty intersection proves no attacker touches the ring.
+    if (features.occupied != 0 &&
+        (features.attacked_squares[color_index(attacker)] & detail::king_attacks(king)) == 0) {
+        return 0;
+    }
+
     const FeatureMasks masks = feature_masks(features);
 
     int units = 0;
-    for (std::uint8_t source = 0; source < 64; ++source) {
-        const Piece piece = features.board[source];
-        if (piece.empty() || piece.color != attacker) {
-            continue;
-        }
+    const auto count_attacker = [&](const int source) noexcept {
+        const Piece piece = features.board[static_cast<std::size_t>(source)];
 
         bool attacks_ring = false;
         for (int file = king_file - 1; file <= king_file + 1 && !attacks_ring; ++file) {
@@ -301,7 +342,7 @@ int king_ring_attack_units(const PositionFeatures& features, Color color) noexce
                 if (!inside(file, rank) || (file == king_file && rank == king_rank)) {
                     continue;
                 }
-                if (piece_attacks_square(features, source,
+                if (piece_attacks_square(features, static_cast<std::uint8_t>(source),
                                          static_cast<std::uint8_t>(rank * 8 + file),
                                          masks.occupied)) {
                     attacks_ring = true;
@@ -310,7 +351,7 @@ int king_ring_attack_units(const PositionFeatures& features, Color color) noexce
             }
         }
         if (!attacks_ring) {
-            continue;
+            return;
         }
 
         switch (piece.type) {
@@ -333,6 +374,18 @@ int king_ring_attack_units(const PositionFeatures& features, Color color) noexce
         case PieceType::none:
             break;
         }
+    };
+
+    if (features.occupied != 0) {
+        for_each_feature_square(features.colors[color_index(attacker)], count_attacker);
+    } else {
+        for (std::uint8_t source = 0; source < 64; ++source) {
+            const Piece piece = features.board[source];
+            if (piece.empty() || piece.color != attacker) {
+                continue;
+            }
+            count_attacker(source);
+        }
     }
     return units;
 }
@@ -354,17 +407,13 @@ int pawn_break_for(const PositionFeatures& features, Color color) noexcept {
     const int enemy = 1 - own;
     const int direction = color == Color::white ? 1 : -1;
     int potential = 0;
-    for (std::uint8_t square = 0; square < 64; ++square) {
-        const Piece pawn = features.board[square];
-        if (pawn.type != PieceType::pawn || color_index(pawn.color) != own) {
-            continue;
-        }
+    const auto inspect_pawn = [&](const int square) noexcept {
         const int file = square % 8;
         const int rank = square / 8;
         const int forward_rank = rank + direction;
         if (!inside(file, forward_rank) ||
             !features.board[static_cast<std::size_t>(forward_rank * 8 + file)].empty()) {
-            continue;
+            return;
         }
         bool has_break = false;
         for (const int adjacent_file : {file - 1, file + 1}) {
@@ -380,6 +429,17 @@ int pawn_break_for(const PositionFeatures& features, Color color) noexcept {
         if (has_break) {
             ++potential;
         }
+    };
+    if (features.occupied != 0) {
+        for_each_feature_square(features.pawns[static_cast<std::size_t>(own)], inspect_pawn);
+    } else {
+        for (std::uint8_t square = 0; square < 64; ++square) {
+            const Piece pawn = features.board[square];
+            if (pawn.type != PieceType::pawn || color_index(pawn.color) != own) {
+                continue;
+            }
+            inspect_pawn(square);
+        }
     }
     return potential * kEvaluation.pawn_break_bonus *
         (static_cast<int>(features.game_phase) + kEvaluation.center_control_phase_offset) /
@@ -392,10 +452,10 @@ int initiative_for(const PositionFeatures& features, Color color) noexcept {
     const int phase_taper = static_cast<int>(features.game_phase) +
         kEvaluation.center_control_phase_offset;
     int score = 0;
-    for (std::uint8_t square = 0; square < 64; ++square) {
-        const Piece piece = features.board[square];
+    const auto inspect_square = [&](const int square) noexcept {
+        const Piece piece = features.board[static_cast<std::size_t>(square)];
         if (piece.empty() || piece.type == PieceType::king) {
-            continue;
+            return;
         }
         const std::uint64_t square_bit = std::uint64_t{1} << square;
         if (color_index(piece.color) == enemy) {
@@ -407,16 +467,24 @@ int initiative_for(const PositionFeatures& features, Color color) noexcept {
                 (features.attacked_squares[enemy] & square_bit) == 0) {
                 score += piece_value(piece.type) * kEvaluation.attacked_piece_pressure_weight / 100;
             }
-            continue;
+            return;
         }
 
         if ((features.attacked_squares[enemy] & square_bit) != 0 &&
             (features.attacked_squares[own] & square_bit) == 0) {
             score -= piece_value(piece.type) * kEvaluation.hanging_piece_penalty / 100;
         }
-        if (piece.type == PieceType::knight && piece_mobility(features, square) == 0) {
+        if (piece.type == PieceType::knight &&
+            piece_mobility(features, static_cast<std::uint8_t>(square)) == 0) {
             score -= kEvaluation.trapped_piece_penalty * phase_taper /
                 (kEvaluation.maximum_phase + kEvaluation.center_control_phase_offset);
+        }
+    };
+    if (features.occupied != 0) {
+        for_each_feature_square(features.occupied, inspect_square);
+    } else {
+        for (std::uint8_t square = 0; square < 64; ++square) {
+            inspect_square(square);
         }
     }
     return score;
@@ -500,8 +568,11 @@ bool pawn_is_passed_bitboard(const PositionFeatures& features, int enemy, int fi
 
 template <typename Fn>
 void for_each_feature_pawn(const PositionFeatures& features, int color, Fn&& visit) noexcept {
-    std::uint64_t pawns = features.pawns[static_cast<std::size_t>(color)];
-    if (pawns != 0) {
+    // The stored pawn bitboard is only meaningful when the features came from
+    // an extraction (`occupied != 0`); synthetic fixtures keep the board scan
+    // even when they happen to hold no pawns at all.
+    if (features.occupied != 0) {
+        std::uint64_t pawns = features.pawns[static_cast<std::size_t>(color)];
         while (pawns != 0) {
             const int square = static_cast<int>(std::countr_zero(pawns));
             pawns &= pawns - 1;
@@ -521,22 +592,18 @@ int pawn_structure_for(const PositionFeatures& features, Color color) noexcept {
     const int own = color_index(color);
     const int enemy = 1 - own;
     std::array<int, 8> own_file_counts{};
-    std::array<int, 8> enemy_file_counts{};
     if (features.occupied != 0) {
         for (int file = 0; file < 8; ++file) {
             own_file_counts[static_cast<std::size_t>(file)] =
                 std::popcount(features.pawns[own] & file_mask(file));
-            enemy_file_counts[static_cast<std::size_t>(file)] =
-                std::popcount(features.pawns[enemy] & file_mask(file));
         }
     } else {
         for (std::uint8_t square = 0; square < 64; ++square) {
             const Piece piece = features.board[square];
-            if (piece.type != PieceType::pawn) {
+            if (piece.type != PieceType::pawn || color_index(piece.color) != own) {
                 continue;
             }
-            auto& counts = color_index(piece.color) == own ? own_file_counts : enemy_file_counts;
-            ++counts[square % 8];
+            ++own_file_counts[static_cast<std::size_t>(square % 8)];
         }
     }
 
@@ -723,14 +790,12 @@ int activity_for(const PositionFeatures& features, Color color) noexcept {
     const int enemy = 1 - own;
     int score = 0;
     int bishops = 0;
-    for (std::uint8_t square = 0; square < 64; ++square) {
-        const Piece piece = features.board[square];
-        if (piece.empty() || color_index(piece.color) != own) {
-            continue;
-        }
+    const auto inspect_square = [&](const int square) noexcept {
+        const Piece piece = features.board[static_cast<std::size_t>(square)];
         if (piece.type == PieceType::bishop) {
             ++bishops;
-            score += sliding_mobility(features, square, PieceType::bishop) * kEvaluation.bishop_mobility_weight;
+            score += sliding_mobility(features, static_cast<std::uint8_t>(square),
+                                      PieceType::bishop) * kEvaluation.bishop_mobility_weight;
         } else if (piece.type == PieceType::knight) {
             const int file = square % 8;
             const int rank = square / 8;
@@ -749,7 +814,19 @@ int activity_for(const PositionFeatures& features, Color color) noexcept {
                 score += kEvaluation.rook_seventh_rank_bonus;
             }
         } else if (piece.type == PieceType::queen) {
-            score += sliding_mobility(features, square, PieceType::queen) * kEvaluation.queen_mobility_weight;
+            score += sliding_mobility(features, static_cast<std::uint8_t>(square),
+                                      PieceType::queen) * kEvaluation.queen_mobility_weight;
+        }
+    };
+    if (features.occupied != 0) {
+        for_each_feature_square(features.colors[static_cast<std::size_t>(own)], inspect_square);
+    } else {
+        for (std::uint8_t square = 0; square < 64; ++square) {
+            const Piece piece = features.board[square];
+            if (piece.empty() || color_index(piece.color) != own) {
+                continue;
+            }
+            inspect_square(square);
         }
     }
     if (bishops >= 2) {
@@ -802,11 +879,10 @@ int endgame_scale_for(const PositionFeatures& features) noexcept {
     int queens[2]{};
     int pawns[2]{};
     int bishop_square[2] = {-1, -1};
-    for (std::uint8_t square = 0; square < 64; ++square) {
-        const Piece piece = features.board[square];
-        if (piece.empty()) {
-            continue;
-        }
+    // Ascending visit order keeps "last bishop per colour" identical to the
+    // scan this replaced.
+    const auto count_piece = [&](const int square) noexcept {
+        const Piece piece = features.board[static_cast<std::size_t>(square)];
         const int own = color_index(piece.color);
         switch (piece.type) {
         case PieceType::knight: ++knights[own]; break;
@@ -817,6 +893,16 @@ int endgame_scale_for(const PositionFeatures& features) noexcept {
         case PieceType::king:
         case PieceType::none:
             break;
+        }
+    };
+    if (features.occupied != 0) {
+        for_each_feature_square(features.occupied, count_piece);
+    } else {
+        for (std::uint8_t square = 0; square < 64; ++square) {
+            if (features.board[square].empty()) {
+                continue;
+            }
+            count_piece(square);
         }
     }
     if (rooks[0] != 0 || rooks[1] != 0 || queens[0] != 0 || queens[1] != 0) {
@@ -865,16 +951,25 @@ EvaluationBreakdown ClassicalEvaluator::breakdown(const GameState& state, Color 
 
     const int phase = features.game_phase;
 
-    for (std::uint8_t square = 0; square < 64; ++square) {
-        const Piece piece = features.board[square];
-        if (piece.empty()) {
-            continue;
-        }
+    const auto accumulate_piece = [&](const int square) noexcept {
+        const Piece piece = features.board[static_cast<std::size_t>(square)];
         const int signed_value = piece_value(piece.type) * (piece.color == Color::white ? 1 : -1);
         score.material += signed_value;
-        const std::uint8_t table_square = piece.color == Color::white ? square : mirrored_square(square);
+        const std::uint8_t table_square = piece.color == Color::white
+            ? static_cast<std::uint8_t>(square)
+            : mirrored_square(static_cast<std::uint8_t>(square));
         const int value = tapered_piece_square(piece.type, table_square, phase);
         score.piece_square += piece.color == Color::white ? value : -value;
+    };
+    if (features.occupied != 0) {
+        for_each_feature_square(features.occupied, accumulate_piece);
+    } else {
+        for (std::uint8_t square = 0; square < 64; ++square) {
+            if (features.board[square].empty()) {
+                continue;
+            }
+            accumulate_piece(square);
+        }
     }
 
     score.mobility = (static_cast<int>(features.mobility[0]) -

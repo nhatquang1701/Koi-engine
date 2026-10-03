@@ -45,7 +45,10 @@ public:
     [[nodiscard]] const Move* end() const noexcept { return storage_.data() + size_; }
 
 private:
-    std::array<Move, kMaximumLegalMoves> storage_{};
+    // Uninitialized on purpose: every read is bounded by size_ and every write
+    // goes through emplace_back, which stores the element before counting it.
+    // Value-initializing would zero 256 Moves (1 KiB) on every generation call.
+    std::array<Move, kMaximumLegalMoves> storage_;
     std::size_t size_ = 0;
 };
 
@@ -951,6 +954,28 @@ std::vector<Move> legal_moves() {
              move.to() == state.en_passant);
     }
 
+    // Single-pass resolution of every board fact the metadata builders need.
+    // The verdicts are exactly those of the individual accessors; callers that
+    // need several of them for one move pay for one pass instead of six.
+    [[nodiscard]] Position::MoveFacts move_facts(const Move& move) const noexcept {
+        Position::MoveFacts facts;
+        const std::uint8_t source = move.from().index();
+        const std::uint8_t destination = move.to().index();
+        if (source >= Square::kInvalid || destination >= Square::kInvalid) {
+            return facts;
+        }
+        facts.valid = true;
+        facts.from = state.board[source];
+        facts.to = state.board[destination];
+        facts.occupied_from = !facts.from.empty();
+        facts.occupied_to = !facts.to.empty();
+        facts.own_piece_on_from = facts.occupied_from && facts.from.color == state.side;
+        // state.en_passant is kInvalid when no en-passant capture is
+        // available, which no on-board destination can match.
+        facts.en_passant_target = destination == state.en_passant.index();
+        return facts;
+    }
+
     bool apply_legal(const Move& move) {
         const auto legal = legal_moves();
         if (std::find(legal.begin(), legal.end(), move) == legal.end()) return false;
@@ -1597,6 +1622,10 @@ bool Position::has_legal_move() const noexcept {
 bool Position::is_legal(const Move& move) const noexcept { return impl_->position.is_legal(move); }
 
 bool Position::is_capture(const Move& move) const noexcept { return impl_->position.is_capture(move); }
+
+Position::MoveFacts Position::move_facts(const Move& move) const noexcept {
+    return impl_->position.move_facts(move);
+}
 
 bool Position::make_move(const Move& move) noexcept { return impl_->position.make_move(move); }
 

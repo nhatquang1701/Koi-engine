@@ -1068,35 +1068,60 @@ std::uint64_t native_feature_attacks(const NativeFeatureBitboards& pieces,
     return 0;
 }
 
-bool native_move_gives_check(const Position& position, const Move& move) noexcept {
+// Position-invariant inputs of the per-move check probe.  A legal move list is
+// probed against one unchanged board, so the enemy king bitboard, the combined
+// occupancy, and the mover's slider bitboards are read once per list instead of
+// once per move.
+struct NativeCheckProbe {
+    std::uint64_t enemy_king = 0;
+    std::uint64_t occupied = 0;
+    std::uint64_t friendly_rook_queen = 0;
+    std::uint64_t friendly_bishop_queen = 0;
+    Color moving_color = Color::white;
+};
+
+[[nodiscard]] NativeCheckProbe native_check_probe(const Position& position) noexcept {
+    NativeCheckProbe probe;
+    probe.moving_color = position.side_to_move();
+    probe.enemy_king = position.piece_bitboard(PieceType::king, opposite(probe.moving_color));
+    probe.occupied = position.occupied_squares();
+    probe.friendly_rook_queen = position.piece_bitboard(PieceType::rook, probe.moving_color) |
+        position.piece_bitboard(PieceType::queen, probe.moving_color);
+    probe.friendly_bishop_queen = position.piece_bitboard(PieceType::bishop, probe.moving_color) |
+        position.piece_bitboard(PieceType::queen, probe.moving_color);
+    return probe;
+}
+
+// `facts` must have been resolved from the same position as `probe`;
+// `castling` reports whether the move has the castling shape.
+bool native_move_gives_check(const Move& move, const Position::MoveFacts& facts,
+                             const NativeCheckProbe& probe, const bool castling) noexcept {
     const std::uint8_t source = move.from().index();
     const std::uint8_t destination = move.to().index();
     if (source >= Square::kInvalid || destination >= Square::kInvalid) {
         return false;
     }
 
-    const Color moving_color = position.side_to_move();
-    const Color enemy_color = opposite(moving_color);
-    const std::uint64_t enemy_king = position.piece_bitboard(PieceType::king, enemy_color);
+    const Color moving_color = probe.moving_color;
+    const std::uint64_t enemy_king = probe.enemy_king;
     if (enemy_king == 0) {
         return false;
     }
 
     // The native position maintains combined occupancy through make and
     // unmake, so reuse it instead of rebuilding it from the piece bitboards.
-    std::uint64_t occupied = position.occupied_squares();
+    std::uint64_t occupied = probe.occupied;
 
     const std::uint64_t source_bit = std::uint64_t{1} << source;
     const std::uint64_t destination_bit = std::uint64_t{1} << destination;
     occupied &= ~source_bit;
-    if (!position.piece_at(Square::from_index(destination)).empty()) {
+    if (facts.occupied_to) {
         occupied &= ~destination_bit;
     }
 
-    const Piece moving_piece = position.piece_at(Square::from_index(source));
-    if (moving_piece.type == PieceType::pawn &&
-        position.en_passant_square().index() == destination &&
-        position.piece_at(Square::from_index(destination)).empty()) {
+    const Piece moving_piece = facts.from;
+    if (moving_piece.type == PieceType::pawn && facts.en_passant_target &&
+        !facts.occupied_to) {
         const int captured_square = static_cast<int>(destination) +
             (moving_color == Color::white ? -8 : 8);
         if (captured_square >= 0 && captured_square < 64) {
@@ -1105,8 +1130,6 @@ bool native_move_gives_check(const Position& position, const Move& move) noexcep
     }
     occupied |= destination_bit;
 
-    const bool castling = moving_piece.type == PieceType::king &&
-        std::abs(static_cast<int>(destination % 8) - static_cast<int>(source % 8)) == 2;
     std::uint8_t rook_source = Square::kInvalid;
     std::uint8_t rook_destination = Square::kInvalid;
     if (castling) {
@@ -1155,10 +1178,8 @@ bool native_move_gives_check(const Position& position, const Move& move) noexcep
     // The vacated squares are masked out of the friendly slider bitboards so
     // the moved piece is never counted at its old square.
     const int king_square = static_cast<int>(std::countr_zero(enemy_king));
-    std::uint64_t friendly_rook_queen = position.piece_bitboard(PieceType::rook, moving_color) |
-        position.piece_bitboard(PieceType::queen, moving_color);
-    std::uint64_t friendly_bishop_queen = position.piece_bitboard(PieceType::bishop, moving_color) |
-        position.piece_bitboard(PieceType::queen, moving_color);
+    std::uint64_t friendly_rook_queen = probe.friendly_rook_queen;
+    std::uint64_t friendly_bishop_queen = probe.friendly_bishop_queen;
     friendly_rook_queen &= ~source_bit;
     friendly_bishop_queen &= ~source_bit;
     if (castling) {
@@ -1177,6 +1198,72 @@ bool native_move_gives_check(const Position& position, const Move& move) noexcep
         return true;
     }
     return false;
+}
+
+// Legacy per-move entry point.  It resolves the board facts and the invariant
+// probe for a single move, preserving the original behavior for callers that
+// probe a move outside a generated list (GameState::move_gives_check).
+bool native_move_gives_check(const Position& position, const Move& move) noexcept {
+    const Position::MoveFacts facts = position.move_facts(move);
+    const bool castling = facts.from.type == PieceType::king &&
+        std::abs(static_cast<int>(move.to().index() % 8) -
+                 static_cast<int>(move.from().index() % 8)) == 2;
+    return native_move_gives_check(move, facts, native_check_probe(position), castling);
+}
+
+// Native position plus the mirror check authority.  A null mirror means mirror
+// tracking is detached (the search path), which selects the native probe.
+struct NativeMetadataContext {
+    const Position* position = nullptr;
+    const detail::CompatibilityMirror* mirror = nullptr;
+};
+
+// Shared metadata body for one generated move.  `facts` is resolved from
+// `context->position` for `move`, and `probe` from the same position; the
+// resulting values are identical to the former per-move accessor calls.
+bool fill_move_metadata_from_facts(const NativeMetadataContext& context, const Move& move,
+                                   const Position::MoveFacts& facts,
+                                   const NativeCheckProbe& probe,
+                                   const bool include_check_flags,
+                                   const CheckFlagMode check_flag_mode,
+                                   MoveMetadata& metadata) noexcept {
+    if (!facts.valid || !facts.own_piece_on_from) {
+        return false;
+    }
+    const Piece moving = facts.from;
+    metadata = MoveMetadata{};
+    metadata.move = move;
+    metadata.moving_piece = moving.type;
+    metadata.captured_piece = facts.occupied_to ? facts.to.type : PieceType::none;
+    metadata.kind = MoveKind::quiet;
+    if (move.promotion() != Promotion::none) {
+        metadata.kind = MoveKind::promotion;
+    } else if (moving.type == PieceType::king &&
+               std::abs(static_cast<int>(move.to().index()) -
+                        static_cast<int>(move.from().index())) == 2) {
+        metadata.kind = MoveKind::castling;
+    } else if (facts.is_capture()) {
+        metadata.kind = facts.occupied_to ? MoveKind::capture : MoveKind::en_passant;
+        if (!facts.occupied_to) {
+            metadata.captured_piece = PieceType::pawn;
+        }
+    }
+
+    const bool analyze_check = include_check_flags &&
+        (check_flag_mode == CheckFlagMode::all_moves ||
+         (check_flag_mode == CheckFlagMode::quiet_moves_only &&
+          !metadata.is_capture() && move.promotion() == Promotion::none));
+    if (analyze_check) {
+        if (check_flag_mode == CheckFlagMode::quiet_moves_only || context.mirror == nullptr) {
+            // For a legal move the castling shape carried by `kind` is exactly
+            // the file-distance test the probe applies internally.
+            metadata.gives_check = native_move_gives_check(
+                move, facts, probe, metadata.kind == MoveKind::castling);
+        } else {
+            metadata.gives_check = context.mirror->gives_check(move);
+        }
+    }
+    return true;
 }
 
 PositionFeatures native_position_features(const Position& position) noexcept {
@@ -1725,18 +1812,41 @@ void GameState::legal_moves_with_metadata(MoveMetadataList& moves,
         // them all before use, so the zero-fill pass is skipped.
         std::array<Move, kMaximumLegalMoves> legal;
         const std::size_t legal_count = impl_->native_position.legal_moves_into(legal);
+        const NativeMetadataContext context{
+            &impl_->native_position,
+            impl_->mirror_tracking ? &impl_->compatibility_mirror : nullptr};
+        // The check probe reads only position-invariant state, so it is built
+        // once for the list; a mode that never probes pays nothing.
+        const bool probe_checks = include_check_flags &&
+            (check_flag_mode == CheckFlagMode::quiet_moves_only || context.mirror == nullptr);
+        const NativeCheckProbe probe = probe_checks && legal_count != 0 ?
+            native_check_probe(*context.position) : NativeCheckProbe{};
         for (std::size_t index = 0; index < legal_count; ++index) {
             const Move& move = legal[index];
             MoveMetadata metadata{};
-            if (!fill_native_move_metadata(move, include_check_flags, check_flag_mode, metadata) ||
-                !moves.push_back(metadata)) {
+            if (!fill_move_metadata_from_facts(context, move,
+                                               impl_->native_position.move_facts(move),
+                                               probe, include_check_flags, check_flag_mode,
+                                               metadata)) {
+                break;
+            }
+            if (!include_see) {
+                // Callers that skip SEE only need the stamp, so fold the
+                // finalize pass into the fill instead of walking the list a
+                // second time; the stamped values are unchanged.
+                metadata.position_key = key;
+                metadata.validation_token = metadata_validation_token(key, metadata);
+            }
+            if (!moves.push_back(metadata)) {
                 break;
             }
         }
     } catch (...) {
         moves.clear();
     }
-    finalize_metadata(moves, key, include_see);
+    if (include_see) {
+        finalize_metadata(moves, key, include_see);
+    }
 }
 
 bool GameState::legal_tactical_moves_with_metadata(MoveMetadataList& moves,
@@ -1764,9 +1874,17 @@ bool GameState::legal_tactical_moves_with_metadata(MoveMetadataList& moves,
             impl_->native_position.legal_moves_into(legal);
         has_legal_moves = legal_count != 0 ||
             (tactical_only && impl_->native_position.has_legal_move());
+        const NativeMetadataContext context{
+            &impl_->native_position,
+            impl_->mirror_tracking ? &impl_->compatibility_mirror : nullptr};
+        // Every retained move of this list is probed, so the position-invariant
+        // probe is built once for the list.
+        const NativeCheckProbe probe = legal_count != 0 ?
+            native_check_probe(*context.position) : NativeCheckProbe{};
         for (std::size_t index = 0; index < legal_count; ++index) {
             const Move& move = legal[index];
-            const bool capture_or_promotion = impl_->native_position.is_capture(move) ||
+            const Position::MoveFacts facts = impl_->native_position.move_facts(move);
+            const bool capture_or_promotion = facts.is_capture() ||
                 move.promotion() != Promotion::none;
             const bool needs_check_probe = checked || capture_or_promotion || include_quiet_checks;
             if (!needs_check_probe) {
@@ -1777,17 +1895,25 @@ bool GameState::legal_tactical_moves_with_metadata(MoveMetadataList& moves,
             const CheckFlagMode probe_mode = checked || capture_or_promotion ?
                 CheckFlagMode::all_moves : CheckFlagMode::quiet_moves_only;
             MoveMetadata metadata{};
-            if (!fill_native_move_metadata(move, true, probe_mode, metadata)) {
+            if (!fill_move_metadata_from_facts(context, move, facts, probe, true,
+                                               probe_mode, metadata)) {
                 continue;
             }
             if (checked || capture_or_promotion || metadata.gives_check) {
+                if (!include_see) {
+                    // Same stamp as the include_see=false finalize pass.
+                    metadata.position_key = key;
+                    metadata.validation_token = metadata_validation_token(key, metadata);
+                }
                 (void)moves.push_back(metadata);
             }
         }
     } catch (...) {
         moves.clear();
     }
-    finalize_metadata(moves, key, include_see);
+    if (include_see) {
+        finalize_metadata(moves, key, include_see);
+    }
     return has_legal_moves;
 }
 
@@ -1814,45 +1940,19 @@ std::optional<MoveMetadata> GameState::describe_move(const Move& move) const noe
 bool GameState::fill_native_move_metadata(
     const Move& move, const bool include_check_flags,
     const CheckFlagMode check_flag_mode, MoveMetadata& metadata) const noexcept {
-    if (move.is_no_move() || move.from().index() >= Square::kInvalid ||
-        move.to().index() >= Square::kInvalid) {
-        return false;
-    }
-    const Piece moving = impl_->native_position.piece_at(move.from());
-    if (moving.empty() || moving.color != side_to_move()) {
-        return false;
-    }
-
-    const Piece target = impl_->native_position.piece_at(move.to());
-    metadata = MoveMetadata{};
-    metadata.move = move;
-    metadata.moving_piece = moving.type;
-    metadata.captured_piece = target.empty() ? PieceType::none : target.type;
-    metadata.kind = MoveKind::quiet;
-    if (move.promotion() != Promotion::none) {
-        metadata.kind = MoveKind::promotion;
-    } else if (moving.type == PieceType::king &&
-               std::abs(static_cast<int>(move.to().index()) - static_cast<int>(move.from().index())) == 2) {
-        metadata.kind = MoveKind::castling;
-    } else if (impl_->native_position.is_capture(move)) {
-        metadata.kind = target.empty() ? MoveKind::en_passant : MoveKind::capture;
-        if (target.empty()) {
-            metadata.captured_piece = PieceType::pawn;
-        }
-    }
-
-    const bool analyze_check = include_check_flags &&
-        (check_flag_mode == CheckFlagMode::all_moves ||
-         (check_flag_mode == CheckFlagMode::quiet_moves_only &&
-          !metadata.is_capture() && move.promotion() == Promotion::none));
-    if (analyze_check) {
-        if (check_flag_mode == CheckFlagMode::quiet_moves_only || !impl_->mirror_tracking) {
-            metadata.gives_check = native_move_gives_check(impl_->native_position, move);
-        } else {
-            metadata.gives_check = impl_->compatibility_mirror.gives_check(move);
-        }
-    }
-    return true;
+    // Thin wrapper retained for the non-hot callers (metadata_for_native_move
+    // and the describe_move path): it resolves the per-move facts and, when the
+    // probe is reachable, the position-invariant probe for this single move.
+    const NativeMetadataContext context{
+        &impl_->native_position,
+        impl_->mirror_tracking ? &impl_->compatibility_mirror : nullptr};
+    const bool probe_checks = include_check_flags &&
+        (check_flag_mode == CheckFlagMode::quiet_moves_only || context.mirror == nullptr);
+    const NativeCheckProbe probe = probe_checks ?
+        native_check_probe(*context.position) : NativeCheckProbe{};
+    return fill_move_metadata_from_facts(context, move,
+                                         impl_->native_position.move_facts(move), probe,
+                                         include_check_flags, check_flag_mode, metadata);
 }
 
 std::optional<MoveMetadata> GameState::metadata_for_native_move(
