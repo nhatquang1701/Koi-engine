@@ -234,8 +234,15 @@ struct TranspositionTable::Storage {
         return segments[slot >> segment_shift]->entries[slot & entries_per_segment_mask];
     }
 
-    // First entry of a cluster; the prefetch target for a probe.
-    [[nodiscard]] const TranspositionEntry* cluster_address(std::size_t cluster) const noexcept {
+    // Base entry of a cluster.  `entries_per_segment` is a multiple of
+    // `kClusterSize`, so a cluster never straddles a segment and this single
+    // resolution covers all kClusterSize entries; the probe/store hot loops
+    // call it once instead of once per entry through at().
+    [[nodiscard]] TranspositionEntry* cluster_base(std::size_t cluster) noexcept {
+        return &at(cluster * kClusterSize);
+    }
+
+    [[nodiscard]] const TranspositionEntry* cluster_base(std::size_t cluster) const noexcept {
         return &at(cluster * kClusterSize);
     }
 
@@ -497,6 +504,9 @@ void TranspositionTable::store(std::uint64_t key, int depth, int score, Transpos
 
     const std::size_t cluster = static_cast<std::size_t>(key) & storage->cluster_mask;
     const std::size_t first_slot = cluster * kClusterSize;
+    // Resolve the cluster base once; every entry in the cluster lives in the
+    // same segment.
+    TranspositionEntry* const cluster_entries = storage->cluster_base(cluster);
     static_assert(std::has_single_bit(kStripeCount));
     std::unique_lock stripe_lock(storage->stripes[cluster & (kStripeCount - 1)]);
 
@@ -505,7 +515,7 @@ void TranspositionTable::store(std::uint64_t key, int depth, int score, Transpos
     std::uint32_t replacement_priority = std::numeric_limits<std::uint32_t>::max();
     for (std::size_t offset = 0; offset < kClusterSize; ++offset) {
         const std::size_t slot = first_slot + offset;
-        TranspositionEntry& candidate = storage->at(slot);
+        TranspositionEntry& candidate = cluster_entries[offset];
         const bool valid = candidate.occupied &&
             candidate.generation_age == storage->clear_epoch;
         if (valid && candidate.key == key) {
@@ -556,7 +566,7 @@ void TranspositionTable::store(std::uint64_t key, int depth, int score, Transpos
 
     const std::size_t slot = empty_slot != storage->total_slot_count ?
         empty_slot : replacement_slot;
-    TranspositionEntry& destination = storage->at(slot);
+    TranspositionEntry& destination = cluster_entries[slot - first_slot];
     if (empty_slot == storage->total_slot_count) {
         const bool older_generation = destination.generation != storage->generation;
         const bool deeper = depth > destination.depth;
@@ -585,13 +595,15 @@ std::optional<TranspositionEntry> TranspositionTable::probe(std::uint64_t key, i
     }
 
     const std::size_t cluster = static_cast<std::size_t>(key) & storage->cluster_mask;
-    const std::size_t first_slot = cluster * kClusterSize;
+    // Resolve the cluster base once; every entry in the cluster lives in the
+    // same segment.
+    const TranspositionEntry* const cluster_entries = storage->cluster_base(cluster);
     // Pull the cluster in while the stripe lock is acquired; callers that
     // prefetched the key earlier already have the fetch in flight.
-    KOI_TT_PREFETCH(storage->cluster_address(cluster));
+    KOI_TT_PREFETCH(cluster_entries);
     std::shared_lock stripe_lock(storage->stripes[cluster & (kStripeCount - 1)]);
     for (std::size_t offset = 0; offset < kClusterSize; ++offset) {
-        const TranspositionEntry& entry = storage->at(first_slot + offset);
+        const TranspositionEntry& entry = cluster_entries[offset];
         if (!entry.occupied || entry.generation_age != storage->clear_epoch ||
             entry.key != key) {
             continue;
@@ -605,13 +617,18 @@ std::optional<TranspositionEntry> TranspositionTable::probe(std::uint64_t key, i
 }
 
 void TranspositionTable::prefetch(std::uint64_t key) const noexcept {
-    const Lease lease(*this);
-    Storage* const storage = lease.storage();
+    // Address-only: read the published storage once and resolve the same
+    // cluster base the probe will use, without pinning a hazard slot.  The
+    // result is a cache hint with no semantic effect, and the controller
+    // joins the active search before a Hash resize can replace storage, so a
+    // per-call lease (publish, two acquire loads, and a release store on a
+    // per-node path) buys nothing here.
+    const Storage* const storage = hot_storage_.load(std::memory_order_acquire);
     if (storage == nullptr || storage->cluster_count == 0) {
         return;
     }
     const std::size_t cluster = static_cast<std::size_t>(key) & storage->cluster_mask;
-    KOI_TT_PREFETCH(storage->cluster_address(cluster));
+    KOI_TT_PREFETCH(storage->cluster_base(cluster));
 }
 
 } // namespace koi

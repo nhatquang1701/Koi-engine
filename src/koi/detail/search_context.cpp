@@ -189,10 +189,11 @@ int SearchContext::quiescence(GameState& state, int alpha, int beta, int ply,
         }
 
         const std::uint64_t qsearch_transposition_key = search_transposition_key(state);
-        std::optional<TranspositionEntry> tt_entry;
-        if (const auto entry = table_access.probe(qsearch_transposition_key, ply);
-            entry.has_value()) {
-            tt_entry = entry;
+        // Consume the probe result in place so the normalized entry is not
+        // copied a second time after probe() already built it.
+        std::optional<TranspositionEntry> tt_entry =
+            table_access.probe(qsearch_transposition_key, ply);
+        if (tt_entry.has_value()) {
             ++stats.tt_hits;
         }
 
@@ -798,29 +799,29 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
         const SearchHistoryContext history = history_context(
             ply, previous_move, node_pawn_key);
         std::optional<Move> tt_move;
-        std::optional<TranspositionEntry> tt_entry;
+        // Consume the probe result in place so the normalized entry is not
+        // copied a second time after probe() already built it.
+        std::optional<TranspositionEntry> tt_entry = table_access.probe(transposition_key, ply);
         int tt_lower_bound_floor = -kInfinity;
-        if (const auto entry = table_access.probe(transposition_key, ply);
-            entry.has_value()) {
-            tt_entry = entry;
+        if (tt_entry.has_value()) {
             ++stats.tt_hits;
-            if (!entry->best_move.is_no_move() && entry->best_move != excluded_move) {
-                tt_move = entry->best_move;
+            if (!tt_entry->best_move.is_no_move() && tt_entry->best_move != excluded_move) {
+                tt_move = tt_entry->best_move;
             }
             if (!claimable_draw && !excluded_search && !repetition_sensitive && !pv_node && ply > 0 &&
-                entry->depth >= depth) {
-                if (entry->bound == TranspositionBound::exact) {
-                    return entry->score;
+                tt_entry->depth >= depth) {
+                if (tt_entry->bound == TranspositionBound::exact) {
+                    return tt_entry->score;
                 }
-                if (entry->bound == TranspositionBound::lower) {
+                if (tt_entry->bound == TranspositionBound::lower) {
                     // Every depth-valid lower bound is a floor, including a
                     // bound that is already below the current alpha.  A later
                     // selective path must not contradict it merely because
                     // alpha was tightened before the floor was recorded.
-                    tt_lower_bound_floor = entry->score;
-                    alpha = std::max(alpha, entry->score);
+                    tt_lower_bound_floor = tt_entry->score;
+                    alpha = std::max(alpha, tt_entry->score);
                 } else {
-                    beta = std::min(beta, entry->score);
+                    beta = std::min(beta, tt_entry->score);
                 }
                 if (alpha >= beta) {
                     // A depth-valid quiet TT lower bound is a proven cut, but
@@ -830,11 +831,11 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
                     // dominate a move that was searched at full depth.  The
                     // generated metadata check keeps this limited to a legal
                     // quiet move in the current position.
-                    if (entry->bound == TranspositionBound::lower &&
-                        !entry->best_move.is_no_move()) {
+                    if (tt_entry->bound == TranspositionBound::lower &&
+                        !tt_entry->best_move.is_no_move()) {
                         const auto tt_metadata = std::find_if(
-                            moves.begin(), moves.end(), [&entry](const MoveMetadata& metadata) {
-                                return metadata.move == entry->best_move;
+                            moves.begin(), moves.end(), [&tt_entry](const MoveMetadata& metadata) {
+                                return metadata.move == tt_entry->best_move;
                             });
                         if (tt_metadata != moves.end() && !tt_metadata->is_capture() &&
                             tt_metadata->move.promotion() == Promotion::none) {
@@ -853,8 +854,8 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
                     // Propagate that distinction so a parent PVS/root line
                     // re-searches before promoting the value to exact data.
                     path_selective_bound = true;
-                    path_lower_bound = entry->bound == TranspositionBound::lower;
-                    return entry->score;
+                    path_lower_bound = tt_entry->bound == TranspositionBound::lower;
+                    return tt_entry->score;
                 }
             }
         }

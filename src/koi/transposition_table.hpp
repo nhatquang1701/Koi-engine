@@ -22,7 +22,7 @@ enum class TranspositionBound : std::uint8_t { exact, lower, upper };
 inline constexpr int kNoEvaluation = -1'000'000'000;
 
 // Number of hazard-pointer slots one table can hand out to concurrent readers.
-// Each store/probe/prefetch publishes the storage it is about to use in one
+// Each store/probe publishes the storage it is about to use in one
 // slot and revalidates it against the live pointer, and a resize waits for the
 // retired storage to leave every slot before dropping it.  The pool is a
 // thread-lifetime resource (acquired once per thread, released at thread exit),
@@ -126,13 +126,16 @@ public:
     [[nodiscard]] std::optional<TranspositionEntry> probe(std::uint64_t key, int ply = 0) const noexcept;
     // Software prefetch of the probe cluster.  Search calls this a few
     // instructions before the matching probe so the cache line fetch overlaps
-    // the work in between; a disabled or empty table is a no-op.
+    // the work in between; a disabled or empty table is a no-op.  Resolves the
+    // address from the published hot storage without a hazard lease: the hint
+    // has no semantic effect and the controller joins the active search before
+    // a Hash resize can replace storage.
     void prefetch(std::uint64_t key) const noexcept;
 
 private:
     struct Storage;
 
-    // Hazard-pointer lease for the store/probe/prefetch hot paths.  A reader
+    // Hazard-pointer lease for the store/probe hot paths.  A reader
     // publishes the storage pointer it is about to use in one hazard slot and
     // then revalidates it against the live pointer; a resize swaps the live
     // pointer first and only then waits for the retired storage to leave every

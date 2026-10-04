@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <limits>
+#include <utility>
 
 #include "koi/detail/static_exchange.hpp"
 #include "koi/piece_values.hpp"
@@ -521,18 +522,36 @@ void SearchMovePicker::prepare_candidates() {
     // grouping by rank and then sorting each group with the remaining keys
     // produces exactly the same emission order; stages that pruning never
     // reaches are never sorted at all.
-    std::sort(staged_.begin(), staged_.begin() + candidate_count_,
-              [](const Candidate& lhs, const Candidate& rhs) {
-                  return lhs.stage_rank < rhs.stage_rank;
-              });
+    //
+    // The grouping itself is a counting partition rather than a comparison
+    // sort.  The per-stage comparator below is a strict total order because
+    // its final key, source_index, is unique per candidate, so the order
+    // inside a stage is fixed by that sort alone and the partition is free
+    // to be unstable.
+    std::array<std::size_t, kStageRankCount> counts{};
+    for (std::size_t i = 0; i < candidate_count_; ++i) {
+        ++counts[staged_[i].stage_rank];
+    }
     std::size_t stage_offset = 0;
     for (std::size_t rank = 0; rank < kStageRankCount; ++rank) {
         stage_begin_[rank] = static_cast<std::uint16_t>(stage_offset);
-        while (stage_offset < candidate_count_ &&
-               staged_[stage_offset].stage_rank == rank) {
-            ++stage_offset;
-        }
+        stage_offset += counts[rank];
         stage_end_[rank] = static_cast<std::uint16_t>(stage_offset);
+    }
+    // In-place counting permutation: move each misplaced candidate to the
+    // write cursor of its rank's range.  Every swap settles one slot, so the
+    // scan performs at most candidate_count_ swaps.
+    std::array<std::size_t, kStageRankCount> write{};
+    for (std::size_t rank = 0; rank < kStageRankCount; ++rank) {
+        write[rank] = stage_begin_[rank];
+    }
+    for (std::size_t i = 0; i < candidate_count_; ++i) {
+        std::size_t rank = staged_[i].stage_rank;
+        while (i < stage_begin_[rank] || i >= stage_end_[rank]) {
+            std::swap(staged_[i], staged_[write[rank]]);
+            ++write[rank];
+            rank = staged_[i].stage_rank;
+        }
     }
     stage_sorted_.reset();
 }
