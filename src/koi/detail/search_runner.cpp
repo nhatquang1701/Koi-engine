@@ -26,6 +26,7 @@
 #include "koi/detail/search_session.hpp"
 #include "koi/detail/search_stack.hpp"
 #include "koi/detail/search_table_access.hpp"
+#include "koi/detail/thread_stack.hpp"
 #include "koi/evaluator.hpp"
 #include "koi/evaluation_features.hpp"
 #include "koi/game_state.hpp"
@@ -1936,7 +1937,9 @@ public:
         helpers_.reserve(helper_stats_.size());
         try {
             for (std::size_t index = 0; index < helper_stats_.size(); ++index) {
-                helpers_.emplace_back(&LazySmpPool::helper_loop, this, index);
+                helpers_.emplace_back(spawn_worker_thread([this, index] {
+                    helper_loop(index);
+                }));
             }
         } catch (...) {
             stop();
@@ -1954,7 +1957,7 @@ public:
     void stop() noexcept {
         stopping_.store(true, std::memory_order_relaxed);
         helper_abort_.store(true, std::memory_order_relaxed);
-        for (std::thread& helper : helpers_) {
+        for (WorkerThread& helper : helpers_) {
             if (helper.joinable()) {
                 helper.join();
             }
@@ -2098,7 +2101,7 @@ private:
     bool use_transposition_table_ = true;
     SearchOptions::QuietHistorySideHook quiet_history_side_hook_;
     TablebaseSearchBinding tablebase_binding_;
-    std::vector<std::thread> helpers_;
+    std::vector<WorkerThread> helpers_;
     std::vector<SearchStats> helper_stats_;
     std::atomic<int> main_depth_{1};
     std::atomic_bool stopping_{false};
@@ -2129,7 +2132,9 @@ public:
         workers_.reserve(worker_count_);
         try {
             for (std::size_t index = 0; index < worker_count_; ++index) {
-                workers_.emplace_back(&RootWorkerPool::worker_loop, this, index);
+                workers_.emplace_back(spawn_worker_thread([this, index] {
+                    worker_loop(index);
+                }));
             }
         } catch (...) {
             shutdown();
@@ -2429,7 +2434,7 @@ private:
             stopping_ = true;
         }
         work_available_.notify_all();
-        for (std::thread& worker : workers_) {
+        for (WorkerThread& worker : workers_) {
             if (worker.joinable()) {
                 worker.join();
             }
@@ -2446,7 +2451,7 @@ private:
     bool use_transposition_table_;
     SearchOptions::QuietHistorySideHook quiet_history_side_hook_;
     TablebaseSearchBinding tablebase_binding_;
-    std::vector<std::thread> workers_;
+    std::vector<WorkerThread> workers_;
     std::vector<SearchStats> worker_stats_;
     std::mutex mutex_;
     std::condition_variable work_available_;
@@ -2473,7 +2478,9 @@ public:
         workers_.reserve(worker_count_ - 1);
         try {
             for (std::size_t index = 1; index < worker_count_; ++index) {
-                workers_.emplace_back(&PolicyValueMctsInferencePool::worker_loop, this);
+                workers_.emplace_back(spawn_worker_thread([this] {
+                    worker_loop();
+                }));
             }
         } catch (...) {
             shutdown();
@@ -2624,7 +2631,7 @@ private:
             stopping_ = true;
         }
         work_available_.notify_all();
-        for (std::thread& worker : workers_) {
+        for (WorkerThread& worker : workers_) {
             if (worker.joinable()) {
                 worker.join();
             }
@@ -2633,7 +2640,7 @@ private:
 
     std::shared_ptr<const PolicyValueModel> model_;
     const std::size_t worker_count_;
-    std::vector<std::thread> workers_;
+    std::vector<WorkerThread> workers_;
     std::mutex mutex_;
     std::condition_variable work_available_;
     std::condition_variable work_finished_;

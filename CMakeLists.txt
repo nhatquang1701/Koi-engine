@@ -2,8 +2,9 @@ cmake_minimum_required(VERSION 3.31)
 
 project(koi_engine VERSION 1.0.0 LANGUAGES CXX)
 
-# Koi Engine supports Windows x64 with MSVC (the primary development platform)
-# and x86-64 Linux with GCC 14+ or Clang 18+.
+# Koi Engine supports Windows x64 with MSVC (the primary development platform),
+# x86-64 Linux with GCC 14+ or Clang 18+, and macOS on Apple Silicon or Intel
+# with AppleClang 18+ or Homebrew LLVM.
 if(WIN32)
     if(NOT MSVC)
         message(FATAL_ERROR
@@ -12,6 +13,29 @@ if(WIN32)
     endif()
     if(NOT CMAKE_CXX_COMPILER_ARCHITECTURE_ID STREQUAL "x64")
         message(FATAL_ERROR "Koi Engine requires an x86-64 compiler target")
+    endif()
+elseif(APPLE)
+    # AppleClang reports its own version series, which does not track upstream
+    # LLVM.  18 is the first series CMake maps to -std=c++26, so older Xcode
+    # toolchains are pointed at Homebrew LLVM, which reports itself as Clang.
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
+        if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 18)
+            message(FATAL_ERROR
+                "Koi Engine needs a C++26-capable Clang; AppleClang "
+                "${CMAKE_CXX_COMPILER_VERSION} is older than 18. Install Homebrew "
+                "LLVM (brew install llvm) and reconfigure with "
+                "-DCMAKE_CXX_COMPILER=$(brew --prefix llvm)/bin/clang++.")
+        endif()
+    elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 18)
+            message(FATAL_ERROR
+                "Koi Engine needs Clang 18 or newer (found "
+                "${CMAKE_CXX_COMPILER_VERSION})")
+        endif()
+    else()
+        message(FATAL_ERROR
+            "Koi Engine supports Clang 18+ on macOS (AppleClang or Homebrew "
+            "LLVM); unsupported compiler ID: ${CMAKE_CXX_COMPILER_ID}")
     endif()
 elseif(UNIX)
     if(NOT CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
@@ -36,7 +60,26 @@ elseif(UNIX)
             "compiler ID: ${CMAKE_CXX_COMPILER_ID}")
     endif()
 else()
-    message(FATAL_ERROR "Koi Engine targets Windows x64 and x86-64 Linux")
+    message(FATAL_ERROR
+        "Koi Engine targets Windows x64, x86-64 Linux, and macOS")
+endif()
+
+# The AVX2/AVX-512 variants and their -m flags exist only on x86-64.  macOS
+# arm64 (and any other non-x86 target) builds the scalar baseline alone; every
+# AVX-specific target and flag below is gated on this variable.
+if(WIN32)
+    set(KOI_TARGET_X86_64 TRUE)
+elseif(APPLE)
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$"
+       AND NOT CMAKE_OSX_ARCHITECTURES MATCHES "arm64")
+        set(KOI_TARGET_X86_64 TRUE)
+    else()
+        set(KOI_TARGET_X86_64 FALSE)
+    endif()
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
+    set(KOI_TARGET_X86_64 TRUE)
+else()
+    set(KOI_TARGET_X86_64 FALSE)
 endif()
 
 if(NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
@@ -127,8 +170,9 @@ endif()
 # Prebuilt Linux binaries should run on any modern distribution, so the C++
 # runtime is linked statically by default. The C library stays dynamic: a fully
 # static glibc would break dlopen("libcuda.so.1"). Sanitizer builds should pass
-# -DKOI_STATIC_RUNTIME=OFF.
-if(MSVC)
+# -DKOI_STATIC_RUNTIME=OFF. macOS links libc++/libSystem dynamically and has no
+# static runtime pair, so the option defaults off and stays off there.
+if(MSVC OR APPLE)
     set(KOI_STATIC_RUNTIME_DEFAULT OFF)
 else()
     set(KOI_STATIC_RUNTIME_DEFAULT ON)
@@ -136,6 +180,11 @@ endif()
 option(KOI_STATIC_RUNTIME
     "Link the C++ runtime statically for portable Linux binaries"
     ${KOI_STATIC_RUNTIME_DEFAULT})
+if(APPLE AND KOI_STATIC_RUNTIME)
+    message(FATAL_ERROR
+        "KOI_STATIC_RUNTIME is not supported on macOS: libc++ has no static "
+        "runtime to link. Reconfigure with -DKOI_STATIC_RUNTIME=OFF.")
+endif()
 if(KOI_STATIC_RUNTIME AND NOT MSVC)
     add_link_options("-static-libstdc++" "-static-libgcc")
 endif()
@@ -287,9 +336,14 @@ set_source_files_properties(third_party/fathom/tbprobe.c PROPERTIES LANGUAGE CXX
 
 # Translates the MSVC /arch flag used by the Windows build into the GCC/Clang
 # equivalent so both platforms share one set of call sites. The AVX-512 flag set
-# is the x86-64-v4 baseline (F/BW/CD/DQ/VL), matching MSVC /arch:AVX512.
+# is the x86-64-v4 baseline (F/BW/CD/DQ/VL), matching MSVC /arch:AVX512.  Off
+# x86-64 (macOS arm64) the AVX flags do not exist and the output is empty.
 function(koi_arch_compile_option msvc_flag output)
-    if(MSVC OR msvc_flag STREQUAL "")
+    if(msvc_flag STREQUAL "")
+        set(${output} "" PARENT_SCOPE)
+    elseif(NOT KOI_TARGET_X86_64)
+        set(${output} "" PARENT_SCOPE)
+    elseif(MSVC)
         set(${output} "${msvc_flag}" PARENT_SCOPE)
     elseif(msvc_flag STREQUAL "/arch:AVX2")
         set(${output} "-mavx2" PARENT_SCOPE)
@@ -313,8 +367,9 @@ target_include_directories(koi_cpu_features PUBLIC
 # enabled by the build flags, so a variant binary can execute an unsupported
 # instruction before main() reaches its gate.  These baseline objects install a
 # pre-main guard (constructor priority 101) into the variant executables, where
-# MSVC needs no equivalent because its startup code stays baseline-safe.
-if(NOT MSVC)
+# MSVC needs no equivalent because its startup code stays baseline-safe.  The
+# AVX variants only exist on x86-64.
+if(NOT MSVC AND KOI_TARGET_X86_64)
     add_library(koi_cpu_guard_avx2 OBJECT src/koi/cpu_variant_guard.cpp)
     target_include_directories(koi_cpu_guard_avx2 PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
@@ -368,8 +423,13 @@ function(koi_add_core_target target arch_option)
     endif()
 endfunction()
 
-# koi_core is the AVX2 build used by the developer tools and every test binary.
-koi_add_core_target(koi_core "/arch:AVX2")
+# koi_core is the AVX2 build on x86-64 and the scalar baseline elsewhere; the
+# developer tools and every test binary link it.
+if(KOI_TARGET_X86_64)
+    koi_add_core_target(koi_core "/arch:AVX2")
+else()
+    koi_add_core_target(koi_core "")
+endif()
 
 # C++26 named modules are a verified part of the MSVC build. GCC's module
 # implementation is still experimental and Clang's module scanning depends on
@@ -378,6 +438,9 @@ koi_add_core_target(koi_core "/arch:AVX2")
 # the modules, so the engine itself never depends on them.
 if(MSVC)
     set(KOI_MODULES_DEFAULT ON)
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
+    # AppleClang's C++26 named modules are not wired into this build yet.
+    set(KOI_MODULES_DEFAULT OFF)
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang"
         AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 18)
     set(KOI_MODULES_DEFAULT ON)
@@ -400,10 +463,13 @@ else()
         "(${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION})")
 endif()
 
-# koi_core_avx512 backs koi-engine-avx512.exe.
-koi_add_core_target(koi_core_avx512 "/arch:AVX512")
+# koi_core_avx512 backs koi-engine-avx512.exe on x86-64 hosts.
+if(KOI_TARGET_X86_64)
+    koi_add_core_target(koi_core_avx512 "/arch:AVX512")
+endif()
 
-# koi_core_generic backs the baseline koi-engine.exe that runs on any x64 CPU.
+# koi_core_generic backs the baseline koi-engine executable that runs on any
+# host CPU (x64 or arm64).
 # Fathom's vendored popcount selects `_mm_popcnt_u64` unconditionally on MSVC
 # x64, so the baseline build asks for its software fallback; the standard
 # library's own std::popcount/countr_zero already dispatch on __isa_available.
@@ -528,13 +594,15 @@ if(KOI_BUILD_MODULES)
     )
 
     target_link_libraries(koi_module_tests PRIVATE koi_core)
-    # The default koi_core module BMI is built with AVX2 in Release. Clang
-    # rejects imports into a translation unit with a different target feature,
-    # so compile the module consumer for the same ISA (Debug stays baseline).
-    koi_arch_compile_option("/arch:AVX2" KOI_MODULE_TEST_ARCH_OPTION)
-    target_compile_options(koi_module_tests PRIVATE
-        "$<$<CONFIG:Release>:${KOI_MODULE_TEST_ARCH_OPTION}>"
-    )
+    if(KOI_TARGET_X86_64)
+        # The default koi_core module BMI is built with AVX2 in Release. Clang
+        # rejects imports into a translation unit with a different target feature,
+        # so compile the module consumer for the same ISA (Debug stays baseline).
+        koi_arch_compile_option("/arch:AVX2" KOI_MODULE_TEST_ARCH_OPTION)
+        target_compile_options(koi_module_tests PRIVATE
+            "$<$<CONFIG:Release>:${KOI_MODULE_TEST_ARCH_OPTION}>"
+        )
+    endif()
 
     add_test(NAME koi_module_tests COMMAND koi_module_tests)
 endif()
@@ -792,9 +860,10 @@ target_link_libraries(koi_nnue_fixture PRIVATE koi_core)
 set_target_properties(koi_nnue_fixture PROPERTIES OUTPUT_NAME "koi-nnue-fixture")
 add_dependencies(koi_nnue_fixture_tests koi_nnue_fixture)
 
-# Three engine flavors: the baseline `koi-engine.exe` selects the best sibling
-# at startup, while the AVX2/AVX-512 binaries gate themselves when launched
-# directly on a CPU that cannot execute them.
+# Engine flavors: the baseline `koi-engine` selects the best sibling at startup,
+# while on x86-64 the AVX2/AVX-512 binaries gate themselves when launched
+# directly on a CPU that cannot execute them.  macOS arm64 builds the baseline
+# alone because those instruction sets do not exist there.
 add_executable(koi_engine
     src/main.cpp
 )
@@ -803,29 +872,31 @@ target_link_libraries(koi_engine PRIVATE koi_core_generic)
 target_compile_definitions(koi_engine PRIVATE KOI_CPU_SELECTOR=1)
 set_target_properties(koi_engine PROPERTIES OUTPUT_NAME "koi-engine")
 
-add_executable(koi_engine_avx2
-    src/main.cpp
-)
+if(KOI_TARGET_X86_64)
+    add_executable(koi_engine_avx2
+        src/main.cpp
+    )
 
-target_link_libraries(koi_engine_avx2 PRIVATE koi_core)
-target_compile_definitions(koi_engine_avx2 PRIVATE KOI_CPU_REQUIRES_AVX2=1)
-if(NOT MSVC)
-    target_sources(koi_engine_avx2 PRIVATE $<TARGET_OBJECTS:koi_cpu_guard_avx2>)
-    add_dependencies(koi_engine_avx2 koi_cpu_guard_avx2)
+    target_link_libraries(koi_engine_avx2 PRIVATE koi_core)
+    target_compile_definitions(koi_engine_avx2 PRIVATE KOI_CPU_REQUIRES_AVX2=1)
+    if(NOT MSVC)
+        target_sources(koi_engine_avx2 PRIVATE $<TARGET_OBJECTS:koi_cpu_guard_avx2>)
+        add_dependencies(koi_engine_avx2 koi_cpu_guard_avx2)
+    endif()
+    set_target_properties(koi_engine_avx2 PROPERTIES OUTPUT_NAME "koi-engine-avx2")
+
+    add_executable(koi_engine_avx512
+        src/main.cpp
+    )
+
+    target_link_libraries(koi_engine_avx512 PRIVATE koi_core_avx512)
+    target_compile_definitions(koi_engine_avx512 PRIVATE KOI_CPU_REQUIRES_AVX512=1)
+    if(NOT MSVC)
+        target_sources(koi_engine_avx512 PRIVATE $<TARGET_OBJECTS:koi_cpu_guard_avx512>)
+        add_dependencies(koi_engine_avx512 koi_cpu_guard_avx512)
+    endif()
+    set_target_properties(koi_engine_avx512 PROPERTIES OUTPUT_NAME "koi-engine-avx512")
 endif()
-set_target_properties(koi_engine_avx2 PROPERTIES OUTPUT_NAME "koi-engine-avx2")
-
-add_executable(koi_engine_avx512
-    src/main.cpp
-)
-
-target_link_libraries(koi_engine_avx512 PRIVATE koi_core_avx512)
-target_compile_definitions(koi_engine_avx512 PRIVATE KOI_CPU_REQUIRES_AVX512=1)
-if(NOT MSVC)
-    target_sources(koi_engine_avx512 PRIVATE $<TARGET_OBJECTS:koi_cpu_guard_avx512>)
-    add_dependencies(koi_engine_avx512 koi_cpu_guard_avx512)
-endif()
-set_target_properties(koi_engine_avx512 PROPERTIES OUTPUT_NAME "koi-engine-avx512")
 
 # Every C++ test binary shares the assertion/fixture helpers. The optional
 # shadow-diff oracle joins the list only when it is part of the build.
@@ -916,16 +987,20 @@ set_tests_properties(run_tests_artifact_path PROPERTIES
     WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
 )
 
-add_test(
-    NAME koi_engine_variant_process
-    COMMAND ${POWERSHELL_EXECUTABLE} -NoProfile -ExecutionPolicy Bypass -File
-            "${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/uci/engine_variant_process_test.ps1"
-            -EnginePath "$<TARGET_FILE:koi_engine>"
-            -Avx2EnginePath "$<TARGET_FILE:koi_engine_avx2>"
-            -Avx512EnginePath "$<TARGET_FILE:koi_engine_avx512>"
-)
+# The variant selector test needs the x86-64 AVX2/AVX-512 siblings, which are
+# not built on arm64.
+if(KOI_TARGET_X86_64)
+    add_test(
+        NAME koi_engine_variant_process
+        COMMAND ${POWERSHELL_EXECUTABLE} -NoProfile -ExecutionPolicy Bypass -File
+                "${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/uci/engine_variant_process_test.ps1"
+                -EnginePath "$<TARGET_FILE:koi_engine>"
+                -Avx2EnginePath "$<TARGET_FILE:koi_engine_avx2>"
+                -Avx512EnginePath "$<TARGET_FILE:koi_engine_avx512>"
+    )
 
-koi_set_timeout(koi_engine_variant_process 60)
+    koi_set_timeout(koi_engine_variant_process 60)
+endif()
 
 add_test(
     NAME koi_engine_en_croissant_process
@@ -1269,8 +1344,13 @@ set_tests_properties(
 set_tests_properties(koi_strength_tests PROPERTIES LABELS "unit;search;heavy")
 set_tests_properties(koi_replay_tests koi_nnue_fixture_tests PROPERTIES LABELS "integration;tools")
 if(POWERSHELL_EXECUTABLE)
-    set_tests_properties(koi_engine_process koi_engine_perft_responsiveness
-        koi_engine_variant_process koi_engine_en_croissant_process
+    set(KOI_UCI_PROCESS_TESTS
+        koi_engine_process koi_engine_perft_responsiveness
+        koi_engine_en_croissant_process)
+    if(KOI_TARGET_X86_64)
+        list(APPEND KOI_UCI_PROCESS_TESTS koi_engine_variant_process)
+    endif()
+    set_tests_properties(${KOI_UCI_PROCESS_TESTS}
         PROPERTIES LABELS "process;uci")
     set_tests_properties(koi_engine_process koi_engine_perft_responsiveness PROPERTIES RUN_SERIAL TRUE)
     set_tests_properties(koi_engine_time_safety_process

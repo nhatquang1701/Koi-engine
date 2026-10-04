@@ -44,15 +44,20 @@ struct GpuNnueService::Impl {
     int hidden_units = 0;
     int l1_shift = 0;
     int output_shift = 0;
-    std::vector<std::uint64_t> host_occupancy;
-    std::vector<std::uint8_t> host_pieces;
-    std::vector<std::uint8_t> host_side;
-    std::vector<std::uint8_t> host_kings;
-    std::vector<std::int32_t> host_scores;
-    std::vector<std::uint8_t> host_overflow;
+    // Host staging is allocated once with cuMemHostAlloc (pinned) when the
+    // driver exposes it, which makes the per-batch H2D/D2H copies cheaper than
+    // pageable memory.  The driver's fallback is plain operator new; the same
+    // driver object knows which release to use.
+    void* host_occupancy = nullptr;
+    void* host_pieces = nullptr;
+    void* host_side = nullptr;
+    void* host_kings = nullptr;
+    void* host_scores = nullptr;
+    void* host_overflow = nullptr;
 
-    // Frees every device buffer.  Called from the service destructor so that a
-    // failed create() and an EvalFile swap do not leak the uploaded network.
+    // Frees every device and host buffer.  Called from the service destructor
+    // so that a failed create() and an EvalFile swap do not leak the uploaded
+    // network.
     void release_all() noexcept {
         for (CUdeviceptr* pointer : {&occupancy, &pieces, &side, &kings,
                                      &feature_weights, &hidden_bias, &l1_weights,
@@ -61,6 +66,13 @@ struct GpuNnueService::Impl {
             if (*pointer != 0) {
                 driver.release(*pointer);
                 *pointer = 0;
+            }
+        }
+        for (void** pointer : {&host_occupancy, &host_pieces, &host_side,
+                               &host_kings, &host_scores, &host_overflow}) {
+            if (*pointer != nullptr) {
+                driver.host_release(*pointer);
+                *pointer = nullptr;
             }
         }
         kernel = nullptr;
@@ -201,12 +213,17 @@ std::unique_ptr<GpuNnueService> GpuNnueService::create(const NnueNetwork& networ
         !impl.driver.allocate(capacity * sizeof(std::uint8_t), impl.overflow, error)) {
         return nullptr;
     }
-    impl.host_occupancy.resize(capacity * 2);
-    impl.host_pieces.resize(capacity * 64);
-    impl.host_side.resize(capacity);
-    impl.host_kings.resize(capacity * 2);
-    impl.host_scores.resize(capacity);
-    impl.host_overflow.resize(capacity);
+    const auto stage_host = [&](std::size_t bytes, void*& pointer) {
+        return impl.driver.host_allocate(bytes, pointer, error);
+    };
+    if (!stage_host(capacity * 2 * sizeof(std::uint64_t), impl.host_occupancy) ||
+        !stage_host(capacity * 64 * sizeof(std::uint8_t), impl.host_pieces) ||
+        !stage_host(capacity * sizeof(std::uint8_t), impl.host_side) ||
+        !stage_host(capacity * 2 * sizeof(std::uint8_t), impl.host_kings) ||
+        !stage_host(capacity * sizeof(std::int32_t), impl.host_scores) ||
+        !stage_host(capacity * sizeof(std::uint8_t), impl.host_overflow)) {
+        return nullptr;
+    }
     return service;
 #endif
 }
@@ -217,6 +234,16 @@ bool GpuNnueService::available() const noexcept {
 #else
     return false;
 #endif
+}
+
+const std::string& GpuNnueService::device_name() const noexcept {
+#if KOI_GPU_INFERENCE_AVAILABLE
+    if (impl_ != nullptr) {
+        return impl_->driver.device_info().name;
+    }
+#endif
+    static const std::string empty;
+    return empty;
 }
 
 bool GpuNnueService::evaluate(std::span<const GameState*> states,
@@ -239,11 +266,17 @@ bool GpuNnueService::evaluate(std::span<const GameState*> states,
         error = "the batch exceeds the GPU staging capacity";
         return false;
     }
+    auto* host_occupancy = static_cast<std::uint64_t*>(impl.host_occupancy);
+    auto* host_pieces = static_cast<std::uint8_t*>(impl.host_pieces);
+    auto* host_side = static_cast<std::uint8_t*>(impl.host_side);
+    auto* host_kings = static_cast<std::uint8_t*>(impl.host_kings);
+    auto* host_scores = static_cast<std::int32_t*>(impl.host_scores);
+    auto* host_overflow = static_cast<std::uint8_t*>(impl.host_overflow);
     for (std::size_t index = 0; index < states.size(); ++index) {
         const GameState& state = *states[index];
         const PositionFeatures& features = state.position_features();
-        std::uint64_t* occupancy = impl.host_occupancy.data() + index * 2;
-        std::uint8_t* pieces = impl.host_pieces.data() + index * 64;
+        std::uint64_t* occupancy = host_occupancy + index * 2;
+        std::uint8_t* pieces = host_pieces + index * 64;
         occupancy[0] = 0;
         occupancy[1] = 0;
         for (std::size_t square = 0; square < 64; ++square) {
@@ -257,10 +290,10 @@ bool GpuNnueService::evaluate(std::span<const GameState*> states,
                 static_cast<std::uint8_t>(piece.type) | (color << 3));
             occupancy[color] |= (std::uint64_t{1} << square);
         }
-        impl.host_side[index] = features.side_to_move == Color::white ? 0U : 1U;
-        impl.host_kings[index * 2] =
+        host_side[index] = features.side_to_move == Color::white ? 0U : 1U;
+        host_kings[index * 2] =
             static_cast<std::uint8_t>(features.king_squares[0].index());
-        impl.host_kings[index * 2 + 1] =
+        host_kings[index * 2 + 1] =
             static_cast<std::uint8_t>(features.king_squares[1].index());
     }
 
@@ -269,13 +302,13 @@ bool GpuNnueService::evaluate(std::span<const GameState*> states,
         error = std::string(step) + " failed: " + (error.empty() ? "unknown error" : error);
         return false;
     };
-    if (!impl.driver.upload(impl.host_occupancy.data(), impl.occupancy,
+    if (!impl.driver.upload(host_occupancy, impl.occupancy,
                             count * 2 * sizeof(std::uint64_t), error) ||
-        !impl.driver.upload(impl.host_pieces.data(), impl.pieces,
+        !impl.driver.upload(host_pieces, impl.pieces,
                             count * 64 * sizeof(std::uint8_t), error) ||
-        !impl.driver.upload(impl.host_side.data(), impl.side,
+        !impl.driver.upload(host_side, impl.side,
                             count * sizeof(std::uint8_t), error) ||
-        !impl.driver.upload(impl.host_kings.data(), impl.kings,
+        !impl.driver.upload(host_kings, impl.kings,
                             count * 2 * sizeof(std::uint8_t), error)) {
         return fail("upload");
     }
@@ -289,20 +322,18 @@ bool GpuNnueService::evaluate(std::span<const GameState*> states,
                                      arguments, error)) {
         return fail("launch");
     }
-    if (!impl.driver.download(impl.scores, impl.host_scores.data(),
+    if (!impl.driver.download(impl.scores, host_scores,
                               count * sizeof(std::int32_t), error) ||
-        !impl.driver.download(impl.overflow, impl.host_overflow.data(),
+        !impl.driver.download(impl.overflow, host_overflow,
                               count * sizeof(std::uint8_t), error)) {
         return fail("download");
     }
-    if (std::any_of(impl.host_overflow.begin(), impl.host_overflow.begin() +
-                        static_cast<std::ptrdiff_t>(count),
+    if (std::any_of(host_overflow, host_overflow + count,
                     [](std::uint8_t flag) { return flag != 0; })) {
         error = "the GPU kernel exceeded its feature capacity";
         return false;
     }
-    std::copy_n(impl.host_scores.begin(), static_cast<std::ptrdiff_t>(count),
-                scores.begin());
+    std::copy_n(host_scores, static_cast<std::ptrdiff_t>(count), scores.begin());
     return true;
 #endif
 }

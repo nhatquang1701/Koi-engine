@@ -624,6 +624,33 @@ void test_uci_handshake_has_identity_and_supported_options_in_order() {
             "uci response must match tests/data/uci/handshake.txt");
 }
 
+void test_gpu_nnue_option_is_case_insensitive_and_cancels_active_searches() {
+    const ControllerResult result = run_controller(
+        "uci\n"
+        "position startpos\n"
+        "go infinite\n"
+        "setoption name GpuNnue value off\n"
+        "go infinite\n"
+        "setoption name gpuNnue value ON\n"
+        "setoption name GpuNnue value maybe\n"
+        "go infinite\n"
+        "setoption name GpuNnue value auto\n"
+        "go infinite\n"
+        "stop\n"
+        "quit\n");
+    const std::vector<std::string> lines = output_lines(result.output);
+    const std::vector<std::string> bestmoves = lines_starting_with(lines, "bestmove ");
+
+    require(result.exit_code == 0 && result.diagnostics.empty(),
+            "GpuNnue option changes must leave the UCI stdio clean");
+    require(result.output.find(
+                "option name GpuNnue type combo default auto var auto var on var off\n") !=
+                std::string::npos,
+            "GpuNnue must be advertised as an auto/on/off combo");
+    require(bestmoves.size() == 1 && is_legal_move(Position{}, first_bestmove_move(bestmoves[0])),
+            "each GpuNnue change must suppress the replaced search and leave one legal completion");
+}
+
 void test_syzygy_options_accept_valid_values_and_ignore_invalid_values() {
     const ControllerResult result = run_controller(
         "uci\n"
@@ -1969,7 +1996,11 @@ void test_handshake_option_table_is_unique_and_well_formed() {
             "a handshake-only transcript must stay clean");
     const std::vector<std::string> options =
         lines_starting_with(output_lines(handshake.output), "option name ");
-    require(options.size() == 28, "the handshake must advertise exactly 28 options");
+    require(options.size() == 29, "the handshake must advertise exactly 29 options");
+    require(handshake.output.find(
+                "option name GpuNnue type combo default auto var auto var on var off") !=
+                std::string::npos,
+            "GpuNnue must advertise auto/on/off with auto as the default");
     require(handshake.output.find("option name SearchAlgorithm type string default AlphaBeta") !=
                 std::string::npos,
             "AlphaBeta must remain the advertised default search algorithm");
@@ -1997,7 +2028,7 @@ void test_handshake_option_table_is_unique_and_well_formed() {
         names.push_back(name);
 
         require(rest == "button" || rest.starts_with("spin ") || rest.starts_with("check ") ||
-                    rest.starts_with("string "),
+                    rest.starts_with("string ") || rest.starts_with("combo "),
                 "advertised option types must be well formed: " + line);
         if (rest == "button") {
             continue;
@@ -2013,6 +2044,10 @@ void test_handshake_option_table_is_unique_and_well_formed() {
             require(bounds.find(" max ") != std::string::npos,
                     "spin options must declare a maximum: " + line);
             default_value = default_value.substr(0, min_at);
+        } else if (rest.starts_with("combo ")) {
+            require(default_value.find(" var ") != std::string::npos,
+                    "combo options must declare their variables: " + line);
+            default_value = default_value.substr(0, default_value.find(" var "));
         }
         defaults_transcript += "setoption name " + name + " value " + default_value + "\n";
     }
@@ -2634,6 +2669,8 @@ void test_bestmove_reports_the_ponder_move_without_the_option() {
 int main(int argc, char** argv) {
     const std::vector<koi::test::TestCase> tests{
         {"uci handshake and options", test_uci_handshake_has_identity_and_supported_options_in_order},
+        {"GpuNnue option replacement",
+         test_gpu_nnue_option_is_case_insensitive_and_cancels_active_searches},
         {"Syzygy option values", test_syzygy_options_accept_valid_values_and_ignore_invalid_values},
         {"legacy strength handshake", test_legacy_strength_options_are_not_advertised},
         {"legacy strength unknown options", test_legacy_strength_options_are_quiet_unknown_options},

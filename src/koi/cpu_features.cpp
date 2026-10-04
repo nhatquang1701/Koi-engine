@@ -2,16 +2,24 @@
 
 #include <cstdint>
 
-#if defined(_MSC_VER)
+// CPUID/XGETBV exist only on x86.  On arm64 (Apple Silicon, and any other
+// non-x86 target) both queries are constants: the instruction sets do not
+// exist, and the engine stays on its scalar paths.
+#if defined(_MSC_VER) && (defined(_M_X64) || defined(_M_IX86))
 #include <intrin.h>
-#elif defined(__GNUC__) || defined(__clang__)
+#define KOI_CPU_ARCH_X86 1
+#elif (defined(__GNUC__) || defined(__clang__)) && \
+    (defined(__x86_64__) || defined(__i386__))
 #include <cpuid.h>
+#define KOI_CPU_ARCH_X86 1
+#else
+#define KOI_CPU_ARCH_X86 0
 #endif
 
 namespace koi {
 namespace {
 
-#if defined(__GNUC__) || defined(__clang__)
+#if KOI_CPU_ARCH_X86 && (defined(__GNUC__) || defined(__clang__))
 // Reads XCR0 through inline assembly.  The probe cannot use
 // __builtin_cpu_supports(): this translation unit is compiled once per CPU
 // flavor, and a compiler may fold that builtin to a constant when the feature
@@ -29,7 +37,9 @@ namespace {
 } // namespace
 
 bool cpu_supports_avx2() noexcept {
-#if defined(_MSC_VER)
+#if !KOI_CPU_ARCH_X86
+    return false;
+#elif defined(_MSC_VER)
     int maximum_leaf[4]{};
     __cpuid(maximum_leaf, 0);
     if (maximum_leaf[0] < 1) {
@@ -72,7 +82,9 @@ bool cpu_supports_avx2() noexcept {
 }
 
 bool cpu_supports_avx512() noexcept {
-#if defined(_MSC_VER)
+#if !KOI_CPU_ARCH_X86
+    return false;
+#elif defined(_MSC_VER)
     int maximum_leaf[4]{};
     __cpuid(maximum_leaf, 0);
     if (maximum_leaf[0] < 7) {

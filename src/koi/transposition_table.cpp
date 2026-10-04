@@ -25,6 +25,8 @@
 #include <intrin.h>
 #define KOI_TT_PREFETCH(address) _mm_prefetch(reinterpret_cast<const char*>(address), _MM_HINT_T0)
 #elif defined(__GNUC__) || defined(__clang__)
+// __builtin_prefetch exists on every GCC/Clang target, including Apple
+// Silicon; the backend lowers it to a hint or a no-op as the ISA allows.
 #define KOI_TT_PREFETCH(address) __builtin_prefetch(address)
 #else
 #define KOI_TT_PREFETCH(address) ((void)(address))
@@ -87,6 +89,9 @@ HashMemorySnapshot default_memory_snapshot() noexcept {
         return HashMemorySnapshot{total, available, commit};
     }
 #endif
+    // macOS (and any other platform) has no snapshot provider yet; a zero
+    // snapshot tells resize_locked() to skip the memory caps and honor the
+    // requested Hash size.
     return {};
 }
 

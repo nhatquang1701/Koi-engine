@@ -20,8 +20,8 @@ unique (GUID or process-unique) name so the suite is safe under `ctest -j`.
 ## Running the suite
 
 Configure and build a Release tree (from an x64 Visual Studio developer shell
-on Windows, or with the system GCC 14+/Clang 18+ on Linux), then run CTest,
-preferably in parallel:
+on Windows, with the system GCC 14+/Clang 18+ on Linux, or with Homebrew LLVM
+clang 19+ on macOS arm64), then run CTest, preferably in parallel:
 
 ```powershell
 cmake -S . -B build\release -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=cl
@@ -36,8 +36,13 @@ cmake --build build/release --config Release
 ctest --test-dir build/release -C Release -j 8 --output-on-failure
 ```
 
+On macOS arm64 (Apple Silicon), use Homebrew LLVM clang 19+ (or AppleClang
+18+) with `-DKOI_BUILD_MODULES=OFF -DKOI_STATIC_RUNTIME=OFF`; the CTest
+commands are identical. GPU NNUE is CUDA-only and unavailable on macOS, so the
+CPU NNUE and classical evaluator paths are exercised there.
+
 The PowerShell process tests are registered only when `pwsh` is found; the C++
-and Python suites are registered on both platforms.
+and Python suites are registered on Windows, Linux, and macOS.
 
 `tools/test/run_tests.ps1` wraps that flow (build + parallel CTest + JUnit and
 `LastTest.log` capture). When `cl.exe` is not on `PATH`, pass the developer
@@ -320,3 +325,11 @@ cancellation):
   `tools/build/package_release.ps1`, verifies and extracts the archive, then
   runs bounded UCI smokes with the automatic and `KOI_CPU_VARIANT=generic`
   variants.
+
+`.github/workflows/macos.yml` runs one Apple Silicon leg:
+
+- `macos-arm64` installs Homebrew LLVM clang and builds Release with
+  `-DKOI_BUILD_MODULES=OFF -DKOI_ENABLE_GPU_NNUE=OFF -DKOI_STATIC_RUNTIME=OFF`,
+  then runs the same unit, heavy-search, process, and Python label groups as
+  the Linux legs. The x86-only AVX-512 binary smoke and the three-binary
+  variant process test are omitted, and diagnostics upload on failure.

@@ -1,0 +1,154 @@
+name: macOS CTest
+
+on:
+  push:
+  pull_request:
+
+# macOS arm64 (Apple Silicon) is the modules-off portability leg: it proves the
+# documented fallback build (KOI_BUILD_MODULES=OFF) works with Homebrew LLVM.
+# GPU NNUE is CUDA-only and the static libstdc++ runtime policy is Linux-only,
+# so both are explicitly disabled.  The x86-only AVX variant binaries and their
+# process test are not built or run here.
+jobs:
+  macos-arm64:
+    runs-on: macos-14
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: tools/measurement/requirements.txt
+      - name: Install the Homebrew LLVM toolchain
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: "1"
+        run: |
+          brew install ninja llvm
+          echo "LLVM_PREFIX=$(brew --prefix llvm)" >> "$GITHUB_ENV"
+          python -m pip install --disable-pip-version-check --quiet --upgrade cmake -r tools/measurement/requirements.txt
+      - name: Configure and build with Homebrew Clang
+        run: |
+          cmake -S . -B build/ci-release -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER="$LLVM_PREFIX/bin/clang" \
+            -DCMAKE_CXX_COMPILER="$LLVM_PREFIX/bin/clang++" \
+            -DKOI_BUILD_MODULES=OFF -DKOI_ENABLE_GPU_NNUE=OFF -DKOI_STATIC_RUNTIME=OFF \
+            -DKOI_TEST_TIMEOUT_SECONDS=300 \
+            -DPython3_EXECUTABLE="$(command -v python)"
+          cmake --build build/ci-release --config Release -j 4
+      # The suite runs in the same label groups as the Linux legs so a slow or
+      # hanging group is localized, and an interrupted step still leaves the
+      # earlier JUnit reports behind.  `--repeat until-pass:2` matches the
+      # Windows and Linux gates: wall-clock-sensitive search and process cases
+      # are retried once on a starved shared runner.
+      - name: Run the unit suite
+        env:
+          KOI_TEST_RETRIES: "3"
+        run: |
+          ctest --test-dir build/ci-release -C Release -j 4 -L unit -LE heavy \
+            --repeat until-pass:2 \
+            --output-on-failure --output-junit build/ci-release/ctest-unit-junit.xml
+      - name: Run the heavy search suite
+        env:
+          KOI_TEST_RETRIES: "5"
+        run: |
+          ctest --test-dir build/ci-release -C Release -j 1 -L heavy -LE process \
+            --repeat until-pass:2 \
+            --output-on-failure --output-junit build/ci-release/ctest-heavy-junit.xml
+      - name: Run the heavy process suite
+        env:
+          KOI_TEST_RETRIES: "3"
+        run: |
+          ctest --test-dir build/ci-release -C Release -j 1 \
+            -R "koi_engine_time_safety_process|koi_benchmark_process" \
+            --repeat until-pass:2 \
+            --output-on-failure --output-junit build/ci-release/ctest-heavy-process-junit.xml
+      # Every process test gets its own step with a hard step timeout so a hung
+      # test names itself in the job summary instead of stalling the whole job,
+      # and the diagnostics upload below still runs.
+      - name: Process suite - koi_replay_tests
+        env:
+          KOI_TEST_RETRIES: "3"
+        timeout-minutes: 6
+        run: |
+          ctest --test-dir build/ci-release -C Release -j 1 -R "^koi_replay_tests$" \
+            --repeat until-pass:2 \
+            --output-on-failure --output-junit build/ci-release/ctest-process-1-junit.xml
+      - name: Process suite - koi_engine_process
+        env:
+          KOI_TEST_RETRIES: "3"
+        timeout-minutes: 6
+        run: |
+          ctest --test-dir build/ci-release -C Release -j 1 -R "^koi_engine_process$" \
+            --repeat until-pass:2 \
+            --output-on-failure --output-junit build/ci-release/ctest-process-2-junit.xml
+      - name: Process suite - koi_engine_en_croissant_process
+        env:
+          KOI_TEST_RETRIES: "3"
+        timeout-minutes: 6
+        run: |
+          ctest --test-dir build/ci-release -C Release -j 1 -R "^koi_engine_en_croissant_process$" \
+            --repeat until-pass:2 \
+            --output-on-failure --output-junit build/ci-release/ctest-process-3-junit.xml
+      - name: Process suite - koi_uci_match_process
+        env:
+          KOI_TEST_RETRIES: "3"
+        timeout-minutes: 6
+        run: |
+          ctest --test-dir build/ci-release -C Release -j 1 -R "^koi_uci_match_process$" \
+            --repeat until-pass:2 \
+            --output-on-failure --output-junit build/ci-release/ctest-process-4-junit.xml
+      - name: Process suite - koi_stockfish_strength_option
+        env:
+          KOI_TEST_RETRIES: "3"
+        timeout-minutes: 6
+        run: |
+          ctest --test-dir build/ci-release -C Release -j 1 -R "^koi_stockfish_strength_option$" \
+            --repeat until-pass:2 \
+            --output-on-failure --output-junit build/ci-release/ctest-process-5-junit.xml
+      - name: Process suite - koi_uci_match_clock
+        env:
+          KOI_TEST_RETRIES: "3"
+        timeout-minutes: 6
+        run: |
+          ctest --test-dir build/ci-release -C Release -j 1 -R "^koi_uci_match_clock$" \
+            --repeat until-pass:2 \
+            --output-on-failure --output-junit build/ci-release/ctest-process-6-junit.xml
+      - name: Process suite - koi_engine_perft_responsiveness
+        env:
+          KOI_TEST_RETRIES: "3"
+        timeout-minutes: 6
+        run: |
+          ctest --test-dir build/ci-release -C Release -j 1 -R "^koi_engine_perft_responsiveness$" \
+            --repeat until-pass:2 \
+            --output-on-failure --output-junit build/ci-release/ctest-process-7-junit.xml
+      - name: Tool integration suite - run_tests_artifact_path
+        env:
+          KOI_TEST_RETRIES: "3"
+        timeout-minutes: 6
+        run: |
+          ctest --test-dir build/ci-release -C Release -j 1 -R "^run_tests_artifact_path$" \
+            --repeat until-pass:2 \
+            --output-on-failure --output-junit build/ci-release/ctest-process-8-junit.xml
+      - name: Run the Python suite
+        env:
+          KOI_TEST_RETRIES: "3"
+        # The Python suites are deterministic and finish quickly; the tests run
+        # serially so the log always ends at the test that failed.
+        timeout-minutes: 15
+        run: |
+          ctest --test-dir build/ci-release -C Release -j 1 -L python \
+            --output-on-failure --output-junit build/ci-release/ctest-python-junit.xml
+      - name: Show the test log tail
+        if: always()
+        run: tail -n 150 build/ci-release/Testing/Temporary/LastTest.log || true
+      - name: Upload macOS test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: macos-arm64-test-diagnostics
+          path: |
+            build/ci-release/ctest-*-junit.xml
+            build/ci-release/Testing/Temporary/LastTest.log
+          if-no-files-found: ignore
+          retention-days: 7

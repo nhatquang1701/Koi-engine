@@ -4,8 +4,11 @@
 #include <array>
 #include <atomic>
 #include <cstdint>
+#include <cstdlib>
 #include <memory>
+#include <optional>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <vector>
 
@@ -91,6 +94,18 @@ std::vector<std::int32_t> cpu_scores(const std::shared_ptr<const koi::NnueNetwor
 std::unique_ptr<koi::gpu::GpuNnueService> open_service(
     const std::shared_ptr<const koi::NnueNetwork>& weights, std::string& error) {
     return koi::gpu::GpuNnueService::create(*weights, error);
+}
+
+void set_environment_variable(const char* name, const char* value) {
+#if defined(_WIN32)
+    _putenv_s(name, value == nullptr ? "" : value);
+#else
+    if (value == nullptr) {
+        unsetenv(name);
+    } else {
+        setenv(name, value, 1);
+    }
+#endif
 }
 
 void test_gpu_matches_cpu_scalar() {
@@ -222,6 +237,97 @@ void test_concurrent_batch_requests_keep_their_own_scores() {
 #endif
 }
 
+void test_gpu_nnue_mode_parsing_and_precedence() {
+    using koi::gpu::GpuNnueMode;
+
+    GpuNnueMode parsed = GpuNnueMode::require;
+    require(koi::gpu::parse_gpu_nnue_mode("auto", parsed) && parsed == GpuNnueMode::automatic,
+            "auto must parse to the automatic mode");
+    require(koi::gpu::parse_gpu_nnue_mode("ON", parsed) && parsed == GpuNnueMode::require,
+            "on must parse case-insensitively");
+    require(koi::gpu::parse_gpu_nnue_mode("Off", parsed) && parsed == GpuNnueMode::disabled,
+            "off must parse case-insensitively");
+    require(!koi::gpu::parse_gpu_nnue_mode("maybe", parsed),
+            "an unknown GpuNnue value must be rejected");
+
+    const GpuNnueMode saved = koi::gpu::gpu_nnue_mode();
+    set_environment_variable("KOI_GPU_NNUE", nullptr);
+    koi::gpu::reset_gpu_nnue_environment_cache();
+    koi::gpu::set_gpu_nnue_mode(GpuNnueMode::automatic);
+    require(koi::gpu::effective_gpu_nnue_mode() == GpuNnueMode::automatic,
+            "without an environment override the option decides");
+
+    set_environment_variable("KOI_GPU_NNUE", "1");
+    koi::gpu::reset_gpu_nnue_environment_cache();
+    require(koi::gpu::effective_gpu_nnue_mode() == GpuNnueMode::require,
+            "KOI_GPU_NNUE must force the GPU on over auto");
+
+    koi::gpu::set_gpu_nnue_mode(GpuNnueMode::disabled);
+    require(koi::gpu::effective_gpu_nnue_mode() == GpuNnueMode::disabled,
+            "an explicit off must beat an environment request for the GPU");
+
+    set_environment_variable("KOI_GPU_NNUE", "0");
+    koi::gpu::reset_gpu_nnue_environment_cache();
+    koi::gpu::set_gpu_nnue_mode(GpuNnueMode::require);
+    require(koi::gpu::effective_gpu_nnue_mode() == GpuNnueMode::disabled,
+            "KOI_GPU_NNUE=0 must force the GPU off over the option");
+
+    set_environment_variable("KOI_GPU_NNUE", nullptr);
+    koi::gpu::reset_gpu_nnue_environment_cache();
+    koi::gpu::set_gpu_nnue_mode(saved);
+}
+
+void test_gpu_nnue_require_falls_back_to_the_cpu_when_unusable() {
+    using koi::gpu::GpuNnueMode;
+#if !KOI_GPU_INFERENCE_AVAILABLE
+    require(!koi::gpu::gpu_nnue_available(),
+            "a build without the GPU kernel must report the GPU as unavailable");
+#endif
+    // The synthetic v5 fixture is intentionally too narrow for the kernel
+    // (hidden 32, L1 8), so service creation fails before any driver work on
+    // every machine and this fallback stays deterministic.
+    const auto incompatible =
+        std::make_shared<const koi::NnueNetwork>(koi::NnueNetwork::synthetic_v5());
+    const GpuNnueMode saved = koi::gpu::gpu_nnue_mode();
+    set_environment_variable("KOI_GPU_NNUE", nullptr);
+    koi::gpu::reset_gpu_nnue_environment_cache();
+    koi::gpu::set_gpu_nnue_mode(GpuNnueMode::require);
+
+    auto cpu = std::make_shared<koi::NnueEvaluator>(incompatible);
+    std::shared_ptr<const koi::Evaluator> wrapped =
+        koi::maybe_wrap_gpu_nnue(incompatible, cpu);
+    const koi::gpu::GpuNnueStatus status = koi::gpu::gpu_nnue_status();
+
+    require(status.network_loaded, "installing an NNUE network must record the GPU status");
+    require(!status.service_ready,
+            "an incompatible network must never report a ready GPU service");
+    require(wrapped.get() == cpu.get(),
+            "on must keep the CPU evaluator when the GPU is unusable");
+    const std::string line = koi::gpu::gpu_nnue_search_diagnostic(4);
+    require(line.starts_with("GPU NNUE: unavailable ("),
+            "on must explain the CPU fallback with an unavailable diagnostic: " + line);
+
+    // The same network under auto must still fall back quietly to the CPU.
+    koi::gpu::set_gpu_nnue_mode(GpuNnueMode::automatic);
+    std::shared_ptr<const koi::Evaluator> auto_wrapped =
+        koi::maybe_wrap_gpu_nnue(incompatible, cpu);
+    require(auto_wrapped.get() == cpu.get(), "auto must keep the CPU evaluator");
+    require(koi::gpu::gpu_nnue_search_diagnostic(4).starts_with("GPU NNUE: auto -> cpu ("),
+            "auto must explain why it stayed on the CPU");
+
+    // Threads=1 keeps the deterministic CPU path even when a service exists,
+    // so the thread rule is reported before any service state.
+    require(koi::gpu::gpu_nnue_search_diagnostic(1) == "GPU NNUE: off (Threads=1)",
+            "Threads=1 must be reported before the service state");
+
+    // With no NNUE network there is no GPU diagnostic at all.
+    koi::gpu::record_gpu_nnue_status(false, false, {}, {});
+    require(koi::gpu::gpu_nnue_search_diagnostic(4).empty(),
+            "the classical evaluator must not emit a GPU NNUE diagnostic");
+
+    koi::gpu::set_gpu_nnue_mode(saved);
+}
+
 void test_ptx_variant_selection_prefers_the_newest_supported_module() {
     // PTX JITs forward only, so a device runs the newest embedded module whose
     // compute capability does not exceed its own.  This case needs no GPU and
@@ -286,10 +392,12 @@ void test_ptx_candidate_list_orders_loadable_modules_newest_first() {
 } // namespace
 
 int main(int argc, char** argv) {
-    const std::array<koi::test::TestCase, 5> tests{{
+    const std::array<koi::test::TestCase, 7> tests{{
         {"GPU NNUE matches CPU scalar", test_gpu_matches_cpu_scalar},
         {"GPU NNUE batch sizes agree", test_gpu_matches_cpu_across_batch_sizes},
         {"GPU NNUE concurrent requests", test_concurrent_batch_requests_keep_their_own_scores},
+        {"GPU NNUE mode precedence", test_gpu_nnue_mode_parsing_and_precedence},
+        {"GPU NNUE require fallback", test_gpu_nnue_require_falls_back_to_the_cpu_when_unusable},
         {"GPU NNUE PTX variant selection", test_ptx_variant_selection_prefers_the_newest_supported_module},
         {"GPU NNUE PTX candidate list", test_ptx_candidate_list_orders_loadable_modules_newest_first},
     }};

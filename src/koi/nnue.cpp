@@ -19,7 +19,10 @@
 #include "koi/classical_evaluator.hpp"
 #include "koi/cpu_features.hpp"
 
-#if defined(_M_AVX2) || defined(__AVX2__)
+// The AVX2 kernel exists only on x86-64; on arm64 (and any other target) the
+// scalar path is compiled in and used for every inference request.
+#if (defined(_M_AVX2) || defined(__AVX2__)) && \
+    (defined(_M_X64) || defined(_M_IX86) || defined(__x86_64__) || defined(__i386__))
 #include <immintrin.h>
 #define KOI_NNUE_COMPILED_AVX2 1
 #else
@@ -2015,24 +2018,54 @@ NnueWorker NnueEvaluator::make_worker() const {
 std::shared_ptr<const Evaluator> maybe_wrap_gpu_nnue(
     const std::shared_ptr<const NnueNetwork>& network,
     std::shared_ptr<const Evaluator> cpu_evaluator) {
+    if (network == nullptr) {
+        gpu::record_gpu_nnue_status(false, false, {}, {});
+        return cpu_evaluator;
+    }
 #if defined(KOI_GPU_INFERENCE_AVAILABLE) && KOI_GPU_INFERENCE_AVAILABLE
-    const char* gpu_requested = std::getenv("KOI_GPU_NNUE");
-    if (gpu_requested != nullptr && std::string_view(gpu_requested) != "0") {
+    // The environment override is applied by effective_gpu_nnue_mode(): an
+    // explicit off always wins, and KOI_GPU_NNUE can otherwise force the GPU on
+    // for tests.  A failed service never aborts the engine: the CPU evaluator
+    // stays in place and the recorded reason is reported by the UCI diagnostic.
+    if (gpu::effective_gpu_nnue_mode() != gpu::GpuNnueMode::disabled) {
         std::string gpu_error;
-        std::unique_ptr<gpu::GpuNnueService> created =
-            gpu::GpuNnueService::create(*network, gpu_error);
+        std::unique_ptr<gpu::GpuNnueService> created;
+        try {
+            created = gpu::GpuNnueService::create(*network, gpu_error);
+        } catch (const std::exception& allocation_error) {
+            gpu_error = allocation_error.what();
+        } catch (...) {
+            gpu_error = "GPU service setup failed";
+        }
+        // The release-candidate attestation harness reads the explicit-request
+        // markers from stderr, so keep the historical lines for `on` (and the
+        // KOI_GPU_NNUE override).  `auto` stays silent on stderr and reports
+        // through the per-search UCI diagnostic instead.
+        const bool explicitly_requested =
+            gpu::effective_gpu_nnue_mode() == gpu::GpuNnueMode::require;
         if (created != nullptr) {
-            std::fprintf(stderr, "koi-engine: GPU NNUE inference enabled.\n");
+            if (explicitly_requested) {
+                std::fprintf(stderr, "koi-engine: GPU NNUE inference enabled.\n");
+            }
+            std::string device = created->device_name();
+            gpu::record_gpu_nnue_status(true, true, std::move(device), {});
             return std::make_shared<gpu::GpuNnueEvaluator>(
                 std::move(cpu_evaluator),
                 std::shared_ptr<gpu::GpuNnueService>(std::move(created)));
         }
-        std::fprintf(stderr,
-                     "koi-engine: GPU NNUE unavailable (%s); using the CPU network.\n",
-                     gpu_error.c_str());
+        if (explicitly_requested) {
+            std::fprintf(stderr,
+                         "koi-engine: GPU NNUE unavailable (%s); using the CPU network.\n",
+                         gpu_error.c_str());
+        }
+        gpu::record_gpu_nnue_status(true, false, {}, std::move(gpu_error));
+    } else {
+        gpu::record_gpu_nnue_status(true, false, {}, "GPU inference is disabled");
     }
 #else
     (void)network;
+    gpu::record_gpu_nnue_status(true, false, {},
+                                "this build has no GPU NNUE kernel");
 #endif
     return cpu_evaluator;
 }
@@ -2041,6 +2074,7 @@ EvaluatorSelection make_evaluator(std::optional<std::filesystem::path> nnue_path
     EvaluatorSelection selection;
     if (!nnue_path.has_value()) {
         selection.evaluator = std::make_shared<ClassicalEvaluator>();
+        gpu::record_gpu_nnue_status(false, false, {}, {});
         return selection;
     }
 
@@ -2048,6 +2082,7 @@ EvaluatorSelection make_evaluator(std::optional<std::filesystem::path> nnue_path
     if (!loaded.has_value()) {
         selection.evaluator = std::make_shared<ClassicalEvaluator>();
         selection.nnue_error = loaded.error();
+        gpu::record_gpu_nnue_status(false, false, {}, {});
         return selection;
     }
     const auto network = std::make_shared<const NnueNetwork>(std::move(*loaded));

@@ -9,6 +9,7 @@
 #include <thread>
 
 #include "koi/completion_gate.hpp"
+#include "koi/detail/thread_stack.hpp"
 
 namespace koi::detail {
 
@@ -63,7 +64,7 @@ private:
     std::condition_variable stop_condition_;
     std::mutex ponderhit_mutex_;
     std::optional<SearchLimits> ponderhit_limits_;
-    std::thread worker_;
+    WorkerThread worker_;
 };
 
 } // namespace koi::detail

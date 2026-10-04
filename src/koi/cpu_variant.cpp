@@ -10,7 +10,7 @@
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__APPLE__)
 #include <unistd.h>
 #endif
 
@@ -152,7 +152,7 @@ int launch_variant(const std::filesystem::path& directory, CpuVariant variant,
     return static_cast<int>(exit_code);
 }
 
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__APPLE__)
 
 // Replaces this process with `variant` through execv: the child keeps the
 // standard streams, the process id, and the controlling terminal, so a GUI or

@@ -1,7 +1,9 @@
 #include "koi/executable_path.hpp"
 
 #include <array>
+#include <cstdint>
 #include <string_view>
+#include <system_error>
 
 #if defined(_WIN32)
 #ifndef NOMINMAX
@@ -12,6 +14,8 @@
 #elif defined(__linux__)
 #include <climits>
 #include <unistd.h>
+#elif defined(__APPLE__)
+#include <mach-o/dyld.h>
 #endif
 
 namespace koi {
@@ -33,6 +37,20 @@ std::filesystem::path current_executable_path() noexcept {
         return std::filesystem::path(buffer.data());
     }
     return {};
+#elif defined(__APPLE__)
+    // _NSGetExecutablePath returns the path used to launch the process, which
+    // may be relative; canonicalize it so sibling lookups (koi.nnue, the CPU
+    // variant executables) resolve beside the running binary.
+    std::array<char, 4096> buffer{};
+    std::uint32_t size = static_cast<std::uint32_t>(buffer.size());
+    if (::_NSGetExecutablePath(buffer.data(), &size) != 0) {
+        return {};
+    }
+    std::error_code canonical_error;
+    const std::filesystem::path path(buffer.data());
+    const std::filesystem::path canonical =
+        std::filesystem::weakly_canonical(path, canonical_error);
+    return canonical_error ? path : canonical;
 #else
     return {};
 #endif

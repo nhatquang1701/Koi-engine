@@ -3,6 +3,7 @@ $ErrorActionPreference = 'Stop'
 $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../../..'))
 $workflow = Join-Path $repositoryRoot '.github/workflows/windows.yml'
 $linuxWorkflow = Join-Path $repositoryRoot '.github/workflows/linux.yml'
+$macosWorkflow = Join-Path $repositoryRoot '.github/workflows/macos.yml'
 $candidateWorkflow = Join-Path $repositoryRoot '.github/workflows/release-candidate-games.yml'
 $cmake = Join-Path $repositoryRoot 'CMakeLists.txt'
 if (-not (Test-Path -LiteralPath $workflow -PathType Leaf)) {
@@ -10,6 +11,9 @@ if (-not (Test-Path -LiteralPath $workflow -PathType Leaf)) {
 }
 if (-not (Test-Path -LiteralPath $linuxWorkflow -PathType Leaf)) {
     throw "Linux CI workflow is missing: $linuxWorkflow"
+}
+if (-not (Test-Path -LiteralPath $macosWorkflow -PathType Leaf)) {
+    throw "macOS CI workflow is missing: $macosWorkflow"
 }
 if (-not (Test-Path -LiteralPath $candidateWorkflow -PathType Leaf)) {
     throw "Release candidate game workflow is missing: $candidateWorkflow"
@@ -22,6 +26,7 @@ if (-not $windowsFlakeMatch.Success) {
 }
 $windowsFlakeContent = $windowsFlakeMatch.Value
 $linuxContent = Get-Content -LiteralPath $linuxWorkflow -Raw
+$macosContent = Get-Content -LiteralPath $macosWorkflow -Raw
 $candidateContent = Get-Content -LiteralPath $candidateWorkflow -Raw
 $cmakeContent = Get-Content -LiteralPath $cmake -Raw
 $requirements = Join-Path $repositoryRoot 'tools/measurement/requirements.txt'
@@ -81,6 +86,18 @@ function Deny-WindowsFlakePattern([string]$Pattern, [string]$Description) {
 function Require-LinuxWorkflowPattern([string]$Pattern, [string]$Description) {
     if ($linuxContent -notmatch $Pattern) {
         throw "Linux CI workflow must define $Description."
+    }
+}
+
+function Require-MacOSWorkflowPattern([string]$Pattern, [string]$Description) {
+    if ($macosContent -notmatch $Pattern) {
+        throw "macOS CI workflow must define $Description."
+    }
+}
+
+function Deny-MacOSWorkflowPattern([string]$Pattern, [string]$Description) {
+    if ($macosContent -match $Pattern) {
+        throw "macOS CI workflow must not define $Description."
     }
 }
 
@@ -183,6 +200,28 @@ Require-LinuxWorkflowPattern '(?i)grep\s+-q\s+"legal\s+1"' 'acceptance of legal 
 Require-LinuxWorkflowPattern '(?i)-DKOI_ENABLE_GPU_NNUE=OFF' 'the CPU-only tarball configure switch'
 Require-LinuxWorkflowPattern '(?i)KOI_CPU_VARIANT=generic' 'the forced generic UCI smoke'
 Require-LinuxWorkflowPattern '(?i)actions/upload-artifact@v5' 'test diagnostic artifact upload'
+
+# The macOS arm64 leg: Homebrew LLVM, the modules-off/CPU-only fallback build,
+# the Linux label groups minus the x86-only AVX variant checks, and diagnostics.
+Require-MacOSWorkflowPattern '(?m)^\s*runs-on:\s*macos-14\s*$' 'an Apple Silicon runner'
+Require-MacOSWorkflowPattern '(?m)^\s{2}macos-arm64:\s*$' 'the macOS arm64 job'
+Require-MacOSWorkflowPattern '(?i)brew\s+install[^\r\n]*\bninja\b' 'the Homebrew Ninja install'
+Require-MacOSWorkflowPattern '(?i)brew\s+install[^\r\n]*\bllvm\b' 'the Homebrew LLVM install'
+Require-MacOSWorkflowPattern '(?i)LLVM_PREFIX/bin/clang\+\+' 'the Homebrew Clang C++ compiler selection'
+Require-MacOSWorkflowPattern '(?i)-DCMAKE_BUILD_TYPE=Release' 'the Release build type'
+Require-MacOSWorkflowPattern '(?i)-DKOI_BUILD_MODULES=OFF' 'the explicit modules-off configure switch'
+Require-MacOSWorkflowPattern '(?i)-DKOI_ENABLE_GPU_NNUE=OFF' 'the CPU-only configure switch'
+Require-MacOSWorkflowPattern '(?i)-DKOI_STATIC_RUNTIME=OFF' 'the system-runtime configure switch'
+Require-MacOSWorkflowPattern '(?i)ctest\s+--test-dir\s+build/ci-release\s+-C\s+Release' 'the macOS CTest invocation'
+Require-MacOSWorkflowPattern '(?i)-L\s+unit\s+-LE\s+heavy' 'the fast unit label selection'
+Require-MacOSWorkflowPattern '(?i)-L\s+heavy\s+-LE\s+process' 'the heavy search label selection'
+Require-MacOSWorkflowPattern '(?i)-L\s+python' 'the Python label selection'
+Require-MacOSWorkflowPattern '(?i)--output-on-failure' 'CTest failure output'
+Require-MacOSWorkflowPattern '(?i)KOI_TEST_RETRIES:\s*"3"' 'the shared-runner retry setting'
+Require-MacOSWorkflowPattern '(?i)actions/upload-artifact@v5' 'test diagnostic artifact upload'
+Require-MacOSWorkflowPattern '(?i)LastTest\.log' 'the LastTest.log diagnostic upload'
+Deny-MacOSWorkflowPattern '(?i)koi-engine-avx512' 'the x86-only AVX-512 smoke'
+Deny-MacOSWorkflowPattern '(?i)koi_engine_variant_process' 'the x86-only three-binary variant process test'
 
 # The Windows no-retry flake gate must run repeated serial CTest selections
 # independently so timing failures remain visible instead of being retried away.

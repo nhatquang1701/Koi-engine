@@ -7,7 +7,8 @@ rules that changes must preserve.
 
 ## Project shape
 
-Koi is a C++26 UCI engine for standard chess on Windows x64 and Linux x86-64.
+Koi is a C++26 UCI engine for standard chess on Windows x64, Linux x86-64, and
+macOS arm64 (Apple Silicon).
 The root [README](README.md) is a short project entry point. The detailed user
 reference is [docs/USER_GUIDE.md](docs/USER_GUIDE.md), and
 [docs/README.md](docs/README.md) maps the documentation, design records, plans,
@@ -95,8 +96,26 @@ cmake --build build/release --config Release
 ctest --test-dir build/release -C Release -j 8 --output-on-failure
 ```
 
+On macOS arm64 (Apple Silicon), use Homebrew LLVM clang 19+ (AppleClang 18+
+also works), CMake 3.31+, and Ninja:
+
+```bash
+brew install llvm ninja
+cmake -S . -B build/release -G Ninja -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_C_COMPILER="$(brew --prefix llvm)/bin/clang" \
+  -DCMAKE_CXX_COMPILER="$(brew --prefix llvm)/bin/clang++" \
+  -DKOI_BUILD_MODULES=OFF -DKOI_STATIC_RUNTIME=OFF
+cmake --build build/release --config Release
+ctest --test-dir build/release -C Release -j 8 --output-on-failure
+```
+
+The documented macOS arm64 build disables C++26 named modules and the Linux
+static-runtime policy. GPU NNUE is CUDA-only and unavailable on macOS; the CPU
+NNUE and classical evaluator paths are unaffected.
+
 `KOI_BUILD_MODULES=OFF` disables named modules where the compiler cannot build
-them. `KOI_BUILD_SHADOW_DIFF=ON` enables the explicit differential target.
+them (the documented macOS arm64 configuration). `KOI_BUILD_SHADOW_DIFF=ON`
+enables the explicit differential target.
 `tools/test/run_tests.ps1` wraps the standard configure, build, CTest, JUnit,
 and `LastTest.log` flow. Read [tests/README.md](tests/README.md) before
 changing tests or test registration.

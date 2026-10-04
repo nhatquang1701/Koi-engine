@@ -13,9 +13,12 @@ struct NnueNetwork;
 
 namespace koi::gpu {
 
-// The service stages this many positions per launch.  The batching evaluator
-// must never hand it a larger batch: a bigger one fails and falls back to the
-// CPU, so the batch size is clamped to this limit.
+// Positions staged per kernel launch.  This single internal constant is both
+// the service's staging capacity and the batching evaluator's cap, so the
+// batcher can never hand the service a larger batch than it can hold (a bigger
+// one would fail and fall back to the CPU).  Retune the cap here; the
+// KOI_GPU_BATCH environment variable is a test seam that can only lower the
+// batcher's request size within it.
 inline constexpr std::size_t kMaximumGpuBatchSize = 256;
 
 // Synchronous GPU evaluation service for the v5 network.  The service owns the
@@ -40,6 +43,9 @@ public:
                                 std::span<std::int32_t> scores, std::string& error);
 
     [[nodiscard]] bool available() const noexcept;
+    // Name of the selected CUDA device, or an empty string when no driver was
+    // opened.  Used by the UCI diagnostic ("... -> cuda (GTX 1060)").
+    [[nodiscard]] const std::string& device_name() const noexcept;
 
 private:
     GpuNnueService();

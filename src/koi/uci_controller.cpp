@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "koi/classical_evaluator.hpp"
+#include "koi/gpu/nnue_gpu_evaluator.hpp"
 #include "koi/nnue.hpp"
 #include "koi/perft.hpp"
 #include "koi/policy_value_model.hpp"
@@ -136,6 +137,7 @@ enum class UciOptionKind {
     spin,
     string,
     button,
+    combo,
 };
 
 enum class UciOptionId {
@@ -163,6 +165,7 @@ enum class UciOptionId {
     syzygy_interior_depth,
     syzygy_50_move_rule,
     eval_file,
+    gpu_nnue,
     search_algorithm,
     policy_value_file,
     mcts_visit_output,
@@ -180,13 +183,16 @@ struct UciOptionDescriptor {
     std::uint64_t maximum;
     bool dynamic_maximum;
     bool advertised;
+    // `var` clauses of a combo option, without the leading "var", e.g.
+    // "var auto var on var off".  Empty for every other kind.
+    std::string_view combo_values{};
 };
 
 // Single source of truth for the UCI option surface. Both `write_handshake`
 // and `handle_setoption` consume this table, so an advertised option can never
 // drift out of sync with the option the controller actually applies. The order
 // of the entries is the order advertised to a GUI and must stay stable.
-constexpr std::array<UciOptionDescriptor, 30> kUciOptions{{
+constexpr std::array<UciOptionDescriptor, 31> kUciOptions{{
     {"RandomSeed", UciOptionKind::spin, UciOptionId::random_seed, "0", 0,
      kMaximumRandomSeed, false, true},
     {"Hash", UciOptionKind::spin, UciOptionId::hash, "512", kMinimumHashMegabytes,
@@ -230,6 +236,15 @@ constexpr std::array<UciOptionDescriptor, 30> kUciOptions{{
     // advertised with KOI_NNUE_PATH).  A non-empty path loads and activates a
     // Koi NNUE network, with the classical evaluator retained as a fallback.
     {"EvalFile", UciOptionKind::string, UciOptionId::eval_file, "", 0, 0, false, true},
+    // GPU inference for a compatible v5 NNUE network.  `auto` (default) uses
+    // the GPU when this build has the kernel, the CUDA driver loads, and the
+    // search uses more than one thread; `on` requests the GPU and falls back to
+    // the CPU with a diagnostic when it is unavailable; `off` never uses it.
+    // Precedence: an explicit `off` from this option or KOI_GPU_NNUE=0 always
+    // wins, otherwise a non-empty KOI_GPU_NNUE other than "0" forces `on` as a
+    // test override, otherwise this option decides.
+    {"GpuNnue", UciOptionKind::combo, UciOptionId::gpu_nnue, "auto", 0, 0, false, true,
+     "var auto var on var off"},
     // AlphaBeta remains the portable default. MCTS requires an explicitly
     // loaded versioned policy/value model and falls back to AlphaBeta otherwise.
     {"SearchAlgorithm", UciOptionKind::string, UciOptionId::search_algorithm,
@@ -1061,6 +1076,43 @@ void UciController::handle_setoption(std::istream& command) {
         break;
     }
 
+    case UciOptionId::gpu_nnue: {
+        gpu::GpuNnueMode requested = gpu::GpuNnueMode::automatic;
+        if (!gpu::parse_gpu_nnue_mode(value, requested) ||
+            requested == gpu::gpu_nnue_mode()) {
+            // An invalid or unchanged value must not disturb a live search.
+            break;
+        }
+        stop_and_suppress_active_search();
+        gpu::set_gpu_nnue_mode(requested);
+        // A network installed while the GPU path was disabled was wrapped
+        // without a service.  Re-install it from EvalFile so a later `on` or
+        // `auto` can actually reach the GPU; an evaluator that already owns a
+        // GPU service re-enables dynamically through the mode check, and a
+        // missing driver or an incompatible network reports its reason through
+        // the search diagnostic instead.
+        if (gpu::effective_gpu_nnue_mode() != gpu::GpuNnueMode::disabled &&
+            !eval_file_.empty() && gpu::gpu_nnue_available() &&
+            !gpu::gpu_nnue_status().service_ready) {
+            std::filesystem::path resolved = eval_file_;
+            if (resolved.is_relative() && !executable_directory_.empty()) {
+                resolved = executable_directory_ / resolved;
+            }
+            auto network = NnueLoader::load_file(resolved);
+            if (network.has_value()) {
+                try {
+                    auto weights = std::make_shared<const NnueNetwork>(std::move(*network));
+                    search_service_.set_evaluator(koi::maybe_wrap_gpu_nnue(
+                        weights, std::make_shared<NnueEvaluator>(weights)));
+                } catch (...) {
+                    // Keep the current evaluator; the next search diagnostic
+                    // reports the GPU state.
+                }
+            }
+        }
+        break;
+    }
+
     case UciOptionId::search_algorithm: {
         SearchAlgorithm algorithm = SearchAlgorithm::alpha_beta;
         if (parse_search_algorithm(value, algorithm) && algorithm != search_algorithm_) {
@@ -1265,6 +1317,14 @@ void UciController::start_search(GameState root, SearchLimits limits, bool skip_
                     " move " + book_choice->move.uci() + " root " + root.fen());
         write_book_completion(generation, root, limits, *book_choice, ply, completion_once);
         return;
+    }
+    // One GPU NNUE diagnostic per search start (never per node).  The line is
+    // empty unless an NNUE network is active, so the classical evaluator keeps
+    // the protocol output unchanged.
+    if (const std::string gpu_line = gpu::gpu_nnue_search_diagnostic(threads_);
+        !gpu_line.empty()) {
+        std::lock_guard lock(output_mutex_);
+        output_ << "info string " << gpu_line << '\n' << std::flush;
     }
     const GameState search_root = root;
     const bool is_ponder_search = limits.ponder;
@@ -1626,6 +1686,12 @@ void UciController::write_handshake() {
             break;
         case UciOptionKind::button:
             output_ << "button";
+            break;
+        case UciOptionKind::combo:
+            output_ << "combo default " << option.default_value;
+            if (!option.combo_values.empty()) {
+                output_ << ' ' << option.combo_values;
+            }
             break;
         }
         output_ << '\n';

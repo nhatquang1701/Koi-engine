@@ -23,13 +23,16 @@ The checked-in fixtures are under `tests/data/games`, `tests/data/openings`,
 and `tests/data/positions`. Stockfish and other installed dependencies may be
 selected explicitly; they are never copied into generated report directories.
 
-The tooling runs on Windows and Linux. Python tools use the in-tree
-`koi_chess` package, PowerShell tools run under `pwsh`, and binary names pick
-up the platform suffix automatically (`.exe` on Windows, no suffix on Linux).
+The tooling runs on Windows, Linux, and macOS arm64 (Apple Silicon). Python
+tools use the in-tree `koi_chess` package, PowerShell tools run under `pwsh`,
+and binary names pick up the platform suffix automatically (`.exe` on Windows,
+no suffix on Linux and macOS).
 The Studio GUI starts from `Koi NNUE Studio.cmd` on Windows and
-`./koi-nnue-studio.sh` on Linux. `tools/build/package_release.ps1` writes the
-Windows `.zip` or, on Linux, the portable `koi-engine-v1.0.0-linux-x86_64.tar.gz`
-built in an Ubuntu 22.04 container by CI. Each package includes a file
+`./koi-nnue-studio.sh` on Linux and macOS.
+`tools/build/package_release.ps1` writes the Windows `.zip` or, on Linux, the
+portable `koi-engine-v1.0.0-linux-x86_64.tar.gz`
+built in an Ubuntu 22.04 container by CI; macOS arm64 is a source-build target
+with no published archive. Each package includes a file
 manifest with SHA-256 hashes and source provenance; the archive has a matching
 `.sha256` sidecar.
 
@@ -728,4 +731,5 @@ and `KOI_GPU_PTX_ARCH=75` forces one embedded module.
 `tools/engine/koi_gpu_probe.cpp` verifies the device path and
 `tests/unit/runtime/gpu_nnue_tests.cpp` checks bit-exact parity against the CPU
 scalar evaluation plus the PTX selection rules. No strength or speed claim is
-attached to this first pass.
+attached to this first pass. GPU NNUE is CUDA-only; macOS arm64 has no CUDA
+support, so macOS builds always stay on the CPU NNUE or classical evaluator.

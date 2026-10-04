@@ -3,6 +3,8 @@
 #include <stdexcept>
 #include <utility>
 
+#include "koi/detail/thread_stack.hpp"
+
 namespace koi::detail {
 
 SearchSession::SearchSession(GameState root, SearchLimits limits, SearchOptions options)
@@ -21,7 +23,7 @@ void SearchSession::launch(std::function<void()> work) {
     stop_requested_.store(false, std::memory_order_relaxed);
     running_.store(true, std::memory_order_release);
     try {
-        worker_ = std::thread([this, work = std::move(work)]() mutable {
+        worker_ = spawn_worker_thread([this, work = std::move(work)]() mutable {
             try {
                 work();
             } catch (...) {

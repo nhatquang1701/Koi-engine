@@ -1,9 +1,9 @@
 # Koi Engine
 
-Koi is a C++26 UCI chess engine for standard chess on Windows x64 and Linux
-x86-64. It uses iterative-deepening alpha-beta search and a persistent
-transposition table, with a classical evaluator by default and optional NNUE,
-GPU NNUE, Polyglot book, and Syzygy support.
+Koi is a C++26 UCI chess engine for standard chess on Windows x64, Linux
+x86-64, and macOS arm64 (Apple Silicon). It uses iterative-deepening alpha-beta
+search and a persistent transposition table, with a classical evaluator by
+default and optional NNUE, GPU NNUE, Polyglot book, and Syzygy support.
 
 ## Start here
 
@@ -13,6 +13,11 @@ GPU NNUE, Polyglot book, and Syzygy support.
   GUI workflows, and optional assets.
 - [Run a first UCI session](USER_GUIDE.md#uci-smoke-test) after building or
   extracting an engine binary.
+
+macOS arm64 (Apple Silicon) is a source-build target: use Homebrew LLVM clang
+19+ (or AppleClang 18+), CMake, and Ninja with `-DKOI_BUILD_MODULES=OFF
+-DKOI_STATIC_RUNTIME=OFF`. GPU NNUE is CUDA-only and unavailable on macOS; the
+CPU NNUE and classical evaluator paths work normally.
 
 Koi has no required configuration file. Begin with `Hash=512`, `Threads=1`,
 and `Speed=100`. `Threads=1` provides deterministic search; higher values use

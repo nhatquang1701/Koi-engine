@@ -1,15 +1,19 @@
+#include <atomic>
+#include <cstddef>
 #include <cstdlib>
 #include <iostream>
 #include <memory>
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <vector>
 
 #include "koi/detail/root_coordinator.hpp"
 #include "koi/detail/search_context.hpp"
 #include "koi/detail/search_session.hpp"
 #include "koi/detail/search_stack.hpp"
+#include "koi/detail/thread_stack.hpp"
 
 #include "koi_test_support.hpp"
 
@@ -80,6 +84,58 @@ void test_search_context_exposes_fixed_stack_boundary() {
             "search context must own the fixed-capacity search stack");
 }
 
+// Consumes a real stack frame per level so the worker body cannot be collapsed
+// into a leaf call. The depth exceeds Darwin's 512 KiB pthread default, so on
+// Apple the case only passes because spawn_worker_thread reserves the explicit
+// worker stack; Linux (8 MiB RLIMIT_STACK) and Windows (16 MiB image reserve)
+// cover the same depth with their ordinary worker budgets.
+int consume_worker_stack(const int depth) {
+    volatile char frame[64] = {};
+    frame[0] = static_cast<char>(depth);
+    if (depth <= 0) {
+        return frame[0];
+    }
+    return consume_worker_stack(depth - 1) + 1;
+}
+
+void test_worker_thread_spawns_joinable_workers_with_stack_headroom() {
+    require(koi::detail::kWorkerStackBytes >= std::size_t{16} * 1024 * 1024,
+            "worker stack budget must not shrink below the Linux/Windows 16 MiB");
+    constexpr int kWorkerCount = 4;
+    // At least 1 MiB of touched frames, comfortably above the 512 KiB default.
+    constexpr int kRecursionDepth = 16'384;
+    std::atomic<int> completed{0};
+    std::vector<koi::detail::WorkerThread> workers;
+    workers.reserve(kWorkerCount);
+    try {
+        for (int index = 0; index < kWorkerCount; ++index) {
+            auto worker = koi::detail::spawn_worker_thread([&completed, index] {
+                if (consume_worker_stack(kRecursionDepth + index) > 0) {
+                    completed.fetch_add(1, std::memory_order_relaxed);
+                }
+            });
+            require(worker.joinable(), "spawned worker must be joinable");
+            require(worker.get_id() != std::this_thread::get_id(),
+                    "spawned worker must run on another thread");
+            workers.push_back(std::move(worker));
+            require(!worker.joinable(), "moved-from worker must not be joinable");
+        }
+    } catch (...) {
+        for (auto& worker : workers) {
+            if (worker.joinable()) {
+                worker.join();
+            }
+        }
+        throw;
+    }
+    for (auto& worker : workers) {
+        worker.join();
+        require(!worker.joinable(), "joined worker must not be joinable");
+    }
+    require(completed.load(std::memory_order_relaxed) == kWorkerCount,
+            "every spawned worker must complete its work");
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -88,6 +144,7 @@ int main(int argc, char** argv) {
         {"deterministic root ranking", test_root_ranking_is_score_then_stable_index},
         {"session ownership", test_session_snapshot_and_completion_are_single_owner_operations},
         {"context stack boundary", test_search_context_exposes_fixed_stack_boundary},
+        {"worker thread spawn", test_worker_thread_spawns_joinable_workers_with_stack_headroom},
     };
     return koi::test::run_tests(tests, argc, argv);
 }

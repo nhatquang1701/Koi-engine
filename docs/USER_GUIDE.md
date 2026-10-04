@@ -1,6 +1,7 @@
 # Koi Engine
 
-Koi Engine is a Windows x64 and Linux x86-64 UCI chess engine for standard chess. It is
+Koi Engine is a Windows x64, Linux x86-64, and macOS arm64 (Apple Silicon) UCI
+chess engine for standard chess. It is
 written in C++26 and is documented and process-tested against En Croissant as
 the primary GUI workflow. It uses deterministic iterative-deepening alpha-beta search
 with a classical evaluator, an opt-in Koi-native NNUE pipeline (training
@@ -129,6 +130,18 @@ On Linux (x86-64 only):
 - Optional: `pwsh` for the PowerShell process tests and Python 3 for the
   Python tooling tests.
 
+On macOS arm64 (Apple Silicon):
+
+- Homebrew LLVM (clang 19+) is the recommended C++26 toolchain; AppleClang 18+
+  also works. Install the compiler and Ninja with `brew install llvm ninja`.
+- CMake 3.31 or newer, for example `python3 -m pip install --upgrade cmake`.
+- C++26 named modules are disabled on macOS (`-DKOI_BUILD_MODULES=OFF`), and
+  the Linux static-runtime policy does not apply (`-DKOI_STATIC_RUNTIME=OFF`).
+- GPU NNUE is CUDA-only and unavailable on macOS; the engine uses the CPU NNUE
+  network when one is loaded and the classical evaluator otherwise.
+- Optional: `pwsh` for the PowerShell process tests and Python 3 for the
+  Python tooling tests.
+
 From an x64 Visual Studio developer shell in the repository root:
 
 ```powershell
@@ -147,15 +160,30 @@ cmake --build build/release --config Release
 ctest --test-dir build/release -C Release -j 8 --output-on-failure
 ```
 
+On macOS arm64 (Apple Silicon) with Homebrew LLVM:
+
+```bash
+brew install llvm ninja
+cmake -S . -B build/release -G Ninja -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_C_COMPILER="$(brew --prefix llvm)/bin/clang" \
+  -DCMAKE_CXX_COMPILER="$(brew --prefix llvm)/bin/clang++" \
+  -DKOI_BUILD_MODULES=OFF -DKOI_STATIC_RUNTIME=OFF
+cmake --build build/release --config Release
+ctest --test-dir build/release -C Release -j 8 --output-on-failure
+```
+
 C++26 named modules are auto-detected: they are built with MSVC, Clang 18+,
 and GCC 14+, and the CMake option `KOI_BUILD_MODULES=OFF` skips them (and the
-module test) on compilers where they are not usable. The Linux build links
+module test) on compilers where they are not usable; the documented macOS
+arm64 build passes that fallback explicitly. The Linux build links
 libstdc++/libgcc statically by default for a portable binary; pass
-`-DKOI_STATIC_RUNTIME=OFF` to link the system runtime instead.
+`-DKOI_STATIC_RUNTIME=OFF` to link the system runtime instead (the macOS build
+has no static-runtime policy and always passes it).
 
 For a Debug build, substitute `build\debug` and `Debug` in those commands. The
 Release build produces three engine executables in `build\release`
-(`build/release` on Linux, where they carry no `.exe` suffix):
+(`build/release` on Linux and macOS, where they carry no `.exe` suffix; macOS
+arm64 builds only the baseline `koi-engine`):
 
 - `koi-engine.exe` — the baseline build and the single entry point for GUIs and
   scripts. It starts the fastest sibling this CPU supports
@@ -171,8 +199,10 @@ clear message instead of executing an unsupported instruction. Set
 unknown values keep the automatic behavior). On Windows the selector launches
 the sibling as a child process, forwards its exit code, and a job object kills
 the child if the parent disappears; on Linux it `execv`s the sibling so the
-process image is replaced. All other tools (`koi-bench`, `koi-replay`,
-`koi-perft`, `koi-eval-features`, `koi-gpu-probe`) are AVX2 builds.
+process image is replaced). On macOS arm64 there are no AVX siblings, so the
+baseline `koi-engine` runs directly. All other tools (`koi-bench`, `koi-replay`,
+`koi-perft`, `koi-eval-features`, `koi-gpu-probe`) are AVX2 builds on Windows
+and Linux x86-64 and baseline builds on macOS arm64.
 
 For an independently reproducible release gate, run the checked-in harness from
 an x64 Visual Studio developer shell. It configures and builds fresh canonical
@@ -399,13 +429,37 @@ file. Validation output is a local report, not an Elo claim or a CI threshold.
 ### Optional GPU NNUE inference
 
 On a machine with an NVIDIA GPU and a CUDA 12.x toolkit, the engine can evaluate
-the version 5 network on the GPU. Set `KOI_GPU_NNUE=1` in the environment and
-run with `Threads` greater than one; Threads=1 keeps the deterministic CPU path.
-The feature is opt-in and never changes the advertised UCI surface or
-`EvalFile` semantics: any driver, device, or kernel failure silently falls back
-to the CPU network. The build compiles `src/koi/gpu/koi_nnue_v5.cu` to PTX for
-the compute capabilities in `KOI_GPU_PTX_ARCHS` (`61;75;86;89;120` by default,
-covering the GTX 10-series through the RTX 50-series) and embeds one module per
+the version 5 network on the GPU. The `GpuNnue` UCI option selects the policy:
+
+- `auto` (default) uses the GPU when this build contains the kernel, the CUDA
+  driver loads, the loaded network is a compatible version 5 container, and the
+  search uses `Threads` greater than one. Threads=1 keeps the deterministic CPU
+  path. Any failure falls back to the CPU network.
+- `on` requests the GPU. If no CUDA driver is available, the build has no GPU
+  kernel, or the network is not a compatible v5 container, the engine keeps the
+  CPU network and reports why; it never fails to start.
+- `off` never uses the GPU, even when a driver and a compatible network are
+  present.
+
+The environment variables stay higher-priority test overrides: `KOI_GPU_NNUE=0`
+forces `off`, and any other non-empty `KOI_GPU_NNUE` value forces `on` over the
+option. An explicit `off` from either the option or `KOI_GPU_NNUE=0` always
+wins, so the GPU can never be enabled against a user's explicit request to
+disable it. `EvalFile` semantics are unchanged; a rejected or incompatible
+network still falls back to the classical evaluator.
+
+At the start of every search with an NNUE network loaded the engine emits one
+diagnostic line, for example:
+
+```
+info string GPU NNUE: auto -> cuda (NVIDIA GeForce GTX 1060)
+info string GPU NNUE: off (Threads=1)
+info string GPU NNUE: unavailable (no CUDA driver)
+```
+
+The build compiles `src/koi/gpu/koi_nnue_v5.cu` to PTX for the compute
+capabilities in `KOI_GPU_PTX_ARCHS` (`61;75;86;89;120` by default, covering the
+GTX 10-series through the RTX 50-series) and embeds one module per
 architecture; at runtime only `nvcuda.dll` is loaded dynamically, so builds
 without `nvcc` stay CPU-only. The engine selects the newest embedded module the
 device can run and JITs it, so a GTX 1060 (sm_61) and an RTX 50-series card
@@ -414,7 +468,9 @@ device can run and JITs it, so a GTX 1060 (sm_61) and an RTX 50-series card
 required at build time because CUDA 13 drops Pascal support; the installed
 driver only has to be CUDA 12.x-capable. The GPU result is bit-exact with the
 CPU scalar evaluation, but this first pass does not promise a speedup and makes
-no strength or Elo claims.
+no strength or Elo claims. GPU NNUE is CUDA-only: macOS arm64 has no CUDA
+support, so those builds always report the GPU as unavailable and use the CPU
+NNUE or classical evaluator.
 
 For a reproducible local match against Stockfish or another UCI engine, use the
 optional PowerShell harness:
@@ -1034,7 +1090,8 @@ Linux archive is
 `koi-engine-v1.0.0-linux-x86_64.tar.gz`. Each archive retains this README, the
 project MIT license, required third-party licenses, and a `package.json` manifest with per-file
 SHA-256 hashes and source commit provenance. A `.sha256` sidecar verifies the
-archive itself.
+archive itself. macOS arm64 (Apple Silicon) is a source-build target; no macOS
+release archive is published.
 
 Koi has no required configuration file. En Croissant or another UCI GUI sends
 the options at session start; the portable release defaults are `RandomSeed=0`,

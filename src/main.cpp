@@ -25,6 +25,11 @@ namespace {
 // inherit.  glibc derives new thread stacks from RLIMIT_STACK (8 MiB by
 // default) and ignores the linker's PT_GNU_STACK size, so raise the process
 // default before any search thread exists; deep tactical lines rely on it.
+//
+// macOS is skipped: Darwin has no process-wide equivalent (Apple's pthread.h
+// declares neither pthread_setattr_default_np nor a setter for the default
+// stack size), so std::thread workers keep the system default there and only
+// the main thread follows the shell's `ulimit -s`.
 void configure_worker_stack() noexcept {
     pthread_attr_t attributes;
     if (pthread_getattr_default_np(&attributes) != 0) {

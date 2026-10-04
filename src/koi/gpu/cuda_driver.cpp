@@ -356,8 +356,11 @@ bool CudaDriver::download(CUdeviceptr source, void* destination, std::size_t byt
 
 bool CudaDriver::host_allocate(std::size_t bytes, void*& pointer,
                                std::string& error) {
-    if (api_->mem_host_alloc == nullptr) {
+    if (api_ == nullptr || api_->mem_host_alloc == nullptr ||
+        api_->mem_free_host == nullptr) {
         // Fall back to pageable memory; transfers stay correct, just slower.
+        // Both entry points must exist so host_release() can pair the same
+        // allocation strategy.
         pointer = ::operator new(bytes);
         return true;
     }
