@@ -1362,7 +1362,9 @@ def running_engines() -> list[int]:
     if os.name != "nt":
         pids: list[int] = []
         try:
-            entries = Path("/proc").iterdir()
+            # Materialize inside the try: iterdir() is lazy, so an absent
+            # /proc (macOS) raises only on the first iteration.
+            entries = list(Path("/proc").iterdir())
         except OSError:
             return pids
         for entry in entries:
