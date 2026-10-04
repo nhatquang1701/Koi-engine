@@ -1596,10 +1596,14 @@ void test_short_search_keeps_the_forced_king_escape() {
             }),
             "the unsafe king retreat must expose an immediate checking reply");
     koi::SearchLimits limits;
-    limits.movetime = 250ms;
+    // Deterministic limits: a loaded runner can starve a wall-clock search to
+    // depth 1 before the opponent's checking reply is seen, which made this
+    // test flaky.  Depth 2 evaluates the reply, and the fixture's qsearch-heavy
+    // tree makes deeper fixed depths far too slow for CI.
+    limits.depth = 2;
     koi::SearchOptions options;
     options.hash_mb = 16;
-    options.threads = std::min<std::size_t>(4, koi::maximum_search_threads());
+    options.threads = 1;
     koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>());
     const koi::SearchResult result = search(service, root, limits, options);
 
