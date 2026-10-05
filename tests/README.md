@@ -409,3 +409,24 @@ Windows machine's public key to `~/.ssh/authorized_keys`, and drive the box
 over SSH. Long jobs must be detached (`launch_gate_macos.sh` for gates,
 `nohup`/`caffeinate` for Elo) and the Mac must not sleep mid-run. Numeric
 evidence stays under the ignored `artifacts/` tree and is not published.
+
+### Verified on a Mac mini M4 (macOS 27, AppleClang 21)
+
+The full local flow was exercised on an Apple Silicon Mac mini M4 (10 cores,
+16 GiB): Release build (145/145 targets), `ctest -j 8` = 100% of 67,
+`run_tests.ps1` heavy (5/5), process (9/9, serial), and Python (24/24) groups
+all green with `ctest-junit.xml` and `LastTest.log` written under
+`artifacts/verification/test-suite-hardening/`. The first `-Runs 2` gate
+measured a same-source noise floor of +0.65% total NPS (about 1.07M NPS on
+the sparse corpus; arm64 and x86-64 NPS numbers are never compared), and an
+Elo smoke ran 192 anchor games end-to-end and wrote its report.
+`elo_estimate.py` accepts `--min-games` only in {128,192,256,320}, and
+`--all-anchors` needs at least 192 games.
+
+Two macOS traps are handled in-tree: `CMakeLists.txt` sets
+`Python3_FIND_FRAMEWORK=LAST` on APPLE so a PATH Python 3.10+ wins over the
+CLT Python 3.9 framework (which lacks `int.bit_count()`), and
+`speed_gate.ps1` joins repository paths with the host separator. No
+administrator rights are needed: Homebrew cannot install without `sudo` over
+SSH, so the verified setup used `pip install --user` (cmake, ninja, numpy),
+a standalone Python build, and the PowerShell GitHub tarball under `$HOME`.
