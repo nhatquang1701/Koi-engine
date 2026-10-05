@@ -333,3 +333,89 @@ cancellation):
   then runs the same unit, heavy-search, process, and Python label groups as
   the Linux legs. The x86-only AVX-512 binary smoke and the three-binary
   variant process test are omitted, and diagnostics upload on failure.
+
+## Local macOS arm64 heavy-test worker
+
+An Apple Silicon Mac (for example a Mac mini M4) can run the heavy search and
+process suites, the speed gate, and Elo A/B matches so the Windows machine
+stays free for GPU work (Lc0 labeling, NNUE training). Prerequisites: Xcode
+command line tools, Homebrew LLVM clang 19+, Ninja, CMake, Python 3, and
+PowerShell 7 (`brew install llvm ninja cmake python pwsh`).
+
+Build Release with the documented macOS configuration and drive the suites
+through `tools/test/run_tests.ps1`; no MSVC wrapper is needed off Windows:
+
+```bash
+cmake -S . -B build/release -G Ninja -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_C_COMPILER="$(brew --prefix llvm)/bin/clang" \
+  -DCMAKE_CXX_COMPILER="$(brew --prefix llvm)/bin/clang++" \
+  -DKOI_BUILD_MODULES=OFF -DKOI_ENABLE_GPU_NNUE=OFF -DKOI_STATIC_RUNTIME=OFF
+cmake --build build/release --config Release
+pwsh -NoProfile -File ./tools/test/run_tests.ps1 -BuildDirectory build/release -NoBuild
+```
+
+The heavy-search group is `-Label heavy -ExcludeLabel process`; the process
+tests are registered individually on macOS (`koi_replay_tests`,
+`koi_engine_process`, `koi_engine_en_croissant_process`, `koi_uci_match_process`,
+`koi_stockfish_strength_option`, `koi_uci_match_clock`,
+`koi_engine_perft_responsiveness`) and run serially; the Python group is
+`-Label python`.
+
+### Speed gates on macOS
+
+`speed_gate.ps1` joins repository paths with the host separator, so it runs
+unchanged under Homebrew `pwsh`. Build the isolated baseline from the same
+revision as on Windows (a detached worktree), then launch the gate through
+`tools/build/launch_gate_macos.sh`, which wraps `nohup` and `caffeinate -i` so
+the run survives the SSH session and the machine does not idle-sleep:
+
+```bash
+git worktree add --detach build/<name>-baseline-src <baseline-revision>
+# configure and build that tree with the same macOS flags, then:
+tools/build/launch_gate_macos.sh \
+  -BaselineExecutable build/<name>-baseline-release/koi-bench \
+  -CandidateExecutable build/release/koi-bench \
+  -OutputDirectory artifacts/verification/speed-gate/<name> \
+  -Runs 5 -Threads 1 -DepthSweep 2..5 \
+  -FenFile artifacts/verification/speed-gate/<name>/sparse-qsearch-fens.txt
+```
+
+The wrapper writes `gate.out.log`, `gate.err.log`, `gate.pid`, and (when the
+gate exits) `gate-status.txt` into the gate directory. An arm64 gate measures
+the scalar NNUE path; the AVX2 kernels only exist on x86-64, so arm64 and
+x86-64 NPS numbers are never compared. Treat the Mac as the fast pre-screen and
+keep a Windows x86-64 gate for release claims that touch hot paths. Record the
+first `-Runs 2` run as that machine's noise floor.
+
+### Elo A/B matches on macOS
+
+`elo_estimate.py` requires `--stockfish` to match `stockfish.path` in the
+anchor manifest, so create a macOS manifest beside the Windows one with the
+same anchor ratings (Stockfish 19 `UCI_LimitStrength` at 1400/1600/1800) and a
+macOS Stockfish 19 path -- either the official prebuilt binary or a source
+build (`make -j profile-build ARCH=apple-silicon`). The underlying
+`tools/stability/uci_match.ps1` harness runs under Homebrew `pwsh`:
+
+```bash
+python3 tools/measurement/elo_estimate.py \
+  --koi build/release/koi-engine \
+  --replay build/release/koi-replay \
+  --stockfish third_party/stockfish-19-macos/stockfish \
+  --anchors artifacts/manifests/elo-anchors-macos.json \
+  --openings tests/data/openings/openings-curated-32.txt \
+  --movetime-ms 1000 --threads 4 --hash 512 --speed 100 \
+  --min-games 192 --max-games 320 --prior-elo 1600 --mode no-book \
+  --all-anchors --run-label measurement \
+  --output artifacts/elo/<name>/elo.json
+```
+
+A/B matches on one machine are valid; absolute Elo at a fixed movetime is
+machine-specific and is never compared across platforms.
+
+### Remote operation
+
+Enable Remote Login on the Mac (System Settings > General > Sharing), add the
+Windows machine's public key to `~/.ssh/authorized_keys`, and drive the box
+over SSH. Long jobs must be detached (`launch_gate_macos.sh` for gates,
+`nohup`/`caffeinate` for Elo) and the Mac must not sleep mid-run. Numeric
+evidence stays under the ignored `artifacts/` tree and is not published.

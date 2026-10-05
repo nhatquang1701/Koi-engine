@@ -119,6 +119,12 @@ pwsh -NoProfile -File .\tools\build\speed_gate.ps1 `
   -OutputDirectory .\artifacts\verification\speed-program\speed-gate\phase-1
 ```
 
+On macOS arm64 the same script runs under Homebrew `pwsh`; launch long gates
+with `tools/build/launch_gate_macos.sh`, which wraps `nohup`/`caffeinate` and
+writes `gate.out.log`, `gate.err.log`, `gate.pid`, and `gate-status.txt` into
+the gate output directory (see `tests/README.md` for the local macOS arm64
+worker runbook).
+
 `koi-bench --profile-json` also records search-work counters per position:
 quiescence-cache hits, quiescence TT cutoffs, quiescence move-generation calls,
 full `PositionFeatures` extractions, reused LMR parent features, and

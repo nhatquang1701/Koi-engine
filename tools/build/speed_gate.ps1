@@ -34,8 +34,11 @@ $ErrorActionPreference = 'Stop'
 # --report`. Both executables must therefore come from a build that includes the
 # Phase 0 measurement upgrade. It is intentionally a standalone measurement
 # command, never a CTest threshold.
-$repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
-$verificationRoot = Join-Path $repoRoot 'artifacts\verification'
+# Every repository path is joined segment by segment: a backslash is a literal
+# filename character on macOS/Linux, so embedded 'a\b' strings would not
+# resolve there. Join-Path uses the host separator.
+$repoRoot = [System.IO.Path]::GetFullPath((Join-Path (Join-Path $PSScriptRoot '..') '..'))
+$verificationRoot = Join-Path (Join-Path $repoRoot 'artifacts') 'verification'
 
 function Resolve-RepoPath([string]$Path, [string]$Label) {
     $resolved = if ([System.IO.Path]::IsPathRooted($Path)) {
@@ -163,13 +166,13 @@ if ($FenFile -ne '') {
 }
 
 if ($OutputDirectory -eq '') {
-    $OutputDirectory = Join-Path $verificationRoot ("speed-program\speed-gate\" + (Get-Date -Format 'yyyyMMdd-HHmmss'))
+    $OutputDirectory = Join-Path (Join-Path (Join-Path $verificationRoot 'speed-program') 'speed-gate') (Get-Date -Format 'yyyyMMdd-HHmmss')
 } elseif (-not [System.IO.Path]::IsPathRooted($OutputDirectory)) {
     $OutputDirectory = Join-Path $repoRoot $OutputDirectory
 }
 $verificationRootFull = [System.IO.Path]::GetFullPath($verificationRoot).TrimEnd('\', '/')
 $outputFull = [System.IO.Path]::GetFullPath($OutputDirectory).TrimEnd('\', '/')
-if (-not $outputFull.StartsWith($verificationRootFull + '\', [System.StringComparison]::OrdinalIgnoreCase)) {
+if (-not $outputFull.StartsWith($verificationRootFull + [System.IO.Path]::DirectorySeparatorChar, [System.StringComparison]::OrdinalIgnoreCase)) {
     throw "OutputDirectory must live under $verificationRootFull, got: $outputFull"
 }
 $baselineDirectory = Join-Path $outputFull 'baseline'
