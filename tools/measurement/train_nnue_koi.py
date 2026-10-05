@@ -813,6 +813,7 @@ def main_v5(args, rng) -> int:
     output_weight = model.output_weight.detach().numpy().astype(np.float64)
     output_bias = model.output_bias.detach().numpy().astype(np.float64)
     best = None
+    best_saturation = 0.0
     for hidden_shift in args.hidden_shifts:
         for l1_shift in args.l1_shifts:
             params = quantize_v5(model, hidden_shift, l1_shift)
@@ -829,10 +830,15 @@ def main_v5(args, rng) -> int:
                 candidate = integer_scores_v5(params, own_hidden, opp_hidden,
                                               buckets[tune_order])
                 mae = float(np.mean(np.abs(candidate - scores[tune_order])))
+                # Prefer a quantization candidate that clips no weight layer: a
+                # saturated export silently destroys the evaluator, so a slightly
+                # worse MAE without saturation is the better network.
+                saturation = max(saturation_fractions_v5(params))
                 log(f"quantization v5 s1={hidden_shift} s_l1={l1_shift} k3={output_shift} "
-                    f"val_mae_cp {mae:.2f}")
-                if best is None or mae < best[0]:
+                    f"val_mae_cp {mae:.2f} saturation {saturation:.4f}")
+                if best is None or (saturation > 0.0, mae) < (best_saturation > 0.0, best[0]):
                     best = (mae, hidden_shift, l1_shift, output_shift, dict(params))
+                    best_saturation = saturation
     if best is None:
         raise TrainerError("no quantization candidate was evaluated")
     best_mae, best_hidden_shift, best_l1_shift, best_output_shift, best_params = best
