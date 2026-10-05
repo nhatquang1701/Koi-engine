@@ -173,6 +173,10 @@ int development_for(const EvaluationFeatures& extracted, Color color) noexcept {
         // The scan stops at the first queen of `color` in ascending square
         // order, so the visited set is iterated in the same order it was
         // scanned. `decided` stops the bitboard walk once that queen is seen.
+        // `inspect_queen` ignores every non-own-queen, so walking the
+        // own-colour bitboard instead of `occupied` only omits no-op visits:
+        // own bits are a subset of `occupied` and both walks ascend, so the
+        // first own queen seen, and the resulting penalty, stay bit-identical.
         bool decided = false;
         bool queen_on_early_square = false;
         const auto inspect_queen = [&](const int square) noexcept {
@@ -196,7 +200,7 @@ int development_for(const EvaluationFeatures& extracted, Color color) noexcept {
             queen_on_early_square = true;
         };
         if (features.occupied != 0) {
-            for_each_feature_square(features.occupied, inspect_queen);
+            for_each_feature_square(features.colors[color_index(color)], inspect_queen);
         } else {
             for (std::uint8_t square = 0; square < 64 && !decided; ++square) {
                 inspect_queen(square);

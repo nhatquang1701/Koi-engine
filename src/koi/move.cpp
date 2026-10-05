@@ -19,10 +19,6 @@ std::string Square::uci() const {
     return {file(), rank()};
 }
 
-Move Move::no_move() noexcept {
-    return {};
-}
-
 std::optional<Move> Move::parse_uci(std::string_view uci) noexcept {
     if (uci == "0000") {
         return Move::no_move();

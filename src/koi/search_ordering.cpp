@@ -121,10 +121,18 @@ void SearchMoveOrdering::order(const GameState& state, MoveMetadataList& moves,
                                const std::optional<Move> tt_move, const int ply,
                                const std::optional<Move> previous_move) const {
     scored_move_count_ = 0;
+    // One exchange baseline serves every capture in this pass, mirroring
+    // GameState::finalize_metadata; it is built at most once and only when a
+    // capture still needs SEE.  Ordering never mutates the position, so the
+    // baseline stays valid for the whole loop.
+    std::optional<ExchangeContext> exchange_context;
     for (MoveMetadata& metadata : moves) {
         if (!metadata.see_computed && metadata.is_capture()) {
+            if (!exchange_context.has_value()) {
+                exchange_context = exchange_context_from(state);
+            }
             metadata.see_score = static_cast<std::int16_t>(std::clamp(
-                static_exchange_gain(state, metadata),
+                static_exchange_gain(*exchange_context, metadata),
                 static_cast<int>(std::numeric_limits<std::int16_t>::min()),
                 static_cast<int>(std::numeric_limits<std::int16_t>::max())));
             metadata.see_computed = true;
@@ -151,10 +159,15 @@ void SearchMoveOrdering::order(const GameState& state, MoveMetadataList& moves,
                                const std::optional<Move> tt_move,
                                const SearchHistoryContext& history_context) const {
     scored_move_count_ = 0;
+    // Same shared baseline as the ply/previous-move overload above.
+    std::optional<ExchangeContext> exchange_context;
     for (MoveMetadata& metadata : moves) {
         if (!metadata.see_computed && metadata.is_capture()) {
+            if (!exchange_context.has_value()) {
+                exchange_context = exchange_context_from(state);
+            }
             metadata.see_score = static_cast<std::int16_t>(std::clamp(
-                static_exchange_gain(state, metadata),
+                static_exchange_gain(*exchange_context, metadata),
                 static_cast<int>(std::numeric_limits<std::int16_t>::min()),
                 static_cast<int>(std::numeric_limits<std::int16_t>::max())));
             metadata.see_computed = true;
@@ -274,10 +287,15 @@ void SearchMoveOrdering::order(const GameState& state, std::vector<MoveMetadata>
                                const std::optional<Move> tt_move, const int ply,
                                const std::optional<Move> previous_move) const {
     scored_move_count_ = 0;
+    // Same shared baseline as the other ordering overloads.
+    std::optional<ExchangeContext> exchange_context;
     for (MoveMetadata& metadata : moves) {
         if (!metadata.see_computed && metadata.is_capture()) {
+            if (!exchange_context.has_value()) {
+                exchange_context = exchange_context_from(state);
+            }
             metadata.see_score = static_cast<std::int16_t>(std::clamp(
-                static_exchange_gain(state, metadata),
+                static_exchange_gain(*exchange_context, metadata),
                 static_cast<int>(std::numeric_limits<std::int16_t>::min()),
                 static_cast<int>(std::numeric_limits<std::int16_t>::max())));
             metadata.see_computed = true;
@@ -431,8 +449,11 @@ MoveMetadata SearchMovePicker::materialize(const std::size_t index) {
             if (metadata.see_computed) {
                 see_scores_[index] = metadata.see_score;
             } else {
+                if (!see_context_.has_value()) {
+                    see_context_ = exchange_context_from(state_);
+                }
                 see_scores_[index] = static_cast<std::int16_t>(std::clamp(
-                    static_exchange_gain(state_, metadata),
+                    static_exchange_gain(*see_context_, metadata),
                     static_cast<int>(std::numeric_limits<std::int16_t>::min()),
                     static_cast<int>(std::numeric_limits<std::int16_t>::max())));
             }
@@ -661,14 +682,19 @@ std::optional<MoveMetadata> SearchMovePicker::next() {
                 }
                 continue;
             }
-            // The staged priority is reusable unless emitting the metadata
-            // could still change what the priority depends on: materializing a
-            // main-mode capture or promotion may resolve the lazy capture
-            // check, so those keep recomputing.  Evasion, quiescence, and
-            // quiet-stage candidates were fully materialized before ranking.
+            // The staged priority is reusable unless materializing the
+            // metadata could still change what the priority depends on.  That
+            // is exactly the main-mode capture case: materialize resolves the
+            // lazy capture check flag and the SEE value, and the capture
+            // priority branch reads both.  Promotions cannot enter that
+            // branch: the generator classifies every promotion, including a
+            // capturing one, as MoveKind::promotion, so is_capture() is false
+            // and priority returns kPromotionPriority plus the promotion
+            // value, which materialize never changes.  Evasion, quiescence,
+            // and quiet-stage candidates were fully materialized before
+            // ranking.
             const bool materialization_can_alter_priority =
-                mode_ == Mode::main &&
-                (metadata.is_capture() || metadata.move.promotion() != Promotion::none);
+                mode_ == Mode::main && metadata.is_capture();
             metadata.ordering_score = materialization_can_alter_priority
                 ? ordering_.priority(state_, metadata, std::nullopt, history_context_)
                 : candidate.priority;

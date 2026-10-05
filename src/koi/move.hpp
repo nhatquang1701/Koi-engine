@@ -65,7 +65,7 @@ public:
     constexpr Move(Square from, Square to, Promotion promotion = Promotion::none) noexcept
         : packed_(encode(from, to, promotion)) {}
 
-    [[nodiscard]] static Move no_move() noexcept;
+    [[nodiscard]] static constexpr Move no_move() noexcept { return {}; }
     [[nodiscard]] static std::optional<Move> parse_uci(std::string_view uci) noexcept;
     [[nodiscard]] constexpr Square from() const noexcept;
     [[nodiscard]] constexpr Square to() const noexcept;

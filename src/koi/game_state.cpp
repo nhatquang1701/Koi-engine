@@ -1,5 +1,4 @@
 #include "koi/game_state.hpp"
-#include "koi/piece_values.hpp"
 
 #include <algorithm>
 #include <atomic>
@@ -18,6 +17,7 @@
 #include "koi/detail/attack_tables.hpp"
 #include "koi/detail/compatibility_mirror.hpp"
 #include "koi/detail/feature_state.hpp"
+#include "koi/detail/static_exchange.hpp"
 #include "koi/position.hpp"
 
 namespace koi {
@@ -990,30 +990,6 @@ std::uint64_t metadata_validation_token(const std::uint64_t key,
     return value ^ (value >> 31U);
 }
 
-constexpr int exchange_piece_value(PieceType type) noexcept {
-    return piece_material_value(type);
-}
-
-constexpr PieceType promotion_piece_type(Promotion promotion) noexcept {
-    switch (promotion) {
-    case Promotion::knight:
-        return PieceType::knight;
-    case Promotion::bishop:
-        return PieceType::bishop;
-    case Promotion::rook:
-        return PieceType::rook;
-    case Promotion::queen:
-        return PieceType::queen;
-    case Promotion::none:
-        return PieceType::pawn;
-    }
-    return PieceType::pawn;
-}
-
-constexpr int promotion_exchange_gain(Promotion promotion) noexcept {
-    return exchange_piece_value(promotion_piece_type(promotion)) - exchange_piece_value(PieceType::pawn);
-}
-
 constexpr std::uint64_t kCoreCenterMask =
     (std::uint64_t{1} << 27) | (std::uint64_t{1} << 28) |
     (std::uint64_t{1} << 35) | (std::uint64_t{1} << 36);
@@ -1077,6 +1053,13 @@ struct NativeCheckProbe {
     std::uint64_t occupied = 0;
     std::uint64_t friendly_rook_queen = 0;
     std::uint64_t friendly_bishop_queen = 0;
+    // Open-board (empty-occupancy) union of the enemy king's rook and bishop
+    // rays: the conservative superset of every square from which a sliding
+    // attack could reach the king and of every square a king slider line can
+    // pass through.  Zero means the rays were not computed (a default probe on
+    // a non-probing path); the per-move probe then runs the full computation
+    // instead of trusting the prefilter.
+    std::uint64_t king_slider_rays = 0;
     Color moving_color = Color::white;
 };
 
@@ -1089,6 +1072,11 @@ struct NativeCheckProbe {
         position.piece_bitboard(PieceType::queen, probe.moving_color);
     probe.friendly_bishop_queen = position.piece_bitboard(PieceType::bishop, probe.moving_color) |
         position.piece_bitboard(PieceType::queen, probe.moving_color);
+    if (probe.enemy_king != 0) {
+        const int king_square = static_cast<int>(std::countr_zero(probe.enemy_king));
+        probe.king_slider_rays = detail::rook_attacks(king_square, 0) |
+            detail::bishop_attacks(king_square, 0);
+    }
     return probe;
 }
 
@@ -1120,28 +1108,57 @@ bool native_move_gives_check(const Move& move, const Position::MoveFacts& facts,
     }
 
     const Piece moving_piece = facts.from;
+    std::uint64_t en_passant_victim_bit = 0;
     if (moving_piece.type == PieceType::pawn && facts.en_passant_target &&
         !facts.occupied_to) {
         const int captured_square = static_cast<int>(destination) +
             (moving_color == Color::white ? -8 : 8);
         if (captured_square >= 0 && captured_square < 64) {
-            occupied &= ~(std::uint64_t{1} << captured_square);
+            en_passant_victim_bit = std::uint64_t{1} << captured_square;
+            occupied &= ~en_passant_victim_bit;
         }
     }
     occupied |= destination_bit;
 
     std::uint8_t rook_source = Square::kInvalid;
     std::uint8_t rook_destination = Square::kInvalid;
+    std::uint64_t castling_rook_source_bit = 0;
     if (castling) {
         const bool king_side = destination > source;
         rook_source = static_cast<std::uint8_t>((source / 8) * 8 + (king_side ? 7 : 0));
         rook_destination = static_cast<std::uint8_t>((source / 8) * 8 + (king_side ? 5 : 3));
-        occupied &= ~(std::uint64_t{1} << rook_source);
+        castling_rook_source_bit = std::uint64_t{1} << rook_source;
+        occupied &= ~castling_rook_source_bit;
         occupied |= std::uint64_t{1} << rook_destination;
     }
 
+    // Feasibility prefilter, bit-identical to the unguarded computation:
+    //  (a) a discovered (revealed) check requires the move to vacate a square
+    //      on a rank/file/diagonal line between a friendly slider and the
+    //      enemy king, and every square on such a line lies on the enemy
+    //      king's open-board rays, so `vacated & king_slider_rays` is a
+    //      conservative superset of every square whose clearing can reveal a
+    //      check (source, en-passant victim, castling rook source; a captured
+    //      destination square is included as well, which is conservative);
+    //  (b) a sliding direct check from the destination requires the
+    //      destination to lie on an open-board king ray, because occupancy can
+    //      only shorten a ray, never extend it;
+    //  (c) pawn, knight, and king direct checks keep their unguarded attack
+    //      tables, and a knight promotion keeps the knight table;
+    //  (d) every skipped computation could not have produced a hit, so the
+    //      returned bool is identical for every input.
+    const std::uint64_t king_slider_rays = probe.king_slider_rays;
+    // A zero ray set means the probe was not fully built; run the full work.
+    const bool rays_known = king_slider_rays != 0;
+    const std::uint64_t vacated = source_bit |
+        (facts.occupied_to ? destination_bit : std::uint64_t{0}) |
+        en_passant_victim_bit | castling_rook_source_bit;
+    const bool maybe_discovered = !rays_known || (vacated & king_slider_rays) != 0;
+    const bool destination_on_ray = !rays_known ||
+        (destination_bit & king_slider_rays) != 0;
+
     const PieceType moved_type = move.promotion() == Promotion::none ? moving_piece.type :
-        promotion_piece_type(move.promotion());
+        detail::promotion_piece_type(move.promotion());
 
     // Direct check: the moving piece attacks the king from its destination.
     std::uint64_t direct_attacks = 0;
@@ -1156,13 +1173,19 @@ bool native_move_gives_check(const Move& move, const Position::MoveFacts& facts,
             direct_attacks = detail::king_attacks(destination);
             break;
         case PieceType::bishop:
-            direct_attacks = detail::bishop_attacks(destination, occupied);
+            if (destination_on_ray) {
+                direct_attacks = detail::bishop_attacks(destination, occupied);
+            }
             break;
         case PieceType::rook:
-            direct_attacks = detail::rook_attacks(destination, occupied);
+            if (destination_on_ray) {
+                direct_attacks = detail::rook_attacks(destination, occupied);
+            }
             break;
         case PieceType::queen:
-            direct_attacks = detail::queen_attacks(destination, occupied);
+            if (destination_on_ray) {
+                direct_attacks = detail::queen_attacks(destination, occupied);
+            }
             break;
         default:
             break;
@@ -1177,20 +1200,22 @@ bool native_move_gives_check(const Move& move, const Position::MoveFacts& facts,
     // castling rook square) is handled in O(1) without rescanning the board.
     // The vacated squares are masked out of the friendly slider bitboards so
     // the moved piece is never counted at its old square.
-    const int king_square = static_cast<int>(std::countr_zero(enemy_king));
-    std::uint64_t friendly_rook_queen = probe.friendly_rook_queen;
-    std::uint64_t friendly_bishop_queen = probe.friendly_bishop_queen;
-    friendly_rook_queen &= ~source_bit;
-    friendly_bishop_queen &= ~source_bit;
-    if (castling) {
-        friendly_rook_queen &= ~(std::uint64_t{1} << rook_source);
-        friendly_bishop_queen &= ~(std::uint64_t{1} << rook_source);
-    }
-    if ((detail::rook_attacks(king_square, occupied) & friendly_rook_queen) != 0) {
-        return true;
-    }
-    if ((detail::bishop_attacks(king_square, occupied) & friendly_bishop_queen) != 0) {
-        return true;
+    if (maybe_discovered) {
+        const int king_square = static_cast<int>(std::countr_zero(enemy_king));
+        std::uint64_t friendly_rook_queen = probe.friendly_rook_queen;
+        std::uint64_t friendly_bishop_queen = probe.friendly_bishop_queen;
+        friendly_rook_queen &= ~source_bit;
+        friendly_bishop_queen &= ~source_bit;
+        if (castling) {
+            friendly_rook_queen &= ~castling_rook_source_bit;
+            friendly_bishop_queen &= ~castling_rook_source_bit;
+        }
+        if ((detail::rook_attacks(king_square, occupied) & friendly_rook_queen) != 0) {
+            return true;
+        }
+        if ((detail::bishop_attacks(king_square, occupied) & friendly_bishop_queen) != 0) {
+            return true;
+        }
     }
 
     if (castling &&
@@ -1359,301 +1384,6 @@ PositionFeatures native_position_features(const Position& position) noexcept {
     return features;
 }
 
-constexpr bool exchange_square_valid(int square) noexcept {
-    return square >= 0 && square < 64;
-}
-
-bool exchange_square_attacked_by(const std::array<Piece, 64>& board, int target, Color attacker) noexcept {
-    if (!exchange_square_valid(target)) {
-        return false;
-    }
-
-    const int target_file = target & 7;
-    const int target_rank = target >> 3;
-    const auto has_piece = [&board, attacker](int square, PieceType type) noexcept {
-        if (!exchange_square_valid(square)) {
-            return false;
-        }
-        const Piece piece = board[static_cast<std::size_t>(square)];
-        return piece.color == attacker && piece.type == type;
-    };
-
-    const int pawn_rank = target_rank - (attacker == Color::white ? 1 : -1);
-    if (pawn_rank >= 0 && pawn_rank < 8) {
-        if ((target_file > 0 && has_piece((pawn_rank << 3) + target_file - 1, PieceType::pawn)) ||
-            (target_file < 7 && has_piece((pawn_rank << 3) + target_file + 1, PieceType::pawn))) {
-            return true;
-        }
-    }
-
-    constexpr int knight_directions[8][2] = {
-        {1, 2}, {2, 1}, {2, -1}, {1, -2},
-        {-1, -2}, {-2, -1}, {-2, 1}, {-1, 2},
-    };
-    for (const auto& direction : knight_directions) {
-        const int file = target_file + direction[0];
-        const int rank = target_rank + direction[1];
-        if (file >= 0 && file < 8 && rank >= 0 && rank < 8 &&
-            has_piece((rank << 3) + file, PieceType::knight)) {
-            return true;
-        }
-    }
-
-    for (int file = target_file - 1; file <= target_file + 1; ++file) {
-        for (int rank = target_rank - 1; rank <= target_rank + 1; ++rank) {
-            if ((file == target_file && rank == target_rank) ||
-                file < 0 || file >= 8 || rank < 0 || rank >= 8) {
-                continue;
-            }
-            if (has_piece((rank << 3) + file, PieceType::king)) {
-                return true;
-            }
-        }
-    }
-
-    constexpr int directions[8][2] = {
-        {1, 0}, {-1, 0}, {0, 1}, {0, -1},
-        {1, 1}, {1, -1}, {-1, 1}, {-1, -1},
-    };
-    for (int direction = 0; direction < 8; ++direction) {
-        const bool diagonal = direction >= 4;
-        int file = target_file + directions[direction][0];
-        int rank = target_rank + directions[direction][1];
-        while (file >= 0 && file < 8 && rank >= 0 && rank < 8) {
-            const Piece piece = board[static_cast<std::size_t>((rank << 3) + file)];
-            if (!piece.empty()) {
-                if (piece.color == attacker &&
-                    ((diagonal && (piece.type == PieceType::bishop || piece.type == PieceType::queen)) ||
-                     (!diagonal && (piece.type == PieceType::rook || piece.type == PieceType::queen)))) {
-                    return true;
-                }
-                break;
-            }
-            file += directions[direction][0];
-            rank += directions[direction][1];
-        }
-    }
-    return false;
-}
-
-template <typename CandidateHandler>
-void for_each_exchange_attacker(const std::array<Piece, 64>& board, int target,
-                                Color attacker, CandidateHandler&& handler) noexcept {
-    if (!exchange_square_valid(target)) {
-        return;
-    }
-    const int target_file = target & 7;
-    const int target_rank = target >> 3;
-    const auto visit = [&board, attacker, &handler](int square, PieceType expected) noexcept {
-        if (exchange_square_valid(square) &&
-            board[static_cast<std::size_t>(square)].color == attacker &&
-            board[static_cast<std::size_t>(square)].type == expected) {
-            handler(square);
-        }
-    };
-
-    const int pawn_rank = target_rank - (attacker == Color::white ? 1 : -1);
-    if (pawn_rank >= 0 && pawn_rank < 8) {
-        if (target_file > 0) visit((pawn_rank << 3) + target_file - 1, PieceType::pawn);
-        if (target_file < 7) visit((pawn_rank << 3) + target_file + 1, PieceType::pawn);
-    }
-
-    constexpr int knight_directions[8][2] = {
-        {1, 2}, {2, 1}, {2, -1}, {1, -2},
-        {-1, -2}, {-2, -1}, {-2, 1}, {-1, 2},
-    };
-    for (const auto& direction : knight_directions) {
-        const int file = target_file + direction[0];
-        const int rank = target_rank + direction[1];
-        if (file >= 0 && file < 8 && rank >= 0 && rank < 8) {
-            visit((rank << 3) + file, PieceType::knight);
-        }
-    }
-
-    for (int file = target_file - 1; file <= target_file + 1; ++file) {
-        for (int rank = target_rank - 1; rank <= target_rank + 1; ++rank) {
-            if ((file == target_file && rank == target_rank) ||
-                file < 0 || file >= 8 || rank < 0 || rank >= 8) {
-                continue;
-            }
-            visit((rank << 3) + file, PieceType::king);
-        }
-    }
-
-    constexpr int directions[8][2] = {
-        {1, 0}, {-1, 0}, {0, 1}, {0, -1},
-        {1, 1}, {1, -1}, {-1, 1}, {-1, -1},
-    };
-    for (int direction = 0; direction < 8; ++direction) {
-        const bool diagonal = direction >= 4;
-        int file = target_file + directions[direction][0];
-        int rank = target_rank + directions[direction][1];
-        while (file >= 0 && file < 8 && rank >= 0 && rank < 8) {
-            const int square = (rank << 3) + file;
-            const Piece piece = board[static_cast<std::size_t>(square)];
-            if (!piece.empty()) {
-                if (piece.color == attacker &&
-                    ((diagonal && (piece.type == PieceType::bishop || piece.type == PieceType::queen)) ||
-                     (!diagonal && (piece.type == PieceType::rook || piece.type == PieceType::queen)))) {
-                    handler(square);
-                }
-                break;
-            }
-            file += directions[direction][0];
-            rank += directions[direction][1];
-        }
-    }
-}
-
-bool exchange_recapture_is_legal(std::array<Piece, 64>& board, std::array<int, 2>& king_squares,
-                                  Color side, int source, int target, Piece placed_piece) noexcept {
-    const Piece moving_piece = board[static_cast<std::size_t>(source)];
-    const Piece captured_piece = board[static_cast<std::size_t>(target)];
-    const std::size_t side_index = side == Color::white ? 0 : 1;
-    const int saved_king_square = king_squares[side_index];
-
-    board[static_cast<std::size_t>(source)] = {};
-    board[static_cast<std::size_t>(target)] = placed_piece;
-    if (moving_piece.type == PieceType::king) {
-        king_squares[side_index] = target;
-    }
-    const bool legal = !exchange_square_attacked_by(board, king_squares[side_index], opposite(side));
-    board[static_cast<std::size_t>(source)] = moving_piece;
-    board[static_cast<std::size_t>(target)] = captured_piece;
-    king_squares[side_index] = saved_king_square;
-    return legal;
-}
-
-// Lightweight board view for static exchange evaluation.  SEE only needs the
-// mailbox layout, the king squares, and the side to move; building the full
-// evaluation feature set (attack maps, pawn structure, phase, and so on) for
-// every node that contains a capture was wasted work.
-struct ExchangeContext {
-    std::array<Piece, 64> board{};
-    std::array<int, 2> king_squares{-1, -1};
-    Color side_to_move = Color::white;
-};
-
-ExchangeContext exchange_context_from(const Position& position) noexcept {
-    ExchangeContext context;
-    for (int square = 0; square < 64; ++square) {
-        context.board[static_cast<std::size_t>(square)] =
-            position.piece_at(Square::from_index(square));
-    }
-    for (const Color color : {Color::white, Color::black}) {
-        const std::uint64_t king = position.piece_bitboard(PieceType::king, color);
-        if (king != 0) {
-            context.king_squares[color == Color::white ? 0 : 1] =
-                static_cast<int>(std::countr_zero(king));
-        }
-    }
-    context.side_to_move = position.side_to_move();
-    return context;
-}
-
-int static_exchange_gain_from_features(const ExchangeContext& context,
-                                       const MoveMetadata& initial) noexcept {
-    const Move move = initial.move;
-    if (move.is_no_move() || move.from().index() == Square::kInvalid ||
-        move.to().index() == Square::kInvalid ||
-        (!initial.is_capture() && initial.captured_piece == PieceType::none)) {
-        return 0;
-    }
-
-    std::array<Piece, 64> board = context.board;
-    std::array<int, 2> king_squares = context.king_squares;
-    const int source = move.from().index();
-    const int target = move.to().index();
-    if (!exchange_square_valid(source) || !exchange_square_valid(target)) {
-        return 0;
-    }
-
-    const Piece moving_piece = board[static_cast<std::size_t>(source)];
-    if (moving_piece.empty() || moving_piece.color != context.side_to_move ||
-        moving_piece.type != initial.moving_piece || king_squares[0] < 0 || king_squares[1] < 0) {
-        return 0;
-    }
-
-    int captured_square = target;
-    if (initial.kind == MoveKind::en_passant) {
-        captured_square += moving_piece.color == Color::white ? -8 : 8;
-    }
-    if (!exchange_square_valid(captured_square)) {
-        return 0;
-    }
-
-    constexpr std::size_t kMaximumExchangeDepth = 32;
-    std::array<int, kMaximumExchangeDepth> gains{};
-    const Piece captured_piece = board[static_cast<std::size_t>(captured_square)];
-    gains[0] = exchange_piece_value(captured_piece.type) + promotion_exchange_gain(move.promotion());
-
-    Piece placed_piece = moving_piece;
-    if (move.promotion() != Promotion::none) {
-        placed_piece.type = promotion_piece_type(move.promotion());
-    }
-    board[static_cast<std::size_t>(source)] = {};
-    board[static_cast<std::size_t>(captured_square)] = {};
-    board[static_cast<std::size_t>(target)] = placed_piece;
-    if (moving_piece.type == PieceType::king) {
-        king_squares[moving_piece.color == Color::white ? 0 : 1] = target;
-    }
-
-    Color side = opposite(moving_piece.color);
-    std::size_t depth = 0;
-    for (;;) {
-        int attacker_square = -1;
-        int attacker_value = std::numeric_limits<int>::max();
-        Piece recapturing_piece{};
-        int recapture_promotion_gain = 0;
-
-        for_each_exchange_attacker(board, target, side, [&](const int square) noexcept {
-            const Piece candidate = board[static_cast<std::size_t>(square)];
-            Piece replacement = candidate;
-            int candidate_promotion_gain = 0;
-            if (candidate.type == PieceType::pawn && (target >> 3 == 0 || target >> 3 == 7)) {
-                replacement.type = PieceType::queen;
-                candidate_promotion_gain =
-                    exchange_piece_value(PieceType::queen) - exchange_piece_value(PieceType::pawn);
-            }
-            if (!exchange_recapture_is_legal(board, king_squares, side, square, target, replacement)) {
-                return;
-            }
-
-            const int value = exchange_piece_value(candidate.type);
-            if (value < attacker_value ||
-                (value == attacker_value && (attacker_square < 0 || square < attacker_square))) {
-                attacker_square = square;
-                attacker_value = value;
-                recapturing_piece = replacement;
-                recapture_promotion_gain = candidate_promotion_gain;
-            }
-        });
-
-        if (attacker_square < 0 || depth + 1 >= kMaximumExchangeDepth) {
-            break;
-        }
-
-        const Piece target_piece = board[static_cast<std::size_t>(target)];
-        ++depth;
-        gains[depth] = exchange_piece_value(target_piece.type) - gains[depth - 1] +
-            recapture_promotion_gain;
-
-        const Piece departing_piece = board[static_cast<std::size_t>(attacker_square)];
-        board[static_cast<std::size_t>(attacker_square)] = {};
-        board[static_cast<std::size_t>(target)] = recapturing_piece;
-        if (departing_piece.type == PieceType::king) {
-            king_squares[side == Color::white ? 0 : 1] = target;
-        }
-        side = opposite(side);
-    }
-
-    while (depth > 0) {
-        gains[depth - 1] = -std::max(-gains[depth - 1], gains[depth]);
-        --depth;
-    }
-    return gains[0];
-}
-
 } // namespace
 
 class GameState::Impl {
@@ -1737,8 +1467,8 @@ Piece GameState::piece_at(Square square) const noexcept {
 }
 
 int GameState::direct_static_exchange_gain(const MoveMetadata& initial) const noexcept {
-    const ExchangeContext context = exchange_context_from(impl_->native_position);
-    return static_exchange_gain_from_features(context, initial);
+    const detail::ExchangeContext context = detail::exchange_context_from(impl_->native_position);
+    return detail::static_exchange_gain_from_features(context, initial);
 }
 
 std::vector<Move> GameState::legal_moves() const {
@@ -1823,7 +1553,7 @@ void GameState::legal_moves_with_metadata(MoveMetadataList& moves,
             native_check_probe(*context.position) : NativeCheckProbe{};
         for (std::size_t index = 0; index < legal_count; ++index) {
             const Move& move = legal[index];
-            MoveMetadata metadata{};
+            MoveMetadata metadata;
             if (!fill_move_metadata_from_facts(context, move,
                                                impl_->native_position.move_facts(move),
                                                probe, include_check_flags, check_flag_mode,
@@ -1894,7 +1624,7 @@ bool GameState::legal_tactical_moves_with_metadata(MoveMetadataList& moves,
             }
             const CheckFlagMode probe_mode = checked || capture_or_promotion ?
                 CheckFlagMode::all_moves : CheckFlagMode::quiet_moves_only;
-            MoveMetadata metadata{};
+            MoveMetadata metadata;
             if (!fill_move_metadata_from_facts(context, move, facts, probe, true,
                                                probe_mode, metadata)) {
                 continue;
@@ -1967,12 +1697,12 @@ std::optional<MoveMetadata> GameState::metadata_for_native_move(
 
 void GameState::finalize_metadata(MoveMetadataList& moves, const std::uint64_t key,
                                   const bool include_see) const noexcept {
-    std::optional<ExchangeContext> exchange_context;
+    std::optional<detail::ExchangeContext> exchange_context;
     if (include_see) {
         const bool has_capture = std::any_of(moves.begin(), moves.end(),
             [](const MoveMetadata& metadata) { return metadata.is_capture(); });
         if (has_capture) {
-            exchange_context = exchange_context_from(impl_->native_position);
+            exchange_context = detail::exchange_context_from(impl_->native_position);
         }
     }
 
@@ -1982,7 +1712,7 @@ void GameState::finalize_metadata(MoveMetadataList& moves, const std::uint64_t k
         if (include_see && (metadata.is_capture() || metadata.move.promotion() != Promotion::none)) {
             metadata.see_score = metadata.is_capture() && exchange_context.has_value() ?
                 static_cast<std::int16_t>(std::clamp(
-                    static_exchange_gain_from_features(*exchange_context, metadata),
+                    detail::static_exchange_gain_from_features(*exchange_context, metadata),
                     static_cast<int>(std::numeric_limits<std::int16_t>::min()),
                     static_cast<int>(std::numeric_limits<std::int16_t>::max()))) : 0;
             metadata.see_computed = true;

@@ -8,6 +8,7 @@
 
 #include "koi/game_state.hpp"
 #include "koi/detail/search_ordering_tables.hpp"
+#include "koi/detail/static_exchange.hpp"
 
 namespace koi::detail {
 
@@ -160,6 +161,14 @@ private:
     std::bitset<kMaximumLegalMoves> capture_check_computed_{};
     std::bitset<kMaximumLegalMoves> capture_checks_{};
     std::array<std::int16_t, kMaximumLegalMoves> see_scores_;
+    // Exchange baseline for this picker, built lazily on the first capture
+    // whose SEE is not already available and reused for every later capture.
+    // It cannot go stale: `state_` is only mutated by the search's
+    // transactional make/unmake, which completes between next() calls
+    // (position.cpp restores the pre-move snapshot on unmake and rolls a
+    // rejected make back), so the baseline still describes the position the
+    // picker was built for.
+    std::optional<ExchangeContext> see_context_;
     std::array<Candidate, kMaximumLegalMoves> staged_;
     // Candidates are grouped by stage rank once per preparation; each group is
     // sorted with the full comparator only when its stage is first reached, so

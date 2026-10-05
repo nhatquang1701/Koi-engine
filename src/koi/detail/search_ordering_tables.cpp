@@ -193,12 +193,17 @@ int SearchOrderingTables::quiet_history_score(
         return 0;
     }
 
+    // `move_index()` is pure, so evaluating it once cannot change any slot.
+    // The continuation hash below is the exact expression of
+    // continuation_index() with the hoisted `move_idx`, so every table slot
+    // stays bit-identical.
+    const std::size_t move_idx = move_index(metadata.move);
     const std::size_t side_index = static_cast<std::size_t>(color_index(side));
-    std::int64_t score = history_[side_index][move_index(metadata.move)];
+    std::int64_t score = history_[side_index][move_idx];
     score += piece_to_history_[piece_to_index(metadata.moving_piece, metadata.move.to())];
     if (context.ply < static_cast<int>(kLowPlyHistoryPlies)) {
         score += low_ply_history_[static_cast<std::size_t>(context.ply) * kMoveTableSize +
-                                  move_index(metadata.move)];
+                                  move_idx];
     }
 
     const std::size_t move_count = std::min(context.count, kSearchContinuationPlies);
@@ -210,15 +215,18 @@ int SearchOrderingTables::quiet_history_score(
         if (previous.is_no_move()) {
             continue;
         }
-        const std::size_t slot = distance * kContinuationHistorySize +
-            continuation_index(previous, metadata.move);
+        const std::size_t pair_index = (move_index(previous) * 131U + move_idx * 17U) &
+            (kContinuationHistorySize - 1U);
+        const std::size_t slot = distance * kContinuationHistorySize + pair_index;
         score += multi_ply_continuation_history_[slot] /
             static_cast<int>(distance + 1);
     }
 
     if (context.count > 0 && !context.continuation_moves[0].is_no_move()) {
-        score += continuation_history_[continuation_index(
-            context.continuation_moves[0], metadata.move)];
+        const std::size_t pair_index =
+            (move_index(context.continuation_moves[0]) * 131U + move_idx * 17U) &
+            (kContinuationHistorySize - 1U);
+        score += continuation_history_[pair_index];
     }
     score += pawn_history_[pawn_index(context, metadata.moving_piece, metadata.move.to())] / 2;
 
@@ -231,6 +239,8 @@ int SearchOrderingTables::continuation_history_score(
         return 0;
     }
 
+    // Same hoist and same inlined continuation hash as quiet_history_score().
+    const std::size_t move_idx = move_index(metadata.move);
     std::int64_t score = 0;
     const std::size_t move_count = std::min(context.count, kSearchContinuationPlies);
     for (std::size_t distance = 1; distance < move_count; ++distance) {
@@ -238,13 +248,17 @@ int SearchOrderingTables::continuation_history_score(
         if (previous.is_no_move()) {
             continue;
         }
+        const std::size_t pair_index = (move_index(previous) * 131U + move_idx * 17U) &
+            (kContinuationHistorySize - 1U);
         score += multi_ply_continuation_history_[
-            distance * kContinuationHistorySize + continuation_index(previous, metadata.move)] /
+            distance * kContinuationHistorySize + pair_index] /
             static_cast<int>(distance + 1);
     }
     if (move_count > 0 && !context.continuation_moves[0].is_no_move()) {
-        score += continuation_history_[continuation_index(
-            context.continuation_moves[0], metadata.move)];
+        const std::size_t pair_index =
+            (move_index(context.continuation_moves[0]) * 131U + move_idx * 17U) &
+            (kContinuationHistorySize - 1U);
+        score += continuation_history_[pair_index];
     }
     return clamp_history(score, kMaximumHistoryScore);
 }

@@ -398,10 +398,9 @@ bool is_checked(const NativeState& state, Color color) noexcept {
 }
 
 // Recomputes the per-colour king state used by incremental legality: the
-// checkers attacking each king, the own pieces pinned against an enemy
-// slider, and the squares between a king and a slider checker.  The masks
-// are keyed by colour because apply_unchecked flips the side before callers
-// ask about the mover.
+// checkers attacking each king and the own pieces pinned against an enemy
+// slider.  The masks are keyed by colour because apply_unchecked flips the
+// side before callers ask about the mover.
 void refresh_king_masks(NativeState& state) noexcept {
     for (std::size_t color_index = 0; color_index < 2; ++color_index) {
         state.checkers[color_index] = 0;
@@ -435,39 +434,43 @@ void refresh_king_masks(NativeState& state) noexcept {
             (detail::rook_attacks(king, state.occupied) & enemy_rooks);
         state.checkers[color_index] = checkers;
 
-        // Squares strictly between each slider checker and the king.
-        std::uint64_t blockers = 0;
-        for (std::uint64_t sliders = checkers & (enemy_bishops | enemy_rooks); sliders != 0;
-             sliders &= sliders - 1) {
-            const int checker = static_cast<int>(std::countr_zero(sliders));
-            const int file_step =
-                (file_of(checker) > file_of(king)) - (file_of(checker) < file_of(king));
-            const int rank_step =
-                (rank_of(checker) > rank_of(king)) - (rank_of(checker) < rank_of(king));
-            for (int file = file_of(king) + file_step, rank = rank_of(king) + rank_step;
-                 file != file_of(checker) || rank != rank_of(checker);
-                 file += file_step, rank += rank_step) {
-                blockers |= bit(rank * 8 + file);
-            }
-        }
-        state.blockers_for_king[color_index] = blockers;
-
-        // An own piece is pinned when removing it exposes the king to an
-        // enemy slider.  Removing a non-first blocker leaves the inner
-        // blocker in place, so the direct test is exact.
-        const std::uint64_t own_pieces =
-            state.occupancy[color_index] &
-            ~state.piece_bitboards[color_index][static_cast<std::size_t>(PieceType::king)];
+        // The former "squares strictly between each slider checker and the
+        // king" mask was written but never read: git grep finds only the
+        // reset above, the snapshot/restore copies, and the declaration of
+        // state.blockers_for_king, so its computation is gone.  The field
+        // itself stays because it is part of the snapshot/restore surface,
+        // and the reset above keeps it at zero.
+        //
+        // Pin scan.  Removing a piece can only expose a slider attack that
+        // runs through the piece's square; a piece between the king and the
+        // removed piece would still block, and a piece off the ray does not
+        // affect it at all.  So a piece is pinned exactly when it is the
+        // nearest blocker on one of the king's rays and the next piece on
+        // that ray is an enemy slider of the matching type.  This is the same
+        // predicate as the former per-piece trial, which removed the piece
+        // from the occupancy and asked bishop_attacks/rook_attacks for an
+        // enemy slider: removing the nearest blocker is the only occupancy
+        // change that trial made, and sliding_attacks stops at the first
+        // blocker, so its intersection is non-zero exactly when that next
+        // blocker is an enemy bishop/queen on a diagonal ray or rook/queen on
+        // an orthogonal ray.  attack_tables.cpp builds the direction order
+        // N, NE, E, SE, S, SW, W, NW, so odd indices are the diagonals.
         std::uint64_t pinned = 0;
-        for (std::uint64_t candidates = own_pieces; candidates != 0; candidates &= candidates - 1) {
-            const int square = static_cast<int>(std::countr_zero(candidates));
-            const std::uint64_t saved_occupied = state.occupied;
-            state.occupied &= ~bit(square);
-            const bool exposes =
-                (detail::bishop_attacks(king, state.occupied) & enemy_bishops) != 0 ||
-                (detail::rook_attacks(king, state.occupied) & enemy_rooks) != 0;
-            state.occupied = saved_occupied;
-            if (exposes) pinned |= bit(square);
+        for (int direction = 0; direction < detail::kAttackDirections; ++direction) {
+            const int first = detail::nearest_blocker(king, direction, state.occupied);
+            if (first < 0) continue;
+            const Piece first_piece = state.board[static_cast<std::size_t>(first)];
+            if (first_piece.color != color || first_piece.type == PieceType::king) continue;
+            const int second = detail::nearest_blocker(
+                king, direction, state.occupied & ~(std::uint64_t{1} << first));
+            if (second < 0) continue;
+            const Piece second_piece = state.board[static_cast<std::size_t>(second)];
+            if (second_piece.color != opposite(color)) continue;
+            const bool diagonal = (direction & 1) != 0;
+            if (second_piece.type == PieceType::queen ||
+                second_piece.type == (diagonal ? PieceType::bishop : PieceType::rook)) {
+                pinned |= std::uint64_t{1} << first;
+            }
         }
         state.pinned[color_index] = pinned;
     }
@@ -754,25 +757,35 @@ public:
         return state.board[square.index()];
     }
 
-bool move_requires_legality_probe(const Move& move) const noexcept {
+// Legality-probe filter for a pseudo-legal candidate.  The board and the
+// king-state prologue fields are passed in by the caller instead of being
+// re-read from `state` on every candidate.  That is exact because
+// resolve_move_legality restores every field it touches: its
+// snapshot()/restore() pair covers board, side, checkers, pinned,
+// en_passant, and occupied, and the king probe (king_move_is_legal)
+// temporarily clears only `occupied` and restores it.  resolve_move_legality
+// never records history (record_snapshot belongs to the public make path),
+// so the hoisted values stay loop-invariant.
+[[nodiscard]] static bool move_requires_legality_probe(
+    const Move& move, const Board& board,
+    std::uint64_t checkers, std::uint64_t pinned, int en_passant) noexcept {
     const int from = move.from().index();
     const int to = move.to().index();
     if (!valid_square(from) || !valid_square(to)) {
         return true;
     }
-    const Piece piece = state.board[static_cast<std::size_t>(from)];
+    const Piece piece = board[static_cast<std::size_t>(from)];
     if (piece.type == PieceType::king) {
         return true;
     }
-    const std::size_t side_index = state.side == Color::white ? 0U : 1U;
-    if (state.checkers[side_index] != 0) {
+    if (checkers != 0) {
         return true;
     }
-    if ((state.pinned[side_index] & bit(from)) != 0) {
+    if ((pinned & bit(from)) != 0) {
         return true;
     }
-    if (piece.type == PieceType::pawn && state.en_passant.index() < Square::kInvalid &&
-        to == state.en_passant.index() && state.board[static_cast<std::size_t>(to)].empty()) {
+    if (piece.type == PieceType::pawn && en_passant < Square::kInvalid &&
+        to == en_passant && board[static_cast<std::size_t>(to)].empty()) {
         return true;
     }
     return false;
@@ -857,12 +870,17 @@ bool move_requires_legality_probe(const Move& move) const noexcept {
 
 std::vector<Move> legal_moves() {
     const Color mover = state.side;
+    const std::size_t side_index = mover == Color::white ? 0U : 1U;
+    const std::uint64_t checkers = state.checkers[side_index];
+    const std::uint64_t pinned = state.pinned[side_index];
+    const int en_passant = state.en_passant.index();
     MoveBuffer pseudo;
     generate_pseudo(pseudo);
     std::vector<Move> result;
     result.reserve(pseudo.size());
     for (const Move& move : pseudo) {
-        bool legal = !move_requires_legality_probe(move);
+        bool legal = !move_requires_legality_probe(
+            move, state.board, checkers, pinned, en_passant);
         if (!legal) {
             legal = resolve_move_legality(move, mover);
         }
@@ -876,11 +894,16 @@ std::vector<Move> legal_moves() {
     template <bool TacticalOnly>
     std::size_t legal_moves_into_impl(std::span<Move> output) {
         const Color mover = state.side;
+        const std::size_t side_index = mover == Color::white ? 0U : 1U;
+        const std::uint64_t checkers = state.checkers[side_index];
+        const std::uint64_t pinned = state.pinned[side_index];
+        const int en_passant = state.en_passant.index();
         MoveBuffer pseudo;
         generate_pseudo<TacticalOnly>(pseudo);
         std::size_t count = 0;
     for (const Move& move : pseudo) {
-        bool legal = !move_requires_legality_probe(move);
+        bool legal = !move_requires_legality_probe(
+            move, state.board, checkers, pinned, en_passant);
         if (!legal) {
             legal = resolve_move_legality(move, mover);
         }
@@ -908,10 +931,15 @@ std::vector<Move> legal_moves() {
     // exists before deciding that a position is terminal.
     [[nodiscard]] bool has_legal_move() {
         const Color mover = state.side;
+        const std::size_t side_index = mover == Color::white ? 0U : 1U;
+        const std::uint64_t checkers = state.checkers[side_index];
+        const std::uint64_t pinned = state.pinned[side_index];
+        const int en_passant = state.en_passant.index();
         MoveBuffer pseudo;
         generate_pseudo(pseudo);
         for (const Move& move : pseudo) {
-            bool legal = !move_requires_legality_probe(move);
+            bool legal = !move_requires_legality_probe(
+                move, state.board, checkers, pinned, en_passant);
             if (!legal) {
                 legal = resolve_move_legality(move, mover);
             }
@@ -1212,6 +1240,20 @@ std::vector<Move> legal_moves() {
         // FEN. Compare the normalized board first: the pattern is almost
         // never present, and the en-passant certificate below needs a copy of
         // the whole state, so it must only run for a matching board.
+        //
+        // The pattern literal below holds exactly 14 non-empty squares
+        // (17, 19, 20, 24, 25, 26, 28, 32, 34, 36, 39, 47, 50, 52), and the
+        // board comparison accepts a position only when every pattern square
+        // holds the same piece type and every other square is empty.  So
+        // passing the loop implies exactly 14 occupied squares, and this
+        // popcount pre-check is equivalent: it can only reject boards the
+        // loop would reject too.  `state.occupied` is kept in sync with the
+        // board by rebuild_derived and the make/unmake path.  The
+        // en-passant exception is only reached once the board matched, so it
+        // is unaffected.
+        if (std::popcount(state.occupied) != 14) {
+            return false;
+        }
         static constexpr Board pattern = [] {
             Board result{};
             result[17] = {PieceType::pawn, Color::white};
