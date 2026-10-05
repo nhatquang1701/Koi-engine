@@ -31,7 +31,6 @@ __all__ = [
 ]
 
 _TERMINATION_TOKENS = frozenset({"0000", "(none)", "none"})
-_MCTS_VISIT_PREFIX = "info string koi_mcts_visits_v1 "
 
 _INFO_INTEGER_KEYS = frozenset(
     {
@@ -445,9 +444,6 @@ class SimpleEngine:
                 if len(tokens) > 3 and tokens[2] == "ponder":
                     ponder_token = tokens[3]
                 break
-            if line.startswith(_MCTS_VISIT_PREFIX):
-                last_info["mcts_root_visits"] = _parse_mcts_visit_extension(line)
-                continue
             if tokens[0] != "info":
                 continue
             parsed = _parse_info_line(tokens)
@@ -517,28 +513,6 @@ def _move_or_none(token):
         return Move.from_uci(token)
     except ValueError:
         return None
-
-
-def _parse_mcts_visit_extension(line: str) -> dict[str, int]:
-    """Parse the opt-in Koi ``info string`` root-visit data extension."""
-    if not line.startswith(_MCTS_VISIT_PREFIX):
-        raise EngineError("line is not a Koi MCTS visit extension")
-    visits_by_uci: dict[str, int] = {}
-    items = line[len(_MCTS_VISIT_PREFIX):].split()
-    if not items:
-        raise EngineError("Koi returned an empty MCTS root-visit distribution")
-    for item in items:
-        move_text, separator, count_text = item.rpartition(":")
-        if not separator or not move_text or not count_text.isascii() or not count_text.isdigit():
-            raise EngineError("Koi returned a malformed MCTS root-visit item")
-        try:
-            Move.from_uci(move_text)
-        except ValueError as error:
-            raise EngineError("Koi returned an invalid move in its MCTS root-visit data") from error
-        if move_text in visits_by_uci:
-            raise EngineError("Koi returned a duplicate move in its MCTS root-visit data")
-        visits_by_uci[move_text] = int(count_text)
-    return visits_by_uci
 
 
 def _parse_info_line(tokens):

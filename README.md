@@ -22,14 +22,13 @@
 
 Koi is a C++26 chess engine for Windows x64, Linux x86-64, and macOS arm64
 (Apple Silicon). Its default search
-uses iterative-deepening alpha-beta with a persistent transposition table. An
-experimental policy/value MCTS backend is also available when a compatible Koi
-model is supplied. A classical evaluator works out of the box; a Koi-native
+uses iterative-deepening alpha-beta with a persistent transposition table. A
+classical evaluator works out of the box; a Koi-native
 NNUE network can be enabled when available.
 
 | Engine area | What Koi provides |
 | --- | --- |
-| Search | Alpha-beta by default with Lazy SMP; experimental single-thread MCTS |
+| Search | Alpha-beta with Lazy SMP |
 | Evaluation | Classical by default, with optional Koi NNUE and GPU NNUE |
 | Chess support | Standard chess over the UCI protocol |
 | Optional assets | User-supplied Polyglot opening books and Syzygy tablebases |
@@ -60,8 +59,6 @@ Koi needs no configuration file or extra assets. `Threads=1` gives deterministic
 search; multiple threads use Lazy SMP and can produce different valid
 principal variations. Opening books are disabled by default (`OwnBook=false`).
 The classical evaluator remains available when no NNUE network is loaded.
-MCTS is opt-in through `SearchAlgorithm` and needs a separate `.kpv` model;
-alpha-beta remains the default until MCTS clears matched strength tests.
 
 ## Explore
 

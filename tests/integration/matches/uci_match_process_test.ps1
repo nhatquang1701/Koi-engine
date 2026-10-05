@@ -252,26 +252,6 @@ try {
         throw 'Compact UCI match reports must retain the final evaluation without retaining the full info stream.'
     }
 
-    $fallbackDirectory = Join-Path $chatterDirectory 'mcts-fallback'
-    New-Item -ItemType Directory -Path $fallbackDirectory -Force | Out-Null
-    $fallbackKoi = New-ScriptedUciEngine -FixturePath $fixturePath -Directory $fallbackDirectory 'info-chatter-mcts-fallback-koi'
-    $fixtureModelPath = Join-Path $fallbackDirectory 'fixture.kpv'
-    [System.IO.File]::WriteAllText($fixtureModelPath, 'fixture policy/value model')
-    $fallbackOptionsPath = Join-Path $fallbackDirectory 'mcts-options.json'
-    @{ SearchAlgorithm = 'MCTS'; PolicyValueFile = $fixtureModelPath; MCTSSelfPlay = 'false' } |
-        ConvertTo-Json -Compress | Set-Content -LiteralPath $fallbackOptionsPath -Encoding UTF8
-    $mctsFallbackRejected = $false
-    try {
-        [void](Invoke-ScriptedMatch $fallbackKoi.path $chatterOpponent.path `
-            (Join-Path $fallbackDirectory 'output') 1 2 `
-            -KoiOptionsJsonPath $fallbackOptionsPath -CompactSearchInfo)
-    } catch {
-        $mctsFallbackRejected = $_.Exception.Message -match 'fell back to AlphaBeta'
-    }
-    if (-not $mctsFallbackRejected) {
-        throw 'Compact reports must still reject an MCTS search that falls back to AlphaBeta.'
-    }
-
     $pgn = Get-Content -LiteralPath $pgnFiles[0].FullName -Raw
     if ($pgn -notmatch '\[Event "Koi Engine UCI match"\]' -or
         $pgn -notmatch '\[Result "\*"\]' -or
@@ -284,57 +264,19 @@ try {
     New-Item -ItemType Directory -Path $jsonOptionsDirectory -Force | Out-Null
     $koiOptionsJsonPath = Join-Path $jsonOptionsDirectory 'koi-options.json'
     $opponentOptionsJsonPath = Join-Path $jsonOptionsDirectory 'opponent-options.json'
-    @{ MCTSSelfPlay = 'true'; RandomSeed = '42' } |
+    @{ RandomSeed = '42' } |
         ConvertTo-Json -Compress |
         Set-Content -LiteralPath $koiOptionsJsonPath -Encoding UTF8
-    @{ SearchAlgorithm = 'AlphaBeta'; MCTSSelfPlay = 'false' } |
+    @{ Speed = '83' } |
         ConvertTo-Json -Compress |
         Set-Content -LiteralPath $opponentOptionsJsonPath -Encoding UTF8
     $jsonOptionsMatch = Invoke-ScriptedMatch $EnginePath $EnginePath $jsonOptionsMatchDirectory `
         1 2 -KoiOptionsJsonPath $koiOptionsJsonPath -OpponentOptionsJsonPath $opponentOptionsJsonPath
     $jsonKoiEngine = @($jsonOptionsMatch.report.engines | Where-Object { $_.label -eq 'Koi' })[0]
     $jsonOpponentEngine = @($jsonOptionsMatch.report.engines | Where-Object { $_.label -eq 'Opponent' })[0]
-    if ($jsonKoiEngine.options -notcontains 'setoption name MCTSSelfPlay value true' -or
-        $jsonKoiEngine.options -notcontains 'setoption name RandomSeed value 42' -or
-        $jsonOpponentEngine.options -notcontains 'setoption name SearchAlgorithm value AlphaBeta' -or
-        $jsonOpponentEngine.options -notcontains 'setoption name MCTSSelfPlay value false') {
+    if ($jsonKoiEngine.options -notcontains 'setoption name RandomSeed value 42' -or
+        $jsonOpponentEngine.options -notcontains 'setoption name Speed value 83') {
         throw 'JSON UCI options must be applied to the selected engine role and recorded in match provenance.'
-    }
-
-    $missingPolicyValueOptionsPath = Join-Path $jsonOptionsDirectory 'missing-model-options.json'
-    $missingPolicyValuePath = Join-Path $jsonOptionsDirectory 'missing-model.kpv'
-    @{ SearchAlgorithm = 'MCTS'; PolicyValueFile = $missingPolicyValuePath; MCTSSelfPlay = 'false' } |
-        ConvertTo-Json -Compress |
-        Set-Content -LiteralPath $missingPolicyValueOptionsPath -Encoding UTF8
-    $missingModelFailedClosed = $false
-    try {
-        $null = Invoke-ScriptedMatch $EnginePath $EnginePath `
-            (Join-Path $outputDirectory 'missing-mcts-model') 1 2 `
-            -KoiOptionsJsonPath $missingPolicyValueOptionsPath `
-            -OpponentOptionsJsonPath $opponentOptionsJsonPath
-    } catch {
-        $missingModelFailedClosed = $_.Exception.Message -match 'MCTS PolicyValueFile is missing'
-    }
-    if (-not $missingModelFailedClosed) {
-        throw 'An MCTS strength match must fail before play when its policy/value model is missing.'
-    }
-
-    $corruptPolicyValuePath = Join-Path $jsonOptionsDirectory 'corrupt-policy-value.kpv'
-    $corruptPolicyValueOptionsPath = Join-Path $jsonOptionsDirectory 'corrupt-policy-value-options.json'
-    [System.IO.File]::WriteAllText($corruptPolicyValuePath, 'not a policy/value model')
-    @{ SearchAlgorithm = 'MCTS'; PolicyValueFile = $corruptPolicyValuePath; MCTSSelfPlay = 'false' } |
-        ConvertTo-Json -Compress |
-        Set-Content -LiteralPath $corruptPolicyValueOptionsPath -Encoding UTF8
-    $corruptMctsModelRejected = $false
-    try {
-        $null = Invoke-ScriptedMatch $EnginePath $EnginePath `
-            (Join-Path $outputDirectory 'corrupt-mcts-model') 1 2 `
-            -KoiOptionsJsonPath $corruptPolicyValueOptionsPath
-    } catch {
-        $corruptMctsModelRejected = $_.Exception.Message -match 'PolicyValueFile rejected'
-    }
-    if (-not $corruptMctsModelRejected) {
-        throw 'An MCTS strength match must fail when the policy/value model is rejected by the engine.'
     }
 
     $sprtCompareScript = Join-Path $repositoryRoot 'tools/stability/sprt_compare.ps1'
@@ -369,10 +311,8 @@ try {
         $sprtReport = Get-Content -LiteralPath $sprtReportFile.FullName -Raw | ConvertFrom-Json
         $candidateEngine = @($sprtReport.engines | Where-Object { $_.label -eq 'Koi' })[0]
         $baselineEngine = @($sprtReport.engines | Where-Object { $_.label -eq 'Opponent' })[0]
-        if ($candidateEngine.options -notcontains 'setoption name MCTSSelfPlay value true' -or
-            $candidateEngine.options -notcontains 'setoption name RandomSeed value 42' -or
-            $baselineEngine.options -notcontains 'setoption name SearchAlgorithm value AlphaBeta' -or
-            $baselineEngine.options -notcontains 'setoption name MCTSSelfPlay value false' -or
+        if ($candidateEngine.options -notcontains 'setoption name RandomSeed value 42' -or
+            $baselineEngine.options -notcontains 'setoption name Speed value 83' -or
             $sprtReport.configuration.compact_search_info -ne $true -or
             @($sprtReport.games[0].moves | Where-Object { @($_.infos).Count -gt 1 }).Count -gt 0) {
             throw 'SPRT color runs must apply and record the candidate/baseline UCI option snapshots.'

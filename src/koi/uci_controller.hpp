@@ -120,12 +120,6 @@ private:
     std::uint8_t book_safety_depth_ = 2;
     std::uint8_t book_depth_ = 16;
     std::uint32_t random_seed_ = 0;
-    SearchAlgorithm search_algorithm_ = SearchAlgorithm::alpha_beta;
-    bool mcts_visit_output_ = false;
-    bool mcts_self_play_ = false;
-    std::filesystem::path policy_value_file_;
-    std::shared_ptr<const PolicyValueModel> policy_value_model_;
-    std::string policy_value_load_error_;
     std::filesystem::path syzygy_path_;
     std::filesystem::path eval_file_;
     std::uint8_t syzygy_probe_depth_ = 1;

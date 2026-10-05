@@ -111,9 +111,6 @@ int main(int argument_count, char* arguments[]) {
                 }
             }
             const std::size_t index = std::min(go_count, active_moves.size() - 1);
-            if (name.contains("mcts-fallback")) {
-                std::cout << "info string MCTS unavailable: fixture fallback\n";
-            }
             if (name.contains("info-chatter")) {
                 for (std::size_t depth = 1; depth <= 128; ++depth) {
                     std::cout << "info depth " << depth << " seldepth " << depth

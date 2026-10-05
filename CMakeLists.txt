@@ -289,7 +289,6 @@ set(KOI_CORE_SOURCES
     src/koi/detail/attack_tables.cpp
     src/koi/detail/evaluation_context.cpp
     src/koi/detail/feature_state.cpp
-    src/koi/detail/policy_value_mcts.cpp
     src/koi/detail/root_coordinator.cpp
     src/koi/detail/search_context.cpp
     src/koi/detail/search_context_support.cpp
@@ -309,7 +308,6 @@ set(KOI_CORE_SOURCES
     src/koi/nnue.cpp
     src/koi/opening_book.cpp
     src/koi/perft.cpp
-    src/koi/policy_value_model.cpp
     src/koi/position.cpp
     src/koi/search_service.cpp
     src/koi/search_ordering.cpp
@@ -707,14 +705,6 @@ target_link_libraries(search_runtime_tests PRIVATE koi_core)
 
 add_test(NAME search_runtime_tests COMMAND search_runtime_tests)
 
-add_executable(policy_value_mcts_tests
-    tests/unit/search/policy_value_mcts_tests.cpp
-)
-
-target_link_libraries(policy_value_mcts_tests PRIVATE koi_core)
-
-add_test(NAME policy_value_mcts_tests COMMAND policy_value_mcts_tests)
-
 add_executable(static_exchange_tests
     tests/unit/search/static_exchange_tests.cpp
 )
@@ -767,14 +757,6 @@ add_executable(evaluation_features_tests
 target_link_libraries(evaluation_features_tests PRIVATE koi_core)
 
 add_test(NAME evaluation_features_tests COMMAND evaluation_features_tests)
-
-add_executable(policy_value_model_tests
-    tests/unit/evaluation/policy_value_model_tests.cpp
-)
-
-target_link_libraries(policy_value_model_tests PRIVATE koi_core)
-
-add_test(NAME policy_value_model_tests COMMAND policy_value_model_tests)
 
 add_executable(time_manager_tests
     tests/unit/search/time_manager_tests.cpp
@@ -918,14 +900,12 @@ set(KOI_TEST_SUPPORT_TARGETS
     search_architecture_tests
     search_policy_tests
     search_runtime_tests
-    policy_value_mcts_tests
     static_exchange_tests
     transposition_table_tests
     search_service_tests
     koi_soak_tests
     classical_evaluator_tests
     evaluation_features_tests
-    policy_value_model_tests
     time_manager_tests
     koi_strength_tests
     perft_tests
@@ -1317,7 +1297,7 @@ set_tests_properties(
     koi_core_tests koi_cpu_features_tests koi_cpu_variant_tests syzygy_tablebase_tests
     koi_rules_tests native_rule_state_tests opening_book_tests completion_gate_tests
     search_ordering_tests search_architecture_tests search_policy_tests
-    search_runtime_tests policy_value_mcts_tests static_exchange_tests time_manager_tests perft_tests
+    search_runtime_tests static_exchange_tests time_manager_tests perft_tests
     PROPERTIES LABELS "unit"
 )
 if(TARGET koi_module_tests)
@@ -1325,7 +1305,7 @@ if(TARGET koi_module_tests)
 endif()
 set_tests_properties(
     evaluation_boundary_tests evaluation_architecture_tests nnue_boundary_tests
-    classical_evaluator_tests evaluation_features_tests policy_value_model_tests
+    classical_evaluator_tests evaluation_features_tests
     PROPERTIES LABELS "unit;evaluation"
 )
 set_tests_properties(transposition_table_tests PROPERTIES LABELS "unit;runtime")

@@ -19,7 +19,6 @@
 #include "koi/gpu/nnue_gpu_evaluator.hpp"
 #include "koi/nnue.hpp"
 #include "koi/perft.hpp"
-#include "koi/policy_value_model.hpp"
 
 namespace koi {
 
@@ -120,18 +119,6 @@ bool equals_ignore_case(std::string_view left, std::string_view right) {
     return true;
 }
 
-bool parse_search_algorithm(std::string_view value, SearchAlgorithm& algorithm) {
-    if (equals_ignore_case(value, "AlphaBeta")) {
-        algorithm = SearchAlgorithm::alpha_beta;
-        return true;
-    }
-    if (equals_ignore_case(value, "MCTS")) {
-        algorithm = SearchAlgorithm::mcts;
-        return true;
-    }
-    return false;
-}
-
 enum class UciOptionKind {
     check,
     spin,
@@ -166,10 +153,6 @@ enum class UciOptionId {
     syzygy_50_move_rule,
     eval_file,
     gpu_nnue,
-    search_algorithm,
-    policy_value_file,
-    mcts_visit_output,
-    mcts_self_play,
     debug,
     debug_file,
 };
@@ -192,7 +175,7 @@ struct UciOptionDescriptor {
 // and `handle_setoption` consume this table, so an advertised option can never
 // drift out of sync with the option the controller actually applies. The order
 // of the entries is the order advertised to a GUI and must stay stable.
-constexpr std::array<UciOptionDescriptor, 31> kUciOptions{{
+constexpr std::array<UciOptionDescriptor, 27> kUciOptions{{
     {"RandomSeed", UciOptionKind::spin, UciOptionId::random_seed, "0", 0,
      kMaximumRandomSeed, false, true},
     {"Hash", UciOptionKind::spin, UciOptionId::hash, "512", kMinimumHashMegabytes,
@@ -245,16 +228,6 @@ constexpr std::array<UciOptionDescriptor, 31> kUciOptions{{
     // test override, otherwise this option decides.
     {"GpuNnue", UciOptionKind::combo, UciOptionId::gpu_nnue, "auto", 0, 0, false, true,
      "var auto var on var off"},
-    // AlphaBeta remains the portable default. MCTS requires an explicitly
-    // loaded versioned policy/value model and falls back to AlphaBeta otherwise.
-    {"SearchAlgorithm", UciOptionKind::string, UciOptionId::search_algorithm,
-     "AlphaBeta", 0, 0, false, true},
-    {"PolicyValueFile", UciOptionKind::string, UciOptionId::policy_value_file,
-     "", 0, 0, false, true},
-    {"MCTSVisitOutput", UciOptionKind::check, UciOptionId::mcts_visit_output,
-     "false", 0, 0, false, true},
-    {"MCTSSelfPlay", UciOptionKind::check, UciOptionId::mcts_self_play,
-     "false", 0, 0, false, true},
     // Developer diagnostics stay settable but are intentionally not advertised.
     {"Debug", UciOptionKind::check, UciOptionId::debug, "false", 0, 0, false, false},
     {"DebugFile", UciOptionKind::string, UciOptionId::debug_file, "koi-debug.log", 0, 0, false,
@@ -463,10 +436,6 @@ std::string debug_limits(const SearchLimits& limits) {
 Wdl score_to_wdl(const SearchInfo& info) noexcept {
     if (info.exact_wdl.has_value()) {
         const std::array<int, 3>& triplet = *info.exact_wdl;
-        return Wdl{triplet[0], triplet[1], triplet[2]};
-    }
-    if (info.estimated_wdl.has_value()) {
-        const std::array<int, 3>& triplet = *info.estimated_wdl;
         return Wdl{triplet[0], triplet[1], triplet[2]};
     }
     if (info.mate.has_value()) {
@@ -1113,69 +1082,6 @@ void UciController::handle_setoption(std::istream& command) {
         break;
     }
 
-    case UciOptionId::search_algorithm: {
-        SearchAlgorithm algorithm = SearchAlgorithm::alpha_beta;
-        if (parse_search_algorithm(value, algorithm) && algorithm != search_algorithm_) {
-            stop_and_suppress_active_search();
-            search_algorithm_ = algorithm;
-        }
-        break;
-    }
-
-    case UciOptionId::mcts_visit_output:
-        apply_boolean(mcts_visit_output_, [this](bool enabled) {
-            mcts_visit_output_ = enabled;
-        });
-        break;
-
-    case UciOptionId::mcts_self_play:
-        apply_boolean(mcts_self_play_, [this](bool enabled) {
-            mcts_self_play_ = enabled;
-        });
-        break;
-
-    case UciOptionId::policy_value_file: {
-        if (value == policy_value_file_.string()) {
-            break;
-        }
-        stop_and_suppress_active_search();
-        policy_value_file_ = value;
-        policy_value_model_.reset();
-        policy_value_load_error_.clear();
-        if (value.empty()) {
-            break;
-        }
-
-        std::filesystem::path resolved = value;
-        if (resolved.is_relative() && !executable_directory_.empty()) {
-            resolved = executable_directory_ / resolved;
-        }
-        auto loaded = PolicyValueModel::load_file(resolved);
-        if (!loaded.has_value()) {
-            policy_value_load_error_ = loaded.error().message;
-            debug_event("PolicyValueFile rejected " + resolved.string() + ": " +
-                        policy_value_load_error_);
-            std::lock_guard lock(output_mutex_);
-            output_ << "info string PolicyValueFile rejected: " << policy_value_load_error_
-                    << '\n' << std::flush;
-            break;
-        }
-        try {
-            policy_value_model_ = std::make_shared<const PolicyValueModel>(std::move(*loaded));
-        } catch (const std::exception& install_error) {
-            policy_value_load_error_ = install_error.what();
-            debug_event("PolicyValueFile installation failed " + resolved.string() + ": " +
-                        policy_value_load_error_);
-            std::lock_guard lock(output_mutex_);
-            output_ << "info string PolicyValueFile rejected: " << policy_value_load_error_
-                    << '\n' << std::flush;
-            break;
-        }
-        debug_json_event("policy_value_file", "\"path\":" + debug_quoted(resolved.string()) +
-                                              ",\"enabled\":true");
-        break;
-    }
-
     case UciOptionId::debug:
         apply_boolean(debug_enabled_, [this](bool debug) {
             debug_enabled_ = debug;
@@ -1503,12 +1409,7 @@ void UciController::start_search(GameState root, SearchLimits limits, bool skip_
     options.threads = threads_;
     options.speed_percent = speed_percent_;
     options.multi_pv = multi_pv_;
-    options.search_algorithm = search_algorithm_;
-    options.collect_mcts_visit_counts = mcts_visit_output_;
-    options.mcts_self_play = mcts_self_play_;
     options.random_seed = random_seed_;
-    options.policy_value_model = policy_value_model_;
-    options.policy_value_load_error = policy_value_load_error_;
     options.analyse_mode = analyse_mode_;
     options.show_wdl = show_wdl_;
     options.move_overhead_ms = move_overhead_ms_;
@@ -1774,8 +1675,7 @@ void UciController::write_search_info(std::uint64_t generation, const SearchInfo
             output_ << " upperbound";
         }
     }
-    if (show_wdl_ &&
-        (info.bound != SearchInfo::Bound::estimate || info.estimated_wdl.has_value())) {
+    if (show_wdl_ && info.bound != SearchInfo::Bound::estimate) {
         const Wdl wdl = score_to_wdl(info);
         output_ << " wdl " << wdl.win << ' ' << wdl.draw << ' ' << wdl.loss;
     }
@@ -1815,18 +1715,6 @@ void UciController::write_search_completion(std::uint64_t generation,
     std::lock_guard lock(output_mutex_);
     if (generation != generation_) {
         return;
-    }
-
-    if (!result.backend_diagnostic.empty()) {
-        output_ << "info string " << result.backend_diagnostic << '\n';
-    }
-
-    if (!result.mcts_root_visits.empty()) {
-        output_ << "info string koi_mcts_visits_v1";
-        for (const MctsRootVisit& visit : result.mcts_root_visits) {
-            output_ << ' ' << visit.move.uci() << ':' << visit.visits;
-        }
-        output_ << '\n';
     }
 
     output_ << "bestmove "

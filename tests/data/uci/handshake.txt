@@ -25,8 +25,4 @@ option name SyzygyInteriorDepth type spin default 0 min 0 max 100
 option name Syzygy50MoveRule type check default true
 option name EvalFile type string default {empty}
 option name GpuNnue type combo default auto var auto var on var off
-option name SearchAlgorithm type string default AlphaBeta
-option name PolicyValueFile type string default {empty}
-option name MCTSVisitOutput type check default false
-option name MCTSSelfPlay type check default false
 uciok

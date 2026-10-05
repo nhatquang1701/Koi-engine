@@ -532,7 +532,7 @@ per record.
 ## Policy/value self-play dataset format
 
 `tools/measurement/policy_value_dataset.py` defines a separate
-`koi-policy-value-dataset-v1` JSONL contract for future MCTS distillation and
+`koi-policy-value-dataset-v1` JSONL contract for policy/value distillation and
 self-play. It keeps each position's FEN and variant, native-order legal UCI
 actions with explicit from/to/promotion fields, aligned policy targets and
 optional visit counts, side-to-move value and outcome, game/opening identity,
@@ -553,14 +553,11 @@ records = list(read_jsonl("artifacts/training/policy-value-v1.jsonl"))
 ## Policy/value self-play generation
 
 `tools/measurement/policy_value_selfplay.py` plays node-limited Koi self-play
-games from a named opening-move corpus. Both modes record the complete legal
+games from a named opening-move corpus. It records the complete legal
 action list in native `go perft 1` order, eventual side-to-move outcomes,
 opening/game identity, seed, termination reason, and engine/opening/source
-hashes. AlphaBeta uses a one-hot PV target (falling back to UCI `bestmove`)
-and an unbounded score target when available. MCTS records the full root visit
-count for every legal move, normalizes those counts into soft policy targets,
-and samples its played move from the visit distribution. Its records include
-the source `.kpv` hash and use game results as value targets. Keep generated
+hashes. It uses a one-hot PV target (falling back to UCI `bestmove`)
+and an unbounded score target when available. Keep generated
 files under `artifacts/training/` and keep training and validation openings
 disjoint so `train_policy_value.py` can enforce the split.
 
@@ -573,18 +570,7 @@ python .\tools\measurement\policy_value_selfplay.py `
 ```
 
 This bootstrap producer is tagged `alpha-beta-distillation` and stores no model
-hash. It uses one-hot search targets. For MCTS self-play, provide a trained
-model and sampling temperature:
-
-```powershell
-python .\tools\measurement\policy_value_selfplay.py `
-  --engine .\build\release\koi-engine.exe `
-  --algorithm MCTS `
-  --policy-value-file .\artifacts\training\policy-value-v1.kpv `
-  --openings .\tools\measurement\data\policy-value-train-v2.txt `
-  --games 8 --nodes 20000 --seed 1 --temperature 1.0 `
-  --output .\artifacts\training\policy-value-mcts-selfplay.jsonl
-```
+hash. It uses one-hot search targets.
 
 The default training corpus is
 `tools/measurement/data/policy-value-train-v2.txt`; its 64 seeded legal
@@ -612,15 +598,6 @@ python .\tools\measurement\policy_value_selfplay.py `
 `train_policy_value.py` rejects duplicated rules-relevant FEN states between
 training and validation outputs, even if their game/opening IDs differ.
 
-MCTS mode enables the opt-in `MCTSVisitOutput` UCI option and fails if the
-engine cannot return a complete root visit map or the map does not match Koi's
-native legal move list. It also enables `MCTSSelfPlay`, which mixes Dirichlet
-noise (`alpha=0.3`, `epsilon=0.25`) into root priors using the recorded
-`RandomSeed`. It uses one search thread and `OwnBook=false`; ordinary MCTS play
-keeps root noise off.
-AlphaBeta remains the default until a trained model and MCTS clear the equal-time
-strength gates.
-
 ## Policy/value v1 training
 
 `tools/measurement/train_policy_value.py` trains the fixed v1 CPU reference
@@ -634,15 +611,9 @@ optional training dependency; importing the tools does not require it. CPU is
 the default. Select `--device cuda` explicitly to use a CUDA-enabled PyTorch
 build. Keep datasets, model files, and metadata under `artifacts/training/`.
 The `.kpv` container is separate from NNUE `EvalFile`. The Python reference
-and C++ CPU loader validate its 40-byte little-endian header, fixed dimensions,
-payload length, CRC32, and finite float32 weights. C++ inference consumes the
-native v5 sparse feature list and caller-provided legal moves/output storage.
-The bounded, tree-only CPU MCTS backend is now selectable through
-`SearchAlgorithm=MCTS` when a compatible model is explicitly loaded with
-`PolicyValueFile`. It currently requires `Threads=1`; unsupported selections
-fall back to alpha-beta with a UCI diagnostic. Alpha-beta remains the default,
-and MCTS remains strength-unvalidated until it passes the documented equal-time
-matched-play gates. Training loss alone does not promote a model or backend.
+implementation validates its 40-byte little-endian header, fixed dimensions,
+payload length, CRC32, and finite float32 weights. Training loss alone does not
+promote a model or make an Elo claim.
 
 ```powershell
 python .\tools\measurement\train_policy_value.py `
@@ -663,53 +634,7 @@ diagnostic, not an engine-strength result.
 
 The training loss is a development metric. Model adoption still requires
 held-out position validation and equal-time matched play against the current
-alpha-beta engine; it does not promote MCTS or make an Elo claim by itself.
-
-### AlphaBeta versus MCTS strength gate
-
-Use `tools/stability/sprt_compare.ps1` for paired, color-balanced games. The
-candidate and baseline UCI options are supplied as JSON objects so the same
-binary can run both backends. Keep `MCTSSelfPlay=false` during matches so root
-noise is disabled; the candidate model hash and engine hashes are retained in
-the match reports.
-
-Long SPRT comparisons use compact search-info capture to keep memory bounded.
-Each move still records its final evaluation and semantic `info string`
-diagnostics, including book and MCTS fallback messages, but omits the full
-per-depth info stream. Reports mark this with
-`configuration.compact_search_info=true`. Direct `uci_match.ps1` runs retain
-full search info by default; pass `-CompactSearchInfo` for longer local matches.
-
-```powershell
-$engine = (Resolve-Path .\build\release\koi-engine.exe).Path
-$replay = (Resolve-Path .\build\release\koi-replay.exe).Path
-$model = (Resolve-Path .\artifacts\training\policy-value-mcts.kpv).Path
-$candidateOptions = .\artifacts\training\mcts-candidate-options.json
-$baselineOptions = .\artifacts\training\mcts-baseline-options.json
-
-@{ SearchAlgorithm = 'MCTS'; PolicyValueFile = $model; MCTSSelfPlay = 'false'; MCTSVisitOutput = 'false' } |
-  ConvertTo-Json -Compress | Set-Content -Encoding UTF8 $candidateOptions
-@{ SearchAlgorithm = 'AlphaBeta'; PolicyValueFile = ''; MCTSSelfPlay = 'false'; MCTSVisitOutput = 'false' } |
-  ConvertTo-Json -Compress | Set-Content -Encoding UTF8 $baselineOptions
-
-pwsh -NoProfile -File .\tools\stability\sprt_compare.ps1 `
-  -CandidatePath $engine -BaselinePath $engine -ReplayPath $replay `
-  -CandidateOptionsJsonPath $candidateOptions -BaselineOptionsJsonPath $baselineOptions `
-  -OpeningFile .\tests\data\openings\openings-release-strength-160.txt `
-  -TimeControl '1+0' -Elo0 0 -Elo1 10 -Games 1 -MinGames 40 -MaxGames 160 `
-  -Threads 1 -Hash 512 -OutputDirectory .\artifacts\matches\mcts-sprt
-
-pwsh -NoProfile -File .\tools\stability\sprt_compare.ps1 `
-  -CandidatePath $engine -BaselinePath $engine -ReplayPath $replay `
-  -CandidateOptionsJsonPath $candidateOptions -BaselineOptionsJsonPath $baselineOptions `
-  -OpeningFile .\tests\data\openings\openings-release-strength-160.txt `
-  -TimeControl '3+2' -Elo0 0 -Elo1 10 -Games 1 -MinGames 40 -MaxGames 160 `
-  -Threads 1 -Hash 512 -OutputDirectory .\artifacts\matches\mcts-sprt
-```
-
-Run the gate separately at both controls. An inconclusive result is not a pass;
-use a larger disjoint match corpus before deciding. Keep the AlphaBeta default
-unless both SPRTs favor MCTS by at least +10 Elo at `alpha=beta=0.05`.
+alpha-beta engine; it does not make an Elo claim by itself.
 
 Typical commands:
 

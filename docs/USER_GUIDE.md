@@ -368,21 +368,16 @@ every probe number above still describes version 4 networks.
 
 ### Generating policy/value self-play data
 
-The policy/value generator records AlphaBeta distillation data by default. To
-generate MCTS self-play data, provide a versioned `.kpv` model and select the
-MCTS algorithm. The first 30 game plies sample from root visits at temperature
-1.0 by default; after that, the generator always selects the highest-visit
-move. Opening-prefix moves count toward the cutoff. Set `--temperature-plies 0`
-to select the highest-visit move throughout, or choose another non-negative
-cutoff. Each record stores the effective sampling temperature, and the
-manifest stores the configured temperature and cutoff.
+The policy/value generator records AlphaBeta distillation data. It plays
+node-limited Koi self-play from a named opening corpus and stores the complete
+legal action list, the search PV target, and side-to-move outcomes.
 
 ```powershell
 python .\tools\measurement\policy_value_selfplay.py `
   --engine .\build\release\koi-engine.exe `
-  --algorithm MCTS `
-  --policy-value-file .\artifacts\training\policy-value.kpv `
-  --temperature 1.0 --temperature-plies 30
+  --openings .\tools\measurement\data\policy-value-train-v2.txt `
+  --games 8 --nodes 20000 --seed 1 `
+  --output .\artifacts\training\policy-value-ab-selfplay.jsonl
 ```
 
 Generated JSONL data and manifests belong under the ignored
@@ -780,12 +775,10 @@ from the starting position (for example, `bestmove e2e4`).
   `setoption name Clear Hash` clears it. Either command stops and joins an
   active search before changing the table.
 - `setoption name Threads value <N>` selects the worker count. `Threads 1`
-  keeps the deterministic serial search. With AlphaBeta, `Threads > 1` adds
-  Lazy SMP helpers and is intentionally nondeterministic because helpers share
-  the transposition table. With MCTS, `Threads > 1` evaluates bounded waves of
-  policy/value leaves in parallel while one coordinator owns tree selection,
-  mutation, and ordered backup; the batch is capped at eight leaves. `setoption
-  name Speed value <1..100>` scales only movetime and clock-derived budgets;
+  keeps the deterministic serial search. `Threads > 1` adds Lazy SMP helpers
+  and is intentionally nondeterministic because helpers share the transposition
+  table. `setoption name Speed value <1..100>` scales only movetime and
+  clock-derived budgets;
   explicit depth, node, and infinite searches are unchanged. Changing either
   option stops and joins the active search before the new snapshot is used by
   the next `go` command.
@@ -794,34 +787,6 @@ from the starting position (for example, `bestmove e2e4`).
   never triggers a load). A rejected or missing file leaves the current
   evaluator in place and reports `info string EvalFile rejected: ...`. Running
   searches keep the evaluator they started with.
-- `SearchAlgorithm` defaults to `AlphaBeta`. `MCTS` is an experimental CPU
-  backend and requires a compatible policy/value model loaded with
-  `PolicyValueFile`; Koi does not bundle a trained model. `Threads 1` uses the
-  serial reference path. `Threads > 1` selects and backs up MCTS paths on one
-  coordinator while a bounded pool evaluates leaves; at most eight inference
-  workers are used even if a larger thread count is configured. Batches are
-  shortened to honor node limits, and completed results are committed in
-  selection order. Missing, malformed, or incompatible models and unsupported
-  search configurations report an `info string` diagnostic and fall back to
-  alpha-beta. Changing either option stops and joins the active search before
-  replacing the selected backend or model.
-- `MCTSVisitOutput` defaults to `false`. When enabled and MCTS completes, Koi
-  adds one final `info string koi_mcts_visits_v1` line containing every root
-  move allowed for that search and its visit count. This extension is intended
-  for self-play data generation; it does not change move selection and is
-  absent from normal UCI output by default.
-- `MCTSSelfPlay` defaults to `false`. When enabled with MCTS, it mixes seeded
-  Dirichlet noise into root priors (`alpha=0.3`, `epsilon=0.25`). The normal
-  MCTS search remains deterministic when this option is off. `RandomSeed`
-  controls the root-noise seed for self-play.
-- With `SearchAlgorithm=MCTS`, `go nodes N` bounds root visits and `go depth N`
-  caps the tree ply. Movetime and clock deadlines, `searchmoves`, MultiPV,
-  `stop`, `quit`, and `ponderhit` continue to use the shared UCI search
-  lifecycle. A bounded request without an explicit node or time limit uses a
-  4096-visit ceiling; `go infinite` without a node limit remains unbounded until
-  stopped. Root Syzygy results retain precedence. MCTS WDL is an estimate and
-  is shown only when `UCI_ShowWDL` is enabled; it is not an exact tablebase
-  result.
 - `setoption name BookRandom value false` (the default) selects the highest-
   weight legal Polyglot move, using deterministic coordinate ordering for equal
   weights. `BookRandom true` enables weighted random selection; the default
@@ -897,8 +862,7 @@ every `go` is answered. `time_manager_tests` and
 `UCI_ShowWDL` defaults to false. When enabled, scored alpha-beta `info` lines
 append a deterministic `wdl W D L` triplet. An alpha-beta selective iteration
 with no proven score direction reports depth, nodes, and PV but omits score and
-WDL; MCTS reports its estimated WDL without presenting it as a proven score or
-exact result. Koi v1.0.0 does not advertise `UCI_LimitStrength` or `UCI_Elo`:
+WDL. Koi v1.0.0 does not advertise `UCI_LimitStrength` or `UCI_Elo`:
 the previous node-cap mapping was not calibrated to an actual rating. A GUI
 that sends those legacy options receives normal full-strength play.
 Stockfish's separate Elo controls remain available to the measurement tools
@@ -1101,8 +1065,7 @@ the options at session start; the portable release defaults are `RandomSeed=0`,
 `UCI_ShowWDL=false`, `Move Overhead=30`, `Slow Mover=100`, `StrengthMode=false`,
 `SyzygyPath=""`, `SyzygyProbeDepth=1`, `SyzygyProbeLimit=7`,
 `Syzygy50MoveRule=true`, `SyzygyInteriorDepth=0`, and `EvalFile=""`
-(empty keeps the boot-time evaluator), `SearchAlgorithm=AlphaBeta`,
-`PolicyValueFile=""`, `MCTSVisitOutput=false`, and `MCTSSelfPlay=false`.
+(empty keeps the boot-time evaluator).
 For the recommended En Croissant smoke scenario, use `Hash=512`, `Threads=4`, and
 `Speed=100`, then keep the book and Syzygy paths explicitly configured if those
 assets are available.

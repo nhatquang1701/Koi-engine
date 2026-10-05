@@ -114,14 +114,9 @@ C++ unit / integration executables under `tests/unit/` and `tests/integration/`:
 - Rules and state: `koi_core_tests`, `koi_rules_tests`, `native_rule_state_tests`,
   `perft_tests`, `koi_shadow_diff_tests` (opt-in via `KOI_BUILD_SHADOW_DIFF`).
 - Evaluation: `evaluation_boundary_tests`, `evaluation_architecture_tests`,
-  `nnue_boundary_tests`, `classical_evaluator_tests`, `evaluation_features_tests`,
-  `policy_value_model_tests` (versioned C++ loader, corruption checks, and CPU
-  inference reference cases).
+  `nnue_boundary_tests`, `classical_evaluator_tests`, `evaluation_features_tests`.
 - Search: `koi_search_tests` (four CTest shards), `search_ordering_tests`,
   `search_architecture_tests`, `search_policy_tests`, `search_runtime_tests`,
-  `policy_value_mcts_tests` (PUCT selection, backup, visit/depth limits,
-  deterministic root behavior, root draw claims, ponder depth, cancellation,
-  and deadline interruption),
   `search_service_tests`, `static_exchange_tests`, `time_manager_tests`,
   `transposition_table_tests`, `completion_gate_tests`, `koi_strength_tests`,
   `koi_soak_tests` (bounded stability soak: long replays past the snapshot
@@ -133,7 +128,7 @@ C++ unit / integration executables under `tests/unit/` and `tests/integration/`:
   (variant parsing, executable names, automatic selection, and the override
   rules), `koi_module_tests`,
   `syzygy_tablebase_tests`, `opening_book_tests`, `uci_controller_tests`
-  (including MCTS fallback, legal MultiPV/WDL, searchmoves, and lifecycle cases),
+  (including legal MultiPV/WDL, searchmoves, and lifecycle cases),
   `koi_replay_tests`.
 
 PowerShell process tests (`tests/integration/**/*.ps1`), driven through
@@ -172,8 +167,8 @@ the repository root as the working directory:
   and v5, and wrapper line parsing).
 - Policy/value: `policy_value_dataset_python`, `policy_value_model_python`,
   `policy_value_trainer_python`, and `policy_value_selfplay_python` (versioned
-  data/model contracts, split-leakage checks, AlphaBeta distillation, MCTS
-  visit targets/root noise, and CPU training smoke coverage).
+  data/model contracts, split-leakage checks, AlphaBeta distillation, and CPU
+  training smoke coverage).
 
 ## Labels and scheduling
 

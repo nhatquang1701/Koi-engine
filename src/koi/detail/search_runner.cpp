@@ -22,7 +22,6 @@
 #include "koi/detail/root_coordinator.hpp"
 #include "koi/detail/search_context.hpp"
 #include "koi/detail/search_ordering.hpp"
-#include "koi/detail/policy_value_mcts.hpp"
 #include "koi/detail/search_session.hpp"
 #include "koi/detail/search_stack.hpp"
 #include "koi/detail/search_table_access.hpp"
@@ -30,7 +29,6 @@
 #include "koi/evaluator.hpp"
 #include "koi/evaluation_features.hpp"
 #include "koi/game_state.hpp"
-#include "koi/policy_value_model.hpp"
 #include "koi/syzygy_tablebase.hpp"
 #include "koi/gpu/nnue_gpu_evaluator.hpp"
 #include "koi/time_manager.hpp"
@@ -80,37 +78,6 @@ constexpr int kEmergencySafeExchangeTieMargin = 80;
 // completed search and ordinary pawn evaluation are unchanged.
 constexpr int kEmergencyUnsafePawnQuietPenalty = 75;
 constexpr std::size_t kMaximumEmergencyForcingCheckEvasions = 3;
-constexpr std::uint64_t kDefaultMctsVisitBudget = 4'096;
-
-[[nodiscard]] std::array<int, 3> policy_value_wdl_permill(
-    const std::array<float, 3>& wdl) noexcept {
-    std::array<int, 3> result{};
-    std::array<double, 3> fractions{};
-    int assigned = 0;
-    for (std::size_t index = 0; index < wdl.size(); ++index) {
-        const double scaled = std::clamp(static_cast<double>(wdl[index]), 0.0, 1.0) * 1'000.0;
-        result[index] = static_cast<int>(std::floor(scaled));
-        fractions[index] = scaled - static_cast<double>(result[index]);
-        assigned += result[index];
-    }
-    while (assigned < 1'000) {
-        const auto best = std::max_element(fractions.begin(), fractions.end());
-        const std::size_t index = static_cast<std::size_t>(best - fractions.begin());
-        ++result[index];
-        *best = -1.0;
-        ++assigned;
-    }
-    while (assigned > 1'000) {
-        const auto least = std::min_element(fractions.begin(), fractions.end());
-        const std::size_t index = static_cast<std::size_t>(least - fractions.begin());
-        if (result[index] > 0) {
-            --result[index];
-            --assigned;
-        }
-        *least = 2.0;
-    }
-    return result;
-}
 constexpr std::size_t kMaximumEmergencyQuietForcingResearches = 16;
 constexpr std::size_t kMaximumEmergencyRootEvasionReplies = 6;
 // The emergency static fallback is deliberately limited to the middle of the
@@ -2462,194 +2429,6 @@ private:
     bool stopping_ = false;
 };
 
-// The MCTS tree remains single-owner: the search coordinator selects and
-// commits every simulation. This pool evaluates the bounded leaf wave in
-// parallel, so workers never touch tree storage or mutable GameState history.
-class PolicyValueMctsInferencePool {
-public:
-    PolicyValueMctsInferencePool(
-        std::shared_ptr<const PolicyValueModel> model, const std::size_t requested_workers)
-        : model_(std::move(model)),
-          worker_count_(std::clamp<std::size_t>(
-              requested_workers, 1, kMaximumPolicyValueMctsBatchSize)) {
-        if (model_ == nullptr) {
-            throw std::invalid_argument("MCTS inference pool requires a loaded model");
-        }
-        workers_.reserve(worker_count_ - 1);
-        try {
-            for (std::size_t index = 1; index < worker_count_; ++index) {
-                workers_.emplace_back(spawn_worker_thread([this] {
-                    worker_loop();
-                }));
-            }
-        } catch (...) {
-            shutdown();
-            throw;
-        }
-    }
-
-    PolicyValueMctsInferencePool(const PolicyValueMctsInferencePool&) = delete;
-    PolicyValueMctsInferencePool& operator=(const PolicyValueMctsInferencePool&) = delete;
-
-    ~PolicyValueMctsInferencePool() {
-        shutdown();
-    }
-
-    [[nodiscard]] std::expected<void, std::string> evaluate(
-        const std::span<PolicyValueMctsLeafRequest> requests) {
-        if (requests.empty()) {
-            return {};
-        }
-        std::shared_ptr<Job> job;
-        try {
-            job = std::make_shared<Job>();
-        } catch (const std::bad_alloc&) {
-            return std::unexpected("unable to allocate an MCTS inference batch");
-        }
-        job->requests = requests;
-        {
-            std::lock_guard lock(mutex_);
-            ++sequence_;
-            job->sequence = sequence_;
-            finished_workers_ = 0;
-            job_ = job;
-        }
-        work_available_.notify_all();
-
-        evaluate_available(*job);
-        if (!workers_.empty()) {
-            std::unique_lock lock(mutex_);
-            work_finished_.wait(lock, [this] {
-                return finished_workers_ == workers_.size();
-            });
-        }
-        if (job->failed.load(std::memory_order_acquire)) {
-            std::lock_guard lock(job->error_mutex);
-            return std::unexpected(job->error.empty() ?
-                "MCTS inference batch failed" : job->error);
-        }
-        return {};
-    }
-
-private:
-    struct Job {
-        std::span<PolicyValueMctsLeafRequest> requests;
-        std::atomic<std::size_t> next_request = 0;
-        std::atomic_bool failed = false;
-        std::mutex error_mutex;
-        std::string error;
-        std::uint64_t sequence = 0;
-    };
-
-    [[nodiscard]] std::expected<void, std::string> evaluate_one(
-        PolicyValueMctsLeafRequest& request) const {
-        if (request.position == nullptr || request.legal_moves == nullptr ||
-            request.legal_moves->empty() ||
-            request.priors.size() != request.legal_moves->size()) {
-            return std::unexpected("MCTS inference received an invalid leaf request");
-        }
-        std::array<Move, kMaximumLegalMoves> actions{};
-        for (std::size_t index = 0; index < request.legal_moves->size(); ++index) {
-            actions[index] = (*request.legal_moves)[index].move;
-        }
-        const EvaluationFeatures features =
-            EvaluationFeatureExtractor::extract(*request.position);
-        const NnueSparseFeaturesV5 sparse_features =
-            EvaluationFeatureExtractor::encode_sparse_v5(features);
-        std::array<float, 3> wdl{};
-        const auto value = model_->evaluate(
-            sparse_features, request.position->side_to_move(),
-            std::span<const Move>(actions.data(), request.legal_moves->size()),
-            request.priors, wdl);
-        if (!value.has_value()) {
-            return std::unexpected(value.error().message);
-        }
-        request.evaluation = PolicyValueMctsEvaluation{*value, wdl};
-        return {};
-    }
-
-    void fail_job(Job& job, const std::string_view message) const noexcept {
-        bool expected = false;
-        if (job.failed.compare_exchange_strong(
-                expected, true, std::memory_order_acq_rel)) {
-            std::lock_guard lock(job.error_mutex);
-            try {
-                job.error.assign(message);
-            } catch (...) {
-            }
-        }
-    }
-
-    void evaluate_available(Job& job) const noexcept {
-        while (!job.failed.load(std::memory_order_acquire)) {
-            const std::size_t index =
-                job.next_request.fetch_add(1, std::memory_order_relaxed);
-            if (index >= job.requests.size()) {
-                break;
-            }
-            try {
-                auto evaluated = evaluate_one(job.requests[index]);
-                if (!evaluated.has_value()) {
-                    fail_job(job, evaluated.error());
-                }
-            } catch (const std::exception& error) {
-                fail_job(job, error.what());
-            } catch (...) {
-                fail_job(job, "MCTS inference failed with an unknown error");
-            }
-        }
-    }
-
-    void worker_loop() {
-        std::uint64_t seen_sequence = 0;
-        for (;;) {
-            std::shared_ptr<Job> job;
-            {
-                std::unique_lock lock(mutex_);
-                work_available_.wait(lock, [this, seen_sequence] {
-                    return stopping_ || (job_ != nullptr &&
-                                         job_->sequence != seen_sequence);
-                });
-                if (stopping_) {
-                    return;
-                }
-                job = job_;
-            }
-            seen_sequence = job->sequence;
-            evaluate_available(*job);
-            {
-                std::lock_guard lock(mutex_);
-                ++finished_workers_;
-            }
-            work_finished_.notify_one();
-        }
-    }
-
-    void shutdown() noexcept {
-        {
-            std::lock_guard lock(mutex_);
-            stopping_ = true;
-        }
-        work_available_.notify_all();
-        for (WorkerThread& worker : workers_) {
-            if (worker.joinable()) {
-                worker.join();
-            }
-        }
-    }
-
-    std::shared_ptr<const PolicyValueModel> model_;
-    const std::size_t worker_count_;
-    std::vector<WorkerThread> workers_;
-    std::mutex mutex_;
-    std::condition_variable work_available_;
-    std::condition_variable work_finished_;
-    std::shared_ptr<Job> job_;
-    std::size_t finished_workers_ = 0;
-    std::uint64_t sequence_ = 0;
-    bool stopping_ = false;
-};
-
 void safely_report_info(const SearchEventSink& sink, const SearchInfo& info) {
     if (!sink.on_info) {
         return;
@@ -2774,12 +2553,6 @@ void SearchRunner::run() {
         const bool root_is_forced_draw = root.is_forced_draw();
         int root_static_eval = 0;
         bool root_static_eval_ready = false;
-        const bool mcts_root_candidate =
-            options.search_algorithm == SearchAlgorithm::mcts &&
-            options.policy_value_model != nullptr &&
-            !root_is_forced_draw && !legal_moves.empty() &&
-            !(options.syzygy_interior_depth > 0 &&
-              (options.syzygy != nullptr || options.tablebase_probe_hook));
         const auto initialize_root_static_eval = [&] {
             if (root_static_eval_ready) {
                 return;
@@ -2800,9 +2573,7 @@ void SearchRunner::run() {
             }
             root_static_eval_ready = true;
         };
-        if (!mcts_root_candidate) {
-            initialize_root_static_eval();
-        }
+        initialize_root_static_eval();
 
         // Interior tablebase probing is opt-in, off by default, and mirrors
         // the root probe restrictions except for ponder: a pondering search is
@@ -2902,13 +2673,10 @@ void SearchRunner::run() {
         const bool ultra_short_nonchecking_parallel = limits.movetime.has_value() &&
             *limits.movetime < kShortTimedFallbackMinimum && !timing_context.in_check;
 
-        // Lazy SMP replaces the root-splitting pool for the common AlphaBeta
-        // Threads > 1 configuration. MCTS uses its own single-owner tree and
-        // bounded inference pool; it must not start Lazy SMP helpers here.
-        // AlphaBeta node-limited, MultiPV, forced-draw and short-tactical
+        // Lazy SMP replaces the root-splitting pool for the common Threads > 1
+        // configuration. Node-limited, MultiPV, forced-draw and short-tactical
         // searches keep the root-parallel path so their accounting stays exact.
-        const bool use_lazy_smp = options.search_algorithm != SearchAlgorithm::mcts &&
-            options.threads > 1 && options.multi_pv == 1 &&
+        const bool use_lazy_smp = options.threads > 1 && options.multi_pv == 1 &&
             !time_manager.node_limit().has_value() && !short_tactical_budget &&
             !root_is_claimable_draw && !root_is_forced_draw && legal_moves.size() >= 2;
         std::unique_ptr<LazySmpPool> lazy_pool;
@@ -2917,238 +2685,6 @@ void SearchRunner::run() {
                 options.threads - 1, root, legal_moves, *evaluator, *table, time_manager,
                 session->stop_requested(), evaluator_mutex_ptr, true,
                 options.quiet_history_side_hook, tablebase_binding);
-        }
-
-        bool mcts_completed = false;
-        if (options.search_algorithm == SearchAlgorithm::mcts && !legal_moves.empty() &&
-            !tablebase_result.has_value()) {
-            std::string unavailable_reason;
-            if (options.policy_value_model == nullptr) {
-                unavailable_reason = options.policy_value_load_error.empty() ?
-                    "no compatible PolicyValueFile is loaded" :
-                    "PolicyValueFile rejected: " + options.policy_value_load_error;
-            } else if (root_is_forced_draw) {
-                unavailable_reason = "the root position is an automatic draw";
-            } else if (options.syzygy_interior_depth > 0 &&
-                       (options.syzygy != nullptr || options.tablebase_probe_hook)) {
-                unavailable_reason = "the CPU MCTS backend does not use interior Syzygy probes";
-            } else {
-                const std::shared_ptr<const PolicyValueModel> model =
-                    options.policy_value_model;
-                const PolicyValueMctsEvaluator policy_value_evaluator =
-                    [model](const GameState& position, const MoveMetadataList& moves,
-                            const std::span<float> priors)
-                        -> std::expected<PolicyValueMctsEvaluation, std::string> {
-                        std::array<Move, kMaximumLegalMoves> actions{};
-                        for (std::size_t index = 0; index < moves.size(); ++index) {
-                            actions[index] = moves[index].move;
-                        }
-                        const EvaluationFeatures features =
-                            EvaluationFeatureExtractor::extract(position);
-                        const NnueSparseFeaturesV5 sparse_features =
-                            EvaluationFeatureExtractor::encode_sparse_v5(features);
-                        std::array<float, 3> wdl{};
-                        const auto value = model->evaluate(
-                            sparse_features, position.side_to_move(),
-                            std::span<const Move>(actions.data(), moves.size()), priors, wdl);
-                        if (!value.has_value()) {
-                            return std::unexpected(value.error().message);
-                        }
-                        return PolicyValueMctsEvaluation{*value, wdl};
-                    };
-
-                std::unique_ptr<PolicyValueMctsInferencePool> inference_pool;
-                PolicyValueMctsBatchEvaluator batch_evaluator;
-                try {
-                    if (options.threads > 1) {
-                        inference_pool = std::make_unique<PolicyValueMctsInferencePool>(
-                            model, options.threads);
-                        batch_evaluator = [&inference_pool](
-                            const std::span<PolicyValueMctsLeafRequest> requests) {
-                            return inference_pool->evaluate(requests);
-                        };
-                    }
-                    PolicyValueMctsConfig config;
-                    // A ponder depth is an initial target, not a tree cap for
-                    // the entire ponder phase. Match alpha-beta's lifecycle:
-                    // keep exploring until ponderhit, then apply its converted
-                    // depth/time/node limits to the warmed tree.
-                    config.max_depth = limits.ponder ? 0 : limits.depth.value_or(0);
-                    config.enable_root_noise = options.mcts_self_play;
-                    config.root_noise_seed =
-                        static_cast<std::uint64_t>(options.random_seed) ^ root.position_key();
-                    PolicyValueMctsTree mcts_tree(root, legal_moves, config,
-                                                  policy_value_evaluator, batch_evaluator);
-                    const auto initialized = mcts_tree.initialize();
-                    if (!initialized.has_value()) {
-                        unavailable_reason = "MCTS initialization failed: " +
-                            initialized.error();
-                    } else {
-                        const auto default_visit_limit_for = [](const SearchLimits& current)
-                            -> std::optional<std::uint64_t> {
-                            const bool has_clock = current.movetime.has_value() ||
-                                current.white_clock.has_value() ||
-                                current.black_clock.has_value();
-                            if (!current.nodes.has_value() && !has_clock &&
-                                !current.infinite && !current.ponder) {
-                                return kDefaultMctsVisitBudget;
-                            }
-                            return std::nullopt;
-                        };
-                        std::optional<std::uint64_t> default_visit_limit =
-                            default_visit_limit_for(limits);
-                        std::uint64_t reported_visits = 0;
-                        std::uint64_t next_report_at = 128;
-                        std::optional<Move> last_reported_best;
-                        std::vector<Move> last_reported_pv;
-
-                        const auto publish_mcts_snapshot = [&] {
-                            const PolicyValueMctsSnapshot snapshot =
-                                mcts_tree.snapshot(options.multi_pv);
-                            if (snapshot.simulations == 0 || snapshot.root_moves.empty()) {
-                                return;
-                            }
-                            const auto elapsed = std::chrono::duration_cast<
-                                std::chrono::milliseconds>(
-                                    std::chrono::steady_clock::now() - started);
-                            const std::uint64_t nps = elapsed.count() > 0 ?
-                                snapshot.simulations * 1000 /
-                                    static_cast<std::uint64_t>(elapsed.count()) :
-                                snapshot.simulations;
-                            const PolicyValueMctsRootMove& best = snapshot.root_moves.front();
-                            result.best_move = best.move;
-                            result.pv = best.pv.empty() ? std::vector<Move>{best.move} : best.pv;
-                            result.ponder_move = result.pv.size() > 1 ?
-                                std::optional<Move>{result.pv[1]} : std::nullopt;
-                            result.score_cp = static_cast<int>(std::lround(
-                                static_cast<double>(best.value) * 1'000.0));
-                            result.completed_depth = std::max(1, snapshot.seldepth);
-                            result.stats.nodes = snapshot.simulations;
-                            result.stats.seldepth = snapshot.seldepth;
-
-                            for (std::size_t index = 0;
-                                 index < snapshot.root_moves.size(); ++index) {
-                                const PolicyValueMctsRootMove& line =
-                                    snapshot.root_moves[index];
-                                SearchInfo info;
-                                info.depth = result.completed_depth;
-                                info.score_cp = static_cast<int>(std::lround(
-                                    static_cast<double>(line.value) * 1'000.0));
-                                info.nodes = snapshot.simulations;
-                                info.nps = nps;
-                                info.elapsed = elapsed;
-                                info.pv = line.pv.empty() ? std::vector<Move>{line.move} :
-                                                          line.pv;
-                                info.seldepth = std::max(info.depth, snapshot.seldepth);
-                                info.multipv = static_cast<int>(index + 1);
-                                info.bound = SearchInfo::Bound::estimate;
-                                info.estimated_wdl = policy_value_wdl_permill(line.wdl);
-                                safely_report_info(sink, info);
-                            }
-
-                            time_manager.observe_iteration(SearchIterationObservation{
-                                result.completed_depth,
-                                result.score_cp,
-                                last_reported_best.has_value() &&
-                                    last_reported_best != result.best_move,
-                                !last_reported_pv.empty() && last_reported_pv != result.pv,
-                                false,
-                                snapshot.simulations});
-                            last_reported_best = result.best_move;
-                            last_reported_pv = result.pv;
-                            reported_visits = snapshot.simulations;
-                        };
-                        const PolicyValueMctsStop mcts_stop_predicate = [&] {
-                            return time_manager.should_stop(mcts_tree.simulations());
-                        };
-
-                        for (;;) {
-                            if (auto conversion = session->take_ponderhit_limits();
-                                conversion.has_value()) {
-                                limits = std::move(*conversion);
-                                time_manager.reconfigure(
-                                    limits, root.side_to_move(), options.speed_percent,
-                                    options.move_overhead_ms, options.slow_mover_percent,
-                                    timing_context);
-                                mcts_tree.set_max_depth(limits.depth.value_or(0));
-                                default_visit_limit = default_visit_limit_for(limits);
-                            }
-                            const std::uint64_t visits = mcts_tree.simulations();
-                            if (session->stop_requested().load(std::memory_order_relaxed) ||
-                                time_manager.should_stop(visits) ||
-                                (default_visit_limit.has_value() &&
-                                 visits >= *default_visit_limit)) {
-                                break;
-                            }
-                            std::size_t batch_limit = std::min(
-                                options.threads, kMaximumPolicyValueMctsBatchSize);
-                            const auto restrict_batch = [&batch_limit, visits](
-                                const std::optional<std::uint64_t> limit) {
-                                if (!limit.has_value()) {
-                                    return;
-                                }
-                                if (visits >= *limit) {
-                                    batch_limit = 0;
-                                    return;
-                                }
-                                const std::uint64_t remaining = *limit - visits;
-                                if (remaining < batch_limit) {
-                                    batch_limit = static_cast<std::size_t>(remaining);
-                                }
-                            };
-                            restrict_batch(time_manager.node_limit());
-                            restrict_batch(default_visit_limit);
-                            if (batch_limit == 0) {
-                                break;
-                            }
-                            const auto simulated = mcts_tree.simulate_batch(
-                                batch_limit, session->stop_requested(), mcts_stop_predicate);
-                            if (!simulated.has_value()) {
-                                unavailable_reason = "MCTS simulation failed: " +
-                                    simulated.error();
-                                break;
-                            }
-                            if (simulated.value() == 0) {
-                                break;
-                            }
-                            if (mcts_tree.simulations() >= next_report_at) {
-                                publish_mcts_snapshot();
-                                next_report_at += 128;
-                                if (time_manager.should_stop_after_iteration()) {
-                                    break;
-                                }
-                            }
-                        }
-
-                        if (unavailable_reason.empty()) {
-                            if (reported_visits != mcts_tree.simulations()) {
-                                publish_mcts_snapshot();
-                            }
-                            mcts_completed = true;
-                        }
-                        if (mcts_completed && options.collect_mcts_visit_counts) {
-                            const PolicyValueMctsSnapshot visit_snapshot =
-                                mcts_tree.snapshot(legal_moves.size());
-                            result.mcts_root_visits.reserve(visit_snapshot.root_moves.size());
-                            for (const PolicyValueMctsRootMove& root_move :
-                                 visit_snapshot.root_moves) {
-                                result.mcts_root_visits.push_back(
-                                    MctsRootVisit{root_move.move, root_move.visits});
-                            }
-                        }
-                    }
-                } catch (const std::exception& error) {
-                    unavailable_reason = "MCTS failed: " + std::string(error.what());
-                } catch (...) {
-                    unavailable_reason = "MCTS failed with an unknown error";
-                }
-            }
-
-            if (!mcts_completed) {
-                result.backend_diagnostic = "MCTS unavailable: " + unavailable_reason +
-                    "; using AlphaBeta";
-                initialize_root_static_eval();
-            }
         }
 
         if (legal_moves.empty()) {
@@ -3167,8 +2703,6 @@ void SearchRunner::run() {
                             {result.best_move.value()}, 0, 0, 0, 1, 1};
             info.exact_wdl = syzygy_wdl_permill(tablebase_result->wdl);
             safely_report_info(sink, info);
-        } else if (mcts_completed) {
-            // The policy/value tree owns the root lines for this search.
         } else if (root_is_claimable_draw || root_is_forced_draw || use_lazy_smp ||
                    (options.threads == 1 && options.multi_pv == 1) || legal_moves.size() < 2 ||
                    (time_manager.node_limit().has_value() && options.multi_pv == 1) ||

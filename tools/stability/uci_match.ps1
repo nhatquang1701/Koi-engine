@@ -163,70 +163,6 @@ function Merge-UciOptionsJson([string]$Path, [hashtable]$Options, [string]$Label
 Merge-UciOptionsJson $KoiOptionsJsonPath $KoiOptions 'Koi'
 Merge-UciOptionsJson $OpponentOptionsJsonPath $OpponentOptions 'Opponent'
 
-function Get-UciOptionValue([hashtable]$Options, [string]$Name, [object]$DefaultValue = '') {
-    foreach ($key in $Options.Keys) {
-        if ([string]$key -ieq $Name) {
-            return $Options[$key]
-        }
-    }
-    return $DefaultValue
-}
-
-function Get-ConfiguredSearchAlgorithm([hashtable]$Options, [string]$Label) {
-    $value = [string](Get-UciOptionValue $Options 'SearchAlgorithm' 'AlphaBeta')
-    if ($value -notin @('AlphaBeta', 'MCTS')) {
-        throw "$Label SearchAlgorithm must be AlphaBeta or MCTS, got '$value'."
-    }
-    return $value
-}
-
-function Resolve-MctsPolicyValueAsset(
-    [hashtable]$Options,
-    [string]$Label,
-    [string]$Algorithm,
-    [string]$Executable,
-    [int]$DefaultThreads,
-    [bool]$DefaultOwnBook) {
-    if ($Algorithm -ne 'MCTS') {
-        return [pscustomobject]@{ path = $null; sha256 = $null }
-    }
-    $threadValue = [string](Get-UciOptionValue $Options 'Threads' "$DefaultThreads")
-    $threadCount = 0
-    if (-not [int]::TryParse($threadValue, [ref]$threadCount) -or $threadCount -ne 1) {
-        throw "$Label MCTS strength matches require Threads=1."
-    }
-    $selfPlayValue = [string](Get-UciOptionValue $Options 'MCTSSelfPlay' 'false')
-    if ($selfPlayValue.ToLowerInvariant() -in @('true', '1')) {
-        throw "$Label MCTS strength matches require MCTSSelfPlay=false."
-    }
-    $visitOutputValue = [string](Get-UciOptionValue $Options 'MCTSVisitOutput' 'false')
-    if ($visitOutputValue.ToLowerInvariant() -in @('true', '1')) {
-        throw "$Label MCTS strength matches require MCTSVisitOutput=false."
-    }
-    $ownBookValue = [string](Get-UciOptionValue `
-        $Options 'OwnBook' $DefaultOwnBook.ToString().ToLowerInvariant())
-    if ($ownBookValue.ToLowerInvariant() -in @('true', '1')) {
-        throw "$Label MCTS strength matches require OwnBook=false."
-    }
-    $modelValue = [string](Get-UciOptionValue $Options 'PolicyValueFile' '')
-    if ([string]::IsNullOrWhiteSpace($modelValue)) {
-        throw "$Label MCTS PolicyValueFile is missing."
-    }
-    $modelPath = $modelValue
-    if (-not [System.IO.Path]::IsPathRooted($modelPath)) {
-        $modelPath = Join-Path (Split-Path -Parent $Executable) $modelPath
-    }
-    if (-not (Test-Path -LiteralPath $modelPath -PathType Leaf)) {
-        throw "$Label MCTS PolicyValueFile is missing: $modelPath"
-    }
-    $resolvedModelPath = (Resolve-Path -LiteralPath $modelPath).Path
-    $Options['PolicyValueFile'] = $resolvedModelPath
-    return [pscustomobject]@{
-        path = $resolvedModelPath
-        sha256 = (Get-FileHash -LiteralPath $resolvedModelPath -Algorithm SHA256).Hash.ToLowerInvariant()
-    }
-}
-
 $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
     $OutputDirectory = Join-Path $repositoryRoot ('artifacts/matches/run-' +
@@ -726,18 +662,6 @@ function Assert-KoiEvalFileAccepted($Engine) {
     }
 }
 
-function Assert-PolicyValueModelAccepted($Engine, [string]$Algorithm) {
-    if ($Algorithm -ne 'MCTS') {
-        return
-    }
-    $rejections = @($Engine.Output | Where-Object {
-        $_ -match '^info string PolicyValueFile rejected:'
-    })
-    if ($rejections.Count -gt 0) {
-        throw "$($Engine.Label) PolicyValueFile rejected: $($rejections -join ' | ')"
-    }
-}
-
 function Get-KoiEvaluatorAttestation($Engine, $StopResult) {
     $stdoutLines = @($Engine.Output)
     $stderrLines = @($StopResult.stderr -split "`r?`n" | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
@@ -1134,13 +1058,6 @@ if ($null -eq $positions) {
 $KoiColor = $KoiColor.ToLowerInvariant()
 $maximumThreads = [Math]::Max(1, [Math]::Min(64, [Environment]::ProcessorCount))
 $Threads = [Math]::Max(1, [Math]::Min($Threads, $maximumThreads))
-$KoiSearchAlgorithm = Get-ConfiguredSearchAlgorithm $KoiOptions 'Koi'
-$OpponentSearchAlgorithm = Get-ConfiguredSearchAlgorithm $OpponentOptions 'Opponent'
-$KoiPolicyValueAsset = Resolve-MctsPolicyValueAsset `
-    $KoiOptions 'Koi' $KoiSearchAlgorithm $koiExecutable $Threads $KoiOwnBookEnabled
-$OpponentPolicyValueAsset = Resolve-MctsPolicyValueAsset `
-    $OpponentOptions 'Opponent' $OpponentSearchAlgorithm $opponentExecutable $Threads `
-    ([bool]$OpponentOwnBookEnabled)
 if ($KoiEvaluatorMode -eq 'gpu-v5') {
     if ($Threads -lt 2) {
         throw 'GPU v5 evaluator attestation requires -Threads of at least 2.'
@@ -1183,9 +1100,7 @@ try {
     $opponentEngine = Start-UciEngine $opponentExecutable 'Opponent'
     Initialize-UciEngine $koiEngine
     Assert-KoiEvalFileAccepted $koiEngine
-    Assert-PolicyValueModelAccepted $koiEngine $KoiSearchAlgorithm
     Initialize-UciEngine $opponentEngine
-    Assert-PolicyValueModelAccepted $opponentEngine $OpponentSearchAlgorithm
     $stopMatches = $false
 
     foreach ($position in $positions) {
@@ -1252,7 +1167,6 @@ try {
                 $koiTurn = ($side -ceq 'w' -and $KoiColor -ceq 'white') -or
                     ($side -ceq 'b' -and $KoiColor -ceq 'black')
                 $engine = if ($koiTurn) { $koiEngine } else { $opponentEngine }
-                $engineSearchAlgorithm = if ($koiTurn) { $KoiSearchAlgorithm } else { $OpponentSearchAlgorithm }
                 $positionCommand = Format-PositionCommand $position $moves
                 try {
                     $search = Search-UciEngine $engine $position $moves $clock $side
@@ -1265,10 +1179,6 @@ try {
                     $engine.Retired = $true
                     $stopMatches = $true
                     break
-                }
-                if ($engineSearchAlgorithm -eq 'MCTS' -and
-                    @($search.all_info_lines | Where-Object { $_ -match '^info string MCTS unavailable:' }).Count -gt 0) {
-                    throw "$($engine.Label) MCTS search fell back to AlphaBeta during a strength match."
                 }
                 $record = [ordered]@{
                     ply = $moveRecords.Count + 1
@@ -1532,12 +1442,6 @@ $report = [ordered]@{
         opponent_own_book = $OpponentOwnBookEnabled
         opponent_limit_strength = ($null -ne $OpponentEloAnchor)
         opponent_elo = $OpponentEloAnchor
-        koi_search_algorithm = $KoiSearchAlgorithm
-        opponent_search_algorithm = $OpponentSearchAlgorithm
-        koi_policy_value_file = $KoiPolicyValueAsset.path
-        koi_policy_value_sha256 = $KoiPolicyValueAsset.sha256
-        opponent_policy_value_file = $OpponentPolicyValueAsset.path
-        opponent_policy_value_sha256 = $OpponentPolicyValueAsset.sha256
         compact_search_info = [bool]$CompactSearchInfo
         batch_id = $BatchId
         run_label = $RunLabel
