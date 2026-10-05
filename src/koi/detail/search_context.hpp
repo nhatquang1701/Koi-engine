@@ -526,8 +526,8 @@ struct SearchContext {
             return 0;
         }
         return 1ULL + static_cast<std::uint64_t>(move.from().index()) +
-            (1ULL + static_cast<std::uint64_t>(move.to().index()) << 7U) +
-            (1ULL + static_cast<std::uint64_t>(move.promotion()) << 14U);
+            ((1ULL + static_cast<std::uint64_t>(move.to().index())) << 7U) +
+            ((1ULL + static_cast<std::uint64_t>(move.promotion())) << 14U);
     }
 
     [[nodiscard]] static std::uint64_t qsearch_cache_key(

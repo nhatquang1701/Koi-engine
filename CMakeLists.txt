@@ -1119,6 +1119,12 @@ endif() # WIN32
 
 endif() # POWERSHELL_EXECUTABLE
 
+if(APPLE)
+    # Prefer an interpreter on PATH (Homebrew or a standalone install) over the
+    # Command Line Tools framework Python, which is still 3.9 and lacks
+    # int.bit_count() used by the measurement tooling.
+    set(Python3_FIND_FRAMEWORK LAST)
+endif()
 find_package(Python3 COMPONENTS Interpreter QUIET)
 if(Python3_Interpreter_FOUND)
     add_test(
