@@ -541,7 +541,10 @@ Validation runs the 64-position gate (`koi-bench --nnue`) and a node-limited,
 colour-split A/B match (`tools/nnue/ab_match.ps1` versus the classical evaluator;
 `tools/nnue/net_match.ps1` for network versus network). Those results are local
 reports: the classical evaluator remains the engine default and no reported
-number is an Elo claim.
+number is an Elo claim. Both tools default to the 32 curated openings in
+`tests/data/openings/openings-curated-32.txt` and spread the requested games
+across them, so the sides meet varied positions instead of repeating one
+deterministic start position; pass `-OpeningFile` to override.
 
 GPU NNUE inference is optional at runtime. When `nvcc` is available
 (CMake option `KOI_ENABLE_GPU_NNUE`, on by default), the build compiles

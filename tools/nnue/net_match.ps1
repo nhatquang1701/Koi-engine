@@ -28,6 +28,12 @@ Total games; the odd game goes to the candidate-white half.
 .PARAMETER Nodes
 Per-move node limit for both engines (default 20000).
 
+.PARAMETER OpeningFile
+Opening file with `name | uci move uci move ...` lines. When omitted, the
+curated 32-opening book (tests/data/openings/openings-curated-32.txt) is used
+when it exists; otherwise every game starts from the initial position and the
+repeated games carry no information (a warning is printed).
+
 .EXAMPLE
 pwsh -NoProfile -File tools/nnue/net_match.ps1 -NnueNet artifacts/training/koi-v4-1024.nnue -OpponentNet artifacts/training/koi-sf-v1.nnue -Games 20
 #>
@@ -54,6 +60,8 @@ param(
 
     [ValidateRange(1000, 120000)]
     [int]$TimeoutMilliseconds = 20000,
+
+    [string]$OpeningFile,
 
     [string]$OutputDirectory,
 
@@ -87,6 +95,29 @@ if (-not (Test-Path -LiteralPath $replay -PathType Leaf)) {
 if (-not (Test-Path -LiteralPath $UciMatchPath -PathType Leaf)) {
     throw "uci_match.ps1 is missing: $UciMatchPath"
 }
+if ([string]::IsNullOrWhiteSpace($OpeningFile)) {
+    $defaultOpeningFile = Join-Path (Join-Path $repositoryRoot 'tests/data/openings') 'openings-curated-32.txt'
+    if (Test-Path -LiteralPath $defaultOpeningFile -PathType Leaf) {
+        $OpeningFile = $defaultOpeningFile
+    }
+}
+if (-not [string]::IsNullOrWhiteSpace($OpeningFile)) {
+    $OpeningFile = (Resolve-Path -LiteralPath $OpeningFile).Path
+}
+$openingLines = @()
+$openingCount = 0
+if (-not [string]::IsNullOrWhiteSpace($OpeningFile)) {
+    $openingLines = @(Get-Content -LiteralPath $OpeningFile |
+        Where-Object { $_ -and -not $_.TrimStart().StartsWith('#') })
+    $openingCount = $openingLines.Count
+    if ($openingCount -lt 1) {
+        throw "Opening file contains no openings: $OpeningFile"
+    }
+    Write-Output "openings $openingCount $OpeningFile"
+} else {
+    Write-Warning ('No opening file: every game starts from the initial position; ' +
+        'repeated deterministic games carry no information.')
+}
 if ([string]::IsNullOrWhiteSpace($ReportPath)) {
     $ReportPath = Join-Path $OutputDirectory 'net-match.json'
 }
@@ -104,6 +135,18 @@ function Invoke-NetLeg {
     $legDirectory = Join-Path $OutputDirectory "match-$Tag"
     New-Item -ItemType Directory -Force -Path $legDirectory | Out-Null
 
+    # uci_match.ps1 plays -Games games per opening. When the opening set is
+    # larger than the requested leg, write a subset file so the leg keeps its
+    # size; otherwise spread the leg across the whole opening set.
+    $perPositionGames = $LegGames
+    $legOpeningFile = $OpeningFile
+    if ($script:openingCount -gt $LegGames) {
+        $legOpeningFile = Join-Path $legDirectory 'openings.txt'
+        Set-Content -LiteralPath $legOpeningFile -Encoding UTF8 -Value $script:openingLines[0..($LegGames - 1)]
+    } elseif ($script:openingCount -gt 1) {
+        $perPositionGames = [Math]::Max(1, [int][Math]::Round($LegGames / [double]$script:openingCount))
+    }
+
     $output = & $UciMatchPath `
         -KoiPath $engine `
         -OpponentPath $engine `
@@ -112,7 +155,8 @@ function Invoke-NetLeg {
         -Threads $Threads `
         -Hash $Hash `
         -KoiColor $KoiColor `
-        -Games $LegGames `
+        -Games $perPositionGames `
+        -OpeningFile $legOpeningFile `
         -KoiOwnBook 'false' `
         -KoiOptions @{ EvalFile = $nnuePath } `
         -OpponentOptions @{ EvalFile = $opponentPath } `
@@ -203,7 +247,9 @@ $report = [ordered]@{
     nodes = $Nodes
     threads = $Threads
     hash_mb = $Hash
-    games = $Games
+    games_requested = $Games
+    games = $decided + $aborted
+    opening_file = $OpeningFile
     wins = $wins
     draws = $draws
     losses = $losses
@@ -215,13 +261,13 @@ $report = [ordered]@{
         [ordered]@{
             tag = $whiteLeg.Tag
             candidate_color = $whiteLeg.KoiColor
-            games = $whiteLeg.Games
+            games = @($whiteLeg.Report.games).Count
             report = $whiteLeg.ReportPath
         },
         [ordered]@{
             tag = $blackLeg.Tag
             candidate_color = $blackLeg.KoiColor
-            games = $blackLeg.Games
+            games = @($blackLeg.Report.games).Count
             report = $blackLeg.ReportPath
         }
     )
@@ -229,7 +275,7 @@ $report = [ordered]@{
 }
 
 $report | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $ReportPath -Encoding UTF8
-Write-Output ("nnue net match {0}: +{1} ={2} -{3} ({4}%) {5}" -f $Games, $wins, $draws, $losses, $percent, $verdict)
+Write-Output ("nnue net match {0}: +{1} ={2} -{3} ({4}%) {5}" -f ($decided + $aborted), $wins, $draws, $losses, $percent, $verdict)
 Write-Output "json $ReportPath"
 
 if ($aborted -gt 0) {
