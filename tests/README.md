@@ -165,11 +165,6 @@ the repository root as the working directory:
   telemetry helpers, validation gating, network naming, numeric guards), and
   `bullet_data_python` (bulletformat conversion, exporter weight layouts for v4
   and v5, and wrapper line parsing).
-- Policy/value: `policy_value_dataset_python`, `policy_value_model_python`,
-  `policy_value_trainer_python`, and `policy_value_selfplay_python` (versioned
-  data/model contracts, split-leakage checks, AlphaBeta distillation, and CPU
-  training smoke coverage).
-
 ## Labels and scheduling
 
 Every test carries CTest labels; combine them with `-L`/`-LE`, for example

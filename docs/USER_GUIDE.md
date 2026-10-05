@@ -366,25 +366,6 @@ The version 5 architecture ships with loader, inference, incremental, dataset, a
 trainer support only: no version 5 network has been trained or strength-validated, so
 every probe number above still describes version 4 networks.
 
-### Generating policy/value self-play data
-
-The policy/value generator records AlphaBeta distillation data. It plays
-node-limited Koi self-play from a named opening corpus and stores the complete
-legal action list, the search PV target, and side-to-move outcomes.
-
-```powershell
-python .\tools\measurement\policy_value_selfplay.py `
-  --engine .\build\release\koi-engine.exe `
-  --openings .\tools\measurement\data\policy-value-train-v2.txt `
-  --games 8 --nodes 20000 --seed 1 `
-  --output .\artifacts\training\policy-value-ab-selfplay.jsonl
-```
-
-Generated JSONL data and manifests belong under the ignored
-`artifacts/training/` directory. Keep training, validation, and match corpora
-separate; the checked-in default opening corpus is for training only. These
-datasets and training runs are not strength evidence.
-
 ### Training a network with the NNUE Studio
 
 `Koi NNUE Studio.cmd` in the repository root opens a small tkinter GUI (Data,

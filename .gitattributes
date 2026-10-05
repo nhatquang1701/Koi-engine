@@ -1,7 +1,0 @@
-# Hash-pinned corpora and their generator must be byte-exact on every
-# checkout. Pin LF so the sha256 values recorded in
-# tools/measurement/data/policy-value-openings-v2.manifest.json hold on
-# Windows checkouts too (autocrlf would otherwise convert them to CRLF).
-tools/measurement/data/*.txt text eol=lf
-tools/measurement/data/*.json text eol=lf
-tools/measurement/policy_value_openings.py text eol=lf
