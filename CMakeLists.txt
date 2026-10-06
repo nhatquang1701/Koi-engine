@@ -1228,14 +1228,6 @@ if(Python3_Interpreter_FOUND)
         COMMAND "${Python3_EXECUTABLE}" -m unittest tests/python/evaluation/strength_report_test.py -v
     )
     add_test(
-        NAME nnue_studio_python
-        COMMAND "${Python3_EXECUTABLE}" -m unittest tests/python/nnue/studio_test.py -v
-    )
-    add_test(
-        NAME nnue_studio_ui_python
-        COMMAND "${Python3_EXECUTABLE}" -m unittest tests/python/nnue/studio_ui_test.py -v
-    )
-    add_test(
         NAME koi_trainer_python
         COMMAND "${Python3_EXECUTABLE}" -m unittest tests/python/nnue/koi_trainer_test.py -v
     )
@@ -1265,7 +1257,7 @@ if(Python3_Interpreter_FOUND)
         koi_chess_python koi_chess_pgn_python koi_chess_engine_python
         measurement_phase_python measurement_forensics_python
         uci_benchmark_python
-        strength_report_python nnue_studio_python nnue_studio_ui_python tune_classical_python
+        strength_report_python tune_classical_python
         bullet_data_python bullet_conversion_python release_candidate_games_python release_strength_openings_python strength_bound_python
         PROPERTIES
             WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
@@ -1355,7 +1347,7 @@ if(Python3_Interpreter_FOUND)
         koi_chess_python koi_chess_pgn_python koi_chess_engine_python
         measurement_phase_python measurement_forensics_python strength_report_python
         uci_benchmark_python
-        nnue_studio_python koi_trainer_python tune_classical_python nnue_studio_ui_python
+        koi_trainer_python tune_classical_python
         bullet_data_python bullet_conversion_python release_candidate_games_python release_strength_openings_python strength_bound_python
         PROPERTIES LABELS "python"
     )

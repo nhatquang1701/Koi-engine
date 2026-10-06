@@ -159,10 +159,7 @@ the repository root as the working directory:
   `koi_trainer_python` (cross-language v4 and v5 parity against the boundary
   executable),
   `tune_classical_python` (ridge-fit recovery plus a `koi-eval-features` CSV
-  round trip when the Release tool is built),
-  `nnue_studio_python` (progress parser, backend CLI contract, GUI smoke, and a
-  torch-gated tiny training selftest), `nnue_studio_ui_python` (run-list and
-  telemetry helpers, validation gating, network naming, numeric guards), and
+  round trip when the Release tool is built), and
   `bullet_data_python` (bulletformat conversion, exporter weight layouts for v4
   and v5, and wrapper line parsing).
 ## Labels and scheduling

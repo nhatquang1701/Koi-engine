@@ -15,7 +15,7 @@ quantization applies:
 
 The hidden/output shift pair is chosen by grid search over a sample of the
 validation text file produced by ``to_bullet.py`` and the same progress lines
-as the PyTorch trainer are printed so the NNUE Studio can parse them.
+as the PyTorch trainer are printed so the caller can parse them.
 """
 
 from __future__ import annotations

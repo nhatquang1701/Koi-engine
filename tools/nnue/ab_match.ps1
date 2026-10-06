@@ -7,8 +7,7 @@ Runs two node-limited matches through tools/stability/uci_match.ps1: the Koi
 engine loaded with `EvalFile` (NNUE side) against the same engine without it
 (classical side), splitting the games so NNUE plays white and black.
 
-The aggregated report is written to JSON (schema koi-nnue-studio-ab-match-v1)
-so tools/nnue/studio_core.py can turn it into a studio validation record.
+The aggregated report is written to JSON (schema koi-nnue-ab-match-v1).
 
 .PARAMETER NnueNet
 Path to the `.nnue` file used by the NNUE side.
@@ -232,7 +231,7 @@ $verdict = if ($aborted -gt 0 -or $decided -lt $Games) {
 }
 
 $report = [ordered]@{
-    schema = 'koi-nnue-studio-ab-match-v1'
+    schema = 'koi-nnue-ab-match-v1'
     generated_utc = (Get-Date).ToUniversalTime().ToString('o')
     nnue_path = $nnuePath
     engine_path = $engine

@@ -13,7 +13,7 @@ Directory map:
 | `tools/build/` | build, package, book-install, and verification scripts |
 | `tools/engine/` | small C++ command-line tools built with Koi |
 | `tools/measurement/` | PGN, oracle, corpus, tuning, and NNUE tooling |
-| `tools/nnue/` | NNUE Studio GUI, trainer backends, and the bullet/Rust crate and wrapper |
+| `tools/nnue/` | NNUE A/B match tools and the bullet/Rust crate and wrapper |
 | `tools/stability/` | UCI, Stockfish, and Cutechess process harnesses |
 | `tools/test/` | CTest wrapper that captures JUnit and LastTest logs |
 | `build/` | ignored canonical Debug/Release build trees |
@@ -27,8 +27,6 @@ The tooling runs on Windows, Linux, and macOS arm64 (Apple Silicon). Python
 tools use the in-tree `koi_chess` package, PowerShell tools run under `pwsh`,
 and binary names pick up the platform suffix automatically (`.exe` on Windows,
 no suffix on Linux and macOS).
-The Studio GUI starts from `Koi NNUE Studio.cmd` on Windows and
-`./koi-nnue-studio.sh` on Linux and macOS.
 `tools/build/package_release.ps1` writes the Windows `.zip` or, on Linux, the
 portable `koi-engine-v1.0.0-linux-x86_64.tar.gz`
 built in an Ubuntu 22.04 container by CI; macOS arm64 is a source-build target
@@ -500,46 +498,42 @@ reported value must be labeled “local Stockfish-equivalent Elo at recorded
 hardware/options/time control” and must not be presented as a universal Elo
 claim.
 
-## NNUE training and the Studio
+## NNUE training
 
-The Studio (`tools/nnue/`) is the training front end. `tools/nnue/koi_nnue_studio.py`
-is a tkinter GUI with Data, Train, Validate and install, and Runs tabs; the same
-file exposes a headless CLI (`--list-backends`, `--dry-run`, `--run`, `--selftest`).
-`tools/nnue/studio_core.py` owns run directories under `artifacts/training/runs/`,
-progress parsing, validation and install helpers, and the detached run launcher.
+Training is driven by the Python trainer and the bullet pipeline; the Koi NNUE
+Studio GUI and its headless wrapper were removed on 2026-10-06 (see
+`docs/history/removed-nnue-studio.md` for what it did and why).
 
-Backends live under `tools/nnue/backends/`: `koi` trains the version 5 network
-by default with `tools/measurement/train_nnue_koi.py --arch v5` on CPU PyTorch
-(group A `halfka-king-bucket-v1` with 9216 inputs plus symmetric group B
-`threat-pairs-v1` with 27648 inputs, one shared feature transformer forwarded
-from both perspectives into full-width cross pairs `p[j] = own[j] * opp[j]`, a
-32-unit CReLU layer, and eight piece-count buckets; hidden 1536 and l1 32 are
-the defaults), while `--arch v4` trains the earlier within-perspective
-`halfka-king-bucket-v1` version 4 network (hidden 1024). `torch` drives the
-legacy `train_nnue_sf.py` v3 trainer, and `bullet` drives the pinned Rust/CUDA
-crate under `tools/nnue/bullet_train/` through `tools/nnue/run_bullet.py` when
-cargo and a CUDA 12.x toolkit are installed, defaulting to version 5 with
-`--arch v4` keeping the earlier pair-product network. The bullet path converts
-text labels with `tools/nnue/to_bullet.py`, trains, measures validation MAE from
-each saved checkpoint, and exports the matching container with
-`tools/measurement/export_bullet_v5.py` (v5) or `export_bullet_v4.py` (v4).
-The converter carries the corpus game result through when the labels record
-one, and the trainer's `--wdl` weight (default `0.5`) blends it with the
-centipawn target; `--wdl 0` reproduces the pure evaluation blend.
-`koi-dataset-v2` encodes four index groups (`A_stm`, `B_stm`, `A_opp`, `B_opp`)
-per record.
+- `tools/measurement/train_nnue_koi.py` is the primary trainer on CPU PyTorch.
+  `--arch v4` trains the within-perspective `halfka-king-bucket-v1` network
+  (hidden 1024); `--arch v5` trains the cross-perspective variant with group A
+  `halfka-king-bucket-v1` (9216 inputs) plus group B `threat-pairs-v1` (27648
+  inputs) and full-width cross pairs `p[j] = own[j] * opp[j]` (hidden 1536 and
+  l1 32 by default).
+- `tools/nnue/run_bullet.py` drives the pinned Rust/CUDA crate under
+  `tools/nnue/bullet_train/` when cargo and a CUDA 12.x toolkit are installed;
+  `tools/nnue/to_bullet.py` converts text labels, and
+  `tools/measurement/export_bullet_v5.py` (v5) or `export_bullet_v4.py` (v4)
+  export the matching container from saved checkpoints.
+- `koi-dataset-v2` encodes four index groups (`A_stm`, `B_stm`, `A_opp`,
+  `B_opp`) per record. The converter carries the corpus game result through when
+  the labels record one, and the bullet trainer's `--wdl` weight (default `0.5`)
+  blends it with the centipawn target; `--wdl 0` reproduces the pure evaluation
+  blend.
 
 Typical commands:
 
 ```powershell
-python .\tools\nnue\koi_nnue_studio.py --list-backends
-python .\tools\nnue\koi_nnue_studio.py --dry-run --preset quick
-python .\tools\nnue\koi_nnue_studio.py --run standard --detach
+python .\tools\measurement\train_nnue_koi.py --corpus .\artifacts\training\corpus.txt `
+  --net-out .\artifacts\training\koi.nnue --arch v4 --epochs 10
+python .\tools\nnue\to_bullet.py --help
+python .\tools\nnue\run_bullet.py --help
 ```
 
 Validation runs the 64-position gate (`koi-bench --nnue`) and a node-limited,
-colour-split A/B match (`tools/nnue/ab_match.ps1` versus the classical evaluator;
-`tools/nnue/net_match.ps1` for network versus network). Those results are local
+colour-split A/B match (`tools/nnue/ab_match.ps1` versus the classical evaluator,
+schema `koi-nnue-ab-match-v1`; `tools/nnue/net_match.ps1` for network versus
+network). Those results are local
 reports: the classical evaluator remains the engine default and no reported
 number is an Elo claim. Both tools default to the 32 curated openings in
 `tests/data/openings/openings-curated-32.txt` and spread the requested games

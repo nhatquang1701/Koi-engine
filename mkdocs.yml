@@ -58,4 +58,5 @@ nav:
       - Developer tools: tools/README.md
   - Reference:
       - Documentation map: docs/overview.md
+      - Removed NNUE Studio: docs/history/removed-nnue-studio.md
       - Release notes: docs/releases/v1.0.0.md

@@ -366,41 +366,25 @@ The version 5 architecture ships with loader, inference, incremental, dataset, a
 trainer support only: no version 5 network has been trained or strength-validated, so
 every probe number above still describes version 4 networks.
 
-### Training a network with the NNUE Studio
+### Training a network
 
-`Koi NNUE Studio.cmd` in the repository root opens a small tkinter GUI (Data,
-Train, Validate and install, and Runs tabs) so a training run does not require
-remembering any command lines. The same pipeline is available headlessly:
+Networks are trained with the Python trainer directly. The Koi NNUE Studio GUI
+(and its headless wrapper) was removed on 2026-10-06; see the
+[NNUE Studio removal record](history/removed-nnue-studio.md).
 
 ```powershell
-pwsh -NoProfile -File .\tools\nnue\train.ps1 -Preset quick              # wait for it
-pwsh -NoProfile -File .\tools\nnue\train.ps1 -Preset thorough -Detach   # background
-python .\tools\nnue\koi_nnue_studio.py --list-backends
-python .\tools\nnue\koi_nnue_studio.py --selftest --rows 2000 --epochs 1
+python .\tools\measurement\train_nnue_koi.py --corpus .\artifacts\training\corpus.txt `
+  --net-out .\artifacts\training\koi-v4.nnue --arch v4 --hidden-units 1024 --epochs 10
 pwsh -NoProfile -File .\tools\nnue\ab_match.ps1 -NnueNet .\artifacts\training\koi.nnue -Games 20
 pwsh -NoProfile -File .\tools\nnue\net_match.ps1 -NnueNet .\artifacts\training\koi-v4-1024.nnue `
   -OpponentNet .\artifacts\training\koi-sf-v1.nnue -Games 20
 ```
 
-Every run keeps its configuration, command line, log, progress history and
-artifacts under `artifacts/training/runs/<stamp>-<kind>-<backend>/`, so runs are
-comparable and resumable. The default `koi` backend trains the version 5
-`halfka-king-bucket-v1` plus `threat-pairs-v1` network (36864 inputs,
-dual-perspective cross pairs, 32-unit L1) on CPU PyTorch; pass `--arch v4` for the
-earlier version 4 network, and `--backend torch` still drives the legacy
-`train_nnue_sf.py` version 3 trainer. `--backend bullet`
-drives the pinned Rust/CUDA trainer through `tools/nnue/run_bullet.py` when cargo
-and a CUDA 12.x toolkit are present; its default architecture is version 5 with the
-same shared feature transformer over both perspectives, and `--arch v4` keeps the
-earlier within-perspective pair-product network. Bullet run length is controlled by
-`bullet_superbatches` rather than the preset `epochs` value. After a run completes the
-studio can validate it with the 64-position `koi-bench --nnue` gate and with a
-node-limited A/B match against the classical evaluator
-(`tools/nnue/ab_match.ps1`, schema `koi-nnue-studio-ab-match-v1`) or against an
-earlier network (`tools/nnue/net_match.ps1`, schema `koi-nnue-net-match-v1`), then
-offer to
-install the network as `koi.nnue` beside the engine, backing up any previous
-file. Validation output is a local report, not an Elo claim or a CI threshold.
+Validation runs the 64-position `koi-bench --nnue` gate and a node-limited
+colour-split A/B match against the classical evaluator
+(`tools/nnue/ab_match.ps1`, schema `koi-nnue-ab-match-v1`) or against an earlier
+network (`tools/nnue/net_match.ps1`, schema `koi-nnue-net-match-v1`). Validation
+output is a local report, not an Elo claim or a CI threshold.
 
 ### Optional GPU NNUE inference
 

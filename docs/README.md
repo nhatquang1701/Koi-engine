@@ -10,6 +10,8 @@ asset, and tooling reference.
   architecture contracts, source map, test workflow, artifact policy, and
   release guidance.
 - [releases/](releases/v1.0.0.md) contains published release notes.
+- [history/](history/removed-nnue-studio.md) records tools that were removed and
+  why.
 - `../tests/README.md` explains test categories and fixture locations.
 - `../tools/README.md` explains developer tools and their artifact policy.
 
