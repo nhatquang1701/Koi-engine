@@ -612,6 +612,15 @@ struct SearchContext {
             }
             candidate = stack.frame(static_cast<std::size_t>(parent_ply)).previous_move;
         }
+        // Hoist the per-node continuation components once.  table_move_index()
+        // is pure and total (no-move and out-of-range both give 0), so each
+        // `table_move_index(move) * 131U` equals the recomputed component for
+        // every input; the read paths only add `move_idx * 17U` and mask, so
+        // every continuation slot stays bit-identical.
+        for (std::size_t distance = 0; distance < kSearchContinuationPlies; ++distance) {
+            context.continuation_previous_scaled[distance] = static_cast<std::uint32_t>(
+                table_move_index(context.continuation_moves[distance]) * 131U);
+        }
         return context;
     }
 

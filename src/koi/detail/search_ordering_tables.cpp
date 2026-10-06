@@ -27,12 +27,15 @@ int color_index(const Color color) noexcept {
     return color == Color::white ? 0 : 1;
 }
 
-std::size_t table_move_index(const Move move) noexcept {
-    if (move.is_no_move() || move.from().index() >= Square::kInvalid ||
-        move.to().index() >= Square::kInvalid) {
-        return 0;
-    }
-    return static_cast<std::size_t>(move.from().index()) * 64U + move.to().index();
+// Zero in `continuation_previous_scaled` marks a context that was not sealed by
+// SearchContext::history_context(); recompute the same pure component for it so
+// hand-built contexts keep the exact previous slot arithmetic.
+std::size_t continuation_previous_component(
+    const SearchHistoryContext& context, const std::size_t distance,
+    const Move previous) noexcept {
+    const std::uint32_t cached = context.continuation_previous_scaled[distance];
+    return cached != 0U ? static_cast<std::size_t>(cached)
+                        : table_move_index(previous) * 131U;
 }
 
 int clamp_history(const std::int64_t value, const int maximum) noexcept {
@@ -195,8 +198,9 @@ int SearchOrderingTables::quiet_history_score(
 
     // `move_index()` is pure, so evaluating it once cannot change any slot.
     // The continuation hash below is the exact expression of
-    // continuation_index() with the hoisted `move_idx`, so every table slot
-    // stays bit-identical.
+    // continuation_index() with the hoisted `move_idx` and the per-node
+    // precomputed previous-move components, so every table slot stays
+    // bit-identical.
     const std::size_t move_idx = move_index(metadata.move);
     const std::size_t side_index = static_cast<std::size_t>(color_index(side));
     std::int64_t score = history_[side_index][move_idx];
@@ -218,7 +222,8 @@ int SearchOrderingTables::quiet_history_score(
     if (move_count > 1) {
         const Move previous = context.continuation_moves[1];
         if (!previous.is_no_move()) {
-            const std::size_t pair_index = (move_index(previous) * 131U + move_idx * 17U) &
+            const std::size_t pair_index =
+                (continuation_previous_component(context, 1, previous) + move_idx * 17U) &
                 (kContinuationHistorySize - 1U);
             score += multi_ply_continuation_history_[
                         kContinuationHistorySize + pair_index] / 2;
@@ -227,7 +232,8 @@ int SearchOrderingTables::quiet_history_score(
     if (move_count > 2) {
         const Move previous = context.continuation_moves[2];
         if (!previous.is_no_move()) {
-            const std::size_t pair_index = (move_index(previous) * 131U + move_idx * 17U) &
+            const std::size_t pair_index =
+                (continuation_previous_component(context, 2, previous) + move_idx * 17U) &
                 (kContinuationHistorySize - 1U);
             score += multi_ply_continuation_history_[
                         2 * kContinuationHistorySize + pair_index] / 3;
@@ -236,7 +242,8 @@ int SearchOrderingTables::quiet_history_score(
     if (move_count > 3) {
         const Move previous = context.continuation_moves[3];
         if (!previous.is_no_move()) {
-            const std::size_t pair_index = (move_index(previous) * 131U + move_idx * 17U) &
+            const std::size_t pair_index =
+                (continuation_previous_component(context, 3, previous) + move_idx * 17U) &
                 (kContinuationHistorySize - 1U);
             score += multi_ply_continuation_history_[
                         3 * kContinuationHistorySize + pair_index] / 4;
@@ -245,7 +252,8 @@ int SearchOrderingTables::quiet_history_score(
     if (move_count > 4) {
         const Move previous = context.continuation_moves[4];
         if (!previous.is_no_move()) {
-            const std::size_t pair_index = (move_index(previous) * 131U + move_idx * 17U) &
+            const std::size_t pair_index =
+                (continuation_previous_component(context, 4, previous) + move_idx * 17U) &
                 (kContinuationHistorySize - 1U);
             score += multi_ply_continuation_history_[
                         4 * kContinuationHistorySize + pair_index] / 5;
@@ -254,7 +262,8 @@ int SearchOrderingTables::quiet_history_score(
     if (move_count > 5) {
         const Move previous = context.continuation_moves[5];
         if (!previous.is_no_move()) {
-            const std::size_t pair_index = (move_index(previous) * 131U + move_idx * 17U) &
+            const std::size_t pair_index =
+                (continuation_previous_component(context, 5, previous) + move_idx * 17U) &
                 (kContinuationHistorySize - 1U);
             score += multi_ply_continuation_history_[
                         5 * kContinuationHistorySize + pair_index] / 6;
@@ -263,7 +272,8 @@ int SearchOrderingTables::quiet_history_score(
 
     if (context.count > 0 && !context.continuation_moves[0].is_no_move()) {
         const std::size_t pair_index =
-            (move_index(context.continuation_moves[0]) * 131U + move_idx * 17U) &
+            (continuation_previous_component(context, 0, context.continuation_moves[0]) +
+             move_idx * 17U) &
             (kContinuationHistorySize - 1U);
         score += continuation_history_[pair_index];
     }
@@ -278,16 +288,18 @@ int SearchOrderingTables::continuation_history_score(
         return 0;
     }
 
-    // Same hoist and same inlined continuation hash as quiet_history_score().
+    // Same hoist and same precomputed continuation hash as
+    // quiet_history_score(); see the bit-identity note there.
     const std::size_t move_idx = move_index(metadata.move);
     std::int64_t score = 0;
     const std::size_t move_count = std::min(context.count, kSearchContinuationPlies);
-    // Same hoist, same inlined continuation hash, and same constant-divisor
+    // Same hoist, same precomputed continuation hash, and same constant-divisor
     // unroll as quiet_history_score(); see the bit-identity note there.
     if (move_count > 1) {
         const Move previous = context.continuation_moves[1];
         if (!previous.is_no_move()) {
-            const std::size_t pair_index = (move_index(previous) * 131U + move_idx * 17U) &
+            const std::size_t pair_index =
+                (continuation_previous_component(context, 1, previous) + move_idx * 17U) &
                 (kContinuationHistorySize - 1U);
             score += multi_ply_continuation_history_[
                         kContinuationHistorySize + pair_index] / 2;
@@ -296,7 +308,8 @@ int SearchOrderingTables::continuation_history_score(
     if (move_count > 2) {
         const Move previous = context.continuation_moves[2];
         if (!previous.is_no_move()) {
-            const std::size_t pair_index = (move_index(previous) * 131U + move_idx * 17U) &
+            const std::size_t pair_index =
+                (continuation_previous_component(context, 2, previous) + move_idx * 17U) &
                 (kContinuationHistorySize - 1U);
             score += multi_ply_continuation_history_[
                         2 * kContinuationHistorySize + pair_index] / 3;
@@ -305,7 +318,8 @@ int SearchOrderingTables::continuation_history_score(
     if (move_count > 3) {
         const Move previous = context.continuation_moves[3];
         if (!previous.is_no_move()) {
-            const std::size_t pair_index = (move_index(previous) * 131U + move_idx * 17U) &
+            const std::size_t pair_index =
+                (continuation_previous_component(context, 3, previous) + move_idx * 17U) &
                 (kContinuationHistorySize - 1U);
             score += multi_ply_continuation_history_[
                         3 * kContinuationHistorySize + pair_index] / 4;
@@ -314,7 +328,8 @@ int SearchOrderingTables::continuation_history_score(
     if (move_count > 4) {
         const Move previous = context.continuation_moves[4];
         if (!previous.is_no_move()) {
-            const std::size_t pair_index = (move_index(previous) * 131U + move_idx * 17U) &
+            const std::size_t pair_index =
+                (continuation_previous_component(context, 4, previous) + move_idx * 17U) &
                 (kContinuationHistorySize - 1U);
             score += multi_ply_continuation_history_[
                         4 * kContinuationHistorySize + pair_index] / 5;
@@ -323,7 +338,8 @@ int SearchOrderingTables::continuation_history_score(
     if (move_count > 5) {
         const Move previous = context.continuation_moves[5];
         if (!previous.is_no_move()) {
-            const std::size_t pair_index = (move_index(previous) * 131U + move_idx * 17U) &
+            const std::size_t pair_index =
+                (continuation_previous_component(context, 5, previous) + move_idx * 17U) &
                 (kContinuationHistorySize - 1U);
             score += multi_ply_continuation_history_[
                         5 * kContinuationHistorySize + pair_index] / 6;
@@ -331,7 +347,8 @@ int SearchOrderingTables::continuation_history_score(
     }
     if (move_count > 0 && !context.continuation_moves[0].is_no_move()) {
         const std::size_t pair_index =
-            (move_index(context.continuation_moves[0]) * 131U + move_idx * 17U) &
+            (continuation_previous_component(context, 0, context.continuation_moves[0]) +
+             move_idx * 17U) &
             (kContinuationHistorySize - 1U);
         score += continuation_history_[pair_index];
     }

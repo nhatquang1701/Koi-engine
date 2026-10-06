@@ -428,13 +428,13 @@ bool is_checked(const NativeState& state, Color color) noexcept {
 // slider.  apply_unchecked flips the side before callers ask about the mover,
 // and every reader indexes the masks with the current side: the hoisted
 // values in legal_moves, legal_moves_into_impl, and has_legal_move
-// (position.cpp:921-922, 945-946, 982-983), the re-read in
-// resolve_move_legality (position.cpp:877), whose callers pass state.side as
-// the mover, and the side-to-move in_check() probe (position.cpp:1179).
+// (position.cpp:962-964, 986-988, 1023-1025), the re-read in
+// resolve_move_legality (position.cpp:878), whose callers pass state.side as
+// the mover, and the side-to-move in_check() probe (position.cpp:1219).
 // NativeState is private to this translation unit, so no other
 // reader exists.  The other colour's masks are intentionally left stale: no
-// reader touches them, and snapshot()/restore() copy both arrays
-// (position.cpp:1407, 1426), so unmake restores whatever was
+// reader touches them, and snapshot_into()/restore() copy both arrays
+// (position.cpp:238, 1457), so unmake restores whatever was
 // current when the snapshot was taken.
 void refresh_king_masks(NativeState& state) noexcept {
     const std::size_t color_index = state.side == Color::white ? 0U : 1U;
@@ -808,12 +808,12 @@ public:
 // Legality-probe filter for a pseudo-legal candidate.  The board and the
 // king-state prologue fields are passed in by the caller instead of being
 // re-read from `state` on every candidate.  That is exact because
-// resolve_move_legality restores every field it touches: its
-// snapshot()/restore() pair covers board, side, checkers, pinned,
-// en_passant, and occupied, and the king probe (king_move_is_legal)
-// temporarily clears only `occupied` and restores it.  resolve_move_legality
-// never records history (snapshot_into belongs to the public make path),
-// so the hoisted values stay loop-invariant.
+// resolve_move_legality leaves them untouched: the king probe
+// (king_move_is_legal) temporarily clears only `occupied` and restores it,
+// and the non-king trial mutates only the captured/victim bitboard words and
+// `occupied`, restoring them before returning.  resolve_move_legality never
+// records history (snapshot_into belongs to the public make path), so the
+// hoisted values stay loop-invariant.
 [[nodiscard]] static bool move_requires_legality_probe(
     const Move& move, const Board& board,
     std::uint64_t checkers, std::uint64_t pinned, int en_passant) noexcept {
@@ -865,8 +865,8 @@ public:
 
     // Full legality resolution for a move the cheap filter could not accept:
     // king moves use the direct destination test; a non-king move in check is
-    // first screened against the check, and everything else applies the move
-    // and checks the mover's king.
+    // first screened against the check, and everything else runs a minimal
+    // in-place trial and checks the mover's king.
     [[nodiscard]] bool resolve_move_legality(const Move& move, Color mover) {
         const int from = move.from().index();
         const int to = move.to().index();
@@ -909,10 +909,50 @@ public:
                 }
             }
         }
-        const Snapshot saved = snapshot();
-        apply_unchecked(move);
+        // Minimal in-place trial.  is_checked() reads only `occupied` and the
+        // piece bitboards: king_square() reads the mover's king word, and
+        // square_attacked() reads the attacker's -- the opponent's -- pawn,
+        // knight, king, bishop, queen, and rook words.  Castling never reaches
+        // here (the king test above returns first) and the mover's king never
+        // moves, so the only predicate-visible effects apply_unchecked() has
+        // on a generated move are the captured piece and the en-passant victim
+        // leaving the opponent's bitboards and `occupied` losing the from,
+        // victim, and captured squares and gaining `to`.  Save exactly those
+        // entries, apply those effects, probe, and restore them; board, keys,
+        // side, rule state, and history stay untouched, so the caller's
+        // hoisted board/checkers/pinned/en-passant values remain valid.  The
+        // captured piece and the en-passant victim are always the opponent's:
+        // the generator rejects own pieces and kings as targets, set_fen()
+        // requires an enemy pawn behind an en-passant target, and
+        // apply_unchecked() drops a target that has no legal capture.
+        const Piece moving = state.board[static_cast<std::size_t>(from)];
+        const Piece captured = state.board[static_cast<std::size_t>(to)];
+        const bool en_passant = moving.type == PieceType::pawn &&
+            to == state.en_passant.index() && captured.empty();
+        const int victim_square =
+            en_passant ? to + (moving.color == Color::white ? -8 : 8) : -1;
+        const Piece victim = en_passant ?
+            state.board[static_cast<std::size_t>(victim_square)] : Piece{};
+        const std::size_t opponent_index = 1U - side_index;
+        const std::size_t captured_type = static_cast<std::size_t>(captured.type);
+        const std::size_t victim_type = static_cast<std::size_t>(victim.type);
+        const std::uint64_t saved_captured_board =
+            state.piece_bitboards[opponent_index][captured_type];
+        const std::uint64_t saved_victim_board =
+            state.piece_bitboards[opponent_index][victim_type];
+        const std::uint64_t saved_occupied = state.occupied;
+        if (!captured.empty()) {
+            state.piece_bitboards[opponent_index][captured_type] &= ~bit(to);
+        }
+        if (en_passant) {
+            state.piece_bitboards[opponent_index][victim_type] &= ~bit(victim_square);
+        }
+        state.occupied =
+            (saved_occupied & ~bit(from) & ~bit(victim_square)) | bit(to);
         const bool legal = !is_checked(state, mover);
-        restore(saved);
+        state.occupied = saved_occupied;
+        state.piece_bitboards[opponent_index][victim_type] = saved_victim_board;
+        state.piece_bitboards[opponent_index][captured_type] = saved_captured_board;
         return legal;
     }
 
@@ -1401,15 +1441,6 @@ std::vector<Move> legal_moves() {
     [[nodiscard]] std::uint16_t fullmove_number() const noexcept { return state.fullmove; }
 
 private:
-    Snapshot snapshot() const noexcept {
-    return Snapshot{state.board, state.side, state.castling, state.en_passant,
-                     state.halfmove, state.fullmove, state.key, state.piece_bitboards,
-                     state.occupancy, state.occupied, state.checkers, state.pinned,
-                     state.blockers_for_king, false,
-                     state.repetition_history_fingerprint,
-                     state.repetition_history_suppressed};
-    }
-
     void restore(const Snapshot& saved) noexcept {
         state.board = saved.board;
         state.side = saved.side;

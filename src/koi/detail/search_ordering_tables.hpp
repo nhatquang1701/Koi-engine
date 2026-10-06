@@ -12,11 +12,33 @@ namespace koi::detail {
 
 inline constexpr std::size_t kSearchContinuationPlies = 6;
 
+// Canonical table index for a move.  Pure and total: the result depends only
+// on the move, and no-move or out-of-range squares both map to 0.  Defined
+// here so the per-node precomputation and the ordering tables share one
+// definition and can never drift apart.
+[[nodiscard]] constexpr std::size_t table_move_index(const Move move) noexcept {
+    if (move.is_no_move() || move.from().index() >= Square::kInvalid ||
+        move.to().index() >= Square::kInvalid) {
+        return 0;
+    }
+    return static_cast<std::size_t>(move.from().index()) * 64U + move.to().index();
+}
+
 // The recursive search supplies the short move suffix that is available at a
 // node.  Keeping this as a value object makes all ordering tables worker-local
 // and avoids exposing SearchStack internals to the ordering implementation.
 struct SearchHistoryContext {
     std::array<Move, kSearchContinuationPlies> continuation_moves{};
+    // `table_move_index(continuation_moves[d]) * 131U`, hoisted once per node
+    // by SearchContext::history_context() so scoring stops recomputing it per
+    // candidate.  table_move_index() is pure and total (no-move and
+    // out-of-range map to 0), so each stored value equals the recomputed
+    // expression for every input; the read paths only add `move_idx * 17U`
+    // and mask, so every continuation slot stays bit-identical.  Zero marks an
+    // unsealed context (a real move never has index 0); those recompute the
+    // component, which preserves the exact previous behavior for hand-built
+    // contexts.
+    std::array<std::uint32_t, kSearchContinuationPlies> continuation_previous_scaled{};
     std::size_t count = 0;
     int ply = 0;
     // The search supplies a pawn-only structural key so equal pawn
