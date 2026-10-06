@@ -34,10 +34,11 @@ namespace {
 
 constexpr std::size_t kContainerHeaderBytes = 72;
 
-// The largest supported container is a v5 payload of 36864 inputs x 1536
-// hidden int16 weights (about 113 MiB); 256 MiB leaves room for a future
-// wider hidden layer while keeping a corrupt, truncated, or hostile EvalFile
-// from requesting an unbounded allocation before any validation runs.
+// The largest supported container is a v5/v6 payload of 36864 inputs x 1536
+// hidden int16 weights plus the L1 matrices (about 113 MiB); 256 MiB leaves
+// room for a future wider hidden layer while keeping a corrupt, truncated, or
+// hostile EvalFile from requesting an unbounded allocation before any
+// validation runs.
 constexpr std::uintmax_t kMaximumNetworkBytes = 256ull * 1024ull * 1024ull;
 
 NnueError make_error(NnueErrorCode code, std::string message) {
@@ -209,8 +210,20 @@ template <typename Integer>
     return manifest.version == kKoiNnueHalfkaThreatV5FormatVersion;
 }
 
+[[nodiscard]] constexpr bool is_halfka_threat_v6(
+    const NnueManifest& manifest) noexcept {
+    return manifest.version == kKoiNnueHalfkaThreatV6FormatVersion;
+}
+
+// Versions 5 and 6 share the feature set, the header skeleton, and the
+// incremental path; only the L1 stage and the payload size differ.
+[[nodiscard]] constexpr bool uses_halfka_threat_features(
+    const NnueManifest& manifest) noexcept {
+    return is_halfka_threat_v5(manifest) || is_halfka_threat_v6(manifest);
+}
+
 [[nodiscard]] std::optional<std::size_t> payload_size_for(const NnueManifest& manifest) noexcept {
-    if (is_halfka_threat_v5(manifest)) {
+    if (uses_halfka_threat_features(manifest)) {
         if (manifest.feature_set != kKoiNnueHalfkaThreatV5FeatureSet) {
             return std::nullopt;
         }
@@ -221,6 +234,8 @@ template <typename Integer>
         return input_units * hidden_units * sizeof(std::int16_t) +
             hidden_units * sizeof(std::int32_t) +
             l1_units * hidden_units * sizeof(std::int8_t) +
+            (is_halfka_threat_v6(manifest) ?
+                 l1_units * hidden_units * sizeof(std::int8_t) : std::size_t{0}) +
             l1_units * sizeof(std::int32_t) +
             output_buckets * l1_units * sizeof(std::int8_t) +
             output_buckets * sizeof(std::int32_t);
@@ -266,13 +281,14 @@ template <typename Integer>
     if (manifest.version != kKoiNnueFormatVersion &&
         manifest.version != kKoiNnuePerspectiveV3FormatVersion &&
         manifest.version != kKoiNnueHalfkaKingBucketV1FormatVersion &&
-        manifest.version != kKoiNnueHalfkaThreatV5FormatVersion) {
+        manifest.version != kKoiNnueHalfkaThreatV5FormatVersion &&
+        manifest.version != kKoiNnueHalfkaThreatV6FormatVersion) {
         return make_error(NnueErrorCode::unsupported_version, "unsupported Koi NNUE container version");
     }
-    if (is_halfka_threat_v5(manifest)) {
+    if (uses_halfka_threat_features(manifest)) {
         if (manifest.feature_set != kKoiNnueHalfkaThreatV5FeatureSet) {
             return make_error(NnueErrorCode::unsupported_feature_set,
-                              "NNUE v5 requires the halfka-king-bucket-v1+threat-pairs-v1 feature set");
+                              "NNUE v5/v6 requires the halfka-king-bucket-v1+threat-pairs-v1 feature set");
         }
         const std::uint32_t hidden_units = manifest.layer_sizes[1];
         const std::uint32_t l1_units = manifest.layer_sizes[3];
@@ -283,7 +299,7 @@ template <typename Integer>
             l1_units < kKoiNnueMinimumL1Units || l1_units > kKoiNnueMaximumL1Units) {
             return make_error(
                 NnueErrorCode::invalid_dimensions,
-                "NNUE v5 layer manifest must be 36864 inputs, even hidden units in [32, 8192], "
+                "NNUE v5/v6 layer manifest must be 36864 inputs, even hidden units in [32, 8192], "
                 "8 output buckets, and 8..128 L1 units");
         }
         if (manifest.quantization != kKoiNnueQuantization) {
@@ -350,11 +366,14 @@ template <typename Integer>
 
 [[nodiscard]] bool arrays_match_manifest(const NnueNetwork& network) noexcept {
     const auto& sizes = network.manifest.layer_sizes;
-    if (is_halfka_threat_v5(network.manifest)) {
+    if (uses_halfka_threat_features(network.manifest)) {
+        const bool v6 = is_halfka_threat_v6(network.manifest);
         return network.feature_weights.size() ==
                 static_cast<std::size_t>(sizes[0]) * sizes[1] &&
             network.hidden_bias.size() == sizes[1] &&
             network.l1_weights.size() == static_cast<std::size_t>(sizes[3]) * sizes[1] &&
+            network.l1_diff_weights.size() ==
+                (v6 ? static_cast<std::size_t>(sizes[3]) * sizes[1] : std::size_t{0}) &&
             network.l1_bias.size() == sizes[3] &&
             network.bottleneck_weights.size() == static_cast<std::size_t>(sizes[2]) * sizes[3] &&
             network.bottleneck_bias.size() == sizes[2] &&
@@ -794,15 +813,40 @@ void compute_cross_pair_products(std::span<const std::int16_t> own,
     }
 }
 
+// v6 antisymmetric channel: both activations are clipped to [0, 127], so the
+// difference fits int16 (-127..127) without saturation.
+void compute_activation_diff(std::span<const std::int16_t> own,
+                             std::span<const std::int16_t> opp,
+                             std::span<std::int16_t> diff) noexcept {
+    for (std::size_t index = 0; index < diff.size(); ++index) {
+        diff[index] = static_cast<std::int16_t>(own[index] - opp[index]);
+    }
+}
+
+// v6 quantization correspondence: with s = l1_shift and a unit weight
+// magnitude w,
+//   l1_weights_q      = round(w * 2^s / 127)
+//   l1_diff_weights_q = round(w * 2^s)          (no /127)
+//   l1_bias_q         = round(bias * 127 * 2^s)
+// A full pair product (127 * 127) contributes w * 127 * 2^s and a full
+// difference (127) contributes w * 127 * 2^s, so both channels land at the
+// same 127 * 2^s scale before the >> s.
 void l1_activations_scalar(const NnueNetwork& network,
                            std::span<const std::int16_t> pairs,
+                           std::span<const std::int16_t> diff,
                            std::span<std::int32_t> activations) noexcept {
     const std::size_t pair_count = pairs.size();
+    const bool use_diff = !diff.empty();
     for (std::size_t unit = 0; unit < activations.size(); ++unit) {
         const std::int8_t* weights = network.l1_weights.data() + unit * pair_count;
+        const std::int8_t* diff_weights = use_diff ?
+            network.l1_diff_weights.data() + unit * pair_count : nullptr;
         std::int64_t sum = network.l1_bias[unit];
         for (std::size_t pair = 0; pair < pair_count; ++pair) {
             sum += static_cast<std::int64_t>(weights[pair]) * pairs[pair];
+            if (use_diff) {
+                sum += static_cast<std::int64_t>(diff_weights[pair]) * diff[pair];
+            }
         }
         if (network.l1_shift > 0) {
             sum >>= network.l1_shift;
@@ -820,6 +864,7 @@ void l1_activations_scalar(const NnueNetwork& network,
     const std::size_t hidden_units = network.manifest.layer_sizes[1];
     const std::size_t pair_count = hidden_units;
     const std::size_t l1_units = network.manifest.layer_sizes[3];
+    const bool use_diff = is_halfka_threat_v6(network.manifest);
     accumulator.values.assign(hidden_units, 0);
     accumulator.bottleneck_values.assign(pair_count, 0);
     std::vector<std::int16_t> opp_values(hidden_units, 0);
@@ -827,8 +872,13 @@ void l1_activations_scalar(const NnueNetwork& network,
     fill_v5_activations(opp_sums, opp_values);
     compute_cross_pair_products(accumulator.values, opp_values,
                                 accumulator.bottleneck_values);
+    std::vector<std::int16_t> diff_values;
+    if (use_diff) {
+        diff_values.resize(hidden_units);
+        compute_activation_diff(accumulator.values, opp_values, diff_values);
+    }
     std::vector<std::int32_t> l1(l1_units, 0);
-    l1_activations_scalar(network, accumulator.bottleneck_values, l1);
+    l1_activations_scalar(network, accumulator.bottleneck_values, diff_values, l1);
     std::int64_t output = network.bottleneck_bias[bucket];
     const std::int8_t* head = network.bottleneck_weights.data() + bucket * l1_units;
     for (std::size_t unit = 0; unit < l1_units; ++unit) {
@@ -861,20 +911,25 @@ void compute_cross_pair_products_avx2(std::span<const std::int16_t> own,
 
 void l1_activations_avx2(const NnueNetwork& network,
                          std::span<const std::int16_t> pairs,
+                         std::span<const std::int16_t> diff,
                          std::span<std::int32_t> activations) noexcept {
     const std::size_t pair_count = pairs.size();
+    const bool use_diff = !diff.empty();
     // Each int32 lane accumulates at most (pair_count / 16 + 1) * 2 products
-    // bounded by 127 * 127 * 127.  Fall back to the int64 scalar path when
-    // that worst case cannot fit, so the vector path is always equivalent.
+    // per channel, each bounded by 127 * (127 * 127).  A v6 lane therefore
+    // doubles the v5 bound; fall back to the int64 scalar path when the
+    // worst case cannot fit, so the vector path is always equivalent.
     const std::int64_t lane_worst_case =
-        static_cast<std::int64_t>(pair_count / 16U + 1U) * 2 * 127 * (127 * 127);
+        static_cast<std::int64_t>(pair_count / 16U + 1U) * (use_diff ? 4 : 2) * 127 * (127 * 127);
     if (lane_worst_case > std::numeric_limits<std::int32_t>::max()) {
-        l1_activations_scalar(network, pairs, activations);
+        l1_activations_scalar(network, pairs, diff, activations);
         return;
     }
     alignas(32) std::array<std::int32_t, 8> lanes{};
     for (std::size_t unit = 0; unit < activations.size(); ++unit) {
         const std::int8_t* weights = network.l1_weights.data() + unit * pair_count;
+        const std::int8_t* diff_weights = use_diff ?
+            network.l1_diff_weights.data() + unit * pair_count : nullptr;
         __m256i accumulator = _mm256_setzero_si256();
         std::size_t pair = 0;
         for (; pair + 16U <= pair_count; pair += 16U) {
@@ -885,6 +940,15 @@ void l1_activations_avx2(const NnueNetwork& network,
             const __m256i weight_values = _mm256_cvtepi8_epi16(weight_bytes);
             accumulator = _mm256_add_epi32(
                 accumulator, _mm256_madd_epi16(pair_values, weight_values));
+            if (use_diff) {
+                const __m256i diff_values = _mm256_loadu_si256(
+                    reinterpret_cast<const __m256i*>(diff.data() + pair));
+                const __m128i diff_weight_bytes = _mm_loadu_si128(
+                    reinterpret_cast<const __m128i*>(diff_weights + pair));
+                const __m256i diff_weight_values = _mm256_cvtepi8_epi16(diff_weight_bytes);
+                accumulator = _mm256_add_epi32(
+                    accumulator, _mm256_madd_epi16(diff_values, diff_weight_values));
+            }
         }
         _mm256_store_si256(reinterpret_cast<__m256i*>(lanes.data()), accumulator);
         std::int64_t sum = network.l1_bias[unit];
@@ -893,6 +957,9 @@ void l1_activations_avx2(const NnueNetwork& network,
         }
         for (; pair < pair_count; ++pair) {
             sum += static_cast<std::int64_t>(weights[pair]) * pairs[pair];
+            if (use_diff) {
+                sum += static_cast<std::int64_t>(diff_weights[pair]) * diff[pair];
+            }
         }
         if (network.l1_shift > 0) {
             sum >>= network.l1_shift;
@@ -910,6 +977,7 @@ void l1_activations_avx2(const NnueNetwork& network,
     const std::size_t hidden_units = network.manifest.layer_sizes[1];
     const std::size_t pair_count = hidden_units;
     const std::size_t l1_units = network.manifest.layer_sizes[3];
+    const bool use_diff = is_halfka_threat_v6(network.manifest);
     accumulator.values.assign(hidden_units, 0);
     accumulator.bottleneck_values.assign(pair_count, 0);
     std::vector<std::int16_t> opp_values(hidden_units, 0);
@@ -917,8 +985,13 @@ void l1_activations_avx2(const NnueNetwork& network,
     fill_v5_activations(opp_sums, opp_values);
     compute_cross_pair_products_avx2(accumulator.values, opp_values,
                                      accumulator.bottleneck_values);
+    std::vector<std::int16_t> diff_values;
+    if (use_diff) {
+        diff_values.resize(hidden_units);
+        compute_activation_diff(accumulator.values, opp_values, diff_values);
+    }
     std::vector<std::int32_t> l1(l1_units, 0);
-    l1_activations_avx2(network, accumulator.bottleneck_values, l1);
+    l1_activations_avx2(network, accumulator.bottleneck_values, diff_values, l1);
     std::int64_t output = network.bottleneck_bias[bucket];
     const std::int8_t* head = network.bottleneck_weights.data() + bucket * l1_units;
     for (std::size_t unit = 0; unit < l1_units; ++unit) {
@@ -1139,6 +1212,17 @@ NnueNetwork NnueNetwork::synthetic_v5() {
     return network;
 }
 
+NnueNetwork NnueNetwork::synthetic_v6() {
+    NnueNetwork network = synthetic_v5();
+    network.manifest.version = kKoiNnueHalfkaThreatV6FormatVersion;
+    network.l1_diff_weights.resize(network.l1_weights.size());
+    for (std::size_t index = 0; index < network.l1_diff_weights.size(); ++index) {
+        network.l1_diff_weights[index] =
+            static_cast<std::int8_t>((index % 2U == 0U) ? 1 : -1);
+    }
+    return network;
+}
+
 std::expected<std::vector<std::uint8_t>, NnueError> NnueLoader::serialize(
     const NnueNetwork& network) {
     if (const auto error = validate_manifest(network.manifest); error.has_value()) {
@@ -1151,13 +1235,13 @@ std::expected<std::vector<std::uint8_t>, NnueError> NnueLoader::serialize(
             NnueErrorCode::malformed_manifest,
             "NNUE v1/v2 containers cannot carry nonzero shifts"));
     }
-    if (is_halfka_threat_v5(network.manifest)) {
+    if (uses_halfka_threat_features(network.manifest)) {
         if (network.hidden_shift > kKoiNnueMaximumShift ||
             network.output_shift > kKoiNnueMaximumShift ||
             network.l1_shift > kKoiNnueMaximumShift ||
             network.bottleneck_shift != 0) {
             return std::unexpected(make_error(NnueErrorCode::malformed_manifest,
-                                              "NNUE v5 shift is out of range"));
+                                              "NNUE v5/v6 shift is out of range"));
         }
     } else if (is_halfka_king_bucket_v1(network.manifest)) {
         if (network.hidden_shift > kKoiNnueMaximumShift ||
@@ -1192,8 +1276,11 @@ std::expected<std::vector<std::uint8_t>, NnueError> NnueLoader::serialize(
     for (const std::int32_t bias : network.hidden_bias) {
         append_little_endian(payload, bias);
     }
-    if (is_halfka_threat_v5(network.manifest)) {
+    if (uses_halfka_threat_features(network.manifest)) {
         for (const std::int8_t weight : network.l1_weights) {
+            payload.push_back(static_cast<std::uint8_t>(weight));
+        }
+        for (const std::int8_t weight : network.l1_diff_weights) {
             payload.push_back(static_cast<std::uint8_t>(weight));
         }
         for (const std::int32_t bias : network.l1_bias) {
@@ -1207,7 +1294,7 @@ std::expected<std::vector<std::uint8_t>, NnueError> NnueLoader::serialize(
         append_little_endian(payload, bias);
     }
     if (!is_halfka_king_bucket_v1(network.manifest) &&
-        !is_halfka_threat_v5(network.manifest)) {
+        !uses_halfka_threat_features(network.manifest)) {
         for (const std::int8_t weight : network.output_weights) {
             payload.push_back(static_cast<std::uint8_t>(weight));
         }
@@ -1226,7 +1313,7 @@ std::expected<std::vector<std::uint8_t>, NnueError> NnueLoader::serialize(
     for (const std::uint32_t layer_size : network.manifest.layer_sizes) {
         append_little_endian(container, layer_size);
     }
-    if (is_halfka_threat_v5(network.manifest)) {
+    if (uses_halfka_threat_features(network.manifest)) {
         container.push_back(network.hidden_shift);
         container.push_back(network.output_shift);
         container.push_back(network.l1_shift);
@@ -1277,10 +1364,10 @@ std::expected<NnueNetwork, NnueError> NnueLoader::load(
     std::uint8_t bottleneck_shift = 0;
     std::uint8_t output_shift = 0;
     std::uint8_t l1_shift = 0;
-    if (manifest.version == kKoiNnueHalfkaThreatV5FormatVersion) {
+    if (uses_halfka_threat_features(manifest)) {
         if (container.size() - offset < 4) {
             return std::unexpected(make_error(NnueErrorCode::malformed_manifest,
-                                               "NNUE v5 scale metadata is truncated"));
+                                               "NNUE v5/v6 scale metadata is truncated"));
         }
         hidden_shift = container[offset++];
         output_shift = container[offset++];
@@ -1288,12 +1375,12 @@ std::expected<NnueNetwork, NnueError> NnueLoader::load(
         const std::uint8_t reserved = container[offset++];
         if (reserved != 0) {
             return std::unexpected(make_error(NnueErrorCode::malformed_manifest,
-                                               "NNUE v5 reserved header byte must be zero"));
+                                               "NNUE v5/v6 reserved header byte must be zero"));
         }
         if (hidden_shift > kKoiNnueMaximumShift || output_shift > kKoiNnueMaximumShift ||
             l1_shift > kKoiNnueMaximumShift) {
             return std::unexpected(make_error(NnueErrorCode::malformed_manifest,
-                                               "NNUE v5 shift is out of range"));
+                                               "NNUE v5/v6 shift is out of range"));
         }
     } else if (manifest.version == kKoiNnueHalfkaKingBucketV1FormatVersion) {
         if (container.size() - offset < 4) {
@@ -1374,7 +1461,7 @@ std::expected<NnueNetwork, NnueError> NnueLoader::load(
     const std::size_t hidden_units = network.manifest.layer_sizes[1];
     const std::size_t output_units = network.manifest.layer_sizes[2];
     const std::size_t l1_units = network.manifest.layer_sizes[3];
-    const bool threat_v5 = is_halfka_threat_v5(network.manifest);
+    const bool threat = uses_halfka_threat_features(network.manifest);
     const bool halfka_v4 = is_halfka_king_bucket_v1(network.manifest);
     const std::size_t feature_weight_count = input_units * hidden_units;
     std::size_t payload_offset = 0;
@@ -1392,13 +1479,22 @@ std::expected<NnueNetwork, NnueError> NnueLoader::load(
         }
         bias = static_cast<std::int32_t>(encoded);
     }
-    if (threat_v5) {
+    if (threat) {
         network.l1_weights.resize(l1_units * hidden_units);
         for (std::int8_t& weight : network.l1_weights) {
             if (payload_offset >= payload.size()) {
                 return std::unexpected(invalid_file_size_error());
             }
             weight = static_cast<std::int8_t>(payload[payload_offset++]);
+        }
+        if (is_halfka_threat_v6(network.manifest)) {
+            network.l1_diff_weights.resize(l1_units * hidden_units);
+            for (std::int8_t& weight : network.l1_diff_weights) {
+                if (payload_offset >= payload.size()) {
+                    return std::unexpected(invalid_file_size_error());
+                }
+                weight = static_cast<std::int8_t>(payload[payload_offset++]);
+            }
         }
         network.l1_bias.resize(l1_units);
         for (std::int32_t& bias : network.l1_bias) {
@@ -1410,7 +1506,7 @@ std::expected<NnueNetwork, NnueError> NnueLoader::load(
         }
     }
     network.bottleneck_weights.resize(
-        threat_v5 ? output_units * l1_units :
+        threat ? output_units * l1_units :
         (halfka_v4 ? output_units * (hidden_units / 2U) : hidden_units * output_units));
     for (std::int8_t& weight : network.bottleneck_weights) {
         if (payload_offset >= payload.size()) {
@@ -1426,7 +1522,7 @@ std::expected<NnueNetwork, NnueError> NnueLoader::load(
         }
         bias = static_cast<std::int32_t>(encoded);
     }
-    if (!halfka_v4 && !threat_v5) {
+    if (!halfka_v4 && !threat) {
         network.output_weights.resize(output_units);
         for (std::int8_t& weight : network.output_weights) {
             if (payload_offset >= payload.size()) {
@@ -1482,10 +1578,10 @@ NnueWorker::NnueWorker(std::shared_ptr<const NnueNetwork> weights)
     if (weights_ && !validate_manifest(weights_->manifest).has_value() &&
         arrays_match_manifest(*weights_)) {
         const std::size_t hidden_units = weights_->manifest.layer_sizes[1];
-        const bool threat_v5 = is_halfka_threat_v5(weights_->manifest);
+        const bool threat = uses_halfka_threat_features(weights_->manifest);
         const bool halfka_v4 = is_halfka_king_bucket_v1(weights_->manifest);
         accumulator_.values.resize(hidden_units);
-        accumulator_.bottleneck_values.resize(threat_v5 ? hidden_units :
+        accumulator_.bottleneck_values.resize(threat ? hidden_units :
             (halfka_v4 ? hidden_units / 2U : weights_->manifest.layer_sizes[2]));
     }
 }
@@ -1497,16 +1593,17 @@ int NnueWorker::evaluate(const EvaluationFeatures& features, const Color perspec
         return 0;
     }
     const bool use_halfka = is_halfka_king_bucket_v1(weights_->manifest);
-    const bool use_v5 = is_halfka_threat_v5(weights_->manifest);
+    const bool use_threat = uses_halfka_threat_features(weights_->manifest);
     const bool use_v2 = weights_->manifest.feature_set ==
         kKoiNnuePieceSquareKingPawnV2FeatureSet;
     const bool use_avx2 = path == NnueInferencePath::avx2_compatible ? avx2_available() :
         (path == NnueInferencePath::automatic && avx2_available());
     int score = 0;
-    if (use_v5) {
+    if (use_threat) {
         // Both perspectives feed the head: own is the side to move, opponent
         // is the other side.  The sign flip below keeps the documented
-        // "raw score is mover-relative" contract.
+        // "raw score is mover-relative" contract.  Version 6 adds the
+        // antisymmetric activation difference inside the L1 stage.
         const Color mover = features.position.side_to_move;
         const NnueSparseFeaturesV5 own =
             EvaluationFeatureExtractor::encode_sparse_v5(features, mover);
@@ -1545,7 +1642,7 @@ int NnueWorker::evaluate(const GameState& state, const Color perspective,
         return evaluate(EvaluationFeatureExtractor::extract(state), perspective, path);
     }
     ensure_incremental_storage();
-    const bool threat_v5 = is_halfka_threat_v5(weights_->manifest);
+    const bool threat = uses_halfka_threat_features(weights_->manifest);
     const Color mover = state.side_to_move();
     const std::size_t mover_index = mover == Color::white ? 0U : 1U;
     const std::size_t opponent_index = 1U - mover_index;
@@ -1571,7 +1668,7 @@ int NnueWorker::evaluate(const GameState& state, const Color perspective,
         const EvaluationFeatures features = EvaluationFeatureExtractor::extract(state);
         for (std::size_t index = 0; index < kIncrementalPerspectives; ++index) {
             const Color real = index == 0U ? Color::white : Color::black;
-            if (threat_v5) {
+            if (threat) {
                 const NnueSparseFeaturesV5 sparse =
                     EvaluationFeatureExtractor::encode_sparse_v5(features, real);
                 accumulate_hidden_sparse_scalar(
@@ -1607,7 +1704,7 @@ int NnueWorker::evaluate(const GameState& state, const Color perspective,
     (void)use_avx2;
     const std::size_t bucket = output_bucket_for_pieces(pieces);
     int score = 0;
-    if (threat_v5) {
+    if (threat) {
 #if KOI_NNUE_COMPILED_AVX2
         if (use_avx2) {
             score = finish_inference_v5_avx2(*weights_, mover_sums, opponent_sums,
@@ -1634,7 +1731,7 @@ int NnueWorker::evaluate(const GameState& state, const Color perspective,
 bool NnueWorker::supports_incremental() const noexcept {
     return weights_ &&
         (is_halfka_king_bucket_v1(weights_->manifest) ||
-         is_halfka_threat_v5(weights_->manifest)) &&
+         uses_halfka_threat_features(weights_->manifest)) &&
         !validate_manifest(weights_->manifest).has_value() &&
         arrays_match_manifest(*weights_);
 }
@@ -1683,7 +1780,7 @@ void NnueWorker::refresh_slot_perspective(const EvaluationFeatures& features,
                                           const std::size_t slot) {
     const std::size_t index = perspective == Color::white ? 0U : 1U;
     std::vector<std::int32_t> sums(hidden_units_, 0);
-    if (is_halfka_threat_v5(weights_->manifest)) {
+    if (uses_halfka_threat_features(weights_->manifest)) {
         const NnueSparseFeaturesV5 sparse =
             EvaluationFeatureExtractor::encode_sparse_v5(features, perspective);
         accumulate_hidden_sparse_scalar(
@@ -1844,7 +1941,7 @@ void NnueWorker::apply_move_deltas(const GameState& child,
         slot_pieces_[slot] = static_cast<std::uint8_t>(
             parent_pieces - (metadata.captured_piece != PieceType::none ? 1U : 0U));
     }
-    if (is_halfka_threat_v5(weights_->manifest)) {
+    if (uses_halfka_threat_features(weights_->manifest)) {
         const EvaluationFeatures child_features =
             EvaluationFeatureExtractor::extract(child);
         for (std::size_t index = 0; index < kIncrementalPerspectives; ++index) {

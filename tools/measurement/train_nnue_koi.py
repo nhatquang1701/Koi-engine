@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Train a KOI-NNUE network (v4 ``halfka-king-bucket-v1`` or v5 dual-perspective
-``halfka-king-bucket-v1+threat-pairs-v1``).
+"""Train a KOI-NNUE network (v4 ``halfka-king-bucket-v1``, v5 dual-perspective
+``halfka-king-bucket-v1+threat-pairs-v1``, or v6 with the antisymmetric diff
+channel).
 
 Reads either a ``koi-dataset-v1``/``koi-dataset-v2`` binary dataset (sparse
 indices, produced by ``koi_dataset.py``) or the ``FEN;cp;best_move`` text
@@ -24,16 +25,38 @@ v5 (``--arch v5``, the default):
                        0, 127)
     score      = (output_bias[b] + sum_k output_weights[b, k] * l1[k]) >> k3
 
+v6 (``--arch v6``):
+
+    own/opp[h] = clamp(clip(hidden_bias[h] + sum_f x[h] * feature_weights[f, h],
+                            -2^31, 2^31 - 1), 0, 127)
+    pairs[j]   = own[j] * opp[j]
+    diff[j]    = own[j] - opp[j]                       # antisymmetric channel
+    l1[k]      = clamp((sum_j l1_weights[k, j] * pairs[j]
+                        + sum_j l1_diff_weights[k, j] * diff[j]
+                        + l1_bias[k]) >> s_l1, 0, 127)
+    score      = (output_bias[b] + sum_k output_weights[b, k] * l1[k]) >> k3
+
+The ``diff`` channel makes the head antisymmetric under swapping the own and
+opponent perspectives, which the v5 pair-only head cannot represent.  Its
+quantization scale is chosen so both terms land on the same 127*2^s*l1_pre
+integer scale before the arithmetic shift:
+
+    pairs_f in [0, 1]   -> pairs_int = 127^2 * pairs_f
+    diff_f  in [-1, 1]  -> diff_int  = 127 * diff_f
+    l1_weights_q      = round(l1_weights_f * 2^s / 127)
+    l1_diff_weights_q = round(l1_diff_weights_f * 2^s)
+
 with ``b = min(7, (32 - pieces) / 4)``.  The exported v4 container is version 4
 (``hidden_shift``/``output_shift`` bytes, metadata ``koi-nnue-training-metadata-v2``);
-the v5 container is version 5 (``hidden_shift``/``output_shift``/``l1_shift``
-bytes, metadata ``koi-nnue-training-metadata-v3``).
+the v5 and v6 containers are version 5/6 (``hidden_shift``/``output_shift``/
+``l1_shift`` bytes, metadata ``koi-nnue-training-metadata-v3``); the v6 payload
+inserts the int8 diff weights directly after the int8 pair weights.
 
 The trainer prints the studio progress contract lines:
 
     epoch <i>/<n> train_loss <f> val_loss <f> val_mae_cp <f> time <f>s
-    quantization v4 s1=<s> k3=<k> val_mae_cp <f>
-    selected v4 s1=<s> k3=<k> val_mae_cp <f>
+    quantization <arch> ... val_mae_cp <f> [saturation <f>]
+    selected <arch> ... val_mae_cp <f>
     wrote <net> (<bytes> bytes) and <metadata>
 """
 
@@ -69,6 +92,7 @@ except ImportError:  # pragma: no cover - reported when the text path is used
 MAGIC = b"KOI-NNUE"
 VERSION = 4
 V5_VERSION = 5
+V6_VERSION = 6
 INPUT_UNITS = 12 * 12 * 64
 V5_INPUT_UNITS = 36864
 OUTPUT_BUCKETS = 8
@@ -402,6 +426,60 @@ if nn is not None:
             l1 = torch.clamp(pairs @ self.l1_weight.T + self.l1_bias, 0.0, 1.0)
             return (l1 * self.output_weight[buckets]).sum(dim=1) + self.output_bias[buckets]
 
+    class KoiNetV6(nn.Module):
+        """v5 plus an antisymmetric ``own - opp`` channel in the L1 head.
+
+        The pair-only v5 head is invariant under swapping the own and opponent
+        perspectives, so it cannot represent which side the evaluation favors.
+        The diff channel is negated by that swap, which lets the head be
+        antisymmetric.
+        """
+
+        def __init__(self, hidden_units: int, l1_units: int = V5_L1_UNITS) -> None:
+            super().__init__()
+            if hidden_units < 32 or hidden_units % 2 != 0:
+                raise TrainerError("hidden units must be even and at least 32")
+            if l1_units < 8 or l1_units > 128:
+                raise TrainerError("L1 units must be between 8 and 128")
+            self.hidden_units = hidden_units
+            self.l1_units = l1_units
+            self.feature = nn.EmbeddingBag(V5_INPUT_UNITS, hidden_units, mode="sum")
+            nn.init.uniform_(self.feature.weight, -0.1, 0.1)
+            self.hidden_bias = nn.Parameter(torch.zeros(hidden_units))
+            self.l1_weight = nn.Parameter(torch.empty(l1_units, hidden_units))
+            # The pair products are small (roughly 0.05 rms), so the default
+            # +-0.05 init leaves the L1 pre-activations near zero and the head
+            # cannot move the score.  Scale the init so a freshly built head
+            # already produces unit-variance activations.
+            nn.init.uniform_(self.l1_weight, -34.0 / math.sqrt(hidden_units),
+                             34.0 / math.sqrt(hidden_units))
+            self.l1_diff_weight = nn.Parameter(torch.empty(l1_units, hidden_units))
+            # The diff values are signed and up to 127x larger than a pair
+            # product, so the diff head uses the same +-34/sqrt(hidden) init;
+            # quantize_v6 scales it without the /127 that the pair head uses.
+            nn.init.uniform_(self.l1_diff_weight, -34.0 / math.sqrt(hidden_units),
+                             34.0 / math.sqrt(hidden_units))
+            self.l1_bias = nn.Parameter(torch.zeros(l1_units))
+            self.output_weight = nn.Parameter(torch.empty(OUTPUT_BUCKETS, l1_units))
+            # Predictions start within a couple of target units instead of at
+            # zero, which is what the integer export can actually represent.
+            nn.init.uniform_(self.output_weight, -0.9, 0.9)
+            self.output_bias = nn.Parameter(torch.zeros(OUTPUT_BUCKETS))
+
+        def forward(self, own_flat, own_weights, opp_flat, opp_weights, buckets):
+            own = torch.clamp(
+                self.feature(own_flat, per_sample_weights=own_weights) + self.hidden_bias,
+                0.0, 1.0)
+            opp = torch.clamp(
+                self.feature(opp_flat, per_sample_weights=opp_weights) + self.hidden_bias,
+                0.0, 1.0)
+            pairs = own * opp
+            diff = own - opp
+            l1 = torch.clamp(
+                pairs @ self.l1_weight.T + diff @ self.l1_diff_weight.T + self.l1_bias,
+                0.0, 1.0)
+            return (l1 * self.output_weight[buckets]).sum(dim=1) + self.output_bias[buckets]
+
 else:  # pragma: no cover - only without PyTorch
 
     class KoiNet:  # type: ignore[no-redef]
@@ -409,6 +487,10 @@ else:  # pragma: no cover - only without PyTorch
             raise TrainerError("PyTorch is required for training; install torch")
 
     class KoiNetV5:  # type: ignore[no-redef]
+        def __init__(self, *args, **kwargs) -> None:  # noqa: ARG002
+            raise TrainerError("PyTorch is required for training; install torch")
+
+    class KoiNetV6:  # type: ignore[no-redef]
         def __init__(self, *args, **kwargs) -> None:  # noqa: ARG002
             raise TrainerError("PyTorch is required for training; install torch")
 
@@ -540,6 +622,36 @@ def quantize_v5(model, hidden_shift: int, l1_shift: int) -> dict:
             "hidden_shift": hidden_shift, "l1_shift": l1_shift}
 
 
+def quantize_v6(model, hidden_shift: int, l1_shift: int) -> dict:
+    """v5 quantization plus the antisymmetric diff head (container version 6).
+
+    In training units ``pairs_f`` is in [0, 1] and ``diff_f`` in [-1, 1], so the
+    integer activations are ``pairs_int = 127^2 * pairs_f`` and
+    ``diff_int = 127 * diff_f``.  With ``l1_weights_q = l1_weights_f * 2^s / 127``
+    and ``l1_diff_weights_q = l1_diff_weights_f * 2^s`` both matrix products land
+    on the same ``127 * 2^s * l1_pre`` scale before the arithmetic shift; the
+    diff weights therefore skip the /127 the pair weights use and stay inside
+    the int8 range as long as their float values are within about 127/2^s.
+    """
+    scale = float(2**hidden_shift)
+    l1_scale = float(2**l1_shift)
+    feature = model.feature.weight.detach().numpy().astype(np.float64)
+    hidden_bias = model.hidden_bias.detach().numpy().astype(np.float64)
+    l1_weight = model.l1_weight.detach().numpy().astype(np.float64)
+    l1_diff_weight = model.l1_diff_weight.detach().numpy().astype(np.float64)
+    l1_bias = model.l1_bias.detach().numpy().astype(np.float64)
+    feature_q = np.clip(np.rint(feature * scale), -W1_LIMIT, W1_LIMIT).astype(np.int64)
+    hidden_bias_q = np.rint(hidden_bias * scale).astype(np.int64)
+    l1_weight_q = np.clip(np.rint(l1_weight * l1_scale / 127.0), -L1_LIMIT,
+                          L1_LIMIT).astype(np.int64)
+    l1_diff_weight_q = np.clip(np.rint(l1_diff_weight * l1_scale), -L1_LIMIT,
+                               L1_LIMIT).astype(np.int64)
+    l1_bias_q = np.rint(l1_bias * 127.0 * l1_scale).astype(np.int64)
+    return {"feature_weights": feature_q, "hidden_bias": hidden_bias_q,
+            "l1_weights": l1_weight_q, "l1_diff_weights": l1_diff_weight_q,
+            "l1_bias": l1_bias_q, "hidden_shift": hidden_shift, "l1_shift": l1_shift}
+
+
 def hidden_activations_dual(params, own_indices, own_offsets, opp_indices, opp_offsets,
                            samples, hidden_units):
     weight = params["feature_weights"].reshape(V5_INPUT_UNITS, hidden_units)
@@ -566,11 +678,32 @@ def integer_scores_v5(params, own, opp, buckets):
     return output >> params["output_shift"]
 
 
+def integer_scores_v6(params, own, opp, buckets):
+    """Integer v6 forward: pair channel plus the antisymmetric diff channel."""
+    pairs = own * opp
+    diff = own - opp
+    l1 = (pairs @ params["l1_weights"].T + diff @ params["l1_diff_weights"].T
+          + params["l1_bias"])
+    l1 >>= params["l1_shift"]
+    l1 = np.clip(l1, 0, 127)
+    output = params["output_bias"][buckets] + (l1 * params["output_weights"][buckets]).sum(axis=1)
+    return output >> params["output_shift"]
+
+
 def saturation_fractions_v5(params) -> tuple[float, float, float]:
     w1 = float(np.mean(np.abs(params["feature_weights"]) >= W1_LIMIT))
     l1 = float(np.mean(np.abs(params["l1_weights"]) >= L1_LIMIT))
     w2 = float(np.mean(np.abs(params["output_weights"]) >= L1_LIMIT))
     return w1, l1, w2
+
+
+def saturation_fractions_v6(params) -> tuple[float, float, float, float]:
+    """Saturation of every clipped v6 layer: w1, pair L1, diff L1, output."""
+    w1 = float(np.mean(np.abs(params["feature_weights"]) >= W1_LIMIT))
+    l1_pairs = float(np.mean(np.abs(params["l1_weights"]) >= L1_LIMIT))
+    l1_diff = float(np.mean(np.abs(params["l1_diff_weights"]) >= L1_LIMIT))
+    w2 = float(np.mean(np.abs(params["output_weights"]) >= L1_LIMIT))
+    return w1, l1_pairs, l1_diff, w2
 
 
 def hidden_activations(params: dict, indices: np.ndarray, offsets: np.ndarray,
@@ -668,6 +801,30 @@ def nnue_container_v5(payload, hidden_units: int, l1_units: int, hidden_shift: i
     return container, payload_hash
 
 
+def nnue_payload_v6(params, hidden_units: int, l1_units: int) -> bytes:
+    """v6 payload: feature int16, hidden bias int32, pair int8, diff int8,
+    L1 bias int32, output int8, output bias int32."""
+    return (params["feature_weights"].astype("<i2").reshape(-1).tobytes() +
+            params["hidden_bias"].astype("<i4").reshape(-1).tobytes() +
+            params["l1_weights"].astype("<i1").reshape(-1).tobytes() +
+            params["l1_diff_weights"].astype("<i1").reshape(-1).tobytes() +
+            params["l1_bias"].astype("<i4").reshape(-1).tobytes() +
+            params["output_weights"].astype("<i1").reshape(-1).tobytes() +
+            params["output_bias"].astype("<i4").reshape(-1).tobytes())
+
+
+def nnue_container_v6(payload, hidden_units: int, l1_units: int, hidden_shift: int,
+                      output_shift: int, l1_shift: int):
+    """Version 6 uses the unchanged v5 header with version = 6."""
+    payload_hash = hashlib.sha256(payload).hexdigest()
+    header = struct.pack("<8sIIIIIBBBBHHQ", MAGIC, V6_VERSION, V5_INPUT_UNITS,
+                         hidden_units, OUTPUT_BUCKETS, l1_units, hidden_shift,
+                         output_shift, l1_shift, 0, len(QUANTIZATION),
+                         len(V5_FEATURE_SET), len(payload))
+    container = header + bytes.fromhex(payload_hash) + QUANTIZATION + V5_FEATURE_SET + payload
+    return container, payload_hash
+
+
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
@@ -699,12 +856,12 @@ def build_parser() -> argparse.ArgumentParser:
                         help="optional path for a float checkpoint after training")
     parser.add_argument("--float-in", type=pathlib.Path, default=None,
                         help="load a float checkpoint and skip training (quantize only)")
-    parser.add_argument("--arch", choices=["v4", "v5"], default="v5",
+    parser.add_argument("--arch", choices=["v4", "v5", "v6"], default="v5",
                         help="network architecture to train (default: v5)")
     parser.add_argument("--l1-units", type=int, default=V5_L1_UNITS,
-                        help="v5 hidden L1 width (8..128)")
+                        help="v5/v6 hidden L1 width (8..128)")
     parser.add_argument("--l1-shifts", type=int, nargs="+", default=[6, 7, 8],
-                        help="v5 quantized L1 shift candidates")
+                        help="v5/v6 quantized L1 shift candidates")
     return parser
 
 
@@ -902,6 +1059,195 @@ def main_v5(args, rng) -> int:
     return 0
 
 
+def main_v6(args, rng) -> int:
+    """Train, quantize, and export a v6 network (v5 head plus the diff channel)."""
+    if torch is None:  # pragma: no cover - environment dependent
+        raise TrainerError("PyTorch is required for training; install torch")
+    if not args.dataset and not args.corpus:
+        raise TrainerError("either --dataset or --corpus is required")
+    torch.set_num_threads(max(1, args.threads))
+    device = resolve_training_device()
+    log(f"training device {device} (torch {torch.__version__}, cuda {torch.version.cuda})")
+    hidden_units = args.hidden_units
+    if hidden_units < 32 or hidden_units % 2 != 0:
+        raise TrainerError("hidden units must be even and at least 32")
+    l1_units = args.l1_units
+    if l1_units < 8 or l1_units > 128:
+        raise TrainerError("L1 units must be between 8 and 128")
+    if args.dataset:
+        (own_indices, own_offsets, opp_indices, opp_offsets, scores,
+         buckets) = load_binary_dataset_v2(pathlib.Path(args.dataset), args.rows)
+    else:
+        (own_indices, own_offsets, opp_indices, opp_offsets, scores,
+         buckets) = load_text_corpus_v5(pathlib.Path(args.corpus), args.rows)
+    rows = own_offsets.size - 1
+    if rows <= 0:
+        raise TrainerError("no training rows were loaded")
+    buckets = np.asarray(buckets, dtype=np.int64)
+    if buckets.size != rows or int(buckets.min()) < 0 or int(buckets.max()) >= OUTPUT_BUCKETS:
+        raise TrainerError("piece-count buckets are outside the v6 head range")
+    own_active = int(np.max(own_offsets[1:] - own_offsets[:-1]))
+    opp_active = int(np.max(opp_offsets[1:] - opp_offsets[:-1]))
+    pad_length = max(own_active, opp_active, 1)
+    started = time.perf_counter()
+    log(f"loaded {rows} rows ({own_active} own, {opp_active} opp, pad {pad_length}) "
+        f"in {time.perf_counter() - started:.2f}s")
+    order = rng.permutation(rows)
+    val_count = max(1, int(rows * args.val_fraction))
+    val_order = order[:val_count]
+    train_order = order[val_count:]
+    targets = scores.astype(np.float32) / TARGET_SCALE
+    model = KoiNetV6(hidden_units, l1_units)
+    if args.float_in:
+        model.load_state_dict(torch.load(args.float_in, map_location="cpu"))
+        log(f"loaded float checkpoint from {args.float_in}")
+    model.to(device)
+    epochs = 0 if args.float_in else max(1, args.epochs)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate,
+                                  weight_decay=args.weight_decay)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=max(1, epochs))
+    loss_fn = torch.nn.SmoothL1Loss(reduction="sum")
+    for epoch in range(1, epochs + 1):
+        model.train()
+        epoch_started = time.perf_counter()
+        loss_total = 0.0
+        seen = 0
+        for (own_flat, own_weights, opp_flat, opp_weights, batch_buckets,
+             batch_targets) in batches_dual(
+                own_indices, own_offsets, opp_indices, opp_offsets, buckets, targets,
+                train_order, args.batch_size, pad_length):
+            own_flat = own_flat.to(device)
+            own_weights = own_weights.to(device)
+            opp_flat = opp_flat.to(device)
+            opp_weights = opp_weights.to(device)
+            batch_buckets = batch_buckets.to(device)
+            batch_targets = batch_targets.to(device)
+            optimizer.zero_grad()
+            prediction = model(own_flat, own_weights, opp_flat, opp_weights, batch_buckets)
+            loss = loss_fn(prediction, batch_targets)
+            loss.backward()
+            optimizer.step()
+            loss_total += float(loss.detach())
+            seen += int(own_flat.shape[0])
+        scheduler.step()
+        train_loss = loss_total / max(1, seen)
+        val_prediction = validate_v5(model, own_indices, own_offsets, opp_indices,
+                                     opp_offsets, buckets, targets, val_order,
+                                     args.batch_size, pad_length, device)
+        val_loss = float(np.mean(np.abs(val_prediction / TARGET_SCALE - targets[val_order])))
+        val_mae = float(np.mean(np.abs(val_prediction - scores[val_order])))
+        log(f"epoch {epoch}/{epochs} train_loss {train_loss:.5f} val_loss {val_loss:.5f} "
+            f"val_mae_cp {val_mae:.2f} time {time.perf_counter() - epoch_started:.1f}s")
+    if device.type == "cuda":
+        torch.cuda.synchronize()
+    model.to("cpu")
+    if device.type == "cuda":
+        torch.cuda.empty_cache()
+    if args.float_out:
+        pathlib.Path(args.float_out).parent.mkdir(parents=True, exist_ok=True)
+        torch.save(model.state_dict(), args.float_out)
+        log(f"saved float checkpoint to {args.float_out}")
+
+    tune_order = val_order
+    if args.tune_samples and args.tune_samples < tune_order.size:
+        tune_order = rng.choice(tune_order, size=args.tune_samples, replace=False)
+    output_weight = model.output_weight.detach().numpy().astype(np.float64)
+    output_bias = model.output_bias.detach().numpy().astype(np.float64)
+    best = None
+    best_saturation = 0.0
+    for hidden_shift in args.hidden_shifts:
+        for l1_shift in args.l1_shifts:
+            params = quantize_v6(model, hidden_shift, l1_shift)
+            own_hidden, opp_hidden = hidden_activations_dual(
+                params, own_indices, own_offsets, opp_indices, opp_offsets, tune_order,
+                hidden_units)
+            for output_shift in args.output_shifts:
+                params["output_weights"] = np.clip(
+                    np.rint(output_weight * TARGET_SCALE * float(2**output_shift) / 127.0),
+                    -L1_LIMIT, L1_LIMIT).astype(np.int64)
+                params["output_bias"] = np.rint(
+                    output_bias * TARGET_SCALE * float(2**output_shift)).astype(np.int64)
+                params["output_shift"] = output_shift
+                candidate = integer_scores_v6(params, own_hidden, opp_hidden,
+                                              buckets[tune_order])
+                mae = float(np.mean(np.abs(candidate - scores[tune_order])))
+                # Prefer a quantization candidate that clips no weight layer: a
+                # saturated export silently destroys the evaluator, so a slightly
+                # worse MAE without saturation is the better network.  The diff
+                # head saturates independently of the pair head, so its fraction
+                # takes part in the same max() key.
+                saturation = max(saturation_fractions_v6(params))
+                log(f"quantization v6 s1={hidden_shift} s_l1={l1_shift} k3={output_shift} "
+                    f"val_mae_cp {mae:.2f} saturation {saturation:.4f}")
+                if best is None or (saturation > 0.0, mae) < (best_saturation > 0.0, best[0]):
+                    best = (mae, hidden_shift, l1_shift, output_shift, dict(params))
+                    best_saturation = saturation
+    if best is None:
+        raise TrainerError("no quantization candidate was evaluated")
+    best_mae, best_hidden_shift, best_l1_shift, best_output_shift, best_params = best
+    log(f"selected v6 s1={best_hidden_shift} s_l1={best_l1_shift} k3={best_output_shift} "
+        f"val_mae_cp {best_mae:.2f}")
+
+    float_prediction = validate_v5(model, own_indices, own_offsets, opp_indices, opp_offsets,
+                                   buckets, targets, val_order, args.batch_size, pad_length)
+    float_mae = float(np.mean(np.abs(float_prediction - scores[val_order])))
+    (w1_saturation, l1_saturation, l1_diff_saturation,
+     w2_saturation) = saturation_fractions_v6(best_params)
+    payload = nnue_payload_v6(best_params, hidden_units, l1_units)
+    container, payload_hash = nnue_container_v6(payload, hidden_units, l1_units,
+                                                best_hidden_shift, best_output_shift,
+                                                best_l1_shift)
+    net_out = args.net_out
+    meta_out = args.meta_out
+    if pathlib.Path(net_out).name in ("koi-v4.nnue", "koi-v5.nnue"):
+        net_out = str(pathlib.Path(net_out).with_name("koi-v6.nnue"))
+    if pathlib.Path(meta_out).name in ("koi-v4.metadata.json", "koi-v5.metadata.json"):
+        meta_out = str(pathlib.Path(meta_out).with_name("koi-v6.metadata.json"))
+    net_path = pathlib.Path(net_out)
+    net_path.parent.mkdir(parents=True, exist_ok=True)
+    net_path.write_bytes(container)
+    metadata = {
+        "schema": "koi-nnue-training-metadata-v3",
+        "created": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "corpus": str(args.dataset or args.corpus),
+        "rows_used": int(rows),
+        "val_rows": int(val_order.size),
+        "feature_set": V5_FEATURE_SET.decode(),
+        "quantization": QUANTIZATION.decode(),
+        "arch": "v6",
+        "architecture": {
+            "input": V5_INPUT_UNITS,
+            "hidden": hidden_units,
+            "l1": l1_units,
+            "output_buckets": OUTPUT_BUCKETS,
+            "groups": [FEATURE_SET.decode(), THREAT_FEATURE_SET.decode()],
+        },
+        "activation": "crelu-pair-diff-l1",
+        "hidden_shift": best_hidden_shift,
+        "l1_shift": best_l1_shift,
+        "output_shift": best_output_shift,
+        "epochs": max(1, args.epochs),
+        "batch_size": args.batch_size,
+        "learning_rate": args.learning_rate,
+        "seed": args.seed,
+        "target_scale": TARGET_SCALE,
+        "val_mae_cp": float_mae,
+        "val_round_trip_mae_cp": best_mae,
+        "w1_saturation": w1_saturation,
+        "l1_saturation": l1_saturation,
+        "l1_diff_saturation": l1_diff_saturation,
+        "w2_saturation": w2_saturation,
+        "payload_sha256": payload_hash,
+        "network_sha256": hashlib.sha256(container).hexdigest(),
+        "command": " ".join(sys.argv),
+    }
+    meta_path = pathlib.Path(meta_out)
+    meta_path.parent.mkdir(parents=True, exist_ok=True)
+    meta_path.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
+    log(f"wrote {net_path} ({len(container)} bytes) and {meta_path}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if torch is None:
@@ -914,6 +1260,8 @@ def main(argv: list[str] | None = None) -> int:
     torch.set_num_threads(max(1, args.threads))
     rng = np.random.default_rng(args.seed)
     torch.manual_seed(args.seed)
+    if args.arch == "v6":
+        return main_v6(args, rng)
     if args.arch == "v5":
         return main_v5(args, rng)
 

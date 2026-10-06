@@ -35,6 +35,12 @@ inline constexpr std::uint32_t kKoiNnueHalfkaKingBucketV1FormatVersion = 4;
 // piece-count buckets finish the chain.  It stores three explicit shifts
 // (hidden metadata, L1, output) in the same 76-byte header skeleton.
 inline constexpr std::uint32_t kKoiNnueHalfkaThreatV5FormatVersion = 5;
+// Version 6 keeps the v5 feature set, header skeleton, and incremental path,
+// but makes the L1 stage antisymmetric: alongside the cross-perspective pair
+// products p[i] = own[i] * opp[i] it consumes the difference d[i] = own[i] -
+// opp[i] through a second int8 matrix.  The payload therefore grows by
+// l1_units * hidden_units bytes, placed directly after `l1_weights`.
+inline constexpr std::uint32_t kKoiNnueHalfkaThreatV6FormatVersion = 6;
 inline constexpr std::uint32_t kKoiNnueHalfkaKingBucketV1FeatureCount =
     static_cast<std::uint32_t>(kNnueHalfkaKingBucketV1FeatureCount);
 inline constexpr std::uint32_t kKoiNnueHalfkaThreatV5FeatureCount =
@@ -112,6 +118,10 @@ struct NnueNetwork {
     // 2-4 leave both empty.
     std::vector<std::int8_t> l1_weights;
     std::vector<std::int32_t> l1_bias;
+    // Version 6 antisymmetric L1 channel: unit-major (l1_units x hidden)
+    // int8 weights applied to the own-minus-opponent activation difference.
+    // Versions 2-5 leave it empty.
+    std::vector<std::int8_t> l1_diff_weights;
 
     // Fixed-point right shifts used by the v3+ integer pipelines.  Version 1
     // and version 2 containers leave them at zero, which reproduces the
@@ -132,6 +142,9 @@ struct NnueNetwork {
     // Minimal-width v5 network: 36864 inputs, 32 hidden units, 8 output
     // buckets, and 8 L1 units, with shifts 7/12 and a 6-bit L1 shift.
     [[nodiscard]] static NnueNetwork synthetic_v5();
+    // Minimal-width v6 network mirroring synthetic_v5, plus the antisymmetric
+    // L1 difference weights (a small alternating +/-1 pattern).
+    [[nodiscard]] static NnueNetwork synthetic_v6();
 };
 
 class NnueLoader final {

@@ -1,4 +1,4 @@
-"""Cross-language tests for the KOI-NNUE version 4 trainer.
+"""Cross-language tests for the KOI-NNUE version 4/5/6 trainer.
 
 The tests cover the pieces the C++ engine and the Python trainer must agree on:
 
@@ -7,7 +7,9 @@ The tests cover the pieces the C++ engine and the Python trainer must agree on:
   arithmetic output shift) against C++ integer scores,
 * the ``koi-dataset-v1`` binary loader,
 * a tiny end-to-end export with metadata schema ``koi-nnue-training-metadata-v2``,
-* byte-deterministic training and ``--float-in`` quantize-only reuse.
+* byte-deterministic training and ``--float-in`` quantize-only reuse,
+* the v6 antisymmetric diff head: integer round trip, container payload order,
+  and the raw perspective direction/antisymmetry the pair-only v5 head lacks.
 
 The cross-language cases run only when ``KOI_NNUE_BOUNDARY_EXE`` points at a
 built ``nnue_boundary_tests`` executable (CMake wires it in CI and local runs).
@@ -211,6 +213,102 @@ def parse_v5_container(path: pathlib.Path) -> dict:
     }
 
 
+def parse_v6_container(path: pathlib.Path) -> dict:
+    """Parse the version 6 container (v5 header plus the diff weight block)."""
+    data = path.read_bytes()
+    (
+        magic,
+        version,
+        input_units,
+        hidden_units,
+        output_buckets,
+        l1_units,
+        hidden_shift,
+        output_shift,
+        l1_shift,
+        reserved,
+        quantization_length,
+        feature_length,
+        payload_length,
+    ) = HEADER_V5.unpack_from(data, 0)
+    payload_hash = data[44:76].hex()
+    quantization = data[76 : 76 + quantization_length]
+    feature_set = data[
+        76 + quantization_length : 76 + quantization_length + feature_length
+    ]
+    payload = data[76 + quantization_length + feature_length :]
+    feature_bytes = input_units * hidden_units * 2
+    hidden_bias_bytes = hidden_units * 4
+    l1_weight_bytes = l1_units * hidden_units
+    l1_bias_bytes = l1_units * 4
+    output_weight_bytes = output_buckets * l1_units
+    output_bias_bytes = output_buckets * 4
+    assert len(payload) == payload_length
+    feature_weights = np.frombuffer(
+        payload[:feature_bytes], dtype="<i2"
+    ).reshape(input_units, hidden_units)
+    split = feature_bytes
+    hidden_bias = np.frombuffer(
+        payload[split : split + hidden_bias_bytes], dtype="<i4"
+    )
+    split += hidden_bias_bytes
+    l1_weights = np.frombuffer(
+        payload[split : split + l1_weight_bytes], dtype="<i1"
+    ).reshape(l1_units, hidden_units)
+    split += l1_weight_bytes
+    l1_diff_weights = np.frombuffer(
+        payload[split : split + l1_weight_bytes], dtype="<i1"
+    ).reshape(l1_units, hidden_units)
+    split += l1_weight_bytes
+    l1_bias = np.frombuffer(
+        payload[split : split + l1_bias_bytes], dtype="<i4"
+    )
+    split += l1_bias_bytes
+    output_weights = np.frombuffer(
+        payload[split : split + output_weight_bytes], dtype="<i1"
+    ).reshape(output_buckets, l1_units)
+    split += output_weight_bytes
+    output_bias = np.frombuffer(
+        payload[split : split + output_bias_bytes], dtype="<i4"
+    )
+    return {
+        "magic": magic,
+        "version": version,
+        "input_units": input_units,
+        "hidden_units": hidden_units,
+        "output_buckets": output_buckets,
+        "l1_units": l1_units,
+        "reserved": reserved,
+        "hidden_shift": hidden_shift,
+        "output_shift": output_shift,
+        "l1_shift": l1_shift,
+        "quantization": quantization,
+        "feature_set": feature_set,
+        "payload_length": payload_length,
+        "payload_hash": payload_hash,
+        "network_hash": hashlib.sha256(data).hexdigest(),
+        "feature_weights": feature_weights,
+        "hidden_bias": hidden_bias,
+        "l1_weights": l1_weights,
+        "l1_diff_weights": l1_diff_weights,
+        "l1_bias": l1_bias,
+        "output_weights": output_weights,
+        "output_bias": output_bias,
+        "params": {
+            "feature_weights": feature_weights,
+            "hidden_bias": hidden_bias,
+            "l1_weights": l1_weights,
+            "l1_diff_weights": l1_diff_weights,
+            "l1_bias": l1_bias,
+            "output_weights": output_weights,
+            "output_bias": output_bias,
+            "hidden_shift": hidden_shift,
+            "l1_shift": l1_shift,
+            "output_shift": output_shift,
+        },
+    }
+
+
 class EncoderParityTests(unittest.TestCase):
     def test_python_encoder_matches_cpp_fixture(self):
         executable = os.environ.get("KOI_NNUE_BOUNDARY_EXE")
@@ -300,6 +398,58 @@ class EncoderParityTests(unittest.TestCase):
                 )
                 buckets = np.asarray([koi_dataset.output_bucket(board)], dtype=np.int64)
                 score = train_nnue_koi.integer_scores_v5(
+                    container["params"], own_hidden, opp_hidden, buckets
+                )
+                self.assertEqual(int(score[0]), int(position["score"]))
+
+    def test_python_encoder_matches_cpp_v6_fixture(self):
+        executable = os.environ.get("KOI_NNUE_BOUNDARY_EXE")
+        if not executable or not pathlib.Path(executable).is_file():
+            self.skipTest("KOI_NNUE_BOUNDARY_EXE is not set to a built boundary test")
+        self.assertIsNotNone(koi_dataset, "koi_dataset is unavailable")
+        with tempfile.TemporaryDirectory() as directory:
+            container_path = pathlib.Path(directory) / "fixture-v6.nnue"
+            completed = subprocess.run(
+                [executable, "--emit-v6-fixture", str(container_path)],
+                capture_output=True,
+                text=True,
+                timeout=120,
+                check=False,
+            )
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertTrue(container_path.is_file())
+            fixture = json.loads(completed.stdout.strip().splitlines()[-1])
+            container = parse_v6_container(container_path)
+            self.assertEqual(container["magic"], b"KOI-NNUE")
+            self.assertEqual(container["version"], 6)
+            self.assertEqual(container["input_units"], 36864)
+            self.assertEqual(container["hidden_units"], fixture["hidden_units"])
+            self.assertEqual(container["l1_units"], fixture["l1_units"])
+            self.assertEqual(container["hidden_shift"], fixture["hidden_shift"])
+            self.assertEqual(container["l1_shift"], fixture["l1_shift"])
+            self.assertEqual(container["output_shift"], fixture["output_shift"])
+            for position in fixture["positions"]:
+                board = chess.Board(position["fen"])
+                a_stm, b_stm, a_opp, b_opp = koi_dataset.encode_record(board)
+                self.assertEqual(
+                    list(a_stm) + list(b_stm), position["own"], position["fen"]
+                )
+                self.assertEqual(
+                    list(a_opp) + list(b_opp), position["opp"], position["fen"]
+                )
+                own = np.asarray(position["own"], dtype=np.int32)
+                opp = np.asarray(position["opp"], dtype=np.int32)
+                own_hidden, opp_hidden = train_nnue_koi.hidden_activations_dual(
+                    container["params"],
+                    own,
+                    np.asarray([0, len(own)], dtype=np.int64),
+                    opp,
+                    np.asarray([0, len(opp)], dtype=np.int64),
+                    np.asarray([0], dtype=np.int64),
+                    container["hidden_units"],
+                )
+                buckets = np.asarray([koi_dataset.output_bucket(board)], dtype=np.int64)
+                score = train_nnue_koi.integer_scores_v6(
                     container["params"], own_hidden, opp_hidden, buckets
                 )
                 self.assertEqual(int(score[0]), int(position["score"]))
@@ -437,6 +587,270 @@ r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 4 4;-40;g8f6
 8/8/8/4k3/8/8/4P3/4K3 w - - 0 1;90;e1d2
 8/8/8/4k3/8/8/4P3/4K3 b - - 0 1;-90;e5d4
 """
+
+
+# ---------------------------------------------------------------------------
+# v6 antisymmetric head helpers
+# ---------------------------------------------------------------------------
+
+V6_MATERIAL_VALUES = {
+    chess.PAWN: 100,
+    chess.KNIGHT: 320,
+    chess.BISHOP: 330,
+    chess.ROOK: 500,
+    chess.QUEEN: 900,
+}
+# Kings on e1/e8 plus one piece on d1 or f3, both turns.  The queen-on-d1
+# rows double as the trained-net evaluation pair below; the rest give the
+# material target enough variety that the diff channel has to carry it.
+V6_MATERIAL_SQUARES = ((0, 3), (2, 5))
+V6_QUEEN_PAIR = (
+    "4k3/8/8/8/8/8/8/3QK3 w - - 0 1",
+    "4k3/8/8/8/8/8/8/3QK3 b - - 0 1",
+)
+
+
+def _board_fen(placement: dict) -> str:
+    rows = []
+    for rank_index in range(7, -1, -1):
+        parts = []
+        empty = 0
+        for file_index in range(8):
+            symbol = placement.get(rank_index * 8 + file_index)
+            if symbol is None:
+                empty += 1
+                continue
+            if empty:
+                parts.append(str(empty))
+                empty = 0
+            parts.append(symbol)
+        if empty:
+            parts.append(str(empty))
+        rows.append("".join(parts))
+    return "/".join(rows)
+
+
+def v6_material_rows() -> list[tuple[str, int]]:
+    """``(fen, side-to-move cp)`` rows for the tiny v6 material corpus."""
+    kings = {chess.square(4, 0): "K", chess.square(4, 7): "k"}
+    rows: list[tuple[str, int]] = []
+    for rank_index, file_index in V6_MATERIAL_SQUARES:
+        for piece_type, value in V6_MATERIAL_VALUES.items():
+            for color in (chess.WHITE, chess.BLACK):
+                symbol = chess.PIECE_SYMBOLS[piece_type]
+                if color == chess.BLACK:
+                    symbol = symbol.lower()
+                placement = dict(kings)
+                placement[chess.square(file_index, rank_index)] = symbol
+                board_fen = _board_fen(placement)
+                white_cp = value if color == chess.WHITE else -value
+                rows.append((f"{board_fen} w - - 0 1", white_cp))
+                rows.append((f"{board_fen} b - - 0 1", -white_cp))
+    board_fen = _board_fen(kings)
+    rows.append((f"{board_fen} w - - 0 1", 0))
+    rows.append((f"{board_fen} b - - 0 1", 0))
+    return rows
+
+
+def v6_encode_rows(rows) -> tuple[np.ndarray, ...]:
+    own_rows, opp_rows, scores, buckets = [], [], [], []
+    for fen, cp in rows:
+        board = chess.Board(fen)
+        a_own, b_own, a_opp, b_opp = koi_dataset.encode_record(board)
+        own_rows.append(list(a_own) + list(b_own))
+        opp_rows.append(list(a_opp) + list(b_opp))
+        scores.append(cp)
+        buckets.append(koi_dataset.output_bucket(board))
+    own_flat, own_offsets, packed_scores = train_nnue_koi._pack_rows(own_rows, scores)
+    opp_flat, opp_offsets, _ = train_nnue_koi._pack_rows(opp_rows, scores)
+    return (own_flat, own_offsets, opp_flat, opp_offsets, packed_scores,
+            np.asarray(buckets, dtype=np.int64))
+
+
+def v6_train_material_model(steps: int = 500, hidden_units: int = 64,
+                            l1_units: int = 32, seed: int = 20261006):
+    """Train a tiny v6 head on the synthetic side-to-move material target.
+
+    The small positive feature init keeps hidden activations visible without
+    the saturation the production init needs many more steps to escape; the
+    point of the test is the head architecture, not the training recipe.
+    """
+    torch.manual_seed(seed)
+    (own_flat, own_offsets, opp_flat, opp_offsets, scores,
+     buckets) = v6_encode_rows(v6_material_rows())
+    rows = own_offsets.size - 1
+    targets = scores.astype(np.float32) / train_nnue_koi.TARGET_SCALE
+    pad_length = int(np.max(own_offsets[1:] - own_offsets[:-1]))
+    model = train_nnue_koi.KoiNetV6(hidden_units, l1_units)
+    with torch.no_grad():
+        model.feature.weight.uniform_(0.0, 0.3)
+        model.l1_weight.uniform_(-0.1, 0.1)
+        model.l1_diff_weight.uniform_(-0.1, 0.1)
+        model.output_weight.uniform_(-1.0, 1.0)
+        model.hidden_bias.zero_()
+        model.l1_bias.zero_()
+        model.output_bias.zero_()
+    optimizer = torch.optim.AdamW(model.parameters(), lr=3e-2, weight_decay=1e-4)
+    loss_fn = torch.nn.MSELoss(reduction="sum")
+    order = np.arange(rows)
+    for _ in range(steps):
+        model.train()
+        for (own, own_weights, opp, opp_weights, batch_buckets,
+             batch_targets) in train_nnue_koi.batches_dual(
+                own_flat, own_offsets, opp_flat, opp_offsets, buckets, targets,
+                order, rows, pad_length):
+            optimizer.zero_grad()
+            prediction = model(own, own_weights, opp, opp_weights, batch_buckets)
+            loss = loss_fn(prediction, batch_targets)
+            loss.backward()
+            optimizer.step()
+    model.eval()
+    return model
+
+
+def v6_raw_cp(model, fen: str) -> float:
+    """Raw (unquantized) side-to-move score of one FEN, in target units."""
+    board = chess.Board(fen)
+    a_own, b_own, a_opp, b_opp = koi_dataset.encode_record(board)
+    own = np.asarray(list(a_own) + list(b_own), dtype=np.int64)
+    opp = np.asarray(list(a_opp) + list(b_opp), dtype=np.int64)
+    own_flat = torch.from_numpy(own[None, :])
+    opp_flat = torch.from_numpy(opp[None, :])
+    weights = torch.ones_like(own_flat, dtype=torch.float32)
+    buckets = torch.from_numpy(
+        np.asarray([koi_dataset.output_bucket(board)], dtype=np.int64))
+    with torch.no_grad():
+        output = model(own_flat, weights, opp_flat, weights, buckets)
+    return float(output[0]) * train_nnue_koi.TARGET_SCALE
+
+
+@unittest.skipUnless(TORCH_AVAILABLE, "PyTorch is not installed")
+class V6HeadTests(unittest.TestCase):
+    """Integer, container, and trained raw checks for the v6 diff head."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.model = v6_train_material_model()
+
+    def test_integer_reference_round_trip(self):
+        self.assertIsNotNone(train_nnue_koi)
+        torch.manual_seed(11)
+        model = train_nnue_koi.KoiNetV6(64, 8)
+        with torch.no_grad():
+            for name, parameter in model.named_parameters():
+                if name == "output_weight":
+                    parameter.uniform_(-0.1, 0.1)
+                else:
+                    parameter.copy_(torch.randn_like(parameter) * 0.3)
+        hidden_shift, l1_shift, output_shift = 7, 8, 6
+        params = train_nnue_koi.quantize_v6(model, hidden_shift, l1_shift)
+        params["output_weights"] = np.clip(
+            np.rint(model.output_weight.detach().numpy().astype(np.float64)
+                    * train_nnue_koi.TARGET_SCALE * 2.0**output_shift / 127.0),
+            -train_nnue_koi.L1_LIMIT, train_nnue_koi.L1_LIMIT).astype(np.int64)
+        params["output_bias"] = np.rint(
+            model.output_bias.detach().numpy().astype(np.float64)
+            * train_nnue_koi.TARGET_SCALE * 2.0**output_shift).astype(np.int64)
+        params["output_shift"] = output_shift
+        rng = np.random.default_rng(12)
+        own = rng.integers(0, 128, size=(24, 64)).astype(np.int64)
+        opp = rng.integers(0, 128, size=(24, 64)).astype(np.int64)
+        buckets = rng.integers(0, 8, size=24)
+        scores = train_nnue_koi.integer_scores_v6(params, own, opp, buckets)
+        # Dequantized reference in the same integer L1 units; the arithmetic
+        # shifts floor, so a sub-unit difference is expected.
+        pairs = own * opp
+        diff = own - opp
+        l1 = (pairs @ params["l1_weights"].T.astype(np.float64) / 2.0**l1_shift
+              + diff @ params["l1_diff_weights"].T.astype(np.float64) / 2.0**l1_shift
+              + params["l1_bias"].astype(np.float64) / 2.0**l1_shift)
+        l1 = np.clip(l1, 0.0, 127.0)
+        reference = (
+            params["output_bias"][buckets].astype(np.float64) / 2.0**output_shift
+            + (l1 * params["output_weights"][buckets].astype(np.float64)
+               / 2.0**output_shift).sum(axis=1))
+        error = np.abs(scores.astype(np.float64) - reference)
+        self.assertLess(float(error.mean()), 1.0)
+        self.assertLess(float(error.max()), 2.0)
+
+    def test_container_payload_layout(self):
+        self.assertIsNotNone(train_nnue_koi)
+        torch.manual_seed(13)
+        model = train_nnue_koi.KoiNetV6(64, 8)
+        params = train_nnue_koi.quantize_v6(model, 7, 8)
+        params["output_weights"] = np.clip(
+            np.rint(model.output_weight.detach().numpy().astype(np.float64)
+                    * train_nnue_koi.TARGET_SCALE * 2.0**6 / 127.0),
+            -train_nnue_koi.L1_LIMIT, train_nnue_koi.L1_LIMIT).astype(np.int64)
+        params["output_bias"] = np.rint(
+            model.output_bias.detach().numpy().astype(np.float64)
+            * train_nnue_koi.TARGET_SCALE * 2.0**6).astype(np.int64)
+        params["output_shift"] = 6
+        payload = train_nnue_koi.nnue_payload_v6(params, 64, 8)
+        container, payload_hash = train_nnue_koi.nnue_container_v6(
+            payload, 64, 8, 7, 6, 8)
+        header = struct.unpack_from("<8sIIIIIBBBBHHQ", container, 0)
+        self.assertEqual(header[0], b"KOI-NNUE")
+        self.assertEqual(header[1], 6)
+        self.assertEqual(header[2], 36864)
+        self.assertEqual(header[3], 64)
+        self.assertEqual(header[4], OUTPUT_BUCKETS)
+        self.assertEqual(header[5], 8)
+        self.assertEqual(header[6:10], (7, 6, 8, 0))
+        self.assertEqual(header[10], len(QUANTIZATION))
+        self.assertEqual(header[11], len(FEATURE_SET + b"+threat-pairs-v1"))
+        self.assertEqual(header[12], len(payload))
+        feature_bytes = 36864 * 64 * 2
+        hidden_bias_bytes = 64 * 4
+        l1_bytes = 8 * 64
+        l1_bias_bytes = 8 * 4
+        output_bytes = OUTPUT_BUCKETS * 8
+        output_bias_bytes = OUTPUT_BUCKETS * 4
+        self.assertEqual(len(payload), feature_bytes + hidden_bias_bytes
+                         + 2 * l1_bytes + l1_bias_bytes + output_bytes
+                         + output_bias_bytes)
+        # The int8 diff weights directly follow the int8 pair weights.
+        split = feature_bytes + hidden_bias_bytes + l1_bytes
+        diff = np.frombuffer(payload[split : split + l1_bytes], dtype="<i1")
+        self.assertEqual(list(diff),
+                         list(params["l1_diff_weights"].astype("<i1").reshape(-1)))
+        self.assertEqual(payload_hash, hashlib.sha256(payload).hexdigest())
+
+    def test_raw_perspective_direction(self):
+        # Same board, white to move versus black to move.  The v5 pair-only
+        # head returns the same raw value for both; the v6 diff channel must
+        # move the side-to-move score by more than the test tolerance.
+        white = v6_raw_cp(self.model, V6_QUEEN_PAIR[0])
+        black = v6_raw_cp(self.model, V6_QUEEN_PAIR[1])
+        self.assertGreater(white - black, 5.0)
+        self.assertGreater(white, 0.0)
+        self.assertLess(black, 0.0)
+
+    def test_raw_antisymmetry(self):
+        # Swapping the own/opponent perspectives must approximately negate the
+        # raw score; the trained tiny net fits both turns of the queen pair.
+        white = v6_raw_cp(self.model, V6_QUEEN_PAIR[0])
+        black = v6_raw_cp(self.model, V6_QUEEN_PAIR[1])
+        self.assertLess(abs(white + black), 5.0)
+
+
+@unittest.skipUnless(TORCH_AVAILABLE, "PyTorch is not installed")
+class V5BlindnessTests(unittest.TestCase):
+    def test_v5_raw_is_invariant_under_the_perspective_swap(self):
+        # Pins the defect the v6 diff channel fixes: the pair-only head cannot
+        # tell whose favour the evaluation is, so raw(own, opp) == raw(opp, own).
+        torch.manual_seed(1)
+        model = train_nnue_koi.KoiNetV5(32, 8)
+        with torch.no_grad():
+            for parameter in model.parameters():
+                parameter.copy_(torch.randn_like(parameter) * 0.2)
+        own = torch.randint(0, 36864, (4, 16))
+        opp = torch.randint(0, 36864, (4, 16))
+        weights = torch.ones_like(own, dtype=torch.float32)
+        buckets = torch.randint(0, OUTPUT_BUCKETS, (4,))
+        direct = model(own, weights, opp, weights, buckets)
+        swapped = model(opp, weights, own, weights, buckets)
+        self.assertTrue(torch.equal(direct, swapped))
 
 
 @unittest.skipUnless(TORCH_AVAILABLE, "PyTorch is not installed")
@@ -633,6 +1047,67 @@ class TrainerPipelineTests(unittest.TestCase):
         completed = self.run_trainer(
             "--arch",
             "v5",
+            "--l1-units",
+            "8",
+            "--l1-shifts",
+            "6",
+            "--net-out",
+            str(second_net),
+            "--meta-out",
+            str(second_meta),
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(first_net.read_bytes(), second_net.read_bytes())
+
+    def test_v6_export_metadata_and_determinism(self):
+        first_net = self.directory / "first-v6.nnue"
+        first_meta = self.directory / "first-v6.metadata.json"
+        completed = self.run_trainer(
+            "--arch",
+            "v6",
+            "--l1-units",
+            "8",
+            "--l1-shifts",
+            "6",
+            "--net-out",
+            str(first_net),
+            "--meta-out",
+            str(first_meta),
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("selected v6", completed.stdout)
+        metadata = json.loads(first_meta.read_text(encoding="utf-8"))
+        self.assertEqual(metadata["schema"], "koi-nnue-training-metadata-v3")
+        self.assertEqual(metadata["arch"], "v6")
+        self.assertEqual(metadata["activation"], "crelu-pair-diff-l1")
+        self.assertEqual(metadata["feature_set"], "halfka-king-bucket-v1+threat-pairs-v1")
+        self.assertEqual(metadata["l1_shift"], 6)
+        self.assertIn("l1_saturation", metadata)
+        self.assertIn("l1_diff_saturation", metadata)
+        container = parse_v6_container(first_net)
+        self.assertEqual(container["magic"], b"KOI-NNUE")
+        self.assertEqual(container["version"], 6)
+        self.assertEqual(container["input_units"], 36864)
+        self.assertEqual(container["l1_units"], 8)
+        expected_payload = (
+            36864 * HIDDEN_UNITS * 2
+            + HIDDEN_UNITS * 4
+            + 2 * 8 * HIDDEN_UNITS
+            + 8 * 4
+            + OUTPUT_BUCKETS * 8
+            + OUTPUT_BUCKETS * 4
+        )
+        self.assertEqual(container["payload_length"], expected_payload)
+        self.assertEqual(container["payload_hash"], metadata["payload_sha256"])
+        self.assertEqual(container["network_hash"], metadata["network_sha256"])
+        self.assertEqual(hashlib.sha256(first_net.read_bytes()).hexdigest(),
+                         metadata["network_sha256"])
+
+        second_net = self.directory / "second-v6.nnue"
+        second_meta = self.directory / "second-v6.metadata.json"
+        completed = self.run_trainer(
+            "--arch",
+            "v6",
             "--l1-units",
             "8",
             "--l1-shifts",

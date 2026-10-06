@@ -99,6 +99,12 @@ std::unique_ptr<GpuNnueService> GpuNnueService::create(const NnueNetwork& networ
     error = "this build has no GPU NNUE kernel";
     return nullptr;
 #else
+    if (network.manifest.version == kKoiNnueHalfkaThreatV6FormatVersion) {
+        // The embedded kernel implements the v5 L1 stage only; a v6 container
+        // must fall back to the CPU evaluator instead of running v5 math.
+        error = "the GPU kernel does not implement version 6 containers";
+        return nullptr;
+    }
     if (network.manifest.version != kKoiNnueHalfkaThreatV5FormatVersion ||
         network.manifest.layer_sizes[0] != kInput ||
         network.manifest.layer_sizes[2] != kBuckets) {

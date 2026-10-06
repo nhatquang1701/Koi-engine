@@ -24,7 +24,8 @@ inline constexpr std::size_t kMaximumGpuBatchSize = 256;
 // Synchronous GPU evaluation service for the v5 network.  The service owns the
 // device weights and a small amount of staging memory; callers pass a batch of
 // positions and receive one score per position.  Every failure returns false so
-// the caller can fall back to the CPU implementation.
+// the caller can fall back to the CPU implementation.  Version 6 containers
+// have a different L1 stage and are rejected explicitly (no v6 kernel exists).
 class GpuNnueService {
 public:
     ~GpuNnueService();
