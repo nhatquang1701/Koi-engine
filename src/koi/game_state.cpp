@@ -1466,6 +1466,10 @@ Piece GameState::piece_at(Square square) const noexcept {
     return impl_->native_position.piece_at(square);
 }
 
+void GameState::copy_board_to(std::span<Piece, 64> output) const noexcept {
+    impl_->native_position.copy_board_to(output);
+}
+
 int GameState::direct_static_exchange_gain(const MoveMetadata& initial) const noexcept {
     const detail::ExchangeContext context = detail::exchange_context_from(impl_->native_position);
     return detail::static_exchange_gain_from_features(context, initial);

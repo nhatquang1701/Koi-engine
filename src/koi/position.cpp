@@ -397,83 +397,88 @@ bool is_checked(const NativeState& state, Color color) noexcept {
     return king < 0 || square_attacked(state, king, opposite(color));
 }
 
-// Recomputes the per-colour king state used by incremental legality: the
-// checkers attacking each king and the own pieces pinned against an enemy
-// slider.  The masks are keyed by colour because apply_unchecked flips the
-// side before callers ask about the mover.
+// Recomputes the incremental king state for the side to move only: the
+// checkers attacking its king and its own pieces pinned against an enemy
+// slider.  apply_unchecked flips the side before callers ask about the mover,
+// and every reader indexes the masks with the current side: the hoisted
+// values in legal_moves, legal_moves_into_impl, and has_legal_move
+// (position.cpp:879-880, 903-904, 940-941) and the re-read in
+// resolve_move_legality (position.cpp:835), whose callers pass state.side as
+// the mover.  NativeState is private to this translation unit, so no other
+// reader exists.  The other colour's masks are intentionally left stale: no
+// reader touches them, and snapshot()/restore() copy both arrays
+// (position.cpp:1341, 1360-1361), so unmake restores whatever was
+// current when the snapshot was taken.
 void refresh_king_masks(NativeState& state) noexcept {
-    for (std::size_t color_index = 0; color_index < 2; ++color_index) {
-        state.checkers[color_index] = 0;
-        state.pinned[color_index] = 0;
-        state.blockers_for_king[color_index] = 0;
-    }
-    for (std::size_t color_index = 0; color_index < 2; ++color_index) {
-        const Color color = color_index == 0 ? Color::white : Color::black;
-        const int king = king_square(state, color);
-        if (king < 0) continue;
-        const std::size_t enemy_index = 1 - color_index;
-        const bool enemy_pawns_are_white = color == Color::black;
-        const std::uint64_t enemy_pawns =
-            state.piece_bitboards[enemy_index][static_cast<std::size_t>(PieceType::pawn)];
-        const std::uint64_t enemy_knights =
-            state.piece_bitboards[enemy_index][static_cast<std::size_t>(PieceType::knight)];
-        const std::uint64_t enemy_kings =
-            state.piece_bitboards[enemy_index][static_cast<std::size_t>(PieceType::king)];
-        const std::uint64_t enemy_bishops =
-            state.piece_bitboards[enemy_index][static_cast<std::size_t>(PieceType::bishop)] |
-            state.piece_bitboards[enemy_index][static_cast<std::size_t>(PieceType::queen)];
-        const std::uint64_t enemy_rooks =
-            state.piece_bitboards[enemy_index][static_cast<std::size_t>(PieceType::rook)] |
-            state.piece_bitboards[enemy_index][static_cast<std::size_t>(PieceType::queen)];
+    const std::size_t color_index = state.side == Color::white ? 0U : 1U;
+    state.checkers[color_index] = 0;
+    state.pinned[color_index] = 0;
+    state.blockers_for_king[color_index] = 0;
+    const Color color = state.side;
+    const int king = king_square(state, color);
+    if (king < 0) return;
+    const std::size_t enemy_index = 1 - color_index;
+    const bool enemy_pawns_are_white = color == Color::black;
+    const std::uint64_t enemy_pawns =
+        state.piece_bitboards[enemy_index][static_cast<std::size_t>(PieceType::pawn)];
+    const std::uint64_t enemy_knights =
+        state.piece_bitboards[enemy_index][static_cast<std::size_t>(PieceType::knight)];
+    const std::uint64_t enemy_kings =
+        state.piece_bitboards[enemy_index][static_cast<std::size_t>(PieceType::king)];
+    const std::uint64_t enemy_bishops =
+        state.piece_bitboards[enemy_index][static_cast<std::size_t>(PieceType::bishop)] |
+        state.piece_bitboards[enemy_index][static_cast<std::size_t>(PieceType::queen)];
+    const std::uint64_t enemy_rooks =
+        state.piece_bitboards[enemy_index][static_cast<std::size_t>(PieceType::rook)] |
+        state.piece_bitboards[enemy_index][static_cast<std::size_t>(PieceType::queen)];
 
-        const std::uint64_t checkers =
-            (detail::pawn_attackers_of(king, enemy_pawns_are_white) & enemy_pawns) |
-            (detail::knight_attacks(king) & enemy_knights) |
-            (detail::king_attacks(king) & enemy_kings) |
-            (detail::bishop_attacks(king, state.occupied) & enemy_bishops) |
-            (detail::rook_attacks(king, state.occupied) & enemy_rooks);
-        state.checkers[color_index] = checkers;
+    const std::uint64_t checkers =
+        (detail::pawn_attackers_of(king, enemy_pawns_are_white) & enemy_pawns) |
+        (detail::knight_attacks(king) & enemy_knights) |
+        (detail::king_attacks(king) & enemy_kings) |
+        (detail::bishop_attacks(king, state.occupied) & enemy_bishops) |
+        (detail::rook_attacks(king, state.occupied) & enemy_rooks);
+    state.checkers[color_index] = checkers;
 
-        // The former "squares strictly between each slider checker and the
-        // king" mask was written but never read: git grep finds only the
-        // reset above, the snapshot/restore copies, and the declaration of
-        // state.blockers_for_king, so its computation is gone.  The field
-        // itself stays because it is part of the snapshot/restore surface,
-        // and the reset above keeps it at zero.
-        //
-        // Pin scan.  Removing a piece can only expose a slider attack that
-        // runs through the piece's square; a piece between the king and the
-        // removed piece would still block, and a piece off the ray does not
-        // affect it at all.  So a piece is pinned exactly when it is the
-        // nearest blocker on one of the king's rays and the next piece on
-        // that ray is an enemy slider of the matching type.  This is the same
-        // predicate as the former per-piece trial, which removed the piece
-        // from the occupancy and asked bishop_attacks/rook_attacks for an
-        // enemy slider: removing the nearest blocker is the only occupancy
-        // change that trial made, and sliding_attacks stops at the first
-        // blocker, so its intersection is non-zero exactly when that next
-        // blocker is an enemy bishop/queen on a diagonal ray or rook/queen on
-        // an orthogonal ray.  attack_tables.cpp builds the direction order
-        // N, NE, E, SE, S, SW, W, NW, so odd indices are the diagonals.
-        std::uint64_t pinned = 0;
-        for (int direction = 0; direction < detail::kAttackDirections; ++direction) {
-            const int first = detail::nearest_blocker(king, direction, state.occupied);
-            if (first < 0) continue;
-            const Piece first_piece = state.board[static_cast<std::size_t>(first)];
-            if (first_piece.color != color || first_piece.type == PieceType::king) continue;
-            const int second = detail::nearest_blocker(
-                king, direction, state.occupied & ~(std::uint64_t{1} << first));
-            if (second < 0) continue;
-            const Piece second_piece = state.board[static_cast<std::size_t>(second)];
-            if (second_piece.color != opposite(color)) continue;
-            const bool diagonal = (direction & 1) != 0;
-            if (second_piece.type == PieceType::queen ||
-                second_piece.type == (diagonal ? PieceType::bishop : PieceType::rook)) {
-                pinned |= std::uint64_t{1} << first;
-            }
+    // The former "squares strictly between each slider checker and the
+    // king" mask was written but never read: git grep finds only the
+    // reset above, the snapshot/restore copies, and the declaration of
+    // state.blockers_for_king, so its computation is gone.  The field
+    // itself stays because it is part of the snapshot/restore surface,
+    // and the reset above keeps it at zero.
+    //
+    // Pin scan.  Removing a piece can only expose a slider attack that
+    // runs through the piece's square; a piece between the king and the
+    // removed piece would still block, and a piece off the ray does not
+    // affect it at all.  So a piece is pinned exactly when it is the
+    // nearest blocker on one of the king's rays and the next piece on
+    // that ray is an enemy slider of the matching type.  This is the same
+    // predicate as the former per-piece trial, which removed the piece
+    // from the occupancy and asked bishop_attacks/rook_attacks for an
+    // enemy slider: removing the nearest blocker is the only occupancy
+    // change that trial made, and sliding_attacks stops at the first
+    // blocker, so its intersection is non-zero exactly when that next
+    // blocker is an enemy bishop/queen on a diagonal ray or rook/queen on
+    // an orthogonal ray.  attack_tables.cpp builds the direction order
+    // N, NE, E, SE, S, SW, W, NW, so odd indices are the diagonals.
+    std::uint64_t pinned = 0;
+    for (int direction = 0; direction < detail::kAttackDirections; ++direction) {
+        const int first = detail::nearest_blocker(king, direction, state.occupied);
+        if (first < 0) continue;
+        const Piece first_piece = state.board[static_cast<std::size_t>(first)];
+        if (first_piece.color != color || first_piece.type == PieceType::king) continue;
+        const int second = detail::nearest_blocker(
+            king, direction, state.occupied & ~(std::uint64_t{1} << first));
+        if (second < 0) continue;
+        const Piece second_piece = state.board[static_cast<std::size_t>(second)];
+        if (second_piece.color != opposite(color)) continue;
+        const bool diagonal = (direction & 1) != 0;
+        if (second_piece.type == PieceType::queen ||
+            second_piece.type == (diagonal ? PieceType::bishop : PieceType::rook)) {
+            pinned |= std::uint64_t{1} << first;
         }
-        state.pinned[color_index] = pinned;
     }
+    state.pinned[color_index] = pinned;
 }
 
 namespace {
@@ -1633,6 +1638,10 @@ std::string Position::fen() const { return impl_->position.fen(); }
 Color Position::side_to_move() const noexcept { return impl_->position.side_to_move(); }
 
 Piece Position::piece_at(Square square) const noexcept { return impl_->position.piece_at(square); }
+
+void Position::copy_board_to(std::span<Piece, 64> output) const noexcept {
+    std::ranges::copy(impl_->position.state.board, output.begin());
+}
 
 std::vector<Move> Position::legal_moves() const {
     return const_cast<NativePosition&>(impl_->position).legal_moves();

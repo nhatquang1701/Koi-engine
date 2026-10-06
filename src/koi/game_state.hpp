@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <expected>
 #include <memory>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -253,6 +254,8 @@ public:
     [[nodiscard]] std::string fen() const;
     [[nodiscard]] Color side_to_move() const noexcept;
     [[nodiscard]] Piece piece_at(Square square) const noexcept;
+    // Forwards Position::copy_board_to; see that declaration.
+    void copy_board_to(std::span<Piece, 64> output) const noexcept;
     [[nodiscard]] std::vector<Move> legal_moves() const;
     [[nodiscard]] PositionConsistencySnapshot consistency_snapshot() const;
     // Cheap search-boundary mirror check. The exhaustive consistency snapshot

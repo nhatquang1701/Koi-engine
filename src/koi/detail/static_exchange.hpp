@@ -220,10 +220,7 @@ struct ExchangeContext {
 
 inline ExchangeContext exchange_context_from(const Position& position) noexcept {
     ExchangeContext context;
-    for (int square = 0; square < 64; ++square) {
-        context.board[static_cast<std::size_t>(square)] =
-            position.piece_at(Square::from_index(square));
-    }
+    position.copy_board_to(context.board);
     for (const Color color : {Color::white, Color::black}) {
         const std::uint64_t king = position.piece_bitboard(PieceType::king, color);
         if (king != 0) {
@@ -236,15 +233,12 @@ inline ExchangeContext exchange_context_from(const Position& position) noexcept 
 }
 
 // Same baseline through the public GameState surface, for search code that
-// only holds a GameState.  GameState forwards piece_at, piece_bitboard, and
-// side_to_move to the native Position, so this produces exactly the mailbox
-// the Position overload above produces.
+// only holds a GameState.  GameState forwards copy_board_to, piece_bitboard,
+// and side_to_move to the native Position, so this produces exactly the
+// mailbox the Position overload above produces.
 inline ExchangeContext exchange_context_from(const GameState& state) noexcept {
     ExchangeContext context;
-    for (int square = 0; square < 64; ++square) {
-        context.board[static_cast<std::size_t>(square)] =
-            state.piece_at(Square::from_index(square));
-    }
+    state.copy_board_to(context.board);
     for (const Color color : {Color::white, Color::black}) {
         const std::uint64_t king = state.piece_bitboard(PieceType::king, color);
         if (king != 0) {

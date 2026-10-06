@@ -27,6 +27,10 @@ public:
     [[nodiscard]] std::string fen() const;
     [[nodiscard]] Color side_to_move() const noexcept;
     [[nodiscard]] Piece piece_at(Square square) const noexcept;
+    // Copies the native mailbox into `output` in square-index order (one block
+    // copy). Bulk callers such as SEE context construction avoid 64 cross-TU
+    // piece_at calls per snapshot.
+    void copy_board_to(std::span<Piece, 64> output) const noexcept;
     [[nodiscard]] std::vector<Move> legal_moves() const;
     // Allocation-free legal generation for hot callers. The output preserves
     // the same deterministic ordering as legal_moves(); the returned value is

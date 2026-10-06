@@ -128,7 +128,9 @@ private:
         std::uint16_t source_index;
         std::uint8_t stage_rank;
         int priority;
-        std::uint32_t tie_break;
+        // Packed (priority descending, tie-break ascending) sort key; see
+        // picker_stage_sort_key() in search_ordering.cpp.
+        std::uint64_t sort_key;
     };
 
     static constexpr std::size_t kStageRankCount =
@@ -171,7 +173,7 @@ private:
     std::optional<ExchangeContext> see_context_;
     std::array<Candidate, kMaximumLegalMoves> staged_;
     // Candidates are grouped by stage rank once per preparation; each group is
-    // sorted with the full comparator only when its stage is first reached, so
+    // sorted with its packed key only when its stage is first reached, so
     // stages that pruning skips never pay for a sort.
     std::array<std::uint16_t, kStageRankCount> stage_begin_{};
     std::array<std::uint16_t, kStageRankCount> stage_end_{};

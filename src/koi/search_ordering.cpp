@@ -48,6 +48,20 @@ int promotion_value(const Promotion promotion) noexcept {
     return 0;
 }
 
+// Ascending 64-bit key for the picker's per-stage sort.  The high half
+// sign-flips and inverts the signed priority, so an ascending key orders
+// priority descending; the low half carries the move tie-break key
+// ascending.  source_index is deliberately not packed: move_tie_break_key is
+// injective over the distinct legal moves of one candidate list, so the low
+// half already separates every pair of records a stage range can contain
+// (see ensure_stage_sorted).
+[[nodiscard]] constexpr std::uint64_t picker_stage_sort_key(
+    const int priority, const std::uint32_t tie_break) noexcept {
+    return (static_cast<std::uint64_t>(
+                ~(static_cast<std::uint32_t>(priority) ^ 0x80000000U)) << 32U) |
+        tie_break;
+}
+
 } // namespace
 
 std::uint32_t move_tie_break_key(const Move move) noexcept {
@@ -535,7 +549,7 @@ void SearchMovePicker::prepare_candidates() {
         }
         staged_[candidate_count_++] = Candidate{
             static_cast<std::uint16_t>(index), static_cast<std::uint8_t>(candidate_stage),
-            priority, move_tie_break_key(metadata->move)};
+            priority, picker_stage_sort_key(priority, move_tie_break_key(metadata->move))};
     }
 
     // Partition by stage rank and sort each stage lazily.  The previous
@@ -545,10 +559,10 @@ void SearchMovePicker::prepare_candidates() {
     // reaches are never sorted at all.
     //
     // The grouping itself is a counting partition rather than a comparison
-    // sort.  The per-stage comparator below is a strict total order because
-    // its final key, source_index, is unique per candidate, so the order
-    // inside a stage is fixed by that sort alone and the partition is free
-    // to be unstable.
+    // sort.  The per-stage packed key below is a strict total order because
+    // its tie-break half is unique per candidate (see ensure_stage_sorted),
+    // so the order inside a stage is fixed by that sort alone and the
+    // partition is free to be unstable.
     std::array<std::size_t, kStageRankCount> counts{};
     for (std::size_t i = 0; i < candidate_count_; ++i) {
         ++counts[staged_[i].stage_rank];
@@ -583,15 +597,23 @@ void SearchMovePicker::ensure_stage_sorted() noexcept {
         return;
     }
     stage_sorted_.set(rank);
+    // One ascending 64-bit key replaces the former three-key comparator
+    // (priority descending, tie_break ascending, source_index ascending).
+    // The third key was unreachable for distinct records: move_tie_break_key
+    // maps (from, to, promotion) through the square-key permutation
+    // (index % 8) * 8 + index / 8 and then (from_key * 64 + to_key) * 5 +
+    // promotion_key, which is injective, and every candidate list handed to
+    // the picker is built from the legal-move generator, which emits each
+    // (from, to, promotion) triple at most once (each origin is visited once;
+    // every step and ray target is distinct; a promotion enumerates four
+    // distinct pieces; castling is the only two-square king move).  Filtering
+    // and compaction only remove records, so two records of one candidate
+    // list can never share a tie-break key.  Distinct records therefore
+    // always differ in the packed key, and this sort's total order is
+    // identical to the old comparator's.
     std::sort(staged_.begin() + stage_begin_[rank], staged_.begin() + stage_end_[rank],
               [](const Candidate& lhs, const Candidate& rhs) {
-                  if (lhs.priority != rhs.priority) {
-                      return lhs.priority > rhs.priority;
-                  }
-                  if (lhs.tie_break != rhs.tie_break) {
-                      return lhs.tie_break < rhs.tie_break;
-                  }
-                  return lhs.source_index < rhs.source_index;
+                  return lhs.sort_key < rhs.sort_key;
               });
 }
 
