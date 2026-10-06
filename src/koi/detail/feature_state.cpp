@@ -48,8 +48,22 @@ PositionFeatures FeatureState::get_or_compute(const std::size_t cache_index,
                                               const std::uint64_t position_key,
                                               const Position& position,
                                               const FeatureBuilder builder) const noexcept {
+    PositionFeatures features;
+    get_or_compute_into(cache_index, position_key, position, builder, features);
+    // NRVO constructs the return object in place, so this wrapper keeps the
+    // by-value API's copy count: one slot copy on a hit, one slot copy on a
+    // miss, with the same snapshot contents as the former direct returns.
+    return features;
+}
+
+void FeatureState::get_or_compute_into(const std::size_t cache_index,
+                                       const std::uint64_t position_key,
+                                       const Position& position,
+                                       const FeatureBuilder builder,
+                                       PositionFeatures& out) const noexcept {
     if (builder == nullptr) {
-        return {};
+        out = {};
+        return;
     }
 
     if (cache_index < kMaximumGameStateHistory) {
@@ -60,7 +74,8 @@ PositionFeatures FeatureState::get_or_compute(const std::size_t cache_index,
         if (published_valid_[cache_index].load(std::memory_order_acquire)) {
             const Entry* entry = published_[cache_index].load(std::memory_order_acquire);
             if (entry != nullptr && keys_[cache_index].load(std::memory_order_acquire) == position_key) {
-                return entry->features;
+                out = entry->features;
+                return;
             }
         }
     }
@@ -69,19 +84,23 @@ PositionFeatures FeatureState::get_or_compute(const std::size_t cache_index,
     if (cache_index < kMaximumGameStateHistory) {
         const auto& entry = slots_[cache_index];
         if (valid_[cache_index] && entry != nullptr && entry->position_key == position_key) {
-            return entry->features;
+            out = entry->features;
+            return;
         }
     }
 
     cache_misses_.fetch_add(1, std::memory_order_relaxed);
-    const PositionFeatures features = builder(position);
+    // Fill the caller's snapshot first, then mirror it into the slot: the miss
+    // path pays the same single copy as the by-value API, and a caller keeps
+    // the builder result even when allocating or storing the entry throws.
+    out = builder(position);
     if (cache_index < kMaximumGameStateHistory) {
         try {
             if (slots_[cache_index] == nullptr) {
                 slots_[cache_index] = std::make_unique<Entry>();
             }
             slots_[cache_index]->position_key = position_key;
-            slots_[cache_index]->features = features;
+            slots_[cache_index]->features = out;
             valid_[cache_index] = true;
             published_[cache_index].store(slots_[cache_index].get(), std::memory_order_release);
             keys_[cache_index].store(position_key, std::memory_order_release);
@@ -92,7 +111,6 @@ PositionFeatures FeatureState::get_or_compute(const std::size_t cache_index,
             keys_[cache_index].store(0, std::memory_order_release);
         }
     }
-    return features;
 }
 
 void FeatureState::invalidate(const std::size_t cache_index) noexcept {

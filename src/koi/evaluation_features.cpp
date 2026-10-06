@@ -320,7 +320,11 @@ constexpr std::size_t kThreatSliderStride = 384;
 
 EvaluationFeatures EvaluationFeatureExtractor::extract(const GameState& state) noexcept {
     EvaluationFeatures features;
-    features.position = state.position_features();
+    // Fill the member in place: the cached snapshot is copied once, where the
+    // by-value call would also build and then copy-assign a return temporary.
+    // Every member of `features.position` is overwritten, so the result is
+    // identical to `features.position = state.position_features()`.
+    state.position_features_into(features.position);
     features.castling_rights = features.position.castling_rights;
     return features;
 }

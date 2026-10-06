@@ -26,6 +26,14 @@ public:
     [[nodiscard]] PositionFeatures get_or_compute(
         std::size_t cache_index, std::uint64_t position_key,
         const Position& position, FeatureBuilder builder) const noexcept;
+    // Output-parameter form for hot callers that already own a destination.
+    // Cache behavior and contents are identical to get_or_compute(); a cache
+    // hit copies the slot snapshot straight into `out` instead of building a
+    // return temporary that the caller then assigns from.
+    void get_or_compute_into(
+        std::size_t cache_index, std::uint64_t position_key,
+        const Position& position, FeatureBuilder builder,
+        PositionFeatures& out) const noexcept;
     void invalidate(std::size_t cache_index) noexcept;
     [[nodiscard]] std::uint64_t cache_misses() const noexcept;
 

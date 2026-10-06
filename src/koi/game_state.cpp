@@ -1777,6 +1777,17 @@ PositionFeatures GameState::position_features() const noexcept {
         native_position_features);
 }
 
+void GameState::position_features_into(PositionFeatures& out) const noexcept {
+    // Same authority, cache slot, and miss accounting as position_features();
+    // only the return path differs, so the extracted snapshot is identical.
+    impl_->feature_state.get_or_compute_into(
+        impl_->native_position.history_size(),
+        impl_->native_position.position_key(),
+        impl_->native_position,
+        native_position_features,
+        out);
+}
+
 std::uint64_t GameState::position_feature_cache_misses() const noexcept {
     return impl_->feature_state.cache_misses();
 }

@@ -276,6 +276,11 @@ public:
         CheckFlagMode check_flag_mode = CheckFlagMode::all_moves) const noexcept;
     [[nodiscard]] std::optional<MoveMetadata> describe_move(const Move&) const noexcept;
     [[nodiscard]] PositionFeatures position_features() const noexcept;
+    // Output-parameter form of position_features(): fills an existing snapshot
+    // in place so hot evaluator/search fetches do not materialize a return
+    // temporary first. Cache behavior, contents, and thread safety are
+    // identical; see detail::FeatureState::get_or_compute_into.
+    void position_features_into(PositionFeatures& out) const noexcept;
     // Diagnostic-only count of cache rebuilds. Search uses this to verify that
     // make/unmake restores parent feature snapshots instead of rebuilding them.
     [[nodiscard]] std::uint64_t position_feature_cache_misses() const noexcept;

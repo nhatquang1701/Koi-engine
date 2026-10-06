@@ -201,20 +201,46 @@ bool has_legal_en_passant_capture(const NativeState& state) noexcept;
 bool has_legal_en_passant_capture_mutable(NativeState& state) noexcept;
 void refresh_king_masks(NativeState& state) noexcept;
 
-// Records a snapshot of the pre-move state. The array has a fixed capacity so
-// the search can make and unmake moves without allocating, but a game may
-// legitimately run past it: a long replay then drops the oldest snapshot and
-// keeps the recent window that repetition detection and search need. Without
-// this, a command listing more than `kMaximumHistory` moves would be rejected
-// and the engine would keep answering the stale position.
-void record_snapshot(NativeState& state, const Snapshot& saved) noexcept {
+// Records a snapshot of the pre-move state in the next history slot. The
+// array has a fixed capacity so the search can make and unmake moves without
+// allocating, but a game may legitimately run past it: a long replay then
+// drops the oldest snapshot and keeps the recent window that repetition
+// detection and search need. Without this, a command listing more than
+// `kMaximumHistory` moves would be rejected and the engine would keep
+// answering the stale position.
+//
+// The slot is filled field by field straight from `state`, so make/unmake
+// pays no intermediate Snapshot temporary. That is bit-identical to the
+// former `record_snapshot(state, snapshot())`: the full-history memmove only
+// shifts history[0..kMaximumHistory-2], which shares no storage with the
+// copied state fields, so shifting before or after the copy writes the same
+// values. Only struct padding is left as the slot had it, and nothing reads
+// padding.
+void snapshot_into(NativeState& state, bool null_move = false) noexcept {
+    Snapshot* slot = nullptr;
     if (state.history_size >= kMaximumHistory) {
         std::memmove(state.history.data(), state.history.data() + 1,
                      (kMaximumHistory - 1) * sizeof(Snapshot));
-        state.history[kMaximumHistory - 1] = saved;
-        return;
+        slot = &state.history[kMaximumHistory - 1];
+    } else {
+        slot = &state.history[state.history_size++];
     }
-    state.history[state.history_size++] = saved;
+    slot->board = state.board;
+    slot->side = state.side;
+    slot->castling = state.castling;
+    slot->en_passant = state.en_passant;
+    slot->halfmove = state.halfmove;
+    slot->fullmove = state.fullmove;
+    slot->key = state.key;
+    slot->piece_bitboards = state.piece_bitboards;
+    slot->occupancy = state.occupancy;
+    slot->occupied = state.occupied;
+    slot->checkers = state.checkers;
+    slot->pinned = state.pinned;
+    slot->blockers_for_king = state.blockers_for_king;
+    slot->null_move = null_move;
+    slot->repetition_history_fingerprint = state.repetition_history_fingerprint;
+    slot->repetition_history_suppressed = state.repetition_history_suppressed;
 }
 
 std::uint64_t bit(int square) noexcept {
@@ -402,13 +428,13 @@ bool is_checked(const NativeState& state, Color color) noexcept {
 // slider.  apply_unchecked flips the side before callers ask about the mover,
 // and every reader indexes the masks with the current side: the hoisted
 // values in legal_moves, legal_moves_into_impl, and has_legal_move
-// (position.cpp:879-880, 903-904, 940-941), the re-read in
-// resolve_move_legality (position.cpp:835), whose callers pass state.side as
-// the mover, and the side-to-move in_check() probe (position.cpp:1125).
+// (position.cpp:921-922, 945-946, 982-983), the re-read in
+// resolve_move_legality (position.cpp:877), whose callers pass state.side as
+// the mover, and the side-to-move in_check() probe (position.cpp:1179).
 // NativeState is private to this translation unit, so no other
 // reader exists.  The other colour's masks are intentionally left stale: no
 // reader touches them, and snapshot()/restore() copy both arrays
-// (position.cpp:1365, 1384), so unmake restores whatever was
+// (position.cpp:1407, 1426), so unmake restores whatever was
 // current when the snapshot was taken.
 void refresh_king_masks(NativeState& state) noexcept {
     const std::size_t color_index = state.side == Color::white ? 0U : 1U;
@@ -464,13 +490,29 @@ void refresh_king_masks(NativeState& state) noexcept {
     // N, NE, E, SE, S, SW, W, NW, so odd indices are the diagonals.
     std::uint64_t pinned = 0;
     for (int direction = 0; direction < detail::kAttackDirections; ++direction) {
-        const int first = detail::nearest_blocker(king, direction, state.occupied);
-        if (first < 0) continue;
+        // One ray word answers both nearest-blocker scans.  A ray is
+        // monotone in square index and starts on the square adjacent to the
+        // king, so every blocker lies on one side of the king: the
+        // lowest-index blocker sits above the king exactly on the
+        // increasing-step rays (N, NE, E, NW) and below it on the four
+        // decreasing ones.  That sign picks the near end for both scans.
+        const std::uint64_t blockers =
+            detail::ray_attacks(king, direction) & state.occupied;
+        if (blockers == 0) continue;
+        const int lowest = static_cast<int>(std::countr_zero(blockers));
+        const int highest = 63 - static_cast<int>(std::countl_zero(blockers));
+        const bool increasing = lowest > king;
+        const int first = increasing ? lowest : highest;
         const Piece first_piece = state.board[static_cast<std::size_t>(first)];
         if (first_piece.color != color || first_piece.type == PieceType::king) continue;
-        const int second = detail::nearest_blocker(
-            king, direction, state.occupied & ~(std::uint64_t{1} << first));
-        if (second < 0) continue;
+        // Clearing the first blocker leaves the next blocker on the same
+        // ray, which is exactly the occupancy the second nearest_blocker
+        // call used to receive; picking its near end yields the same square.
+        const std::uint64_t remaining = blockers & ~(std::uint64_t{1} << first);
+        if (remaining == 0) continue;
+        const int second = increasing ?
+            static_cast<int>(std::countr_zero(remaining)) :
+            63 - static_cast<int>(std::countl_zero(remaining));
         const Piece second_piece = state.board[static_cast<std::size_t>(second)];
         if (second_piece.color != opposite(color)) continue;
         const bool diagonal = (direction & 1) != 0;
@@ -770,7 +812,7 @@ public:
 // snapshot()/restore() pair covers board, side, checkers, pinned,
 // en_passant, and occupied, and the king probe (king_move_is_legal)
 // temporarily clears only `occupied` and restores it.  resolve_move_legality
-// never records history (record_snapshot belongs to the public make path),
+// never records history (snapshot_into belongs to the public make path),
 // so the hoisted values stay loop-invariant.
 [[nodiscard]] static bool move_requires_legality_probe(
     const Move& move, const Board& board,
@@ -1014,7 +1056,7 @@ std::vector<Move> legal_moves() {
     bool apply_legal(const Move& move) {
         const auto legal = legal_moves();
         if (std::find(legal.begin(), legal.end(), move) == legal.end()) return false;
-        record_snapshot(state, snapshot());
+        snapshot_into(state);
         apply_unchecked(move);
         refresh_king_masks(state);
         return true;
@@ -1036,7 +1078,7 @@ std::vector<Move> legal_moves() {
         if (moving.empty() || moving.color != state.side) {
             return false;
         }
-        record_snapshot(state, snapshot());
+        snapshot_into(state);
         apply_unchecked(move);
         refresh_king_masks(state);
         return true;
@@ -1044,8 +1086,10 @@ std::vector<Move> legal_moves() {
 
     bool unapply() noexcept {
         if (state.history_size == 0) return false;
-        const Snapshot saved = state.history[--state.history_size];
-        restore(saved);
+        // Restore straight from the history slot: restore() only reads it,
+        // and the slot is not written again until the next snapshot_into, so
+        // the local copy was pure overhead.
+        restore(state.history[--state.history_size]);
         return true;
     }
 
@@ -1057,9 +1101,7 @@ std::vector<Move> legal_moves() {
     }
 
     bool make_null_move() noexcept {
-        Snapshot saved = snapshot();
-        saved.null_move = true;
-        record_snapshot(state, saved);
+        snapshot_into(state, /*null_move=*/true);
         state.en_passant = {};
         state.halfmove = static_cast<std::uint16_t>(
             std::min<unsigned>(std::numeric_limits<std::uint16_t>::max(), state.halfmove + 1));

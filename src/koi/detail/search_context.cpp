@@ -780,7 +780,13 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
         const auto ensure_features = [&]() -> const PositionFeatures& {
             if (!features.has_value()) {
                 const std::uint64_t misses_before = state.position_feature_cache_misses();
-                features = state.position_features();
+                // emplace() value-initializes the snapshot, but the fill below
+                // overwrites every member with the same cached slot the
+                // by-value call would return, so the final contents are
+                // identical while the return temporary and its copy-assignment
+                // disappear.
+                features.emplace();
+                state.position_features_into(*features);
                 if (state.position_feature_cache_misses() > misses_before) {
                     ++stats.position_feature_extractions;
                 }
@@ -1467,7 +1473,11 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
             if (lmr_candidate && !metadata.is_capture()) {
                 if (!lmr_parent_features.has_value()) {
                     const std::uint64_t misses_before = state.position_feature_cache_misses();
-                    lmr_parent_features = state.position_features();
+                    // Same in-place fill as ensure_features(): the parent
+                    // snapshot is a value, not a reference into the cache, so
+                    // child fetches cannot rewrite it.
+                    lmr_parent_features.emplace();
+                    state.position_features_into(*lmr_parent_features);
                     if (state.position_feature_cache_misses() > misses_before) {
                         ++stats.position_feature_extractions;
                     }
