@@ -84,7 +84,10 @@ int SearchContext::quiescence(GameState& state, int alpha, int beta, int ply,
         record_ply(ply);
 
         const bool checked = state.in_check();
-        const bool repetition_sensitive = state.is_repetition_sensitive();
+        // One history scan feeds both the repetition-sensitivity flag here and
+        // the draw status below; the position does not change in between.
+        const std::size_t repetitions = state.repetition_count();
+        const bool repetition_sensitive = repetitions >= 2;
         bool path_repetition_sensitive = repetition_sensitive;
         bool path_selective_bound = false;
         if (repetition_sensitive_path != nullptr) {
@@ -197,7 +200,7 @@ int SearchContext::quiescence(GameState& state, int alpha, int beta, int ply,
             ++stats.tt_hits;
         }
 
-        const DrawStatus draw_status = state.draw_status();
+        const DrawStatus draw_status = state.draw_status(repetitions);
         // A non-checked forced draw has the same zero score as stalemate and
         // can be returned without generating the tactical frontier. Checked
         // positions still need legal evasions first so checkmate keeps
@@ -591,7 +594,11 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
                            bool* selective_bound_path,
                            bool* root_authoritative_path,
                            bool* lower_bound_path) {
-        bool path_repetition_sensitive = state.is_repetition_sensitive();
+        // One history scan feeds both the repetition-sensitivity flag here and
+        // the draw status after move generation; no mutation happens between
+        // the two reads on the path that reaches that status.
+        const std::size_t repetitions = state.repetition_count();
+        bool path_repetition_sensitive = repetitions >= 2;
         const RepetitionPathGuard repetition_path_guard{
             repetition_sensitive_path, &path_repetition_sensitive};
         bool path_selective_bound = false;
@@ -705,7 +712,7 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
         if (moves.empty()) {
             return terminal_score(state, moves.size(), ply);
         }
-        const DrawStatus draw_status = state.draw_status();
+        const DrawStatus draw_status = state.draw_status(repetitions);
         const bool claimable_draw = is_claimable_draw_status(draw_status);
         // Automatic/dead draws are properties of the current position, not
         // of the remaining move subset. A claimable draw is different: it is

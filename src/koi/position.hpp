@@ -110,6 +110,10 @@ public:
     [[nodiscard]] bool is_automatic_seventy_five_move_draw() const noexcept;
     [[nodiscard]] bool is_dead_position() const noexcept;
     [[nodiscard]] DrawStatus draw_status() const noexcept;
+    // Overload taking a precomputed repetition_count() so one history scan can
+    // serve both the draw status and repetition sensitivity of the same
+    // unchanged position.
+    [[nodiscard]] DrawStatus draw_status(std::size_t repetitions) const noexcept;
     // A claimable draw is an option for the side to move, not an automatic
     // terminal result. Search must still consider legal continuations.
     [[nodiscard]] bool is_claimable_draw() const noexcept;

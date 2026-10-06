@@ -402,12 +402,13 @@ bool is_checked(const NativeState& state, Color color) noexcept {
 // slider.  apply_unchecked flips the side before callers ask about the mover,
 // and every reader indexes the masks with the current side: the hoisted
 // values in legal_moves, legal_moves_into_impl, and has_legal_move
-// (position.cpp:879-880, 903-904, 940-941) and the re-read in
+// (position.cpp:879-880, 903-904, 940-941), the re-read in
 // resolve_move_legality (position.cpp:835), whose callers pass state.side as
-// the mover.  NativeState is private to this translation unit, so no other
+// the mover, and the side-to-move in_check() probe (position.cpp:1125).
+// NativeState is private to this translation unit, so no other
 // reader exists.  The other colour's masks are intentionally left stale: no
 // reader touches them, and snapshot()/restore() copy both arrays
-// (position.cpp:1341, 1360-1361), so unmake restores whatever was
+// (position.cpp:1365, 1384), so unmake restores whatever was
 // current when the snapshot was taken.
 void refresh_king_masks(NativeState& state) noexcept {
     const std::size_t color_index = state.side == Color::white ? 0U : 1U;
@@ -1122,7 +1123,19 @@ std::vector<Move> legal_moves() {
 
     [[nodiscard]] std::uint64_t occupied_squares() const noexcept { return state.occupied; }
 
-    [[nodiscard]] bool in_check() const noexcept { return is_checked(state, state.side); }
+    [[nodiscard]] bool in_check() const noexcept {
+        // Bit-identity with is_checked(state, state.side): refresh_king_masks()
+        // fills checkers[side] from exactly square_attacked()'s five terms, and
+        // every public mutation refreshes the side-to-move mask (rebuild_derived
+        // on set_fen and null transitions, apply_legal/make_generated_move after
+        // the side flip, restore on unmake).  Board-mutating trial helpers
+        // (has_legal_en_passant_capture_in_place, resolve_move_legality,
+        // safe_king_step) call is_checked()/square_attacked() directly and never
+        // read this mask.  is_checked() reports true for an absent king, so keep
+        // that guard; set_fen requires one king per side, making it defensive.
+        if (king_square(state, state.side) < 0) return true;
+        return state.checkers[state.side == Color::white ? 0U : 1U] != 0;
+    }
 
     [[nodiscard]] bool in_check(Color color) const noexcept { return is_checked(state, color); }
 
@@ -1294,21 +1307,32 @@ std::vector<Move> legal_moves() {
         return is_insufficient_material() || is_known_locked_pawn_wall();
     }
 
-    [[nodiscard]] DrawStatus draw_status() const noexcept {
+    // Overload taking a precomputed repetition_count() so one history scan can
+    // serve both the draw status and is_repetition_sensitive() for the same
+    // unchanged position.  The branches, ordering, and verdicts are identical
+    // to the scanning overload below; is_checkmate() stays lazily queried.
+    [[nodiscard]] DrawStatus draw_status(std::size_t repetitions) const noexcept {
         if (is_dead_position()) return DrawStatus::dead_position;
         if (is_automatic_seventy_five_move_draw()) {
             return DrawStatus::automatic_seventy_five_move;
         }
-        // The fivefold and threefold checks share one history scan.
-        const std::size_t repetitions = repetition_count();
+        // The fivefold and threefold checks share the caller's history scan.
         if (repetitions >= 5 && !is_checkmate()) return DrawStatus::automatic_fivefold;
         if (can_claim_fifty_move_draw()) return DrawStatus::claimable_fifty_move;
         if (repetitions >= 3 && !is_checkmate()) return DrawStatus::claimable_threefold;
         return DrawStatus::none;
     }
 
+    [[nodiscard]] DrawStatus draw_status() const noexcept {
+        return draw_status(repetition_count());
+    }
+
+    [[nodiscard]] bool is_repetition_sensitive(std::size_t repetitions) const noexcept {
+        return repetitions >= 2;
+    }
+
     [[nodiscard]] bool is_repetition_sensitive() const noexcept {
-        return repetition_count() >= 2;
+        return is_repetition_sensitive(repetition_count());
     }
 
     [[nodiscard]] bool is_draw_by_rule() const noexcept {
@@ -1776,6 +1800,10 @@ bool Position::is_dead_position() const noexcept {
 
 DrawStatus Position::draw_status() const noexcept {
     return impl_->position.draw_status();
+}
+
+DrawStatus Position::draw_status(std::size_t repetitions) const noexcept {
+    return impl_->position.draw_status(repetitions);
 }
 
 bool Position::is_claimable_draw() const noexcept {

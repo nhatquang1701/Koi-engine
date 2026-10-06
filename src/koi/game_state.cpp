@@ -1080,6 +1080,38 @@ struct NativeCheckProbe {
     return probe;
 }
 
+// Recomputes the six inputs native_check_probe() reads and reports whether they
+// still match `probe`.  The probe is a pure function of those inputs, so a
+// match guarantees the cached probe is bit-identical to a fresh build and the
+// caller may skip the rebuild.  A default-constructed probe can only match a
+// degenerate empty position, where a fresh probe would be identical anyway.
+bool native_check_probe_matches(const Position& position,
+                                const NativeCheckProbe& probe) noexcept {
+    if (position.side_to_move() != probe.moving_color) {
+        return false;
+    }
+    const std::uint64_t enemy_king =
+        position.piece_bitboard(PieceType::king, opposite(probe.moving_color));
+    if (enemy_king != probe.enemy_king ||
+        position.occupied_squares() != probe.occupied) {
+        return false;
+    }
+    if ((position.piece_bitboard(PieceType::rook, probe.moving_color) |
+         position.piece_bitboard(PieceType::queen, probe.moving_color)) !=
+        probe.friendly_rook_queen) {
+        return false;
+    }
+    if ((position.piece_bitboard(PieceType::bishop, probe.moving_color) |
+         position.piece_bitboard(PieceType::queen, probe.moving_color)) !=
+        probe.friendly_bishop_queen) {
+        return false;
+    }
+    const std::uint64_t king_slider_rays = enemy_king == 0 ? 0 :
+        detail::rook_attacks(static_cast<int>(std::countr_zero(enemy_king)), 0) |
+        detail::bishop_attacks(static_cast<int>(std::countr_zero(enemy_king)), 0);
+    return king_slider_rays == probe.king_slider_rays;
+}
+
 // `facts` must have been resolved from the same position as `probe`;
 // `castling` reports whether the move has the castling shape.
 bool native_move_gives_check(const Move& move, const Position::MoveFacts& facts,
@@ -1225,15 +1257,17 @@ bool native_move_gives_check(const Move& move, const Position::MoveFacts& facts,
     return false;
 }
 
-// Legacy per-move entry point.  It resolves the board facts and the invariant
-// probe for a single move, preserving the original behavior for callers that
-// probe a move outside a generated list (GameState::move_gives_check).
-bool native_move_gives_check(const Position& position, const Move& move) noexcept {
+// Single-move entry point.  It resolves the board facts for a move outside a
+// generated list and reuses the caller's cached invariant probe
+// (GameState::move_gives_check), which must have been validated against this
+// same position.
+bool native_move_gives_check(const Position& position, const Move& move,
+                             const NativeCheckProbe& probe) noexcept {
     const Position::MoveFacts facts = position.move_facts(move);
     const bool castling = facts.from.type == PieceType::king &&
         std::abs(static_cast<int>(move.to().index() % 8) -
                  static_cast<int>(move.from().index() % 8)) == 2;
-    return native_move_gives_check(move, facts, native_check_probe(position), castling);
+    return native_move_gives_check(move, facts, probe, castling);
 }
 
 // Native position plus the mirror check authority.  A null mirror means mirror
@@ -1397,6 +1431,12 @@ public:
     // Search-only states disable shadow maintenance (see detach_mirror()).
     // The flag is copied so every search descendant inherits it.
     bool mirror_tracking = true;
+    // Cached invariant inputs of the last native_check_probe() built for
+    // native_position.  move_gives_check() compares fresh inputs on every call,
+    // so a stale cache (for example after a copy, which starts with the default
+    // probe) can never change a result.  No mutable is needed: unique_ptr
+    // indirection permits mutation from const member functions.
+    NativeCheckProbe check_probe{};
 
     Impl() = default;
 
@@ -1906,7 +1946,15 @@ bool GameState::is_capture(const Move& move) const noexcept {
 }
 
 bool GameState::move_gives_check(const Move& move) const noexcept {
-    return native_move_gives_check(impl_->native_position, move);
+    const Position& position = impl_->native_position;
+    // The probe is a pure function of the six inputs compared here, so equal
+    // inputs reuse a probe bit-identical to a fresh build; a moved (or copied)
+    // state fails the comparison and rebuilds.  No explicit invalidation hook
+    // is needed because every call validates the cache first.
+    if (!native_check_probe_matches(position, impl_->check_probe)) {
+        impl_->check_probe = native_check_probe(position);
+    }
+    return native_move_gives_check(position, move, impl_->check_probe);
 }
 
 bool GameState::in_check() const noexcept {
@@ -1951,6 +1999,10 @@ std::uint64_t GameState::pawn_key() const noexcept {
 
 std::uint64_t GameState::piece_bitboard(const PieceType type, const Color color) const noexcept {
     return impl_->native_position.piece_bitboard(type, color);
+}
+
+std::size_t GameState::piece_count() const noexcept {
+    return impl_->native_position.piece_count();
 }
 
 std::uint64_t GameState::polyglot_key() const noexcept {
@@ -2036,6 +2088,10 @@ bool GameState::is_dead_position() const noexcept {
 
 DrawStatus GameState::draw_status() const noexcept {
     return impl_->native_position.draw_status();
+}
+
+DrawStatus GameState::draw_status(std::size_t repetitions) const noexcept {
+    return impl_->native_position.draw_status(repetitions);
 }
 
 bool GameState::is_claimable_draw() const noexcept {

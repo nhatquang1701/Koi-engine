@@ -1,8 +1,10 @@
 #include "koi/detail/search_context_support.hpp"
 
 #include <algorithm>
+#include <bit>
 #include <cmath>
 
+#include "koi/detail/attack_tables.hpp"
 #include "koi/detail/search_constants.hpp"
 #include "koi/piece_values.hpp"
 
@@ -86,35 +88,94 @@ bool quiet_move_is_forcing(const PositionFeatures& before,
     }
 
     int attacked_valuable_pieces = 0;
-    for (std::uint8_t square = 0; square < 64; ++square) {
-        const Piece target = features.board[square];
-        if (target.empty() || target.type == PieceType::king ||
-            (target.color == Color::white ? 0U : 1U) != enemy ||
-            !piece_attacks_square(features, destination, square)) {
-            continue;
+    if (features.occupied != 0) {
+        // Bitboard path.  The moved piece's attack mask with post-move
+        // occupancy is exactly the set of squares piece_attacks_square would
+        // accept: the tables encode the same geometry and first-blocker
+        // clearance the board walk applies.  Intersecting with `colors[enemy]`
+        // keeps only enemy-occupied squares, and ascending set-bit iteration
+        // (countr_zero) visits them in the same order as the 64-square scan.
+        std::uint64_t attacks = 0;
+        const Piece moved = features.board[destination];
+        switch (moved.type) {
+        case PieceType::pawn:
+            attacks = pawn_attacks(destination, moved.color == Color::white);
+            break;
+        case PieceType::knight:
+            attacks = knight_attacks(destination);
+            break;
+        case PieceType::king:
+            attacks = king_attacks(destination);
+            break;
+        case PieceType::bishop:
+            attacks = bishop_attacks(destination, features.occupied);
+            break;
+        case PieceType::rook:
+            attacks = rook_attacks(destination, features.occupied);
+            break;
+        case PieceType::queen:
+            attacks = queen_attacks(destination, features.occupied);
+            break;
+        case PieceType::none:
+            break;
         }
-        if (target.type == PieceType::queen || target.type == PieceType::rook) {
-            return true;
-        }
-        if (target.type == PieceType::pawn) {
-            const int target_file = square % 8;
-            const int target_rank = square / 8;
-            if (target_file >= 2 && target_file <= 5 &&
-                (target_rank == 3 || target_rank == 4)) {
+        attacks &= features.colors[enemy];
+        while (attacks != 0) {
+            const std::uint8_t square =
+                static_cast<std::uint8_t>(std::countr_zero(attacks));
+            attacks &= attacks - 1;
+            const Piece target = features.board[square];
+            if (target.empty() || target.type == PieceType::king ||
+                (target.color == Color::white ? 0U : 1U) != enemy) {
+                continue;
+            }
+            if (target.type == PieceType::queen || target.type == PieceType::rook) {
+                return true;
+            }
+            if (target.type == PieceType::pawn) {
+                const int target_file = square % 8;
+                const int target_rank = square / 8;
+                if (target_file >= 2 && target_file <= 5 &&
+                    (target_rank == 3 || target_rank == 4)) {
+                    return true;
+                }
+            }
+            if (++attacked_valuable_pieces >= 2) {
                 return true;
             }
         }
-        if (++attacked_valuable_pieces >= 2) {
-            return true;
+    } else {
+        // Synthetic fixtures carry no bitboards; keep the board-scanning path.
+        for (std::uint8_t square = 0; square < 64; ++square) {
+            const Piece target = features.board[square];
+            if (target.empty() || target.type == PieceType::king ||
+                (target.color == Color::white ? 0U : 1U) != enemy ||
+                !piece_attacks_square(features, destination, square)) {
+                continue;
+            }
+            if (target.type == PieceType::queen || target.type == PieceType::rook) {
+                return true;
+            }
+            if (target.type == PieceType::pawn) {
+                const int target_file = square % 8;
+                const int target_rank = square / 8;
+                if (target_file >= 2 && target_file <= 5 &&
+                    (target_rank == 3 || target_rank == 4)) {
+                    return true;
+                }
+            }
+            if (++attacked_valuable_pieces >= 2) {
+                return true;
+            }
         }
     }
 
-    const std::uint64_t newly_attacked = features.attacked_squares[own] &
+    std::uint64_t newly_attacked = features.attacked_squares[own] &
         ~before.attacked_squares[own];
-    for (std::uint8_t square = 0; square < 64; ++square) {
-        if ((newly_attacked & (std::uint64_t{1} << square)) == 0) {
-            continue;
-        }
+    while (newly_attacked != 0) {
+        const std::uint8_t square =
+            static_cast<std::uint8_t>(std::countr_zero(newly_attacked));
+        newly_attacked &= newly_attacked - 1;
         const Piece target = features.board[square];
         if (!target.empty() && (target.color == Color::white ? 0U : 1U) == enemy &&
             (target.type == PieceType::queen || target.type == PieceType::rook ||
@@ -269,14 +330,21 @@ bool quiet_move_has_pawn_break_target(const MoveMetadata& metadata) noexcept {
 }
 
 bool null_move_is_safe(const GameState& state, const PositionFeatures& features) noexcept {
+    // No repetition re-check: the only caller reaches this function only when
+    // SearchPolicy::dynamic_null_move() reported eligible, which requires
+    // `null_move_allowed`; that flag already contains
+    // `!repetition_sensitive` (search_context.cpp), so the direct
+    // state.is_repetition_sensitive() scan could only return false here.
     if (features.game_phase < 8 ||
         !state.has_non_pawn_material(state.side_to_move()) ||
         !state.has_non_pawn_material(opposite(state.side_to_move())) ||
-        state.halfmove_clock() >= kNullMoveRuleSafetyHalfmoves ||
-        state.is_repetition_sensitive()) {
+        state.halfmove_clock() >= kNullMoveRuleSafetyHalfmoves) {
         return false;
     }
-    return state.tablebase_snapshot().piece_count() > kNullMoveSparsePieceLimit;
+    // GameState::piece_count() forwards to the native position's maintained
+    // bitboards, which are the same per-piece bitboards the tablebase snapshot
+    // is rebuilt from (kings included), so the sparse gate is unchanged.
+    return state.piece_count() > kNullMoveSparsePieceLimit;
 }
 
 bool deep_quiet_check_candidate(const MoveMetadata& metadata) noexcept {
