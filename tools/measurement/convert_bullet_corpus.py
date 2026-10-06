@@ -19,7 +19,10 @@ from __future__ import annotations
 import argparse
 import pathlib
 
-import chess
+# ``koi_chess`` mirrors the python-chess API subset this tool needs and is
+# standard-library only, so the converter (and its regression test) run in CI
+# and on machines without python-chess installed.
+import koi_chess as chess
 
 
 def convert_line(line: str) -> str | None:

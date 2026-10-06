@@ -17,7 +17,9 @@ import pathlib
 import random
 import sys
 
-import chess
+# ``koi_chess`` mirrors the python-chess API subset this tool needs and is
+# standard-library only, so the validator runs without python-chess installed.
+import koi_chess as chess
 
 PIECE_CP = {
     chess.PAWN: 100,
@@ -30,9 +32,9 @@ PIECE_CP = {
 
 def material_stm(board: chess.Board) -> int:
     balance = 0
-    for piece_type, value in PIECE_CP.items():
-        balance += value * len(board.pieces(piece_type, chess.WHITE))
-        balance -= value * len(board.pieces(piece_type, chess.BLACK))
+    for piece in board.piece_map().values():
+        value = PIECE_CP.get(piece.piece_type, 0)
+        balance += value if piece.color == chess.WHITE else -value
     return balance if board.turn == chess.WHITE else -balance
 
 

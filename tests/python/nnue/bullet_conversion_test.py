@@ -15,10 +15,10 @@ import sys
 import tempfile
 import unittest
 
-import chess
-
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO_ROOT / "tools" / "measurement"))
+
+import koi_chess as chess  # noqa: E402
 
 from convert_bullet_corpus import convert_file, convert_line  # noqa: E402
 
@@ -38,13 +38,14 @@ class BulletConversionTests(unittest.TestCase):
         # A position and its colour mirror describe the same evaluation from
         # the mover's point of view: Bullet stores +55 for White to move and
         # -55 for the mirrored Black-to-move board, and both must convert to
-        # +55 after the side-to-move flip.
-        board = chess.Board("r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 0 3")
-        mirror = board.mirror()
-        self.assertEqual(board.turn, chess.WHITE)
-        self.assertEqual(mirror.turn, chess.BLACK)
-        white_row = f"{board.fen()} | 55 | 0.5"
-        mirror_row = f"{mirror.fen()} | -55 | 0.5"
+        # +55 after the side-to-move flip.  The mirror FEN is spelled out
+        # because koi_chess has no Board.mirror().
+        white_fen = "r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 0 3"
+        mirror_fen = "rnbqkb1r/pppp1ppp/5n2/4p3/4P3/2N5/PPPP1PPP/R1BQKBNR b KQkq - 0 3"
+        self.assertEqual(chess.Board(white_fen).turn, chess.WHITE)
+        self.assertEqual(chess.Board(mirror_fen).turn, chess.BLACK)
+        white_row = f"{white_fen} | 55 | 0.5"
+        mirror_row = f"{mirror_fen} | -55 | 0.5"
         self.assertEqual(convert_line(white_row).split(";")[1], "55")
         self.assertEqual(convert_line(mirror_row).split(";")[1], "55")
 
