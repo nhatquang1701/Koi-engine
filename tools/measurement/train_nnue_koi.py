@@ -866,13 +866,19 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def resolve_training_device() -> "torch.device":
-    """Select the training device; set KOI_NNUE_DEVICE=cpu|cuda to override."""
+    """Select the training device; set KOI_NNUE_DEVICE=cpu|cuda|mps to override."""
     preference = os.environ.get("KOI_NNUE_DEVICE", "auto").strip().lower()
     if preference == "cuda" and not torch.cuda.is_available():
         raise TrainerError("KOI_NNUE_DEVICE=cuda was set but CUDA is not available")
-    if preference == "cpu" or not torch.cuda.is_available():
+    if preference == "mps" and not torch.backends.mps.is_available():
+        raise TrainerError("KOI_NNUE_DEVICE=mps was set but MPS is not available")
+    if preference == "cpu":
         return torch.device("cpu")
-    return torch.device("cuda")
+    if preference in ("cuda", "auto") and torch.cuda.is_available():
+        return torch.device("cuda")
+    if preference in ("mps", "auto") and torch.backends.mps.is_available():
+        return torch.device("mps")
+    return torch.device("cpu")
 
 
 def main_v5(args, rng) -> int:
