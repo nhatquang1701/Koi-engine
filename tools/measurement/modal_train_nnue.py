@@ -15,7 +15,7 @@ Upload the corpus once into the Modal volume:
 
     modal volume put koi-training artifacts/training/labels.txt /labels.txt
 
-Smoke test (20 epochs, a few minutes on an L4):
+Smoke test (20 epochs, a few minutes on an A10):
 
     modal run tools/measurement/modal_train_nnue.py --epochs 20 --run-name koi-v6-labels-smoke
 
@@ -29,11 +29,14 @@ Download the outputs (net + metadata + log):
 
 Notes:
 
-- The function requests an L4 GPU.  Edit the ``gpu=`` argument in the
-  ``@app.function`` decorator to use a different class (``A10G``, ``A100``,
-  ``H100``, ...); ``gpu="any"`` is the cheapest fallback.
-- An L4 costs roughly $0.80/h, so a smoke run costs cents and a full run a few
-  dollars; the free plan's monthly compute credit covers the test.
+- The function requests an A10 GPU ($1.10/h).  That is the best speed/cost
+  pick for this workload: the trainer is embedding/optimizer memory-bound, and
+  the A10's ~600 GB/s of memory bandwidth is twice the L4's for 1.4x the
+  price.  Edit the ``gpu=`` argument in the ``@app.function`` decorator to use
+  a different class (``L4`` for the cheapest run, ``A100``, ``H100``, ...);
+  ``gpu="any"`` is the cheapest fallback.
+- A smoke run costs cents and a full run a few dollars; the free plan's
+  monthly compute credit covers the test.
 - Outputs are written to ``/data/out/<run-name>/`` inside the volume; commit
   happens after training and ``modal volume get`` copies them back.
 """
@@ -62,7 +65,7 @@ TRAIN_SCRIPT = "/root/koi/tools/measurement/train_nnue_koi.py"
 VALIDATE_SCRIPT = "/root/koi/tools/measurement/validate_corpus_perspective.py"
 
 
-@app.function(image=image, gpu="L4", volumes={"/data": volume}, timeout=12 * 60 * 60)
+@app.function(image=image, gpu="A10", volumes={"/data": volume}, timeout=12 * 60 * 60)
 def train(
     corpus: str = "/data/labels.txt",
     arch: str = "v6",
