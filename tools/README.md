@@ -530,14 +530,6 @@ python .\tools\nnue\to_bullet.py --help
 python .\tools\nnue\run_bullet.py --help
 ```
 
-`tools/measurement/modal_train_nnue.py` runs the same trainer on Modal
-(serverless GPU) as an optional cloud path: `pip install -U modal`, `modal
-token new`, upload the corpus with `modal volume put koi-training
-artifacts/training/labels.txt /labels.txt`, then `modal run
-tools/measurement/modal_train_nnue.py` (the module docstring has the smoke run
-and download commands). It validates the corpus perspective first and writes
-the net, metadata, and log into the `koi-training` volume.
-
 Validation runs the 64-position gate (`koi-bench --nnue`) and a node-limited,
 colour-split A/B match (`tools/nnue/ab_match.ps1` versus the classical evaluator,
 schema `koi-nnue-ab-match-v1`; `tools/nnue/net_match.ps1` for network versus
