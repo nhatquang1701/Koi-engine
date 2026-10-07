@@ -1867,6 +1867,27 @@ void test_v6_incremental_scripted_special_moves() {
     play_scripted_incremental("n3k3/1P6/8/8/8/8/8/4K3 w - - 0 1", {"b7a8q"}, weights);
 }
 
+void test_v6_incremental_wide_accumulation_deltas() {
+    // Saturating biases plus alternating extreme feature rows push the
+    // incremental deltas into int32 overflow, so the AVX2 delta path must fall
+    // back to the scalar int64 clamp and still match a full recompute.  The v6
+    // pair/difference head consumes the same hidden sums, so it must stay
+    // consistent across the fallback as well.
+    koi::NnueNetwork network = koi::NnueNetwork::synthetic_v6();
+    const std::size_t hidden = network.manifest.layer_sizes[1];
+    for (std::size_t index = 0; index < hidden; ++index) {
+        network.hidden_bias[index] = std::numeric_limits<std::int32_t>::max() - 100;
+    }
+    for (std::size_t index = 0; index < network.feature_weights.size(); ++index) {
+        network.feature_weights[index] =
+            index % 2U == 0U ? static_cast<std::int16_t>(32767)
+                             : static_cast<std::int16_t>(-32768);
+    }
+    const auto weights = std::make_shared<const koi::NnueNetwork>(std::move(network));
+    play_scripted_incremental("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+                              {"e2e4", "e7e5", "g1f3", "b8c6", "f1b5"}, weights);
+}
+
 } // namespace
 
 // Test-only seam: serialize a deterministic v4 fixture network and print the
@@ -2191,6 +2212,7 @@ int main(int argc, char** argv) {
         {"NNUE v6 incremental king bucket", test_v6_incremental_handles_king_bucket_crossing},
         {"NNUE v6 incremental recovery", test_v6_incremental_recovers_from_skipped_hooks},
         {"NNUE v6 incremental special moves", test_v6_incremental_scripted_special_moves},
+        {"NNUE v6 incremental wide deltas", test_v6_incremental_wide_accumulation_deltas},
         {"NNUE v6 container", test_v6_container_round_trip_and_validation},
         {"NNUE v6 validation", test_v6_manifest_validation_rejects_mismatches},
         {"NNUE v6 corruption", test_v6_container_rejects_corruption},

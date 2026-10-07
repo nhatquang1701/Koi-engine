@@ -454,11 +454,16 @@ if nn is not None:
             nn.init.uniform_(self.l1_weight, -34.0 / math.sqrt(hidden_units),
                              34.0 / math.sqrt(hidden_units))
             self.l1_diff_weight = nn.Parameter(torch.empty(l1_units, hidden_units))
-            # The diff values are signed and up to 127x larger than a pair
-            # product, so the diff head uses the same +-34/sqrt(hidden) init;
-            # quantize_v6 scales it without the /127 that the pair head uses.
-            nn.init.uniform_(self.l1_diff_weight, -34.0 / math.sqrt(hidden_units),
-                             34.0 / math.sqrt(hidden_units))
+            # The diff channel is not on the pair-product scale: measured on the
+            # real corpus, the pair-part L1 pre-activation sigma is 1.039 while
+            # the diff part is 4.243 (diff rms 4.07x the pair rms).  Reusing the
+            # pair +-34/sqrt(hidden) init would start the L1 layer ~90% outside
+            # [0, 1] and train it into a near-binary layer, so scale the diff
+            # init by 1/4.07; both channels then start near unit pre-activation
+            # sigma.  quantize_v6 still skips the /127 the pair head uses.
+            nn.init.uniform_(self.l1_diff_weight,
+                             -(34.0 / 4.07) / math.sqrt(hidden_units),
+                             (34.0 / 4.07) / math.sqrt(hidden_units))
             self.l1_bias = nn.Parameter(torch.zeros(l1_units))
             self.output_weight = nn.Parameter(torch.empty(OUTPUT_BUCKETS, l1_units))
             # Predictions start within a couple of target units instead of at
@@ -690,6 +695,17 @@ def integer_scores_v6(params, own, opp, buckets):
     return output >> params["output_shift"]
 
 
+def l1_saturation_v6(params, own, opp) -> float:
+    """Fraction of quantized v6 L1 units clipped to 0 or 127 on the sample."""
+    pairs = own * opp
+    diff = own - opp
+    l1 = (pairs @ params["l1_weights"].T + diff @ params["l1_diff_weights"].T
+          + params["l1_bias"])
+    l1 >>= params["l1_shift"]
+    l1 = np.clip(l1, 0, 127)
+    return float(np.mean((l1 == 0) | (l1 == 127)))
+
+
 def saturation_fractions_v5(params) -> tuple[float, float, float]:
     w1 = float(np.mean(np.abs(params["feature_weights"]) >= W1_LIMIT))
     l1 = float(np.mean(np.abs(params["l1_weights"]) >= L1_LIMIT))
@@ -697,13 +713,19 @@ def saturation_fractions_v5(params) -> tuple[float, float, float]:
     return w1, l1, w2
 
 
-def saturation_fractions_v6(params) -> tuple[float, float, float, float]:
-    """Saturation of every clipped v6 layer: w1, pair L1, diff L1, output."""
+def saturation_fractions_v6(params) -> tuple[float, float, float, float, float]:
+    """Clipping saturation of every v6 layer plus the pair-weight zero fraction.
+
+    The shared ``l1_shift`` rounds the pair weights through an extra /127 the
+    diff weights skip, so a large ``pair_zero`` fraction means the shift is
+    crushing the pair channel even when nothing clips at 127.
+    """
     w1 = float(np.mean(np.abs(params["feature_weights"]) >= W1_LIMIT))
     l1_pairs = float(np.mean(np.abs(params["l1_weights"]) >= L1_LIMIT))
     l1_diff = float(np.mean(np.abs(params["l1_diff_weights"]) >= L1_LIMIT))
     w2 = float(np.mean(np.abs(params["output_weights"]) >= L1_LIMIT))
-    return w1, l1_pairs, l1_diff, w2
+    pair_zero = float(np.mean(params["l1_weights"] == 0))
+    return w1, l1_pairs, l1_diff, w2, pair_zero
 
 
 def hidden_activations(params: dict, indices: np.ndarray, offsets: np.ndarray,
@@ -842,6 +864,8 @@ def build_parser() -> argparse.ArgumentParser:
                         default=pathlib.Path("artifacts/training/koi-v4.metadata.json"))
     parser.add_argument("--rows", type=int, default=0, help="0 = all available rows")
     parser.add_argument("--epochs", type=int, default=10)
+    parser.add_argument("--early-stop-patience", type=int, default=0,
+                        help="stop when val_mae_cp does not improve for N epochs (0 = off)")
     parser.add_argument("--batch-size", type=int, default=8192)
     parser.add_argument("--learning-rate", type=float, default=0.002)
     parser.add_argument("--weight-decay", type=float, default=1e-4)
@@ -929,6 +953,10 @@ def main_v5(args, rng) -> int:
                                   weight_decay=args.weight_decay)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=max(1, epochs))
     loss_fn = torch.nn.SmoothL1Loss(reduction="sum")
+    best_state = None
+    best_epoch = 0
+    best_val_mae = float("inf")
+    epochs_without_improvement = 0
     for epoch in range(1, epochs + 1):
         model.train()
         epoch_started = time.perf_counter()
@@ -960,11 +988,27 @@ def main_v5(args, rng) -> int:
         val_mae = float(np.mean(np.abs(val_prediction - scores[val_order])))
         log(f"epoch {epoch}/{epochs} train_loss {train_loss:.5f} val_loss {val_loss:.5f} "
             f"val_mae_cp {val_mae:.2f} time {time.perf_counter() - epoch_started:.1f}s")
+        if val_mae < best_val_mae:
+            best_val_mae = val_mae
+            best_epoch = epoch
+            best_state = {name: value.detach().cpu().clone()
+                          for name, value in model.state_dict().items()}
+            epochs_without_improvement = 0
+            log(f"best val epoch {epoch} mae {val_mae:.2f}")
+        else:
+            epochs_without_improvement += 1
+            if (args.early_stop_patience > 0
+                    and epochs_without_improvement >= args.early_stop_patience):
+                log(f"early stop at epoch {epoch} (best epoch {best_epoch})")
+                break
     if device.type == "cuda":
         torch.cuda.synchronize()
     model.to("cpu")
     if device.type == "cuda":
         torch.cuda.empty_cache()
+    if best_state is not None:
+        model.load_state_dict(best_state)
+        log(f"exporting best-val checkpoint (epoch {best_epoch}, mae {best_val_mae:.2f})")
     if args.float_out:
         pathlib.Path(args.float_out).parent.mkdir(parents=True, exist_ok=True)
         torch.save(model.state_dict(), args.float_out)
@@ -1119,6 +1163,10 @@ def main_v6(args, rng) -> int:
                                   weight_decay=args.weight_decay)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=max(1, epochs))
     loss_fn = torch.nn.SmoothL1Loss(reduction="sum")
+    best_state = None
+    best_epoch = 0
+    best_val_mae = float("inf")
+    epochs_without_improvement = 0
     for epoch in range(1, epochs + 1):
         model.train()
         epoch_started = time.perf_counter()
@@ -1150,11 +1198,27 @@ def main_v6(args, rng) -> int:
         val_mae = float(np.mean(np.abs(val_prediction - scores[val_order])))
         log(f"epoch {epoch}/{epochs} train_loss {train_loss:.5f} val_loss {val_loss:.5f} "
             f"val_mae_cp {val_mae:.2f} time {time.perf_counter() - epoch_started:.1f}s")
+        if val_mae < best_val_mae:
+            best_val_mae = val_mae
+            best_epoch = epoch
+            best_state = {name: value.detach().cpu().clone()
+                          for name, value in model.state_dict().items()}
+            epochs_without_improvement = 0
+            log(f"best val epoch {epoch} mae {val_mae:.2f}")
+        else:
+            epochs_without_improvement += 1
+            if (args.early_stop_patience > 0
+                    and epochs_without_improvement >= args.early_stop_patience):
+                log(f"early stop at epoch {epoch} (best epoch {best_epoch})")
+                break
     if device.type == "cuda":
         torch.cuda.synchronize()
     model.to("cpu")
     if device.type == "cuda":
         torch.cuda.empty_cache()
+    if best_state is not None:
+        model.load_state_dict(best_state)
+        log(f"exporting best-val checkpoint (epoch {best_epoch}, mae {best_val_mae:.2f})")
     if args.float_out:
         pathlib.Path(args.float_out).parent.mkdir(parents=True, exist_ok=True)
         torch.save(model.state_dict(), args.float_out)
@@ -1168,12 +1232,18 @@ def main_v6(args, rng) -> int:
     best = None
     best_output_saturated = False
     best_hidden_saturated = False
-    for hidden_shift in args.hidden_shifts:
+    best_pair_zero_high = False
+    # v6 only works with hidden shift 7: shift 6 compresses the whole pipeline
+    # ~2x and shift 8 clips the hidden CReLU at 127.
+    if list(args.hidden_shifts) != [7]:
+        log("hidden shift pinned to 7 for v6 (only self-consistent value)")
+    for hidden_shift in [7]:
         for l1_shift in args.l1_shifts:
             params = quantize_v6(model, hidden_shift, l1_shift)
             own_hidden, opp_hidden = hidden_activations_dual(
                 params, own_indices, own_offsets, opp_indices, opp_offsets, tune_order,
                 hidden_units)
+            l1_sat = l1_saturation_v6(params, own_hidden, opp_hidden)
             for output_shift in args.output_shifts:
                 params["output_weights"] = np.clip(
                     np.rint(output_weight * TARGET_SCALE * float(2**output_shift) / 127.0),
@@ -1188,17 +1258,25 @@ def main_v6(args, rng) -> int:
                 # any candidate without output saturation beats one with it.
                 # The diff head saturates independently of the pair head, so both
                 # hidden fractions count; small amounts (<= 5%) are tolerated.
-                w1_sat, l1_pair_sat, l1_diff_sat, w2_sat = saturation_fractions_v6(params)
+                w1_sat, l1_pair_sat, l1_diff_sat, w2_sat, pair_zero_sat = (
+                    saturation_fractions_v6(params))
                 output_saturated = w2_sat > 0.0
                 hidden_saturated = max(w1_sat, l1_pair_sat, l1_diff_sat) > 0.05
+                # A shared l1_shift that rounds most pair weights to zero is as
+                # harmful as clipping, so treat pair_zero > 10% as unhealthy.
+                pair_zero_high = pair_zero_sat > 0.10
                 log(f"quantization v6 s1={hidden_shift} s_l1={l1_shift} k3={output_shift} "
                     f"val_mae_cp {mae:.2f} saturation "
-                    f"{w1_sat:.4f},{l1_pair_sat:.4f},{l1_diff_sat:.4f},{w2_sat:.4f}")
-                if best is None or ((output_saturated, hidden_saturated, mae)
-                                    < (best_output_saturated, best_hidden_saturated, best[0])):
+                    f"{w1_sat:.4f},{l1_pair_sat:.4f},{l1_diff_sat:.4f},{w2_sat:.4f} "
+                    f"pair_zero {pair_zero_sat:.4f} l1_sat {l1_sat:.4f}")
+                if best is None or (
+                        (output_saturated, hidden_saturated, pair_zero_high, mae)
+                        < (best_output_saturated, best_hidden_saturated,
+                           best_pair_zero_high, best[0])):
                     best = (mae, hidden_shift, l1_shift, output_shift, dict(params))
                     best_output_saturated = output_saturated
                     best_hidden_saturated = hidden_saturated
+                    best_pair_zero_high = pair_zero_high
     if best is None:
         raise TrainerError("no quantization candidate was evaluated")
     best_mae, best_hidden_shift, best_l1_shift, best_output_shift, best_params = best
@@ -1208,8 +1286,8 @@ def main_v6(args, rng) -> int:
     float_prediction = validate_v5(model, own_indices, own_offsets, opp_indices, opp_offsets,
                                    buckets, targets, val_order, args.batch_size, pad_length)
     float_mae = float(np.mean(np.abs(float_prediction - scores[val_order])))
-    (w1_saturation, l1_saturation, l1_diff_saturation,
-     w2_saturation) = saturation_fractions_v6(best_params)
+    (w1_saturation, l1_saturation, l1_diff_saturation, w2_saturation,
+     pair_zero_saturation) = saturation_fractions_v6(best_params)
     payload = nnue_payload_v6(best_params, hidden_units, l1_units)
     container, payload_hash = nnue_container_v6(payload, hidden_units, l1_units,
                                                 best_hidden_shift, best_output_shift,
@@ -1254,6 +1332,7 @@ def main_v6(args, rng) -> int:
         "l1_saturation": l1_saturation,
         "l1_diff_saturation": l1_diff_saturation,
         "w2_saturation": w2_saturation,
+        "l1_pair_zero_fraction": pair_zero_saturation,
         "payload_sha256": payload_hash,
         "network_sha256": hashlib.sha256(container).hexdigest(),
         "command": " ".join(sys.argv),
