@@ -23,7 +23,12 @@ SCRIPT_PATH = Path(__file__).resolve()
 REPOSITORY_ROOT = SCRIPT_PATH.parents[2]
 SOURCE_DIRECTORY = REPOSITORY_ROOT / "build" / "pages-src"
 ARCHIVE_INDEX = SOURCE_DIRECTORY / "archive" / "index.md"
-EXCLUDED_PREFIXES = ("third_party/", "build/", ".superpowers/")
+EXCLUDED_PREFIXES = (
+    "third_party/",
+    "build/",
+    ".superpowers/",
+    "artifacts/",
+)
 MARKDOWN_LINK = re.compile(r"(?<!!)\[([^\]]+)\]\(([^)]+)\)")
 
 
