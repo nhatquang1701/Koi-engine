@@ -1,0 +1,173 @@
+Internal ctest changing into directory: /work/build/roadmap-current-linux-gcc14-debug-modules-off-20260929
+Test project /work/build/roadmap-current-linux-gcc14-debug-modules-off-20260929
+      Start  1: koi_gpu_probe
+      Start  2: gpu_nnue_tests
+ 1/76 Test  #1: koi_gpu_probe ......................   Passed    0.01 sec
+      Start  3: koi_shadow_diff_tests
+ 2/76 Test  #2: gpu_nnue_tests .....................   Passed    0.05 sec
+      Start  4: koi_core_tests
+ 3/76 Test  #3: koi_shadow_diff_tests ..............   Passed    0.22 sec
+      Start  5: evaluation_boundary_tests
+ 4/76 Test  #5: evaluation_boundary_tests ..........   Passed    0.06 sec
+      Start  6: evaluation_architecture_tests
+ 5/76 Test  #6: evaluation_architecture_tests ......   Passed    0.06 sec
+      Start  7: nnue_boundary_tests
+ 6/76 Test  #4: koi_core_tests .....................   Passed    0.83 sec
+      Start  8: koi_cpu_features_tests
+ 7/76 Test  #8: koi_cpu_features_tests .............   Passed    0.01 sec
+      Start  9: koi_cpu_variant_tests
+ 8/76 Test  #9: koi_cpu_variant_tests ..............   Passed    0.01 sec
+      Start 10: syzygy_tablebase_tests
+ 9/76 Test #10: syzygy_tablebase_tests .............   Passed    0.11 sec
+      Start 11: koi_rules_tests
+10/76 Test #11: koi_rules_tests ....................   Passed    0.05 sec
+      Start 12: native_rule_state_tests
+11/76 Test #12: native_rule_state_tests ............   Passed    0.05 sec
+      Start 13: opening_book_tests
+12/76 Test #13: opening_book_tests .................   Passed    0.06 sec
+      Start 14: uci_controller_tests
+13/76 Test  #7: nnue_boundary_tests ................   Passed    1.96 sec
+      Start 15: completion_gate_tests
+14/76 Test #15: completion_gate_tests ..............   Passed    0.05 sec
+      Start 20: search_ordering_tests
+15/76 Test #20: search_ordering_tests ..............   Passed    0.06 sec
+      Start 21: search_architecture_tests
+16/76 Test #21: search_architecture_tests ..........   Passed    0.04 sec
+      Start 22: search_policy_tests
+17/76 Test #22: search_policy_tests ................   Passed    0.01 sec
+      Start 23: search_runtime_tests
+18/76 Test #23: search_runtime_tests ...............   Passed    0.01 sec
+      Start 24: policy_value_mcts_tests
+19/76 Test #24: policy_value_mcts_tests ............   Passed    0.05 sec
+      Start 25: static_exchange_tests
+20/76 Test #25: static_exchange_tests ..............   Passed    0.04 sec
+      Start 26: transposition_table_tests
+21/76 Test #26: transposition_table_tests ..........   Passed    0.04 sec
+      Start 27: search_service_tests
+22/76 Test #27: search_service_tests ...............   Passed    2.06 sec
+      Start 28: koi_soak_tests
+23/76 Test #28: koi_soak_tests .....................   Passed   14.11 sec
+      Start 29: classical_evaluator_tests
+24/76 Test #29: classical_evaluator_tests ..........   Passed    0.05 sec
+      Start 30: evaluation_features_tests
+25/76 Test #30: evaluation_features_tests ..........   Passed    0.04 sec
+      Start 31: policy_value_model_tests
+26/76 Test #31: policy_value_model_tests ...........   Passed    4.60 sec
+      Start 32: time_manager_tests
+27/76 Test #32: time_manager_tests .................   Passed    0.01 sec
+      Start 34: perft_tests
+28/76 Test #34: perft_tests ........................   Passed    2.03 sec
+      Start 35: koi_replay_tests
+29/76 Test #35: koi_replay_tests ...................   Passed    0.43 sec
+      Start 36: koi_nnue_fixture_tests
+30/76 Test #14: uci_controller_tests ...............   Passed   26.29 sec
+      Start 39: run_tests_artifact_path
+31/76 Test #39: run_tests_artifact_path ............   Passed    1.14 sec
+      Start 40: koi_engine_variant_process
+32/76 Test #40: koi_engine_variant_process .........   Passed    3.24 sec
+      Start 41: koi_engine_en_croissant_process
+33/76 Test #41: koi_engine_en_croissant_process ....   Passed    1.68 sec
+      Start 44: koi_uci_match_process
+34/76 Test #36: koi_nnue_fixture_tests .............   Passed   45.25 sec
+      Start 45: koi_stockfish_strength_option
+35/76 Test #45: koi_stockfish_strength_option ......   Passed    3.57 sec
+      Start 47: koi_sprt_compare_decision
+36/76 Test #47: koi_sprt_compare_decision ..........   Passed    0.50 sec
+      Start 48: release_candidate_games_python
+37/76 Test #48: release_candidate_games_python .....   Passed    0.73 sec
+      Start 49: release_strength_openings_python
+38/76 Test #49: release_strength_openings_python ...   Passed    0.44 sec
+      Start 50: strength_bound_python
+39/76 Test #50: strength_bound_python ..............   Passed    2.63 sec
+      Start 51: elo_oracle_python
+40/76 Test #51: elo_oracle_python ..................   Passed    2.48 sec
+      Start 52: elo_estimate_python
+41/76 Test #52: elo_estimate_python ................   Passed    1.91 sec
+      Start 53: stockfish_match_python
+42/76 Test #53: stockfish_match_python .............   Passed    0.25 sec
+      Start 54: elo_openings_python
+43/76 Test #54: elo_openings_python ................   Passed    1.56 sec
+      Start 55: tune_eval_python
+44/76 Test #55: tune_eval_python ...................   Passed    0.59 sec
+      Start 56: nnue_training_python
+45/76 Test #56: nnue_training_python ...............   Passed    1.52 sec
+      Start 57: nnue_wrapper_python
+46/76 Test #57: nnue_wrapper_python ................   Passed    0.36 sec
+      Start 58: koi_dataset_python
+47/76 Test #58: koi_dataset_python .................   Passed    3.65 sec
+      Start 59: koi_chess_python
+48/76 Test #59: koi_chess_python ...................   Passed    6.51 sec
+      Start 60: koi_chess_pgn_python
+49/76 Test #60: koi_chess_pgn_python ...............   Passed    0.27 sec
+      Start 61: koi_chess_engine_python
+50/76 Test #61: koi_chess_engine_python ............   Passed    0.40 sec
+      Start 62: gen_training_data_python
+51/76 Test #62: gen_training_data_python ...........   Passed    0.27 sec
+      Start 63: measurement_phase_python
+52/76 Test #63: measurement_phase_python ...........   Passed    0.70 sec
+      Start 64: measurement_forensics_python
+53/76 Test #64: measurement_forensics_python .......   Passed    1.64 sec
+      Start 65: uci_benchmark_python
+54/76 Test #65: uci_benchmark_python ...............   Passed    0.94 sec
+      Start 66: policy_value_dataset_python
+55/76 Test #66: policy_value_dataset_python ........   Passed    0.18 sec
+      Start 67: policy_value_model_python
+56/76 Test #67: policy_value_model_python ..........   Passed    0.78 sec
+      Start 68: policy_value_trainer_python
+57/76 Test #68: policy_value_trainer_python ........   Passed    0.83 sec
+      Start 69: policy_value_selfplay_python
+58/76 Test #69: policy_value_selfplay_python .......   Passed    0.94 sec
+      Start 70: policy_value_openings_python
+59/76 Test #70: policy_value_openings_python .......   Passed    0.43 sec
+      Start 71: strength_report_python
+60/76 Test #71: strength_report_python .............   Passed    0.63 sec
+      Start 72: nnue_studio_python
+61/76 Test #72: nnue_studio_python .................   Passed    1.41 sec
+      Start 73: nnue_studio_ui_python
+62/76 Test #73: nnue_studio_ui_python ..............   Passed    1.12 sec
+      Start 74: koi_trainer_python
+63/76 Test #74: koi_trainer_python .................   Passed    0.75 sec
+      Start 75: tune_classical_python
+64/76 Test #75: tune_classical_python ..............   Passed    0.29 sec
+      Start 76: bullet_data_python
+65/76 Test #76: bullet_data_python .................   Passed    0.71 sec
+66/76 Test #44: koi_uci_match_process ..............   Passed   83.33 sec
+      Start 16: koi_search_tests_1of4
+67/76 Test #16: koi_search_tests_1of4 ..............   Passed  357.45 sec
+      Start 17: koi_search_tests_2of4
+68/76 Test #17: koi_search_tests_2of4 ..............   Passed   42.71 sec
+      Start 18: koi_search_tests_3of4
+69/76 Test #18: koi_search_tests_3of4 ..............   Passed  389.30 sec
+      Start 19: koi_search_tests_4of4
+70/76 Test #19: koi_search_tests_4of4 ..............   Passed  337.35 sec
+      Start 33: koi_strength_tests
+71/76 Test #33: koi_strength_tests .................   Passed   21.93 sec
+      Start 37: koi_engine_process
+72/76 Test #37: koi_engine_process .................   Passed    4.86 sec
+      Start 38: koi_engine_perft_responsiveness
+73/76 Test #38: koi_engine_perft_responsiveness ....   Passed    1.01 sec
+      Start 42: koi_engine_time_safety_process
+74/76 Test #42: koi_engine_time_safety_process .....   Passed   11.48 sec
+      Start 43: koi_benchmark_process
+75/76 Test #43: koi_benchmark_process ..............   Passed  215.55 sec
+      Start 46: koi_uci_match_clock
+76/76 Test #46: koi_uci_match_clock ................   Passed   68.16 sec
+
+100% tests passed, 0 tests failed out of 76
+
+Label Time Summary:
+evaluation     =   6.78 sec*proc (6 tests)
+heavy          = 2751.53 sec*proc (7 tests)
+integration    =  47.04 sec*proc (4 tests)
+matches        = 223.71 sec*proc (4 tests)
+measurement    =   6.15 sec*proc (6 tests)
+process        = 688.56 sec*proc (10 tests)
+python         =  34.49 sec*proc (28 tests)
+rules          =   0.22 sec*proc (1 test)
+runtime        =  40.50 sec*proc (5 tests)
+search         = 2299.53 sec*proc (6 tests)
+tools          = 477.92 sec*proc (4 tests)
+uci            =  33.75 sec*proc (5 tests)
+unit           = 2350.23 sec*proc (32 tests)
+
+Total Test time (real) = 1566.77 sec

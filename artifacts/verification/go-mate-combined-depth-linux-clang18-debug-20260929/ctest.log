@@ -1,0 +1,20 @@
+[OUTPUT] 
+Internal ctest changing into directory: /work/build/roadmap-current-linux-clang18-debug-libcpp-exp-20260929
+
+[HANDLER_OUTPUT] 
+Test project /work/build/roadmap-current-linux-clang18-debug-libcpp-exp-20260929
+
+    Start 15: uci_controller_tests
+1/2 Test #15: uci_controller_tests .............   Passed   31.00 sec
+    Start 38: koi_engine_process
+2/2 Test #38: koi_engine_process ...............   Passed    6.39 sec
+
+100% tests passed, 0 tests failed out of 2
+
+Label Time Summary:
+process    =   6.39 sec*proc (1 test)
+runtime    =  31.00 sec*proc (1 test)
+uci        =   6.39 sec*proc (1 test)
+unit       =  31.00 sec*proc (1 test)
+
+Total Test time (real) =  37.43 sec

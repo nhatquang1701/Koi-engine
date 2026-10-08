@@ -1,0 +1,25 @@
+{
+  "schema": "koi-qsearch-sprt-runner-v1",
+  "experiment_path": "artifacts/verification/qsearch-tt-followup-20260929/experiment-batch9.json",
+  "experiment_sha256": "aa9c233806c382c6ef187278683e4f8abb437897657f617a69b9f1cd43064bc3",
+  "runner_pid": 19816,
+  "run_root": "artifacts/matches/qsearch-tt-followup-20260929/sprt-batch9/qsearch-tt-current-source-20k-batch9-20260929-184309",
+  "candidate_sha256": "3c187fc9bdad3572e6c849b077ffee2f612661083602d79261c0c50169da268c",
+  "baseline_sha256": "cbc05d459445eacd9f0ef8749aec18434ce251b105e6d1900f5dd4b5299ce0aa",
+  "opening_sha256": "4ab18651cd854a9eccb1ff4fc90f1f9713c369f6c15b81337f29af8cf30c816b",
+  "harness_path": "tools/stability/uci_match.ps1",
+  "harness_sha256": "9df4f67a4632a05e070eb44fde202814a9692befd3a63c880688b946feedfb3e",
+  "harness_git_blob": "de0de5bce59c2d650a7f1c872d730b9d82e76952",
+  "launcher_sha256": "7970da867e0cb173617b0f1e056245c6f9461a0def616de184a305bc961039ce",
+  "workers": {
+    "white": 29744,
+    "black": 6680
+  },
+  "started_utc": "2026-09-29T11:43:12.1393678Z",
+  "status": "failed",
+  "exit_codes": {
+    "white": 1,
+    "black": 1
+  },
+  "completed_utc": "2026-09-29T12:37:48.0749942Z"
+}

@@ -1,0 +1,96 @@
+{
+  "schema": "koi-nnue-studio-ab-match-v1",
+  "generated_utc": "2026-09-18T14:30:06.3640739Z",
+  "nnue_path": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\training\\bullet\\koi-v4-bullet-long\\koi.nnue",
+  "engine_path": "C:\\Users\\ntATh\\AI test\\Koi engine\\build\\release\\koi-engine.exe",
+  "nodes": 20000,
+  "threads": 1,
+  "hash_mb": 64,
+  "games": 20,
+  "wins": 0,
+  "draws": 7,
+  "losses": 0,
+  "aborted": 2,
+  "score": 3.5,
+  "percent": 50.0,
+  "verdict": "incomplete",
+  "legs": [
+    {
+      "tag": "white",
+      "koi_color": "white",
+      "games": 10,
+      "report": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\verification\\nnue-bullet-training\\ab-bullet-classical\\match-white\\koi-uci-match-20260918-142908-277.json"
+    },
+    {
+      "tag": "black",
+      "koi_color": "black",
+      "games": 10,
+      "report": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\verification\\nnue-bullet-training\\ab-bullet-classical\\match-black\\koi-uci-match-20260918-143004-871.json"
+    }
+  ],
+  "game_results": [
+    {
+      "leg": "white",
+      "nnue_color": "white",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "white",
+      "nnue_color": "white",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "white",
+      "nnue_color": "white",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "white",
+      "nnue_color": "white",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "white",
+      "nnue_color": "white",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "white",
+      "nnue_color": "white",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "white",
+      "nnue_color": "white",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "white",
+      "nnue_color": "white",
+      "result": "*",
+      "outcome": "aborted",
+      "termination": "timeout"
+    },
+    {
+      "leg": "black",
+      "nnue_color": "black",
+      "result": "*",
+      "outcome": "aborted",
+      "termination": "timeout"
+    }
+  ]
+}

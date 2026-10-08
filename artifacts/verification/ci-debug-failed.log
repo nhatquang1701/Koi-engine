@@ -1,0 +1,624 @@
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	﻿2026-09-26T14:15:00.6282593Z ##[group]Run if not exist "%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" exit /b 1
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:00.6283412Z ^[[36;1mif not exist "%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" exit /b 1^[[0m
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:00.6284566Z ^[[36;1mfor /f "usebackq delims=" %%I in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do set "VSINSTALL=%%I"^[[0m
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:00.6285548Z ^[[36;1mif not defined VSINSTALL exit /b 1^[[0m
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:00.6285890Z ^[[36;1mset "VSDEVCMD=%VSINSTALL%\Common7\Tools\VsDevCmd.bat"^[[0m
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:00.6286245Z ^[[36;1mif not exist "%VSDEVCMD%" exit /b 1^[[0m
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:00.6286555Z ^[[36;1mcall "%VSDEVCMD%" -arch=x64 -host_arch=x64^[[0m
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:00.6286854Z ^[[36;1mif errorlevel 1 exit /b 1^[[0m
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:00.6287091Z ^[[36;1mwhere cl^[[0m
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:00.6287300Z ^[[36;1mcl 2>&1 | findstr /C:"x64" >nul^[[0m
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:00.6287580Z ^[[36;1mif errorlevel 1 exit /b 1^[[0m
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:00.6287997Z ^[[36;1mcmake -S . -B build/ci-debug -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=cl^[[0m
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:00.6288422Z ^[[36;1mif errorlevel 1 exit /b 1^[[0m
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:00.6288712Z ^[[36;1mcmake --build build/ci-debug --config Debug^[[0m
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:00.6289013Z ^[[36;1mif errorlevel 1 exit /b 1^[[0m
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:00.6289633Z ^[[36;1mctest --test-dir build/ci-debug -C Debug -j 4 -LE heavy --repeat until-pass:2 --output-on-failure --output-junit build/ci-debug/ctest-junit.xml^[[0m
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:00.6290825Z ^[[36;1mif errorlevel 1 exit /b 1^[[0m
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:00.6324450Z shell: C:\Windows\system32\cmd.EXE /D /E:ON /V:OFF /S /C "CALL "{0}""
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:00.6324817Z env:
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:00.6325090Z   pythonLocation: C:\hostedtoolcache\windows\Python\3.12.10\x64
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:00.6325553Z   PKG_CONFIG_PATH: C:\hostedtoolcache\windows\Python\3.12.10\x64/lib/pkgconfig
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:00.6326040Z   Python_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.12.10\x64
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:00.6326451Z   Python2_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.12.10\x64
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:00.6326862Z   Python3_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.12.10\x64
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:00.6327370Z ##[endgroup]
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:01.3173706Z **********************************************************************
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:01.3174380Z ** Visual Studio 2026 Developer Command Prompt v18.10.1
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:01.3174891Z ** Copyright (c) 2026 Microsoft Corporation
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:01.3175406Z **********************************************************************
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:03.4461091Z C:\Program Files\Microsoft Visual Studio\18\Enterprise\VC\Tools\MSVC\14.51.36231\bin\Hostx64\x64\cl.exe
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:13.5450133Z -- The CXX compiler identification is MSVC 19.51.36257.0
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:13.6620842Z -- Detecting CXX compiler ABI info
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:15.7687428Z -- Detecting CXX compiler ABI info - done
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:15.8020290Z -- Check for working CXX compiler: C:/Program Files/Microsoft Visual Studio/18/Enterprise/VC/Tools/MSVC/14.51.36231/bin/Hostx64/x64/cl.exe - skipped
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:15.8073622Z -- Detecting CXX compile features
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:15.8096406Z -- Detecting CXX compile features - done
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:18.5891558Z -- cutechess-cli not found; the real Cutechess smoke test is omitted
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:18.9328269Z -- Configuring done (11.3s)
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:19.1011854Z -- Generating done (0.2s)
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:19.1024211Z -- Build files have been written to: D:/a/Koi-engine/Koi-engine/build/ci-debug
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:20.0893587Z [1/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\cpu_features.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:20.3628953Z [2/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\detail\attack_tables.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:20.8114262Z [3/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\detail\root_coordinator.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:20.8621835Z [4/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\detail\evaluation_context.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:20.9182234Z [5/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\detail\feature_state.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:20.9326122Z [6/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\classical_evaluator.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:21.0917080Z [7/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\detail\search_ordering_tables.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:21.1587639Z [8/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\detail\compatibility_mirror.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:21.2099320Z [9/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\detail\search_context_support.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:21.2679152Z [10/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\detail\search_context.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:21.3328457Z [11/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\detail\search_runner.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:21.3365284Z [12/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\detail\search_session.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:21.4543538Z [13/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\completion_gate.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:21.5669296Z [14/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\evaluation_features.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:21.7500474Z [15/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\game_state.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:21.7788235Z [16/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\gpu\gpu_nnue_service.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:21.7988502Z [17/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\gpu\nnue_gpu_evaluator.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:21.9170346Z [18/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\move.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:22.0776665Z [19/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\nnue.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:22.1063998Z [20/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\move_chooser.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:22.2096832Z [21/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\opening_book.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:22.3029775Z [22/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\perft.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:22.3053505Z [23/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\position.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:22.5113681Z [24/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\static_exchange.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:22.5140297Z [25/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\search_service.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:22.5174584Z [26/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\search_ordering.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:22.6953376Z [27/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\strength_suite.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:22.8240098Z [28/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\time_manager.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:22.8271513Z [29/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\syzygy_tablebase.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:22.9654288Z [30/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\gpu\cuda_driver.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:22.9691674Z [31/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\executable_path.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:22.9737577Z [32/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\cpu_variant.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:23.1305312Z [33/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\modules\position.ixx for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:23.1306512Z position.ixx
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:23.1325701Z [34/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\modules\eval.ixx for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:23.1326664Z eval.ixx
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:23.1377906Z [35/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\uci_controller.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:23.1910819Z [36/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\modules\tablebase.ixx for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:23.1914278Z tablebase.ixx
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:23.1953228Z [37/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\modules\types.ixx for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:23.1997024Z types.ixx
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:23.2074040Z [38/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\modules\search.ixx for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:23.2094162Z search.ixx
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:23.2095998Z [39/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\modules\runtime.ixx for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:23.2103657Z runtime.ixx
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:23.2316858Z [40/387] Generating CXX dyndep file CMakeFiles\koi_cpu_features.dir\CXX.dd
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:23.2348338Z [41/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\modules\koi.ixx for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:23.2354828Z koi.ixx
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:23.4543451Z [42/387] Scanning D:\a\Koi-engine\Koi-engine\tools\engine\koi_replay.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:23.4566772Z [43/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\classical_evaluator.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:23.4759476Z [44/387] Scanning D:\a\Koi-engine\Koi-engine\tools\engine\koi_nnue_fixture.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:23.5913043Z [45/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\detail\attack_tables.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:23.6987767Z [46/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\detail\evaluation_context.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:23.7518042Z [47/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\detail\compatibility_mirror.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:23.8437763Z [48/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\detail\feature_state.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:23.9227659Z [49/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\detail\root_coordinator.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:23.9621600Z [50/387] Building CXX object CMakeFiles\koi_cpu_features.dir\src\koi\cpu_features.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:24.0703254Z [51/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\detail\search_context.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:24.1285186Z [52/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\detail\search_context_support.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:24.1644371Z [53/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\detail\search_ordering_tables.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:24.3415632Z [54/387] Scanning D:\a\Koi-engine\Koi-engine\third_party\fathom\tbprobe.c for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:24.3489633Z [55/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\transposition_table.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:24.3958829Z [56/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\detail\search_runner.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:24.4520673Z [57/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\detail\search_session.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:24.4539774Z [58/387] Generating CXX dyndep file CMakeFiles\koi_core.dir\CXX.dd
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:24.5258972Z [59/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\completion_gate.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:24.6763944Z [60/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\cpu_variant.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:24.6841798Z [61/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\evaluation_features.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:24.8744267Z [62/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\game_state.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:24.9280974Z [63/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\executable_path.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:25.9366946Z [64/387] Building CXX object CMakeFiles\koi_core.dir\src\koi\detail\attack_tables.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:27.1965094Z [65/387] Building CXX object CMakeFiles\koi_core.dir\src\koi\classical_evaluator.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:27.2799082Z [66/387] Building CXX object CMakeFiles\koi_core.dir\src\koi\detail\feature_state.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:27.2833845Z [67/387] Building CXX object CMakeFiles\koi_core.dir\src\koi\detail\evaluation_context.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:27.3122056Z [68/387] Building CXX object CMakeFiles\koi_core.dir\src\koi\detail\root_coordinator.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:30.6349628Z [69/387] Building CXX object CMakeFiles\koi_core.dir\src\koi\detail\search_ordering_tables.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:31.6060996Z [70/387] Building CXX object CMakeFiles\koi_core.dir\src\koi\detail\search_context_support.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:32.0737445Z [71/387] Building CXX object CMakeFiles\koi_core.dir\src\koi\detail\compatibility_mirror.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:32.1861453Z [72/387] Building CXX object CMakeFiles\koi_core.dir\src\koi\detail\search_session.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:33.3299607Z [73/387] Building CXX object CMakeFiles\koi_core.dir\src\koi\detail\search_context.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:34.8657156Z [74/387] Building CXX object CMakeFiles\koi_core.dir\src\koi\evaluation_features.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:35.8099462Z [75/387] Building CXX object CMakeFiles\koi_core.dir\src\koi\completion_gate.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:37.0647315Z [76/387] Building CXX object CMakeFiles\koi_core.dir\src\koi\cpu_variant.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:37.0750546Z [77/387] Building CXX object CMakeFiles\koi_core.dir\src\koi\gpu\cuda_driver.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:37.1243954Z [78/387] Building CXX object CMakeFiles\koi_core.dir\src\koi\detail\search_runner.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:37.6639412Z [79/387] Building CXX object CMakeFiles\koi_core.dir\src\koi\executable_path.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:38.7287648Z [80/387] Building CXX object CMakeFiles\koi_core.dir\src\koi\move.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:39.7899728Z [81/387] Building CXX object CMakeFiles\koi_core.dir\src\koi\gpu\nnue_gpu_evaluator.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:41.7368728Z [82/387] Building CXX object CMakeFiles\koi_core.dir\src\koi\gpu\gpu_nnue_service.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:41.7870730Z [83/387] Building CXX object CMakeFiles\koi_core.dir\src\koi\move_chooser.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:42.0014782Z [84/387] Building CXX object CMakeFiles\koi_core.dir\src\koi\game_state.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:42.1051024Z [85/387] Building CXX object CMakeFiles\koi_core.dir\src\koi\perft.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:44.6909786Z [86/387] Building CXX object CMakeFiles\koi_core.dir\src\koi\static_exchange.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:44.7397378Z [87/387] Building CXX object CMakeFiles\koi_core.dir\src\koi\nnue.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:44.9274400Z [88/387] Building CXX object CMakeFiles\koi_core.dir\src\koi\opening_book.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:44.9534322Z [89/387] Building CXX object CMakeFiles\koi_core.dir\src\koi\search_ordering.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:46.1520149Z [90/387] Building CXX object CMakeFiles\koi_core.dir\src\koi\strength_suite.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:47.0695759Z [91/387] Building CXX object CMakeFiles\koi_core.dir\src\koi\search_service.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:48.6164191Z [92/387] Building CXX object CMakeFiles\koi_core.dir\src\koi\transposition_table.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:48.7163823Z [93/387] Building CXX object CMakeFiles\koi_core.dir\third_party\fathom\tbprobe.c.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:48.7695719Z [94/387] Building CXX object CMakeFiles\koi_core.dir\src\koi\position.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:48.7978429Z [95/387] Generating CXX dyndep file CMakeFiles\koi_replay.dir\CXX.dd
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:48.8869496Z [96/387] Generating CXX dyndep file CMakeFiles\koi_nnue_fixture.dir\CXX.dd
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:49.5259221Z [97/387] Building CXX object CMakeFiles\koi_core.dir\src\koi\modules\types.ixx.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:49.5464845Z types.ixx
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:49.8077486Z [98/387] Building CXX object CMakeFiles\koi_core.dir\src\koi\modules\position.ixx.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:49.8081987Z position.ixx
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:49.8734782Z [99/387] Building CXX object CMakeFiles\koi_core.dir\src\koi\time_manager.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:49.9717911Z [100/387] Building CXX object CMakeFiles\koi_core.dir\src\koi\modules\eval.ixx.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:49.9785212Z eval.ixx
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:50.0112069Z [101/387] Building CXX object CMakeFiles\koi_core.dir\src\koi\modules\tablebase.ixx.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:50.0246730Z tablebase.ixx
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:50.2320416Z [102/387] Building CXX object CMakeFiles\koi_core.dir\src\koi\modules\search.ixx.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:50.2343621Z search.ixx
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:50.4948256Z [103/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\gpu\cuda_driver.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:50.5015016Z [104/387] Building CXX object CMakeFiles\koi_core.dir\src\koi\modules\runtime.ixx.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:50.5311880Z runtime.ixx
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:50.5364802Z [105/387] Building CXX object CMakeFiles\koi_core.dir\src\koi\syzygy_tablebase.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:50.6923123Z [106/387] Building CXX object CMakeFiles\koi_core.dir\src\koi\modules\koi.ixx.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:50.7123327Z koi.ixx
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:50.8031502Z [107/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\gpu\nnue_gpu_evaluator.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:50.8651553Z [108/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\gpu\gpu_nnue_service.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:50.9958089Z [109/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\move.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:51.2407398Z [110/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\move_chooser.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:51.3235761Z [111/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\nnue.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:51.5850582Z [112/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\perft.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:51.6209816Z [113/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\opening_book.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:51.7553861Z [114/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\position.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:51.9864426Z [115/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\search_service.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:52.0064841Z [116/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\search_ordering.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:52.1058520Z [117/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\static_exchange.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:52.1115952Z [118/387] Building CXX object CMakeFiles\koi_replay.dir\tools\engine\koi_replay.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:52.3536469Z [119/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\strength_suite.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:52.4076083Z [120/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\syzygy_tablebase.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:52.4628424Z [121/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\time_manager.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:52.7811084Z [122/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\uci_controller.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:52.8466654Z [123/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\transposition_table.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:52.9362655Z [124/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\classical_evaluator.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:52.9757130Z [125/387] Scanning D:\a\Koi-engine\Koi-engine\third_party\fathom\tbprobe.c for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:53.0463504Z [126/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\detail\attack_tables.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:53.1935794Z [127/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\detail\compatibility_mirror.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:53.2491780Z [128/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\detail\evaluation_context.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:53.3001797Z [129/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\detail\feature_state.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:53.4076337Z [130/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\detail\root_coordinator.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:53.6198045Z [131/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\detail\search_context.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:53.6776825Z [132/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\detail\search_context_support.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:53.7366271Z [133/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\detail\search_ordering_tables.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:53.9953764Z [134/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\detail\search_runner.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:54.0041004Z [135/387] Building CXX object CMakeFiles\koi_core.dir\src\koi\uci_controller.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:54.0970129Z [136/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\detail\search_session.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:54.1014958Z [137/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\completion_gate.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:54.3718621Z [138/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\cpu_variant.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:54.3763353Z [139/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\evaluation_features.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:54.4040223Z [140/387] Linking CXX static library koi_core.lib
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:54.4954613Z [141/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\game_state.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:54.5356414Z [142/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\executable_path.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:54.7433772Z [143/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\move.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:54.7780424Z [144/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\gpu\gpu_nnue_service.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:54.7839107Z [145/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\gpu\cuda_driver.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:54.8233025Z [146/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\gpu\nnue_gpu_evaluator.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:54.9977570Z [147/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\move_chooser.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:55.0849900Z [148/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\perft.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:55.1031388Z [149/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\nnue.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:55.2236710Z [150/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\position.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:55.2273403Z [151/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\opening_book.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:55.4187072Z [152/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\search_service.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:55.4514745Z [153/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\search_ordering.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:55.4765899Z [154/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\static_exchange.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:55.4944388Z [155/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\strength_suite.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:55.6411240Z [156/387] Building CXX object CMakeFiles\koi_nnue_fixture.dir\tools\engine\koi_nnue_fixture.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:55.7749479Z [157/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\syzygy_tablebase.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:55.7968725Z [158/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\time_manager.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:55.8797541Z [159/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\uci_controller.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:55.8831745Z [160/387] Generating CXX dyndep file CMakeFiles\koi_core_avx512.dir\CXX.dd
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:56.1216655Z [161/387] Scanning D:\a\Koi-engine\Koi-engine\tools\engine\koi_gpu_probe.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:56.1404465Z [162/387] Scanning D:\a\Koi-engine\Koi-engine\third_party\fathom\tbprobe.c for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:56.1449011Z [163/387] Scanning D:\a\Koi-engine\Koi-engine\src\koi\transposition_table.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:56.2004213Z [164/387] Generating CXX dyndep file CMakeFiles\koi_core_generic.dir\CXX.dd
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:56.3899118Z [165/387] Scanning D:\a\Koi-engine\Koi-engine\tests\unit\runtime\gpu_nnue_tests.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:56.4344511Z [166/387] Scanning D:\a\Koi-engine\Koi-engine\tests\unit\evaluation\evaluation_boundary_tests.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:56.4377542Z [167/387] Scanning D:\a\Koi-engine\Koi-engine\tests\unit\core\koi_core_tests.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:56.5363976Z [168/387] Scanning D:\a\Koi-engine\Koi-engine\tests\unit\evaluation\evaluation_architecture_tests.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:56.7043656Z [169/387] Scanning D:\a\Koi-engine\Koi-engine\tests\unit\evaluation\nnue_boundary_tests.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:56.7442152Z [170/387] Scanning D:\a\Koi-engine\Koi-engine\tests\unit\runtime\cpu_features_tests.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:56.7467978Z [171/387] Scanning D:\a\Koi-engine\Koi-engine\tests\unit\runtime\cpu_variant_tests.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:56.8639318Z [172/387] Scanning D:\a\Koi-engine\Koi-engine\tests\unit\core\koi_module_tests.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:57.0138369Z [173/387] Scanning D:\a\Koi-engine\Koi-engine\tests\unit\runtime\syzygy_tablebase_tests.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:57.0467852Z [174/387] Scanning D:\a\Koi-engine\Koi-engine\tests\unit\rules\koi_rules_tests.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:57.0647588Z [175/387] Scanning D:\a\Koi-engine\Koi-engine\tests\unit\rules\native_rule_state_tests.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:57.1673522Z [176/387] Scanning D:\a\Koi-engine\Koi-engine\tests\unit\runtime\opening_book_tests.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:57.3526968Z [177/387] Scanning D:\a\Koi-engine\Koi-engine\tests\unit\runtime\uci_controller_tests.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:57.3780038Z [178/387] Scanning D:\a\Koi-engine\Koi-engine\tests\unit\runtime\completion_gate_tests.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:57.4117421Z [179/387] Scanning D:\a\Koi-engine\Koi-engine\tests\unit\search\koi_search_tests.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:57.5103316Z [180/387] Scanning D:\a\Koi-engine\Koi-engine\tests\unit\search\search_ordering_tests.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:57.6906935Z [181/387] Scanning D:\a\Koi-engine\Koi-engine\tests\unit\search\search_architecture_tests.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:57.7633368Z [182/387] Scanning D:\a\Koi-engine\Koi-engine\tests\unit\search\search_policy_tests.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:57.7949037Z [183/387] Scanning D:\a\Koi-engine\Koi-engine\tests\unit\search\search_runtime_tests.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:57.8409210Z [184/387] Scanning D:\a\Koi-engine\Koi-engine\tests\unit\search\static_exchange_tests.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:58.1003145Z [185/387] Scanning D:\a\Koi-engine\Koi-engine\tests\unit\runtime\search_service_tests.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:58.1198964Z [186/387] Scanning D:\a\Koi-engine\Koi-engine\tests\unit\runtime\koi_soak_tests.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:58.1233818Z [187/387] Scanning D:\a\Koi-engine\Koi-engine\tests\unit\runtime\transposition_table_tests.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:58.1572306Z [188/387] Scanning D:\a\Koi-engine\Koi-engine\tests\unit\evaluation\classical_evaluator_tests.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:58.4343775Z [189/387] Scanning D:\a\Koi-engine\Koi-engine\tests\unit\search\time_manager_tests.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:58.4603840Z [190/387] Scanning D:\a\Koi-engine\Koi-engine\tests\unit\evaluation\evaluation_features_tests.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:58.4663607Z [191/387] Scanning D:\a\Koi-engine\Koi-engine\tests\unit\search\koi_strength_tests.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:58.5143170Z [192/387] Scanning D:\a\Koi-engine\Koi-engine\tests\unit\rules\perft_tests.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:58.7307509Z [193/387] Scanning D:\a\Koi-engine\Koi-engine\tests\integration\tools\uci_match_fixture.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:58.7401145Z [194/387] Scanning D:\a\Koi-engine\Koi-engine\tools\engine\perft.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:58.8070338Z [195/387] Scanning D:\a\Koi-engine\Koi-engine\tools\engine\koi_bench.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:58.8551238Z [196/387] Scanning D:\a\Koi-engine\Koi-engine\tools\engine\koi_eval_features.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:59.0721980Z [197/387] Scanning D:\a\Koi-engine\Koi-engine\src\main.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:59.1048227Z [198/387] Scanning D:\a\Koi-engine\Koi-engine\src\main.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:59.1920572Z [199/387] Scanning D:\a\Koi-engine\Koi-engine\src\main.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:15:59.9105788Z [200/387] Building CXX object CMakeFiles\koi_core_avx512.dir\src\koi\detail\attack_tables.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:00.5567835Z [201/387] Linking CXX executable koi-nnue-fixture.exe
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:00.8578914Z [202/387] Linking CXX executable koi-replay.exe
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:01.1283433Z [203/387] Building CXX object CMakeFiles\koi_core_avx512.dir\src\koi\classical_evaluator.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:01.1312996Z [204/387] Scanning D:\a\Koi-engine\Koi-engine\tests\integration\tools\koi_nnue_fixture_tests.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:01.3271819Z [205/387] Scanning D:\a\Koi-engine\Koi-engine\tests\integration\tools\koi_replay_tests.cpp for CXX dependencies
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:01.5695087Z [206/387] Building CXX object CMakeFiles\koi_core_avx512.dir\src\koi\detail\evaluation_context.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:02.8886209Z [207/387] Building CXX object CMakeFiles\koi_core_avx512.dir\src\koi\detail\feature_state.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:03.3964886Z [208/387] Building CXX object CMakeFiles\koi_core_avx512.dir\src\koi\detail\root_coordinator.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:05.0137260Z [209/387] Building CXX object CMakeFiles\koi_core_avx512.dir\src\koi\detail\search_ordering_tables.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:05.8225703Z [210/387] Building CXX object CMakeFiles\koi_core_avx512.dir\src\koi\detail\search_context_support.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:06.8368578Z [211/387] Building CXX object CMakeFiles\koi_core_avx512.dir\src\koi\detail\compatibility_mirror.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:08.2037789Z [212/387] Building CXX object CMakeFiles\koi_core_avx512.dir\src\koi\detail\search_context.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:08.2966365Z [213/387] Building CXX object CMakeFiles\koi_core_avx512.dir\src\koi\detail\search_session.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:10.0160407Z [214/387] Building CXX object CMakeFiles\koi_core_avx512.dir\src\koi\completion_gate.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:10.8550959Z [215/387] Building CXX object CMakeFiles\koi_core_avx512.dir\src\koi\evaluation_features.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:11.5497141Z [216/387] Building CXX object CMakeFiles\koi_core_avx512.dir\src\koi\cpu_variant.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:12.2848374Z [217/387] Building CXX object CMakeFiles\koi_core_avx512.dir\src\koi\gpu\cuda_driver.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:12.2948470Z [218/387] Building CXX object CMakeFiles\koi_core_avx512.dir\src\koi\detail\search_runner.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:12.6363737Z [219/387] Building CXX object CMakeFiles\koi_core_avx512.dir\src\koi\executable_path.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:14.0544812Z [220/387] Building CXX object CMakeFiles\koi_core_avx512.dir\src\koi\move.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:14.5017795Z [221/387] Building CXX object CMakeFiles\koi_core_avx512.dir\src\koi\gpu\nnue_gpu_evaluator.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:16.5129021Z [222/387] Building CXX object CMakeFiles\koi_core_avx512.dir\src\koi\game_state.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:16.5470088Z [223/387] Building CXX object CMakeFiles\koi_core_avx512.dir\src\koi\gpu\gpu_nnue_service.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:16.9265041Z [224/387] Building CXX object CMakeFiles\koi_core_avx512.dir\src\koi\perft.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:17.0241218Z [225/387] Building CXX object CMakeFiles\koi_core_avx512.dir\src\koi\move_chooser.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:19.2653859Z [226/387] Building CXX object CMakeFiles\koi_core_avx512.dir\src\koi\static_exchange.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:19.6202767Z [227/387] Building CXX object CMakeFiles\koi_core_avx512.dir\src\koi\nnue.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:19.7663112Z [228/387] Building CXX object CMakeFiles\koi_core_avx512.dir\src\koi\search_ordering.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:20.3159963Z [229/387] Building CXX object CMakeFiles\koi_core_avx512.dir\src\koi\opening_book.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:20.9679290Z [230/387] Building CXX object CMakeFiles\koi_core_avx512.dir\src\koi\strength_suite.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:21.8741858Z [231/387] Building CXX object CMakeFiles\koi_core_avx512.dir\src\koi\search_service.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:23.2953038Z [232/387] Building CXX object CMakeFiles\koi_core_avx512.dir\src\koi\position.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:23.6159018Z [233/387] Building CXX object CMakeFiles\koi_core_avx512.dir\third_party\fathom\tbprobe.c.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:23.9264274Z [234/387] Building CXX object CMakeFiles\koi_core_avx512.dir\src\koi\transposition_table.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:25.0118229Z [235/387] Building CXX object CMakeFiles\koi_core_avx512.dir\src\koi\time_manager.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:25.0501943Z [236/387] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\detail\attack_tables.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:25.1253157Z [237/387] Building CXX object CMakeFiles\koi_core_avx512.dir\src\koi\syzygy_tablebase.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:25.7013168Z [238/387] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\classical_evaluator.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:27.3767572Z [239/387] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\detail\evaluation_context.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:27.4800372Z [240/387] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\detail\root_coordinator.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:27.5489790Z [241/387] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\detail\feature_state.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:28.5736667Z [242/387] Building CXX object CMakeFiles\koi_core_avx512.dir\src\koi\uci_controller.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:30.9889397Z [243/387] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\detail\search_ordering_tables.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:31.7794010Z [244/387] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\detail\compatibility_mirror.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:31.8257581Z [245/387] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\detail\search_context_support.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:33.1828782Z [246/387] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\detail\search_context.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:33.3625835Z [247/387] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\detail\search_session.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:35.8987851Z [248/387] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\evaluation_features.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:35.9531183Z [249/387] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\completion_gate.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:37.1917507Z [250/387] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\detail\search_runner.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:37.3225555Z [251/387] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\cpu_variant.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:37.4227994Z [252/387] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\executable_path.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:38.0648401Z [253/387] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\gpu\cuda_driver.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:38.9712831Z [254/387] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\move.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:40.1205844Z [255/387] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\gpu\nnue_gpu_evaluator.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:41.6840771Z [256/387] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\gpu\gpu_nnue_service.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:42.0682755Z [257/387] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\game_state.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:42.1625281Z [258/387] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\move_chooser.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:42.6227284Z [259/387] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\perft.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:44.9938452Z [260/387] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\static_exchange.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:45.0283945Z [261/387] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\search_ordering.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:45.0715073Z [262/387] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\nnue.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:45.2660799Z [263/387] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\opening_book.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:46.5183185Z [264/387] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\strength_suite.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:47.4041005Z [265/387] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\search_service.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:48.7421191Z [266/387] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\position.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:48.9233559Z [267/387] Generating CXX dyndep file CMakeFiles\koi_gpu_probe.dir\CXX.dd
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:48.9812718Z [268/387] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\transposition_table.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:49.0298100Z [269/387] Building CXX object CMakeFiles\koi_core_generic.dir\third_party\fathom\tbprobe.c.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:49.0423371Z [270/387] Generating CXX dyndep file CMakeFiles\gpu_nnue_tests.dir\CXX.dd
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:49.0811021Z [271/387] Generating CXX dyndep file CMakeFiles\koi_core_tests.dir\CXX.dd
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:49.1061651Z [272/387] Generating CXX dyndep file CMakeFiles\evaluation_boundary_tests.dir\CXX.dd
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:49.1347683Z [273/387] Generating CXX dyndep file CMakeFiles\evaluation_architecture_tests.dir\CXX.dd
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:49.1463789Z [274/387] Generating CXX dyndep file CMakeFiles\nnue_boundary_tests.dir\CXX.dd
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:49.1633141Z [275/387] Generating CXX dyndep file CMakeFiles\koi_cpu_features_tests.dir\CXX.dd
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:49.1918540Z [276/387] Generating CXX dyndep file CMakeFiles\koi_cpu_variant_tests.dir\CXX.dd
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:49.2093634Z [277/387] Generating CXX dyndep file CMakeFiles\koi_module_tests.dir\CXX.dd
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:49.2495413Z [278/387] Generating CXX dyndep file CMakeFiles\koi_rules_tests.dir\CXX.dd
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:49.2605475Z [279/387] Generating CXX dyndep file CMakeFiles\syzygy_tablebase_tests.dir\CXX.dd
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:49.2659875Z [280/387] Generating CXX dyndep file CMakeFiles\native_rule_state_tests.dir\CXX.dd
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:49.3130569Z [281/387] Generating CXX dyndep file CMakeFiles\opening_book_tests.dir\CXX.dd
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:49.3187505Z [282/387] Generating CXX dyndep file CMakeFiles\completion_gate_tests.dir\CXX.dd
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:49.3239350Z [283/387] Generating CXX dyndep file CMakeFiles\uci_controller_tests.dir\CXX.dd
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:49.3750902Z [284/387] Generating CXX dyndep file CMakeFiles\koi_search_tests.dir\CXX.dd
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:49.4185347Z [285/387] Generating CXX dyndep file CMakeFiles\search_architecture_tests.dir\CXX.dd
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:49.4280164Z [286/387] Generating CXX dyndep file CMakeFiles\search_ordering_tests.dir\CXX.dd
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:49.4586291Z [287/387] Generating CXX dyndep file CMakeFiles\search_policy_tests.dir\CXX.dd
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:49.4973118Z [288/387] Generating CXX dyndep file CMakeFiles\search_runtime_tests.dir\CXX.dd
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:49.5047621Z [289/387] Generating CXX dyndep file CMakeFiles\static_exchange_tests.dir\CXX.dd
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:49.5289249Z [290/387] Generating CXX dyndep file CMakeFiles\transposition_table_tests.dir\CXX.dd
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:49.5655369Z [291/387] Generating CXX dyndep file CMakeFiles\search_service_tests.dir\CXX.dd
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:49.5713053Z [292/387] Generating CXX dyndep file CMakeFiles\koi_soak_tests.dir\CXX.dd
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:49.6060230Z [293/387] Generating CXX dyndep file CMakeFiles\classical_evaluator_tests.dir\CXX.dd
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:49.6249346Z [294/387] Generating CXX dyndep file CMakeFiles\evaluation_features_tests.dir\CXX.dd
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:49.6302593Z [295/387] Generating CXX dyndep file CMakeFiles\time_manager_tests.dir\CXX.dd
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:49.6833461Z [296/387] Generating CXX dyndep file CMakeFiles\koi_strength_tests.dir\CXX.dd
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:49.6926492Z [297/387] Generating CXX dyndep file CMakeFiles\koi_replay_tests.dir\CXX.dd
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:49.6955527Z [298/387] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\time_manager.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:49.7242486Z [299/387] Generating CXX dyndep file CMakeFiles\perft_tests.dir\CXX.dd
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:49.7272647Z [300/387] Generating CXX dyndep file CMakeFiles\koi_nnue_fixture_tests.dir\CXX.dd
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:49.7381082Z [301/387] Generating CXX dyndep file CMakeFiles\uci_match_fixture.dir\CXX.dd
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:49.7515700Z [302/387] Generating CXX dyndep file CMakeFiles\koi_perft.dir\CXX.dd
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:49.7763662Z [303/387] Generating CXX dyndep file CMakeFiles\koi_bench.dir\CXX.dd
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:49.7946722Z [304/387] Generating CXX dyndep file CMakeFiles\koi_eval_features.dir\CXX.dd
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:49.8015368Z [305/387] Generating CXX dyndep file CMakeFiles\koi_engine.dir\CXX.dd
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:49.8040884Z [306/387] Generating CXX dyndep file CMakeFiles\koi_engine_avx2.dir\CXX.dd
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:49.8177251Z [307/387] Generating CXX dyndep file CMakeFiles\koi_engine_avx512.dir\CXX.dd
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:50.3375920Z [308/387] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\syzygy_tablebase.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:50.3574161Z [309/387] Linking CXX static library koi_core_avx512.lib
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:51.5921161Z [310/387] Building CXX object CMakeFiles\koi_gpu_probe.dir\tools\engine\koi_gpu_probe.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:54.2559353Z [311/387] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\uci_controller.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:55.0869360Z [312/387] Linking CXX static library koi_core_generic.lib
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:55.7845921Z [313/387] Building CXX object CMakeFiles\gpu_nnue_tests.dir\tests\unit\runtime\gpu_nnue_tests.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:56.1595293Z [314/387] Building CXX object CMakeFiles\evaluation_boundary_tests.dir\tests\unit\evaluation\evaluation_boundary_tests.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:56.2851047Z [315/387] Building CXX object CMakeFiles\koi_core_tests.dir\tests\unit\core\koi_core_tests.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:58.2083103Z [316/387] Building CXX object CMakeFiles\evaluation_architecture_tests.dir\tests\unit\evaluation\evaluation_architecture_tests.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:16:59.0506688Z [317/387] Building CXX object CMakeFiles\nnue_boundary_tests.dir\tests\unit\evaluation\nnue_boundary_tests.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:01.1977582Z [318/387] Building CXX object CMakeFiles\koi_cpu_features_tests.dir\tests\unit\runtime\cpu_features_tests.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:01.4670484Z [319/387] Building CXX object CMakeFiles\koi_cpu_variant_tests.dir\tests\unit\runtime\cpu_variant_tests.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:02.1465106Z [320/387] Building CXX object CMakeFiles\koi_module_tests.dir\tests\unit\core\koi_module_tests.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:02.6518649Z [321/387] Building CXX object CMakeFiles\syzygy_tablebase_tests.dir\tests\unit\runtime\syzygy_tablebase_tests.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:04.7938323Z [322/387] Building CXX object CMakeFiles\koi_rules_tests.dir\tests\unit\rules\koi_rules_tests.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:07.6634946Z [323/387] Building CXX object CMakeFiles\opening_book_tests.dir\tests\unit\runtime\opening_book_tests.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:08.4158144Z [324/387] Building CXX object CMakeFiles\completion_gate_tests.dir\tests\unit\runtime\completion_gate_tests.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:09.3806398Z [325/387] Building CXX object CMakeFiles\native_rule_state_tests.dir\tests\unit\rules\native_rule_state_tests.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:09.8681450Z [326/387] Building CXX object CMakeFiles\uci_controller_tests.dir\tests\unit\runtime\uci_controller_tests.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:11.3987304Z [327/387] Building CXX object CMakeFiles\search_ordering_tests.dir\tests\unit\search\search_ordering_tests.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:12.3923289Z [328/387] Building CXX object CMakeFiles\koi_search_tests.dir\tests\unit\search\koi_search_tests.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:12.4155709Z D:\a\Koi-engine\Koi-engine\tests\unit\search\koi_search_tests.cpp(3878): warning C4834: discarding return value of function with [[nodiscard]] attribute
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:12.4577266Z D:\a\Koi-engine\Koi-engine\tests\unit\search\koi_search_tests.cpp(3908): warning C4834: discarding return value of function with [[nodiscard]] attribute
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:12.4901421Z D:\a\Koi-engine\Koi-engine\tests\unit\search\koi_search_tests.cpp(3936): warning C4834: discarding return value of function with [[nodiscard]] attribute
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:12.4954111Z D:\a\Koi-engine\Koi-engine\tests\unit\search\koi_search_tests.cpp(4151): warning C4834: discarding return value of function with [[nodiscard]] attribute
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:12.5440310Z D:\a\Koi-engine\Koi-engine\tests\unit\search\koi_search_tests.cpp(4185): warning C4834: discarding return value of function with [[nodiscard]] attribute
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:15.0735497Z [329/387] Building CXX object CMakeFiles\search_policy_tests.dir\tests\unit\search\search_policy_tests.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:16.0340324Z [330/387] Building CXX object CMakeFiles\search_architecture_tests.dir\tests\unit\search\search_architecture_tests.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:16.0673732Z [331/387] Building CXX object CMakeFiles\search_runtime_tests.dir\tests\unit\search\search_runtime_tests.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:16.1253991Z [332/387] Building CXX object CMakeFiles\static_exchange_tests.dir\tests\unit\search\static_exchange_tests.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:18.1745807Z [333/387] Building CXX object CMakeFiles\transposition_table_tests.dir\tests\unit\runtime\transposition_table_tests.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:19.8899250Z [334/387] Building CXX object CMakeFiles\search_service_tests.dir\tests\unit\runtime\search_service_tests.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:21.8866323Z [335/387] Building CXX object CMakeFiles\koi_soak_tests.dir\tests\unit\runtime\koi_soak_tests.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:22.1225135Z [336/387] Building CXX object CMakeFiles\classical_evaluator_tests.dir\tests\unit\evaluation\classical_evaluator_tests.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:22.4920343Z [337/387] Building CXX object CMakeFiles\evaluation_features_tests.dir\tests\unit\evaluation\evaluation_features_tests.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:22.6755653Z [338/387] Building CXX object CMakeFiles\time_manager_tests.dir\tests\unit\search\time_manager_tests.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:25.6896435Z [339/387] Building CXX object CMakeFiles\koi_strength_tests.dir\tests\unit\search\koi_strength_tests.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:25.8959601Z [340/387] Building CXX object CMakeFiles\perft_tests.dir\tests\unit\rules\perft_tests.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:26.4644540Z [341/387] Building CXX object CMakeFiles\koi_perft.dir\tools\engine\perft.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:28.4320851Z [342/387] Building CXX object CMakeFiles\koi_replay_tests.dir\tests\integration\tools\koi_replay_tests.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:28.5331343Z [343/387] Building CXX object CMakeFiles\uci_match_fixture.dir\tests\integration\tools\uci_match_fixture.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:28.6249001Z [344/387] Building CXX object CMakeFiles\koi_nnue_fixture_tests.dir\tests\integration\tools\koi_nnue_fixture_tests.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:29.4908912Z [345/387] Building CXX object CMakeFiles\koi_eval_features.dir\tools\engine\koi_eval_features.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:31.0981820Z [346/387] Linking CXX executable koi_gpu_probe.exe
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:31.9552574Z [347/387] Linking CXX executable gpu_nnue_tests.exe
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:32.1185418Z [348/387] Building CXX object CMakeFiles\koi_engine.dir\src\main.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:33.1065636Z [349/387] Building CXX object CMakeFiles\koi_bench.dir\tools\engine\koi_bench.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:33.4893717Z [350/387] Linking CXX executable koi_core_tests.exe
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:34.0096196Z [351/387] Linking CXX executable evaluation_boundary_tests.exe
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:34.2386403Z [352/387] Building CXX object CMakeFiles\koi_engine_avx2.dir\src\main.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:34.2787848Z [353/387] Building CXX object CMakeFiles\koi_engine_avx512.dir\src\main.cpp.obj
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:34.2858719Z [354/387] Linking CXX executable evaluation_architecture_tests.exe
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:35.1152406Z [355/387] Linking CXX executable nnue_boundary_tests.exe
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:35.5683833Z [356/387] Linking CXX executable koi_cpu_features_tests.exe
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:35.8737802Z [357/387] Linking CXX executable koi_module_tests.exe
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:35.9384319Z [358/387] Linking CXX executable koi_rules_tests.exe
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:35.9501677Z [359/387] Linking CXX executable koi_cpu_variant_tests.exe
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:36.3749600Z [360/387] Linking CXX executable syzygy_tablebase_tests.exe
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:37.3444780Z [361/387] Linking CXX executable native_rule_state_tests.exe
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:37.7925600Z [362/387] Linking CXX executable koi_search_tests.exe
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:37.7938169Z [363/387] Linking CXX executable opening_book_tests.exe
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:37.9879684Z [364/387] Linking CXX executable completion_gate_tests.exe
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:38.3370381Z [365/387] Linking CXX executable search_ordering_tests.exe
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:38.3833918Z [366/387] Linking CXX executable uci_controller_tests.exe
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:39.2033633Z [367/387] Linking CXX executable search_architecture_tests.exe
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:39.7003526Z [368/387] Linking CXX executable search_runtime_tests.exe
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:39.8234766Z [369/387] Linking CXX executable search_policy_tests.exe
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:39.8740185Z [370/387] Linking CXX executable static_exchange_tests.exe
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:40.2826706Z [371/387] Linking CXX executable transposition_table_tests.exe
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:40.9385053Z [372/387] Linking CXX executable search_service_tests.exe
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:41.2347178Z [373/387] Linking CXX executable koi_soak_tests.exe
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:41.4563809Z [374/387] Linking CXX executable classical_evaluator_tests.exe
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:41.7830475Z [375/387] Linking CXX executable time_manager_tests.exe
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:41.8588686Z [376/387] Linking CXX executable evaluation_features_tests.exe
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:42.5181378Z [377/387] Linking CXX executable koi_strength_tests.exe
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:42.9046719Z [378/387] Linking CXX executable perft_tests.exe
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:43.3217577Z [379/387] Linking CXX executable uci_match_fixture.exe
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:43.3480336Z [380/387] Linking CXX executable koi_replay_tests.exe
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:43.7216931Z [381/387] Linking CXX executable koi_nnue_fixture_tests.exe
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:43.7804137Z [382/387] Linking CXX executable koi-perft.exe
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:44.5198122Z [383/387] Linking CXX executable koi-bench.exe
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:44.7077428Z [384/387] Linking CXX executable koi-eval-features.exe
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:45.0141772Z [385/387] Linking CXX executable koi-engine-avx2.exe
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:45.0825653Z [386/387] Linking CXX executable koi-engine.exe
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:45.2723037Z [387/387] Linking CXX executable koi-engine-avx512.exe
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:45.9750849Z Test project D:/a/Koi-engine/Koi-engine/build/ci-debug
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:46.0167049Z       Start  1: koi_gpu_probe
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:46.0268564Z       Start  2: gpu_nnue_tests
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:46.0314468Z       Start  3: koi_core_tests
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:46.0388268Z       Start  4: evaluation_boundary_tests
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:46.0441892Z  1/64 Test  #1: koi_gpu_probe ......................   Passed    0.03 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:46.0447688Z       Start  5: evaluation_architecture_tests
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:46.0517375Z  2/64 Test  #2: gpu_nnue_tests .....................   Passed    0.02 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:46.0572480Z       Start  6: nnue_boundary_tests
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:46.1303696Z  3/64 Test  #5: evaluation_architecture_tests ......   Passed    0.08 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:46.1308557Z       Start  7: koi_cpu_features_tests
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:46.1550901Z  4/64 Test  #4: evaluation_boundary_tests ..........   Passed    0.11 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:46.1572289Z       Start  8: koi_cpu_variant_tests
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:46.1888308Z  5/64 Test  #7: koi_cpu_features_tests .............   Passed    0.05 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:46.1944661Z       Start  9: koi_module_tests
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:46.1981991Z  6/64 Test  #8: koi_cpu_variant_tests ..............   Passed    0.05 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:46.2006178Z       Start 10: syzygy_tablebase_tests
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:46.2097923Z  7/64 Test  #9: koi_module_tests ...................   Passed    0.02 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:46.2100694Z       Start 11: koi_rules_tests
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:46.3691779Z  8/64 Test #11: koi_rules_tests ....................   Passed    0.16 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:46.3740066Z       Start 12: native_rule_state_tests
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:46.6815319Z  9/64 Test #12: native_rule_state_tests ............   Passed    0.29 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:46.6832519Z       Start 13: opening_book_tests
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:46.7755392Z 10/64 Test #10: syzygy_tablebase_tests .............   Passed    0.58 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:46.7761943Z       Start 14: uci_controller_tests
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:46.9030247Z 11/64 Test #13: opening_book_tests .................   Passed    0.24 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:46.9038596Z       Start 15: completion_gate_tests
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:47.0728700Z 12/64 Test #15: completion_gate_tests ..............   Passed    0.16 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:47.0834245Z       Start 20: search_ordering_tests
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:47.2333126Z 13/64 Test #20: search_ordering_tests ..............   Passed    0.16 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:47.2334339Z       Start 21: search_architecture_tests
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:47.3470494Z 14/64 Test #21: search_architecture_tests ..........   Passed    0.11 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:47.3518106Z       Start 22: search_policy_tests
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:47.3808523Z 15/64 Test #22: search_policy_tests ................   Passed    0.04 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:47.3903924Z       Start 23: search_runtime_tests
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:47.4186411Z 16/64 Test #23: search_runtime_tests ...............   Passed    0.04 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:47.4401821Z       Start 24: static_exchange_tests
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:47.5715585Z 17/64 Test #24: static_exchange_tests ..............   Passed    0.15 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:47.5717489Z       Start 25: transposition_table_tests
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:47.7972498Z 18/64 Test #25: transposition_table_tests ..........   Passed    0.20 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:47.8104945Z       Start 26: search_service_tests
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:50.7134774Z 19/64 Test  #6: nnue_boundary_tests ................   Passed    4.65 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:50.7153681Z       Start 27: koi_soak_tests
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:56.3011103Z 20/64 Test #26: search_service_tests ...............   Passed    8.52 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:56.3599160Z       Start 28: classical_evaluator_tests
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:56.6994647Z 21/64 Test #28: classical_evaluator_tests ..........   Passed    0.38 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:56.7206529Z       Start 29: evaluation_features_tests
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:57.1119735Z 22/64 Test #29: evaluation_features_tests ..........   Passed    0.40 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:57.1173365Z       Start 30: time_manager_tests
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:57.2998941Z 23/64 Test #30: time_manager_tests .................   Passed    0.18 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:17:57.3194859Z       Start 32: perft_tests
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:18:08.2441801Z 24/64 Test #32: perft_tests ........................   Passed   10.97 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:18:08.2699592Z       Start 33: koi_replay_tests
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:18:10.9787388Z 25/64 Test  #3: koi_core_tests .....................   Passed   24.94 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:18:11.0117180Z       Start 34: koi_nnue_fixture_tests
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:18:14.7817699Z 26/64 Test #33: koi_replay_tests ...................   Passed    6.52 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:18:14.8135462Z       Start 36: koi_engine_variant_process
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:18:19.5896756Z 27/64 Test #27: koi_soak_tests .....................   Passed   28.88 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:18:19.5904017Z       Start 37: koi_engine_en_croissant_process
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:18:23.9895194Z 28/64 Test #37: koi_engine_en_croissant_process ....   Passed    4.40 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:18:23.9914297Z       Start 40: koi_uci_match_process
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:18:25.9100781Z 29/64 Test #14: uci_controller_tests ...............   Passed   39.13 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:18:25.9131485Z       Start 41: koi_stockfish_strength_option
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:18:28.4385441Z 30/64 Test #36: koi_engine_variant_process .........   Passed   13.68 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:18:28.4400961Z       Start 43: koi_sprt_compare_decision
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:18:29.3892015Z 31/64 Test #43: koi_sprt_compare_decision ..........   Passed    0.95 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:18:29.3949961Z       Start 44: cutechess_stability_diagnostics
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:18:31.7490521Z 32/64 Test #41: koi_stockfish_strength_option ......   Passed    5.84 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:18:31.7495178Z       Start 45: hash_memory_stability
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:18:33.2102443Z 33/64 Test #45: hash_memory_stability ..............   Passed    1.46 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:18:33.2125458Z       Start 46: windows_ci_configuration
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:18:33.9239998Z 34/64 Test #46: windows_ci_configuration ...........   Passed    0.71 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:18:33.9252448Z       Start 47: install_book_script
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:18:35.1440975Z 35/64 Test #47: install_book_script ................   Passed    1.22 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:18:35.1446908Z       Start 48: package_release_layout
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:18:41.9086980Z 36/64 Test #48: package_release_layout .............   Passed    6.76 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:18:41.9104802Z       Start 49: release_candidate_games_python
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:18:43.0951977Z 37/64 Test #49: release_candidate_games_python .....   Passed    1.19 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:18:43.1002493Z       Start 50: release_strength_openings_python
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:18:43.5603997Z 38/64 Test #50: release_strength_openings_python ...   Passed    0.47 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:18:43.5608265Z       Start 51: strength_bound_python
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:18:45.6533185Z 39/64 Test #51: strength_bound_python ..............   Passed    2.09 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:18:45.6539537Z       Start 52: elo_oracle_python
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:18:48.7013008Z 40/64 Test #52: elo_oracle_python ..................   Passed    3.05 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:18:48.7017468Z       Start 53: elo_estimate_python
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:18:53.1655698Z 41/64 Test #53: elo_estimate_python ................   Passed    4.46 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:18:53.1682342Z       Start 54: stockfish_match_python
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:18:53.4032851Z 42/64 Test #54: stockfish_match_python .............   Passed    0.24 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:18:53.4045860Z       Start 55: elo_openings_python
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:18:55.3009118Z 43/64 Test #55: elo_openings_python ................   Passed    1.90 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:18:55.3014633Z       Start 56: tune_eval_python
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:18:55.6488717Z 44/64 Test #56: tune_eval_python ...................   Passed    0.35 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:18:55.6492189Z       Start 57: nnue_training_python
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:18:56.3806170Z 45/64 Test #44: cutechess_stability_diagnostics ....   Passed   26.99 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:18:56.3813924Z       Start 58: nnue_wrapper_python
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:18:56.7600527Z 46/64 Test #58: nnue_wrapper_python ................   Passed    0.38 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:18:56.7657279Z       Start 59: koi_dataset_python
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:18:57.0155190Z 47/64 Test #57: nnue_training_python ...............   Passed    1.36 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:18:57.0183175Z       Start 60: koi_chess_python
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:19:00.4435324Z 48/64 Test #59: koi_dataset_python .................   Passed    3.68 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:19:00.4455866Z       Start 61: koi_chess_pgn_python
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:19:00.7275527Z 49/64 Test #61: koi_chess_pgn_python ...............   Passed    0.28 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:19:00.7294923Z       Start 62: koi_chess_engine_python
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:19:01.5519208Z 50/64 Test #62: koi_chess_engine_python ............   Passed    0.82 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:19:01.5540010Z       Start 63: gen_training_data_python
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:19:01.7963988Z 51/64 Test #63: gen_training_data_python ...........   Passed    0.25 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:19:01.8064020Z       Start 64: measurement_phase_python
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:19:02.0174628Z 52/64 Test #40: koi_uci_match_process ..............***Failed   38.03 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:19:02.0177477Z ^[[31;1mException: ^[[0mD:\a\Koi-engine\Koi-engine\tests\integration\matches\uci_match_process_test.ps1:263^[[0m
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:19:02.0178730Z ^[[31;1m^[[0m^[[36;1mLine |^[[0m
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:19:02.0179907Z ^[[31;1m^[[0m^[[36;1m^[[36;1m 263 | ^[[0m             ^[[36;1mthrow "Attested $($modeCase.mode) match failed: $($modeMa^[[0m …^[[0m
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:19:02.0182008Z ^[[31;1m^[[0m^[[36;1m^[[36;1m^[[0m^[[36;1m^[[0m^[[36;1m     | ^[[31;1m             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^[[0m
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:19:02.0183418Z ^[[31;1m^[[0m^[[36;1m^[[36;1m^[[0m^[[36;1m^[[0m^[[36;1m^[[31;1m^[[31;1m^[[36;1m     | ^[[31;1mAttested nnue-v5 match failed: ^[[31;1mOperationStopped:^[[0m
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:19:02.0185341Z ^[[31;1m^[[0m^[[36;1m^[[36;1m^[[0m^[[36;1m^[[0m^[[36;1m^[[31;1m^[[31;1m^[[36;1m^[[31;1m^[[31;1m^[[36;1m     | ^[[31;1m^[[0mD:\a\Koi-engine\Koi-engine\tools\stability\uci_match.ps1:510^[[0m | ^[[31;1m^[[0m^[[36;1mLine |^[[0m |^[[0m
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:19:02.0189401Z ^[[31;1m^[[0m^[[36;1m^[[36;1m^[[0m^[[36;1m^[[0m^[[36;1m^[[31;1m^[[31;1m^[[36;1m^[[31;1m^[[31;1m^[[36;1m^[[31;1m^[[0m^[[0m^[[31;1m^[[0m^[[36;1m^[[0m^[[36;1m     | ^[[31;1m^[[31;1m^[[0m^[[36;1m^[[36;1m 510 | ^[[0m         ^[[36;1mthrow [System.TimeoutException]::new("Timed out waiting for^[[0m
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:19:02.0194072Z ^[[31;1m^[[0m^[[36;1m^[[36;1m^[[0m^[[36;1m^[[0m^[[36;1m^[[31;1m^[[31;1m^[[36;1m^[[31;1m^[[31;1m^[[36;1m^[[31;1m^[[0m^[[0m^[[31;1m^[[0m^[[36;1m^[[0m^[[36;1m^[[31;1m^[[31;1m^[[0m^[[36;1m^[[36;1m^[[0m^[[36;1m^[[36;1m     | ^[[31;1m$^[[0m …^[[0m | ^[[31;1m^[[0m^[[36;1m^[[36;1m^[[0m^[[36;1m^[[0m^[[36;1m     | ^[[31;1m        ^[[0m
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:19:02.0197676Z ^[[31;1m^[[0m^[[36;1m^[[36;1m^[[0m^[[36;1m^[[0m^[[36;1m^[[31;1m^[[31;1m^[[36;1m^[[31;1m^[[31;1m^[[36;1m^[[31;1m^[[0m^[[0m^[[31;1m^[[0m^[[36;1m^[[0m^[[36;1m^[[31;1m^[[31;1m^[[0m^[[36;1m^[[36;1m^[[0m^[[36;1m^[[36;1m^[[31;1m^[[0m^[[0m^[[31;1m^[[0m^[[36;1m^[[36;1m^[[0m^[[36;1m^[[0m^[[36;1m^[[31;1m^[[36;1m     | ^[[31;1m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^[[0m |^[[0m
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:19:02.0201929Z ^[[31;1m^[[0m^[[36;1m^[[36;1m^[[0m^[[36;1m^[[0m^[[36;1m^[[31;1m^[[31;1m^[[36;1m^[[31;1m^[[31;1m^[[36;1m^[[31;1m^[[0m^[[0m^[[31;1m^[[0m^[[36;1m^[[0m^[[36;1m^[[31;1m^[[31;1m^[[0m^[[36;1m^[[36;1m^[[0m^[[36;1m^[[36;1m^[[31;1m^[[0m^[[0m^[[31;1m^[[0m^[[36;1m^[[36;1m^[[0m^[[36;1m^[[0m^[[36;1m^[[31;1m^[[36;1m^[[31;1m^[[0m^[[36;1m     | ^[[31;1m^[[31;1m^[[0m^[[36;1m^[[36;1m^[[0m^[[36;1m^[[0m^[[36;1m^[[31;1m^[[31;1m^[[36;1m     | ^[[31;1mTimed out waiting for ^[[0m
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:19:02.0205293Z ^[[31;1m^[[0m^[[36;1m^[[36;1m^[[0m^[[36;1m^[[0m^[[36;1m^[[31;1m^[[31;1m^[[36;1m^[[31;1m^[[31;1m^[[36;1m^[[31;1m^[[0m^[[0m^[[31;1m^[[0m^[[36;1m^[[0m^[[36;1m^[[31;1m^[[31;1m^[[0m^[[36;1m^[[36;1m^[[0m^[[36;1m^[[36;1m^[[31;1m^[[0m^[[0m^[[31;1m^[[0m^[[36;1m^[[36;1m^[[0m^[[36;1m^[[0m^[[36;1m^[[31;1m^[[36;1m^[[31;1m^[[0m^[[36;1m^[[31;1m^[[31;1m^[[0m^[[36;1m^[[36;1m^[[0m^[[36;1m^[[0m^[[36;1m^[[31;1m^[[31;1m^[[36;1m^[[31;1m^[[36;1m     | ^[[31;1mreadyok.^[[0m
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:19:02.0209237Z 
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:19:02.0209706Z       Start 40: koi_uci_match_process
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:19:02.8983692Z 52/64 Test #64: measurement_phase_python ...........   Passed    1.10 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:19:02.9003157Z       Start 65: measurement_forensics_python
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:19:04.3653430Z 53/64 Test #65: measurement_forensics_python .......   Passed    1.47 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:19:04.3672150Z       Start 66: strength_report_python
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:19:05.0508256Z 54/64 Test #66: strength_report_python .............   Passed    0.67 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:19:05.0588462Z       Start 67: nnue_studio_python
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:19:08.3354885Z 55/64 Test #67: nnue_studio_python .................   Passed    3.30 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:19:08.3401881Z       Start 68: nnue_studio_ui_python
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:19:09.9695570Z 56/64 Test #68: nnue_studio_ui_python ..............   Passed    1.63 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:19:09.9712736Z       Start 69: koi_trainer_python
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:19:11.1675475Z 57/64 Test #69: koi_trainer_python .................   Passed    1.20 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:19:11.1727239Z       Start 70: tune_classical_python
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:19:11.4687613Z 58/64 Test #70: tune_classical_python ..............   Passed    0.30 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:19:11.4737725Z       Start 71: bullet_data_python
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:19:11.6079873Z 59/64 Test #60: koi_chess_python ...................   Passed   14.60 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:19:12.0354259Z 60/64 Test #71: bullet_data_python .................   Passed    0.57 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:19:12.0358832Z       Start 42: koi_uci_match_clock
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:19:32.8626662Z     Test #40: koi_uci_match_process ..............***Failed   30.84 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:19:32.8628504Z ^[[31;1mException: ^[[0mD:\a\Koi-engine\Koi-engine\tests\integration\matches\uci_match_process_test.ps1:263^[[0m
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:19:32.8629432Z ^[[31;1m^[[0m^[[36;1mLine |^[[0m
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:19:32.8630342Z ^[[31;1m^[[0m^[[36;1m^[[36;1m 263 | ^[[0m             ^[[36;1mthrow "Attested $($modeCase.mode) match failed: $($modeMa^[[0m …^[[0m
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:19:32.8631543Z ^[[31;1m^[[0m^[[36;1m^[[36;1m^[[0m^[[36;1m^[[0m^[[36;1m     | ^[[31;1m             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^[[0m
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:19:32.8632998Z ^[[31;1m^[[0m^[[36;1m^[[36;1m^[[0m^[[36;1m^[[0m^[[36;1m^[[31;1m^[[31;1m^[[36;1m     | ^[[31;1mAttested nnue-v5 match failed: ^[[31;1mOperationStopped:^[[0m
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:19:32.8634698Z ^[[31;1m^[[0m^[[36;1m^[[36;1m^[[0m^[[36;1m^[[0m^[[36;1m^[[31;1m^[[31;1m^[[36;1m^[[31;1m^[[31;1m^[[36;1m     | ^[[31;1m^[[0mD:\a\Koi-engine\Koi-engine\tools\stability\uci_match.ps1:510^[[0m | ^[[31;1m^[[0m^[[36;1mLine |^[[0m |^[[0m
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:19:32.8636814Z ^[[31;1m^[[0m^[[36;1m^[[36;1m^[[0m^[[36;1m^[[0m^[[36;1m^[[31;1m^[[31;1m^[[36;1m^[[31;1m^[[31;1m^[[36;1m^[[31;1m^[[0m^[[0m^[[31;1m^[[0m^[[36;1m^[[0m^[[36;1m     | ^[[31;1m^[[31;1m^[[0m^[[36;1m^[[36;1m 510 | ^[[0m         ^[[36;1mthrow [System.TimeoutException]::new("Timed out waiting for^[[0m
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:19:32.8638148Z ^[[31;1m^[[0m^[[36;1m^[[36;1m^[[0m^[[36;1m^[[0m^[[36;1m^[[31;1m^[[31;1m^[[36;1m^[[31;1m^[[31;1m^[[36;1m^[[31;1m^[[0m^[[0m^[[31;1m^[[0m^[[36;1m^[[0m^[[36;1m^[[31;1m^[[31;1m^[[0m^[[36;1m^[[36;1m^[[0m^[[36;1m^[[36;1m     | ^[[31;1m$^[[0m …^[[0m | ^[[31;1m^[[0m^[[36;1m^[[36;1m^[[0m^[[36;1m^[[0m^[[36;1m     | ^[[31;1m        ^[[0m
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:19:32.8639555Z ^[[31;1m^[[0m^[[36;1m^[[36;1m^[[0m^[[36;1m^[[0m^[[36;1m^[[31;1m^[[31;1m^[[36;1m^[[31;1m^[[31;1m^[[36;1m^[[31;1m^[[0m^[[0m^[[31;1m^[[0m^[[36;1m^[[0m^[[36;1m^[[31;1m^[[31;1m^[[0m^[[36;1m^[[36;1m^[[0m^[[36;1m^[[36;1m^[[31;1m^[[0m^[[0m^[[31;1m^[[0m^[[36;1m^[[36;1m^[[0m^[[36;1m^[[0m^[[36;1m^[[31;1m^[[36;1m     | ^[[31;1m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^[[0m |^[[0m
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:19:32.8641202Z ^[[31;1m^[[0m^[[36;1m^[[36;1m^[[0m^[[36;1m^[[0m^[[36;1m^[[31;1m^[[31;1m^[[36;1m^[[31;1m^[[31;1m^[[36;1m^[[31;1m^[[0m^[[0m^[[31;1m^[[0m^[[36;1m^[[0m^[[36;1m^[[31;1m^[[31;1m^[[0m^[[36;1m^[[36;1m^[[0m^[[36;1m^[[36;1m^[[31;1m^[[0m^[[0m^[[31;1m^[[0m^[[36;1m^[[36;1m^[[0m^[[36;1m^[[0m^[[36;1m^[[31;1m^[[36;1m^[[31;1m^[[0m^[[36;1m     | ^[[31;1m^[[31;1m^[[0m^[[36;1m^[[36;1m^[[0m^[[36;1m^[[0m^[[36;1m^[[31;1m^[[31;1m^[[36;1m     | ^[[31;1mTimed out waiting for ^[[0m
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:19:32.8643176Z ^[[31;1m^[[0m^[[36;1m^[[36;1m^[[0m^[[36;1m^[[0m^[[36;1m^[[31;1m^[[31;1m^[[36;1m^[[31;1m^[[31;1m^[[36;1m^[[31;1m^[[0m^[[0m^[[31;1m^[[0m^[[36;1m^[[0m^[[36;1m^[[31;1m^[[31;1m^[[0m^[[36;1m^[[36;1m^[[0m^[[36;1m^[[36;1m^[[31;1m^[[0m^[[0m^[[31;1m^[[0m^[[36;1m^[[36;1m^[[0m^[[36;1m^[[0m^[[36;1m^[[31;1m^[[36;1m^[[31;1m^[[0m^[[36;1m^[[31;1m^[[31;1m^[[0m^[[36;1m^[[36;1m^[[0m^[[36;1m^[[0m^[[36;1m^[[31;1m^[[31;1m^[[36;1m^[[31;1m^[[36;1m     | ^[[31;1mreadyok.^[[0m
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:19:32.8643991Z 
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:19:33.1904159Z 62/64 Test #34: koi_nnue_fixture_tests .............   Passed   82.22 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:20:20.8394803Z 63/64 Test #42: koi_uci_match_clock ................   Passed   68.80 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:20:20.8399515Z       Start 35: koi_engine_process
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:20:27.5265985Z 64/64 Test #35: koi_engine_process .................   Passed    6.69 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:20:27.5277725Z 
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:20:27.5277953Z 98% tests passed, 1 tests failed out of 64
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:20:27.5278216Z 
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:20:27.5278356Z Label Time Summary:
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:20:27.5278984Z evaluation     =   5.63 sec*proc (5 tests)
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:20:27.5279474Z integration    =  88.74 sec*proc (2 tests)
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:20:27.5280288Z matches        = 202.23 sec*proc (5 tests)
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:20:27.5280908Z measurement    =   3.05 sec*proc (1 test)
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:20:27.5281433Z packaging      =   8.70 sec*proc (3 tests)
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:20:27.5281926Z process        = 237.15 sec*proc (12 tests)
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:20:27.5282422Z python         =  45.33 sec*proc (23 tests)
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:20:27.5283007Z runtime        =  69.71 sec*proc (6 tests)
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:20:27.5283510Z search         =   8.52 sec*proc (1 test)
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:20:27.5284000Z tools          =  88.74 sec*proc (2 tests)
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:20:27.5284461Z uci            =  24.76 sec*proc (3 tests)
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:20:27.5286279Z unit           = 120.52 sec*proc (26 tests)
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:20:27.5286621Z 
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:20:27.5286804Z Total Test time (real) = 161.55 sec
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:20:27.5287471Z 
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:20:27.5287637Z The following tests FAILED:
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:20:27.5288224Z 	 40 - koi_uci_match_process (Failed)                    matches process
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:20:27.5318246Z Errors while running CTest
+debug-smoke	Configure x64 MSVC environment, build, and smoke-test Debug	2026-09-26T14:20:27.5662341Z ##[error]Process completed with exit code 1.

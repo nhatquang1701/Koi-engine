@@ -1,0 +1,3 @@
+openings 32 C:\Users\ntATh\AI test\Koi engine\tests\data\openings\openings-curated-32.txt
+nnue net match 128: +6 =54 -68 (25.78%) candidate-weaker
+json artifacts\matches\koi-v6req-vs-v4-20261007\net-match.json

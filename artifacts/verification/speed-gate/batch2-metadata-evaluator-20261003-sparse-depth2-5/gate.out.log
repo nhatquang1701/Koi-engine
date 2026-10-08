@@ -1,0 +1,78 @@
+output_directory=C:\Users\ntATh\AI test\Koi engine\artifacts\verification\speed-gate\batch2-metadata-evaluator-20261003-sparse-depth2-5
+baseline_executable=C:\Users\ntATh\AI test\Koi engine\artifacts\verification\speed-gate\batch2-metadata-evaluator-20261003-sparse-depth2-5\baseline\koi-bench-baseline.exe
+candidate_executable=C:\Users\ntATh\AI test\Koi engine\build\roadmap-visit-win-release\koi-bench.exe
+runs=5 threads=1 speed=100 timed=1 fen-file=C:\Users\ntATh\AI test\Koi engine\artifacts\verification\speed-gate\batch2-metadata-evaluator-20261003-sparse-depth2-5\sparse-qsearch-fens.txt depth-sweep=2..5
+nps_regression_limit=2.00% row_nps_regression_limit=2.00% min_row_elapsed_ms=20.0
+run=1 baseline_nps=338,349 candidate_nps=388,877 order=baseline,candidate
+run=2 baseline_nps=340,290 candidate_nps=387,826 order=candidate,baseline
+run=3 baseline_nps=338,856 candidate_nps=389,235 order=baseline,candidate
+run=4 baseline_nps=340,134 candidate_nps=390,354 order=candidate,baseline
+run=5 baseline_nps=338,791 candidate_nps=388,802 order=baseline,candidate
+baseline_total_nps=338,856 candidate_total_nps=388,877 delta=14.76%
+median_row_nps_delta=14.85% excluded_noise_rows=14
+row=fen-001#2 baseline_nps=409555 candidate_nps=460750 nps_delta=12.50% baseline_ms=9 candidate_ms=8
+row=fen-001#3 baseline_nps=378314 candidate_nps=446946 nps_delta=18.14% baseline_ms=267 candidate_ms=226
+row=fen-001#4 baseline_nps=402199 candidate_nps=460317 nps_delta=14.45% baseline_ms=1592 candidate_ms=1391
+row=fen-001#5 baseline_nps=393501 candidate_nps=440161 nps_delta=11.86% baseline_ms=21810 candidate_ms=19498
+row=fen-002#2 baseline_nps=386250 candidate_nps=515000 nps_delta=33.33% baseline_ms=4 candidate_ms=3
+row=fen-002#3 baseline_nps=431361 candidate_nps=526597 nps_delta=22.08% baseline_ms=94 candidate_ms=77
+row=fen-002#4 baseline_nps=436536 candidate_nps=525091 nps_delta=20.29% baseline_ms=421 candidate_ms=350
+row=fen-002#5 baseline_nps=425204 candidate_nps=492078 nps_delta=15.73% baseline_ms=4702 candidate_ms=4063
+row=fen-003#2 baseline_nps=323000 candidate_nps=430666 nps_delta=33.33% baseline_ms=4 candidate_ms=3
+row=fen-003#3 baseline_nps=445777 candidate_nps=507264 nps_delta=13.79% baseline_ms=99 candidate_ms=87
+row=fen-003#4 baseline_nps=387678 candidate_nps=436852 nps_delta=12.68% baseline_ms=764 candidate_ms=678
+row=fen-003#5 baseline_nps=465751 candidate_nps=521924 nps_delta=12.06% baseline_ms=1403 candidate_ms=1252
+row=fen-004#2 baseline_nps=340000 candidate_nps=340000 nps_delta=0.00% baseline_ms=1 candidate_ms=1
+row=fen-004#3 baseline_nps=547102 candidate_nps=638285 nps_delta=16.67% baseline_ms=49 candidate_ms=42
+row=fen-004#4 baseline_nps=429596 candidate_nps=491980 nps_delta=14.52% baseline_ms=694 candidate_ms=606
+row=fen-004#5 baseline_nps=497379 candidate_nps=568747 nps_delta=14.35% baseline_ms=3363 candidate_ms=2941
+row=fen-005#2 baseline_nps=501840 candidate_nps=583534 nps_delta=16.28% baseline_ms=50 candidate_ms=43
+row=fen-005#3 baseline_nps=503376 candidate_nps=566753 nps_delta=12.59% baseline_ms=778 candidate_ms=691
+row=fen-005#4 baseline_nps=563772 candidate_nps=634186 nps_delta=12.49% baseline_ms=1378 candidate_ms=1225
+row=fen-005#5 baseline_nps=500162 candidate_nps=558974 nps_delta=11.76% baseline_ms=29682 candidate_ms=26559
+row=fen-006#2 baseline_nps=255000 candidate_nps=255000 nps_delta=0.00% baseline_ms=1 candidate_ms=1
+row=fen-006#3 baseline_nps=368769 candidate_nps=435818 nps_delta=18.18% baseline_ms=13 candidate_ms=11
+row=fen-006#4 baseline_nps=423661 candidate_nps=500323 nps_delta=18.10% baseline_ms=248 candidate_ms=210
+row=fen-006#5 baseline_nps=396049 candidate_nps=452963 nps_delta=14.37% baseline_ms=4242 candidate_ms=3709
+row=fen-007#2 baseline_nps=424800 candidate_nps=531000 nps_delta=25.00% baseline_ms=5 candidate_ms=4
+row=fen-007#3 baseline_nps=452960 candidate_nps=518845 nps_delta=14.55% baseline_ms=126 candidate_ms=110
+row=fen-007#4 baseline_nps=428910 candidate_nps=482481 nps_delta=12.49% baseline_ms=2774 candidate_ms=2466
+row=fen-007#5 baseline_nps=451319 candidate_nps=511318 nps_delta=13.29% baseline_ms=4227 candidate_ms=3731
+row=fen-008#2 baseline_nps=523500 candidate_nps=523500 nps_delta=0.00% baseline_ms=2 candidate_ms=2
+row=fen-008#3 baseline_nps=538781 candidate_nps=617354 nps_delta=14.58% baseline_ms=55 candidate_ms=48
+row=fen-008#4 baseline_nps=505178 candidate_nps=567523 nps_delta=12.34% baseline_ms=1593 candidate_ms=1418
+row=fen-008#5 baseline_nps=566615 candidate_nps=636315 nps_delta=12.30% baseline_ms=2894 candidate_ms=2577
+row=fen-009#2 baseline_nps=268000 candidate_nps=268000 nps_delta=0.00% baseline_ms=1 candidate_ms=1
+row=fen-009#3 baseline_nps=457650 candidate_nps=554727 nps_delta=21.21% baseline_ms=40 candidate_ms=33
+row=fen-009#4 baseline_nps=480854 candidate_nps=569675 nps_delta=18.47% baseline_ms=186 candidate_ms=157
+row=fen-009#5 baseline_nps=433746 candidate_nps=507926 nps_delta=17.10% baseline_ms=493 candidate_ms=421
+row=fen-010#2 baseline_nps=276888 candidate_nps=356000 nps_delta=28.57% baseline_ms=9 candidate_ms=7
+row=fen-010#3 baseline_nps=348447 candidate_nps=417154 nps_delta=19.72% baseline_ms=170 candidate_ms=142
+row=fen-010#4 baseline_nps=373513 candidate_nps=445747 nps_delta=19.34% baseline_ms=975 candidate_ms=817
+row=fen-010#5 baseline_nps=342230 candidate_nps=397990 nps_delta=16.29% baseline_ms=9907 candidate_ms=8519
+row=fen-011#2 baseline_nps=417431 candidate_nps=495093 nps_delta=18.60% baseline_ms=51 candidate_ms=43
+row=fen-011#3 baseline_nps=407194 candidate_nps=464374 nps_delta=14.04% baseline_ms=804 candidate_ms=705
+row=fen-011#4 baseline_nps=459464 candidate_nps=525272 nps_delta=14.32% baseline_ms=1325 candidate_ms=1159
+row=fen-011#5 baseline_nps=442490 candidate_nps=498368 nps_delta=12.63% baseline_ms=4620 candidate_ms=4102
+row=fen-012#2 baseline_nps=402000 candidate_nps=402000 nps_delta=0.00% baseline_ms=2 candidate_ms=2
+row=fen-012#3 baseline_nps=449757 candidate_nps=530071 nps_delta=17.86% baseline_ms=33 candidate_ms=28
+row=fen-012#4 baseline_nps=426484 candidate_nps=488744 nps_delta=14.60% baseline_ms=314 candidate_ms=274
+row=fen-012#5 baseline_nps=452551 candidate_nps=516628 nps_delta=14.16% baseline_ms=2185 candidate_ms=1914
+row=fen-013#2 baseline_nps=384500 candidate_nps=480625 nps_delta=25.00% baseline_ms=10 candidate_ms=8
+row=fen-013#3 baseline_nps=382555 candidate_nps=447277 nps_delta=16.92% baseline_ms=387 candidate_ms=331
+row=fen-013#4 baseline_nps=380062 candidate_nps=435315 nps_delta=14.54% baseline_ms=7004 candidate_ms=6115
+row=fen-013#5 baseline_nps=432664 candidate_nps=492928 nps_delta=13.93% baseline_ms=93278 candidate_ms=81874
+row=fen-014#2 baseline_nps=292400 candidate_nps=365500 nps_delta=25.00% baseline_ms=5 candidate_ms=4
+row=fen-014#3 baseline_nps=392550 candidate_nps=461823 nps_delta=17.65% baseline_ms=80 candidate_ms=68
+row=fen-014#4 baseline_nps=396204 candidate_nps=462755 nps_delta=16.80% baseline_ms=1043 candidate_ms=893
+row=fen-014#5 baseline_nps=379314 candidate_nps=439231 nps_delta=15.80% baseline_ms=7448 candidate_ms=6432
+row=fen-015#2 baseline_nps=289041 candidate_nps=346850 nps_delta=20.00% baseline_ms=48 candidate_ms=40
+row=fen-015#3 baseline_nps=332539 candidate_nps=392017 nps_delta=17.89% baseline_ms=725 candidate_ms=615
+row=fen-015#4 baseline_nps=337101 candidate_nps=391317 nps_delta=16.08% baseline_ms=14421 candidate_ms=12423
+row=fen-015#5 baseline_nps=292009 candidate_nps=336690 nps_delta=15.30% baseline_ms=443625 candidate_ms=384753
+row=fen-016#2 baseline_nps=465000 candidate_nps=465000 nps_delta=0.00% baseline_ms=1 candidate_ms=1
+row=fen-016#3 baseline_nps=458264 candidate_nps=546701 nps_delta=19.30% baseline_ms=68 candidate_ms=57
+row=fen-016#4 baseline_nps=449554 candidate_nps=517467 nps_delta=15.11% baseline_ms=701 candidate_ms=609
+row=fen-016#5 baseline_nps=386595 candidate_nps=439360 nps_delta=13.65% baseline_ms=16004 candidate_ms=14082
+summary=C:\Users\ntATh\AI test\Koi engine\artifacts\verification\speed-gate\batch2-metadata-evaluator-20261003-sparse-depth2-5\speed-gate.json
+result=PASS

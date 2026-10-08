@@ -1,0 +1,94 @@
+{
+  "schema": "koi-qsearch-tt-sprt-extension-v1",
+  "experiment_id": "qsearch-tt-current-source-20k-batch4",
+  "recorded_utc": "2026-09-29T04:56:45.063558Z",
+  "workspace_branch": "koi-engine",
+  "workspace_head": "2fecbe6bc1b2a5a611ec5882083af1a797606a80",
+  "engine_source_commit": "18c2f9ae9e9aec480112af32b63b893ae030e32e",
+  "candidate_change_commit": "b49dee4",
+  "baseline_source_commit": "b49dee4^",
+  "candidate_sha256": "3c187fc9bdad3572e6c849b077ffee2f612661083602d79261c0c50169da268c",
+  "baseline_sha256": "cbc05d459445eacd9f0ef8749aec18434ce251b105e6d1900f5dd4b5299ce0aa",
+  "replay_sha256": "3bfc8758939531e8c5b2a07adabe9d23fd11e9a64e0b39b95265d2b4dcc14003",
+  "opening_generator": {
+    "path": "artifacts/verification/qsearch-tt-followup-20260929/generate_openings_batch4.py",
+    "sha256": "81faba20795072247177704d6dfa1e4cfd4cbbb0ce7565c74bd5c9e2cd06d5d8"
+  },
+  "opening_file": {
+    "path": "artifacts/matches/qsearch-tt-followup-20260929/openings-128-batch4.txt",
+    "sha256": "0e49be81ac6f8521ffef63c17e3cf3bd17c5dc3c7fce4d334842d0b8054d14f6",
+    "count": 128,
+    "unique": 128,
+    "overlap_with_previous_batches": 0
+  },
+  "opening_manifest": {
+    "path": "artifacts/manifests/qsearch-tt-followup-20260929-batch4.json",
+    "sha256": "d13bf623ae46b1c50b874bd81da1de24381fff29f6abfab7f8bd1856afd964ef"
+  },
+  "options": {
+    "speed": 100,
+    "max_plies": 512,
+    "threads": 1,
+    "games_per_opening": 2,
+    "evaluator": "classical",
+    "algorithm": "AlphaBeta",
+    "own_book": false,
+    "random_seed": 0,
+    "nodes": 20000,
+    "hash_mb": 512,
+    "time_control": "nodes 20000",
+    "protocol_timeout_ms": 5000
+  },
+  "sprt": {
+    "elo1": 10,
+    "max_games_per_color": 256,
+    "beta": 0.05,
+    "alpha": 0.05,
+    "min_games_per_color": 40,
+    "elo0": 0
+  },
+  "hardware": {
+    "build": "26200",
+    "cpu": "Intel(R) Core(TM) i3-10100F CPU @ 3.60GHz",
+    "ram_gib": 31.87,
+    "cores": 4,
+    "os_version": "10.0.26200",
+    "os": "Microsoft Windows 11 Home",
+    "gpu": "NVIDIA GeForce GTX 1060 6GB",
+    "logical_processors": 8
+  },
+  "prior_batches": [
+    {
+      "label": "batch-1",
+      "sha256": "84b8255fedf021e26d5611f0006e12859355b76610a6d96ee6fa68682db20b96",
+      "games": 256,
+      "decision": "inconclusive",
+      "llr": -0.17975799999999997,
+      "path": "artifacts/matches/qsearch-tt-followup-20260929/sprt/qsearch-tt-current-source-20k-20260929-034116/combined-decision-derived.json"
+    },
+    {
+      "label": "batch-2",
+      "sha256": "17904e9e816a28c890a279fe304553e5561b08a367ab4ce0e61f50e463c72ff9",
+      "games": 477,
+      "decision": "inconclusive",
+      "llr": -0.29965600000000014,
+      "path": "artifacts/matches/qsearch-tt-followup-20260929/sprt-batch2/qsearch-tt-current-source-20k-batch2-20260929-043312/combined-decision-derived.json"
+    },
+    {
+      "label": "cumulative-batches-1-3",
+      "sha256": "bddeb5ae4821ed49455ad40fa60c34aea64cfb87e2dc7c2f796ed683b2f9e09a",
+      "games": 1245,
+      "decision": "inconclusive",
+      "llr": -0.8446140000000002,
+      "path": "artifacts/matches/qsearch-tt-followup-20260929/sprt-batch3/qsearch-tt-current-source-20k-batch3-20260929-065150/combined-decision-derived.json"
+    }
+  ],
+  "prior_cumulative": {
+    "label": "cumulative-batches-1-3",
+    "sha256": "bddeb5ae4821ed49455ad40fa60c34aea64cfb87e2dc7c2f796ed683b2f9e09a",
+    "games": 1245,
+    "decision": "inconclusive",
+    "llr": -0.8446140000000002,
+    "path": "artifacts/matches/qsearch-tt-followup-20260929/sprt-batch3/qsearch-tt-current-source-20k-batch3-20260929-065150/combined-decision-derived.json"
+  }
+}

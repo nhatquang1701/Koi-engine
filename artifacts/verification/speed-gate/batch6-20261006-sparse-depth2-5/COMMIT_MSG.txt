@@ -1,0 +1,29 @@
+perf(search): unroll continuation-history divisors and trim check/repetition probes
+
+- Unroll the continuation-history score loops in quiet_history_score and
+  continuation_history_score: the runtime division by (distance + 1) becomes
+  a sequence of constant-divisor terms, removing idiv from the quiet-priority
+  hot path. Same dividends, divisors, slot indices, and accumulation order.
+  Write paths left unchanged.
+- in_check() for the side to move now reads the maintained checkers mask
+  (the same five-term predicate that refresh_king_masks computes and that is
+  refreshed after every side flip), with a guard matching is_checked() for a
+  kingless state. The other-colour overload keeps the full attack query.
+- quiet_move_is_forcing: the moved piece's attack mask is intersected with the
+  enemy colours and iterated ascending with countr_zero, replacing the
+  64-square scan plus per-piece geometry walks; the occupied == 0 arena
+  fallback and the exact visitation order are preserved.
+- GameState caches the NativeCheckProbe inputs (side, enemy king, occupied,
+  friendly rook/queen and bishop/queen bitboards, king slider rays) in its
+  implementation; move_gives_check rebuilds the probe only when one of the six
+  inputs differs. The probe is a pure function of those inputs.
+- null_move_is_safe drops the provably-false repetition scan (null_move_allowed
+  already excludes repetition-sensitive positions at the call site) and uses
+  the maintained Position piece count instead of building a TablebaseSnapshot.
+- One repetition_count per node now feeds both draw_status and
+  is_repetition_sensitive through a combined API; the existing methods
+  delegate, so public behavior is unchanged.
+
+Local verification before the gate: koi_core builds clean; the candidate full build reaches 245/245 targets; the 18-target ctest suite passes 18/18 (exit 0, 114 s wall) with TMP/TEMP redirected to build\koi-test-temp (the agent sandbox denies directory creation under system %TEMP%).
+
+Speed gate against the isolated 51f8b28 baseline: PASS (+0.83% total NPS, +1.80% median row NPS; 5 runs, depth sweep 2..5, 14 noise rows excluded).

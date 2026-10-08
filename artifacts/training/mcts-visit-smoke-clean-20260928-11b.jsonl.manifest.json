@@ -1,0 +1,51 @@
+{
+  "bestmove_fallbacks": 0,
+  "boot_nnue_path": null,
+  "cpu_variant": "generic",
+  "dataset_sha256": "c0e662532583e34d8914b2c42a7e0436880d0658b0552af49ecf0400e1a9c161",
+  "engine_sha256": "91827b30e9c0e1ff68a7a6fc44bc461e7eeaee50a8f6add2ffb2e566aab4aaf2",
+  "engine_version": "source-e77914701f17",
+  "games_completed": 1,
+  "games_requested": 1,
+  "nnue_sha256": null,
+  "opening_corpus_sha256": "4f85dda69b993e5aa68e8d48b10d23f69ea5a9357f84da8307521680f1b29038",
+  "outcome_counts": {
+    "draw": 1
+  },
+  "policy_value_file": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\training\\mcts-visit-training-smoke-20260928-11b.kpv",
+  "policy_value_sha256": "5341a12b0960a7f9e1227a1c0ee40f43d906c94a3c15edf5540b7b9080282023",
+  "record_count": 1,
+  "records_written": 1,
+  "schema": "koi-policy-value-selfplay-manifest-v1",
+  "search_options": {
+    "hash_mb": 512,
+    "max_plies": 1,
+    "mcts_visit_output": true,
+    "multi_pv": 1,
+    "nodes": 32,
+    "own_book": false,
+    "policy_temperature": 1.0,
+    "search_algorithm": "MCTS",
+    "threads": 1,
+    "value_target_transform": "game result"
+  },
+  "seed": 37,
+  "selected_openings": [
+    "smoke-start"
+  ],
+  "source_dirty": true,
+  "source_revision": "e77914701f17488dd33c54d126c46cb7997a20c8",
+  "source_sha256": {
+    "tools/measurement/koi_chess/__init__.py": "c0f15babf0fea462091dd6360a815c0fe9df7f8781c80c66efd02d3179553115",
+    "tools/measurement/koi_chess/attacks.py": "dc017a9347b0e0fbfac15599cdb0fbbb454b9777e4b1b3135c529ea235b45080",
+    "tools/measurement/koi_chess/board.py": "66428f81defb6b6ae9b926a71ca29d7d3e48a86c7a78e3d58faa0a5355084693",
+    "tools/measurement/koi_chess/core.py": "2afe2de739b7d80bce8c6cf81074d775e8a9873dd539bcbf530acfc1eb48e9a4",
+    "tools/measurement/koi_chess/engine.py": "58ca1762d04b82b2ec16251196a90759b6d6fba2209474d41e6c8b33eb375cfc",
+    "tools/measurement/koi_chess/pgn.py": "3ed89525f5fa5ca3a7b1e3a070b0c327727ec2dd3cc09e024fa3051a5dba76d7",
+    "tools/measurement/policy_value_dataset.py": "69d7fea413a6d428fc1c7a7a4a207200575919e7854777dfaf183f9390d9d1ae",
+    "tools/measurement/policy_value_selfplay.py": "e800e9d6f5d3ee8bf2f9b08780774dbfafd6f90fa7c9cc35a41c249e894a3c2e"
+  },
+  "termination_counts": {
+    "ply-limit": 1
+  }
+}

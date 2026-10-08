@@ -1,0 +1,39 @@
+PASS classical evaluator
+PASS evaluator endgame and mobility
+PASS evaluator color symmetric endgame passer
+PASS evaluator tempo
+PASS time manager
+PASS speed budgets
+PASS root filtering legal move
+PASS short timed threaded search
+PASS very short timed root workers
+PASS queen check mate horizon
+PASS short tactical root fallback
+PASS short oracle fallback safety
+PASS short quiet hanging piece
+PASS short c5b4 queen check trap
+PASS short queen retreat over safe capture
+PASS depth seven check extension stack safety
+PASS short broad check horizon
+XFAIL depth-one forcing check: depth-one root research must prefer the near-tied check (best=c2c3)
+PASS threaded root overlap
+XPASS threaded root-in-check parity: known failure now passes; remove it from the known_failures list
+XFAIL threaded multipv warmed hash: warmed threaded MultiPV must retain the stable ordered root prefix
+PASS search info accounting
+FAIL threaded timed cancellation: Threads=2 timed cancellation must not perform a serial confirmation search
+PASS deterministic legal search
+PASS tactical search statistics
+PASS shorter mate preference
+PASS repetition-sensitive null safety
+PASS eligible null verification
+PASS quiet history hook exceptions
+XFAIL late move full-depth verification: a reduced move that exceeds alpha must receive a full-depth verification search
+XFAIL threaded short forcing root research: a forcing quiet root must retain its tactical move in a short search (got f6e4, score -9)
+PASS near-root pawn break extension
+PASS deep quiescence checks
+PASS ponder search lifecycle
+PASS service hash persistence
+PASS transposition table hashfull
+PASS transposition table depth preservation
+PASS transposition table resize concurrency
+koi-test-summary run=38 pass=32 fail=2 xfail=4 xpass=0 skip=0 unseen=0 intermittent=0

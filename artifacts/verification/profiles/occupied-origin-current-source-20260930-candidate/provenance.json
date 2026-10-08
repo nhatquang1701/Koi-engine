@@ -1,0 +1,23 @@
+{
+  "suite": "strength",
+  "KOI_BUILD_MODULES": "OFF",
+  "cmake_build_type": "Release",
+  "baseline_executable_sha256": "F5F7A3DF549E064393736DD865D86264E6FA586794EFFD9DFEA16C593283C2E6",
+  "KOI_ENABLE_GPU_NNUE": "OFF",
+  "warmup": 1,
+  "repeat": 5,
+  "candidate_executable_sha256": "874EF1389951FD9F4A10F9C1F4CAE608732D06C138FAC40F59FF2D0B6F21BB27",
+  "schema": "occupied-origin-candidate-provenance-v1",
+  "hash_state": "warm",
+  "source_revision": "b40feb1c8447e4e8c56589409f9a5ccb47e3edfd",
+  "speed": 100,
+  "candidate_engine_sha256": "33B7FEF5ED935D8610665444C653B2598344618ED97A4E987A9D05C91A0C10FF",
+  "node_limit": 20000,
+  "timed": true,
+  "threads": [
+    1,
+    4
+  ],
+  "KOI_BUILD_SHADOW_DIFF": "OFF",
+  "hash_mb": 512
+}

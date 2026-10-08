@@ -1,0 +1,589 @@
+{
+  "schema": "koi-speed-gate-v1",
+  "timestamp": "2026-09-26T08:24:03.2793166+07:00",
+  "baseline_executable": "C:\\Users\\ntATh\\AI test\\Koi engine\\build\\release\\koi-bench.exe",
+  "candidate_executable": "C:\\Users\\ntATh\\AI test\\Koi engine\\build\\pgo-generate\\koi-bench.exe",
+  "runs": 5,
+  "threads": 1,
+  "speed": 100,
+  "fen_file": "C:\\Users\\ntATh\\AI test\\Koi engine\\tests\\data\\endgames\\endgame-positions.txt",
+  "depth": null,
+  "depth_sweep": "2..5",
+  "nps_regression_limit_percent": 2.0,
+  "row_nps_regression_limit_percent": 2.0,
+  "min_row_elapsed_ms": 20.0,
+  "excluded_noise_rows": 46,
+  "baseline_total_nps": 290538,
+  "candidate_total_nps": 304865,
+  "total_nps_delta_percent": 4.9312,
+  "median_row_nps_delta_percent": 3.9999,
+  "rows": [
+    {
+      "key": "supported_passer#2",
+      "baseline_nps": 73000,
+      "candidate_nps": 73,
+      "nps_delta_percent": -99.9,
+      "baseline_elapsed_ms": 1,
+      "candidate_elapsed_ms": 0,
+      "noise": true
+    },
+    {
+      "key": "supported_passer#3",
+      "baseline_nps": 216000,
+      "candidate_nps": 432000,
+      "nps_delta_percent": 100.0,
+      "baseline_elapsed_ms": 2,
+      "candidate_elapsed_ms": 1,
+      "noise": true
+    },
+    {
+      "key": "supported_passer#4",
+      "baseline_nps": 338000,
+      "candidate_nps": 338000,
+      "nps_delta_percent": 0.0,
+      "baseline_elapsed_ms": 2,
+      "candidate_elapsed_ms": 2,
+      "noise": true
+    },
+    {
+      "key": "supported_passer#5",
+      "baseline_nps": 178166,
+      "candidate_nps": 213800,
+      "nps_delta_percent": 20.0004,
+      "baseline_elapsed_ms": 6,
+      "candidate_elapsed_ms": 5,
+      "noise": true
+    },
+    {
+      "key": "advanced_passer#2",
+      "baseline_nps": 397000,
+      "candidate_nps": 264666,
+      "nps_delta_percent": -33.3335,
+      "baseline_elapsed_ms": 2,
+      "candidate_elapsed_ms": 3,
+      "noise": true
+    },
+    {
+      "key": "advanced_passer#3",
+      "baseline_nps": 294413,
+      "candidate_nps": 322452,
+      "nps_delta_percent": 9.5237,
+      "baseline_elapsed_ms": 46,
+      "candidate_elapsed_ms": 42,
+      "noise": false
+    },
+    {
+      "key": "advanced_passer#4",
+      "baseline_nps": 260689,
+      "candidate_nps": 270407,
+      "nps_delta_percent": 3.7278,
+      "baseline_elapsed_ms": 946,
+      "candidate_elapsed_ms": 912,
+      "noise": false
+    },
+    {
+      "key": "advanced_passer#5",
+      "baseline_nps": 310449,
+      "candidate_nps": 333925,
+      "nps_delta_percent": 7.562,
+      "baseline_elapsed_ms": 1650,
+      "candidate_elapsed_ms": 1534,
+      "noise": false
+    },
+    {
+      "key": "enemy_king_near_passer#2",
+      "baseline_nps": 125000,
+      "candidate_nps": 125000,
+      "nps_delta_percent": 0.0,
+      "baseline_elapsed_ms": 1,
+      "candidate_elapsed_ms": 1,
+      "noise": true
+    },
+    {
+      "key": "enemy_king_near_passer#3",
+      "baseline_nps": 224000,
+      "candidate_nps": 224000,
+      "nps_delta_percent": 0.0,
+      "baseline_elapsed_ms": 1,
+      "candidate_elapsed_ms": 1,
+      "noise": true
+    },
+    {
+      "key": "enemy_king_near_passer#4",
+      "baseline_nps": 294000,
+      "candidate_nps": 294000,
+      "nps_delta_percent": 0.0,
+      "baseline_elapsed_ms": 1,
+      "candidate_elapsed_ms": 1,
+      "noise": true
+    },
+    {
+      "key": "enemy_king_near_passer#5",
+      "baseline_nps": 185400,
+      "candidate_nps": 231750,
+      "nps_delta_percent": 25.0,
+      "baseline_elapsed_ms": 5,
+      "candidate_elapsed_ms": 4,
+      "noise": true
+    },
+    {
+      "key": "enemy_king_far_passer#2",
+      "baseline_nps": 17,
+      "candidate_nps": 17,
+      "nps_delta_percent": 0.0,
+      "baseline_elapsed_ms": 0,
+      "candidate_elapsed_ms": 0,
+      "noise": true
+    },
+    {
+      "key": "enemy_king_far_passer#3",
+      "baseline_nps": 61000,
+      "candidate_nps": 61,
+      "nps_delta_percent": -99.9,
+      "baseline_elapsed_ms": 1,
+      "candidate_elapsed_ms": 0,
+      "noise": true
+    },
+    {
+      "key": "enemy_king_far_passer#4",
+      "baseline_nps": 144000,
+      "candidate_nps": 288000,
+      "nps_delta_percent": 100.0,
+      "baseline_elapsed_ms": 2,
+      "candidate_elapsed_ms": 1,
+      "noise": true
+    },
+    {
+      "key": "enemy_king_far_passer#5",
+      "baseline_nps": 219000,
+      "candidate_nps": 328500,
+      "nps_delta_percent": 50.0,
+      "baseline_elapsed_ms": 3,
+      "candidate_elapsed_ms": 2,
+      "noise": true
+    },
+    {
+      "key": "black_passer_race#2",
+      "baseline_nps": 33,
+      "candidate_nps": 33,
+      "nps_delta_percent": 0.0,
+      "baseline_elapsed_ms": 0,
+      "candidate_elapsed_ms": 0,
+      "noise": true
+    },
+    {
+      "key": "black_passer_race#3",
+      "baseline_nps": 156000,
+      "candidate_nps": 156000,
+      "nps_delta_percent": 0.0,
+      "baseline_elapsed_ms": 1,
+      "candidate_elapsed_ms": 1,
+      "noise": true
+    },
+    {
+      "key": "black_passer_race#4",
+      "baseline_nps": 338000,
+      "candidate_nps": 169000,
+      "nps_delta_percent": -50.0,
+      "baseline_elapsed_ms": 1,
+      "candidate_elapsed_ms": 2,
+      "noise": true
+    },
+    {
+      "key": "black_passer_race#5",
+      "baseline_nps": 216500,
+      "candidate_nps": 144333,
+      "nps_delta_percent": -33.3335,
+      "baseline_elapsed_ms": 2,
+      "candidate_elapsed_ms": 3,
+      "noise": true
+    },
+    {
+      "key": "pawn_race_tempo#2",
+      "baseline_nps": 29,
+      "candidate_nps": 29,
+      "nps_delta_percent": 0.0,
+      "baseline_elapsed_ms": 0,
+      "candidate_elapsed_ms": 0,
+      "noise": true
+    },
+    {
+      "key": "pawn_race_tempo#3",
+      "baseline_nps": 293000,
+      "candidate_nps": 293000,
+      "nps_delta_percent": 0.0,
+      "baseline_elapsed_ms": 1,
+      "candidate_elapsed_ms": 1,
+      "noise": true
+    },
+    {
+      "key": "pawn_race_tempo#4",
+      "baseline_nps": 223500,
+      "candidate_nps": 447000,
+      "nps_delta_percent": 100.0,
+      "baseline_elapsed_ms": 2,
+      "candidate_elapsed_ms": 1,
+      "noise": true
+    },
+    {
+      "key": "pawn_race_tempo#5",
+      "baseline_nps": 211333,
+      "candidate_nps": 211333,
+      "nps_delta_percent": 0.0,
+      "baseline_elapsed_ms": 3,
+      "candidate_elapsed_ms": 3,
+      "noise": true
+    },
+    {
+      "key": "symmetrical_pawn_endgame#2",
+      "baseline_nps": 24,
+      "candidate_nps": 24,
+      "nps_delta_percent": 0.0,
+      "baseline_elapsed_ms": 0,
+      "candidate_elapsed_ms": 0,
+      "noise": true
+    },
+    {
+      "key": "symmetrical_pawn_endgame#3",
+      "baseline_nps": 198000,
+      "candidate_nps": 198000,
+      "nps_delta_percent": 0.0,
+      "baseline_elapsed_ms": 1,
+      "candidate_elapsed_ms": 1,
+      "noise": true
+    },
+    {
+      "key": "symmetrical_pawn_endgame#4",
+      "baseline_nps": 166500,
+      "candidate_nps": 333000,
+      "nps_delta_percent": 100.0,
+      "baseline_elapsed_ms": 2,
+      "candidate_elapsed_ms": 1,
+      "noise": true
+    },
+    {
+      "key": "symmetrical_pawn_endgame#5",
+      "baseline_nps": 152800,
+      "candidate_nps": 191000,
+      "nps_delta_percent": 25.0,
+      "baseline_elapsed_ms": 5,
+      "candidate_elapsed_ms": 4,
+      "noise": true
+    },
+    {
+      "key": "kb_vs_kn#2",
+      "baseline_nps": 118000,
+      "candidate_nps": 118,
+      "nps_delta_percent": -99.9,
+      "baseline_elapsed_ms": 1,
+      "candidate_elapsed_ms": 0,
+      "noise": true
+    },
+    {
+      "key": "kb_vs_kn#3",
+      "baseline_nps": 220000,
+      "candidate_nps": 293333,
+      "nps_delta_percent": 33.3332,
+      "baseline_elapsed_ms": 4,
+      "candidate_elapsed_ms": 3,
+      "noise": true
+    },
+    {
+      "key": "kb_vs_kn#4",
+      "baseline_nps": 269000,
+      "candidate_nps": 230571,
+      "nps_delta_percent": -14.2859,
+      "baseline_elapsed_ms": 6,
+      "candidate_elapsed_ms": 7,
+      "noise": true
+    },
+    {
+      "key": "kb_vs_kn#5",
+      "baseline_nps": 216000,
+      "candidate_nps": 216000,
+      "nps_delta_percent": 0.0,
+      "baseline_elapsed_ms": 15,
+      "candidate_elapsed_ms": 15,
+      "noise": true
+    },
+    {
+      "key": "kbn_vs_k#2",
+      "baseline_nps": 157000,
+      "candidate_nps": 157000,
+      "nps_delta_percent": 0.0,
+      "baseline_elapsed_ms": 1,
+      "candidate_elapsed_ms": 1,
+      "noise": true
+    },
+    {
+      "key": "kbn_vs_k#3",
+      "baseline_nps": 241000,
+      "candidate_nps": 321333,
+      "nps_delta_percent": 33.3332,
+      "baseline_elapsed_ms": 4,
+      "candidate_elapsed_ms": 3,
+      "noise": true
+    },
+    {
+      "key": "kbn_vs_k#4",
+      "baseline_nps": 248875,
+      "candidate_nps": 248875,
+      "nps_delta_percent": 0.0,
+      "baseline_elapsed_ms": 8,
+      "candidate_elapsed_ms": 8,
+      "noise": true
+    },
+    {
+      "key": "kbn_vs_k#5",
+      "baseline_nps": 243904,
+      "candidate_nps": 243904,
+      "nps_delta_percent": 0.0,
+      "baseline_elapsed_ms": 21,
+      "candidate_elapsed_ms": 21,
+      "noise": false
+    },
+    {
+      "key": "opposite_colored_bishops#2",
+      "baseline_nps": 61500,
+      "candidate_nps": 123000,
+      "nps_delta_percent": 100.0,
+      "baseline_elapsed_ms": 1,
+      "candidate_elapsed_ms": 1,
+      "noise": true
+    },
+    {
+      "key": "opposite_colored_bishops#3",
+      "baseline_nps": 228714,
+      "candidate_nps": 228714,
+      "nps_delta_percent": 0.0,
+      "baseline_elapsed_ms": 7,
+      "candidate_elapsed_ms": 7,
+      "noise": true
+    },
+    {
+      "key": "opposite_colored_bishops#4",
+      "baseline_nps": 222500,
+      "candidate_nps": 237333,
+      "nps_delta_percent": 6.6665,
+      "baseline_elapsed_ms": 16,
+      "candidate_elapsed_ms": 15,
+      "noise": true
+    },
+    {
+      "key": "opposite_colored_bishops#5",
+      "baseline_nps": 214052,
+      "candidate_nps": 219837,
+      "nps_delta_percent": 2.7026,
+      "baseline_elapsed_ms": 38,
+      "candidate_elapsed_ms": 37,
+      "noise": false
+    },
+    {
+      "key": "same_colored_bishops#2",
+      "baseline_nps": 196000,
+      "candidate_nps": 196000,
+      "nps_delta_percent": 0.0,
+      "baseline_elapsed_ms": 2,
+      "candidate_elapsed_ms": 2,
+      "noise": true
+    },
+    {
+      "key": "same_colored_bishops#3",
+      "baseline_nps": 221633,
+      "candidate_nps": 246259,
+      "nps_delta_percent": 11.1112,
+      "baseline_elapsed_ms": 30,
+      "candidate_elapsed_ms": 27,
+      "noise": false
+    },
+    {
+      "key": "same_colored_bishops#4",
+      "baseline_nps": 223549,
+      "candidate_nps": 232673,
+      "nps_delta_percent": 4.0814,
+      "baseline_elapsed_ms": 51,
+      "candidate_elapsed_ms": 49,
+      "noise": false
+    },
+    {
+      "key": "same_colored_bishops#5",
+      "baseline_nps": 215201,
+      "candidate_nps": 221137,
+      "nps_delta_percent": 2.7584,
+      "baseline_elapsed_ms": 149,
+      "candidate_elapsed_ms": 145,
+      "noise": false
+    },
+    {
+      "key": "rook_active_king#2",
+      "baseline_nps": 246500,
+      "candidate_nps": 246500,
+      "nps_delta_percent": 0.0,
+      "baseline_elapsed_ms": 2,
+      "candidate_elapsed_ms": 2,
+      "noise": true
+    },
+    {
+      "key": "rook_active_king#3",
+      "baseline_nps": 259000,
+      "candidate_nps": 259000,
+      "nps_delta_percent": 0.0,
+      "baseline_elapsed_ms": 16,
+      "candidate_elapsed_ms": 16,
+      "noise": true
+    },
+    {
+      "key": "rook_active_king#4",
+      "baseline_nps": 255170,
+      "candidate_nps": 239860,
+      "nps_delta_percent": -5.9999,
+      "baseline_elapsed_ms": 47,
+      "candidate_elapsed_ms": 50,
+      "noise": false
+    },
+    {
+      "key": "rook_active_king#5",
+      "baseline_nps": 249987,
+      "candidate_nps": 254675,
+      "nps_delta_percent": 1.8753,
+      "baseline_elapsed_ms": 163,
+      "candidate_elapsed_ms": 160,
+      "noise": false
+    },
+    {
+      "key": "rook_idle_king#2",
+      "baseline_nps": 242000,
+      "candidate_nps": 242000,
+      "nps_delta_percent": 0.0,
+      "baseline_elapsed_ms": 1,
+      "candidate_elapsed_ms": 1,
+      "noise": true
+    },
+    {
+      "key": "rook_idle_king#3",
+      "baseline_nps": 246571,
+      "candidate_nps": 215750,
+      "nps_delta_percent": -12.4998,
+      "baseline_elapsed_ms": 7,
+      "candidate_elapsed_ms": 8,
+      "noise": true
+    },
+    {
+      "key": "rook_idle_king#4",
+      "baseline_nps": 248866,
+      "candidate_nps": 266642,
+      "nps_delta_percent": 7.1428,
+      "baseline_elapsed_ms": 30,
+      "candidate_elapsed_ms": 28,
+      "noise": false
+    },
+    {
+      "key": "rook_idle_king#5",
+      "baseline_nps": 259156,
+      "candidate_nps": 269734,
+      "nps_delta_percent": 4.0817,
+      "baseline_elapsed_ms": 51,
+      "candidate_elapsed_ms": 49,
+      "noise": false
+    },
+    {
+      "key": "rook_versus_king#2",
+      "baseline_nps": 321000,
+      "candidate_nps": 321000,
+      "nps_delta_percent": 0.0,
+      "baseline_elapsed_ms": 1,
+      "candidate_elapsed_ms": 1,
+      "noise": true
+    },
+    {
+      "key": "rook_versus_king#3",
+      "baseline_nps": 239125,
+      "candidate_nps": 239125,
+      "nps_delta_percent": 0.0,
+      "baseline_elapsed_ms": 8,
+      "candidate_elapsed_ms": 8,
+      "noise": true
+    },
+    {
+      "key": "rook_versus_king#4",
+      "baseline_nps": 244794,
+      "candidate_nps": 258027,
+      "nps_delta_percent": 5.4058,
+      "baseline_elapsed_ms": 39,
+      "candidate_elapsed_ms": 37,
+      "noise": false
+    },
+    {
+      "key": "rook_versus_king#5",
+      "baseline_nps": 244179,
+      "candidate_nps": 253946,
+      "nps_delta_percent": 3.9999,
+      "baseline_elapsed_ms": 78,
+      "candidate_elapsed_ms": 75,
+      "noise": false
+    },
+    {
+      "key": "queen_endgame#2",
+      "baseline_nps": 318000,
+      "candidate_nps": 318000,
+      "nps_delta_percent": 0.0,
+      "baseline_elapsed_ms": 10,
+      "candidate_elapsed_ms": 10,
+      "noise": true
+    },
+    {
+      "key": "queen_endgame#3",
+      "baseline_nps": 300935,
+      "candidate_nps": 317545,
+      "nps_delta_percent": 5.5195,
+      "baseline_elapsed_ms": 1778,
+      "candidate_elapsed_ms": 1685,
+      "noise": false
+    },
+    {
+      "key": "queen_endgame#4",
+      "baseline_nps": 298862,
+      "candidate_nps": 305955,
+      "nps_delta_percent": 2.3733,
+      "baseline_elapsed_ms": 3537,
+      "candidate_elapsed_ms": 3455,
+      "noise": false
+    },
+    {
+      "key": "queen_endgame#5",
+      "baseline_nps": 312099,
+      "candidate_nps": 318994,
+      "nps_delta_percent": 2.2092,
+      "baseline_elapsed_ms": 4951,
+      "candidate_elapsed_ms": 4844,
+      "noise": false
+    },
+    {
+      "key": "bare_kings_draw#0",
+      "baseline_nps": 1,
+      "candidate_nps": 1000,
+      "nps_delta_percent": 99900.0,
+      "baseline_elapsed_ms": 0,
+      "candidate_elapsed_ms": 1,
+      "noise": true
+    },
+    {
+      "key": "kn_vs_k_draw#0",
+      "baseline_nps": 500,
+      "candidate_nps": 1000,
+      "nps_delta_percent": 100.0,
+      "baseline_elapsed_ms": 1,
+      "candidate_elapsed_ms": 1,
+      "noise": true
+    },
+    {
+      "key": "locked_pawn_wall#0",
+      "baseline_nps": 1000,
+      "candidate_nps": 1000,
+      "nps_delta_percent": 0.0,
+      "baseline_elapsed_ms": 1,
+      "candidate_elapsed_ms": 1,
+      "noise": true
+    }
+  ]
+}

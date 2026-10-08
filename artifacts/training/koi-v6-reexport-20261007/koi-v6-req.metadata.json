@@ -1,0 +1,29 @@
+{
+  "schema": "koi-nnue-training-metadata-v3",
+  "created": "2026-10-07T00:52:00Z",
+  "corpus": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\training\\koi-v5-fixed-20261006\\corpus\\train.txt",
+  "rows_used": 2138346,
+  "val_rows": 106917,
+  "feature_set": "halfka-king-bucket-v1+threat-pairs-v1",
+  "quantization": "int16/int8",
+  "arch": "v6",
+  "activation": "crelu-pair-diff-l1",
+  "hidden_shift": 7,
+  "l1_shift": 7,
+  "output_shift": 6,
+  "target_scale": 100.0,
+  "val_round_trip_mae_cp": 43.6842,
+  "w1_saturation": 0.0,
+  "l1_saturation": 0.0,
+  "l1_diff_saturation": 0.026652018229166668,
+  "w2_saturation": 0.0,
+  "payload_sha256": "f4b79476bd09685687abca695341f338609d6d8b75be353524a104eea10053f5",
+  "network_sha256": "c55c41b9c29fb1a4e7ba5da3ec8205bb0f1d5affd47cd874535f067b9a45fb32",
+  "re-export": {
+    "source_checkpoint": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\training\\koi-v6-fixed-20261006\\net.pt",
+    "note": "re-exported from the trained float checkpoint with a selection policy that rejects output-layer saturation and tolerates <=5% hidden/L1 clipping; the original training export selected s1=6/s_l1=6/k3=6 at 174.95 cp.",
+    "original_float_val_mae_cp": 138.31,
+    "original_selected_round_trip_mae_cp": 174.95,
+    "tune_sample": "fresh 20000-row draw from the seeded 5% val split"
+  }
+}

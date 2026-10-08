@@ -1,0 +1,29 @@
+loaded 2172420 rows (18.2 active, pad 32) in 4.9s
+epoch 1/10 train_loss 2.18769 val_loss 1.83720 val_mae_cp 183.7 time 138.9s
+epoch 2/10 train_loss 1.28615 val_loss 1.68914 val_mae_cp 168.9 time 135.0s
+epoch 3/10 train_loss 1.11370 val_loss 1.58983 val_mae_cp 159.0 time 107.2s
+epoch 4/10 train_loss 0.98044 val_loss 1.53421 val_mae_cp 153.4 time 106.2s
+epoch 5/10 train_loss 0.87469 val_loss 1.48327 val_mae_cp 148.3 time 105.9s
+epoch 6/10 train_loss 0.79139 val_loss 1.45543 val_mae_cp 145.5 time 106.4s
+epoch 7/10 train_loss 0.72872 val_loss 1.43795 val_mae_cp 143.8 time 106.0s
+epoch 8/10 train_loss 0.68441 val_loss 1.42608 val_mae_cp 142.6 time 105.8s
+epoch 9/10 train_loss 0.65616 val_loss 1.42074 val_mae_cp 142.1 time 105.8s
+epoch 10/10 train_loss 0.64148 val_loss 1.41874 val_mae_cp 141.9 time 106.1s
+wrote float checkpoint artifacts\training\koi-v4-1024.pt
+quantization v4 s1=6 k3=12 val_mae_cp 259.4
+quantization v4 s1=6 k3=14 val_mae_cp 259.0
+quantization v4 s1=6 k3=16 val_mae_cp 283.1
+quantization v4 s1=6 k3=18 val_mae_cp 395.5
+quantization v4 s1=6 k3=20 val_mae_cp 428.9
+quantization v4 s1=7 k3=12 val_mae_cp 142.3
+quantization v4 s1=7 k3=14 val_mae_cp 142.1
+quantization v4 s1=7 k3=16 val_mae_cp 154.5
+quantization v4 s1=7 k3=18 val_mae_cp 313.0
+quantization v4 s1=7 k3=20 val_mae_cp 406.7
+quantization v4 s1=8 k3=12 val_mae_cp 358.8
+quantization v4 s1=8 k3=14 val_mae_cp 353.3
+quantization v4 s1=8 k3=16 val_mae_cp 353.0
+quantization v4 s1=8 k3=18 val_mae_cp 357.9
+quantization v4 s1=8 k3=20 val_mae_cp 404.0
+selected v4 s1=7 k3=14 val_mae_cp 142.1
+wrote artifacts\training\koi-v4-1024.nnue (18882699 bytes) and artifacts\training\koi-v4-1024.metadata.json

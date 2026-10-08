@@ -1,0 +1,7 @@
+nnue ab match 20: +0 =7 -0 (50%) incomplete
+json C:\Users\ntATh\AI test\Koi engine\artifacts\verification\nnue-bullet-training\ab-bullet-classical\ab-match.json
+[31;1mException: [0mC:\Users\ntATh\AI test\Koi engine\tools\nnue\ab_match.ps1:227[0m
+[31;1m[0m[36;1mLine |[0m
+[31;1m[0m[36;1m[36;1m 227 | [0m     [36;1mthrow "The A/B match produced $aborted aborted game(s); inspect t[0m .[0m
+[31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m     | [31;1m     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+[31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m     | [31;1mThe A/B match produced 2 aborted game(s); inspect the leg reports.[0m

@@ -1,0 +1,932 @@
+{
+  "schema": "koi-nnue-net-match-v1",
+  "generated_utc": "2026-10-07T03:01:22.8012750Z",
+  "nnue_path": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\training\\koi-v6-reexport-20261007\\koi-v6-req.nnue",
+  "opponent_path": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\networks\\koi-v4-official\\koi-v4-official-20261006.nnue",
+  "engine_path": "C:\\Users\\ntATh\\AI test\\Koi engine\\build\\roadmap-visit-win-release\\koi-engine.exe",
+  "nodes": 20000,
+  "threads": 4,
+  "hash_mb": 512,
+  "games_requested": 128,
+  "games": 128,
+  "opening_file": "C:\\Users\\ntATh\\AI test\\Koi engine\\tests\\data\\openings\\openings-curated-32.txt",
+  "wins": 6,
+  "draws": 54,
+  "losses": 68,
+  "aborted": 0,
+  "score": 33.0,
+  "percent": 25.78,
+  "verdict": "candidate-weaker",
+  "legs": [
+    {
+      "tag": "white",
+      "candidate_color": "white",
+      "games": 64,
+      "report": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\matches\\koi-v6req-vs-v4-20261007\\match-white\\koi-uci-match-20261007-021159-627.json"
+    },
+    {
+      "tag": "black",
+      "candidate_color": "black",
+      "games": 64,
+      "report": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\matches\\koi-v6req-vs-v4-20261007\\match-black\\koi-uci-match-20261007-030119-793.json"
+    }
+  ],
+  "game_results": [
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "0-1",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "0-1",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "0-1",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "0-1",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "0-1",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "0-1",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "0-1",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "0-1",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "0-1",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "0-1",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "0-1",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "0-1",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "0-1",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "0-1",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "1-0",
+      "outcome": "win",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "1-0",
+      "outcome": "win",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "0-1",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "0-1",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "0-1",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "0-1",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "0-1",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "0-1",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "0-1",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "0-1",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "0-1",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "0-1",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "0-1",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "0-1",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "0-1",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "0-1",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "0-1",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "0-1",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "0-1",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "0-1",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "0-1",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "0-1",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1-0",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1-0",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1-0",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1-0",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1-0",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1-0",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1-0",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1-0",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1-0",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1-0",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1-0",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1-0",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1-0",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1-0",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1-0",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1-0",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1-0",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1-0",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1-0",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1-0",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1-0",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1-0",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "0-1",
+      "outcome": "win",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "0-1",
+      "outcome": "win",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1-0",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1-0",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1-0",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1-0",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "0-1",
+      "outcome": "win",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "0-1",
+      "outcome": "win",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1-0",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1-0",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1-0",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1-0",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1-0",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1-0",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1-0",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1-0",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    }
+  ]
+}

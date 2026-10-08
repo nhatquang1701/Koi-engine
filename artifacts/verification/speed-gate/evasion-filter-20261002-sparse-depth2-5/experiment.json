@@ -1,0 +1,22 @@
+{
+  "schema": "koi-speed-gate-experiment-v1",
+  "recorded_utc": "2026-10-01T21:00:26Z",
+  "gate_script": "tools/build/speed_gate.ps1",
+  "gate_script_sha256": "B743DD45DC5409A2073ACD11602934E740925C57992222B4596211D12BF3F15E",
+  "baseline_exe": "artifacts\\verification\\speed-gate\\evasion-filter-20261002-sparse-depth2-5/baseline/koi-bench-baseline.exe",
+  "baseline_exe_sha256": "B8F3E12CC6660AE850D91055818B94A8EDBD143B28BD6203799A255787AF45FF",
+  "candidate_exe": "build/roadmap-visit-win-release/koi-bench.exe",
+  "candidate_exe_sha256": "9068758B32E1B38E68F5C520B3C2FB6A692D28EDDD8C0AE858F344296EB47074",
+  "source_revision": "1e8abbb45bff5e7fae040de825d54239a5e69212",
+  "baseline_note": "isolated Release build of HEAD 1e8abbb from build/roadmap-evasion-baseline-src (BuildTools MSVC 14.44.35207, Ninja, modules/shadow/GPU/PGO/sanitize/static-runtime OFF)",
+  "candidate": "evasion filter: non-king moves while in check are screened before the snapshot/apply/is_checked/restore probe; only captures of the single checker, moves onto the king-checker ray, and en-passant captures of the checking pawn can be legal, and those still take the probe",
+  "fen_file": "artifacts\\verification\\speed-gate\\evasion-filter-20261002-sparse-depth2-5/sparse-qsearch-fens.txt",
+  "fen_sha256": "07855F78D6544FD4D9ED8E6000FDA3B279208AFC608F389569D85DE3026D930C",
+  "threads": 1,
+  "speed": 100,
+  "depth_sweep": "2..5",
+  "runs": 5,
+  "max_total_nps_regression_percent": 2.0,
+  "max_row_nps_regression_percent": 2.0,
+  "min_row_elapsed_ms": 20.0
+}

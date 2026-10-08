@@ -1,0 +1,22 @@
+Internal ctest changing into directory: C:/Users/ntATh/AI test/Koi engine/build/debug
+Test project C:/Users/ntATh/AI test/Koi engine/build/debug
+    Start 40: koi_uci_match_process
+    Start 14: uci_controller_tests
+1/4 Test #14: uci_controller_tests .............   Passed   10.11 sec
+    Start 49: package_release_layout
+2/4 Test #49: package_release_layout ...........   Passed   10.11 sec
+3/4 Test #40: koi_uci_match_process ............   Passed   58.56 sec
+    Start 35: koi_engine_process
+4/4 Test #35: koi_engine_process ...............   Passed    7.91 sec
+
+100% tests passed, 0 tests failed out of 4
+
+Label Time Summary:
+matches      =  58.56 sec*proc (1 test)
+packaging    =  10.11 sec*proc (1 test)
+process      =  76.59 sec*proc (3 tests)
+runtime      =  10.11 sec*proc (1 test)
+uci          =   7.91 sec*proc (1 test)
+unit         =  10.11 sec*proc (1 test)
+
+Total Test time (real) =  66.48 sec

@@ -1,0 +1,6 @@
+bench-threads1.json: threads=1 timed=False repeat=2 rows=64 matches=64 nodes=16469 qnodes=753564 mean_nps=0 repeat_identical=True
+bench-threads2.json: threads=2 timed=False repeat=1 rows=64 matches=64 nodes=30939 qnodes=1483738 mean_nps=0 repeat_identical=True
+bench-threads4.json: threads=4 timed=False repeat=1 rows=64 matches=64 nodes=57349 qnodes=2840487 mean_nps=0 repeat_identical=True
+bench-threads8.json: threads=8 timed=False repeat=1 rows=64 matches=64 nodes=110682 qnodes=5754182 mean_nps=0 repeat_identical=True
+bench-threads1-timed.json: threads=1 timed=True repeat=1 rows=64 matches=64 nodes=16469 qnodes=753564 mean_nps=0 repeat_identical=True
+bench-threads4-timed.json: threads=4 timed=True repeat=1 rows=64 matches=64 nodes=57849 qnodes=2839718 mean_nps=0 repeat_identical=True

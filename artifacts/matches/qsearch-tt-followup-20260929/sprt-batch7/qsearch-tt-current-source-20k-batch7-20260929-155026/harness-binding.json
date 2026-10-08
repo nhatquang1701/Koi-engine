@@ -1,0 +1,20 @@
+{
+  "schema": "koi-qsearch-match-harness-binding-v1",
+  "recorded_utc": "2026-09-29T08:57:09.5527886Z",
+  "experiment_path": "artifacts/verification/qsearch-tt-followup-20260929/experiment-batch7.json",
+  "experiment_sha256": "b8d73c6935e5ce78dea41d367dafea8fe6e1d48bee5e1b78ae45a2229cd3b0af",
+  "source_commit": "b40feb1c8447e4e8c56589409f9a5ccb47e3edfd",
+  "harness_path": "tools/stability/uci_match.ps1",
+  "harness_sha256": "9df4f67a4632a05e070eb44fde202814a9692befd3a63c880688b946feedfb3e",
+  "harness_git_blob_at_head": "de0de5bce59c2d650a7f1c872d730b9d82e76952",
+  "harness_working_tree_git_blob": "de0de5bce59c2d650a7f1c872d730b9d82e76952",
+  "harness_matches_pinned_commit": true,
+  "launcher_path": "artifacts/verification/qsearch-tt-followup-20260929/run_batch7.ps1",
+  "launcher_sha256": "2395a1fc428c9248a1690175403b61cfc6ddcda3f342a4962765b6c4db4949cd",
+  "run_root": "artifacts/matches/qsearch-tt-followup-20260929/sprt-batch7/qsearch-tt-current-source-20k-batch7-20260929-155026",
+  "runner_pid": 30108,
+  "workers": {
+    "white": 620,
+    "black": 14568
+  }
+}

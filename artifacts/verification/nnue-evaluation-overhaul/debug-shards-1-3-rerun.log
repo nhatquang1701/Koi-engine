@@ -1,0 +1,15 @@
+Internal ctest changing into directory: C:/Users/ntATh/AI test/Koi engine/build/debug
+Test project C:/Users/ntATh/AI test/Koi engine/build/debug
+    Start 13: koi_search_tests_1of4
+1/2 Test #13: koi_search_tests_1of4 ............   Passed  239.71 sec
+    Start 15: koi_search_tests_3of4
+2/2 Test #15: koi_search_tests_3of4 ............   Passed   87.01 sec
+
+100% tests passed, 0 tests failed out of 2
+
+Label Time Summary:
+heavy     = 653.43 sec*proc (2 tests)
+search    = 653.43 sec*proc (2 tests)
+unit      = 653.43 sec*proc (2 tests)
+
+Total Test time (real) = 326.72 sec

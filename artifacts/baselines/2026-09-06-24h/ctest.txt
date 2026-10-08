@@ -1,0 +1,58 @@
+Internal ctest changing into directory: C:/Users/ntATh/AI test/Koi engine/out/architecture-release
+Test project C:/Users/ntATh/AI test/Koi engine/out/architecture-release
+      Start  1: koi_core_tests
+ 1/26 Test  #1: koi_core_tests ....................   Passed    0.54 sec
+      Start  2: koi_cpu_features_tests
+ 2/26 Test  #2: koi_cpu_features_tests ............   Passed    0.07 sec
+      Start  3: koi_module_tests
+ 3/26 Test  #3: koi_module_tests ..................   Passed    0.08 sec
+      Start  4: syzygy_tablebase_tests
+ 4/26 Test  #4: syzygy_tablebase_tests ............   Passed    0.23 sec
+      Start  5: koi_rules_tests
+ 5/26 Test  #5: koi_rules_tests ...................   Passed    0.07 sec
+      Start  6: opening_book_tests
+ 6/26 Test  #6: opening_book_tests ................   Passed    0.15 sec
+      Start  7: uci_controller_tests
+ 7/26 Test  #7: uci_controller_tests ..............   Passed    7.34 sec
+      Start  8: koi_search_tests
+ 8/26 Test  #8: koi_search_tests ..................   Passed   26.62 sec
+      Start  9: search_ordering_tests
+ 9/26 Test  #9: search_ordering_tests .............   Passed    0.07 sec
+      Start 10: static_exchange_tests
+10/26 Test #10: static_exchange_tests .............   Passed    0.07 sec
+      Start 11: koi_strength_tests
+11/26 Test #11: koi_strength_tests ................   Passed    4.11 sec
+      Start 12: perft_tests
+12/26 Test #12: perft_tests .......................   Passed    2.06 sec
+      Start 13: koi_replay_tests
+13/26 Test #13: koi_replay_tests ..................   Passed    0.62 sec
+      Start 14: koi_engine_process
+14/26 Test #14: koi_engine_process ................   Passed    2.83 sec
+      Start 15: koi_engine_en_croissant_process
+15/26 Test #15: koi_engine_en_croissant_process ...   Passed    0.64 sec
+      Start 16: koi_benchmark_process
+16/26 Test #16: koi_benchmark_process .............   Passed   41.94 sec
+      Start 17: koi_uci_match_process
+17/26 Test #17: koi_uci_match_process .............   Passed   12.58 sec
+      Start 18: koi_uci_match_clock
+18/26 Test #18: koi_uci_match_clock ...............   Passed   68.96 sec
+      Start 19: windows_ci_configuration
+19/26 Test #19: windows_ci_configuration ..........   Passed    0.36 sec
+      Start 20: install_book_script
+20/26 Test #20: install_book_script ...............   Passed    0.69 sec
+      Start 21: package_release_layout
+21/26 Test #21: package_release_layout ............   Passed    2.03 sec
+      Start 22: elo_oracle_python
+22/26 Test #22: elo_oracle_python .................   Passed    5.44 sec
+      Start 23: elo_estimate_python
+23/26 Test #23: elo_estimate_python ...............   Passed    4.30 sec
+      Start 24: stockfish_match_python
+24/26 Test #24: stockfish_match_python ............   Passed    0.25 sec
+      Start 25: elo_openings_python
+25/26 Test #25: elo_openings_python ...............   Passed    1.39 sec
+      Start 26: tune_eval_python
+26/26 Test #26: tune_eval_python ..................   Passed    1.02 sec
+
+100% tests passed, 0 tests failed out of 26
+
+Total Test time (real) = 184.55 sec

@@ -1,0 +1,108 @@
+{
+  "dataset_counts": {
+    "train": 24358,
+    "validation": 6181
+  },
+  "device": "cpu",
+  "early_stopping": {
+    "actual_epochs": 3,
+    "best_epoch": 1,
+    "best_validation_objective": 3.65551844717794,
+    "enabled": true,
+    "min_delta": 0.0,
+    "patience": 2,
+    "requested_epochs": 10,
+    "stopped_early": true,
+    "validation_history": [
+      {
+        "epoch": 1,
+        "objective": 3.65551844717794,
+        "policy_ce": 3.096545552967764,
+        "value_mse": 0.15054690262514445,
+        "wdl_ce": 0.5439182048933356
+      },
+      {
+        "epoch": 2,
+        "objective": 3.729525022070352,
+        "policy_ce": 3.075434688742691,
+        "value_mse": 0.16061807084450055,
+        "wdl_ce": 0.63802852772469
+      },
+      {
+        "epoch": 3,
+        "objective": 3.8075779027579295,
+        "policy_ce": 3.0555863974724717,
+        "value_mse": 0.1642553228384966,
+        "wdl_ce": 0.7355659760851478
+      }
+    ]
+  },
+  "environment": {
+    "cuda_available": false,
+    "cuda_build_version": null,
+    "cuda_devices": [],
+    "cuda_driver_version": "582.66",
+    "device": "cpu",
+    "device_name": "Intel64 Family 6 Model 165 Stepping 3, GenuineIntel",
+    "host": {
+      "hostname": "QUANGPC",
+      "logical_cpu_count": 8,
+      "machine": "AMD64",
+      "processor": "Intel64 Family 6 Model 165 Stepping 3, GenuineIntel",
+      "release": "11",
+      "system": "Windows"
+    },
+    "numpy_version": "2.5.3",
+    "python_version": "3.14.7",
+    "pytorch_version": "2.14.0+cpu"
+  },
+  "hyperparameters": {
+    "batch_size": 64,
+    "early_stopping_min_delta": 0.0,
+    "early_stopping_patience": 2,
+    "epochs": 10,
+    "learning_rate": 0.001,
+    "seed": 20260929,
+    "value_loss_weight": 0.1
+  },
+  "metrics": {
+    "train": {
+      "objective": 3.36982978452132,
+      "policy_ce": 3.037334389242853,
+      "value_mse": 0.10026723893534414,
+      "wdl_ce": 0.32246867104380944
+    },
+    "validation": {
+      "objective": 3.65551844717794,
+      "policy_ce": 3.096545552967764,
+      "value_mse": 0.15054690262514445,
+      "wdl_ce": 0.5439182048933356
+    }
+  },
+  "model_sha256": "c56d5055d403e471c982d4f967cdd742178f6418b1ff2eb46b2ba66ddf879c05",
+  "schema": "koi-policy-value-training-metadata-v1",
+  "source_dirty": false,
+  "source_revision": "edaa10584d43bd9d66c6261cb3a5d4374c1f937b",
+  "source_sha256": {
+    "tools/measurement/koi_chess/__init__.py": "c0f15babf0fea462091dd6360a815c0fe9df7f8781c80c66efd02d3179553115",
+    "tools/measurement/koi_chess/attacks.py": "dc017a9347b0e0fbfac15599cdb0fbbb454b9777e4b1b3135c529ea235b45080",
+    "tools/measurement/koi_chess/board.py": "66428f81defb6b6ae9b926a71ca29d7d3e48a86c7a78e3d58faa0a5355084693",
+    "tools/measurement/koi_chess/core.py": "2afe2de739b7d80bce8c6cf81074d775e8a9873dd539bcbf530acfc1eb48e9a4",
+    "tools/measurement/koi_chess/engine.py": "58ca1762d04b82b2ec16251196a90759b6d6fba2209474d41e6c8b33eb375cfc",
+    "tools/measurement/koi_chess/pgn.py": "3ed89525f5fa5ca3a7b1e3a070b0c327727ec2dd3cc09e024fa3051a5dba76d7",
+    "tools/measurement/koi_dataset.py": "57137fd6713536a58afd30b907abf54edf919068b45a51acc552861a77d7ccac",
+    "tools/measurement/policy_value_dataset.py": "fac84eeb1210387b1efb58ee2350bbefdef2cddd5d089b638f21c322e4176490",
+    "tools/measurement/policy_value_model.py": "0c63b76a0b763445d13167e5cf069a52e7e2cc64aab2353a4c505698665844e8",
+    "tools/measurement/train_policy_value.py": "465a42c9ba7c1cfb8ffa7c048d30bd7b048a84cbb037adfa0fff39284ac56966"
+  },
+  "timing": {
+    "train_positions_per_second": 948.5395610634945,
+    "training_positions": 73074,
+    "training_seconds": 77.03843149996828,
+    "validation_positions": 18543,
+    "validation_positions_per_second": 1922.3279170325734,
+    "validation_seconds": 9.64611699996749
+  },
+  "train_sha256": "cc72ee9a112542e85bb1f189fc2bb9de922d60376633b9dec51f82b361591926",
+  "validation_sha256": "8ffcf78393eb0bbfa083f4a2c5fbe0da2ea28e7064781b6f6f932409e8e4784b"
+}

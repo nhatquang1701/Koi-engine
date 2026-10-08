@@ -1,0 +1,9 @@
+{
+  "schema": "koi-elo-anchor-manifest-v1",
+  "stockfish": {
+    "path": ".\\third_party\\stockfish-19\\stockfish-windows-x86-64-universal\\stockfish\\stockfish-windows-x86-64-universal.exe",
+    "elos": [1400, 1800],
+    "rating_source": "Stockfish 19 UCI_LimitStrength"
+  },
+  "lower_anchors": []
+}

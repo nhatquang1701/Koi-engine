@@ -1,0 +1,39 @@
+{
+  "schema": "koi-nnue-training-metadata-v3",
+  "created": "2026-10-07T15:40:50Z",
+  "corpus": "artifacts\\training\\labels.txt",
+  "rows_used": 2251516,
+  "val_rows": 112575,
+  "feature_set": "halfka-king-bucket-v1+threat-pairs-v1",
+  "quantization": "int16/int8",
+  "arch": "v6",
+  "architecture": {
+    "input": 36864,
+    "hidden": 1536,
+    "l1": 32,
+    "output_buckets": 8,
+    "groups": [
+      "halfka-king-bucket-v1",
+      "threat-pairs-v1"
+    ]
+  },
+  "activation": "crelu-pair-diff-l1",
+  "hidden_shift": 7,
+  "l1_shift": 8,
+  "output_shift": 5,
+  "epochs": 440,
+  "batch_size": 4096,
+  "learning_rate": 0.0015,
+  "seed": 20260916,
+  "target_scale": 100.0,
+  "val_mae_cp": 127.7546532540706,
+  "val_round_trip_mae_cp": 130.88295,
+  "w1_saturation": 0.0,
+  "l1_saturation": 0.0,
+  "l1_diff_saturation": 4.0690104166666664e-05,
+  "w2_saturation": 0.0,
+  "l1_pair_zero_fraction": 0.3025716145833333,
+  "payload_sha256": "c3e69d5f78cf586528952543baea3f0cc4cd1a36b600957049bf28ff2e300ed8",
+  "network_sha256": "150c12f2cbc0ee88db621c914a5b918f3d89eca0f0c61b24661a6e5f22e9935b",
+  "command": "tools\\measurement\\train_nnue_koi.py --corpus artifacts\\training\\labels.txt --net-out artifacts\\training\\koi-v6-labels2-20261007\\koi-v6-labels2.nnue --meta-out artifacts\\training\\koi-v6-labels2-20261007\\koi-v6-labels2.metadata.json --epochs 440 --batch-size 4096 --learning-rate 0.0015 --threads 2 --val-fraction 0.05 --seed 20260916 --arch v6 --hidden-units 1536 --l1-units 32 --hidden-shifts 6 7 8 --l1-shifts 6 7 8 --tune-samples 20000 --early-stop-patience 40 --float-out artifacts\\training\\koi-v6-labels2-20261007\\koi-v6-labels2.pt"
+}

@@ -1,0 +1,84 @@
+{
+  "schema": "koi-roadmap-baseline-provenance-v1",
+  "status": "completed",
+  "started_local": "2026-09-27T14:30:51+07:00",
+  "source_revision": "0c7c47d3b7f62ebfcda96e25164e6a09ac79a583",
+  "source_dirty": false,
+  "build": {
+    "configuration": "Release",
+    "compiler": "MSVC 19.44",
+    "cmake": "3.31.6",
+    "koi_executable": "build/roadmap-release/koi-engine.exe",
+    "replay_executable": "build/roadmap-release/koi-replay.exe",
+    "hashes": {
+      "koi": "4617473eaa477622807bfc3b0dd6a205b117df902f28c9a94bd6de8ee7b3c555",
+      "replay": "64f2a269f916eaa5a75f93ec2d8dabe4ae7601991c6927fe21e90a5738d444c3",
+      "stockfish": "45bc8e4969147db9c2eb533810637994619bff0eacc81ccfd9854394901bcbd0",
+      "anchor_manifest": "01ff65e2cfb099435ed754a20089f391f3398c00ab3150ea1fe5bc7053524e41",
+      "openings": "1e2dcccfabb9bf5fa4aa28df6c5b23c81e9feeb782aecd7d5722298d4f235e79",
+      "schedule": "87d86ea17a559e8dec7e36f23064db8aef28e8a0edbb4db63d761417a7a09666"
+    }
+  },
+  "stockfish": {
+    "version": "19",
+    "ratings": [
+      1400,
+      1600,
+      1800
+    ],
+    "limit_strength": true
+  },
+  "measurement": {
+    "time_control": "movetime",
+    "movetime_ms": 1000,
+    "threads": 4,
+    "hash_mb": 512,
+    "speed": 100,
+    "own_book": false,
+    "opening_count": 32,
+    "pairing": "Each opening once with Koi White and once with Koi Black",
+    "initial_games": 192,
+    "max_games": 320,
+    "anchors": "Stockfish 19 UCI_Elo 1400, 1600, 1800"
+  },
+  "host": {
+    "os": "Microsoft Windows 11 Home",
+    "os_version": "10.0.26200",
+    "cpu": "Intel(R) Core(TM) i3-10100F CPU @ 3.60GHz",
+    "physical_cores": 4,
+    "logical_processors": 8,
+    "ram_bytes": 34224672768,
+    "gpu": "NVIDIA GeForce GTX 1060 6GB",
+    "gpu_driver": "32.0.15.8266"
+  },
+  "artifacts": {
+    "report": "artifacts/matches/roadmap-current-baseline-1s.json",
+    "schedule": "artifacts/manifests/roadmap-current-baseline-1s-schedule.json",
+    "raw_match_directory": "artifacts/matches/roadmap-current-baseline-1s-artifacts"
+  },
+  "completion": {
+    "completed_utc": "2026-09-27T12:01:04Z",
+    "completed_local": "2026-09-27T19:01:04+07:00",
+    "validated_local": "2026-09-27T19:11:12+07:00",
+    "harness_exit_code": 0,
+    "report": "artifacts/matches/roadmap-current-baseline-1s.json",
+    "report_sha256": "b94147fac42e051cd932b7fcc9d4e36ed9763dad51497bac9e872a679cea0316",
+    "report_reproducibility_hash": "5f4db8d01c3bc20d2ee7e1385f06e2149248e9d1a7f0b119cb0a4006245d9d52",
+    "games": 192,
+    "results": {
+      "wins": 105,
+      "draws": 13,
+      "losses": 74
+    },
+    "artifact_hashes_verified": 13,
+    "raw_color_reports_validated": 6,
+    "calibration_status": "anchor-inconsistent; no single Elo accepted",
+    "calibration_review": "artifacts/verification/roadmap-current-baseline-1s-calibration-review.md"
+  },
+  "execution_notes": [
+    "Brief synthetic Python tests and a documentation build overlapped earlier baseline phases.",
+    "A README edit and git diff --check overlapped the final 1800 batches; no engine binary or C++ search source changed.",
+    "No second match runner or benchmark was started during the baseline.",
+    "All match processes exited before post-run tests or throughput benchmarks."
+  ]
+}

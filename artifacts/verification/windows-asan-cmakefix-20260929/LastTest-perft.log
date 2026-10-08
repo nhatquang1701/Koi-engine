@@ -1,0 +1,24 @@
+Start testing: Sep 29 11:48 SE Asia Standard Time
+----------------------------------------------------------
+38/82 Testing: koi_engine_perft_responsiveness
+38/82 Test: koi_engine_perft_responsiveness
+Command: "C:/Program Files/PowerShell/7/pwsh.exe" "-NoProfile" "-ExecutionPolicy" "Bypass" "-File" "C:/Users/ntATh/AI test/Koi engine/tests/integration/uci/perft_responsiveness_test.ps1" "-EnginePath" "C:/Users/ntATh/AI test/Koi engine/build/ci-asan/koi-engine.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/ci-asan
+"koi_engine_perft_responsiveness" start time: Sep 29 11:48 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+go perft remained responsive to isready and stop.
+<end of output>
+Test time =   3.33 sec
+----------------------------------------------------------
+Test Passed.
+"koi_engine_perft_responsiveness" end time: Sep 29 11:48 SE Asia Standard Time
+"koi_engine_perft_responsiveness" time elapsed: 00:00:03
+----------------------------------------------------------
+
+End testing: Sep 29 11:48 SE Asia Standard Time
+
+process =   3.33 sec*proc
+
+uci =   3.33 sec*proc
+

@@ -1,0 +1,2324 @@
+Start testing: Sep 29 03:11 UTC
+----------------------------------------------------------
+1/76 Testing: koi_gpu_probe
+1/76 Test: koi_gpu_probe
+Command: "/work/build/roadmap-current-linux-gcc14-release-modules-off-20260929/koi_gpu_probe"
+Directory: /work/build/roadmap-current-linux-gcc14-release-modules-off-20260929
+"koi_gpu_probe" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+gpu-probe: built without nvcc; GPU inference is unavailable
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"koi_gpu_probe" end time: Sep 29 03:11 UTC
+"koi_gpu_probe" time elapsed: 00:00:00
+----------------------------------------------------------
+
+2/76 Testing: gpu_nnue_tests
+2/76 Test: gpu_nnue_tests
+Command: "/work/build/roadmap-current-linux-gcc14-release-modules-off-20260929/gpu_nnue_tests"
+Directory: /work/build/roadmap-current-linux-gcc14-release-modules-off-20260929
+"gpu_nnue_tests" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+SKIP GPU NNUE matches CPU scalar: this build has no GPU NNUE kernel
+SKIP GPU NNUE batch sizes agree: this build has no GPU NNUE kernel
+SKIP GPU NNUE concurrent requests: this build has no GPU NNUE kernel
+PASS GPU NNUE PTX variant selection
+PASS GPU NNUE PTX candidate list
+koi-test-summary run=5 pass=2 fail=0 xfail=0 xpass=0 skip=3 unseen=0 intermittent=0
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"gpu_nnue_tests" end time: Sep 29 03:11 UTC
+"gpu_nnue_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+3/76 Testing: koi_shadow_diff_tests
+3/76 Test: koi_shadow_diff_tests
+Command: "/work/build/roadmap-current-linux-gcc14-release-modules-off-20260929/koi_shadow_diff_tests"
+Directory: /work/build/roadmap-current-linux-gcc14-release-modules-off-20260929
+"koi_shadow_diff_tests" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+PASS fixture differential
+PASS sequential differential
+PASS game state consistency snapshot
+PASS fixed-seed generated move replay stays consistent
+PASS special generated moves are transactional
+PASS fixed-seed make/unmake restores diagnostic snapshots
+PASS repetition and rejected generated metadata preserve consistency
+koi-test-summary run=7 pass=7 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =   0.02 sec
+----------------------------------------------------------
+Test Passed.
+"koi_shadow_diff_tests" end time: Sep 29 03:11 UTC
+"koi_shadow_diff_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+5/76 Testing: evaluation_boundary_tests
+5/76 Test: evaluation_boundary_tests
+Command: "/work/build/roadmap-current-linux-gcc14-release-modules-off-20260929/evaluation_boundary_tests"
+Directory: /work/build/roadmap-current-linux-gcc14-release-modules-off-20260929
+"evaluation_boundary_tests" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+PASS castling readiness
+PASS early queen development
+PASS central early queen development
+PASS late central queen taper
+PASS pawn break potential
+PASS parameter metadata
+PASS trapped piece
+PASS hanging piece
+PASS weighted king-ring attackers
+PASS castle-ready king-ring deferral
+PASS sparse king-ring taper
+PASS feature extraction context
+koi-test-summary run=12 pass=12 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =   0.02 sec
+----------------------------------------------------------
+Test Passed.
+"evaluation_boundary_tests" end time: Sep 29 03:11 UTC
+"evaluation_boundary_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+6/76 Testing: evaluation_architecture_tests
+6/76 Test: evaluation_architecture_tests
+Command: "/work/build/roadmap-current-linux-gcc14-release-modules-off-20260929/evaluation_architecture_tests"
+Directory: /work/build/roadmap-current-linux-gcc14-release-modules-off-20260929
+"evaluation_architecture_tests" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+PASS worker ownership
+PASS base fallback
+PASS search evaluation boundary
+PASS advisory notification forwarding
+koi-test-summary run=4 pass=4 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"evaluation_architecture_tests" end time: Sep 29 03:11 UTC
+"evaluation_architecture_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+4/76 Testing: koi_core_tests
+4/76 Test: koi_core_tests
+Command: "/work/build/roadmap-current-linux-gcc14-release-modules-off-20260929/koi_core_tests"
+Directory: /work/build/roadmap-current-linux-gcc14-release-modules-off-20260929
+"koi_core_tests" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+PASS default position
+PASS legal UCI sequence
+PASS native position undo and key
+PASS special moves
+PASS malformed FEN rejection
+PASS back-rank pawn rejection
+PASS en-passant state validation
+PASS adjacent king rejection
+PASS castling-rights validation
+PASS triple-check rejection
+PASS strict material and double-check rejection
+PASS invalid UCI rejection
+PASS malformed UCI rejection
+PASS compatibility position forwarding
+PASS native search state contract
+PASS checkmate and stalemate
+PASS random chooser legality
+PASS seeded chooser repeatability
+PASS position feature freshness
+PASS position feature concurrent reads
+PASS position feature concurrent copy
+PASS native feature replay
+PASS tactical checking horizon
+PASS metadata SEE cache
+PASS fabricated metadata rejection
+PASS tactical quiet-check probe budget
+PASS fast quiet-check differential
+koi-test-summary run=27 pass=27 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =   0.20 sec
+----------------------------------------------------------
+Test Passed.
+"koi_core_tests" end time: Sep 29 03:11 UTC
+"koi_core_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+8/76 Testing: koi_cpu_features_tests
+8/76 Test: koi_cpu_features_tests
+Command: "/work/build/roadmap-current-linux-gcc14-release-modules-off-20260929/koi_cpu_features_tests"
+Directory: /work/build/roadmap-current-linux-gcc14-release-modules-off-20260929
+"koi_cpu_features_tests" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+PASS AVX2 CPU feature query
+PASS AVX-512 CPU feature query
+koi-test-summary run=2 pass=2 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"koi_cpu_features_tests" end time: Sep 29 03:11 UTC
+"koi_cpu_features_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+9/76 Testing: koi_cpu_variant_tests
+9/76 Test: koi_cpu_variant_tests
+Command: "/work/build/roadmap-current-linux-gcc14-release-modules-off-20260929/koi_cpu_variant_tests"
+Directory: /work/build/roadmap-current-linux-gcc14-release-modules-off-20260929
+"koi_cpu_variant_tests" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+PASS CPU variant parsing
+PASS CPU variant executable names
+PASS CPU variant automatic selection
+PASS CPU variant explicit override
+koi-test-summary run=4 pass=4 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"koi_cpu_variant_tests" end time: Sep 29 03:11 UTC
+"koi_cpu_variant_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+10/76 Testing: syzygy_tablebase_tests
+10/76 Test: syzygy_tablebase_tests
+Command: "/work/build/roadmap-current-linux-gcc14-release-modules-off-20260929/syzygy_tablebase_tests"
+Directory: /work/build/roadmap-current-linux-gcc14-release-modules-off-20260929
+"syzygy_tablebase_tests" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+PASS snapshot rule metadata and piece bitboards
+PASS snapshot native rule state after pinned double push
+PASS absent and malformed paths disable probing safely
+PASS empty and valid paths preserve optional fallback
+Incomplete tablebase file KQvK..rtbw
+info string Incomplete tablebase file KQvK..rtbw
+PASS wrong-sized fixture disables probing safely
+PASS tablebase instances share Fathom lifetime in both clear orders
+PASS piece count and castling gate probing
+PASS malformed snapshots are rejected before probing
+PASS WDL conversion and concurrent disabled probes
+PASS 50-move rule selects clock-aware root probe
+PASS seven-piece probe limit is preserved
+PASS large table limit reflects the loaded directory
+PASS probe eligibility is a cheap conservative gate
+Corrupted table.
+PASS concurrent enabled WDL probes agree
+koi-test-summary run=14 pass=14 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =   0.05 sec
+----------------------------------------------------------
+Test Passed.
+"syzygy_tablebase_tests" end time: Sep 29 03:11 UTC
+"syzygy_tablebase_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+11/76 Testing: koi_rules_tests
+11/76 Test: koi_rules_tests
+Command: "/work/build/roadmap-current-linux-gcc14-release-modules-off-20260929/koi_rules_tests"
+Directory: /work/build/roadmap-current-linux-gcc14-release-modules-off-20260929
+"koi_rules_tests" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+PASS Koi-owned move coordinates
+PASS FEN construction
+PASS strict FEN legality
+PASS legal special moves
+PASS special move conversion round trips
+PASS move metadata
+PASS batch move metadata
+PASS search metadata fast path
+PASS generated move application
+PASS all fast generated moves
+PASS draw rule view
+PASS non-pawn material view
+PASS tactical move generation
+PASS position features
+PASS make/unmake restoration
+PASS null move restoration
+PASS transactional rejected move
+PASS start-position move count
+koi-test-summary run=18 pass=18 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"koi_rules_tests" end time: Sep 29 03:11 UTC
+"koi_rules_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+12/76 Testing: native_rule_state_tests
+12/76 Test: native_rule_state_tests
+Command: "/work/build/roadmap-current-linux-gcc14-release-modules-off-20260929/native_rule_state_tests"
+Directory: /work/build/roadmap-current-linux-gcc14-release-modules-off-20260929
+"native_rule_state_tests" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+PASS compatibility mirror ownership
+PASS feature state ownership
+PASS FEN rule state and Position facade
+PASS repetition thresholds
+PASS clock, checkmate, and dead positions
+PASS make/unmake and special moves
+PASS legal en-passant repetition identity
+PASS unusable en-passant repetition identity
+PASS long replay history window
+PASS generated move transaction
+PASS search move transaction
+PASS fixed-buffer legal generation
+PASS sparse piece move ordering
+koi-test-summary run=13 pass=13 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"native_rule_state_tests" end time: Sep 29 03:11 UTC
+"native_rule_state_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+7/76 Testing: nnue_boundary_tests
+7/76 Test: nnue_boundary_tests
+Command: "/work/build/roadmap-current-linux-gcc14-release-modules-off-20260929/nnue_boundary_tests"
+Directory: /work/build/roadmap-current-linux-gcc14-release-modules-off-20260929
+"nnue_boundary_tests" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+PASS NNUE container
+PASS NNUE layer shape
+PASS NNUE fallback
+PASS NNUE worker isolation
+PASS NNUE v2 features
+PASS NNUE v2 container
+PASS NNUE v2 validation
+PASS NNUE v2 inference
+PASS NNUE AVX2 wide accumulation
+PASS NNUE invalid worker guard
+PASS NNUE v3 shifts
+PASS NNUE v4 golden score
+PASS NNUE v4 reference
+PASS NNUE v4 path parity
+PASS NNUE v4 piece bucket
+PASS NNUE v4 wide accumulation
+PASS NNUE v4 container
+PASS NNUE v4 validation
+PASS NNUE v4 corruption
+PASS NNUE v4 incremental walk
+PASS NNUE v4 incremental king bucket
+PASS NNUE v4 incremental recovery
+PASS NNUE v4 incremental special moves
+PASS NNUE v4 incremental wide deltas
+PASS NNUE v5 incremental walk
+PASS NNUE v5 incremental king bucket
+PASS NNUE v5 incremental recovery
+PASS NNUE v5 incremental special moves
+PASS NNUE v5 incremental wide deltas
+PASS NNUE v5 container
+PASS NNUE v5 validation
+PASS NNUE v5 corruption
+PASS NNUE v5 reference
+PASS NNUE v5 path parity
+PASS NNUE v5 golden score
+PASS NNUE v2 shifts rejected
+PASS NNUE invalid fallback
+PASS NNUE one-shot stateless
+SKIP external NNUE container: no external container path provided
+koi-test-summary run=39 pass=38 fail=0 xfail=0 xpass=0 skip=1 unseen=0 intermittent=0
+<end of output>
+Test time =   0.25 sec
+----------------------------------------------------------
+Test Passed.
+"nnue_boundary_tests" end time: Sep 29 03:11 UTC
+"nnue_boundary_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+13/76 Testing: opening_book_tests
+13/76 Test: opening_book_tests
+Command: "/work/build/roadmap-current-linux-gcc14-release-modules-off-20260929/opening_book_tests"
+Directory: /work/build/roadmap-current-linux-gcc14-release-modules-off-20260929
+"opening_book_tests" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+PASS reference Polyglot keys
+PASS special Polyglot moves
+PASS weighted legal selection
+PASS deterministic highest-weight selection
+PASS book fallback behavior
+PASS oversized book fallback
+PASS book safety
+koi-test-summary run=7 pass=7 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =   0.02 sec
+----------------------------------------------------------
+Test Passed.
+"opening_book_tests" end time: Sep 29 03:11 UTC
+"opening_book_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+15/76 Testing: completion_gate_tests
+15/76 Test: completion_gate_tests
+Command: "/work/build/roadmap-current-linux-gcc14-release-modules-off-20260929/completion_gate_tests"
+Directory: /work/build/roadmap-current-linux-gcc14-release-modules-off-20260929
+"completion_gate_tests" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+PASS current root move
+PASS stale generation
+PASS mismatched root key
+PASS illegal d4c3 fallback
+PASS searchmoves restriction
+PASS invalid PV fallback
+PASS terminal 0000
+PASS completion once
+PASS request identity helper
+koi-test-summary run=9 pass=9 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"completion_gate_tests" end time: Sep 29 03:11 UTC
+"completion_gate_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+20/76 Testing: search_ordering_tests
+20/76 Test: search_ordering_tests
+Command: "/work/build/roadmap-current-linux-gcc14-release-modules-off-20260929/search_ordering_tests"
+Directory: /work/build/roadmap-current-linux-gcc14-release-modules-off-20260929
+"search_ordering_tests" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+PASS TT and MVV-LVA ordering
+PASS SEE capture ordering
+PASS killer history stable ordering
+PASS killer tier outranks saturated history
+PASS counter move tier
+PASS counter move confidence
+PASS counter move collision confidence
+PASS counter move failure confidence
+PASS quiet checks before quiet moves
+PASS history malus and continuation ordering
+PASS history saturation overflow safety
+PASS parent move feedback
+PASS cached move scores
+PASS deferred SEE generation
+PASS quiet-only check metadata
+PASS deferred SEE ordering
+PASS correction history saturation
+koi-test-summary run=17 pass=17 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"search_ordering_tests" end time: Sep 29 03:11 UTC
+"search_ordering_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+21/76 Testing: search_architecture_tests
+21/76 Test: search_architecture_tests
+Command: "/work/build/roadmap-current-linux-gcc14-release-modules-off-20260929/search_architecture_tests"
+Directory: /work/build/roadmap-current-linux-gcc14-release-modules-off-20260929
+"search_architecture_tests" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+PASS fixed search stack
+PASS deterministic root ranking
+PASS session ownership
+PASS context stack boundary
+koi-test-summary run=4 pass=4 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"search_architecture_tests" end time: Sep 29 03:11 UTC
+"search_architecture_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+22/76 Testing: search_policy_tests
+22/76 Test: search_policy_tests
+Command: "/work/build/roadmap-current-linux-gcc14-release-modules-off-20260929/search_policy_tests"
+Directory: /work/build/roadmap-current-linux-gcc14-release-modules-off-20260929
+"search_policy_tests" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+PASS null move policy
+PASS dynamic null move policy
+PASS check extension policy
+PASS late move policy
+PASS quiet futility policy
+PASS quiescence capture policy
+PASS ordering table ownership
+PASS root verification mate provenance
+koi-test-summary run=8 pass=8 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"search_policy_tests" end time: Sep 29 03:11 UTC
+"search_policy_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+23/76 Testing: search_runtime_tests
+23/76 Test: search_runtime_tests
+Command: "/work/build/roadmap-current-linux-gcc14-release-modules-off-20260929/search_runtime_tests"
+Directory: /work/build/roadmap-current-linux-gcc14-release-modules-off-20260929
+"search_runtime_tests" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+PASS enabled table access
+PASS disabled table access
+PASS table access generation
+PASS local node budget
+PASS shared node budget
+koi-test-summary run=5 pass=5 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"search_runtime_tests" end time: Sep 29 03:11 UTC
+"search_runtime_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+24/76 Testing: policy_value_mcts_tests
+24/76 Test: policy_value_mcts_tests
+Command: "/work/build/roadmap-current-linux-gcc14-release-modules-off-20260929/policy_value_mcts_tests"
+Directory: /work/build/roadmap-current-linux-gcc14-release-modules-off-20260929
+"policy_value_mcts_tests" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+PASS MCTS visits, depth and deterministic prior selection
+PASS MCTS self-play root noise
+PASS MCTS checkmate WDL backup
+PASS MCTS multi-ply serial value and WDL backup
+PASS MCTS multi-ply batch value and WDL backup
+PASS MCTS bounded tree capacity
+PASS MCTS stop and evaluator failure
+PASS MCTS deadline interruption and recovery
+PASS MCTS claimable root draw ranking
+PASS MCTS bounded leaf batches
+PASS MCTS failed batch rollback
+PASS MCTS batch cancellation rollback
+PASS MCTS batch deadline rollback
+koi-test-summary run=13 pass=13 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"policy_value_mcts_tests" end time: Sep 29 03:11 UTC
+"policy_value_mcts_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+25/76 Testing: static_exchange_tests
+25/76 Test: static_exchange_tests
+Command: "/work/build/roadmap-current-linux-gcc14-release-modules-off-20260929/static_exchange_tests"
+Directory: /work/build/roadmap-current-linux-gcc14-release-modules-off-20260929
+"static_exchange_tests" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+PASS winning capture
+PASS poisoned capture
+PASS non-capture
+PASS quiet promotions
+PASS metadata exchange
+PASS en passant capture
+PASS capturing promotion
+PASS promotion recapture
+PASS pinned recapturer
+PASS unsafe king recapture
+PASS tactical SEE without feature snapshots
+koi-test-summary run=11 pass=11 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"static_exchange_tests" end time: Sep 29 03:11 UTC
+"static_exchange_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+26/76 Testing: transposition_table_tests
+26/76 Test: transposition_table_tests
+Command: "/work/build/roadmap-current-linux-gcc14-release-modules-off-20260929/transposition_table_tests"
+Directory: /work/build/roadmap-current-linux-gcc14-release-modules-off-20260929
+"transposition_table_tests" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+PASS transposition store and probe
+PASS transposition mate normalisation
+PASS transposition replacement depth
+PASS transposition generation ageing
+PASS transposition clear and hashfull
+PASS transposition resize bounds
+PASS transposition power of two rounding
+PASS transposition cluster masking
+PASS transposition concurrent access
+koi-test-summary run=9 pass=9 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =   0.02 sec
+----------------------------------------------------------
+Test Passed.
+"transposition_table_tests" end time: Sep 29 03:11 UTC
+"transposition_table_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+27/76 Testing: search_service_tests
+27/76 Test: search_service_tests
+Command: "/work/build/roadmap-current-linux-gcc14-release-modules-off-20260929/search_service_tests"
+Directory: /work/build/roadmap-current-linux-gcc14-release-modules-off-20260929
+"search_service_tests" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+PASS search service depth search
+PASS search service stop
+PASS search service evaluator swap
+PASS search service evaluator pinning
+PASS search service hash controls
+PASS search service sinkless search
+PASS search service ponderhit conversion
+PASS search service incremental hooks
+PASS interior tablebase hook cutoff
+PASS interior tablebase hook non-decisive
+PASS interior tablebase hook zero mate
+PASS interior tablebase hook fifty move
+PASS interior tablebase hook exception
+PASS interior tablebase default off
+koi-test-summary run=14 pass=14 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =   0.19 sec
+----------------------------------------------------------
+Test Passed.
+"search_service_tests" end time: Sep 29 03:11 UTC
+"search_service_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+28/76 Testing: koi_soak_tests
+28/76 Test: koi_soak_tests
+Command: "/work/build/roadmap-current-linux-gcc14-release-modules-off-20260929/koi_soak_tests"
+Directory: /work/build/roadmap-current-linux-gcc14-release-modules-off-20260929
+"koi_soak_tests" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+PASS long replay soak
+PASS hash resize soak
+PASS ponder cycle soak
+PASS thread sweep soak
+koi-test-summary run=4 pass=4 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =   1.72 sec
+----------------------------------------------------------
+Test Passed.
+"koi_soak_tests" end time: Sep 29 03:11 UTC
+"koi_soak_tests" time elapsed: 00:00:01
+----------------------------------------------------------
+
+29/76 Testing: classical_evaluator_tests
+29/76 Test: classical_evaluator_tests
+Command: "/work/build/roadmap-current-linux-gcc14-release-modules-off-20260929/classical_evaluator_tests"
+Directory: /work/build/roadmap-current-linux-gcc14-release-modules-off-20260929
+"classical_evaluator_tests" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+PASS classical evaluator perspective
+PASS classical evaluator breakdown sum
+PASS classical evaluator symmetric start
+PASS classical evaluator insufficient material
+PASS classical evaluator locked pawn wall
+PASS classical evaluator material
+PASS classical evaluator mobility
+PASS classical evaluator tempo gate
+PASS classical evaluator minor-piece draw scale
+PASS classical evaluator opposite-bishop scale
+PASS classical evaluator king activity taper
+PASS classical evaluator passed pawn king proximity
+PASS classical evaluator endgame fixture invariants
+koi-test-summary run=13 pass=13 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =   0.02 sec
+----------------------------------------------------------
+Test Passed.
+"classical_evaluator_tests" end time: Sep 29 03:11 UTC
+"classical_evaluator_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+30/76 Testing: evaluation_features_tests
+30/76 Test: evaluation_features_tests
+Command: "/work/build/roadmap-current-linux-gcc14-release-modules-off-20260929/evaluation_features_tests"
+Directory: /work/build/roadmap-current-linux-gcc14-release-modules-off-20260929
+"evaluation_features_tests" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+PASS evaluation features v1 startpos
+PASS evaluation features v2 startpos
+PASS evaluation features perspective
+PASS evaluation features sparse view
+PASS evaluation features pawn flags
+PASS evaluation features castling rights
+PASS evaluation features v4 startpos
+PASS evaluation features v4 midgame
+PASS evaluation features v4 king buckets
+PASS evaluation features v4 sparse view
+PASS evaluation features threat startpos
+PASS evaluation features threat golden
+PASS evaluation features threat dedupe
+PASS evaluation features threat families
+PASS evaluation features v5 merge
+koi-test-summary run=15 pass=15 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"evaluation_features_tests" end time: Sep 29 03:11 UTC
+"evaluation_features_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+31/76 Testing: policy_value_model_tests
+31/76 Test: policy_value_model_tests
+Command: "/work/build/roadmap-current-linux-gcc14-release-modules-off-20260929/policy_value_model_tests"
+Directory: /work/build/roadmap-current-linux-gcc14-release-modules-off-20260929
+"policy_value_model_tests" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+PASS policy/value v1 CPU inference and symmetry
+PASS policy/value v1 header and size rejection
+PASS policy/value v1 checksum and nonfinite rejection
+PASS policy/value inference input validation
+PASS policy/value v1 file loader
+koi-test-summary run=5 pass=5 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =   1.35 sec
+----------------------------------------------------------
+Test Passed.
+"policy_value_model_tests" end time: Sep 29 03:11 UTC
+"policy_value_model_tests" time elapsed: 00:00:01
+----------------------------------------------------------
+
+32/76 Testing: time_manager_tests
+32/76 Test: time_manager_tests
+Command: "/work/build/roadmap-current-linux-gcc14-release-modules-off-20260929/time_manager_tests"
+Directory: /work/build/roadmap-current-linux-gcc14-release-modules-off-20260929
+"time_manager_tests" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+PASS clock budget safety invariants
+PASS fast control keeps the clock
+PASS emergency pacing
+PASS movetime budget
+PASS frozen deadline
+PASS synthetic games never flag
+koi-test-summary run=6 pass=6 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"time_manager_tests" end time: Sep 29 03:11 UTC
+"time_manager_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+34/76 Testing: perft_tests
+34/76 Test: perft_tests
+Command: "/work/build/roadmap-current-linux-gcc14-release-modules-off-20260929/perft_tests"
+Directory: /work/build/roadmap-current-linux-gcc14-release-modules-off-20260929
+"perft_tests" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+PASS start-position perft
+PASS Kiwipete perft
+PASS endgame pin perft
+PASS interruptible perft count and restore
+PASS interruptible perft stop
+koi-test-summary run=5 pass=5 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =   0.13 sec
+----------------------------------------------------------
+Test Passed.
+"perft_tests" end time: Sep 29 03:11 UTC
+"perft_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+35/76 Testing: koi_replay_tests
+35/76 Test: koi_replay_tests
+Command: "/work/build/roadmap-current-linux-gcc14-release-modules-off-20260929/koi_replay_tests" "/work/build/roadmap-current-linux-gcc14-release-modules-off-20260929/koi-replay"
+Directory: /work/build/roadmap-current-linux-gcc14-release-modules-off-20260929
+"koi_replay_tests" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+PASS startpos replay
+PASS castling replay
+PASS en passant replay
+PASS promotion replay
+PASS illegal move transaction
+PASS checkmate classification
+PASS stalemate classification
+PASS rule draw classification
+PASS repetition draw classification
+usage: koi-replay <startpos|fen six-field-fen> [moves <coordinate>...]
+PASS stray move rejection
+koi-test-summary run=10 pass=10 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =   0.11 sec
+----------------------------------------------------------
+Test Passed.
+"koi_replay_tests" end time: Sep 29 03:11 UTC
+"koi_replay_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+14/76 Testing: uci_controller_tests
+14/76 Test: uci_controller_tests
+Command: "/work/build/roadmap-current-linux-gcc14-release-modules-off-20260929/uci_controller_tests"
+Directory: /work/build/roadmap-current-linux-gcc14-release-modules-off-20260929
+"uci_controller_tests" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+PASS uci handshake and options
+PASS Syzygy option values
+PASS legacy strength handshake
+PASS legacy strength unknown options
+PASS surviving UCI strength options
+PASS En Croissant option casing
+PASS Task 1 WDL
+PASS Task 1 hidden diagnostics
+PASS public option replacement
+PASS Task 6 StrengthMode
+PASS opening-book normal play
+PASS opening-book disabled by default
+PASS opening-book random option
+PASS opening-book safety option
+PASS opening-book fallback and bypass
+PASS opening-book MultiPV bypass
+PASS ponderhit book bypass
+PASS opening-book depth boundaries
+PASS opening-book option generation replacement
+PASS Hash and Clear Hash contract
+PASS large Hash safety
+PASS Threads and Speed validation
+PASS Threads and Speed generation replacement
+PASS Lucas analysis options and multipv output
+PASS Lucas analysis option generation replacement
+PASS ponderhit continuation lifecycle
+PASS immediate ponderhit completion
+PASS ponderhit shutdown suppression
+PASS idle ponderhit
+PASS ponder stop lifecycle
+PASS ponder root filtering
+PASS ponder terminal result
+PASS ready response
+PASS deterministic search
+PASS position startpos and FEN
+PASS go limits and malformed values
+PASS go limit parser exact mapping
+PASS go limit fallback and clocks
+PASS go limit parser Lucas root options
+PASS go limit parser fallback
+PASS Ponder PV emission
+PASS transactional invalid positions
+PASS terminal 0000
+PASS ready during search
+PASS position generation replacement
+PASS new game and hash generation replacement
+PASS ucinewgame clears the hash
+PASS debug command toggle
+PASS handshake option table
+PASS MCTS missing-model fallback
+PASS MCTS corrupt-model fallback
+PASS MCTS legal MultiPV and WDL
+PASS MCTS opt-in root visit output
+PASS MCTS threaded leaf evaluation
+PASS MCTS searchmoves root filter
+PASS MCTS stop, quit and EOF lifecycle
+PASS threaded MCTS lifecycle
+PASS MCTS ponder depth deepening
+PASS quit and EOF cleanup
+PASS unknown stop quit
+PASS protocol-clean output
+PASS selective root score provenance
+PASS promptly flushed responses
+PASS go mate mapping
+PASS legacy strength node cap
+PASS same-value option reapplication
+PASS ponder move without the option
+koi-test-summary run=67 pass=67 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =   7.88 sec
+----------------------------------------------------------
+Test Passed.
+"uci_controller_tests" end time: Sep 29 03:11 UTC
+"uci_controller_tests" time elapsed: 00:00:07
+----------------------------------------------------------
+
+36/76 Testing: koi_nnue_fixture_tests
+36/76 Test: koi_nnue_fixture_tests
+Command: "/work/build/roadmap-current-linux-gcc14-release-modules-off-20260929/koi_nnue_fixture_tests" "/work/build/roadmap-current-linux-gcc14-release-modules-off-20260929/koi-nnue-fixture"
+Directory: /work/build/roadmap-current-linux-gcc14-release-modules-off-20260929
+"koi_nnue_fixture_tests" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+PASS deterministic loadable architecture fixtures
+usage: koi-nnue-fixture --arch v4|v5 --output <path>
+usage: koi-nnue-fixture --arch v4|v5 --output <path>
+PASS invalid fixture arguments
+koi-test-summary run=2 pass=2 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =   4.50 sec
+----------------------------------------------------------
+Test Passed.
+"koi_nnue_fixture_tests" end time: Sep 29 03:11 UTC
+"koi_nnue_fixture_tests" time elapsed: 00:00:04
+----------------------------------------------------------
+
+39/76 Testing: run_tests_artifact_path
+39/76 Test: run_tests_artifact_path
+Command: "/usr/bin/pwsh" "-NoProfile" "-ExecutionPolicy" "Bypass" "-File" "/work/tests/integration/tools/run_tests_artifact_path_test.ps1" "-RunTestsPath" "/work/tools/test/run_tests.ps1" "-CMakePath" "/opt/koi-venv/lib/python3.12/site-packages/cmake/data/bin/cmake"
+Directory: /work
+"run_tests_artifact_path" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+ctest: /tmp/koi-run-tests-artifact-d61907a1f327487788c9b36b9655aade/fake-ctest.ps1 --test-dir /tmp/koi-run-tests-artifact-d61907a1f327487788c9b36b9655aade/build -C Release --output-on-failure -j 1 --output-junit /work/build/run-tests-artifact-9cc5a96303754728afd9c5443177bf61/ctest-junit.xml
+results: /work/build/run-tests-artifact-9cc5a96303754728afd9c5443177bf61
+run_tests.ps1 preserves JUnit and LastTest.log in the selected output directory.
+<end of output>
+Test time =   1.19 sec
+----------------------------------------------------------
+Test Passed.
+"run_tests_artifact_path" end time: Sep 29 03:11 UTC
+"run_tests_artifact_path" time elapsed: 00:00:01
+----------------------------------------------------------
+
+40/76 Testing: koi_engine_variant_process
+40/76 Test: koi_engine_variant_process
+Command: "/usr/bin/pwsh" "-NoProfile" "-ExecutionPolicy" "Bypass" "-File" "/work/tests/integration/uci/engine_variant_process_test.ps1" "-EnginePath" "/work/build/roadmap-current-linux-gcc14-release-modules-off-20260929/koi-engine" "-Avx2EnginePath" "/work/build/roadmap-current-linux-gcc14-release-modules-off-20260929/koi-engine-avx2" "-Avx512EnginePath" "/work/build/roadmap-current-linux-gcc14-release-modules-off-20260929/koi-engine-avx512"
+Directory: /work/build/roadmap-current-linux-gcc14-release-modules-off-20260929
+"koi_engine_variant_process" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   1.72 sec
+----------------------------------------------------------
+Test Passed.
+"koi_engine_variant_process" end time: Sep 29 03:11 UTC
+"koi_engine_variant_process" time elapsed: 00:00:01
+----------------------------------------------------------
+
+41/76 Testing: koi_engine_en_croissant_process
+41/76 Test: koi_engine_en_croissant_process
+Command: "/usr/bin/pwsh" "-NoProfile" "-ExecutionPolicy" "Bypass" "-File" "/work/tests/integration/uci/en_croissant_uci_test.ps1" "-EnginePath" "/work/build/roadmap-current-linux-gcc14-release-modules-off-20260929/koi-engine"
+Directory: /work/build/roadmap-current-linux-gcc14-release-modules-off-20260929
+"koi_engine_en_croissant_process" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+En Croissant UCI transcript passed.
+<end of output>
+Test time =   0.90 sec
+----------------------------------------------------------
+Test Passed.
+"koi_engine_en_croissant_process" end time: Sep 29 03:11 UTC
+"koi_engine_en_croissant_process" time elapsed: 00:00:00
+----------------------------------------------------------
+
+45/76 Testing: koi_stockfish_strength_option
+45/76 Test: koi_stockfish_strength_option
+Command: "/usr/bin/pwsh" "-NoProfile" "-ExecutionPolicy" "Bypass" "-File" "/work/tests/integration/matches/stockfish_strength_test.ps1" "-EnginePath" "/work/build/roadmap-current-linux-gcc14-release-modules-off-20260929/koi-engine"
+Directory: /work/build/roadmap-current-linux-gcc14-release-modules-off-20260929
+"koi_stockfish_strength_option" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+PASS stockfish strength option integration
+<end of output>
+Test time =   2.83 sec
+----------------------------------------------------------
+Test Passed.
+"koi_stockfish_strength_option" end time: Sep 29 03:11 UTC
+"koi_stockfish_strength_option" time elapsed: 00:00:02
+----------------------------------------------------------
+
+47/76 Testing: koi_sprt_compare_decision
+47/76 Test: koi_sprt_compare_decision
+Command: "/usr/bin/pwsh" "-NoProfile" "-ExecutionPolicy" "Bypass" "-File" "/work/tests/integration/matches/sprt_compare_decision_test.ps1"
+Directory: /work/build/roadmap-current-linux-gcc14-release-modules-off-20260929
+"koi_sprt_compare_decision" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+PASS combined SPRT decision uses aggregate evidence only
+<end of output>
+Test time =   0.60 sec
+----------------------------------------------------------
+Test Passed.
+"koi_sprt_compare_decision" end time: Sep 29 03:11 UTC
+"koi_sprt_compare_decision" time elapsed: 00:00:00
+----------------------------------------------------------
+
+48/76 Testing: release_candidate_games_python
+48/76 Test: release_candidate_games_python
+Command: "/opt/koi-venv/bin/python" "-m" "unittest" "tests/python/stability/release_candidate_games_test.py" "-v"
+Directory: /work
+"release_candidate_games_python" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+test_accepts_a_complete_legal_match_bundle (tests.python.stability.release_candidate_games_test.ReleaseCandidateGamesTest.test_accepts_a_complete_legal_match_bundle) ... ok
+test_accepts_attested_nnue_mode_when_expected_hash_matches (tests.python.stability.release_candidate_games_test.ReleaseCandidateGamesTest.test_accepts_attested_nnue_mode_when_expected_hash_matches) ... ok
+test_accepts_harness_rule_draw_termination (tests.python.stability.release_candidate_games_test.ReleaseCandidateGamesTest.test_accepts_harness_rule_draw_termination) ... ok
+test_accepts_max_plies_as_a_completed_bounded_uci_game (tests.python.stability.release_candidate_games_test.ReleaseCandidateGamesTest.test_accepts_max_plies_as_a_completed_bounded_uci_game) ... ok
+test_black_to_move_opening_allows_one_delayed_cap_ply (tests.python.stability.release_candidate_games_test.ReleaseCandidateGamesTest.test_black_to_move_opening_allows_one_delayed_cap_ply) ... ok
+test_cli_accepts_explicit_evaluator_mode_and_hash (tests.python.stability.release_candidate_games_test.ReleaseCandidateGamesTest.test_cli_accepts_explicit_evaluator_mode_and_hash) ... ok
+test_cli_labels_the_cute_chess_limit_as_full_moves (tests.python.stability.release_candidate_games_test.ReleaseCandidateGamesTest.test_cli_labels_the_cute_chess_limit_as_full_moves) ... ok
+test_full_move_cap_allows_one_delay_but_rejects_two_for_either_side (tests.python.stability.release_candidate_games_test.ReleaseCandidateGamesTest.test_full_move_cap_allows_one_delay_but_rejects_two_for_either_side) ... ok
+test_gpu_v5_requires_requested_gpu_marker_threads_and_no_fallback (tests.python.stability.release_candidate_games_test.ReleaseCandidateGamesTest.test_gpu_v5_requires_requested_gpu_marker_threads_and_no_fallback) ... ok
+test_max_moves_is_a_full_move_cap (tests.python.stability.release_candidate_games_test.ReleaseCandidateGamesTest.test_max_moves_is_a_full_move_cap) ... ok
+test_max_plies_cap_starts_after_the_curated_opening (tests.python.stability.release_candidate_games_test.ReleaseCandidateGamesTest.test_max_plies_cap_starts_after_the_curated_opening) ... ok
+test_opening_coverage_can_be_disabled_for_a_small_pilot (tests.python.stability.release_candidate_games_test.ReleaseCandidateGamesTest.test_opening_coverage_can_be_disabled_for_a_small_pilot) ... ok
+test_package_expectation_flags_are_available_through_cli (tests.python.stability.release_candidate_games_test.ReleaseCandidateGamesTest.test_package_expectation_flags_are_available_through_cli) ... ok
+test_package_expectations_accept_a_clean_matching_candidate_binding (tests.python.stability.release_candidate_games_test.ReleaseCandidateGamesTest.test_package_expectations_accept_a_clean_matching_candidate_binding) ... ok
+test_package_expectations_reject_forged_archive_source_dirty_and_executable (tests.python.stability.release_candidate_games_test.ReleaseCandidateGamesTest.test_package_expectations_reject_forged_archive_source_dirty_and_executable) ... ok
+test_rejects_a_malformed_present_package_binding_without_expectations (tests.python.stability.release_candidate_games_test.ReleaseCandidateGamesTest.test_rejects_a_malformed_present_package_binding_without_expectations) ... ok
+test_rejects_a_match_missing_curated_opening_coverage (tests.python.stability.release_candidate_games_test.ReleaseCandidateGamesTest.test_rejects_a_match_missing_curated_opening_coverage) ... ok
+test_rejects_actual_color_counts_that_disagree_with_requested_color (tests.python.stability.release_candidate_games_test.ReleaseCandidateGamesTest.test_rejects_actual_color_counts_that_disagree_with_requested_color) ... ok
+test_rejects_cute_chess_result_without_engine_play (tests.python.stability.release_candidate_games_test.ReleaseCandidateGamesTest.test_rejects_cute_chess_result_without_engine_play) ... ok
+test_rejects_illegal_or_unfinished_games (tests.python.stability.release_candidate_games_test.ReleaseCandidateGamesTest.test_rejects_illegal_or_unfinished_games) ... ok
+test_rejects_missing_or_rejected_nnue_attestation (tests.python.stability.release_candidate_games_test.ReleaseCandidateGamesTest.test_rejects_missing_or_rejected_nnue_attestation) ... ok
+test_rejects_process_failures_and_configuration_drift (tests.python.stability.release_candidate_games_test.ReleaseCandidateGamesTest.test_rejects_process_failures_and_configuration_drift) ... ok
+test_rejects_uci_missing_opponent_process_status (tests.python.stability.release_candidate_games_test.ReleaseCandidateGamesTest.test_rejects_uci_missing_opponent_process_status) ... ok
+test_rejects_uci_opening_only_result (tests.python.stability.release_candidate_games_test.ReleaseCandidateGamesTest.test_rejects_uci_opening_only_result) ... ok
+test_rejects_uci_protocol_and_process_failures (tests.python.stability.release_candidate_games_test.ReleaseCandidateGamesTest.test_rejects_uci_protocol_and_process_failures) ... ok
+test_rejects_uci_result_without_played_moves (tests.python.stability.release_candidate_games_test.ReleaseCandidateGamesTest.test_rejects_uci_result_without_played_moves) ... ok
+test_short_opening_is_not_mistaken_for_a_longer_matching_prefix (tests.python.stability.release_candidate_games_test.ReleaseCandidateGamesTest.test_short_opening_is_not_mistaken_for_a_longer_matching_prefix) ... ok
+
+----------------------------------------------------------------------
+Ran 27 tests in 0.432s
+
+OK
+<end of output>
+Test time =   0.71 sec
+----------------------------------------------------------
+Test Passed.
+"release_candidate_games_python" end time: Sep 29 03:11 UTC
+"release_candidate_games_python" time elapsed: 00:00:00
+----------------------------------------------------------
+
+49/76 Testing: release_strength_openings_python
+49/76 Test: release_strength_openings_python
+Command: "/opt/koi-venv/bin/python" "-m" "unittest" "tests/python/stability/release_strength_openings_test.py" "-v"
+Directory: /work
+"release_strength_openings_python" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+test_iid_sample_is_deterministic_legal_and_has_160_named_draws (tests.python.stability.release_strength_openings_test.ReleaseStrengthOpeningsTest.test_iid_sample_is_deterministic_legal_and_has_160_named_draws) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.203s
+
+OK
+<end of output>
+Test time =   0.49 sec
+----------------------------------------------------------
+Test Passed.
+"release_strength_openings_python" end time: Sep 29 03:11 UTC
+"release_strength_openings_python" time elapsed: 00:00:00
+----------------------------------------------------------
+
+50/76 Testing: strength_bound_python
+50/76 Test: strength_bound_python
+Command: "/opt/koi-venv/bin/python" "-m" "unittest" "tests/python/stability/strength_bound_test.py" "-v"
+Directory: /work
+"strength_bound_python" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+test_candidate_and_baseline_effective_book_settings_must_match (tests.python.stability.strength_bound_test.StrengthBoundTests.test_candidate_and_baseline_effective_book_settings_must_match) ... ok
+test_configuration_mismatch_is_rejected (tests.python.stability.strength_bound_test.StrengthBoundTests.test_configuration_mismatch_is_rejected) ... ok
+test_forged_replay_legal_flag_does_not_make_illegal_move_valid (tests.python.stability.strength_bound_test.StrengthBoundTests.test_forged_replay_legal_flag_does_not_make_illegal_move_valid) ... ok
+test_non_reversed_or_different_opening_pairs_are_rejected (tests.python.stability.strength_bound_test.StrengthBoundTests.test_non_reversed_or_different_opening_pairs_are_rejected) ... ok
+test_opening_prefix_without_engine_play_is_rejected (tests.python.stability.strength_bound_test.StrengthBoundTests.test_opening_prefix_without_engine_play_is_rejected) ... ok
+test_pairs_color_reversed_games_and_reports_explicit_cap_draws (tests.python.stability.strength_bound_test.StrengthBoundTests.test_pairs_color_reversed_games_and_reports_explicit_cap_draws) ... ok
+test_pgn_movetext_must_match_json_moves (tests.python.stability.strength_bound_test.StrengthBoundTests.test_pgn_movetext_must_match_json_moves) ... ok
+test_positive_adverse_count_uses_exact_cp_bound (tests.python.stability.strength_bound_test.StrengthBoundTests.test_positive_adverse_count_uses_exact_cp_bound) ... ok
+test_result_headers_without_played_moves_are_rejected (tests.python.stability.strength_bound_test.StrengthBoundTests.test_result_headers_without_played_moves_are_rejected) ... ok
+test_same_opening_names_with_different_moves_are_rejected (tests.python.stability.strength_bound_test.StrengthBoundTests.test_same_opening_names_with_different_moves_are_rejected) ... ok
+test_wrong_candidate_hash_is_rejected (tests.python.stability.strength_bound_test.StrengthBoundTests.test_wrong_candidate_hash_is_rejected) ... ok
+test_zero_adverse_pairs_uses_exact_cp_bound_and_can_clear_minus_ten (tests.python.stability.strength_bound_test.StrengthBoundTests.test_zero_adverse_pairs_uses_exact_cp_bound_and_can_clear_minus_ten) ... ok
+
+----------------------------------------------------------------------
+Ran 12 tests in 2.990s
+
+OK
+<end of output>
+Test time =   3.15 sec
+----------------------------------------------------------
+Test Passed.
+"strength_bound_python" end time: Sep 29 03:11 UTC
+"strength_bound_python" time elapsed: 00:00:03
+----------------------------------------------------------
+
+51/76 Testing: elo_oracle_python
+51/76 Test: elo_oracle_python
+Command: "/opt/koi-venv/bin/python" "-m" "unittest" "tests/python/measurement/elo_oracle_test.py" "-v"
+Directory: /work
+"elo_oracle_python" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+test_analysis_records_separate_cpl_values_and_engine_options (tests.python.measurement.elo_oracle_test.EloOracleExtractionTests.test_analysis_records_separate_cpl_values_and_engine_options) ... ok
+test_analysis_requires_external_engine_paths (tests.python.measurement.elo_oracle_test.EloOracleExtractionTests.test_analysis_requires_external_engine_paths) ... ok
+test_book_audit_entrypoint_defaults_to_a_repository_artifact (tests.python.measurement.elo_oracle_test.EloOracleExtractionTests.test_book_audit_entrypoint_defaults_to_a_repository_artifact) ... ok
+test_book_audit_entrypoint_forwards_to_the_existing_report_schema (tests.python.measurement.elo_oracle_test.EloOracleExtractionTests.test_book_audit_entrypoint_forwards_to_the_existing_report_schema) ... ok
+test_book_audit_keeps_book_hits_and_cpl_outside_search_metrics (tests.python.measurement.elo_oracle_test.EloOracleExtractionTests.test_book_audit_keeps_book_hits_and_cpl_outside_search_metrics) ... ok
+test_classify_cpl_uses_stable_forensic_bands (tests.python.measurement.elo_oracle_test.EloOracleExtractionTests.test_classify_cpl_uses_stable_forensic_bands) ... ok
+test_cli_rejects_threads_other_than_the_approved_four (tests.python.measurement.elo_oracle_test.EloOracleExtractionTests.test_cli_rejects_threads_other_than_the_approved_four) ... ok
+test_cpl_is_loss_from_the_moving_side (tests.python.measurement.elo_oracle_test.EloOracleExtractionTests.test_cpl_is_loss_from_the_moving_side) ... ok
+test_extract_only_defaults_to_a_repository_artifact_and_announces_path (tests.python.measurement.elo_oracle_test.EloOracleExtractionTests.test_extract_only_defaults_to_a_repository_artifact_and_announces_path) ... ok
+test_extract_only_records_mainline_san_positions_and_metadata (tests.python.measurement.elo_oracle_test.EloOracleExtractionTests.test_extract_only_records_mainline_san_positions_and_metadata) ... ok
+test_extract_preserves_annotations_on_mainline_positions (tests.python.measurement.elo_oracle_test.EloOracleExtractionTests.test_extract_preserves_annotations_on_mainline_positions) ... ok
+test_match_entrypoint_preserves_zero_random_seed_and_shell_free_arguments (tests.python.measurement.elo_oracle_test.EloOracleExtractionTests.test_match_entrypoint_preserves_zero_random_seed_and_shell_free_arguments) ... ok
+test_named_tool_entrypoints_have_safe_help_without_starting_engines (tests.python.measurement.elo_oracle_test.EloOracleExtractionTests.test_named_tool_entrypoints_have_safe_help_without_starting_engines) ... ok
+test_normalize_score_uses_white_perspective_and_fixed_mate_scale (tests.python.measurement.elo_oracle_test.EloOracleExtractionTests.test_normalize_score_uses_white_perspective_and_fixed_mate_scale) ... ok
+test_parse_stockfish_terminal_none_bestmove_as_no_move (tests.python.measurement.elo_oracle_test.EloOracleExtractionTests.test_parse_stockfish_terminal_none_bestmove_as_no_move) ... ok
+
+----------------------------------------------------------------------
+Ran 15 tests in 2.766s
+
+OK
+<end of output>
+Test time =   2.95 sec
+----------------------------------------------------------
+Test Passed.
+"elo_oracle_python" end time: Sep 29 03:11 UTC
+"elo_oracle_python" time elapsed: 00:00:02
+----------------------------------------------------------
+
+52/76 Testing: elo_estimate_python
+52/76 Test: elo_estimate_python
+Command: "/opt/koi-venv/bin/python" "-m" "unittest" "tests/python/measurement/elo_estimate_test.py" "-v"
+Directory: /work
+"elo_estimate_python" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+test_all_anchor_dry_run_records_sweep_and_schedule_provenance (tests.python.measurement.elo_estimate_test.EloEstimateTests.test_all_anchor_dry_run_records_sweep_and_schedule_provenance) ... ok
+test_all_anchor_schedule_exports_and_imports_every_initial_anchor (tests.python.measurement.elo_estimate_test.EloEstimateTests.test_all_anchor_schedule_exports_and_imports_every_initial_anchor) ... ok
+test_anchor_manifest_requires_schema_matching_stockfish_and_lower_anchor_when_needed (tests.python.measurement.elo_estimate_test.EloEstimateTests.test_anchor_manifest_requires_schema_matching_stockfish_and_lower_anchor_when_needed) ... ok
+test_calibration_sweep_includes_each_anchor_before_adaptive_sampling (tests.python.measurement.elo_estimate_test.EloEstimateTests.test_calibration_sweep_includes_each_anchor_before_adaptive_sampling) ... ok
+test_calibration_sweep_requires_one_initial_batch_for_each_anchor (tests.python.measurement.elo_estimate_test.EloEstimateTests.test_calibration_sweep_requires_one_initial_batch_for_each_anchor) ... ok
+test_dry_run_validates_and_writes_full_schedule_without_launching (tests.python.measurement.elo_estimate_test.EloEstimateTests.test_dry_run_validates_and_writes_full_schedule_without_launching) ... ok
+test_fit_uses_jeffreys_smoothing_and_reports_bounds_outside_bracket (tests.python.measurement.elo_estimate_test.EloEstimateTests.test_fit_uses_jeffreys_smoothing_and_reports_bounds_outside_bracket) ... ok
+test_logistic_helpers_have_known_50_75_and_25_percent_values (tests.python.measurement.elo_estimate_test.EloEstimateTests.test_logistic_helpers_have_known_50_75_and_25_percent_values) ... ok
+test_low_confidence_non_dry_run_adds_an_adaptive_64_game_batch_up_to_maximum (tests.python.measurement.elo_estimate_test.EloEstimateTests.test_low_confidence_non_dry_run_adds_an_adaptive_64_game_batch_up_to_maximum) ... ok
+test_mocked_non_dry_run_invokes_powershell_harness_and_preserves_artifacts (tests.python.measurement.elo_estimate_test.EloEstimateTests.test_mocked_non_dry_run_invokes_powershell_harness_and_preserves_artifacts) ... ok
+test_no_book_and_book_options_are_distinct_and_book_random_is_false (tests.python.measurement.elo_estimate_test.EloEstimateTests.test_no_book_and_book_options_are_distinct_and_book_random_is_false) ... ok
+test_paired_bootstrap_is_deterministic_uses_2000_samples_and_has_ci (tests.python.measurement.elo_estimate_test.EloEstimateTests.test_paired_bootstrap_is_deterministic_uses_2000_samples_and_has_ci) ... ok
+test_report_validation_binds_opening_positions_to_the_requested_sequences (tests.python.measurement.elo_estimate_test.EloEstimateTests.test_report_validation_binds_opening_positions_to_the_requested_sequences) ... ok
+test_report_validation_rejects_conflicting_options_and_configuration_drift (tests.python.measurement.elo_estimate_test.EloEstimateTests.test_report_validation_rejects_conflicting_options_and_configuration_drift) ... ok
+test_reproducibility_hash_excludes_timestamp_fields (tests.python.measurement.elo_estimate_test.EloEstimateTests.test_reproducibility_hash_excludes_timestamp_fields) ... ok
+test_result_normalization_and_report_validation_rejects_bad_game_evidence (tests.python.measurement.elo_estimate_test.EloEstimateTests.test_result_normalization_and_report_validation_rejects_bad_game_evidence) ... ok
+test_schedule_cli_options_are_available_for_reproducible_before_after_runs (tests.python.measurement.elo_estimate_test.EloEstimateTests.test_schedule_cli_options_are_available_for_reproducible_before_after_runs) ... ok
+test_schedule_import_rejects_inconsistent_target_and_missing_opening_contract (tests.python.measurement.elo_estimate_test.EloEstimateTests.test_schedule_import_rejects_inconsistent_target_and_missing_opening_contract) ... ok
+test_schedule_sizes_are_exact_and_initial_batch_brackets_prior (tests.python.measurement.elo_estimate_test.EloEstimateTests.test_schedule_sizes_are_exact_and_initial_batch_brackets_prior) ... ok
+
+----------------------------------------------------------------------
+Ran 19 tests in 1.719s
+
+OK
+report /tmp/tmpf5rj_t3w/dry-run.json
+report /tmp/tmpgk92g97k/external-report.json
+report /tmp/tmpa4rdb95w/external-report.json
+report /tmp/tmpniv_e9ds/external-report.json
+<end of output>
+Test time =   1.92 sec
+----------------------------------------------------------
+Test Passed.
+"elo_estimate_python" end time: Sep 29 03:11 UTC
+"elo_estimate_python" time elapsed: 00:00:01
+----------------------------------------------------------
+
+53/76 Testing: stockfish_match_python
+53/76 Test: stockfish_match_python
+Command: "/opt/koi-venv/bin/python" "-m" "unittest" "tests/python/measurement/stockfish_match_test.py" "-v"
+Directory: /work
+"stockfish_match_python" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+test_book_random_and_explicit_opponent_elo_are_forwarded_and_clamped (tests.python.measurement.stockfish_match_test.StockfishMatchOptionsTests.test_book_random_and_explicit_opponent_elo_are_forwarded_and_clamped) ... ok
+test_defaults_keep_hash_16_and_send_book_random_false_for_koi (tests.python.measurement.stockfish_match_test.StockfishMatchOptionsTests.test_defaults_keep_hash_16_and_send_book_random_false_for_koi) ... ok
+test_explicit_opponent_elo_is_forwarded (tests.python.measurement.stockfish_match_test.StockfishMatchOptionsTests.test_explicit_opponent_elo_is_forwarded) ... ok
+test_invalid_book_random_and_opponent_elo_are_rejected (tests.python.measurement.stockfish_match_test.StockfishMatchOptionsTests.test_invalid_book_random_and_opponent_elo_are_rejected) ... ok
+test_operator_documentation_covers_strength_aliases_clamping_and_omission (tests.python.measurement.stockfish_match_test.StockfishMatchOptionsTests.test_operator_documentation_covers_strength_aliases_clamping_and_omission) ... ok
+test_paired_run_metadata_is_forwarded_to_the_uci_harness (tests.python.measurement.stockfish_match_test.StockfishMatchOptionsTests.test_paired_run_metadata_is_forwarded_to_the_uci_harness) ... ok
+
+----------------------------------------------------------------------
+Ran 6 tests in 0.038s
+
+OK
+<end of output>
+Test time =   0.21 sec
+----------------------------------------------------------
+Test Passed.
+"stockfish_match_python" end time: Sep 29 03:11 UTC
+"stockfish_match_python" time elapsed: 00:00:00
+----------------------------------------------------------
+
+54/76 Testing: elo_openings_python
+54/76 Test: elo_openings_python
+Command: "/opt/koi-venv/bin/python" "-m" "unittest" "tests/python/measurement/elo_openings_test.py" "-v"
+Directory: /work
+"elo_openings_python" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+test_corpus_has_32_legal_named_opening_lines (tests.python.measurement.elo_openings_test.EloOpeningCorpusTests.test_corpus_has_32_legal_named_opening_lines) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.329s
+
+OK
+<end of output>
+Test time =   0.45 sec
+----------------------------------------------------------
+Test Passed.
+"elo_openings_python" end time: Sep 29 03:11 UTC
+"elo_openings_python" time elapsed: 00:00:00
+----------------------------------------------------------
+
+55/76 Testing: tune_eval_python
+55/76 Test: tune_eval_python
+Command: "/opt/koi-venv/bin/python" "-m" "unittest" "tests/python/evaluation/tune_eval_test.py" "-v"
+Directory: /work
+"tune_eval_python" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+test_output_tracks_every_canonical_parameter (tests.python.evaluation.tune_eval_test.TuneEvalTest.test_output_tracks_every_canonical_parameter) ... ok
+test_split_corpora_emit_independent_hashes_and_counts (tests.python.evaluation.tune_eval_test.TuneEvalTest.test_split_corpora_emit_independent_hashes_and_counts) ... ok
+
+----------------------------------------------------------------------
+Ran 2 tests in 0.446s
+
+OK
+<end of output>
+Test time =   0.57 sec
+----------------------------------------------------------
+Test Passed.
+"tune_eval_python" end time: Sep 29 03:11 UTC
+"tune_eval_python" time elapsed: 00:00:00
+----------------------------------------------------------
+
+56/76 Testing: nnue_training_python
+56/76 Test: nnue_training_python
+Command: "/opt/koi-venv/bin/python" "-m" "unittest" "tests/python/evaluation/nnue_training_test.py" "-v"
+Directory: /work
+"nnue_training_python" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+test_manifest_input_resolves_relative_split_paths (tests.python.evaluation.nnue_training_test.NnueTrainingBoundaryTest.test_manifest_input_resolves_relative_split_paths) ... ok
+test_synthetic_export_is_deterministic_and_records_provenance (tests.python.evaluation.nnue_training_test.NnueTrainingBoundaryTest.test_synthetic_export_is_deterministic_and_records_provenance) ... ok
+test_synthetic_export_is_small_corpus_and_gpu_independent (tests.python.evaluation.nnue_training_test.NnueTrainingBoundaryTest.test_synthetic_export_is_small_corpus_and_gpu_independent) ... ok
+test_torch_backend_reports_missing_optional_dependency (tests.python.evaluation.nnue_training_test.NnueTrainingBoundaryTest.test_torch_backend_reports_missing_optional_dependency) ... ok
+test_torch_export_is_a_v3_container_with_small_quantization_error (tests.python.evaluation.nnue_training_test.NnueTrainingBoundaryTest.test_torch_export_is_a_v3_container_with_small_quantization_error) ... skipped 'PyTorch is not installed; the torch backend is unavailable'
+
+----------------------------------------------------------------------
+Ran 5 tests in 1.330s
+
+OK (skipped=1)
+<end of output>
+Test time =   1.48 sec
+----------------------------------------------------------
+Test Passed.
+"nnue_training_python" end time: Sep 29 03:11 UTC
+"nnue_training_python" time elapsed: 00:00:01
+----------------------------------------------------------
+
+57/76 Testing: nnue_wrapper_python
+57/76 Test: nnue_wrapper_python
+Command: "/opt/koi-venv/bin/python" "-m" "unittest" "tests/python/evaluation/nnue_wrapper_test.py" "-v"
+Directory: /work
+"nnue_wrapper_python" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+test_export_wrapper_exposes_the_same_versioned_cli (tests.python.evaluation.nnue_wrapper_test.NnueWrapperTest.test_export_wrapper_exposes_the_same_versioned_cli) ... ok
+test_training_wrapper_exposes_the_koi_nnue_cli (tests.python.evaluation.nnue_wrapper_test.NnueWrapperTest.test_training_wrapper_exposes_the_koi_nnue_cli) ... ok
+
+----------------------------------------------------------------------
+Ran 2 tests in 0.222s
+
+OK
+<end of output>
+Test time =   0.34 sec
+----------------------------------------------------------
+Test Passed.
+"nnue_wrapper_python" end time: Sep 29 03:11 UTC
+"nnue_wrapper_python" time elapsed: 00:00:00
+----------------------------------------------------------
+
+58/76 Testing: koi_dataset_python
+58/76 Test: koi_dataset_python
+Command: "/opt/koi-venv/bin/python" "-m" "unittest" "tests/python/evaluation/koi_dataset_test.py" "-v"
+Directory: /work
+"koi_dataset_python" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+test_black_startpos_mirrors_to_the_same_indices (tests.python.evaluation.koi_dataset_test.KoiDatasetTest.test_black_startpos_mirrors_to_the_same_indices) ... ok
+test_capacity_bound_holds_over_random_games (tests.python.evaluation.koi_dataset_test.KoiDatasetTest.test_capacity_bound_holds_over_random_games) ... ok
+test_combined_v5_merges_both_groups (tests.python.evaluation.koi_dataset_test.KoiDatasetTest.test_combined_v5_merges_both_groups) ... ok
+test_encode_round_trip_is_deterministic (tests.python.evaluation.koi_dataset_test.KoiDatasetTest.test_encode_round_trip_is_deterministic) ... ok
+test_encode_skips_malformed_and_out_of_range_rows (tests.python.evaluation.koi_dataset_test.KoiDatasetTest.test_encode_skips_malformed_and_out_of_range_rows) ... ok
+test_existing_output_requires_resume (tests.python.evaluation.koi_dataset_test.KoiDatasetTest.test_existing_output_requires_resume) ... ok
+test_info_reports_the_header (tests.python.evaluation.koi_dataset_test.KoiDatasetTest.test_info_reports_the_header) ... ok
+test_king_bucket_uses_mirrored_file_and_rank_zone (tests.python.evaluation.koi_dataset_test.KoiDatasetTest.test_king_bucket_uses_mirrored_file_and_rank_zone) ... ok
+test_output_bucket_uses_piece_count (tests.python.evaluation.koi_dataset_test.KoiDatasetTest.test_output_bucket_uses_piece_count) ... ok
+test_resume_checkpoint_finishes_with_identical_bytes (tests.python.evaluation.koi_dataset_test.KoiDatasetTest.test_resume_checkpoint_finishes_with_identical_bytes) ... ok
+test_startpos_indices_match_pinned_golden_list (tests.python.evaluation.koi_dataset_test.KoiDatasetTest.test_startpos_indices_match_pinned_golden_list) ... ok
+test_threat_dedupe_and_family_offsets (tests.python.evaluation.koi_dataset_test.KoiDatasetTest.test_threat_dedupe_and_family_offsets) ... ok
+test_threat_golden_vectors (tests.python.evaluation.koi_dataset_test.KoiDatasetTest.test_threat_golden_vectors) ... ok
+test_v1_reader_retains_the_legacy_header (tests.python.evaluation.koi_dataset_test.KoiDatasetTest.test_v1_reader_retains_the_legacy_header) ... ok
+
+----------------------------------------------------------------------
+Ran 14 tests in 3.418s
+
+OK
+<end of output>
+Test time =   3.65 sec
+----------------------------------------------------------
+Test Passed.
+"koi_dataset_python" end time: Sep 29 03:11 UTC
+"koi_dataset_python" time elapsed: 00:00:03
+----------------------------------------------------------
+
+59/76 Testing: koi_chess_python
+59/76 Test: koi_chess_python
+Command: "/opt/koi-venv/bin/python" "-m" "unittest" "tests/python/rules/koi_chess_test.py" "-v"
+Directory: /work
+"koi_chess_python" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+test_attacks_list_matches_mask (tests.python.rules.koi_chess_test.AttackTests.test_attacks_list_matches_mask) ... ok
+test_attacks_mask_of_empty_square_is_zero (tests.python.rules.koi_chess_test.AttackTests.test_attacks_mask_of_empty_square_is_zero) ... ok
+test_check_detection (tests.python.rules.koi_chess_test.AttackTests.test_check_detection) ... ok
+test_kiwipete_attack_masks (tests.python.rules.koi_chess_test.AttackTests.test_kiwipete_attack_masks) ... ok
+test_starting_position_attack_masks (tests.python.rules.koi_chess_test.AttackTests.test_starting_position_attack_masks) ... ok
+test_copy_isolated_from_the_original (tests.python.rules.koi_chess_test.CoreTypeTests.test_copy_isolated_from_the_original) ... ok
+test_move_uci_round_trip (tests.python.rules.koi_chess_test.CoreTypeTests.test_move_uci_round_trip) ... ok
+test_piece_at_and_piece_map (tests.python.rules.koi_chess_test.CoreTypeTests.test_piece_at_and_piece_map) ... ok
+test_piece_symbols_round_trip (tests.python.rules.koi_chess_test.CoreTypeTests.test_piece_symbols_round_trip) ... ok
+test_push_pop_restores_the_position (tests.python.rules.koi_chess_test.CoreTypeTests.test_push_pop_restores_the_position) ... ok
+test_square_helpers (tests.python.rules.koi_chess_test.CoreTypeTests.test_square_helpers) ... ok
+test_en_passant_field_hidden_when_capture_is_pinned (tests.python.rules.koi_chess_test.FenTests.test_en_passant_field_hidden_when_capture_is_pinned) ... ok
+test_en_passant_field_kept_when_capture_is_legal (tests.python.rules.koi_chess_test.FenTests.test_en_passant_field_kept_when_capture_is_legal) ... ok
+test_en_passant_field_only_written_when_capture_is_legal (tests.python.rules.koi_chess_test.FenTests.test_en_passant_field_only_written_when_capture_is_legal) ... ok
+test_fen_round_trips_for_standard_positions (tests.python.rules.koi_chess_test.FenTests.test_fen_round_trips_for_standard_positions) ... ok
+test_invalid_fen_is_rejected (tests.python.rules.koi_chess_test.FenTests.test_invalid_fen_is_rejected) ... ok
+test_partial_fen_fields_default (tests.python.rules.koi_chess_test.FenTests.test_partial_fen_fields_default) ... ok
+test_starting_position_round_trips (tests.python.rules.koi_chess_test.FenTests.test_starting_position_round_trips) ... ok
+test_castling_moves_are_generated (tests.python.rules.koi_chess_test.MovegenTests.test_castling_moves_are_generated) ... ok
+test_castling_rights_are_lost_when_the_king_moves (tests.python.rules.koi_chess_test.MovegenTests.test_castling_rights_are_lost_when_the_king_moves) ... ok
+test_en_passant_capture_is_generated_and_applied (tests.python.rules.koi_chess_test.MovegenTests.test_en_passant_capture_is_generated_and_applied) ... ok
+test_perft_kiwipete (tests.python.rules.koi_chess_test.MovegenTests.test_perft_kiwipete) ... ok
+test_perft_position_five (tests.python.rules.koi_chess_test.MovegenTests.test_perft_position_five) ... ok
+test_perft_position_four (tests.python.rules.koi_chess_test.MovegenTests.test_perft_position_four) ... ok
+test_perft_position_six (tests.python.rules.koi_chess_test.MovegenTests.test_perft_position_six) ... ok
+test_perft_position_three (tests.python.rules.koi_chess_test.MovegenTests.test_perft_position_three) ... ok
+test_perft_starting_position (tests.python.rules.koi_chess_test.MovegenTests.test_perft_starting_position) ... ok
+test_promotions_include_all_pieces (tests.python.rules.koi_chess_test.MovegenTests.test_promotions_include_all_pieces) ... ok
+test_starting_position_has_twenty_moves (tests.python.rules.koi_chess_test.MovegenTests.test_starting_position_has_twenty_moves) ... ok
+test_checkmate (tests.python.rules.koi_chess_test.OutcomeTests.test_checkmate) ... ok
+test_fifty_move_claim (tests.python.rules.koi_chess_test.OutcomeTests.test_fifty_move_claim) ... ok
+test_fivefold_repetition (tests.python.rules.koi_chess_test.OutcomeTests.test_fivefold_repetition) ... ok
+test_insufficient_material (tests.python.rules.koi_chess_test.OutcomeTests.test_insufficient_material) ... ok
+test_seventyfive_move_rule (tests.python.rules.koi_chess_test.OutcomeTests.test_seventyfive_move_rule) ... ok
+test_stalemate (tests.python.rules.koi_chess_test.OutcomeTests.test_stalemate) ... ok
+test_threefold_repetition_claim (tests.python.rules.koi_chess_test.OutcomeTests.test_threefold_repetition_claim) ... ok
+test_legal_playouts_stay_consistent (tests.python.rules.koi_chess_test.RandomPlayoutTests.test_legal_playouts_stay_consistent) ... ok
+test_capture_san (tests.python.rules.koi_chess_test.SanTests.test_capture_san) ... ok
+test_castling_san (tests.python.rules.koi_chess_test.SanTests.test_castling_san) ... ok
+test_en_passant_san (tests.python.rules.koi_chess_test.SanTests.test_en_passant_san) ... ok
+test_file_disambiguation_san (tests.python.rules.koi_chess_test.SanTests.test_file_disambiguation_san) ... ok
+test_mate_san (tests.python.rules.koi_chess_test.SanTests.test_mate_san) ... ok
+test_parse_san_accepts_common_spellings (tests.python.rules.koi_chess_test.SanTests.test_parse_san_accepts_common_spellings) ... ok
+test_parse_san_round_trips_every_legal_move (tests.python.rules.koi_chess_test.SanTests.test_parse_san_round_trips_every_legal_move) ... ok
+test_promotion_and_check_san (tests.python.rules.koi_chess_test.SanTests.test_promotion_and_check_san) ... ok
+
+----------------------------------------------------------------------
+Ran 45 tests in 6.569s
+
+OK
+<end of output>
+Test time =   6.81 sec
+----------------------------------------------------------
+Test Passed.
+"koi_chess_python" end time: Sep 29 03:11 UTC
+"koi_chess_python" time elapsed: 00:00:06
+----------------------------------------------------------
+
+60/76 Testing: koi_chess_pgn_python
+60/76 Test: koi_chess_pgn_python
+Command: "/opt/koi-venv/bin/python" "-m" "unittest" "tests/python/rules/koi_chess_pgn_test.py" "-v"
+Directory: /work
+"koi_chess_pgn_python" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+test_fen_header_creates_the_root_position (tests.python.rules.koi_chess_pgn_test.FenSetupTests.test_fen_header_creates_the_root_position) ... ok
+test_invalid_fen_is_reported_and_keeps_the_starting_position (tests.python.rules.koi_chess_pgn_test.FenSetupTests.test_invalid_fen_is_reported_and_keeps_the_starting_position) ... ok
+test_setup_zero_still_applies_the_fen_header (tests.python.rules.koi_chess_pgn_test.FenSetupTests.test_setup_zero_still_applies_the_fen_header) ... ok
+test_default_headers_and_order (tests.python.rules.koi_chess_pgn_test.HeaderTests.test_default_headers_and_order) ... ok
+test_duplicate_header_last_wins (tests.python.rules.koi_chess_pgn_test.HeaderTests.test_duplicate_header_last_wins) ... ok
+test_extra_headers_append_in_file_order (tests.python.rules.koi_chess_pgn_test.HeaderTests.test_extra_headers_append_in_file_order) ... ok
+test_header_keys_are_case_sensitive (tests.python.rules.koi_chess_pgn_test.HeaderTests.test_header_keys_are_case_sensitive) ... ok
+test_black_ellipsis_move_number (tests.python.rules.koi_chess_pgn_test.MovetextTests.test_black_ellipsis_move_number) ... ok
+test_blank_line_inside_variation_ends_the_game (tests.python.rules.koi_chess_pgn_test.MovetextTests.test_blank_line_inside_variation_ends_the_game) ... ok
+test_comment_before_any_move_is_ignored (tests.python.rules.koi_chess_pgn_test.MovetextTests.test_comment_before_any_move_is_ignored) ... ok
+test_comments_and_nags_attach_to_the_previous_move (tests.python.rules.koi_chess_pgn_test.MovetextTests.test_comments_and_nags_attach_to_the_previous_move) ... ok
+test_elo_oracle_fixture (tests.python.rules.koi_chess_pgn_test.MovetextTests.test_elo_oracle_fixture) ... ok
+test_illegal_first_move_reports_an_error (tests.python.rules.koi_chess_pgn_test.MovetextTests.test_illegal_first_move_reports_an_error) ... ok
+test_illegal_move_is_reported_and_stops_the_mainline (tests.python.rules.koi_chess_pgn_test.MovetextTests.test_illegal_move_is_reported_and_stops_the_mainline) ... ok
+test_mainline_excludes_the_root (tests.python.rules.koi_chess_pgn_test.MovetextTests.test_mainline_excludes_the_root) ... ok
+test_move_numbers_with_and_without_spaces (tests.python.rules.koi_chess_pgn_test.MovetextTests.test_move_numbers_with_and_without_spaces) ... ok
+test_multiline_comment_keeps_blank_lines (tests.python.rules.koi_chess_pgn_test.MovetextTests.test_multiline_comment_keeps_blank_lines) ... ok
+test_multiple_comments_are_joined (tests.python.rules.koi_chess_pgn_test.MovetextTests.test_multiple_comments_are_joined) ... ok
+test_nested_variations_are_skipped (tests.python.rules.koi_chess_pgn_test.MovetextTests.test_nested_variations_are_skipped) ... ok
+test_novelty_markers_and_glued_annotations (tests.python.rules.koi_chess_pgn_test.MovetextTests.test_novelty_markers_and_glued_annotations) ... ok
+test_percent_escape_lines_are_skipped (tests.python.rules.koi_chess_pgn_test.MovetextTests.test_percent_escape_lines_are_skipped) ... ok
+test_plain_trailing_letter_is_illegal (tests.python.rules.koi_chess_pgn_test.MovetextTests.test_plain_trailing_letter_is_illegal) ... ok
+test_semicolon_comment_is_ignored (tests.python.rules.koi_chess_pgn_test.MovetextTests.test_semicolon_comment_is_ignored) ... ok
+test_suffix_glyphs_become_nags (tests.python.rules.koi_chess_pgn_test.MovetextTests.test_suffix_glyphs_become_nags) ... ok
+test_tokens_that_cannot_be_san_are_skipped (tests.python.rules.koi_chess_pgn_test.MovetextTests.test_tokens_that_cannot_be_san_are_skipped) ... ok
+test_variations_are_skipped (tests.python.rules.koi_chess_pgn_test.MovetextTests.test_variations_are_skipped) ... ok
+test_explicit_result_header_wins (tests.python.rules.koi_chess_pgn_test.ResultTests.test_explicit_result_header_wins) ... ok
+test_missing_result_token_keeps_default (tests.python.rules.koi_chess_pgn_test.ResultTests.test_missing_result_token_keeps_default) ... ok
+test_result_token_sets_header (tests.python.rules.koi_chess_pgn_test.ResultTests.test_result_token_sets_header) ... ok
+test_empty_stream_returns_none (tests.python.rules.koi_chess_pgn_test.StreamTests.test_empty_stream_returns_none) ... ok
+test_game_board_returns_an_isolated_copy (tests.python.rules.koi_chess_pgn_test.StreamTests.test_game_board_returns_an_isolated_copy) ... ok
+test_multiple_games_are_separated_by_blank_lines (tests.python.rules.koi_chess_pgn_test.StreamTests.test_multiple_games_are_separated_by_blank_lines) ... ok
+test_pgn_module_is_exported (tests.python.rules.koi_chess_pgn_test.StreamTests.test_pgn_module_is_exported) ... ok
+
+----------------------------------------------------------------------
+Ran 33 tests in 0.042s
+
+OK
+<end of output>
+Test time =   0.26 sec
+----------------------------------------------------------
+Test Passed.
+"koi_chess_pgn_python" end time: Sep 29 03:11 UTC
+"koi_chess_pgn_python" time elapsed: 00:00:00
+----------------------------------------------------------
+
+61/76 Testing: koi_chess_engine_python
+61/76 Test: koi_chess_engine_python
+Command: "/opt/koi-venv/bin/python" "-m" "unittest" "tests/python/rules/koi_chess_engine_test.py" "-v"
+Directory: /work
+"koi_chess_engine_python" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+test_analyse_multipv_sets_the_option (tests.python.rules.koi_chess_engine_test.EngineSessionTests.test_analyse_multipv_sets_the_option) ... ok
+test_analyse_preserves_the_mcts_root_visit_extension (tests.python.rules.koi_chess_engine_test.EngineSessionTests.test_analyse_preserves_the_mcts_root_visit_extension) ... ok
+test_analyse_reports_mate_scores (tests.python.rules.koi_chess_engine_test.EngineSessionTests.test_analyse_reports_mate_scores) ... ok
+test_analyse_reports_score_pv_and_depth (tests.python.rules.koi_chess_engine_test.EngineSessionTests.test_analyse_reports_score_pv_and_depth) ... ok
+test_analyse_score_is_relative_to_the_side_to_move (tests.python.rules.koi_chess_engine_test.EngineSessionTests.test_analyse_score_is_relative_to_the_side_to_move) ... ok
+test_closed_engine_rejects_commands (tests.python.rules.koi_chess_engine_test.EngineSessionTests.test_closed_engine_rejects_commands) ... ok
+test_context_manager_quits (tests.python.rules.koi_chess_engine_test.EngineSessionTests.test_context_manager_quits) ... ok
+test_handshake_and_configure (tests.python.rules.koi_chess_engine_test.EngineSessionTests.test_handshake_and_configure) ... ok
+test_legal_moves_preserve_native_perft_order (tests.python.rules.koi_chess_engine_test.EngineSessionTests.test_legal_moves_preserve_native_perft_order) ... ok
+test_missing_binary_raises_engine_error (tests.python.rules.koi_chess_engine_test.EngineSessionTests.test_missing_binary_raises_engine_error) ... ok
+test_play_returns_move_and_ponder (tests.python.rules.koi_chess_engine_test.EngineSessionTests.test_play_returns_move_and_ponder) ... ok
+test_play_returns_none_for_no_move (tests.python.rules.koi_chess_engine_test.EngineSessionTests.test_play_returns_none_for_no_move) ... ok
+test_quit_is_idempotent (tests.python.rules.koi_chess_engine_test.EngineSessionTests.test_quit_is_idempotent) ... ok
+test_terminated_engine_raises_terminated_error (tests.python.rules.koi_chess_engine_test.EngineSessionTests.test_terminated_engine_raises_terminated_error) ... ok
+test_combined_limits (tests.python.rules.koi_chess_engine_test.LimitTests.test_combined_limits) ... ok
+test_depth_limit (tests.python.rules.koi_chess_engine_test.LimitTests.test_depth_limit) ... ok
+test_empty_limit_is_rejected (tests.python.rules.koi_chess_engine_test.LimitTests.test_empty_limit_is_rejected) ... ok
+test_infinite_limit (tests.python.rules.koi_chess_engine_test.LimitTests.test_infinite_limit) ... ok
+test_time_and_increment_limits (tests.python.rules.koi_chess_engine_test.LimitTests.test_time_and_increment_limits) ... ok
+test_cp_score (tests.python.rules.koi_chess_engine_test.ScoreTests.test_cp_score) ... ok
+test_mate_score (tests.python.rules.koi_chess_engine_test.ScoreTests.test_mate_score) ... ok
+test_pov_score_negation (tests.python.rules.koi_chess_engine_test.ScoreTests.test_pov_score_negation) ... ok
+
+----------------------------------------------------------------------
+Ran 22 tests in 0.187s
+
+OK
+<end of output>
+Test time =   0.41 sec
+----------------------------------------------------------
+Test Passed.
+"koi_chess_engine_python" end time: Sep 29 03:11 UTC
+"koi_chess_engine_python" time elapsed: 00:00:00
+----------------------------------------------------------
+
+62/76 Testing: gen_training_data_python
+62/76 Test: gen_training_data_python
+Command: "/opt/koi-venv/bin/python" "-m" "unittest" "tests/python/evaluation/gen_training_data_test.py" "-v"
+Directory: /work
+"gen_training_data_python" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+test_consumers_ignore_the_optional_result_column (tests.python.evaluation.gen_training_data_test.GenTrainingDataTest.test_consumers_ignore_the_optional_result_column) ... ok
+test_game_result_tokens_are_white_relative (tests.python.evaluation.gen_training_data_test.GenTrainingDataTest.test_game_result_tokens_are_white_relative) ... ok
+test_label_resume_reader_parses_rows (tests.python.evaluation.gen_training_data_test.GenTrainingDataTest.test_label_resume_reader_parses_rows) ... ok
+test_move_weight_prefers_captures_checks_and_promotions (tests.python.evaluation.gen_training_data_test.GenTrainingDataTest.test_move_weight_prefers_captures_checks_and_promotions) ... ok
+test_parser_defaults_match_documented_values (tests.python.evaluation.gen_training_data_test.GenTrainingDataTest.test_parser_defaults_match_documented_values) ... ok
+test_resume_reader_accepts_result_columns (tests.python.evaluation.gen_training_data_test.GenTrainingDataTest.test_resume_reader_accepts_result_columns) ... ok
+test_resume_seeds_dedup_from_existing_positions (tests.python.evaluation.gen_training_data_test.GenTrainingDataTest.test_resume_seeds_dedup_from_existing_positions) ... ok
+
+----------------------------------------------------------------------
+Ran 7 tests in 0.023s
+
+OK
+<end of output>
+Test time =   0.26 sec
+----------------------------------------------------------
+Test Passed.
+"gen_training_data_python" end time: Sep 29 03:11 UTC
+"gen_training_data_python" time elapsed: 00:00:00
+----------------------------------------------------------
+
+63/76 Testing: measurement_phase_python
+63/76 Test: measurement_phase_python
+Command: "/opt/koi-venv/bin/python" "-m" "unittest" "tests/python/measurement/measurement_phase_test.py" "-v"
+Directory: /work
+"measurement_phase_python" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+test_schedule_export_import_preserves_paired_openings_for_before_after_runs (tests.python.measurement.measurement_phase_test.EloScheduleMeasurementTests.test_schedule_export_import_preserves_paired_openings_for_before_after_runs) ... ok
+test_gigabase_caps_decoded_legal_positions_when_source_count_understates (tests.python.measurement.measurement_phase_test.GigaBaseMeasurementTests.test_gigabase_caps_decoded_legal_positions_when_source_count_understates) ... ok
+test_gigabase_decodes_deduplicates_stratifies_and_is_reproducible (tests.python.measurement.measurement_phase_test.GigaBaseMeasurementTests.test_gigabase_decodes_deduplicates_stratifies_and_is_reproducible) ... ok
+test_gigabase_malformed_move_decoding_falls_back_without_breaking_caps (tests.python.measurement.measurement_phase_test.GigaBaseMeasurementTests.test_gigabase_malformed_move_decoding_falls_back_without_breaking_caps) ... ok
+test_extraction_report_declares_measurement_state_and_position_classification (tests.python.measurement.measurement_phase_test.OracleMeasurementMetadataTests.test_extraction_report_declares_measurement_state_and_position_classification) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.485s
+
+OK
+<end of output>
+Test time =   0.71 sec
+----------------------------------------------------------
+Test Passed.
+"measurement_phase_python" end time: Sep 29 03:11 UTC
+"measurement_phase_python" time elapsed: 00:00:00
+----------------------------------------------------------
+
+64/76 Testing: measurement_forensics_python
+64/76 Test: measurement_forensics_python
+Command: "/opt/koi-venv/bin/python" "-m" "unittest" "tests/python/measurement/measurement_forensics_test.py" "-v"
+Directory: /work
+"measurement_forensics_python" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+test_forensic_fixture_categories_are_legal (tests.python.measurement.measurement_forensics_test.MeasurementForensicsTests.test_forensic_fixture_categories_are_legal) ... ok
+test_gigabase_sampling_is_read_only_deterministic_and_bounded (tests.python.measurement.measurement_forensics_test.MeasurementForensicsTests.test_gigabase_sampling_is_read_only_deterministic_and_bounded) ... ok
+test_gigabase_sampling_rejects_repository_local_output (tests.python.measurement.measurement_forensics_test.MeasurementForensicsTests.test_gigabase_sampling_rejects_repository_local_output) ... ok
+test_pgn_corpus_is_deterministic_and_preserves_schema (tests.python.measurement.measurement_forensics_test.MeasurementForensicsTests.test_pgn_corpus_is_deterministic_and_preserves_schema) ... ok
+test_pgn_corpus_rejects_repository_local_output (tests.python.measurement.measurement_forensics_test.MeasurementForensicsTests.test_pgn_corpus_rejects_repository_local_output) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 1.698s
+
+OK
+<end of output>
+Test time =   1.94 sec
+----------------------------------------------------------
+Test Passed.
+"measurement_forensics_python" end time: Sep 29 03:11 UTC
+"measurement_forensics_python" time elapsed: 00:00:01
+----------------------------------------------------------
+
+65/76 Testing: uci_benchmark_python
+65/76 Test: uci_benchmark_python
+Command: "/opt/koi-venv/bin/python" "-m" "unittest" "tests/python/measurement/uci_benchmark_test.py" "-v"
+Directory: /work
+"uci_benchmark_python" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+test_continuous_engine_output_cannot_extend_protocol_deadlines (tests.python.measurement.uci_benchmark_test.UciBenchmarkReportTest.test_continuous_engine_output_cannot_extend_protocol_deadlines) ... ok
+test_engine_fen_rejection_fails_with_position_context (tests.python.measurement.uci_benchmark_test.UciBenchmarkReportTest.test_engine_fen_rejection_fails_with_position_context) ... ok
+test_fixed_movetime_stops_infinite_search_at_the_requested_deadline (tests.python.measurement.uci_benchmark_test.UciBenchmarkReportTest.test_fixed_movetime_stops_infinite_search_at_the_requested_deadline) ... ok
+test_named_fen_corpus_is_normalized_before_engine_launch (tests.python.measurement.uci_benchmark_test.UciBenchmarkReportTest.test_named_fen_corpus_is_normalized_before_engine_launch) ... ok
+test_refuses_to_search_when_engine_does_not_advertise_required_options (tests.python.measurement.uci_benchmark_test.UciBenchmarkReportTest.test_refuses_to_search_when_engine_does_not_advertise_required_options) ... ok
+test_rejects_an_empty_fen_corpus_before_starting_an_engine (tests.python.measurement.uci_benchmark_test.UciBenchmarkReportTest.test_rejects_an_empty_fen_corpus_before_starting_an_engine) ... ok
+test_rejects_engine_options_with_wrong_type_or_out_of_range_values (tests.python.measurement.uci_benchmark_test.UciBenchmarkReportTest.test_rejects_engine_options_with_wrong_type_or_out_of_range_values) ... ok
+test_report_captures_sequential_runs_and_provenance_from_fake_engines (tests.python.measurement.uci_benchmark_test.UciBenchmarkReportTest.test_report_captures_sequential_runs_and_provenance_from_fake_engines) ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 0.805s
+
+OK
+<end of output>
+Test time =   1.00 sec
+----------------------------------------------------------
+Test Passed.
+"uci_benchmark_python" end time: Sep 29 03:11 UTC
+"uci_benchmark_python" time elapsed: 00:00:01
+----------------------------------------------------------
+
+66/76 Testing: policy_value_dataset_python
+66/76 Test: policy_value_dataset_python
+Command: "/opt/koi-venv/bin/python" "-m" "unittest" "tests/python/measurement/policy_value_dataset_test.py" "-v"
+Directory: /work
+"policy_value_dataset_python" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+test_alpha_beta_distillation_may_omit_network_hash (tests.python.measurement.policy_value_dataset_test.PolicyValueDatasetTests.test_alpha_beta_distillation_may_omit_network_hash) ... ok
+test_direct_validation_rejects_oversized_fen_counters_as_dataset_errors (tests.python.measurement.policy_value_dataset_test.PolicyValueDatasetTests.test_direct_validation_rejects_oversized_fen_counters_as_dataset_errors) ... ok
+test_jsonl_output_is_canonical_and_has_no_generated_metadata (tests.python.measurement.policy_value_dataset_test.PolicyValueDatasetTests.test_jsonl_output_is_canonical_and_has_no_generated_metadata) ... ok
+test_jsonl_round_trip_preserves_all_record_fields_and_action_order (tests.python.measurement.policy_value_dataset_test.PolicyValueDatasetTests.test_jsonl_round_trip_preserves_all_record_fields_and_action_order) ... ok
+test_reader_rejects_malformed_truncated_and_duplicate_key_records (tests.python.measurement.policy_value_dataset_test.PolicyValueDatasetTests.test_reader_rejects_malformed_truncated_and_duplicate_key_records) ... ok
+test_reader_wraps_invalid_utf8_with_line_context (tests.python.measurement.policy_value_dataset_test.PolicyValueDatasetTests.test_reader_wraps_invalid_utf8_with_line_context) ... ok
+test_reader_wraps_oversized_fen_counter_conversion_with_line_context (tests.python.measurement.policy_value_dataset_test.PolicyValueDatasetTests.test_reader_wraps_oversized_fen_counter_conversion_with_line_context) ... ok
+test_reader_wraps_oversized_json_integer_with_line_context (tests.python.measurement.policy_value_dataset_test.PolicyValueDatasetTests.test_reader_wraps_oversized_json_integer_with_line_context) ... ok
+test_rejects_action_target_and_visit_count_length_mismatches (tests.python.measurement.policy_value_dataset_test.PolicyValueDatasetTests.test_rejects_action_target_and_visit_count_length_mismatches) ... ok
+test_rejects_bad_hash_seed_and_negative_ply (tests.python.measurement.policy_value_dataset_test.PolicyValueDatasetTests.test_rejects_bad_hash_seed_and_negative_ply) ... ok
+test_rejects_invalid_uci_fields_and_duplicate_legal_actions (tests.python.measurement.policy_value_dataset_test.PolicyValueDatasetTests.test_rejects_invalid_uci_fields_and_duplicate_legal_actions) ... ok
+test_rejects_non_normalized_policy_and_invalid_value_or_outcome (tests.python.measurement.policy_value_dataset_test.PolicyValueDatasetTests.test_rejects_non_normalized_policy_and_invalid_value_or_outcome) ... ok
+test_rejects_wrong_schema_and_action_encoding (tests.python.measurement.policy_value_dataset_test.PolicyValueDatasetTests.test_rejects_wrong_schema_and_action_encoding) ... ok
+test_self_play_requires_a_sha256_network_identity (tests.python.measurement.policy_value_dataset_test.PolicyValueDatasetTests.test_self_play_requires_a_sha256_network_identity) ... ok
+test_visit_counts_must_match_the_normalized_policy_targets (tests.python.measurement.policy_value_dataset_test.PolicyValueDatasetTests.test_visit_counts_must_match_the_normalized_policy_targets) ... ok
+test_writer_cleans_up_when_record_iterator_raises (tests.python.measurement.policy_value_dataset_test.PolicyValueDatasetTests.test_writer_cleans_up_when_record_iterator_raises) ... ok
+test_writer_creates_missing_parent_directories (tests.python.measurement.policy_value_dataset_test.PolicyValueDatasetTests.test_writer_creates_missing_parent_directories) ... ok
+test_writer_preserves_existing_destination_when_a_later_record_is_invalid (tests.python.measurement.policy_value_dataset_test.PolicyValueDatasetTests.test_writer_preserves_existing_destination_when_a_later_record_is_invalid) ... ok
+
+----------------------------------------------------------------------
+Ran 18 tests in 0.053s
+
+OK
+<end of output>
+Test time =   0.19 sec
+----------------------------------------------------------
+Test Passed.
+"policy_value_dataset_python" end time: Sep 29 03:11 UTC
+"policy_value_dataset_python" time elapsed: 00:00:00
+----------------------------------------------------------
+
+67/76 Testing: policy_value_model_python
+67/76 Test: policy_value_model_python
+Command: "/opt/koi-venv/bin/python" "-m" "unittest" "tests/python/measurement/policy_value_model_test.py" "-v"
+Directory: /work
+"policy_value_model_python" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+test_black_positions_keep_canonical_sparse_features_and_mirror_actions (tests.python.measurement.policy_value_model_test.PolicyValueModelTests.test_black_positions_keep_canonical_sparse_features_and_mirror_actions) ... ok
+test_header_is_exact_v1_little_endian_contract (tests.python.measurement.policy_value_model_test.PolicyValueModelTests.test_header_is_exact_v1_little_endian_contract) ... ok
+test_model_file_round_trip_preserves_weights_and_evaluation (tests.python.measurement.policy_value_model_test.PolicyValueModelTests.test_model_file_round_trip_preserves_weights_and_evaluation) ... ok
+test_payload_tensor_offsets_and_little_endian_values_are_fixed (tests.python.measurement.policy_value_model_test.PolicyValueModelTests.test_payload_tensor_offsets_and_little_endian_values_are_fixed) ... ok
+test_policy_bias_is_float32_quantized_before_evaluation_and_round_trip (tests.python.measurement.policy_value_model_test.PolicyValueModelTests.test_policy_bias_is_float32_quantized_before_evaluation_and_round_trip) ... ok
+test_priors_follow_supplied_legal_action_order_and_only_legal_actions (tests.python.measurement.policy_value_model_test.PolicyValueModelTests.test_priors_follow_supplied_legal_action_order_and_only_legal_actions) ... ok
+test_reassigned_policy_bias_stays_float32_quantized_through_round_trip (tests.python.measurement.policy_value_model_test.PolicyValueModelTests.test_reassigned_policy_bias_stays_float32_quantized_through_round_trip) ... ok
+test_rejects_bad_magic_version_schema_action_dimensions_crc_and_lengths (tests.python.measurement.policy_value_model_test.PolicyValueModelTests.test_rejects_bad_magic_version_schema_action_dimensions_crc_and_lengths) ... ok
+test_rejects_invalid_sparse_indices_and_legal_actions (tests.python.measurement.policy_value_model_test.PolicyValueModelTests.test_rejects_invalid_sparse_indices_and_legal_actions) ... ok
+test_rejects_non_finite_weights (tests.python.measurement.policy_value_model_test.PolicyValueModelTests.test_rejects_non_finite_weights) ... ok
+test_sha256_helper_hashes_model_bytes (tests.python.measurement.policy_value_model_test.PolicyValueModelTests.test_sha256_helper_hashes_model_bytes) ... ok
+test_wdl_softmax_is_stable_for_large_finite_logits (tests.python.measurement.policy_value_model_test.PolicyValueModelTests.test_wdl_softmax_is_stable_for_large_finite_logits) ... ok
+test_write_creates_missing_parent_directories (tests.python.measurement.policy_value_model_test.PolicyValueModelTests.test_write_creates_missing_parent_directories) ... ok
+
+----------------------------------------------------------------------
+Ran 13 tests in 0.574s
+
+OK
+<end of output>
+Test time =   0.81 sec
+----------------------------------------------------------
+Test Passed.
+"policy_value_model_python" end time: Sep 29 03:11 UTC
+"policy_value_model_python" time elapsed: 00:00:00
+----------------------------------------------------------
+
+68/76 Testing: policy_value_trainer_python
+68/76 Test: policy_value_trainer_python
+Command: "/opt/koi-venv/bin/python" "-m" "unittest" "tests/python/measurement/train_policy_value_test.py" "-v"
+Directory: /work
+"policy_value_trainer_python" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+test_cli_accepts_and_forwards_early_stopping_controls (tests.python.measurement.train_policy_value_test.TrainPolicyValueTests.test_cli_accepts_and_forwards_early_stopping_controls) ... ok
+test_cpu_training_exports_reloadable_model_and_reproducible_metadata (tests.python.measurement.train_policy_value_test.TrainPolicyValueTests.test_cpu_training_exports_reloadable_model_and_reproducible_metadata) ... skipped 'PyTorch is not installed'
+test_cuda_provenance_has_build_and_bounded_driver_fields (tests.python.measurement.train_policy_value_test.TrainPolicyValueTests.test_cuda_provenance_has_build_and_bounded_driver_fields) ... ok
+test_cuda_sync_helper_calls_torch_synchronize_without_gpu_execution (tests.python.measurement.train_policy_value_test.TrainPolicyValueTests.test_cuda_sync_helper_calls_torch_synchronize_without_gpu_execution) ... skipped 'PyTorch is not installed'
+test_cuda_workspace_is_set_before_availability_check (tests.python.measurement.train_policy_value_test.TrainPolicyValueTests.test_cuda_workspace_is_set_before_availability_check) ... skipped 'PyTorch is not installed'
+test_cuda_workspace_rejects_initialized_cuda_with_incompatible_config (tests.python.measurement.train_policy_value_test.TrainPolicyValueTests.test_cuda_workspace_rejects_initialized_cuda_with_incompatible_config) ... skipped 'PyTorch is not installed'
+test_early_stopping_restores_best_validation_checkpoint (tests.python.measurement.train_policy_value_test.TrainPolicyValueTests.test_early_stopping_restores_best_validation_checkpoint) ... skipped 'PyTorch is not installed'
+test_metadata_replace_failure_preserves_previous_file_and_cleans_temp (tests.python.measurement.train_policy_value_test.TrainPolicyValueTests.test_metadata_replace_failure_preserves_previous_file_and_cleans_temp) ... ok
+test_missing_torch_has_a_clear_training_error (tests.python.measurement.train_policy_value_test.TrainPolicyValueTests.test_missing_torch_has_a_clear_training_error) ... ok
+test_module_imports_when_torch_is_unavailable (tests.python.measurement.train_policy_value_test.TrainPolicyValueTests.test_module_imports_when_torch_is_unavailable) ... ok
+test_position_identity_keeps_the_halfmove_clock (tests.python.measurement.train_policy_value_test.TrainPolicyValueTests.test_position_identity_keeps_the_halfmove_clock) ... ok
+test_rejects_game_or_opening_leakage_between_splits (tests.python.measurement.train_policy_value_test.TrainPolicyValueTests.test_rejects_game_or_opening_leakage_between_splits) ... skipped 'PyTorch is not installed'
+test_rejects_incomplete_legal_move_list (tests.python.measurement.train_policy_value_test.TrainPolicyValueTests.test_rejects_incomplete_legal_move_list) ... skipped 'PyTorch is not installed'
+test_rejects_invalid_early_stopping_parameters (tests.python.measurement.train_policy_value_test.TrainPolicyValueTests.test_rejects_invalid_early_stopping_parameters) ... skipped 'PyTorch is not installed'
+test_rejects_position_leakage_even_when_split_ids_and_fullmove_differ (tests.python.measurement.train_policy_value_test.TrainPolicyValueTests.test_rejects_position_leakage_even_when_split_ids_and_fullmove_differ) ... ok
+test_rejects_resolved_output_path_collisions_before_writing (tests.python.measurement.train_policy_value_test.TrainPolicyValueTests.test_rejects_resolved_output_path_collisions_before_writing) ... skipped 'PyTorch is not installed'
+
+----------------------------------------------------------------------
+Ran 16 tests in 0.541s
+
+OK (skipped=9)
+{"ok": true}
+<end of output>
+Test time =   0.82 sec
+----------------------------------------------------------
+Test Passed.
+"policy_value_trainer_python" end time: Sep 29 03:11 UTC
+"policy_value_trainer_python" time elapsed: 00:00:00
+----------------------------------------------------------
+
+69/76 Testing: policy_value_selfplay_python
+69/76 Test: policy_value_selfplay_python
+Command: "/opt/koi-venv/bin/python" "-m" "unittest" "tests/python/measurement/policy_value_selfplay_test.py" "-v"
+Directory: /work
+"policy_value_selfplay_python" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+test_alpha_beta_score_is_distilled_separately_from_game_outcome (tests.python.measurement.policy_value_selfplay_test.PolicyValueSelfPlayTests.test_alpha_beta_score_is_distilled_separately_from_game_outcome) ... ok
+test_alpha_beta_selfplay_records_legal_one_hot_policy_and_stm_outcome (tests.python.measurement.policy_value_selfplay_test.PolicyValueSelfPlayTests.test_alpha_beta_selfplay_records_legal_one_hot_policy_and_stm_outcome) ... ok
+test_bestmove_is_used_when_a_node_limited_search_has_no_info_pv (tests.python.measurement.policy_value_selfplay_test.PolicyValueSelfPlayTests.test_bestmove_is_used_when_a_node_limited_search_has_no_info_pv) ... ok
+test_dataset_and_manifest_are_written_with_stable_hashes (tests.python.measurement.policy_value_selfplay_test.PolicyValueSelfPlayTests.test_dataset_and_manifest_are_written_with_stable_hashes) ... ok
+test_maximum_ply_cutoff_is_an_explicit_draw (tests.python.measurement.policy_value_selfplay_test.PolicyValueSelfPlayTests.test_maximum_ply_cutoff_is_an_explicit_draw) ... ok
+test_mcts_move_sampling_records_temperature_before_cutoff (tests.python.measurement.policy_value_selfplay_test.PolicyValueSelfPlayTests.test_mcts_move_sampling_records_temperature_before_cutoff) ... ok
+test_mcts_move_sampling_switches_to_argmax_after_temperature_plies (tests.python.measurement.policy_value_selfplay_test.PolicyValueSelfPlayTests.test_mcts_move_sampling_switches_to_argmax_after_temperature_plies) ... ok
+test_mcts_selfplay_records_visit_targets_and_uses_them_for_move_selection (tests.python.measurement.policy_value_selfplay_test.PolicyValueSelfPlayTests.test_mcts_selfplay_records_visit_targets_and_uses_them_for_move_selection) ... ok
+test_mcts_selfplay_rejects_incomplete_visit_maps (tests.python.measurement.policy_value_selfplay_test.PolicyValueSelfPlayTests.test_mcts_selfplay_rejects_incomplete_visit_maps) ... ok
+test_mcts_temperature_plies_must_be_non_negative_integer (tests.python.measurement.policy_value_selfplay_test.PolicyValueSelfPlayTests.test_mcts_temperature_plies_must_be_non_negative_integer) ... ok
+test_opening_parser_reads_move_lists_and_rejects_duplicate_ids (tests.python.measurement.policy_value_selfplay_test.PolicyValueSelfPlayTests.test_opening_parser_reads_move_lists_and_rejects_duplicate_ids) ... ok
+test_source_provenance_includes_local_chess_rules_imports (tests.python.measurement.policy_value_selfplay_test.PolicyValueSelfPlayTests.test_source_provenance_includes_local_chess_rules_imports) ... ok
+test_training_and_validation_openings_are_separate_from_match_positions (tests.python.measurement.policy_value_selfplay_test.PolicyValueSelfPlayTests.test_training_and_validation_openings_are_separate_from_match_positions) ... ok
+
+----------------------------------------------------------------------
+Ran 13 tests in 0.435s
+
+OK
+<end of output>
+Test time =   0.70 sec
+----------------------------------------------------------
+Test Passed.
+"policy_value_selfplay_python" end time: Sep 29 03:11 UTC
+"policy_value_selfplay_python" time elapsed: 00:00:00
+----------------------------------------------------------
+
+70/76 Testing: policy_value_openings_python
+70/76 Test: policy_value_openings_python
+Command: "/opt/koi-venv/bin/python" "-m" "unittest" "tests/python/measurement/policy_value_openings_test.py" "-v"
+Directory: /work
+"policy_value_openings_python" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+test_checked_in_v2_corpora_match_the_generation_manifest (tests.python.measurement.policy_value_openings_test.PolicyValueOpeningGenerationTests.test_checked_in_v2_corpora_match_the_generation_manifest) ... ok
+test_generation_fails_when_all_requested_roots_are_held_out (tests.python.measurement.policy_value_openings_test.PolicyValueOpeningGenerationTests.test_generation_fails_when_all_requested_roots_are_held_out) ... ok
+test_generation_is_repeatable_legal_and_disjoint_from_heldout_prefixes (tests.python.measurement.policy_value_openings_test.PolicyValueOpeningGenerationTests.test_generation_is_repeatable_legal_and_disjoint_from_heldout_prefixes) ... ok
+test_generation_refuses_to_overwrite_a_heldout_match_corpus (tests.python.measurement.policy_value_openings_test.PolicyValueOpeningGenerationTests.test_generation_refuses_to_overwrite_a_heldout_match_corpus) ... ok
+test_generation_writes_reproducible_corpora_and_manifest_outside_repo (tests.python.measurement.policy_value_openings_test.PolicyValueOpeningGenerationTests.test_generation_writes_reproducible_corpora_and_manifest_outside_repo) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.095s
+
+OK
+<end of output>
+Test time =   0.34 sec
+----------------------------------------------------------
+Test Passed.
+"policy_value_openings_python" end time: Sep 29 03:11 UTC
+"policy_value_openings_python" time elapsed: 00:00:00
+----------------------------------------------------------
+
+71/76 Testing: strength_report_python
+71/76 Test: strength_report_python
+Command: "/opt/koi-venv/bin/python" "-m" "unittest" "tests/python/evaluation/strength_report_test.py" "-v"
+Directory: /work
+"strength_report_python" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+test_category_aggregation_and_deterministic_output (tests.python.evaluation.strength_report_test.StrengthReportTests.test_category_aggregation_and_deterministic_output) ... ok
+test_malformed_json_is_rejected (tests.python.evaluation.strength_report_test.StrengthReportTests.test_malformed_json_is_rejected) ... ok
+test_missing_pv_is_rejected (tests.python.evaluation.strength_report_test.StrengthReportTests.test_missing_pv_is_rejected) ... ok
+test_mixed_options_are_rejected (tests.python.evaluation.strength_report_test.StrengthReportTests.test_mixed_options_are_rejected) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.512s
+
+OK
+<end of output>
+Test time =   0.63 sec
+----------------------------------------------------------
+Test Passed.
+"strength_report_python" end time: Sep 29 03:11 UTC
+"strength_report_python" time elapsed: 00:00:00
+----------------------------------------------------------
+
+72/76 Testing: nnue_studio_python
+72/76 Test: nnue_studio_python
+Command: "/opt/koi-venv/bin/python" "-m" "unittest" "tests/python/nnue/studio_test.py" "-v"
+Directory: /work
+"nnue_studio_python" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+test_build_command_targets_the_wrapper (tests.python.nnue.studio_test.BulletBackendTests.test_build_command_targets_the_wrapper) ... skipped 'CUDA toolkit 12.x is not installed (no CUDA bin directory found)'
+test_epoch_line_is_parsed (tests.python.nnue.studio_test.ProgressParserTests.test_epoch_line_is_parsed) ... ok
+test_loaded_line_reports_throughput (tests.python.nnue.studio_test.ProgressParserTests.test_loaded_line_reports_throughput) ... ok
+test_presets_have_ordered_effort (tests.python.nnue.studio_test.ProgressParserTests.test_presets_have_ordered_effort) ... ok
+test_quantization_and_selection_lines_are_parsed (tests.python.nnue.studio_test.ProgressParserTests.test_quantization_and_selection_lines_are_parsed) ... ok
+test_unrelated_lines_are_ignored (tests.python.nnue.studio_test.ProgressParserTests.test_unrelated_lines_are_ignored) ... ok
+test_wrote_line_reports_the_network (tests.python.nnue.studio_test.ProgressParserTests.test_wrote_line_reports_the_network) ... ok
+test_selftest_trains_a_tiny_network (tests.python.nnue.studio_test.SelftestTests.test_selftest_trains_a_tiny_network) ... skipped 'PyTorch is required for the training selftest'
+test_dry_run_builds_a_v4_trainer_command (tests.python.nnue.studio_test.StudioCliTests.test_dry_run_builds_a_v4_trainer_command) ... ok
+test_dry_run_can_target_the_legacy_v3_trainer (tests.python.nnue.studio_test.StudioCliTests.test_dry_run_can_target_the_legacy_v3_trainer) ... ok
+test_dry_run_targets_the_bullet_gpu_trainer (tests.python.nnue.studio_test.StudioCliTests.test_dry_run_targets_the_bullet_gpu_trainer) ... ok
+test_gui_selftest_constructs_the_window (tests.python.nnue.studio_test.StudioCliTests.test_gui_selftest_constructs_the_window) ... skipped 'tkinter is unavailable'
+test_list_backends_reports_the_trainers (tests.python.nnue.studio_test.StudioCliTests.test_list_backends_reports_the_trainers) ... ok
+
+----------------------------------------------------------------------
+Ran 13 tests in 1.208s
+
+OK (skipped=3)
+<end of output>
+Test time =   1.33 sec
+----------------------------------------------------------
+Test Passed.
+"nnue_studio_python" end time: Sep 29 03:11 UTC
+"nnue_studio_python" time elapsed: 00:00:01
+----------------------------------------------------------
+
+73/76 Testing: nnue_studio_ui_python
+73/76 Test: nnue_studio_ui_python
+Command: "/opt/koi-venv/bin/python" "-m" "unittest" "tests/python/nnue/studio_ui_test.py" "-v"
+Directory: /work
+"nnue_studio_ui_python" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+test_gate_failure_skips (tests.python.nnue.studio_ui_test.AdoptionPolicyTests.test_gate_failure_skips) ... ok
+test_installed_network_requires_a_comparison (tests.python.nnue.studio_ui_test.AdoptionPolicyTests.test_installed_network_requires_a_comparison) ... ok
+test_no_installed_network_adopts_after_gate (tests.python.nnue.studio_ui_test.AdoptionPolicyTests.test_no_installed_network_adopts_after_gate) ... ok
+test_adopt_records_and_reverts (tests.python.nnue.studio_ui_test.AdoptionRegistryTests.test_adopt_records_and_reverts) ... ok
+test_missing_backup_is_reported (tests.python.nnue.studio_ui_test.AdoptionRegistryTests.test_missing_backup_is_reported) ... ok
+test_dry_run_honors_the_configured_network_name (tests.python.nnue.studio_ui_test.BackendCommandTests.test_dry_run_honors_the_configured_network_name) ... ok
+test_run_process_stops_a_cancelled_command (tests.python.nnue.studio_ui_test.CancelTokenTests.test_run_process_stops_a_cancelled_command) ... /work/tests/python/nnue/studio_ui_test.py:644: ResourceWarning: unclosed file <_io.TextIOWrapper name=4 encoding='UTF-8'>
+  result = self.core.run_process(
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+ok
+test_run_process_streams_lines_and_reports_success (tests.python.nnue.studio_ui_test.CancelTokenTests.test_run_process_streams_lines_and_reports_success) ... /work/tests/python/nnue/studio_ui_test.py:652: ResourceWarning: unclosed file <_io.TextIOWrapper name=4 encoding='UTF-8'>
+  result = self.core.run_process(
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+ok
+test_terminate_process_tree_ignores_missing_pids (tests.python.nnue.studio_ui_test.CancelTokenTests.test_terminate_process_tree_ignores_missing_pids) ... ok
+test_token_starts_clear_and_cancels_once (tests.python.nnue.studio_ui_test.CancelTokenTests.test_token_starts_clear_and_cancels_once) ... ok
+test_hover_index_maps_x_to_the_nearest_epoch (tests.python.nnue.studio_ui_test.ChartHoverTests.test_hover_index_maps_x_to_the_nearest_epoch) ... ok
+test_hover_index_rejects_coordinates_outside_the_plot (tests.python.nnue.studio_ui_test.ChartHoverTests.test_hover_index_rejects_coordinates_outside_the_plot) ... ok
+test_single_epoch_hover_always_hits_index_zero (tests.python.nnue.studio_ui_test.ChartHoverTests.test_single_epoch_hover_always_hits_index_zero) ... ok
+test_gui_exposes_the_auto_adopt_controls (tests.python.nnue.studio_ui_test.GuiAdoptionWiringTests.test_gui_exposes_the_auto_adopt_controls) ... ok
+test_gui_exposes_the_presentation_controls (tests.python.nnue.studio_ui_test.GuiPhaseThreeWiringTests.test_gui_exposes_the_presentation_controls) ... ok
+test_gui_selftest_applies_both_themes (tests.python.nnue.studio_ui_test.GuiPhaseThreeWiringTests.test_gui_selftest_applies_both_themes) ... ok
+test_parse_float_accepts_and_bounds (tests.python.nnue.studio_ui_test.InputGuardTests.test_parse_float_accepts_and_bounds) ... ok
+test_parse_int_accepts_and_bounds (tests.python.nnue.studio_ui_test.InputGuardTests.test_parse_int_accepts_and_bounds) ... ok
+test_command_uses_the_reference_wrapper (tests.python.nnue.studio_ui_test.NetMatchCommandTests.test_command_uses_the_reference_wrapper) ... ok
+test_running_engines_returns_a_list (tests.python.nnue.studio_ui_test.NetMatchCommandTests.test_running_engines_returns_a_list) ... ok
+test_configured_name_wins_when_the_file_exists (tests.python.nnue.studio_ui_test.NetworkNamingTests.test_configured_name_wins_when_the_file_exists) ... ok
+test_default_and_sanitized_names (tests.python.nnue.studio_ui_test.NetworkNamingTests.test_default_and_sanitized_names) ... ok
+test_legacy_net_nnue_is_the_fallback_for_old_runs (tests.python.nnue.studio_ui_test.NetworkNamingTests.test_legacy_net_nnue_is_the_fallback_for_old_runs) ... ok
+test_run_properties_use_their_own_config (tests.python.nnue.studio_ui_test.NetworkNamingTests.test_run_properties_use_their_own_config) ... ok
+test_unwritten_run_resolves_to_the_configured_target (tests.python.nnue.studio_ui_test.NetworkNamingTests.test_unwritten_run_resolves_to_the_configured_target) ... ok
+test_duration_and_failure_lines (tests.python.nnue.studio_ui_test.RunListTests.test_duration_and_failure_lines) ... ok
+test_filter_runs_matches_name_kind_and_status (tests.python.nnue.studio_ui_test.RunListTests.test_filter_runs_matches_name_kind_and_status) ... ok
+test_run_detail_lines_include_status_and_errors (tests.python.nnue.studio_ui_test.RunListTests.test_run_detail_lines_include_status_and_errors) ... ok
+test_sort_runs_by_columns (tests.python.nnue.studio_ui_test.RunListTests.test_sort_runs_by_columns) ... ok
+test_defaults_and_round_trip (tests.python.nnue.studio_ui_test.SettingsTests.test_defaults_and_round_trip) ... ok
+test_malformed_settings_fall_back (tests.python.nnue.studio_ui_test.SettingsTests.test_malformed_settings_fall_back) ... ok
+test_concurrent_state_writes_stay_parseable (tests.python.nnue.studio_ui_test.StateLockTests.test_concurrent_state_writes_stay_parseable) ... ok
+test_chart_series_and_bounds (tests.python.nnue.studio_ui_test.TelemetryTests.test_chart_series_and_bounds) ... ok
+test_eta_summary_and_duration_formatting (tests.python.nnue.studio_ui_test.TelemetryTests.test_eta_summary_and_duration_formatting) ... ok
+test_loaded_lines_are_parsed_for_both_trainers (tests.python.nnue.studio_ui_test.TelemetryTests.test_loaded_lines_are_parsed_for_both_trainers) ... ok
+test_log_line_matches_filters (tests.python.nnue.studio_ui_test.TelemetryTests.test_log_line_matches_filters) ... ok
+test_update_from_log_events_persists_the_histories (tests.python.nnue.studio_ui_test.TelemetryTests.test_update_from_log_events_persists_the_histories) ... ok
+test_configure_styles_applies_the_palette (tests.python.nnue.studio_ui_test.ThemeTests.test_configure_styles_applies_the_palette) ... skipped 'tkinter is unavailable'
+test_palettes_expose_the_contract_keys (tests.python.nnue.studio_ui_test.ThemeTests.test_palettes_expose_the_contract_keys) ... ok
+test_theme_round_trips_through_settings (tests.python.nnue.studio_ui_test.ThemeTests.test_theme_round_trips_through_settings) ... ok
+test_unknown_theme_falls_back_to_light (tests.python.nnue.studio_ui_test.ThemeTests.test_unknown_theme_falls_back_to_light) ... ok
+test_full_validation_runs_both_checks (tests.python.nnue.studio_ui_test.ValidationGatingTests.test_full_validation_runs_both_checks) ... ok
+test_gate_allows_install_only_after_a_successful_run (tests.python.nnue.studio_ui_test.ValidationGatingTests.test_gate_allows_install_only_after_a_successful_run) ... ok
+test_gate_only_skips_the_ab_match (tests.python.nnue.studio_ui_test.ValidationGatingTests.test_gate_only_skips_the_ab_match) ... ok
+
+----------------------------------------------------------------------
+Ran 44 tests in 1.009s
+
+OK (skipped=1)
+<end of output>
+Test time =   1.17 sec
+----------------------------------------------------------
+Test Passed.
+"nnue_studio_ui_python" end time: Sep 29 03:11 UTC
+"nnue_studio_ui_python" time elapsed: 00:00:01
+----------------------------------------------------------
+
+74/76 Testing: koi_trainer_python
+74/76 Test: koi_trainer_python
+Command: "/opt/koi-venv/bin/python" "-m" "unittest" "tests/python/nnue/koi_trainer_test.py" "-v"
+Directory: /work
+"koi_trainer_python" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+test_binary_dataset_round_trip_and_rejections (tests.python.nnue.koi_trainer_test.DatasetLoaderTests.test_binary_dataset_round_trip_and_rejections) ... ok
+test_binary_dataset_v2_buckets_follow_piece_counts (tests.python.nnue.koi_trainer_test.DatasetLoaderTests.test_binary_dataset_v2_buckets_follow_piece_counts) ... ok
+test_text_corpus_v5_buckets_follow_piece_counts (tests.python.nnue.koi_trainer_test.DatasetLoaderTests.test_text_corpus_v5_buckets_follow_piece_counts) ... ok
+test_integer_reference_clips_and_shifts (tests.python.nnue.koi_trainer_test.EncoderParityTests.test_integer_reference_clips_and_shifts) ... ok
+test_python_encoder_matches_cpp_fixture (tests.python.nnue.koi_trainer_test.EncoderParityTests.test_python_encoder_matches_cpp_fixture) ... ok
+test_python_encoder_matches_cpp_v5_fixture (tests.python.nnue.koi_trainer_test.EncoderParityTests.test_python_encoder_matches_cpp_v5_fixture) ... ok
+test_export_metadata_and_determinism (tests.python.nnue.koi_trainer_test.TrainerPipelineTests.test_export_metadata_and_determinism) ... skipped 'PyTorch is not installed'
+test_float_in_reuses_the_checkpoint (tests.python.nnue.koi_trainer_test.TrainerPipelineTests.test_float_in_reuses_the_checkpoint) ... skipped 'PyTorch is not installed'
+test_v5_export_metadata_and_determinism (tests.python.nnue.koi_trainer_test.TrainerPipelineTests.test_v5_export_metadata_and_determinism) ... skipped 'PyTorch is not installed'
+
+----------------------------------------------------------------------
+Ran 9 tests in 0.085s
+
+OK (skipped=3)
+<end of output>
+Test time =   0.47 sec
+----------------------------------------------------------
+Test Passed.
+"koi_trainer_python" end time: Sep 29 03:11 UTC
+"koi_trainer_python" time elapsed: 00:00:00
+----------------------------------------------------------
+
+75/76 Testing: tune_classical_python
+75/76 Test: tune_classical_python
+Command: "/opt/koi-venv/bin/python" "-m" "unittest" "tests/python/evaluation/tune_classical_test.py" "-v"
+Directory: /work
+"tune_classical_python" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+test_feature_csv_round_trip (tests.python.evaluation.tune_classical_test.EmittedCsvTests.test_feature_csv_round_trip) ... skipped 'koi-eval-features is not built'
+test_header_declares_the_tuned_tables (tests.python.evaluation.tune_classical_test.PieceSquareTests.test_header_declares_the_tuned_tables) ... ok
+test_placement_squares_mirrors_black_pieces (tests.python.evaluation.tune_classical_test.PieceSquareTests.test_placement_squares_mirrors_black_pieces) ... ok
+test_residual_corrections_are_zero_sum_and_clamped (tests.python.evaluation.tune_classical_test.PieceSquareTests.test_residual_corrections_are_zero_sum_and_clamped) ... ok
+test_flags_a_degenerate_corpus (tests.python.evaluation.tune_classical_test.RecoveryTests.test_flags_a_degenerate_corpus) ... ok
+test_recovers_the_known_scales (tests.python.evaluation.tune_classical_test.RecoveryTests.test_recovers_the_known_scales) ... ok
+test_cli_writes_header_and_report (tests.python.evaluation.tune_classical_test.ReportTests.test_cli_writes_header_and_report) ... ok
+test_header_and_report_symbols (tests.python.evaluation.tune_classical_test.ReportTests.test_header_and_report_symbols) ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 0.014s
+
+OK (skipped=1)
+tuned rows=240 target=cp current mae=8.01 r2=-1.3971 fitted mae=0.00 r2=1.0000
+<end of output>
+Test time =   0.27 sec
+----------------------------------------------------------
+Test Passed.
+"tune_classical_python" end time: Sep 29 03:11 UTC
+"tune_classical_python" time elapsed: 00:00:00
+----------------------------------------------------------
+
+76/76 Testing: bullet_data_python
+76/76 Test: bullet_data_python
+Command: "/opt/koi-venv/bin/python" "-m" "unittest" "tests/python/nnue/bullet_data_test.py" "-v"
+Directory: /work
+"bullet_data_python" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+test_binary_conversion_when_the_convert_binary_exists (tests.python.nnue.bullet_data_test.CliTests.test_binary_conversion_when_the_convert_binary_exists) ... skipped 'bullet_train convert binary is not built'
+test_text_only_does_not_need_the_convert_binary (tests.python.nnue.bullet_data_test.CliTests.test_text_only_does_not_need_the_convert_binary) ... ok
+test_export_command_parses_with_exact_options (tests.python.nnue.bullet_data_test.ExporterTests.test_export_command_parses_with_exact_options) ... ok
+test_exporter_rejects_a_hidden_mismatch (tests.python.nnue.bullet_data_test.ExporterTests.test_exporter_rejects_a_hidden_mismatch) ... export_bullet_v4: [Errno 20] Not a directory: '/tmp/tmpdbquwy0a/raw.bin/raw.bin'
+ok
+test_infer_hidden_units (tests.python.nnue.bullet_data_test.ExporterTests.test_infer_hidden_units) ... ok
+test_read_raw_weights_uses_the_feature_major_layout (tests.python.nnue.bullet_data_test.ExporterTests.test_read_raw_weights_uses_the_feature_major_layout) ... ok
+test_truncated_dataset_header_raises_trainer_error (tests.python.nnue.bullet_data_test.ExporterTests.test_truncated_dataset_header_raises_trainer_error) ... ok
+test_validation_rows_with_inf_or_nan_are_skipped (tests.python.nnue.bullet_data_test.ExporterTests.test_validation_rows_with_inf_or_nan_are_skipped) ... to_bullet: wrote 0 train rows and 1 validation rows
+export: skipped 2 malformed validation rows
+ok
+test_auto_output_shifts_avoid_weight_saturation (tests.python.nnue.bullet_data_test.ExporterV5Tests.test_auto_output_shifts_avoid_weight_saturation) ... ok
+test_exporter_rejects_a_hidden_mismatch_v5 (tests.python.nnue.bullet_data_test.ExporterV5Tests.test_exporter_rejects_a_hidden_mismatch_v5) ... export-bullet-v5: /tmp/tmpiu2cdefx/raw.bin has 1180016 floats; expected 2359952 for hidden 64
+ok
+test_exporter_without_validation_selects_the_first_shifts (tests.python.nnue.bullet_data_test.ExporterV5Tests.test_exporter_without_validation_selects_the_first_shifts) ... output shift candidates [12] (peak |w2| 0.0000)
+validation rows unavailable; selecting the first shift combination
+quantization v5 s1=7 s_l1=6 k3=12 val_mae_cp inf w2_saturation 0.000
+selected v5 s1=7 s_l1=6 k3=12 val_mae_cp inf
+wrote /tmp/tmp1tn9yz82/koi-v5.nnue (2359931 bytes) and /tmp/tmp1tn9yz82/koi-v5.metadata.json
+ok
+test_exporter_writes_a_v5_container (tests.python.nnue.bullet_data_test.ExporterV5Tests.test_exporter_writes_a_v5_container) ... output shift candidates [12] (peak |w2| 0.0000)
+validation 2 rows from /tmp/tmpji58z1qn/validation.txt
+quantization v5 s1=7 s_l1=6 k3=12 val_mae_cp 24.00 w2_saturation 0.000
+selected v5 s1=7 s_l1=6 k3=12 val_mae_cp 24.00
+wrote /tmp/tmpji58z1qn/koi-v5.nnue (2359931 bytes) and /tmp/tmpji58z1qn/koi-v5.metadata.json
+ok
+test_infer_hidden_units_v5 (tests.python.nnue.bullet_data_test.ExporterV5Tests.test_infer_hidden_units_v5) ... ok
+test_read_raw_weights_v5_layout (tests.python.nnue.bullet_data_test.ExporterV5Tests.test_read_raw_weights_v5_layout) ... ok
+test_command_builders (tests.python.nnue.bullet_data_test.RunBulletTests.test_command_builders) ... ok
+test_format_epoch_line_matches_the_studio_contract (tests.python.nnue.bullet_data_test.RunBulletTests.test_format_epoch_line_matches_the_studio_contract) ... ok
+test_parse_bullet_line_handles_the_cursor_up_prefix (tests.python.nnue.bullet_data_test.RunBulletTests.test_parse_bullet_line_handles_the_cursor_up_prefix) ... ok
+test_parse_bullet_line_reads_saved_and_ignores_the_rest (tests.python.nnue.bullet_data_test.RunBulletTests.test_parse_bullet_line_reads_saved_and_ignores_the_rest) ... ok
+test_parse_bullet_line_strips_ansi (tests.python.nnue.bullet_data_test.RunBulletTests.test_parse_bullet_line_strips_ansi) ... ok
+test_game_results_are_carried_through (tests.python.nnue.bullet_data_test.TextConversionTests.test_game_results_are_carried_through) ... ok
+test_missing_input_raises (tests.python.nnue.bullet_data_test.TextConversionTests.test_missing_input_raises) ... ok
+test_scores_are_converted_to_white_relative (tests.python.nnue.bullet_data_test.TextConversionTests.test_scores_are_converted_to_white_relative) ... ok
+test_split_limit_and_malformed_rows (tests.python.nnue.bullet_data_test.TextConversionTests.test_split_limit_and_malformed_rows) ... ok
+test_val_fraction_zero_writes_no_validation_file (tests.python.nnue.bullet_data_test.TextConversionTests.test_val_fraction_zero_writes_no_validation_file) ... ok
+
+----------------------------------------------------------------------
+Ran 24 tests in 0.214s
+
+OK (skipped=1)
+<end of output>
+Test time =   0.67 sec
+----------------------------------------------------------
+Test Passed.
+"bullet_data_python" end time: Sep 29 03:11 UTC
+"bullet_data_python" time elapsed: 00:00:00
+----------------------------------------------------------
+
+44/76 Testing: koi_uci_match_process
+44/76 Test: koi_uci_match_process
+Command: "/usr/bin/pwsh" "-NoProfile" "-ExecutionPolicy" "Bypass" "-File" "/work/tests/integration/matches/uci_match_process_test.ps1" "-EnginePath" "/work/build/roadmap-current-linux-gcc14-release-modules-off-20260929/koi-engine"
+Directory: /work/build/roadmap-current-linux-gcc14-release-modules-off-20260929
+"koi_uci_match_process" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+[31;1mException: [0m/work/tools/stability/uci_match.ps1:1165[0m
+[31;1m[0m[36;1mLine |[0m
+[31;1m[0m[36;1m[36;1m1165 | [0m             [36;1mthrow "Opening '$($position.Name)' contains an illegal mo[0m …[0m
+[31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m     | [31;1m             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+[31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m     | [31;1mOpening 'illegal' contains an illegal move sequence.[0m
+<end of output>
+Test time =  42.56 sec
+----------------------------------------------------------
+Test Passed.
+"koi_uci_match_process" end time: Sep 29 03:11 UTC
+"koi_uci_match_process" time elapsed: 00:00:42
+----------------------------------------------------------
+
+16/76 Testing: koi_search_tests_1of4
+16/76 Test: koi_search_tests_1of4
+Command: "/work/build/roadmap-current-linux-gcc14-release-modules-off-20260929/koi_search_tests" "--shard=0/4"
+Directory: /work/build/roadmap-current-linux-gcc14-release-modules-off-20260929
+"koi_search_tests_1of4" start time: Sep 29 03:11 UTC
+Output:
+----------------------------------------------------------
+PASS classical evaluator
+PASS evaluator endgame and mobility
+PASS evaluator color symmetric endgame passer
+PASS evaluator tempo
+PASS time manager
+PASS speed budgets
+PASS root filtering legal move
+PASS short timed threaded search
+PASS very short timed root workers
+PASS queen check mate horizon
+PASS short tactical root fallback
+PASS short oracle fallback safety
+PASS short quiet hanging piece
+PASS short c5b4 queen check trap
+PASS short queen retreat over safe capture
+PASS depth seven check extension stack safety
+PASS short broad check horizon
+PASS depth-one forcing check
+PASS threaded root overlap
+PASS threaded root-in-check parity
+PASS threaded multipv warmed hash
+PASS search info accounting
+PASS threaded timed cancellation
+PASS deterministic legal search
+PASS tactical search statistics
+PASS shorter mate preference
+PASS repetition-sensitive null safety
+PASS shallow null verification off
+PASS quiet history hook exceptions
+PASS true internal iterative deepening
+PASS shallow root near-tie research
+PASS near-root quiet forcing extension
+PASS qsearch lower TT cutoff window
+PASS bounded quiescence checks
+PASS search exception lifecycle
+PASS ponderhit in-place conversion
+PASS transposition table
+PASS transposition table allocation failure
+PASS transposition table concurrency
+koi-test-summary run=39 pass=39 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =  42.90 sec
+----------------------------------------------------------
+Test Passed.
+"koi_search_tests_1of4" end time: Sep 29 03:12 UTC
+"koi_search_tests_1of4" time elapsed: 00:00:42
+----------------------------------------------------------
+
+17/76 Testing: koi_search_tests_2of4
+17/76 Test: koi_search_tests_2of4
+Command: "/work/build/roadmap-current-linux-gcc14-release-modules-off-20260929/koi_search_tests" "--shard=1/4"
+Directory: /work/build/roadmap-current-linux-gcc14-release-modules-off-20260929
+"koi_search_tests_2of4" start time: Sep 29 03:12 UTC
+Output:
+----------------------------------------------------------
+PASS classical evaluator breakdown
+PASS evaluator passed pawn endgame scaling
+PASS evaluator versioned parameters
+PASS evaluator pawnless endgame terms
+PASS adaptive time manager
+PASS compatibility timing controls
+PASS root filtering illegal move
+PASS medium timed forcing root
+PASS ultra short timed completed root
+PASS single-PV root forcing extension
+PASS short poisoned pawn capture
+PASS short oracle b2b1 rook retreat
+PASS short oracle d5c6 mating blunder
+PASS short c5f2 forcing capture
+PASS short safe-looking rook capture horizon mate
+PASS short preserves completed forcing check
+PASS short safe recapture
+PASS threaded depth-one forcing check
+PASS classical threaded parity
+PASS stable root ties
+PASS threaded global nodes
+PASS lazy search features
+PASS evaluator cross-handle safety
+PASS search result identity
+PASS check extensions
+PASS pawn-only zugzwang null safety
+PASS king-zone LMR exclusion
+PASS shallow futility tactical safety
+PASS late quiet move reductions
+PASS bounded mirror validation overhead
+PASS threaded shallow root near-tie research
+PASS near-root pawn king-ring extension
+PASS qsearch TT terminal precedence
+PASS deep quiescence checks
+PASS ponder search lifecycle
+PASS service hash persistence
+PASS transposition table hashfull
+PASS transposition table depth preservation
+PASS transposition table resize concurrency
+koi-test-summary run=39 pass=39 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =   9.15 sec
+----------------------------------------------------------
+Test Passed.
+"koi_search_tests_2of4" end time: Sep 29 03:12 UTC
+"koi_search_tests_2of4" time elapsed: 00:00:09
+----------------------------------------------------------
+
+18/76 Testing: koi_search_tests_3of4
+18/76 Test: koi_search_tests_3of4
+Command: "/work/build/roadmap-current-linux-gcc14-release-modules-off-20260929/koi_search_tests" "--shard=2/4"
+Directory: /work/build/roadmap-current-linux-gcc14-release-modules-off-20260929
+"koi_search_tests_3of4" start time: Sep 29 03:12 UTC
+Output:
+----------------------------------------------------------
+PASS development center pressure
+PASS evaluator passed pawn blockade
+PASS evaluator endgame king activity
+PASS evaluator complete breakdown
+PASS low-clock emergency pacing
+PASS explicit limits honor clock guard
+PASS deterministic multipv
+PASS low clock forcing root
+PASS short timed threaded authoritative root
+PASS timed poisoned capture
+PASS short defensive rook lift
+PASS short oracle b2b4 rook lift
+PASS short forced king escape
+PASS short a5c5 forcing check
+PASS short recapture before material capture
+PASS short safe forcing exchange
+PASS short second check horizon
+PASS root king safety escape
+PASS threaded single-PV evaluates the root iteration
+PASS threaded multipv ranked root lines
+PASS threaded node parity
+PASS feature cache restoration
+PASS terminal search
+PASS search result legal PV
+PASS forced quiet evasion
+PASS low-phase null safety
+PASS high-history LMR exclusion
+PASS shallow futility accounting
+PASS static evaluation cache
+PASS late move full-depth verification
+PASS threaded short forcing root research
+PASS near-root pawn break extension
+PASS checked quiescence cap
+PASS aspiration windows
+PASS ponder terminal lifecycle
+PASS search timing context
+PASS transposition table memory cap
+PASS transposition table age refresh
+PASS transposition table mixed maintenance
+koi-test-summary run=39 pass=39 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =  42.55 sec
+----------------------------------------------------------
+Test Passed.
+"koi_search_tests_3of4" end time: Sep 29 03:13 UTC
+"koi_search_tests_3of4" time elapsed: 00:00:42
+----------------------------------------------------------
+
+19/76 Testing: koi_search_tests_4of4
+19/76 Test: koi_search_tests_4of4
+Command: "/work/build/roadmap-current-linux-gcc14-release-modules-off-20260929/koi_search_tests" "--shard=3/4"
+Directory: /work/build/roadmap-current-linux-gcc14-release-modules-off-20260929
+"koi_search_tests_4of4" start time: Sep 29 03:13 UTC
+Output:
+----------------------------------------------------------
+PASS evaluator perspective symmetry
+PASS evaluator mirrored terms and black blockade
+PASS evaluator passer support and race
+PASS evaluator bishop pair
+PASS low-clock hard window
+PASS search options
+PASS threaded root search
+PASS short timed multithread overlap
+PASS hard short search deadline
+PASS interrupted root completed candidate
+PASS short queen check trap
+PASS short b2b4 pawn lure
+PASS short d2c1 king trap
+PASS short b2b4 mating rook lift
+PASS short info PV matches bestmove
+PASS short parallel abort safe exchange
+PASS incomplete root forcing fallback
+PASS timed PV and bestmove coherence
+PASS threaded single-PV uses lazy smp
+PASS threaded multipv final-depth parity
+PASS depth-zero node accounting
+PASS threaded cancellation
+PASS claimable draw root fallback
+PASS fixed-depth tactical reference
+PASS mate in one distance
+PASS sparse phase-rich null safety
+PASS opening central break
+PASS quiet history moving side
+PASS static eval correction history
+PASS committed PGN tactical fixtures
+PASS clock short forcing root research
+PASS qsearch exact TT cutoff ordering
+PASS poisoned capture quiescence
+PASS infinite search lifecycle
+PASS ponder time and node limits
+PASS hash bounds and clear
+PASS transposition table unchanged cap
+PASS transposition table mate normalization
+koi-test-summary run=38 pass=38 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =  49.42 sec
+----------------------------------------------------------
+Test Passed.
+"koi_search_tests_4of4" end time: Sep 29 03:14 UTC
+"koi_search_tests_4of4" time elapsed: 00:00:49
+----------------------------------------------------------
+
+33/76 Testing: koi_strength_tests
+33/76 Test: koi_strength_tests
+Command: "/work/build/roadmap-current-linux-gcc14-release-modules-off-20260929/koi_strength_tests"
+Directory: /work/build/roadmap-current-linux-gcc14-release-modules-off-20260929
+"koi_strength_tests" start time: Sep 29 03:14 UTC
+Output:
+----------------------------------------------------------
+PASS strength suite hard gate
+PASS optional strength fixture contract
+PASS optional strength rule draws
+PASS strength corpora cross-distinct and legal
+PASS strength position legacy initialization
+PASS legacy strength rows exact
+PASS strength positions valid and tactical
+koi-test-summary run=7 pass=7 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =   2.18 sec
+----------------------------------------------------------
+Test Passed.
+"koi_strength_tests" end time: Sep 29 03:14 UTC
+"koi_strength_tests" time elapsed: 00:00:02
+----------------------------------------------------------
+
+37/76 Testing: koi_engine_process
+37/76 Test: koi_engine_process
+Command: "/usr/bin/pwsh" "-NoProfile" "-ExecutionPolicy" "Bypass" "-File" "/work/tests/integration/uci/uci_process_test.ps1" "-EnginePath" "/work/build/roadmap-current-linux-gcc14-release-modules-off-20260929/koi-engine"
+Directory: /work/build/roadmap-current-linux-gcc14-release-modules-off-20260929
+"koi_engine_process" start time: Sep 29 03:14 UTC
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   2.22 sec
+----------------------------------------------------------
+Test Passed.
+"koi_engine_process" end time: Sep 29 03:14 UTC
+"koi_engine_process" time elapsed: 00:00:02
+----------------------------------------------------------
+
+38/76 Testing: koi_engine_perft_responsiveness
+38/76 Test: koi_engine_perft_responsiveness
+Command: "/usr/bin/pwsh" "-NoProfile" "-ExecutionPolicy" "Bypass" "-File" "/work/tests/integration/uci/perft_responsiveness_test.ps1" "-EnginePath" "/work/build/roadmap-current-linux-gcc14-release-modules-off-20260929/koi-engine"
+Directory: /work/build/roadmap-current-linux-gcc14-release-modules-off-20260929
+"koi_engine_perft_responsiveness" start time: Sep 29 03:14 UTC
+Output:
+----------------------------------------------------------
+go perft remained responsive to isready and stop.
+<end of output>
+Test time =   0.66 sec
+----------------------------------------------------------
+Test Passed.
+"koi_engine_perft_responsiveness" end time: Sep 29 03:14 UTC
+"koi_engine_perft_responsiveness" time elapsed: 00:00:00
+----------------------------------------------------------
+
+42/76 Testing: koi_engine_time_safety_process
+42/76 Test: koi_engine_time_safety_process
+Command: "/usr/bin/pwsh" "-NoProfile" "-ExecutionPolicy" "Bypass" "-File" "/work/tests/integration/uci/time_safety_test.ps1" "-EnginePath" "/work/build/roadmap-current-linux-gcc14-release-modules-off-20260929/koi-engine"
+Directory: /work/build/roadmap-current-linux-gcc14-release-modules-off-20260929
+"koi_engine_time_safety_process" start time: Sep 29 03:14 UTC
+Output:
+----------------------------------------------------------
+Time safety UCI transcript passed.
+<end of output>
+Test time =  11.71 sec
+----------------------------------------------------------
+Test Passed.
+"koi_engine_time_safety_process" end time: Sep 29 03:14 UTC
+"koi_engine_time_safety_process" time elapsed: 00:00:11
+----------------------------------------------------------
+
+43/76 Testing: koi_benchmark_process
+43/76 Test: koi_benchmark_process
+Command: "/usr/bin/pwsh" "-NoProfile" "-ExecutionPolicy" "Bypass" "-File" "/work/tests/integration/tools/koi_bench_process_test.ps1" "-BenchPath" "/work/build/roadmap-current-linux-gcc14-release-modules-off-20260929/koi-bench"
+Directory: /work/build/roadmap-current-linux-gcc14-release-modules-off-20260929
+"koi_benchmark_process" start time: Sep 29 03:14 UTC
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =  22.40 sec
+----------------------------------------------------------
+Test Passed.
+"koi_benchmark_process" end time: Sep 29 03:14 UTC
+"koi_benchmark_process" time elapsed: 00:00:22
+----------------------------------------------------------
+
+46/76 Testing: koi_uci_match_clock
+46/76 Test: koi_uci_match_clock
+Command: "/usr/bin/pwsh" "-NoProfile" "-ExecutionPolicy" "Bypass" "-File" "/work/tests/integration/matches/uci_match_clock_test.ps1" "-EnginePath" "/work/build/roadmap-current-linux-gcc14-release-modules-off-20260929/koi-engine"
+Directory: /work/build/roadmap-current-linux-gcc14-release-modules-off-20260929
+"koi_uci_match_clock" start time: Sep 29 03:14 UTC
+Output:
+----------------------------------------------------------
+PASS UCI match clock deadline integration
+<end of output>
+Test time =  68.07 sec
+----------------------------------------------------------
+Test Passed.
+"koi_uci_match_clock" end time: Sep 29 03:16 UTC
+"koi_uci_match_clock" time elapsed: 00:01:08
+----------------------------------------------------------
+
+End testing: Sep 29 03:16 UTC
+
+evaluation =   1.66 sec*proc
+
+heavy = 360.62 sec*proc
+
+integration =   5.82 sec*proc
+
+matches = 182.13 sec*proc
+
+measurement =   6.47 sec*proc
+
+process = 255.83 sec*proc
+
+python =  34.36 sec*proc
+
+rules =   0.02 sec*proc
+
+runtime =   9.62 sec*proc
+
+search = 292.61 sec*proc
+
+tools =  50.59 sec*proc
+
+uci =  28.92 sec*proc
+
+unit = 304.40 sec*proc
+

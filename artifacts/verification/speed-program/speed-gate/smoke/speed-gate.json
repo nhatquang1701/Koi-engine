@@ -1,0 +1,36 @@
+{
+  "schema": "koi-speed-gate-v1",
+  "timestamp": "2026-09-25T17:59:59.0575277+07:00",
+  "baseline_executable": "C:\\Users\\ntATh\\AI test\\Koi engine\\build\\release\\koi-bench.exe",
+  "candidate_executable": "C:\\Users\\ntATh\\AI test\\Koi engine\\build\\release\\koi-bench.exe",
+  "runs": 3,
+  "threads": 1,
+  "speed": 100,
+  "fen_file": "C:\\Users\\ntATh\\AppData\\Local\\Temp\\opencode\\speed-baseline\\smoke-fens.txt",
+  "depth": 4,
+  "depth_sweep": null,
+  "nps_regression_limit_percent": 2.0,
+  "row_nps_regression_limit_percent": 2.0,
+  "baseline_total_nps": 137576,
+  "candidate_total_nps": 138429,
+  "total_nps_delta_percent": 0.62,
+  "median_row_nps_delta_percent": 0.3243,
+  "rows": [
+    {
+      "key": "fen-001#4",
+      "baseline_nps": 125280,
+      "candidate_nps": 125280,
+      "nps_delta_percent": 0.0,
+      "baseline_elapsed_ms": 51,
+      "candidate_elapsed_ms": 63
+    },
+    {
+      "key": "fen-002#4",
+      "baseline_nps": 138142,
+      "candidate_nps": 139038,
+      "nps_delta_percent": 0.6486,
+      "baseline_elapsed_ms": 1104,
+      "candidate_elapsed_ms": 1177
+    }
+  ]
+}

@@ -1,0 +1,454 @@
+﻿> uci
+< id name Koi Engine
+< id author Koi Engine contributors
+< option name RandomSeed type spin default 0 min 0 max 2147483647
+< option name Hash type spin default 512 min 1 max 4096
+< option name Threads type spin default 1 min 1 max 8
+< option name Speed type spin default 100 min 1 max 100
+< option name UCI_AnalyseMode type check default false
+< option name MultiPV type spin default 1 min 1 max 16
+< option name Ponder type check default false
+< option name OwnBook type check default true
+< option name BookFile type string default book.bin
+< option name BookDepth type spin default 16 min 0 max 40
+< option name BookRandom type check default false
+< option name BookSafety type check default true
+< option name BookSafetyDepth type spin default 2 min 0 max 3
+< option name Clear Hash type button
+< option name UCI_ShowWDL type check default false
+< option name Move Overhead type spin default 10 min 0 max 5000
+< option name Slow Mover type spin default 100 min 10 max 1000
+< option name UCI_LimitStrength type check default false
+< option name UCI_Elo type spin default 1320 min 1320 max 3190
+< option name StrengthMode type check default false
+< option name SyzygyPath type string default 
+< option name SyzygyProbeDepth type spin default 1 min 1 max 100
+< option name SyzygyProbeLimit type spin default 5 min 0 max 7
+< option name Syzygy50MoveRule type check default true
+< uciok
+> setoption name OwnBook value false
+> setoption name Threads value 4
+> setoption name Speed value 100
+> isready
+< readyok
+> position fen rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
+> go movetime 100
+< info depth 1 seldepth 1 multipv 1 score cp 102 nodes 23 nps 23 time 0 pv b1c3
+< info depth 2 seldepth 8 multipv 1 score cp 0 nodes 182 nps 60666 time 3 pv g1f3 b8c6
+< info depth 3 seldepth 8 multipv 1 score cp 102 nodes 325 nps 65000 time 5 pv g1f3 b8c6 b1c3
+< info depth 4 seldepth 12 multipv 1 score cp 0 nodes 1595 nps 56964 time 28 pv b1c3 b8c6 g1f3
+< bestmove b1c3
+> setoption name OwnBook value false
+> setoption name Threads value 4
+> setoption name Speed value 100
+> isready
+< readyok
+> position fen rnbqkbnr/pppppppp/8/8/8/2N5/PPPPPPPP/R1BQKBNR b KQkq - 1 1
+> go movetime 100
+< info depth 1 seldepth 1 multipv 1 score cp 0 nodes 21 nps 21 time 0 pv b8c6
+< info depth 2 seldepth 1 multipv 1 score cp -44 nodes 42 nps 42 time 0 pv b8c6
+< info depth 3 seldepth 1 multipv 1 score cp -44 nodes 63 nps 63 time 0 pv b8c6
+< info depth 4 seldepth 6 multipv 1 score cp -44 nodes 162 nps 81000 time 2 pv b8c6
+< info depth 5 seldepth 15 multipv 1 score cp 0 nodes 4809 nps 56576 time 85 pv b8c6 g1f3 g8f6 d2d4 d7d5
+< bestmove b8c6
+> setoption name OwnBook value false
+> setoption name Threads value 4
+> setoption name Speed value 100
+> isready
+< readyok
+> position fen rnbqkbnr/ppp1pppp/8/3p4/8/2N5/PPPPPPPP/R1BQKBNR w KQkq - 0 2
+> go movetime 100
+< info depth 1 seldepth 11 multipv 1 score cp 134 nodes 464 nps 51555 time 9 pv g1f3
+< info depth 2 seldepth 11 multipv 1 score cp 35 nodes 567 nps 47250 time 12 pv e2e4
+< info depth 3 seldepth 11 multipv 1 score cp 76 nodes 998 nps 43391 time 23 pv d2d4 b8c6 g1f3
+< bestmove d2d4
+> setoption name OwnBook value false
+> setoption name Threads value 4
+> setoption name Speed value 100
+> isready
+< readyok
+> position fen rnbqkbnr/ppp1pppp/8/3p4/3P4/2N5/PPP1PPPP/R1BQKBNR b KQkq - 0 2
+> go movetime 100
+< info depth 1 seldepth 11 multipv 1 score cp -21 nodes 161 nps 53666 time 3 pv d8d6
+< info depth 2 seldepth 11 multipv 1 score cp -76 nodes 243 nps 60750 time 4 pv b8c6 g1f3
+< info depth 3 seldepth 11 multipv 1 score cp 0 nodes 304 nps 50666 time 6 pv b8c6 g1f3 g8f6
+< info depth 4 seldepth 18 multipv 1 score cp -60 nodes 3349 nps 50742 time 66 pv b8c6 g1f3 g8f6 d1d3
+< bestmove b8c6
+> setoption name OwnBook value false
+> setoption name Threads value 4
+> setoption name Speed value 100
+> isready
+< readyok
+> position fen rnbqkb1r/ppp1pppp/5n2/3p4/3P4/2N5/PPP1PPPP/R1BQKBNR w KQkq - 1 3
+> go movetime 100
+< info depth 1 seldepth 11 multipv 1 score cp 102 nodes 159 nps 31800 time 5 pv g1f3
+< info depth 2 seldepth 11 multipv 1 score cp 60 nodes 189 nps 31500 time 6 pv g1f3 b8c6
+< info depth 3 seldepth 11 multipv 1 score cp 60 nodes 479 nps 36846 time 13 pv g1f3 b8c6
+< bestmove g1f3
+> setoption name OwnBook value false
+> setoption name Threads value 4
+> setoption name Speed value 100
+> isready
+< readyok
+> position fen rnbqkb1r/ppp1pppp/5n2/3p4/3P4/2N2N2/PPP1PPPP/R1BQKB1R b KQkq - 2 3
+> go movetime 100
+< info depth 1 seldepth 7 multipv 1 score cp -14 nodes 112 nps 56000 time 2 pv b8c6
+< info depth 2 seldepth 7 multipv 1 score cp -14 nodes 142 nps 47333 time 3 pv b8c6
+< info depth 3 seldepth 7 multipv 1 score cp -14 nodes 172 nps 57333 time 3 pv b8c6
+< bestmove b8c6
+> setoption name OwnBook value false
+> setoption name Threads value 4
+> setoption name Speed value 100
+> isready
+< readyok
+> position fen rnbqkb1r/pp2pppp/5n2/2pp4/3P4/2N2N2/PPP1PPPP/R1BQKB1R w KQkq - 0 4
+> go movetime 100
+< info depth 1 seldepth 14 multipv 1 score cp 111 nodes 973 nps 46333 time 21 pv d4c5 b8c6
+< info depth 2 seldepth 14 multipv 1 score cp 111 nodes 1391 nps 44870 time 31 pv d4c5
+< info depth 3 seldepth 14 multipv 1 score cp 171 nodes 2640 nps 43278 time 61 pv d4c5 b8c6 d1d3
+< bestmove d4c5
+> setoption name OwnBook value false
+> setoption name Threads value 4
+> setoption name Speed value 100
+> isready
+< readyok
+> position fen rnbqkb1r/pp2pppp/5n2/2Pp4/8/2N2N2/PPP1PPPP/R1BQKB1R b KQkq - 0 4
+> go movetime 100
+< info depth 1 seldepth 13 multipv 1 score cp -111 nodes 667 nps 44466 time 15 pv b8c6
+< info depth 2 seldepth 13 multipv 1 score cp -171 nodes 731 nps 45687 time 16 pv b8c6
+< info depth 3 seldepth 13 multipv 1 score cp -108 nodes 1722 nps 40046 time 43 pv b8c6 d1d3 d8a5
+< bestmove b8c6
+> setoption name OwnBook value false
+> setoption name Threads value 4
+> setoption name Speed value 100
+> isready
+< readyok
+> position fen r1bqkb1r/pp2pppp/2n2n2/2Pp4/8/2N2N2/PPP1PPPP/R1BQKB1R w KQkq - 1 5
+> go movetime 100
+< info depth 1 seldepth 10 multipv 1 score cp 167 nodes 1058 nps 35266 time 30 pv c1g5
+< info depth 2 seldepth 10 multipv 1 score cp 124 nodes 1140 nps 35625 time 32 pv c1e3
+< info depth 3 seldepth 10 multipv 1 score cp 124 nodes 1835 nps 33981 time 54 pv c1e3
+< bestmove c1e3
+> setoption name OwnBook value false
+> setoption name Threads value 4
+> setoption name Speed value 100
+> isready
+< readyok
+> position fen r1bqkb1r/pp2pppp/2n2n2/2Pp4/3N4/2N5/PPP1PPPP/R1BQKB1R b KQkq - 2 5
+> go movetime 100
+< info depth 1 seldepth 8 multipv 1 score cp -92 nodes 421 nps 30071 time 14 pv d8c7
+< info depth 2 seldepth 13 multipv 1 score cp -96 nodes 772 nps 30880 time 25 pv e7e5 d4c6
+< info depth 3 seldepth 13 multipv 1 score cp -65 nodes 2227 nps 32275 time 69 pv d8a5 d4c6 b7c6
+< bestmove d8a5
+> setoption name OwnBook value false
+> setoption name Threads value 4
+> setoption name Speed value 100
+> isready
+< readyok
+> position fen r1bqkb1r/pp3ppp/2n2n2/2Ppp3/3N4/2N5/PPP1PPPP/R1BQKB1R w KQkq - 0 6
+> go movetime 100
+< info depth 1 seldepth 13 multipv 1 score cp 96 nodes 707 nps 28280 time 25 pv d4c6
+< info depth 2 seldepth 13 multipv 1 score cp 96 nodes 742 nps 28538 time 26 pv d4c6
+< info depth 3 seldepth 13 multipv 1 score cp 142 nodes 1904 nps 28000 time 68 pv d4c6 b7c6 c1e3
+< bestmove d4c6
+> setoption name OwnBook value false
+> setoption name Threads value 4
+> setoption name Speed value 100
+> isready
+< readyok
+> position fen r1bqkb1r/pp3ppp/2N2n2/2Ppp3/8/2N5/PPP1PPPP/R1BQKB1R b KQkq - 0 6
+> go movetime 100
+< info depth 1 seldepth 15 multipv 1 score cp -142 nodes 723 nps 36150 time 20 pv b7c6
+< info depth 2 seldepth 15 multipv 1 score cp -142 nodes 758 nps 36095 time 21 pv b7c6
+< info depth 3 seldepth 15 multipv 1 score cp -76 nodes 1916 nps 33614 time 57 pv b7c6 c1e3 d5d4
+< bestmove b7c6
+> setoption name OwnBook value false
+> setoption name Threads value 4
+> setoption name Speed value 100
+> isready
+< readyok
+> position fen r1bqkb1r/p4ppp/2p2n2/2Ppp3/8/2N5/PPP1PPPP/R1BQKB1R w KQkq - 0 7
+> go movetime 100
+< info depth 1 seldepth 14 multipv 1 score cp 142 nodes 985 nps 35178 time 28 pv c1e3
+< info depth 2 seldepth 14 multipv 1 score cp 85 nodes 1305 nps 37285 time 35 pv c1e3 c8g4 a1c1
+< info depth 3 seldepth 14 multipv 1 score cp 112 nodes 2556 nps 34080 time 75 pv c1e3 a8b8 a1b1
+< bestmove c1e3
+> setoption name OwnBook value false
+> setoption name Threads value 4
+> setoption name Speed value 100
+> isready
+< readyok
+> position fen r1bqkb1r/p4ppp/2p2n2/2Ppp3/5P2/2N5/PPP1P1PP/R1BQKB1R b KQkq - 0 7
+> go movetime 100
+< info depth 1 seldepth 11 multipv 1 score cp 35 nodes 1070 nps 35666 time 30 pv e5f4 h2h3
+< info depth 2 seldepth 11 multipv 1 score cp 35 nodes 1137 nps 35531 time 32 pv e5f4
+< info depth 3 seldepth 11 multipv 1 score cp 55 nodes 2500 nps 36764 time 68 pv e5f4 c1f4 f8c5
+< bestmove e5f4
+> setoption name OwnBook value false
+> setoption name Threads value 4
+> setoption name Speed value 100
+> isready
+< readyok
+> position fen r1bqk2r/p4ppp/2p2n2/2bpp3/5P2/2N5/PPP1P1PP/R1BQKB1R w KQkq - 0 8
+> go movetime 100
+< info depth 1 seldepth 14 multipv 1 score cp 9 nodes 2734 nps 40205 time 68 pv f4e5 f6e4 c3e4
+< bestmove f4e5
+> setoption name OwnBook value false
+> setoption name Threads value 4
+> setoption name Speed value 100
+> isready
+< readyok
+> position fen r1bqk2r/p4ppp/2p2n2/2bpP3/8/2N5/PPP1P1PP/R1BQKB1R b KQkq - 0 8
+> go movetime 100
+< info depth 1 seldepth 14 multipv 1 score cp -9 nodes 717 nps 47800 time 15 pv f6e4
+< info depth 2 seldepth 14 multipv 1 score cp -9 nodes 1318 nps 43933 time 30 pv f6e4
+< bestmove f6e4
+> setoption name OwnBook value false
+> setoption name Threads value 4
+> setoption name Speed value 100
+> isready
+< readyok
+> position fen r1bqk2r/p4ppp/2p5/2bpP3/6n1/2N5/PPP1P1PP/R1BQKB1R w KQkq - 1 9
+> go movetime 100
+< info depth 1 seldepth 16 multipv 1 score cp 13 nodes 1877 nps 38306 time 49 pv e2e4
+< bestmove e2e4
+> setoption name OwnBook value false
+> setoption name Threads value 4
+> setoption name Speed value 100
+> isready
+< readyok
+> position fen r1bqk2r/p4ppp/2p5/2bpP3/6n1/2N1P3/PPP3PP/R1BQKB1R b KQkq - 0 9
+> go movetime 100
+< info depth 1 seldepth 19 multipv 1 score cp 73 nodes 3448 nps 40093 time 86 pv d8c7
+< bestmove d8c7
+> setoption name OwnBook value false
+> setoption name Threads value 4
+> setoption name Speed value 100
+> isready
+< readyok
+> position fen r1bq1rk1/p4ppp/2p5/2bpP3/6n1/2N1P3/PPP3PP/R1BQKB1R w KQ - 1 10
+> go movetime 100
+< bestmove f1d3
+> setoption name OwnBook value false
+> setoption name Threads value 4
+> setoption name Speed value 100
+> isready
+< readyok
+> position fen r1bq1rk1/p4ppp/2p5/2bpP3/6n1/2NBP3/PPP3PP/R1BQK2R b KQ - 2 10
+> go movetime 100
+< bestmove g4e3
+> setoption name OwnBook value false
+> setoption name Threads value 4
+> setoption name Speed value 100
+> isready
+< readyok
+> position fen r1b2rk1/p4ppp/2p5/2bpP3/6nq/2NBP3/PPP3PP/R1BQK2R w KQ - 3 11
+> go movetime 100
+< info depth 1 seldepth 13 multipv 1 score cp 50 nodes 804 nps 50250 time 16 pv g2g3 h4h6
+< info depth 2 seldepth 13 multipv 1 score cp -11 nodes 1560 nps 47272 time 33 pv g2g3 h4d8 e1g1
+< bestmove g2g3
+> setoption name OwnBook value false
+> setoption name Threads value 4
+> setoption name Speed value 100
+> isready
+< readyok
+> position fen r1b2rk1/p4ppp/2p5/2bpP3/6nq/2NBP1P1/PPP4P/R1BQK2R b KQ - 0 11
+> go movetime 100
+< info depth 1 seldepth 13 multipv 1 score cp 57 nodes 1091 nps 40407 time 27 pv h4g5 h1f1 g5e5
+< info depth 2 seldepth 13 multipv 1 score cp 57 nodes 1446 nps 43818 time 33 pv h4g5 h1f1
+< info depth 3 seldepth 15 multipv 1 score cp 57 nodes 3260 nps 43466 time 75 pv h4g5 h1f1
+< bestmove h4g5
+> setoption name OwnBook value false
+> setoption name Threads value 4
+> setoption name Speed value 100
+> isready
+< readyok
+> position fen r1b2rk1/p4ppp/2p5/2bpP3/6n1/2NBP1Pq/PPP4P/R1BQK2R w KQ - 1 12
+> go movetime 100
+< bestmove d3f1
+> setoption name OwnBook value false
+> setoption name Threads value 4
+> setoption name Speed value 100
+> isready
+< readyok
+> position fen r1b2rk1/p4ppp/2p5/2bpP3/6n1/2N1P1Pq/PPP4P/R1BQKB1R b KQ - 2 12
+> go movetime 100
+< info depth 1 seldepth 12 multipv 1 score cp 6 nodes 1485 nps 43676 time 34 pv h3h5
+< info depth 2 seldepth 12 multipv 1 score cp 6 nodes 1644 nps 43263 time 38 pv h3h5
+< bestmove h3h5
+> setoption name OwnBook value false
+> setoption name Threads value 4
+> setoption name Speed value 100
+> isready
+< readyok
+> position fen r1b2rk1/p4ppp/2p4q/2bpP3/6n1/2N1P1P1/PPP4P/R1BQKB1R w KQ - 3 13
+> go movetime 100
+< info depth 1 seldepth 15 multipv 1 score cp -123 nodes 2402 nps 45320 time 53 pv a2a3 g4e5
+< bestmove a2a3
+> setoption name OwnBook value false
+> setoption name Threads value 4
+> setoption name Speed value 100
+> isready
+< readyok
+> position fen r1b2rk1/p4ppp/2p4q/2bNP3/6n1/4P1P1/PPP4P/R1BQKB1R b KQ - 0 13
+> go movetime 100
+< bestmove g4e5
+> setoption name OwnBook value false
+> setoption name Threads value 4
+> setoption name Speed value 100
+> isready
+< readyok
+> position fen r1b2rk1/p4ppp/7q/2bpP3/6n1/4P1P1/PPP4P/R1BQKB1R w KQ - 0 14
+> go movetime 100
+< bestmove d1d5
+> setoption name OwnBook value false
+> setoption name Threads value 4
+> setoption name Speed value 100
+> isready
+< readyok
+> position fen r1b2rk1/p4ppp/7q/2bQP3/6n1/4P1P1/PPP4P/R1B1KB1R b KQ - 0 14
+> go movetime 100
+< bestmove c5e3
+> setoption name OwnBook value false
+> setoption name Threads value 4
+> setoption name Speed value 100
+> isready
+< readyok
+> position fen r1b2rk1/p4ppp/7q/3QP3/6n1/4b1P1/PPP4P/R1B1KB1R w KQ - 0 15
+> go movetime 100
+< info depth 1 seldepth 17 multipv 1 score cp 30 nodes 4251 nps 49430 time 86 pv d5a8
+< bestmove d5a8
+> setoption name OwnBook value false
+> setoption name Threads value 4
+> setoption name Speed value 100
+> isready
+< readyok
+> position fen r1b2rk1/p4ppp/7q/3QP3/6n1/4B1P1/PPP4P/R3KB1R b KQ - 0 15
+> go movetime 100
+< info depth 1 seldepth 13 multipv 1 score cp 218 nodes 3503 nps 47986 time 73 pv h6e3 f1e2 c8e6
+< bestmove h6e3
+> setoption name OwnBook value false
+> setoption name Threads value 4
+> setoption name Speed value 100
+> isready
+< readyok
+> position fen r1b2rk1/p4ppp/8/3QP3/6n1/4q1P1/PPP4P/R3KB1R w KQ - 0 16
+> go movetime 100
+< info depth 1 seldepth 1 multipv 1 score cp -218 nodes 3 nps 3 time 0 pv f1e2
+< info depth 2 seldepth 14 multipv 1 score cp -259 nodes 2169 nps 51642 time 42 pv f1e2 c8e6
+< bestmove f1e2
+> setoption name OwnBook value false
+> setoption name Threads value 4
+> setoption name Speed value 100
+> isready
+< readyok
+> position fen r1b2rk1/p4ppp/8/3QP3/6n1/4q1P1/PPP1B2P/R3K2R b KQ - 1 16
+> go movetime 100
+< info depth 1 seldepth 13 multipv 1 score cp 259 nodes 1607 nps 44638 time 36 pv c8e6
+< info depth 2 seldepth 13 multipv 1 score cp 259 nodes 1718 nps 45210 time 38 pv c8e6
+< bestmove c8e6
+> setoption name OwnBook value false
+> setoption name Threads value 4
+> setoption name Speed value 100
+> isready
+< readyok
+> position fen r1b2rk1/p4ppp/8/3QP3/6n1/6P1/PPP1Bq1P/R3K2R w KQ - 2 17
+> go movetime 100
+< info depth 1 seldepth 1 multipv 1 score cp -302 nodes 3 nps 3 time 0 pv e1d2
+< info depth 2 seldepth 1 multipv 1 score cp -302 nodes 6 nps 6 time 0 pv e1d2
+< bestmove e1d2
+> setoption name OwnBook value false
+> setoption name Threads value 4
+> setoption name Speed value 100
+> isready
+< readyok
+> position fen r1b2rk1/p4ppp/8/3QP3/6n1/6P1/PPPKBq1P/R6R b - - 3 17
+> go movetime 100
+< info depth 1 seldepth 15 multipv 1 score cp 194 nodes 3855 nps 50064 time 77 pv c8e6 d5e4 e6f5
+< bestmove c8e6
+> setoption name OwnBook value false
+> setoption name Threads value 4
+> setoption name Speed value 100
+> isready
+< readyok
+> position fen r4rk1/pb3ppp/8/3QP3/6n1/6P1/PPPKBq1P/R6R w - - 4 18
+> go movetime 100
+< bestmove d5b7
+> setoption name OwnBook value false
+> setoption name Threads value 4
+> setoption name Speed value 100
+> isready
+< readyok
+> position fen r4rk1/pQ3ppp/8/4P3/6n1/6P1/PPPKBq1P/R6R b - - 0 18
+> go movetime 100
+< bestmove f8d8
+> setoption name OwnBook value false
+> setoption name Threads value 4
+> setoption name Speed value 100
+> isready
+< readyok
+> position fen r2r2k1/pQ3ppp/8/4P3/6n1/6P1/PPPKBq1P/R6R w - - 1 19
+> go movetime 100
+< info depth 1 seldepth 13 multipv 1 score cp -120 nodes 1520 nps 49032 time 31 pv d2c1 f2e2
+< bestmove d2c1
+> setoption name OwnBook value false
+> setoption name Threads value 4
+> setoption name Speed value 100
+> isready
+< readyok
+> position fen r2r2k1/pQ3ppp/8/4P3/6n1/6P1/PPP1Bq1P/R1K4R b - - 2 19
+> go movetime 100
+< info depth 1 seldepth 13 multipv 1 score cp 290 nodes 2013 nps 46813 time 43 pv f2e2
+< bestmove f2e2
+> setoption name OwnBook value false
+> setoption name Threads value 4
+> setoption name Speed value 100
+> isready
+< readyok
+> position fen r2r2k1/pQ3ppp/8/4P3/6n1/6P1/PPP1q2P/R1K4R w - - 0 20
+> go movetime 100
+< info depth 1 seldepth 15 multipv 1 score cp -290 nodes 4557 nps 57683 time 79 pv a2a3
+< bestmove a2a3
+> setoption name OwnBook value false
+> setoption name Threads value 4
+> setoption name Speed value 100
+> isready
+< readyok
+> position fen r2r2k1/pQ3ppp/8/4P3/6n1/1P4P1/P1P1q2P/R1K4R b - - 0 20
+> go movetime 100
+< info depth 1 seldepth 12 multipv 1 score cp 347 nodes 4251 nps 49430 time 86 pv g4f2
+< bestmove g4f2
+> setoption name OwnBook value false
+> setoption name Threads value 4
+> setoption name Speed value 100
+> isready
+< readyok
+> position fen r2r2k1/pQ3ppp/8/4P3/8/1P2n1P1/P1P1q2P/R1K4R w - - 1 21
+> go movetime 100
+< bestmove b7c6
+> setoption name OwnBook value false
+> setoption name Threads value 4
+> setoption name Speed value 100
+> isready
+< readyok
+> position fen r2r2k1/pQ3ppp/8/4P3/8/1P2n1P1/PKP1q2P/R6R b - - 2 21
+> go movetime 100
+< bestmove e2c2
+> setoption name OwnBook value false
+> setoption name Threads value 4
+> setoption name Speed value 100
+> isready
+< readyok
+> position fen r2r2k1/pQ3ppp/8/4P3/8/1P2n1P1/PKq4P/R6R w - - 0 22
+> go movetime 100
+< info depth 1 seldepth 13 multipv 1 score cp -454 nodes 4763 nps 66152 time 72 pv b2a3 c2c3 a3a4
+< bestmove b2a3
+> setoption name OwnBook value false
+> setoption name Threads value 4
+> setoption name Speed value 100
+> isready
+< readyok
+> position fen r2r2k1/pQ3ppp/8/4P3/8/KP2n1P1/P1q4P/R6R b - - 1 22
+> go movetime 100
+< bestmove c2c5
+> quit

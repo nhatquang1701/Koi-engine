@@ -1,0 +1,30 @@
+{
+  "schema": "koi-lmp-sprt-runner-state-v1",
+  "status": "running",
+  "experiment_manifest": "artifacts/matches/lmp-quiet-check-20260930/sprt/experiment.json",
+  "experiment_sha256": "4625645daaa89a555a9d0b1dee0fec31a028cb142ad81328e2d4c2584440ea48",
+  "run_root": "artifacts/matches/lmp-quiet-check-20260930/sprt/lmp-quiet-check-batch1-20260930-085214",
+  "exec_session": 78241,
+  "runner_pid": 12244,
+  "workers": {
+    "white": 10008,
+    "black": 9268
+  },
+  "engine_children": {
+    "white": [
+      17732,
+      2396
+    ],
+    "black": [
+      23396,
+      11736
+    ]
+  },
+  "started_local": "2026-09-30 08:52:14 +07:00",
+  "cpu_variant": "avx2",
+  "opening_sha256": "e9b4752564f418c37196586d367f1e6eda175be8f6ca5cdc470c509b13dd405f",
+  "runner_sha256": "7cdd13180dc22450883d15796f0cf8b74822c948e95b0f50bdd62fca77ab41fa",
+  "harness_sha256": "9df4f67a4632a05e070eb44fde202814a9692befd3a63c880688b946feedfb3e",
+  "candidate_sha256": "1fbf7321466bf83bcdd2983d26514b3d647720a48b73a718e841062cb29a05c6",
+  "baseline_sha256": "da08c26912a5fce8dce2d85efc28cc33503345b26018d82b961181df2ad2af20"
+}

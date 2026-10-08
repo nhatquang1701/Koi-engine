@@ -1,0 +1,16 @@
+perf(search): enlarge eval/qsearch caches and sort picker stages lazily
+
+- Double the static-evaluation cache (32K -> 64K entries) and quadruple the
+  quiescence cache (4K -> 16K entries). Both stay exact-key checked, so this
+  trades a little memory for fewer evaluator recomputations (16K qsearch
+  entries = 256 KiB per search).
+- prepare_candidates() now groups the move list by stage rank once and sorts
+  each contiguous stage slice with the full priority/tie-break comparator only
+  when that stage is first reached, so stages that pruning skips are never
+  sorted. Emission order is unchanged.
+- Speed gate vs the isolated af79d71 baseline (5 runs, Threads 1, Speed 100,
+  depth sweep 2..5, 16-position sparse qsearch corpus): PASS - total NPS
+  +0.0823%, median row +4.0612%, 14 timer-quantized rows excluded.
+- Focused tests green (search_ordering_tests, koi_search_tests,
+  search_policy_tests) plus the full correctness chain: Release and Debug CTest
+  and the shadow-diff suite.

@@ -1,0 +1,73 @@
+{
+  "dataset_counts": {
+    "train": 396,
+    "validation": 466
+  },
+  "device": "cpu",
+  "environment": {
+    "cuda_available": false,
+    "cuda_build_version": null,
+    "cuda_devices": [],
+    "cuda_driver_version": "582.66",
+    "device": "cpu",
+    "device_name": "Intel64 Family 6 Model 165 Stepping 3, GenuineIntel",
+    "host": {
+      "hostname": "QUANGPC",
+      "logical_cpu_count": 8,
+      "machine": "AMD64",
+      "processor": "Intel64 Family 6 Model 165 Stepping 3, GenuineIntel",
+      "release": "11",
+      "system": "Windows"
+    },
+    "numpy_version": "2.5.3",
+    "python_version": "3.14.7",
+    "pytorch_version": "2.14.0+cpu"
+  },
+  "hyperparameters": {
+    "batch_size": 32,
+    "epochs": 5,
+    "learning_rate": 0.001,
+    "seed": 1,
+    "value_loss_weight": 0.1
+  },
+  "metrics": {
+    "train": {
+      "objective": 3.022177463905378,
+      "policy_ce": 2.874638297566862,
+      "value_mse": 0.03392865312719318,
+      "wdl_ce": 0.1441463056606043
+    },
+    "validation": {
+      "objective": 3.918442409069881,
+      "policy_ce": 3.0210863231589355,
+      "value_mse": 0.24312761802764074,
+      "wdl_ce": 0.8730433265490721
+    }
+  },
+  "model_sha256": "64da7217d9a15a4f5a0776b4ddc1c595cf9429892074f5399fff62c0c13559c0",
+  "schema": "koi-policy-value-training-metadata-v1",
+  "source_dirty": false,
+  "source_revision": "37dfbb417744844559480f1f59341880f365bad3",
+  "source_sha256": {
+    "tools/measurement/koi_chess/__init__.py": "c0f15babf0fea462091dd6360a815c0fe9df7f8781c80c66efd02d3179553115",
+    "tools/measurement/koi_chess/attacks.py": "dc017a9347b0e0fbfac15599cdb0fbbb454b9777e4b1b3135c529ea235b45080",
+    "tools/measurement/koi_chess/board.py": "66428f81defb6b6ae9b926a71ca29d7d3e48a86c7a78e3d58faa0a5355084693",
+    "tools/measurement/koi_chess/core.py": "2afe2de739b7d80bce8c6cf81074d775e8a9873dd539bcbf530acfc1eb48e9a4",
+    "tools/measurement/koi_chess/engine.py": "58ca1762d04b82b2ec16251196a90759b6d6fba2209474d41e6c8b33eb375cfc",
+    "tools/measurement/koi_chess/pgn.py": "3ed89525f5fa5ca3a7b1e3a070b0c327727ec2dd3cc09e024fa3051a5dba76d7",
+    "tools/measurement/koi_dataset.py": "57137fd6713536a58afd30b907abf54edf919068b45a51acc552861a77d7ccac",
+    "tools/measurement/policy_value_dataset.py": "69d7fea413a6d428fc1c7a7a4a207200575919e7854777dfaf183f9390d9d1ae",
+    "tools/measurement/policy_value_model.py": "0c63b76a0b763445d13167e5cf069a52e7e2cc64aab2353a4c505698665844e8",
+    "tools/measurement/train_policy_value.py": "071517f50323244ae6effc365f0c1ac7353c9ee823456abe430a44a03c1abb2b"
+  },
+  "timing": {
+    "train_positions_per_second": 952.5692669415881,
+    "training_positions": 1980,
+    "training_seconds": 2.0785889999970095,
+    "validation_positions": 466,
+    "validation_positions_per_second": 1970.1359521090453,
+    "validation_seconds": 0.23653189999458846
+  },
+  "train_sha256": "4f471b221023282b91d2f87d1aff5ff2d437e0615d6af1e793b5c6bb55825ff9",
+  "validation_sha256": "bed2c1132c96a78e962014528e7403375c656810339873f65bc35792a18654c9"
+}

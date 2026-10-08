@@ -1,0 +1,46 @@
+{
+  "schema": "koi-hash-memory-soak-v1",
+  "generated_utc": "2026-09-17T15:50:49.0618777Z",
+  "repository_root": "C:\\Users\\ntATh\\AI test\\Koi engine",
+  "engine_path": "C:\\Users\\ntATh\\AI test\\Koi engine\\build\\release\\koi-engine.exe",
+  "engine_sha256": "31B0122828BC6EABE93AD94A17E0287091ED0545AFA802F4B02344728F16FCFB",
+  "hash_values_mb": [
+    1,
+    2
+  ],
+  "cycles": 1,
+  "records": [
+    {
+      "hash_requested_mb": 1,
+      "hash_effective_mb": 1,
+      "hash_status": "unchanged",
+      "hash_reason": "none",
+      "cycle": 1,
+      "exit_code": 0,
+      "duration_ms": 433,
+      "peak_working_set_bytes": 11403264,
+      "peak_commit_bytes": 4169728,
+      "bestmove_count": 2,
+      "stdout": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\hash-memory-969f5500f09d48e7a8ed6d2f1181a4c8\\20260917-155048-254\\hash-0001-cycle-01\\stdout.log",
+      "stderr": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\hash-memory-969f5500f09d48e7a8ed6d2f1181a4c8\\20260917-155048-254\\hash-0001-cycle-01\\stderr.log",
+      "diagnostics": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\hash-memory-969f5500f09d48e7a8ed6d2f1181a4c8\\20260917-155048-254\\hash-0001-cycle-01\\koi-debug.jsonl"
+    },
+    {
+      "hash_requested_mb": 2,
+      "hash_effective_mb": 2,
+      "hash_status": "applied",
+      "hash_reason": "none",
+      "cycle": 1,
+      "exit_code": 0,
+      "duration_ms": 307,
+      "peak_working_set_bytes": 12480512,
+      "peak_commit_bytes": 5271552,
+      "bestmove_count": 2,
+      "stdout": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\hash-memory-969f5500f09d48e7a8ed6d2f1181a4c8\\20260917-155048-254\\hash-0002-cycle-01\\stdout.log",
+      "stderr": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\hash-memory-969f5500f09d48e7a8ed6d2f1181a4c8\\20260917-155048-254\\hash-0002-cycle-01\\stderr.log",
+      "diagnostics": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\hash-memory-969f5500f09d48e7a8ed6d2f1181a4c8\\20260917-155048-254\\hash-0002-cycle-01\\koi-debug.jsonl"
+    }
+  ],
+  "failures": [],
+  "status": "pass"
+}

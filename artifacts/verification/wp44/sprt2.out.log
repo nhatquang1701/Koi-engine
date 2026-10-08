@@ -1,0 +1,7 @@
+sprt-compare: candidate artifacts\verification\wp44\koi-engine-cand.exe vs baseline artifacts\verification\wp44\koi-engine-baseline.exe
+sprt-compare: 20000 nodes, 4 game(s) per opening and color
+sprt-compare: white pid 22816, black pid 14568
+white: 128 games 28W/64D/36L elo -21.74306492903708 llr -0.256748 decision inconclusive
+black: 128 games 48W/44D/36L elo 32.668018580527814 llr 0.244314 decision inconclusive
+combined: 256 games 76W/108D/72L score 0.5078 elo 5.5 llr -0.012 decision inconclusive
+sprt-compare: results under artifacts\matches\sprt-wp44b\wp44b-20260921-022909

@@ -1,0 +1,21 @@
+{
+  "schema": "koi-qsearch-sprt-runner-v1",
+  "experiment_path": "artifacts/verification/qsearch-tt-followup-20260929/experiment-batch7.json",
+  "experiment_sha256": "b8d73c6935e5ce78dea41d367dafea8fe6e1d48bee5e1b78ae45a2229cd3b0af",
+  "runner_pid": 25752,
+  "run_root": "artifacts/matches/qsearch-tt-followup-20260929/sprt-batch7/qsearch-tt-current-source-20k-batch7-20260929-154851",
+  "candidate_sha256": "3c187fc9bdad3572e6c849b077ffee2f612661083602d79261c0c50169da268c",
+  "baseline_sha256": "cbc05d459445eacd9f0ef8749aec18434ce251b105e6d1900f5dd4b5299ce0aa",
+  "opening_sha256": "3a1b18a852e85910d030ad22b690e64a92b4aa9bcf30f801fa01c8a377fe65ce",
+  "workers": {
+    "white": 26600,
+    "black": 3928
+  },
+  "started_utc": "2026-09-29T08:48:53.9844210Z",
+  "status": "failed",
+  "exit_codes": {
+    "white": 1,
+    "black": 1
+  },
+  "completed_utc": "2026-09-29T08:48:54.5409054Z"
+}

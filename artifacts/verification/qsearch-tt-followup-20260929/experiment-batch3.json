@@ -1,0 +1,87 @@
+{
+  "schema": "koi-qsearch-tt-sprt-extension-v1",
+  "experiment_id": "qsearch-tt-current-source-20k-batch3",
+  "recorded_utc": "2026-09-28T23:51:13.6532177Z",
+  "workspace_branch": "koi-engine",
+  "workspace_head": "6858335f0702df63128cec37eba037f7e80e9ff2",
+  "engine_source_commit": "18c2f9ae9e9aec480112af32b63b893ae030e32e",
+  "candidate_change_commit": "b49dee4",
+  "baseline_source_commit": "b49dee4^",
+  "candidate_sha256": "3c187fc9bdad3572e6c849b077ffee2f612661083602d79261c0c50169da268c",
+  "baseline_sha256": "cbc05d459445eacd9f0ef8749aec18434ce251b105e6d1900f5dd4b5299ce0aa",
+  "replay_sha256": "3bfc8758939531e8c5b2a07adabe9d23fd11e9a64e0b39b95265d2b4dcc14003",
+  "opening_generator": {
+    "sha256": "d2be084058d650acaeb505b2acdd4bd04010934e36094dbc46e8df0a700db93a",
+    "path": "artifacts/verification/qsearch-tt-followup-20260929/generate_openings_batch3.py"
+  },
+  "opening_file": {
+    "sha256": "715a4cd5f1342f2652cef47b73223f538c777a8ffa75c96c7487b0a3d0fdaca7",
+    "count": 128,
+    "path": "artifacts/matches/qsearch-tt-followup-20260929/openings-128-batch3.txt",
+    "overlap_with_previous_batches": 0,
+    "unique": 128
+  },
+  "opening_manifest": {
+    "continuation_plies": 2,
+    "openings_per_root": 4,
+    "curated_root_count": 32,
+    "seed": 20261001,
+    "sha256": "b719d32c831002f98e935c5746dca3f2415fa429029890a1d8629f0751a78f7e",
+    "path": "artifacts/manifests/qsearch-tt-followup-20260929-batch3.json"
+  },
+  "options": {
+    "speed": 100,
+    "max_plies": 512,
+    "threads": 1,
+    "games_per_opening": 2,
+    "evaluator": "classical",
+    "algorithm": "AlphaBeta",
+    "own_book": false,
+    "random_seed": 0,
+    "nodes": 20000,
+    "hash_mb": 512,
+    "time_control": "nodes 20000",
+    "protocol_timeout_ms": 5000
+  },
+  "sprt": {
+    "elo1": 10,
+    "max_games_per_color": 256,
+    "beta": 0.05,
+    "alpha": 0.05,
+    "min_games_per_color": 40,
+    "elo0": 0
+  },
+  "hardware": {
+    "build": "26200",
+    "cpu": "Intel(R) Core(TM) i3-10100F CPU @ 3.60GHz",
+    "ram_gib": 31.87,
+    "cores": 4,
+    "os_version": "10.0.26200",
+    "os": "Microsoft Windows 11 Home",
+    "gpu": "NVIDIA GeForce GTX 1060 6GB",
+    "logical_processors": 8
+  },
+  "prior_batches": [
+    {
+      "sha256": "84b8255fedf021e26d5611f0006e12859355b76610a6d96ee6fa68682db20b96",
+      "games": 256,
+      "path": "artifacts/matches/qsearch-tt-followup-20260929/sprt/qsearch-tt-current-source-20k-20260929-034116/combined-decision-derived.json",
+      "decision": "inconclusive",
+      "llr": -0.17975799999999997
+    },
+    {
+      "sha256": "17904e9e816a28c890a279fe304553e5561b08a367ab4ce0e61f50e463c72ff9",
+      "games": 477,
+      "path": "artifacts/matches/qsearch-tt-followup-20260929/sprt-batch2/qsearch-tt-current-source-20k-batch2-20260929-043312/combined-decision-derived.json",
+      "decision": "inconclusive",
+      "llr": -0.29965600000000014
+    },
+    {
+      "sha256": "17904e9e816a28c890a279fe304553e5561b08a367ab4ce0e61f50e463c72ff9",
+      "games": 733,
+      "path": "artifacts/matches/qsearch-tt-followup-20260929/sprt-batch2/qsearch-tt-current-source-20k-batch2-20260929-043312/combined-decision-derived.json",
+      "decision": "inconclusive",
+      "llr": -0.4794140000000001
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "schema": "koi-bench-speed-v1",
+  "engine": "Koi Engine",
+  "build": "Koi Engine 1.1.0",
+  "suite": "fen_file",
+  "source": "C:\\Users\\ntATh\\AppData\\Local\\Temp\\opencode\\speed-baseline\\smoke-fens.txt",
+  "evaluator": "classical",
+  "threads": 1,
+  "speed": 100,
+  "hash_mb": 512,
+  "hash_state": "cold",
+  "timed": true,
+  "warmup": 0,
+  "repeat": 1,
+  "node_limit": 0,
+  "depth": 4,
+  "depth_sweep": null,
+  "positions": [
+    {"id": "fen-001", "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", "depth": 4, "nodes": 1870, "qnodes": 4394, "tt_hits": 331, "score_cp": 0, "best_move": "b1c3", "elapsed_ms": 52, "nps": 120461},
+    {"id": "fen-002", "fen": "r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3", "depth": 4, "nodes": 6569, "qnodes": 143454, "tt_hits": 12752, "score_cp": 44, "best_move": "b1c3", "elapsed_ms": 1100, "nps": 136384}
+
+  ],
+  "totals": {"samples": 2, "nodes": 8439, "qnodes": 147848, "visited": 156287, "elapsed_ms": 1152, "nps": 135665}
+}

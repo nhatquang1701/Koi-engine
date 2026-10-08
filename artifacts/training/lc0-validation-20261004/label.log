@@ -1,0 +1,48 @@
+[07:09:48] 4371 positions, resuming at index 0
+[07:10:52] 100/4371 positions, 1.57 pos/s, eta 0.8 h, errors 0
+[07:11:40] 200/4371 positions, 1.78 pos/s, eta 0.6 h, errors 0
+[07:12:32] 300/4371 positions, 1.83 pos/s, eta 0.6 h, errors 0
+[07:13:16] 400/4371 positions, 1.93 pos/s, eta 0.6 h, errors 0
+[07:14:04] 500/4371 positions, 1.96 pos/s, eta 0.5 h, errors 0
+[07:14:56] 600/4371 positions, 1.95 pos/s, eta 0.5 h, errors 0
+[07:15:35] 700/4371 positions, 2.02 pos/s, eta 0.5 h, errors 0
+[07:16:27] 800/4371 positions, 2.01 pos/s, eta 0.5 h, errors 0
+[07:17:26] 900/4371 positions, 1.97 pos/s, eta 0.5 h, errors 0
+[07:18:15] 1000/4371 positions, 1.97 pos/s, eta 0.5 h, errors 0
+[07:19:08] 1100/4371 positions, 1.97 pos/s, eta 0.5 h, errors 0
+[07:19:52] 1200/4371 positions, 1.99 pos/s, eta 0.4 h, errors 0
+[07:20:33] 1300/4371 positions, 2.02 pos/s, eta 0.4 h, errors 0
+[07:21:16] 1400/4371 positions, 2.04 pos/s, eta 0.4 h, errors 0
+[07:21:58] 1500/4371 positions, 2.06 pos/s, eta 0.4 h, errors 0
+[07:22:25] 1600/4371 positions, 2.11 pos/s, eta 0.4 h, errors 0
+[07:22:57] 1700/4371 positions, 2.16 pos/s, eta 0.3 h, errors 0
+[07:23:28] 1800/4371 positions, 2.20 pos/s, eta 0.3 h, errors 0
+[07:23:59] 1900/4371 positions, 2.23 pos/s, eta 0.3 h, errors 0
+[07:24:28] 2000/4371 positions, 2.27 pos/s, eta 0.3 h, errors 0
+[07:25:00] 2100/4371 positions, 2.30 pos/s, eta 0.3 h, errors 0
+[07:25:31] 2200/4371 positions, 2.33 pos/s, eta 0.3 h, errors 0
+[07:26:02] 2300/4371 positions, 2.36 pos/s, eta 0.2 h, errors 0
+[07:26:39] 2400/4371 positions, 2.37 pos/s, eta 0.2 h, errors 0
+[07:27:28] 2500/4371 positions, 2.36 pos/s, eta 0.2 h, errors 0
+[07:28:19] 2600/4371 positions, 2.34 pos/s, eta 0.2 h, errors 0
+[07:29:38] 2700/4371 positions, 2.27 pos/s, eta 0.2 h, errors 0
+[07:31:01] 2800/4371 positions, 2.20 pos/s, eta 0.2 h, errors 0
+[07:32:55] 2900/4371 positions, 2.09 pos/s, eta 0.2 h, errors 0
+[07:34:23] 3000/4371 positions, 2.04 pos/s, eta 0.2 h, errors 0
+[07:35:19] 3100/4371 positions, 2.03 pos/s, eta 0.2 h, errors 0
+[07:36:23] 3200/4371 positions, 2.01 pos/s, eta 0.2 h, errors 0
+[07:37:13] 3300/4371 positions, 2.01 pos/s, eta 0.1 h, errors 0
+[07:38:02] 3400/4371 positions, 2.01 pos/s, eta 0.1 h, errors 0
+[07:38:41] 3500/4371 positions, 2.02 pos/s, eta 0.1 h, errors 0
+[07:40:12] 3600/4371 positions, 1.97 pos/s, eta 0.1 h, errors 0
+[07:41:28] 3700/4371 positions, 1.95 pos/s, eta 0.1 h, errors 0
+[07:42:32] 3800/4371 positions, 1.94 pos/s, eta 0.1 h, errors 0
+[07:43:40] 3900/4371 positions, 1.92 pos/s, eta 0.1 h, errors 0
+[07:45:43] 4000/4371 positions, 1.86 pos/s, eta 0.1 h, errors 0
+[07:46:07] 4100/4371 positions, 1.88 pos/s, eta 0.0 h, errors 0
+[07:46:33] 4200/4371 positions, 1.90 pos/s, eta 0.0 h, errors 0
+[07:46:58] 4300/4371 positions, 1.93 pos/s, eta 0.0 h, errors 0
+[07:47:19] done: 4371 positions in 2250.3s (0 errors)
+LABEL-EXITCODE 0 
+[07:47:19] done: total=4371 written=3711 skipped_cp=660 skipped_dup=0 bad=0
+CONVERT-EXITCODE 0 

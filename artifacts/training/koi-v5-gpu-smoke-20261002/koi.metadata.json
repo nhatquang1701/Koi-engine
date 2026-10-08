@@ -1,0 +1,36 @@
+{
+  "schema": "koi-nnue-training-metadata-v3",
+  "created": "2026-10-02T14:35:11Z",
+  "corpus": "artifacts\\training\\koi-v5-official-20261002\\corpus\\train.txt",
+  "rows_used": 20000,
+  "val_rows": 1000,
+  "feature_set": "halfka-king-bucket-v1+threat-pairs-v1",
+  "quantization": "int16/int8",
+  "architecture": {
+    "input": 36864,
+    "hidden": 128,
+    "l1": 8,
+    "output_buckets": 8,
+    "groups": [
+      "halfka-king-bucket-v1",
+      "threat-pairs-v1"
+    ]
+  },
+  "activation": "crelu-pair-l1",
+  "hidden_shift": 7,
+  "l1_shift": 6,
+  "output_shift": 12,
+  "epochs": 1,
+  "batch_size": 2048,
+  "learning_rate": 0.002,
+  "seed": 20260916,
+  "target_scale": 100.0,
+  "val_mae_cp": 365.4560778486142,
+  "val_round_trip_mae_cp": 380.914,
+  "w1_saturation": 0.0,
+  "l1_saturation": 0.0,
+  "w2_saturation": 0.96875,
+  "payload_sha256": "a959c674c95828537970faef183df18e93ffa01f22125cb1bdee5542cc6d5e3b",
+  "network_sha256": "cf8cae6c0519b2eb59f79a1e8f3eaa6f8ec060ff9a0562611584408b711d83ab",
+  "command": "tools\\measurement\\train_nnue_koi.py --corpus artifacts\\training\\koi-v5-official-20261002\\corpus\\train.txt --net-out artifacts\\training\\koi-v5-gpu-smoke-20261002\\koi-v5.nnue --meta-out artifacts\\training\\koi-v5-gpu-smoke-20261002\\koi.metadata.json --epochs 1 --batch-size 2048 --learning-rate 0.002 --threads 2 --val-fraction 0.05 --seed 20260916 --arch v5 --hidden-units 128 --hidden-shifts 7 --output-shifts 12 --l1-units 8 --l1-shifts 6 --float-out artifacts\\training\\koi-v5-gpu-smoke-20261002\\net.pt --rows 20000 --tune-samples 2000"
+}

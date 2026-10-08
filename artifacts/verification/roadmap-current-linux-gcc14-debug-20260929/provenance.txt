@@ -1,0 +1,4 @@
+source=4015fff3b191fa26e527454e5a23fbe8b2b2b903
+cmake=cmake version 3.31.6
+compiler=g++-14 (Ubuntu 14.2.0-4ubuntu2~24.04.1) 14.2.0
+powershell=PowerShell 7.6.6

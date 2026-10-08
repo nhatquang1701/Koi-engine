@@ -1,0 +1,39 @@
+command uci
+command setoption name BookDepth value 16
+search cancellation requested with generation suppression
+command setoption name BookFile value book.bin
+search cancellation requested with generation suppression
+command setoption name BookRandom value false
+search cancellation requested with generation suppression
+command setoption name Hash value 512
+search cancellation requested with generation suppression
+command setoption name OwnBook value false
+search cancellation requested with generation suppression
+command setoption name Speed value 100
+search cancellation requested with generation suppression
+command setoption name Threads value 1
+search cancellation requested with generation suppression
+command isready
+command debug on
+command ucinewgame
+search cancellation requested with generation suppression
+command setoption name Ponder value false
+search cancellation requested with generation suppression
+command position fen r3k2r/p1ppqpb1/bn2pnp1/2qPN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1
+search cancellation requested with generation suppression
+position accepted generation 12 key 5525019177736958019 fen r3k2r/p1ppqpb1/bn2pnp1/2qPN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1 legal_moves 48
+position_record command="position fen r3k2r/p1ppqpb1/bn2pnp1/2qPN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1" generation=12 root_fen="r3k2r/p1ppqpb1/bn2pnp1/2qPN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1" native_key=5525019177736958019 side=w castling=KQkq ep=- halfmove=0 fullmove=1 native_legal_count=48 shadow_legal_count=48 legal_digest=4740b8aeb92b5447 native_shadow_consistent=true
+command isready
+command go wtime 1000 btime 1000
+search cancellation requested with generation suppression
+search start generation 14
+search root generation 14 key 5525019177736958019 fen r3k2r/p1ppqpb1/bn2pnp1/2qPN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1
+go_record generation=14 root_fen="r3k2r/p1ppqpb1/bn2pnp1/2qPN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1" root_key=5525019177736958019 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=1000,btime_ms=1000,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+command stop
+search cancellation requested
+search complete generation 14
+completion_record generation=14 result_generation=14 root_match=true result_key=5525019177736958019 candidate=e2a6 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=e2a6 source=search completed=true cancelled=true failed=false
+command isready
+command quit
+search cancellation requested with generation suppression
+search cancellation requested with generation suppression

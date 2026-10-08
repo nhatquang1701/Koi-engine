@@ -1,0 +1,189 @@
+[1/201] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\detail\root_coordinator.cpp" for CXX dependencies
+[2/201] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\classical_evaluator.cpp" for CXX dependencies
+[3/201] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\detail\feature_state.cpp" for CXX dependencies
+[4/201] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\detail\search_ordering_tables.cpp" for CXX dependencies
+[5/201] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\detail\compatibility_mirror.cpp" for CXX dependencies
+[6/201] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\detail\search_context_support.cpp" for CXX dependencies
+[7/201] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\detail\search_context.cpp" for CXX dependencies
+[8/201] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\detail\search_runner.cpp" for CXX dependencies
+[9/201] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\detail\search_session.cpp" for CXX dependencies
+[10/201] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\completion_gate.cpp" for CXX dependencies
+[11/201] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\game_state.cpp" for CXX dependencies
+[12/201] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\position.cpp" for CXX dependencies
+[13/201] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\nnue.cpp" for CXX dependencies
+[14/201] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\opening_book.cpp" for CXX dependencies
+[15/201] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\search_ordering.cpp" for CXX dependencies
+[16/201] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\search_service.cpp" for CXX dependencies
+[17/201] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\time_manager.cpp" for CXX dependencies
+[18/201] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\syzygy_tablebase.cpp" for CXX dependencies
+[19/201] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\uci_controller.cpp" for CXX dependencies
+[20/201] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\gpu\cuda_driver.cpp" for CXX dependencies
+[21/201] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\gpu\gpu_nnue_service.cpp" for CXX dependencies
+[22/201] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\gpu\nnue_gpu_evaluator.cpp" for CXX dependencies
+[23/201] Scanning "C:\Users\ntATh\AI test\Koi engine\tools\engine\koi_gpu_probe.cpp" for CXX dependencies
+[24/201] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\transposition_table.cpp" for CXX dependencies
+[25/201] Scanning "C:\Users\ntATh\AI test\Koi engine\tests\unit\core\koi_core_tests.cpp" for CXX dependencies
+[26/201] Scanning "C:\Users\ntATh\AI test\Koi engine\tests\unit\runtime\gpu_nnue_tests.cpp" for CXX dependencies
+[27/201] Scanning "C:\Users\ntATh\AI test\Koi engine\tests\unit\evaluation\evaluation_boundary_tests.cpp" for CXX dependencies
+[28/201] Scanning "C:\Users\ntATh\AI test\Koi engine\tests\unit\runtime\cpu_features_tests.cpp" for CXX dependencies
+[29/201] Scanning "C:\Users\ntATh\AI test\Koi engine\tests\unit\evaluation\nnue_boundary_tests.cpp" for CXX dependencies
+[30/201] Scanning "C:\Users\ntATh\AI test\Koi engine\tests\unit\evaluation\evaluation_architecture_tests.cpp" for CXX dependencies
+[31/201] Scanning "C:\Users\ntATh\AI test\Koi engine\tests\unit\core\koi_module_tests.cpp" for CXX dependencies
+[32/201] Scanning "C:\Users\ntATh\AI test\Koi engine\tests\unit\runtime\syzygy_tablebase_tests.cpp" for CXX dependencies
+[33/201] Scanning "C:\Users\ntATh\AI test\Koi engine\tests\unit\rules\koi_rules_tests.cpp" for CXX dependencies
+[34/201] Scanning "C:\Users\ntATh\AI test\Koi engine\tests\unit\rules\native_rule_state_tests.cpp" for CXX dependencies
+[35/201] Scanning "C:\Users\ntATh\AI test\Koi engine\tests\unit\runtime\opening_book_tests.cpp" for CXX dependencies
+[36/201] Scanning "C:\Users\ntATh\AI test\Koi engine\tests\unit\runtime\completion_gate_tests.cpp" for CXX dependencies
+[37/201] Scanning "C:\Users\ntATh\AI test\Koi engine\tests\unit\runtime\uci_controller_tests.cpp" for CXX dependencies
+[38/201] Generating CXX dyndep file CMakeFiles\koi_core.dir\CXX.dd
+[39/184] Scanning "C:\Users\ntATh\AI test\Koi engine\tests\unit\search\koi_search_tests.cpp" for CXX dependencies
+[40/184] Scanning "C:\Users\ntATh\AI test\Koi engine\tests\unit\search\search_ordering_tests.cpp" for CXX dependencies
+[41/184] Scanning "C:\Users\ntATh\AI test\Koi engine\tests\unit\search\search_architecture_tests.cpp" for CXX dependencies
+[42/184] Scanning "C:\Users\ntATh\AI test\Koi engine\tests\unit\search\search_policy_tests.cpp" for CXX dependencies
+[43/184] Scanning "C:\Users\ntATh\AI test\Koi engine\tests\unit\search\search_runtime_tests.cpp" for CXX dependencies
+[44/184] Scanning "C:\Users\ntATh\AI test\Koi engine\tests\unit\search\static_exchange_tests.cpp" for CXX dependencies
+[45/184] Scanning "C:\Users\ntATh\AI test\Koi engine\tests\unit\runtime\transposition_table_tests.cpp" for CXX dependencies
+[46/184] Building CXX object CMakeFiles\koi_core.dir\src\koi\detail\root_coordinator.cpp.obj
+[47/184] Building CXX object CMakeFiles\koi_core.dir\src\koi\classical_evaluator.cpp.obj
+[48/184] Building CXX object CMakeFiles\koi_core.dir\src\koi\detail\feature_state.cpp.obj
+[49/184] Building CXX object CMakeFiles\koi_core.dir\src\koi\detail\search_ordering_tables.cpp.obj
+[50/184] Building CXX object CMakeFiles\koi_core.dir\src\koi\detail\search_context_support.cpp.obj
+[51/184] Building CXX object CMakeFiles\koi_core.dir\src\koi\detail\compatibility_mirror.cpp.obj
+[52/184] Building CXX object CMakeFiles\koi_core.dir\src\koi\detail\search_session.cpp.obj
+[53/184] Building CXX object CMakeFiles\koi_core.dir\src\koi\detail\search_context.cpp.obj
+[54/184] Building CXX object CMakeFiles\koi_core.dir\src\koi\completion_gate.cpp.obj
+[55/184] Building CXX object CMakeFiles\koi_core.dir\src\koi\detail\search_runner.cpp.obj
+[56/184] Building CXX object CMakeFiles\koi_core.dir\src\koi\search_ordering.cpp.obj
+[57/184] Building CXX object CMakeFiles\koi_core.dir\src\koi\nnue.cpp.obj
+[58/184] Building CXX object CMakeFiles\koi_core.dir\src\koi\game_state.cpp.obj
+[59/184] Building CXX object CMakeFiles\koi_core.dir\src\koi\opening_book.cpp.obj
+[60/184] Building CXX object CMakeFiles\koi_core.dir\src\koi\search_service.cpp.obj
+[61/184] Building CXX object CMakeFiles\koi_core.dir\src\koi\syzygy_tablebase.cpp.obj
+[62/184] Generating CXX dyndep file CMakeFiles\koi_gpu_probe.dir\CXX.dd
+[63/184] Building CXX object CMakeFiles\koi_core.dir\src\koi\gpu\cuda_driver.cpp.obj
+[64/184] Generating CXX dyndep file CMakeFiles\gpu_nnue_tests.dir\CXX.dd
+[65/184] Building CXX object CMakeFiles\koi_core.dir\src\koi\position.cpp.obj
+[66/184] Generating CXX dyndep file CMakeFiles\koi_core_tests.dir\CXX.dd
+[67/184] Building CXX object CMakeFiles\koi_core.dir\src\koi\transposition_table.cpp.obj
+[68/184] Generating CXX dyndep file CMakeFiles\evaluation_boundary_tests.dir\CXX.dd
+[69/184] Building CXX object CMakeFiles\koi_core.dir\src\koi\time_manager.cpp.obj
+[70/184] Generating CXX dyndep file CMakeFiles\evaluation_architecture_tests.dir\CXX.dd
+[71/184] Building CXX object CMakeFiles\koi_gpu_probe.dir\tools\engine\koi_gpu_probe.cpp.obj
+[72/184] Building CXX object CMakeFiles\koi_core.dir\src\koi\gpu\nnue_gpu_evaluator.cpp.obj
+[73/184] Generating CXX dyndep file CMakeFiles\nnue_boundary_tests.dir\CXX.dd
+[74/184] Generating CXX dyndep file CMakeFiles\koi_cpu_features_tests.dir\CXX.dd
+[75/184] Building CXX object CMakeFiles\koi_core.dir\src\koi\gpu\gpu_nnue_service.cpp.obj
+[76/184] Generating CXX dyndep file CMakeFiles\koi_module_tests.dir\CXX.dd
+[77/184] Building CXX object CMakeFiles\koi_core.dir\src\koi\uci_controller.cpp.obj
+[78/184] Linking CXX static library koi_core.lib
+[79/184] Building CXX object CMakeFiles\gpu_nnue_tests.dir\tests\unit\runtime\gpu_nnue_tests.cpp.obj
+[80/184] Linking CXX executable koi_gpu_probe.exe
+[81/184] Generating CXX dyndep file CMakeFiles\syzygy_tablebase_tests.dir\CXX.dd
+[82/184] Building CXX object CMakeFiles\evaluation_boundary_tests.dir\tests\unit\evaluation\evaluation_boundary_tests.cpp.obj
+[83/184] Building CXX object CMakeFiles\koi_core_tests.dir\tests\unit\core\koi_core_tests.cpp.obj
+[84/184] Building CXX object CMakeFiles\koi_cpu_features_tests.dir\tests\unit\runtime\cpu_features_tests.cpp.obj
+[85/184] Linking CXX executable gpu_nnue_tests.exe
+[86/184] Generating CXX dyndep file CMakeFiles\koi_rules_tests.dir\CXX.dd
+[87/184] Linking CXX executable evaluation_boundary_tests.exe
+[88/184] Linking CXX executable koi_core_tests.exe
+[89/184] Building CXX object CMakeFiles\evaluation_architecture_tests.dir\tests\unit\evaluation\evaluation_architecture_tests.cpp.obj
+[90/184] Generating CXX dyndep file CMakeFiles\native_rule_state_tests.dir\CXX.dd
+[91/184] Generating CXX dyndep file CMakeFiles\opening_book_tests.dir\CXX.dd
+[92/184] Building CXX object CMakeFiles\nnue_boundary_tests.dir\tests\unit\evaluation\nnue_boundary_tests.cpp.obj
+[93/184] Building CXX object CMakeFiles\koi_module_tests.dir\tests\unit\core\koi_module_tests.cpp.obj
+[94/184] Linking CXX executable koi_cpu_features_tests.exe
+[95/184] Generating CXX dyndep file CMakeFiles\uci_controller_tests.dir\CXX.dd
+[96/184] Linking CXX executable evaluation_architecture_tests.exe
+[97/184] Linking CXX executable koi_module_tests.exe
+[98/184] Generating CXX dyndep file CMakeFiles\completion_gate_tests.dir\CXX.dd
+[99/184] Linking CXX executable nnue_boundary_tests.exe
+[100/184] Building CXX object CMakeFiles\syzygy_tablebase_tests.dir\tests\unit\runtime\syzygy_tablebase_tests.cpp.obj
+[101/184] Generating CXX dyndep file CMakeFiles\koi_search_tests.dir\CXX.dd
+[102/184] Generating CXX dyndep file CMakeFiles\search_ordering_tests.dir\CXX.dd
+[103/184] Building CXX object CMakeFiles\koi_rules_tests.dir\tests\unit\rules\koi_rules_tests.cpp.obj
+[104/184] Linking CXX executable syzygy_tablebase_tests.exe
+[105/184] Building CXX object CMakeFiles\opening_book_tests.dir\tests\unit\runtime\opening_book_tests.cpp.obj
+[106/184] Generating CXX dyndep file CMakeFiles\search_architecture_tests.dir\CXX.dd
+[107/184] Linking CXX executable koi_rules_tests.exe
+[108/184] Generating CXX dyndep file CMakeFiles\search_policy_tests.dir\CXX.dd
+[109/184] Linking CXX executable opening_book_tests.exe
+[110/184] Generating CXX dyndep file CMakeFiles\search_runtime_tests.dir\CXX.dd
+[111/184] Building CXX object CMakeFiles\uci_controller_tests.dir\tests\unit\runtime\uci_controller_tests.cpp.obj
+[112/184] Building CXX object CMakeFiles\completion_gate_tests.dir\tests\unit\runtime\completion_gate_tests.cpp.obj
+[113/184] Building CXX object CMakeFiles\search_ordering_tests.dir\tests\unit\search\search_ordering_tests.cpp.obj
+[114/184] Building CXX object CMakeFiles\native_rule_state_tests.dir\tests\unit\rules\native_rule_state_tests.cpp.obj
+[115/184] Linking CXX executable completion_gate_tests.exe
+[116/184] Generating CXX dyndep file CMakeFiles\static_exchange_tests.dir\CXX.dd
+[117/184] Linking CXX executable uci_controller_tests.exe
+[118/184] Linking CXX executable search_ordering_tests.exe
+[119/184] Generating CXX dyndep file CMakeFiles\transposition_table_tests.dir\CXX.dd
+[120/184] Linking CXX executable native_rule_state_tests.exe
+[121/184] Scanning "C:\Users\ntATh\AI test\Koi engine\tests\unit\runtime\search_service_tests.cpp" for CXX dependencies
+[122/184] Generating CXX dyndep file CMakeFiles\search_service_tests.dir\CXX.dd
+[123/184] Scanning "C:\Users\ntATh\AI test\Koi engine\tests\unit\evaluation\classical_evaluator_tests.cpp" for CXX dependencies
+[124/184] Generating CXX dyndep file CMakeFiles\classical_evaluator_tests.dir\CXX.dd
+[125/184] Building CXX object CMakeFiles\search_policy_tests.dir\tests\unit\search\search_policy_tests.cpp.obj
+[126/184] Building CXX object CMakeFiles\search_architecture_tests.dir\tests\unit\search\search_architecture_tests.cpp.obj
+[127/184] Building CXX object CMakeFiles\koi_search_tests.dir\tests\unit\search\koi_search_tests.cpp.obj
+C:\Users\ntATh\AI test\Koi engine\tests\unit\search\koi_search_tests.cpp(3866): warning C4834: discarding return value of function with [[nodiscard]] attribute
+C:\Users\ntATh\AI test\Koi engine\tests\unit\search\koi_search_tests.cpp(3896): warning C4834: discarding return value of function with [[nodiscard]] attribute
+C:\Users\ntATh\AI test\Koi engine\tests\unit\search\koi_search_tests.cpp(3924): warning C4834: discarding return value of function with [[nodiscard]] attribute
+C:\Users\ntATh\AI test\Koi engine\tests\unit\search\koi_search_tests.cpp(4139): warning C4834: discarding return value of function with [[nodiscard]] attribute
+C:\Users\ntATh\AI test\Koi engine\tests\unit\search\koi_search_tests.cpp(4173): warning C4834: discarding return value of function with [[nodiscard]] attribute
+[128/184] Building CXX object CMakeFiles\search_runtime_tests.dir\tests\unit\search\search_runtime_tests.cpp.obj
+[129/184] Linking CXX executable search_policy_tests.exe
+[130/184] Linking CXX executable koi_search_tests.exe
+[131/184] Linking CXX executable search_architecture_tests.exe
+[132/184] Scanning "C:\Users\ntATh\AI test\Koi engine\tests\unit\evaluation\evaluation_features_tests.cpp" for CXX dependencies
+[133/184] Scanning "C:\Users\ntATh\AI test\Koi engine\tests\unit\search\time_manager_tests.cpp" for CXX dependencies
+[134/184] Generating CXX dyndep file CMakeFiles\evaluation_features_tests.dir\CXX.dd
+[135/184] Scanning "C:\Users\ntATh\AI test\Koi engine\tests\unit\search\koi_strength_tests.cpp" for CXX dependencies
+[136/184] Generating CXX dyndep file CMakeFiles\time_manager_tests.dir\CXX.dd
+[137/184] Generating CXX dyndep file CMakeFiles\koi_strength_tests.dir\CXX.dd
+[138/184] Linking CXX executable search_runtime_tests.exe
+[139/184] Scanning "C:\Users\ntATh\AI test\Koi engine\tests\unit\rules\perft_tests.cpp" for CXX dependencies
+[140/184] Generating CXX dyndep file CMakeFiles\perft_tests.dir\CXX.dd
+[141/184] Building CXX object CMakeFiles\static_exchange_tests.dir\tests\unit\search\static_exchange_tests.cpp.obj
+[142/184] Building CXX object CMakeFiles\transposition_table_tests.dir\tests\unit\runtime\transposition_table_tests.cpp.obj
+[143/184] Building CXX object CMakeFiles\classical_evaluator_tests.dir\tests\unit\evaluation\classical_evaluator_tests.cpp.obj
+[144/184] Building CXX object CMakeFiles\search_service_tests.dir\tests\unit\runtime\search_service_tests.cpp.obj
+[145/184] Linking CXX executable static_exchange_tests.exe
+[146/184] Linking CXX executable transposition_table_tests.exe
+[147/184] Scanning "C:\Users\ntATh\AI test\Koi engine\tests\integration\tools\uci_match_fixture.cpp" for CXX dependencies
+[148/184] Scanning "C:\Users\ntATh\AI test\Koi engine\tools\engine\perft.cpp" for CXX dependencies
+[149/184] Generating CXX dyndep file CMakeFiles\uci_match_fixture.dir\CXX.dd
+[150/184] Generating CXX dyndep file CMakeFiles\koi_perft.dir\CXX.dd
+[151/184] Linking CXX executable classical_evaluator_tests.exe
+[152/184] Scanning "C:\Users\ntATh\AI test\Koi engine\tools\engine\koi_bench.cpp" for CXX dependencies
+[153/184] Generating CXX dyndep file CMakeFiles\koi_bench.dir\CXX.dd
+[154/184] Linking CXX executable search_service_tests.exe
+[155/184] Scanning "C:\Users\ntATh\AI test\Koi engine\tools\engine\koi_replay.cpp" for CXX dependencies
+[156/184] Building CXX object CMakeFiles\evaluation_features_tests.dir\tests\unit\evaluation\evaluation_features_tests.cpp.obj
+[157/184] Generating CXX dyndep file CMakeFiles\koi_replay.dir\CXX.dd
+[158/184] Building CXX object CMakeFiles\time_manager_tests.dir\tests\unit\search\time_manager_tests.cpp.obj
+[159/184] Building CXX object CMakeFiles\perft_tests.dir\tests\unit\rules\perft_tests.cpp.obj
+[160/184] Building CXX object CMakeFiles\koi_strength_tests.dir\tests\unit\search\koi_strength_tests.cpp.obj
+[161/184] Building CXX object CMakeFiles\koi_perft.dir\tools\engine\perft.cpp.obj
+[162/184] Linking CXX executable evaluation_features_tests.exe
+[163/184] Linking CXX executable time_manager_tests.exe
+[164/184] Linking CXX executable perft_tests.exe
+[165/184] Scanning "C:\Users\ntATh\AI test\Koi engine\tools\engine\koi_eval_features.cpp" for CXX dependencies
+[166/184] Generating CXX dyndep file CMakeFiles\koi_eval_features.dir\CXX.dd
+[167/184] Scanning "C:\Users\ntATh\AI test\Koi engine\src\main.cpp" for CXX dependencies
+[168/184] Building CXX object CMakeFiles\koi_replay.dir\tools\engine\koi_replay.cpp.obj
+[169/184] Generating CXX dyndep file CMakeFiles\koi_engine.dir\CXX.dd
+[170/184] Linking CXX executable koi-perft.exe
+[171/184] Linking CXX executable koi_strength_tests.exe
+[172/184] Building CXX object CMakeFiles\uci_match_fixture.dir\tests\integration\tools\uci_match_fixture.cpp.obj
+[173/184] Linking CXX executable koi-replay.exe
+[174/184] Linking CXX executable uci_match_fixture.exe
+[175/184] Building CXX object CMakeFiles\koi_bench.dir\tools\engine\koi_bench.cpp.obj
+[176/184] Scanning "C:\Users\ntATh\AI test\Koi engine\tests\integration\tools\koi_replay_tests.cpp" for CXX dependencies
+[177/184] Generating CXX dyndep file CMakeFiles\koi_replay_tests.dir\CXX.dd
+[178/184] Building CXX object CMakeFiles\koi_eval_features.dir\tools\engine\koi_eval_features.cpp.obj
+[179/184] Linking CXX executable koi-bench.exe
+[180/184] Linking CXX executable koi-eval-features.exe
+[181/184] Building CXX object CMakeFiles\koi_engine.dir\src\main.cpp.obj
+[182/184] Building CXX object CMakeFiles\koi_replay_tests.dir\tests\integration\tools\koi_replay_tests.cpp.obj
+[183/184] Linking CXX executable koi-engine.exe
+[184/184] Linking CXX executable koi_replay_tests.exe

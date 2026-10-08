@@ -1,0 +1,1135 @@
+command uci
+command setoption name BookDepth value 16
+search cancellation requested with generation suppression
+command setoption name BookFile value book.bin
+search cancellation requested with generation suppression
+command setoption name BookRandom value false
+search cancellation requested with generation suppression
+command setoption name Hash value 512
+search cancellation requested with generation suppression
+command setoption name OwnBook value false
+search cancellation requested with generation suppression
+command setoption name Speed value 100
+search cancellation requested with generation suppression
+command setoption name Threads value 1
+search cancellation requested with generation suppression
+command isready
+command debug on
+command ucinewgame
+search cancellation requested with generation suppression
+command setoption name Ponder value false
+search cancellation requested with generation suppression
+command position startpos
+search cancellation requested with generation suppression
+position accepted generation 12 key 3906274489859857123 fen rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 legal_moves 20
+position_record command="position startpos" generation=12 root_fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1" native_key=3906274489859857123 side=w castling=KQkq ep=- halfmove=0 fullmove=1 native_legal_count=20 shadow_legal_count=20 legal_digest=4b4ae01098485157 native_shadow_consistent=true
+command isready
+command go wtime 1000 btime 1000
+search cancellation requested with generation suppression
+search start generation 14
+search root generation 14 key 3906274489859857123 fen rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
+go_record generation=14 root_fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1" root_key=3906274489859857123 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=1000,btime_ms=1000,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 14
+completion_record generation=14 result_generation=14 root_match=true result_key=3906274489859857123 candidate=b1c3 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=b1c3 source=search completed=true cancelled=false failed=false
+command position startpos moves b1c3 d7d5
+search cancellation requested with generation suppression
+position accepted generation 15 key 6514627042616657971 fen rnbqkbnr/ppp1pppp/8/3p4/8/2N5/PPPPPPPP/R1BQKBNR w KQkq - 0 2 legal_moves 22
+position_record command="position startpos moves b1c3 d7d5" generation=15 root_fen="rnbqkbnr/ppp1pppp/8/3p4/8/2N5/PPPPPPPP/R1BQKBNR w KQkq - 0 2" native_key=6514627042616657971 side=w castling=KQkq ep=- halfmove=0 fullmove=2 native_legal_count=22 shadow_legal_count=22 legal_digest=cac0f6d6cad7aa7e native_shadow_consistent=true
+command isready
+command go wtime 976 btime 994
+search cancellation requested with generation suppression
+search start generation 17
+search root generation 17 key 6514627042616657971 fen rnbqkbnr/ppp1pppp/8/3p4/8/2N5/PPPPPPPP/R1BQKBNR w KQkq - 0 2
+go_record generation=17 root_fen="rnbqkbnr/ppp1pppp/8/3p4/8/2N5/PPPPPPPP/R1BQKBNR w KQkq - 0 2" root_key=6514627042616657971 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=976,btime_ms=994,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 17
+completion_record generation=17 result_generation=17 root_match=true result_key=6514627042616657971 candidate=g1f3 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=g1f3 source=search completed=true cancelled=false failed=false
+command position startpos moves b1c3 d7d5 g1f3 c8f5
+search cancellation requested with generation suppression
+position accepted generation 18 key 12951510115548168134 fen rn1qkbnr/ppp1pppp/8/3p1b2/8/2N2N2/PPPPPPPP/R1BQKB1R w KQkq - 2 3 legal_moves 24
+position_record command="position startpos moves b1c3 d7d5 g1f3 c8f5" generation=18 root_fen="rn1qkbnr/ppp1pppp/8/3p1b2/8/2N2N2/PPPPPPPP/R1BQKB1R w KQkq - 2 3" native_key=12951510115548168134 side=w castling=KQkq ep=- halfmove=2 fullmove=3 native_legal_count=24 shadow_legal_count=24 legal_digest=cc0fde4d5f27a625 native_shadow_consistent=true
+command isready
+command go wtime 953 btime 986
+search cancellation requested with generation suppression
+search start generation 20
+search root generation 20 key 12951510115548168134 fen rn1qkbnr/ppp1pppp/8/3p1b2/8/2N2N2/PPPPPPPP/R1BQKB1R w KQkq - 2 3
+go_record generation=20 root_fen="rn1qkbnr/ppp1pppp/8/3p1b2/8/2N2N2/PPPPPPPP/R1BQKB1R w KQkq - 2 3" root_key=12951510115548168134 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=953,btime_ms=986,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 20
+completion_record generation=20 result_generation=20 root_match=true result_key=12951510115548168134 candidate=d2d4 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=d2d4 source=search completed=true cancelled=false failed=false
+command position startpos moves b1c3 d7d5 g1f3 c8f5 d2d4 e7e6
+search cancellation requested with generation suppression
+position accepted generation 21 key 11816646209074487459 fen rn1qkbnr/ppp2ppp/4p3/3p1b2/3P4/2N2N2/PPP1PPPP/R1BQKB1R w KQkq - 0 4 legal_moves 30
+position_record command="position startpos moves b1c3 d7d5 g1f3 c8f5 d2d4 e7e6" generation=21 root_fen="rn1qkbnr/ppp2ppp/4p3/3p1b2/3P4/2N2N2/PPP1PPPP/R1BQKB1R w KQkq - 0 4" native_key=11816646209074487459 side=w castling=KQkq ep=- halfmove=0 fullmove=4 native_legal_count=30 shadow_legal_count=30 legal_digest=14983e57f043da47 native_shadow_consistent=true
+command isready
+command go wtime 932 btime 984
+search cancellation requested with generation suppression
+search start generation 23
+search root generation 23 key 11816646209074487459 fen rn1qkbnr/ppp2ppp/4p3/3p1b2/3P4/2N2N2/PPP1PPPP/R1BQKB1R w KQkq - 0 4
+go_record generation=23 root_fen="rn1qkbnr/ppp2ppp/4p3/3p1b2/3P4/2N2N2/PPP1PPPP/R1BQKB1R w KQkq - 0 4" root_key=11816646209074487459 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=932,btime_ms=984,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 23
+completion_record generation=23 result_generation=23 root_match=true result_key=11816646209074487459 candidate=f3e5 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=f3e5 source=search completed=true cancelled=false failed=false
+command position startpos moves b1c3 d7d5 g1f3 c8f5 d2d4 e7e6 f3e5 h7h5
+search cancellation requested with generation suppression
+position accepted generation 24 key 712744780222325172 fen rn1qkbnr/ppp2pp1/4p3/3pNb1p/3P4/2N5/PPP1PPPP/R1BQKB1R w KQkq - 0 5 legal_moves 35
+position_record command="position startpos moves b1c3 d7d5 g1f3 c8f5 d2d4 e7e6 f3e5 h7h5" generation=24 root_fen="rn1qkbnr/ppp2pp1/4p3/3pNb1p/3P4/2N5/PPP1PPPP/R1BQKB1R w KQkq - 0 5" native_key=712744780222325172 side=w castling=KQkq ep=- halfmove=0 fullmove=5 native_legal_count=35 shadow_legal_count=35 legal_digest=976e5451af1589bb native_shadow_consistent=true
+command isready
+command go wtime 911 btime 974
+search cancellation requested with generation suppression
+search start generation 26
+search root generation 26 key 712744780222325172 fen rn1qkbnr/ppp2pp1/4p3/3pNb1p/3P4/2N5/PPP1PPPP/R1BQKB1R w KQkq - 0 5
+go_record generation=26 root_fen="rn1qkbnr/ppp2pp1/4p3/3pNb1p/3P4/2N5/PPP1PPPP/R1BQKB1R w KQkq - 0 5" root_key=712744780222325172 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=911,btime_ms=974,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 26
+completion_record generation=26 result_generation=26 root_match=true result_key=712744780222325172 candidate=c1e3 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=c1e3 source=search completed=true cancelled=false failed=false
+command position startpos moves b1c3 d7d5 g1f3 c8f5 d2d4 e7e6 f3e5 h7h5 c1e3 b8d7
+search cancellation requested with generation suppression
+position accepted generation 27 key 15145905407841711317 fen r2qkbnr/pppn1pp1/4p3/3pNb1p/3P4/2N1B3/PPP1PPPP/R2QKB1R w KQkq - 2 6 legal_moves 36
+position_record command="position startpos moves b1c3 d7d5 g1f3 c8f5 d2d4 e7e6 f3e5 h7h5 c1e3 b8d7" generation=27 root_fen="r2qkbnr/pppn1pp1/4p3/3pNb1p/3P4/2N1B3/PPP1PPPP/R2QKB1R w KQkq - 2 6" native_key=15145905407841711317 side=w castling=KQkq ep=- halfmove=2 fullmove=6 native_legal_count=36 shadow_legal_count=36 legal_digest=e3979c2be53d74fd native_shadow_consistent=true
+command isready
+command go wtime 891 btime 971
+search cancellation requested with generation suppression
+search start generation 29
+search root generation 29 key 15145905407841711317 fen r2qkbnr/pppn1pp1/4p3/3pNb1p/3P4/2N1B3/PPP1PPPP/R2QKB1R w KQkq - 2 6
+go_record generation=29 root_fen="r2qkbnr/pppn1pp1/4p3/3pNb1p/3P4/2N1B3/PPP1PPPP/R2QKB1R w KQkq - 2 6" root_key=15145905407841711317 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=891,btime_ms=971,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 29
+completion_record generation=29 result_generation=29 root_match=true result_key=15145905407841711317 candidate=a2a3 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=a2a3 source=search completed=true cancelled=false failed=false
+command position startpos moves b1c3 d7d5 g1f3 c8f5 d2d4 e7e6 f3e5 h7h5 c1e3 b8d7 a2a3 d7e5
+search cancellation requested with generation suppression
+position accepted generation 30 key 3872284494976504845 fen r2qkbnr/ppp2pp1/4p3/3pnb1p/3P4/P1N1B3/1PP1PPPP/R2QKB1R w KQkq - 0 7 legal_moves 30
+position_record command="position startpos moves b1c3 d7d5 g1f3 c8f5 d2d4 e7e6 f3e5 h7h5 c1e3 b8d7 a2a3 d7e5" generation=30 root_fen="r2qkbnr/ppp2pp1/4p3/3pnb1p/3P4/P1N1B3/1PP1PPPP/R2QKB1R w KQkq - 0 7" native_key=3872284494976504845 side=w castling=KQkq ep=- halfmove=0 fullmove=7 native_legal_count=30 shadow_legal_count=30 legal_digest=43fd48cfaa3a0b61 native_shadow_consistent=true
+command isready
+command go wtime 872 btime 969
+search cancellation requested with generation suppression
+search start generation 32
+search root generation 32 key 3872284494976504845 fen r2qkbnr/ppp2pp1/4p3/3pnb1p/3P4/P1N1B3/1PP1PPPP/R2QKB1R w KQkq - 0 7
+go_record generation=32 root_fen="r2qkbnr/ppp2pp1/4p3/3pnb1p/3P4/P1N1B3/1PP1PPPP/R2QKB1R w KQkq - 0 7" root_key=3872284494976504845 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=872,btime_ms=969,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 32
+completion_record generation=32 result_generation=32 root_match=true result_key=3872284494976504845 candidate=d4e5 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=d4e5 source=search completed=true cancelled=false failed=false
+command position startpos moves b1c3 d7d5 g1f3 c8f5 d2d4 e7e6 f3e5 h7h5 c1e3 b8d7 a2a3 d7e5 d4e5 a7a6
+search cancellation requested with generation suppression
+position accepted generation 33 key 11725030838384998562 fen r2qkbnr/1pp2pp1/p3p3/3pPb1p/8/P1N1B3/1PP1PPPP/R2QKB1R w KQkq - 0 8 legal_moves 35
+position_record command="position startpos moves b1c3 d7d5 g1f3 c8f5 d2d4 e7e6 f3e5 h7h5 c1e3 b8d7 a2a3 d7e5 d4e5 a7a6" generation=33 root_fen="r2qkbnr/1pp2pp1/p3p3/3pPb1p/8/P1N1B3/1PP1PPPP/R2QKB1R w KQkq - 0 8" native_key=11725030838384998562 side=w castling=KQkq ep=- halfmove=0 fullmove=8 native_legal_count=35 shadow_legal_count=35 legal_digest=a01adbbad41b2a46 native_shadow_consistent=true
+command isready
+command go wtime 853 btime 948
+search cancellation requested with generation suppression
+search start generation 35
+search root generation 35 key 11725030838384998562 fen r2qkbnr/1pp2pp1/p3p3/3pPb1p/8/P1N1B3/1PP1PPPP/R2QKB1R w KQkq - 0 8
+go_record generation=35 root_fen="r2qkbnr/1pp2pp1/p3p3/3pPb1p/8/P1N1B3/1PP1PPPP/R2QKB1R w KQkq - 0 8" root_key=11725030838384998562 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=853,btime_ms=948,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 35
+completion_record generation=35 result_generation=35 root_match=true result_key=11725030838384998562 candidate=h2h4 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=h2h4 source=search completed=true cancelled=false failed=false
+command position startpos moves b1c3 d7d5 g1f3 c8f5 d2d4 e7e6 f3e5 h7h5 c1e3 b8d7 a2a3 d7e5 d4e5 a7a6 h2h4 c7c5
+search cancellation requested with generation suppression
+position accepted generation 36 key 16012459850871932763 fen r2qkbnr/1p3pp1/p3p3/2ppPb1p/7P/P1N1B3/1PP1PPP1/R2QKB1R w KQkq - 0 9 legal_moves 33
+position_record command="position startpos moves b1c3 d7d5 g1f3 c8f5 d2d4 e7e6 f3e5 h7h5 c1e3 b8d7 a2a3 d7e5 d4e5 a7a6 h2h4 c7c5" generation=36 root_fen="r2qkbnr/1p3pp1/p3p3/2ppPb1p/7P/P1N1B3/1PP1PPP1/R2QKB1R w KQkq - 0 9" native_key=16012459850871932763 side=w castling=KQkq ep=- halfmove=0 fullmove=9 native_legal_count=33 shadow_legal_count=33 legal_digest=84afe77e5ab99b48 native_shadow_consistent=true
+command isready
+command go wtime 835 btime 941
+search cancellation requested with generation suppression
+search start generation 38
+search root generation 38 key 16012459850871932763 fen r2qkbnr/1p3pp1/p3p3/2ppPb1p/7P/P1N1B3/1PP1PPP1/R2QKB1R w KQkq - 0 9
+go_record generation=38 root_fen="r2qkbnr/1p3pp1/p3p3/2ppPb1p/7P/P1N1B3/1PP1PPP1/R2QKB1R w KQkq - 0 9" root_key=16012459850871932763 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=835,btime_ms=941,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 38
+completion_record generation=38 result_generation=38 root_match=true result_key=16012459850871932763 candidate=e3g5 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=e3g5 source=search completed=true cancelled=false failed=false
+command position startpos moves b1c3 d7d5 g1f3 c8f5 d2d4 e7e6 f3e5 h7h5 c1e3 b8d7 a2a3 d7e5 d4e5 a7a6 h2h4 c7c5 e3g5 d8c7
+search cancellation requested with generation suppression
+position accepted generation 39 key 9047863039885713399 fen r3kbnr/1pq2pp1/p3p3/2ppPbBp/7P/P1N5/1PP1PPP1/R2QKB1R w KQkq - 2 10 legal_moves 36
+position_record command="position startpos moves b1c3 d7d5 g1f3 c8f5 d2d4 e7e6 f3e5 h7h5 c1e3 b8d7 a2a3 d7e5 d4e5 a7a6 h2h4 c7c5 e3g5 d8c7" generation=39 root_fen="r3kbnr/1pq2pp1/p3p3/2ppPbBp/7P/P1N5/1PP1PPP1/R2QKB1R w KQkq - 2 10" native_key=9047863039885713399 side=w castling=KQkq ep=- halfmove=2 fullmove=10 native_legal_count=36 shadow_legal_count=36 legal_digest=e8918d9c6ff8c5a1 native_shadow_consistent=true
+command isready
+command go wtime 817 btime 938
+search cancellation requested with generation suppression
+search start generation 41
+search root generation 41 key 9047863039885713399 fen r3kbnr/1pq2pp1/p3p3/2ppPbBp/7P/P1N5/1PP1PPP1/R2QKB1R w KQkq - 2 10
+go_record generation=41 root_fen="r3kbnr/1pq2pp1/p3p3/2ppPbBp/7P/P1N5/1PP1PPP1/R2QKB1R w KQkq - 2 10" root_key=9047863039885713399 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=817,btime_ms=938,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 41
+completion_record generation=41 result_generation=41 root_match=true result_key=9047863039885713399 candidate=g5f4 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=g5f4 source=search completed=true cancelled=false failed=false
+command position startpos moves b1c3 d7d5 g1f3 c8f5 d2d4 e7e6 f3e5 h7h5 c1e3 b8d7 a2a3 d7e5 d4e5 a7a6 h2h4 c7c5 e3g5 d8c7 g5f4 d5d4
+search cancellation requested with generation suppression
+position accepted generation 42 key 2130183472183811337 fen r3kbnr/1pq2pp1/p3p3/2p1Pb1p/3p1B1P/P1N5/1PP1PPP1/R2QKB1R w KQkq - 0 11 legal_moves 33
+position_record command="position startpos moves b1c3 d7d5 g1f3 c8f5 d2d4 e7e6 f3e5 h7h5 c1e3 b8d7 a2a3 d7e5 d4e5 a7a6 h2h4 c7c5 e3g5 d8c7 g5f4 d5d4" generation=42 root_fen="r3kbnr/1pq2pp1/p3p3/2p1Pb1p/3p1B1P/P1N5/1PP1PPP1/R2QKB1R w KQkq - 0 11" native_key=2130183472183811337 side=w castling=KQkq ep=- halfmove=0 fullmove=11 native_legal_count=33 shadow_legal_count=33 legal_digest=16ed024bd4535cbd native_shadow_consistent=true
+command isready
+command go wtime 800 btime 930
+search cancellation requested with generation suppression
+search start generation 44
+search root generation 44 key 2130183472183811337 fen r3kbnr/1pq2pp1/p3p3/2p1Pb1p/3p1B1P/P1N5/1PP1PPP1/R2QKB1R w KQkq - 0 11
+go_record generation=44 root_fen="r3kbnr/1pq2pp1/p3p3/2p1Pb1p/3p1B1P/P1N5/1PP1PPP1/R2QKB1R w KQkq - 0 11" root_key=2130183472183811337 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=800,btime_ms=930,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 44
+completion_record generation=44 result_generation=44 root_match=true result_key=2130183472183811337 candidate=d1d4 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=d1d4 source=search completed=true cancelled=false failed=false
+command position startpos moves b1c3 d7d5 g1f3 c8f5 d2d4 e7e6 f3e5 h7h5 c1e3 b8d7 a2a3 d7e5 d4e5 a7a6 h2h4 c7c5 e3g5 d8c7 g5f4 d5d4 d1d4 c5d4
+search cancellation requested with generation suppression
+position accepted generation 45 key 7397507051278631388 fen r3kbnr/1pq2pp1/p3p3/4Pb1p/3p1B1P/P1N5/1PP1PPP1/R3KB1R w KQkq - 0 12 legal_moves 32
+position_record command="position startpos moves b1c3 d7d5 g1f3 c8f5 d2d4 e7e6 f3e5 h7h5 c1e3 b8d7 a2a3 d7e5 d4e5 a7a6 h2h4 c7c5 e3g5 d8c7 g5f4 d5d4 d1d4 c5d4" generation=45 root_fen="r3kbnr/1pq2pp1/p3p3/4Pb1p/3p1B1P/P1N5/1PP1PPP1/R3KB1R w KQkq - 0 12" native_key=7397507051278631388 side=w castling=KQkq ep=- halfmove=0 fullmove=12 native_legal_count=32 shadow_legal_count=32 legal_digest=a082943c6a50d1c9 native_shadow_consistent=true
+command isready
+command go wtime 783 btime 928
+search cancellation requested with generation suppression
+search start generation 47
+search root generation 47 key 7397507051278631388 fen r3kbnr/1pq2pp1/p3p3/4Pb1p/3p1B1P/P1N5/1PP1PPP1/R3KB1R w KQkq - 0 12
+go_record generation=47 root_fen="r3kbnr/1pq2pp1/p3p3/4Pb1p/3p1B1P/P1N5/1PP1PPP1/R3KB1R w KQkq - 0 12" root_key=7397507051278631388 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=783,btime_ms=928,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 47
+completion_record generation=47 result_generation=47 root_match=true result_key=7397507051278631388 candidate=e2e4 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=e2e4 source=search completed=true cancelled=false failed=false
+command position startpos moves b1c3 d7d5 g1f3 c8f5 d2d4 e7e6 f3e5 h7h5 c1e3 b8d7 a2a3 d7e5 d4e5 a7a6 h2h4 c7c5 e3g5 d8c7 g5f4 d5d4 d1d4 c5d4 e2e4 d4c3
+search cancellation requested with generation suppression
+position accepted generation 48 key 6876354261637818263 fen r3kbnr/1pq2pp1/p3p3/4Pb1p/4PB1P/P1p5/1PP2PP1/R3KB1R w KQkq - 0 13 legal_moves 30
+position_record command="position startpos moves b1c3 d7d5 g1f3 c8f5 d2d4 e7e6 f3e5 h7h5 c1e3 b8d7 a2a3 d7e5 d4e5 a7a6 h2h4 c7c5 e3g5 d8c7 g5f4 d5d4 d1d4 c5d4 e2e4 d4c3" generation=48 root_fen="r3kbnr/1pq2pp1/p3p3/4Pb1p/4PB1P/P1p5/1PP2PP1/R3KB1R w KQkq - 0 13" native_key=6876354261637818263 side=w castling=KQkq ep=- halfmove=0 fullmove=13 native_legal_count=30 shadow_legal_count=30 legal_digest=936164fb26c1e086 native_shadow_consistent=true
+command isready
+command go wtime 767 btime 925
+search cancellation requested with generation suppression
+search start generation 50
+search root generation 50 key 6876354261637818263 fen r3kbnr/1pq2pp1/p3p3/4Pb1p/4PB1P/P1p5/1PP2PP1/R3KB1R w KQkq - 0 13
+go_record generation=50 root_fen="r3kbnr/1pq2pp1/p3p3/4Pb1p/4PB1P/P1p5/1PP2PP1/R3KB1R w KQkq - 0 13" root_key=6876354261637818263 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=767,btime_ms=925,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 50
+completion_record generation=50 result_generation=50 root_match=true result_key=6876354261637818263 candidate=e4f5 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=e4f5 source=search completed=true cancelled=false failed=false
+command position startpos moves b1c3 d7d5 g1f3 c8f5 d2d4 e7e6 f3e5 h7h5 c1e3 b8d7 a2a3 d7e5 d4e5 a7a6 h2h4 c7c5 e3g5 d8c7 g5f4 d5d4 d1d4 c5d4 e2e4 d4c3 e4f5 c3b2
+search cancellation requested with generation suppression
+position accepted generation 51 key 4971242432848251627 fen r3kbnr/1pq2pp1/p3p3/4PP1p/5B1P/P7/1pP2PP1/R3KB1R w KQkq - 0 14 legal_moves 30
+position_record command="position startpos moves b1c3 d7d5 g1f3 c8f5 d2d4 e7e6 f3e5 h7h5 c1e3 b8d7 a2a3 d7e5 d4e5 a7a6 h2h4 c7c5 e3g5 d8c7 g5f4 d5d4 d1d4 c5d4 e2e4 d4c3 e4f5 c3b2" generation=51 root_fen="r3kbnr/1pq2pp1/p3p3/4PP1p/5B1P/P7/1pP2PP1/R3KB1R w KQkq - 0 14" native_key=4971242432848251627 side=w castling=KQkq ep=- halfmove=0 fullmove=14 native_legal_count=30 shadow_legal_count=30 legal_digest=0d80299ac8dceb0b native_shadow_consistent=true
+command isready
+command go wtime 751 btime 898
+search cancellation requested with generation suppression
+search start generation 53
+search root generation 53 key 4971242432848251627 fen r3kbnr/1pq2pp1/p3p3/4PP1p/5B1P/P7/1pP2PP1/R3KB1R w KQkq - 0 14
+go_record generation=53 root_fen="r3kbnr/1pq2pp1/p3p3/4PP1p/5B1P/P7/1pP2PP1/R3KB1R w KQkq - 0 14" root_key=4971242432848251627 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=751,btime_ms=898,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 53
+completion_record generation=53 result_generation=53 root_match=true result_key=4971242432848251627 candidate=f5e6 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=f5e6 source=search completed=true cancelled=false failed=false
+command position startpos moves b1c3 d7d5 g1f3 c8f5 d2d4 e7e6 f3e5 h7h5 c1e3 b8d7 a2a3 d7e5 d4e5 a7a6 h2h4 c7c5 e3g5 d8c7 g5f4 d5d4 d1d4 c5d4 e2e4 d4c3 e4f5 c3b2 f5e6 b2a1q
+search cancellation requested with generation suppression
+position accepted generation 54 key 2782751131225991583 fen r3kbnr/1pq2pp1/p3P3/4P2p/5B1P/P7/2P2PP1/q3KB1R w Kkq - 0 15 legal_moves 3
+position_record command="position startpos moves b1c3 d7d5 g1f3 c8f5 d2d4 e7e6 f3e5 h7h5 c1e3 b8d7 a2a3 d7e5 d4e5 a7a6 h2h4 c7c5 e3g5 d8c7 g5f4 d5d4 d1d4 c5d4 e2e4 d4c3 e4f5 c3b2 f5e6 b2a1q" generation=54 root_fen="r3kbnr/1pq2pp1/p3P3/4P2p/5B1P/P7/2P2PP1/q3KB1R w Kkq - 0 15" native_key=2782751131225991583 side=w castling=Kkq ep=- halfmove=0 fullmove=15 native_legal_count=3 shadow_legal_count=3 legal_digest=99573b77d7290188 native_shadow_consistent=true
+command isready
+command go wtime 736 btime 894
+search cancellation requested with generation suppression
+search start generation 56
+search root generation 56 key 2782751131225991583 fen r3kbnr/1pq2pp1/p3P3/4P2p/5B1P/P7/2P2PP1/q3KB1R w Kkq - 0 15
+go_record generation=56 root_fen="r3kbnr/1pq2pp1/p3P3/4P2p/5B1P/P7/2P2PP1/q3KB1R w Kkq - 0 15" root_key=2782751131225991583 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=736,btime_ms=894,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 56
+completion_record generation=56 result_generation=56 root_match=true result_key=2782751131225991583 candidate=e1d2 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=e1d2 source=search completed=true cancelled=false failed=false
+command position startpos moves b1c3 d7d5 g1f3 c8f5 d2d4 e7e6 f3e5 h7h5 c1e3 b8d7 a2a3 d7e5 d4e5 a7a6 h2h4 c7c5 e3g5 d8c7 g5f4 d5d4 d1d4 c5d4 e2e4 d4c3 e4f5 c3b2 f5e6 b2a1q e1d2 c7c3
+search cancellation requested with generation suppression
+position accepted generation 57 key 13635193470559515536 fen r3kbnr/1p3pp1/p3P3/4P2p/5B1P/P1q5/2PK1PP1/q4B1R w kq - 2 16 legal_moves 1
+position_record command="position startpos moves b1c3 d7d5 g1f3 c8f5 d2d4 e7e6 f3e5 h7h5 c1e3 b8d7 a2a3 d7e5 d4e5 a7a6 h2h4 c7c5 e3g5 d8c7 g5f4 d5d4 d1d4 c5d4 e2e4 d4c3 e4f5 c3b2 f5e6 b2a1q e1d2 c7c3" generation=57 root_fen="r3kbnr/1p3pp1/p3P3/4P2p/5B1P/P1q5/2PK1PP1/q4B1R w kq - 2 16" native_key=13635193470559515536 side=w castling=kq ep=- halfmove=2 fullmove=16 native_legal_count=1 shadow_legal_count=1 legal_digest=3c31b6fc9f11bc04 native_shadow_consistent=true
+command isready
+command go wtime 721 btime 893
+search cancellation requested with generation suppression
+search start generation 59
+search root generation 59 key 13635193470559515536 fen r3kbnr/1p3pp1/p3P3/4P2p/5B1P/P1q5/2PK1PP1/q4B1R w kq - 2 16
+go_record generation=59 root_fen="r3kbnr/1p3pp1/p3P3/4P2p/5B1P/P1q5/2PK1PP1/q4B1R w kq - 2 16" root_key=13635193470559515536 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=721,btime_ms=893,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 59
+completion_record generation=59 result_generation=59 root_match=true result_key=13635193470559515536 candidate=d2e2 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=d2e2 source=search completed=true cancelled=false failed=false
+command position startpos moves b1c3 d7d5 g1f3 c8f5 d2d4 e7e6 f3e5 h7h5 c1e3 b8d7 a2a3 d7e5 d4e5 a7a6 h2h4 c7c5 e3g5 d8c7 g5f4 d5d4 d1d4 c5d4 e2e4 d4c3 e4f5 c3b2 f5e6 b2a1q e1d2 c7c3 d2e2 a1e1
+search cancellation requested with generation suppression
+position accepted generation 60 key 13628702577616621529 fen r3kbnr/1p3pp1/p3P3/4P2p/5B1P/P1q5/2P1KPP1/4qB1R w kq - 4 17 legal_moves 0
+position_record command="position startpos moves b1c3 d7d5 g1f3 c8f5 d2d4 e7e6 f3e5 h7h5 c1e3 b8d7 a2a3 d7e5 d4e5 a7a6 h2h4 c7c5 e3g5 d8c7 g5f4 d5d4 d1d4 c5d4 e2e4 d4c3 e4f5 c3b2 f5e6 b2a1q e1d2 c7c3 d2e2 a1e1" generation=60 root_fen="r3kbnr/1p3pp1/p3P3/4P2p/5B1P/P1q5/2P1KPP1/4qB1R w kq - 4 17" native_key=13628702577616621529 side=w castling=kq ep=- halfmove=4 fullmove=17 native_legal_count=0 shadow_legal_count=0 legal_digest=14650fb0739d0383 native_shadow_consistent=true
+command isready
+command debug on
+command ucinewgame
+search cancellation requested with generation suppression
+command setoption name Ponder value false
+search cancellation requested with generation suppression
+command position fen r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1
+search cancellation requested with generation suppression
+position accepted generation 63 key 14355230147081457153 fen r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1 legal_moves 26
+position_record command="position fen r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1" generation=63 root_fen="r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1" native_key=14355230147081457153 side=w castling=KQkq ep=- halfmove=0 fullmove=1 native_legal_count=26 shadow_legal_count=26 legal_digest=cdc2346a5b17e747 native_shadow_consistent=true
+command position fen r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1 moves a1a8
+search cancellation requested with generation suppression
+position accepted generation 64 key 10508835810294853110 fen R3k2r/8/8/8/8/8/8/4K2R b Kk - 0 1 legal_moves 3
+position_record command="position fen r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1 moves a1a8" generation=64 root_fen="R3k2r/8/8/8/8/8/8/4K2R b Kk - 0 1" native_key=10508835810294853110 side=b castling=Kk ep=- halfmove=0 fullmove=1 native_legal_count=3 shadow_legal_count=3 legal_digest=741972b100c2b1c8 native_shadow_consistent=true
+command isready
+command go wtime 989 btime 1000
+search cancellation requested with generation suppression
+search start generation 66
+search root generation 66 key 10508835810294853110 fen R3k2r/8/8/8/8/8/8/4K2R b Kk - 0 1
+go_record generation=66 root_fen="R3k2r/8/8/8/8/8/8/4K2R b Kk - 0 1" root_key=10508835810294853110 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=989,btime_ms=1000,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 66
+completion_record generation=66 result_generation=66 root_match=true result_key=10508835810294853110 candidate=e8f7 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=e8f7 source=search completed=true cancelled=false failed=false
+command position fen r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1 moves a1a8 e8f7 h1h8
+search cancellation requested with generation suppression
+position accepted generation 67 key 16990025823553517856 fen R6R/5k2/8/8/8/8/8/4K3 b - - 0 2 legal_moves 5
+position_record command="position fen r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1 moves a1a8 e8f7 h1h8" generation=67 root_fen="R6R/5k2/8/8/8/8/8/4K3 b - - 0 2" native_key=16990025823553517856 side=b castling=- ep=- halfmove=0 fullmove=2 native_legal_count=5 shadow_legal_count=5 legal_digest=204fa6863ce6caf4 native_shadow_consistent=true
+command isready
+command go wtime 985 btime 977
+search cancellation requested with generation suppression
+search start generation 69
+search root generation 69 key 16990025823553517856 fen R6R/5k2/8/8/8/8/8/4K3 b - - 0 2
+go_record generation=69 root_fen="R6R/5k2/8/8/8/8/8/4K3 b - - 0 2" root_key=16990025823553517856 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=985,btime_ms=977,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 69
+completion_record generation=69 result_generation=69 root_match=true result_key=16990025823553517856 candidate=f7f6 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=f7f6 source=search completed=true cancelled=false failed=false
+command position fen r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1 moves a1a8 e8f7 h1h8 f7f6 e1e2
+search cancellation requested with generation suppression
+position accepted generation 70 key 5520754540349524178 fen R6R/8/5k2/8/8/8/4K3/8 b - - 2 3 legal_moves 8
+position_record command="position fen r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1 moves a1a8 e8f7 h1h8 f7f6 e1e2" generation=70 root_fen="R6R/8/5k2/8/8/8/4K3/8 b - - 2 3" native_key=5520754540349524178 side=b castling=- ep=- halfmove=2 fullmove=3 native_legal_count=8 shadow_legal_count=8 legal_digest=95bf7cfdb6f87b9b native_shadow_consistent=true
+command isready
+command go wtime 970 btime 955
+search cancellation requested with generation suppression
+search start generation 72
+search root generation 72 key 5520754540349524178 fen R6R/8/5k2/8/8/8/4K3/8 b - - 2 3
+go_record generation=72 root_fen="R6R/8/5k2/8/8/8/4K3/8 b - - 2 3" root_key=5520754540349524178 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=970,btime_ms=955,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 72
+completion_record generation=72 result_generation=72 root_match=true result_key=5520754540349524178 candidate=f6e5 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=f6e5 source=search completed=true cancelled=false failed=false
+command position fen r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1 moves a1a8 e8f7 h1h8 f7f6 e1e2 f6e5 e2e3
+search cancellation requested with generation suppression
+position accepted generation 73 key 15673552774689847358 fen R6R/8/8/4k3/8/4K3/8/8 b - - 4 4 legal_moves 5
+position_record command="position fen r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1 moves a1a8 e8f7 h1h8 f7f6 e1e2 f6e5 e2e3" generation=73 root_fen="R6R/8/8/4k3/8/4K3/8/8 b - - 4 4" native_key=15673552774689847358 side=b castling=- ep=- halfmove=4 fullmove=4 native_legal_count=5 shadow_legal_count=5 legal_digest=a02c6f2641365b2e native_shadow_consistent=true
+command isready
+command go wtime 956 btime 934
+search cancellation requested with generation suppression
+search start generation 75
+search root generation 75 key 15673552774689847358 fen R6R/8/8/4k3/8/4K3/8/8 b - - 4 4
+go_record generation=75 root_fen="R6R/8/8/4k3/8/4K3/8/8 b - - 4 4" root_key=15673552774689847358 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=956,btime_ms=934,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 75
+completion_record generation=75 result_generation=75 root_match=true result_key=15673552774689847358 candidate=e5d5 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=e5d5 source=search completed=true cancelled=false failed=false
+command position fen r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1 moves a1a8 e8f7 h1h8 f7f6 e1e2 f6e5 e2e3 e5d5 h8g8
+search cancellation requested with generation suppression
+position accepted generation 76 key 11375475597251600948 fen R5R1/8/8/3k4/8/4K3/8/8 b - - 6 5 legal_moves 6
+position_record command="position fen r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1 moves a1a8 e8f7 h1h8 f7f6 e1e2 f6e5 e2e3 e5d5 h8g8" generation=76 root_fen="R5R1/8/8/3k4/8/4K3/8/8 b - - 6 5" native_key=11375475597251600948 side=b castling=- ep=- halfmove=6 fullmove=5 native_legal_count=6 shadow_legal_count=6 legal_digest=b212543a2c52e6de native_shadow_consistent=true
+command isready
+command go wtime 941 btime 913
+search cancellation requested with generation suppression
+search start generation 78
+search root generation 78 key 11375475597251600948 fen R5R1/8/8/3k4/8/4K3/8/8 b - - 6 5
+go_record generation=78 root_fen="R5R1/8/8/3k4/8/4K3/8/8 b - - 6 5" root_key=11375475597251600948 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=941,btime_ms=913,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 78
+completion_record generation=78 result_generation=78 root_match=true result_key=11375475597251600948 candidate=d5e5 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=d5e5 source=search completed=true cancelled=false failed=false
+command position fen r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1 moves a1a8 e8f7 h1h8 f7f6 e1e2 f6e5 e2e3 e5d5 h8g8 d5e5 g8d8
+search cancellation requested with generation suppression
+position accepted generation 79 key 17381909889333182466 fen R2R4/8/8/4k3/8/4K3/8/8 b - - 8 6 legal_moves 3
+position_record command="position fen r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1 moves a1a8 e8f7 h1h8 f7f6 e1e2 f6e5 e2e3 e5d5 h8g8 d5e5 g8d8" generation=79 root_fen="R2R4/8/8/4k3/8/4K3/8/8 b - - 8 6" native_key=17381909889333182466 side=b castling=- ep=- halfmove=8 fullmove=6 native_legal_count=3 shadow_legal_count=3 legal_digest=b54164322cf7e409 native_shadow_consistent=true
+command isready
+command go wtime 932 btime 893
+search cancellation requested with generation suppression
+search start generation 81
+search root generation 81 key 17381909889333182466 fen R2R4/8/8/4k3/8/4K3/8/8 b - - 8 6
+go_record generation=81 root_fen="R2R4/8/8/4k3/8/4K3/8/8 b - - 8 6" root_key=17381909889333182466 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=932,btime_ms=893,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 81
+completion_record generation=81 result_generation=81 root_match=true result_key=17381909889333182466 candidate=e5f5 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=e5f5 source=search completed=true cancelled=false failed=false
+command position fen r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1 moves a1a8 e8f7 h1h8 f7f6 e1e2 f6e5 e2e3 e5d5 h8g8 d5e5 g8d8 e5f5 d8e8
+search cancellation requested with generation suppression
+position accepted generation 82 key 9921206714938689568 fen R3R3/8/8/5k2/8/4K3/8/8 b - - 10 7 legal_moves 4
+position_record command="position fen r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1 moves a1a8 e8f7 h1h8 f7f6 e1e2 f6e5 e2e3 e5d5 h8g8 d5e5 g8d8 e5f5 d8e8" generation=82 root_fen="R3R3/8/8/5k2/8/4K3/8/8 b - - 10 7" native_key=9921206714938689568 side=b castling=- ep=- halfmove=10 fullmove=7 native_legal_count=4 shadow_legal_count=4 legal_digest=d3911423759f0955 native_shadow_consistent=true
+command isready
+command go wtime 920 btime 874
+search cancellation requested with generation suppression
+search start generation 84
+search root generation 84 key 9921206714938689568 fen R3R3/8/8/5k2/8/4K3/8/8 b - - 10 7
+go_record generation=84 root_fen="R3R3/8/8/5k2/8/4K3/8/8 b - - 10 7" root_key=9921206714938689568 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=920,btime_ms=874,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 84
+completion_record generation=84 result_generation=84 root_match=true result_key=9921206714938689568 candidate=f5f6 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=f5f6 source=search completed=true cancelled=false failed=false
+command position fen r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1 moves a1a8 e8f7 h1h8 f7f6 e1e2 f6e5 e2e3 e5d5 h8g8 d5e5 g8d8 e5f5 d8e8 f5f6 e3f4
+search cancellation requested with generation suppression
+position accepted generation 85 key 881708561344909800 fen R3R3/8/5k2/8/5K2/8/8/8 b - - 12 8 legal_moves 3
+position_record command="position fen r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1 moves a1a8 e8f7 h1h8 f7f6 e1e2 f6e5 e2e3 e5d5 h8g8 d5e5 g8d8 e5f5 d8e8 f5f6 e3f4" generation=85 root_fen="R3R3/8/5k2/8/5K2/8/8/8 b - - 12 8" native_key=881708561344909800 side=b castling=- ep=- halfmove=12 fullmove=8 native_legal_count=3 shadow_legal_count=3 legal_digest=395f36a2a6f46201 native_shadow_consistent=true
+command isready
+command go wtime 910 btime 855
+search cancellation requested with generation suppression
+search start generation 87
+search root generation 87 key 881708561344909800 fen R3R3/8/5k2/8/5K2/8/8/8 b - - 12 8
+go_record generation=87 root_fen="R3R3/8/5k2/8/5K2/8/8/8 b - - 12 8" root_key=881708561344909800 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=910,btime_ms=855,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 87
+completion_record generation=87 result_generation=87 root_match=true result_key=881708561344909800 candidate=f6g7 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=f6g7 source=search completed=true cancelled=false failed=false
+command position fen r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1 moves a1a8 e8f7 h1h8 f7f6 e1e2 f6e5 e2e3 e5d5 h8g8 d5e5 g8d8 e5f5 d8e8 f5f6 e3f4 f6g7 f4e5
+search cancellation requested with generation suppression
+position accepted generation 88 key 16572753067302727808 fen R3R3/6k1/8/4K3/8/8/8/8 b - - 14 9 legal_moves 4
+position_record command="position fen r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1 moves a1a8 e8f7 h1h8 f7f6 e1e2 f6e5 e2e3 e5d5 h8g8 d5e5 g8d8 e5f5 d8e8 f5f6 e3f4 f6g7 f4e5" generation=88 root_fen="R3R3/6k1/8/4K3/8/8/8/8 b - - 14 9" native_key=16572753067302727808 side=b castling=- ep=- halfmove=14 fullmove=9 native_legal_count=4 shadow_legal_count=4 legal_digest=a1e750cd7a7a3026 native_shadow_consistent=true
+command isready
+command go wtime 908 btime 837
+search cancellation requested with generation suppression
+search start generation 90
+search root generation 90 key 16572753067302727808 fen R3R3/6k1/8/4K3/8/8/8/8 b - - 14 9
+go_record generation=90 root_fen="R3R3/6k1/8/4K3/8/8/8/8 b - - 14 9" root_key=16572753067302727808 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=908,btime_ms=837,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 90
+completion_record generation=90 result_generation=90 root_match=true result_key=16572753067302727808 candidate=g7g6 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=g7g6 source=search completed=true cancelled=false failed=false
+command position fen r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1 moves a1a8 e8f7 h1h8 f7f6 e1e2 f6e5 e2e3 e5d5 h8g8 d5e5 g8d8 e5f5 d8e8 f5f6 e3f4 f6g7 f4e5 g7g6 e8h8
+search cancellation requested with generation suppression
+position accepted generation 91 key 2488206221025852618 fen R6R/8/6k1/4K3/8/8/8/8 b - - 16 10 legal_moves 3
+position_record command="position fen r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1 moves a1a8 e8f7 h1h8 f7f6 e1e2 f6e5 e2e3 e5d5 h8g8 d5e5 g8d8 e5f5 d8e8 f5f6 e3f4 f6g7 f4e5 g7g6 e8h8" generation=91 root_fen="R6R/8/6k1/4K3/8/8/8/8 b - - 16 10" native_key=2488206221025852618 side=b castling=- ep=- halfmove=16 fullmove=10 native_legal_count=3 shadow_legal_count=3 legal_digest=704f04501f8e2e4d native_shadow_consistent=true
+command isready
+command go wtime 904 btime 819
+search cancellation requested with generation suppression
+search start generation 93
+search root generation 93 key 2488206221025852618 fen R6R/8/6k1/4K3/8/8/8/8 b - - 16 10
+go_record generation=93 root_fen="R6R/8/6k1/4K3/8/8/8/8 b - - 16 10" root_key=2488206221025852618 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=904,btime_ms=819,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 93
+completion_record generation=93 result_generation=93 root_match=true result_key=2488206221025852618 candidate=g6g7 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=g6g7 source=search completed=true cancelled=false failed=false
+command position fen r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1 moves a1a8 e8f7 h1h8 f7f6 e1e2 f6e5 e2e3 e5d5 h8g8 d5e5 g8d8 e5f5 d8e8 f5f6 e3f4 f6g7 f4e5 g7g6 e8h8 g6g7 e5f5
+search cancellation requested with generation suppression
+position accepted generation 94 key 15881245529877155891 fen R6R/6k1/8/5K2/8/8/8/8 b - - 18 11 legal_moves 1
+position_record command="position fen r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1 moves a1a8 e8f7 h1h8 f7f6 e1e2 f6e5 e2e3 e5d5 h8g8 d5e5 g8d8 e5f5 d8e8 f5f6 e3f4 f6g7 f4e5 g7g6 e8h8 g6g7 e5f5" generation=94 root_fen="R6R/6k1/8/5K2/8/8/8/8 b - - 18 11" native_key=15881245529877155891 side=b castling=- ep=- halfmove=18 fullmove=11 native_legal_count=1 shadow_legal_count=1 legal_digest=ebeb925141585f14 native_shadow_consistent=true
+command isready
+command go wtime 904 btime 801
+search cancellation requested with generation suppression
+search start generation 96
+search root generation 96 key 15881245529877155891 fen R6R/6k1/8/5K2/8/8/8/8 b - - 18 11
+go_record generation=96 root_fen="R6R/6k1/8/5K2/8/8/8/8 b - - 18 11" root_key=15881245529877155891 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=904,btime_ms=801,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 96
+completion_record generation=96 result_generation=96 root_match=true result_key=15881245529877155891 candidate=g7f7 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=g7f7 source=search completed=true cancelled=false failed=false
+command position fen r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1 moves a1a8 e8f7 h1h8 f7f6 e1e2 f6e5 e2e3 e5d5 h8g8 d5e5 g8d8 e5f5 d8e8 f5f6 e3f4 f6g7 f4e5 g7g6 e8h8 g6g7 e5f5 g7f7 a8a7
+search cancellation requested with generation suppression
+position accepted generation 97 key 7762142635406893325 fen 7R/R4k2/8/5K2/8/8/8/8 b - - 20 12 legal_moves 0
+position_record command="position fen r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1 moves a1a8 e8f7 h1h8 f7f6 e1e2 f6e5 e2e3 e5d5 h8g8 d5e5 g8d8 e5f5 d8e8 f5f6 e3f4 f6g7 f4e5 g7g6 e8h8 g6g7 e5f5 g7f7 a8a7" generation=97 root_fen="7R/R4k2/8/5K2/8/8/8/8 b - - 20 12" native_key=7762142635406893325 side=b castling=- ep=- halfmove=20 fullmove=12 native_legal_count=0 shadow_legal_count=0 legal_digest=14650fb0739d0383 native_shadow_consistent=true
+command isready
+command debug on
+command ucinewgame
+search cancellation requested with generation suppression
+command setoption name Ponder value false
+search cancellation requested with generation suppression
+command position fen rnbqkbnr/pppp1ppp/8/3Pp3/8/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 2
+search cancellation requested with generation suppression
+position accepted generation 100 key 11143766388399903349 fen rnbqkbnr/pppp1ppp/8/3Pp3/8/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 2 legal_moves 30
+position_record command="position fen rnbqkbnr/pppp1ppp/8/3Pp3/8/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 2" generation=100 root_fen="rnbqkbnr/pppp1ppp/8/3Pp3/8/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 2" native_key=11143766388399903349 side=w castling=KQkq ep=e6 halfmove=0 fullmove=2 native_legal_count=30 shadow_legal_count=30 legal_digest=1ba0dcbac0343cd6 native_shadow_consistent=true
+command isready
+command go wtime 1000 btime 1000
+search cancellation requested with generation suppression
+search start generation 102
+search root generation 102 key 11143766388399903349 fen rnbqkbnr/pppp1ppp/8/3Pp3/8/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 2
+go_record generation=102 root_fen="rnbqkbnr/pppp1ppp/8/3Pp3/8/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 2" root_key=11143766388399903349 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=1000,btime_ms=1000,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 102
+completion_record generation=102 result_generation=102 root_match=true result_key=11143766388399903349 candidate=g1f3 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=g1f3 source=search completed=true cancelled=false failed=false
+command position fen rnbqkbnr/pppp1ppp/8/3Pp3/8/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 2 moves g1f3 d7d6
+search cancellation requested with generation suppression
+position accepted generation 103 key 13308428575609126884 fen rnbqkbnr/ppp2ppp/3p4/3Pp3/8/5N2/PPP1PPPP/RNBQKB1R w KQkq - 0 3 legal_moves 31
+position_record command="position fen rnbqkbnr/pppp1ppp/8/3Pp3/8/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 2 moves g1f3 d7d6" generation=103 root_fen="rnbqkbnr/ppp2ppp/3p4/3Pp3/8/5N2/PPP1PPPP/RNBQKB1R w KQkq - 0 3" native_key=13308428575609126884 side=w castling=KQkq ep=- halfmove=0 fullmove=3 native_legal_count=31 shadow_legal_count=31 legal_digest=0d8041357dd746c7 native_shadow_consistent=true
+command isready
+command go wtime 976 btime 989
+search cancellation requested with generation suppression
+search start generation 105
+search root generation 105 key 13308428575609126884 fen rnbqkbnr/ppp2ppp/3p4/3Pp3/8/5N2/PPP1PPPP/RNBQKB1R w KQkq - 0 3
+go_record generation=105 root_fen="rnbqkbnr/ppp2ppp/3p4/3Pp3/8/5N2/PPP1PPPP/RNBQKB1R w KQkq - 0 3" root_key=13308428575609126884 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=976,btime_ms=989,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 105
+completion_record generation=105 result_generation=105 root_match=true result_key=13308428575609126884 candidate=b1c3 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=b1c3 source=search completed=true cancelled=false failed=false
+command position fen rnbqkbnr/pppp1ppp/8/3Pp3/8/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 2 moves g1f3 d7d6 b1c3 g8f6
+search cancellation requested with generation suppression
+position accepted generation 106 key 11980672031826412024 fen rnbqkb1r/ppp2ppp/3p1n2/3Pp3/8/2N2N2/PPP1PPPP/R1BQKB1R w KQkq - 2 4 legal_moves 31
+position_record command="position fen rnbqkbnr/pppp1ppp/8/3Pp3/8/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 2 moves g1f3 d7d6 b1c3 g8f6" generation=106 root_fen="rnbqkb1r/ppp2ppp/3p1n2/3Pp3/8/2N2N2/PPP1PPPP/R1BQKB1R w KQkq - 2 4" native_key=11980672031826412024 side=w castling=KQkq ep=- halfmove=2 fullmove=4 native_legal_count=31 shadow_legal_count=31 legal_digest=0a4d541c1b52a722 native_shadow_consistent=true
+command isready
+command go wtime 954 btime 973
+search cancellation requested with generation suppression
+search start generation 108
+search root generation 108 key 11980672031826412024 fen rnbqkb1r/ppp2ppp/3p1n2/3Pp3/8/2N2N2/PPP1PPPP/R1BQKB1R w KQkq - 2 4
+go_record generation=108 root_fen="rnbqkb1r/ppp2ppp/3p1n2/3Pp3/8/2N2N2/PPP1PPPP/R1BQKB1R w KQkq - 2 4" root_key=11980672031826412024 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=954,btime_ms=973,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 108
+completion_record generation=108 result_generation=108 root_match=true result_key=11980672031826412024 candidate=d1d3 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=d1d3 source=search completed=true cancelled=false failed=false
+command position fen rnbqkbnr/pppp1ppp/8/3Pp3/8/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 2 moves g1f3 d7d6 b1c3 g8f6 d1d3 f8e7
+search cancellation requested with generation suppression
+position accepted generation 109 key 10692711516626732063 fen rnbqk2r/ppp1bppp/3p1n2/3Pp3/8/2NQ1N2/PPP1PPPP/R1B1KB1R w KQkq - 4 5 legal_moves 41
+position_record command="position fen rnbqkbnr/pppp1ppp/8/3Pp3/8/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 2 moves g1f3 d7d6 b1c3 g8f6 d1d3 f8e7" generation=109 root_fen="rnbqk2r/ppp1bppp/3p1n2/3Pp3/8/2NQ1N2/PPP1PPPP/R1B1KB1R w KQkq - 4 5" native_key=10692711516626732063 side=w castling=KQkq ep=- halfmove=4 fullmove=5 native_legal_count=41 shadow_legal_count=41 legal_digest=0c7e127c93f54f71 native_shadow_consistent=true
+command isready
+command go wtime 933 btime 971
+search cancellation requested with generation suppression
+search start generation 111
+search root generation 111 key 10692711516626732063 fen rnbqk2r/ppp1bppp/3p1n2/3Pp3/8/2NQ1N2/PPP1PPPP/R1B1KB1R w KQkq - 4 5
+go_record generation=111 root_fen="rnbqk2r/ppp1bppp/3p1n2/3Pp3/8/2NQ1N2/PPP1PPPP/R1B1KB1R w KQkq - 4 5" root_key=10692711516626732063 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=933,btime_ms=971,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 111
+completion_record generation=111 result_generation=111 root_match=true result_key=10692711516626732063 candidate=c1e3 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=c1e3 source=search completed=true cancelled=false failed=false
+command position fen rnbqkbnr/pppp1ppp/8/3Pp3/8/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 2 moves g1f3 d7d6 b1c3 g8f6 d1d3 f8e7 c1e3 c7c6
+search cancellation requested with generation suppression
+position accepted generation 112 key 10909180739065144382 fen rnbqk2r/pp2bppp/2pp1n2/3Pp3/8/2NQBN2/PPP1PPPP/R3KB1R w KQkq - 0 6 legal_moves 46
+position_record command="position fen rnbqkbnr/pppp1ppp/8/3Pp3/8/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 2 moves g1f3 d7d6 b1c3 g8f6 d1d3 f8e7 c1e3 c7c6" generation=112 root_fen="rnbqk2r/pp2bppp/2pp1n2/3Pp3/8/2NQBN2/PPP1PPPP/R3KB1R w KQkq - 0 6" native_key=10909180739065144382 side=w castling=KQkq ep=- halfmove=0 fullmove=6 native_legal_count=46 shadow_legal_count=46 legal_digest=d0793e1aa8f316d0 native_shadow_consistent=true
+command isready
+command go wtime 911 btime 954
+search cancellation requested with generation suppression
+search start generation 114
+search root generation 114 key 10909180739065144382 fen rnbqk2r/pp2bppp/2pp1n2/3Pp3/8/2NQBN2/PPP1PPPP/R3KB1R w KQkq - 0 6
+go_record generation=114 root_fen="rnbqk2r/pp2bppp/2pp1n2/3Pp3/8/2NQBN2/PPP1PPPP/R3KB1R w KQkq - 0 6" root_key=10909180739065144382 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=911,btime_ms=954,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 114
+completion_record generation=114 result_generation=114 root_match=true result_key=10909180739065144382 candidate=a1d1 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=a1d1 source=search completed=true cancelled=false failed=false
+command position fen rnbqkbnr/pppp1ppp/8/3Pp3/8/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 2 moves g1f3 d7d6 b1c3 g8f6 d1d3 f8e7 c1e3 c7c6 a1d1 e8g8
+search cancellation requested with generation suppression
+position accepted generation 115 key 9934061721755516193 fen rnbq1rk1/pp2bppp/2pp1n2/3Pp3/8/2NQBN2/PPP1PPPP/3RKB1R w K - 2 7 legal_moves 43
+position_record command="position fen rnbqkbnr/pppp1ppp/8/3Pp3/8/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 2 moves g1f3 d7d6 b1c3 g8f6 d1d3 f8e7 c1e3 c7c6 a1d1 e8g8" generation=115 root_fen="rnbq1rk1/pp2bppp/2pp1n2/3Pp3/8/2NQBN2/PPP1PPPP/3RKB1R w K - 2 7" native_key=9934061721755516193 side=w castling=K ep=- halfmove=2 fullmove=7 native_legal_count=43 shadow_legal_count=43 legal_digest=12d491e61a7cb707 native_shadow_consistent=true
+command isready
+command go wtime 890 btime 944
+search cancellation requested with generation suppression
+search start generation 117
+search root generation 117 key 9934061721755516193 fen rnbq1rk1/pp2bppp/2pp1n2/3Pp3/8/2NQBN2/PPP1PPPP/3RKB1R w K - 2 7
+go_record generation=117 root_fen="rnbq1rk1/pp2bppp/2pp1n2/3Pp3/8/2NQBN2/PPP1PPPP/3RKB1R w K - 2 7" root_key=9934061721755516193 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=890,btime_ms=944,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 117
+completion_record generation=117 result_generation=117 root_match=true result_key=9934061721755516193 candidate=a2a3 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=a2a3 source=search completed=true cancelled=false failed=false
+command position fen rnbqkbnr/pppp1ppp/8/3Pp3/8/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 2 moves g1f3 d7d6 b1c3 g8f6 d1d3 f8e7 c1e3 c7c6 a1d1 e8g8 a2a3 b8d7
+search cancellation requested with generation suppression
+position accepted generation 118 key 3636970848006840674 fen r1bq1rk1/pp1nbppp/2pp1n2/3Pp3/8/P1NQBN2/1PP1PPPP/3RKB1R w K - 1 8 legal_moves 43
+position_record command="position fen rnbqkbnr/pppp1ppp/8/3Pp3/8/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 2 moves g1f3 d7d6 b1c3 g8f6 d1d3 f8e7 c1e3 c7c6 a1d1 e8g8 a2a3 b8d7" generation=118 root_fen="r1bq1rk1/pp1nbppp/2pp1n2/3Pp3/8/P1NQBN2/1PP1PPPP/3RKB1R w K - 1 8" native_key=3636970848006840674 side=w castling=K ep=- halfmove=1 fullmove=8 native_legal_count=43 shadow_legal_count=43 legal_digest=3f28d4b83b983568 native_shadow_consistent=true
+command isready
+command go wtime 870 btime 930
+search cancellation requested with generation suppression
+search start generation 120
+search root generation 120 key 3636970848006840674 fen r1bq1rk1/pp1nbppp/2pp1n2/3Pp3/8/P1NQBN2/1PP1PPPP/3RKB1R w K - 1 8
+go_record generation=120 root_fen="r1bq1rk1/pp1nbppp/2pp1n2/3Pp3/8/P1NQBN2/1PP1PPPP/3RKB1R w K - 1 8" root_key=3636970848006840674 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=870,btime_ms=930,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 120
+completion_record generation=120 result_generation=120 root_match=true result_key=3636970848006840674 candidate=d5c6 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=d5c6 source=search completed=true cancelled=false failed=false
+command position fen rnbqkbnr/pppp1ppp/8/3Pp3/8/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 2 moves g1f3 d7d6 b1c3 g8f6 d1d3 f8e7 c1e3 c7c6 a1d1 e8g8 a2a3 b8d7 d5c6 b7c6
+search cancellation requested with generation suppression
+position accepted generation 121 key 12326880254650279123 fen r1bq1rk1/p2nbppp/2pp1n2/4p3/8/P1NQBN2/1PP1PPPP/3RKB1R w K - 0 9 legal_moves 45
+position_record command="position fen rnbqkbnr/pppp1ppp/8/3Pp3/8/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 2 moves g1f3 d7d6 b1c3 g8f6 d1d3 f8e7 c1e3 c7c6 a1d1 e8g8 a2a3 b8d7 d5c6 b7c6" generation=121 root_fen="r1bq1rk1/p2nbppp/2pp1n2/4p3/8/P1NQBN2/1PP1PPPP/3RKB1R w K - 0 9" native_key=12326880254650279123 side=w castling=K ep=- halfmove=0 fullmove=9 native_legal_count=45 shadow_legal_count=45 legal_digest=e536ddae2ddf22c2 native_shadow_consistent=true
+command isready
+command go wtime 850 btime 927
+search cancellation requested with generation suppression
+search start generation 123
+search root generation 123 key 12326880254650279123 fen r1bq1rk1/p2nbppp/2pp1n2/4p3/8/P1NQBN2/1PP1PPPP/3RKB1R w K - 0 9
+go_record generation=123 root_fen="r1bq1rk1/p2nbppp/2pp1n2/4p3/8/P1NQBN2/1PP1PPPP/3RKB1R w K - 0 9" root_key=12326880254650279123 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=850,btime_ms=927,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 123
+completion_record generation=123 result_generation=123 root_match=true result_key=12326880254650279123 candidate=d3f5 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=d3f5 source=search completed=true cancelled=false failed=false
+command position fen rnbqkbnr/pppp1ppp/8/3Pp3/8/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 2 moves g1f3 d7d6 b1c3 g8f6 d1d3 f8e7 c1e3 c7c6 a1d1 e8g8 a2a3 b8d7 d5c6 b7c6 d3f5 h7h6
+search cancellation requested with generation suppression
+position accepted generation 124 key 14289825445907317439 fen r1bq1rk1/p2nbpp1/2pp1n1p/4pQ2/8/P1N1BN2/1PP1PPPP/3RKB1R w K - 0 10 legal_moves 51
+position_record command="position fen rnbqkbnr/pppp1ppp/8/3Pp3/8/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 2 moves g1f3 d7d6 b1c3 g8f6 d1d3 f8e7 c1e3 c7c6 a1d1 e8g8 a2a3 b8d7 d5c6 b7c6 d3f5 h7h6" generation=124 root_fen="r1bq1rk1/p2nbpp1/2pp1n1p/4pQ2/8/P1N1BN2/1PP1PPPP/3RKB1R w K - 0 10" native_key=14289825445907317439 side=w castling=K ep=- halfmove=0 fullmove=10 native_legal_count=51 shadow_legal_count=51 legal_digest=cc58a49123a8ab39 native_shadow_consistent=true
+command isready
+command go wtime 832 btime 914
+search cancellation requested with generation suppression
+search start generation 126
+search root generation 126 key 14289825445907317439 fen r1bq1rk1/p2nbpp1/2pp1n1p/4pQ2/8/P1N1BN2/1PP1PPPP/3RKB1R w K - 0 10
+go_record generation=126 root_fen="r1bq1rk1/p2nbpp1/2pp1n1p/4pQ2/8/P1N1BN2/1PP1PPPP/3RKB1R w K - 0 10" root_key=14289825445907317439 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=832,btime_ms=914,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 126
+completion_record generation=126 result_generation=126 root_match=true result_key=14289825445907317439 candidate=h2h3 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=h2h3 source=search completed=true cancelled=false failed=false
+command position fen rnbqkbnr/pppp1ppp/8/3Pp3/8/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 2 moves g1f3 d7d6 b1c3 g8f6 d1d3 f8e7 c1e3 c7c6 a1d1 e8g8 a2a3 b8d7 d5c6 b7c6 d3f5 h7h6 h2h3 d7c5
+search cancellation requested with generation suppression
+position accepted generation 127 key 8036175577152351664 fen r1bq1rk1/p3bpp1/2pp1n1p/2n1pQ2/8/P1N1BN1P/1PP1PPP1/3RKB1R w K - 1 11 legal_moves 50
+position_record command="position fen rnbqkbnr/pppp1ppp/8/3Pp3/8/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 2 moves g1f3 d7d6 b1c3 g8f6 d1d3 f8e7 c1e3 c7c6 a1d1 e8g8 a2a3 b8d7 d5c6 b7c6 d3f5 h7h6 h2h3 d7c5" generation=127 root_fen="r1bq1rk1/p3bpp1/2pp1n1p/2n1pQ2/8/P1N1BN1P/1PP1PPP1/3RKB1R w K - 1 11" native_key=8036175577152351664 side=w castling=K ep=- halfmove=1 fullmove=11 native_legal_count=50 shadow_legal_count=50 legal_digest=d8ff6eda08168111 native_shadow_consistent=true
+command isready
+command go wtime 814 btime 912
+search cancellation requested with generation suppression
+search start generation 129
+search root generation 129 key 8036175577152351664 fen r1bq1rk1/p3bpp1/2pp1n1p/2n1pQ2/8/P1N1BN1P/1PP1PPP1/3RKB1R w K - 1 11
+go_record generation=129 root_fen="r1bq1rk1/p3bpp1/2pp1n1p/2n1pQ2/8/P1N1BN1P/1PP1PPP1/3RKB1R w K - 1 11" root_key=8036175577152351664 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=814,btime_ms=912,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 129
+completion_record generation=129 result_generation=129 root_match=true result_key=8036175577152351664 candidate=f5e5 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=f5e5 source=search completed=true cancelled=false failed=false
+command position fen rnbqkbnr/pppp1ppp/8/3Pp3/8/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 2 moves g1f3 d7d6 b1c3 g8f6 d1d3 f8e7 c1e3 c7c6 a1d1 e8g8 a2a3 b8d7 d5c6 b7c6 d3f5 h7h6 h2h3 d7c5 f5e5 d6e5
+search cancellation requested with generation suppression
+position accepted generation 130 key 11625557600980946527 fen r1bq1rk1/p3bpp1/2p2n1p/2n1p3/8/P1N1BN1P/1PP1PPP1/3RKB1R w K - 0 12 legal_moves 38
+position_record command="position fen rnbqkbnr/pppp1ppp/8/3Pp3/8/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 2 moves g1f3 d7d6 b1c3 g8f6 d1d3 f8e7 c1e3 c7c6 a1d1 e8g8 a2a3 b8d7 d5c6 b7c6 d3f5 h7h6 h2h3 d7c5 f5e5 d6e5" generation=130 root_fen="r1bq1rk1/p3bpp1/2p2n1p/2n1p3/8/P1N1BN1P/1PP1PPP1/3RKB1R w K - 0 12" native_key=11625557600980946527 side=w castling=K ep=- halfmove=0 fullmove=12 native_legal_count=38 shadow_legal_count=38 legal_digest=c878fe04f6f5b77e native_shadow_consistent=true
+command isready
+command go wtime 797 btime 888
+search cancellation requested with generation suppression
+search start generation 132
+search root generation 132 key 11625557600980946527 fen r1bq1rk1/p3bpp1/2p2n1p/2n1p3/8/P1N1BN1P/1PP1PPP1/3RKB1R w K - 0 12
+go_record generation=132 root_fen="r1bq1rk1/p3bpp1/2p2n1p/2n1p3/8/P1N1BN1P/1PP1PPP1/3RKB1R w K - 0 12" root_key=11625557600980946527 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=797,btime_ms=888,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 132
+completion_record generation=132 result_generation=132 root_match=true result_key=11625557600980946527 candidate=d1d8 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=d1d8 source=search completed=true cancelled=false failed=false
+command position fen rnbqkbnr/pppp1ppp/8/3Pp3/8/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 2 moves g1f3 d7d6 b1c3 g8f6 d1d3 f8e7 c1e3 c7c6 a1d1 e8g8 a2a3 b8d7 d5c6 b7c6 d3f5 h7h6 h2h3 d7c5 f5e5 d6e5 d1d8 f8d8
+search cancellation requested with generation suppression
+position accepted generation 133 key 18186747674885318578 fen r1br2k1/p3bpp1/2p2n1p/2n1p3/8/P1N1BN1P/1PP1PPP1/4KB1R w K - 0 13 legal_moves 29
+position_record command="position fen rnbqkbnr/pppp1ppp/8/3Pp3/8/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 2 moves g1f3 d7d6 b1c3 g8f6 d1d3 f8e7 c1e3 c7c6 a1d1 e8g8 a2a3 b8d7 d5c6 b7c6 d3f5 h7h6 h2h3 d7c5 f5e5 d6e5 d1d8 f8d8" generation=133 root_fen="r1br2k1/p3bpp1/2p2n1p/2n1p3/8/P1N1BN1P/1PP1PPP1/4KB1R w K - 0 13" native_key=18186747674885318578 side=w castling=K ep=- halfmove=0 fullmove=13 native_legal_count=29 shadow_legal_count=29 legal_digest=8fbca76500112887 native_shadow_consistent=true
+command isready
+command go wtime 781 btime 874
+search cancellation requested with generation suppression
+search start generation 135
+search root generation 135 key 18186747674885318578 fen r1br2k1/p3bpp1/2p2n1p/2n1p3/8/P1N1BN1P/1PP1PPP1/4KB1R w K - 0 13
+go_record generation=135 root_fen="r1br2k1/p3bpp1/2p2n1p/2n1p3/8/P1N1BN1P/1PP1PPP1/4KB1R w K - 0 13" root_key=18186747674885318578 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=781,btime_ms=874,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 135
+completion_record generation=135 result_generation=135 root_match=true result_key=18186747674885318578 candidate=f3e5 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=f3e5 source=search completed=true cancelled=false failed=false
+command position fen rnbqkbnr/pppp1ppp/8/3Pp3/8/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 2 moves g1f3 d7d6 b1c3 g8f6 d1d3 f8e7 c1e3 c7c6 a1d1 e8g8 a2a3 b8d7 d5c6 b7c6 d3f5 h7h6 h2h3 d7c5 f5e5 d6e5 d1d8 f8d8 f3e5 c8d7
+search cancellation requested with generation suppression
+position accepted generation 136 key 1982857176229108626 fen r2r2k1/p2bbpp1/2p2n1p/2n1N3/8/P1N1B2P/1PP1PPP1/4KB1R w K - 1 14 legal_moves 34
+position_record command="position fen rnbqkbnr/pppp1ppp/8/3Pp3/8/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 2 moves g1f3 d7d6 b1c3 g8f6 d1d3 f8e7 c1e3 c7c6 a1d1 e8g8 a2a3 b8d7 d5c6 b7c6 d3f5 h7h6 h2h3 d7c5 f5e5 d6e5 d1d8 f8d8 f3e5 c8d7" generation=136 root_fen="r2r2k1/p2bbpp1/2p2n1p/2n1N3/8/P1N1B2P/1PP1PPP1/4KB1R w K - 1 14" native_key=1982857176229108626 side=w castling=K ep=- halfmove=1 fullmove=14 native_legal_count=34 shadow_legal_count=34 legal_digest=909b860f8d95fdd8 native_shadow_consistent=true
+command isready
+command go wtime 765 btime 847
+search cancellation requested with generation suppression
+search start generation 138
+search root generation 138 key 1982857176229108626 fen r2r2k1/p2bbpp1/2p2n1p/2n1N3/8/P1N1B2P/1PP1PPP1/4KB1R w K - 1 14
+go_record generation=138 root_fen="r2r2k1/p2bbpp1/2p2n1p/2n1N3/8/P1N1B2P/1PP1PPP1/4KB1R w K - 1 14" root_key=1982857176229108626 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=765,btime_ms=847,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 138
+completion_record generation=138 result_generation=138 root_match=true result_key=1982857176229108626 candidate=g2g4 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=g2g4 source=search completed=true cancelled=false failed=false
+command position fen rnbqkbnr/pppp1ppp/8/3Pp3/8/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 2 moves g1f3 d7d6 b1c3 g8f6 d1d3 f8e7 c1e3 c7c6 a1d1 e8g8 a2a3 b8d7 d5c6 b7c6 d3f5 h7h6 h2h3 d7c5 f5e5 d6e5 d1d8 f8d8 f3e5 c8d7 g2g4 a8b8
+search cancellation requested with generation suppression
+position accepted generation 139 key 10884638885274991988 fen 1r1r2k1/p2bbpp1/2p2n1p/2n1N3/6P1/P1N1B2P/1PP1PP2/4KB1R w K - 1 15 legal_moves 33
+position_record command="position fen rnbqkbnr/pppp1ppp/8/3Pp3/8/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 2 moves g1f3 d7d6 b1c3 g8f6 d1d3 f8e7 c1e3 c7c6 a1d1 e8g8 a2a3 b8d7 d5c6 b7c6 d3f5 h7h6 h2h3 d7c5 f5e5 d6e5 d1d8 f8d8 f3e5 c8d7 g2g4 a8b8" generation=139 root_fen="1r1r2k1/p2bbpp1/2p2n1p/2n1N3/6P1/P1N1B2P/1PP1PP2/4KB1R w K - 1 15" native_key=10884638885274991988 side=w castling=K ep=- halfmove=1 fullmove=15 native_legal_count=33 shadow_legal_count=33 legal_digest=369d19352783e9d1 native_shadow_consistent=true
+command isready
+command go wtime 750 btime 820
+search cancellation requested with generation suppression
+search start generation 141
+search root generation 141 key 10884638885274991988 fen 1r1r2k1/p2bbpp1/2p2n1p/2n1N3/6P1/P1N1B2P/1PP1PP2/4KB1R w K - 1 15
+go_record generation=141 root_fen="1r1r2k1/p2bbpp1/2p2n1p/2n1N3/6P1/P1N1B2P/1PP1PP2/4KB1R w K - 1 15" root_key=10884638885274991988 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=750,btime_ms=820,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 141
+completion_record generation=141 result_generation=141 root_match=true result_key=10884638885274991988 candidate=b2b4 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=b2b4 source=search completed=true cancelled=false failed=false
+command position fen rnbqkbnr/pppp1ppp/8/3Pp3/8/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 2 moves g1f3 d7d6 b1c3 g8f6 d1d3 f8e7 c1e3 c7c6 a1d1 e8g8 a2a3 b8d7 d5c6 b7c6 d3f5 h7h6 h2h3 d7c5 f5e5 d6e5 d1d8 f8d8 f3e5 c8d7 g2g4 a8b8 b2b4 c5e6
+search cancellation requested with generation suppression
+position accepted generation 142 key 1248352693613591696 fen 1r1r2k1/p2bbpp1/2p1nn1p/4N3/1P4P1/P1N1B2P/2P1PP2/4KB1R w K - 1 16 legal_moves 34
+position_record command="position fen rnbqkbnr/pppp1ppp/8/3Pp3/8/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 2 moves g1f3 d7d6 b1c3 g8f6 d1d3 f8e7 c1e3 c7c6 a1d1 e8g8 a2a3 b8d7 d5c6 b7c6 d3f5 h7h6 h2h3 d7c5 f5e5 d6e5 d1d8 f8d8 f3e5 c8d7 g2g4 a8b8 b2b4 c5e6" generation=142 root_fen="1r1r2k1/p2bbpp1/2p1nn1p/4N3/1P4P1/P1N1B2P/2P1PP2/4KB1R w K - 1 16" native_key=1248352693613591696 side=w castling=K ep=- halfmove=1 fullmove=16 native_legal_count=34 shadow_legal_count=34 legal_digest=10768831e75b564f native_shadow_consistent=true
+command isready
+command go wtime 735 btime 817
+search cancellation requested with generation suppression
+search start generation 144
+search root generation 144 key 1248352693613591696 fen 1r1r2k1/p2bbpp1/2p1nn1p/4N3/1P4P1/P1N1B2P/2P1PP2/4KB1R w K - 1 16
+go_record generation=144 root_fen="1r1r2k1/p2bbpp1/2p1nn1p/4N3/1P4P1/P1N1B2P/2P1PP2/4KB1R w K - 1 16" root_key=1248352693613591696 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=735,btime_ms=817,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 144
+completion_record generation=144 result_generation=144 root_match=true result_key=1248352693613591696 candidate=e3a7 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=e3a7 source=search completed=true cancelled=false failed=false
+command position fen rnbqkbnr/pppp1ppp/8/3Pp3/8/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 2 moves g1f3 d7d6 b1c3 g8f6 d1d3 f8e7 c1e3 c7c6 a1d1 e8g8 a2a3 b8d7 d5c6 b7c6 d3f5 h7h6 h2h3 d7c5 f5e5 d6e5 d1d8 f8d8 f3e5 c8d7 g2g4 a8b8 b2b4 c5e6 e3a7 b8a8
+search cancellation requested with generation suppression
+position accepted generation 145 key 1978606050327604443 fen r2r2k1/B2bbpp1/2p1nn1p/4N3/1P4P1/P1N4P/2P1PP2/4KB1R w K - 1 17 legal_moves 32
+position_record command="position fen rnbqkbnr/pppp1ppp/8/3Pp3/8/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 2 moves g1f3 d7d6 b1c3 g8f6 d1d3 f8e7 c1e3 c7c6 a1d1 e8g8 a2a3 b8d7 d5c6 b7c6 d3f5 h7h6 h2h3 d7c5 f5e5 d6e5 d1d8 f8d8 f3e5 c8d7 g2g4 a8b8 b2b4 c5e6 e3a7 b8a8" generation=145 root_fen="r2r2k1/B2bbpp1/2p1nn1p/4N3/1P4P1/P1N4P/2P1PP2/4KB1R w K - 1 17" native_key=1978606050327604443 side=w castling=K ep=- halfmove=1 fullmove=17 native_legal_count=32 shadow_legal_count=32 legal_digest=d93f792cb69b68d8 native_shadow_consistent=true
+command isready
+command go wtime 720 btime 811
+search cancellation requested with generation suppression
+search start generation 147
+search root generation 147 key 1978606050327604443 fen r2r2k1/B2bbpp1/2p1nn1p/4N3/1P4P1/P1N4P/2P1PP2/4KB1R w K - 1 17
+go_record generation=147 root_fen="r2r2k1/B2bbpp1/2p1nn1p/4N3/1P4P1/P1N4P/2P1PP2/4KB1R w K - 1 17" root_key=1978606050327604443 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=720,btime_ms=811,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 147
+completion_record generation=147 result_generation=147 root_match=true result_key=1978606050327604443 candidate=a7b6 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=a7b6 source=search completed=true cancelled=false failed=false
+command position fen rnbqkbnr/pppp1ppp/8/3Pp3/8/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 2 moves g1f3 d7d6 b1c3 g8f6 d1d3 f8e7 c1e3 c7c6 a1d1 e8g8 a2a3 b8d7 d5c6 b7c6 d3f5 h7h6 h2h3 d7c5 f5e5 d6e5 d1d8 f8d8 f3e5 c8d7 g2g4 a8b8 b2b4 c5e6 e3a7 b8a8 a7b6 a8a3
+search cancellation requested with generation suppression
+position accepted generation 148 key 11344792269596599491 fen 3r2k1/3bbpp1/1Bp1nn1p/4N3/1P4P1/r1N4P/2P1PP2/4KB1R w K - 0 18 legal_moves 33
+position_record command="position fen rnbqkbnr/pppp1ppp/8/3Pp3/8/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 2 moves g1f3 d7d6 b1c3 g8f6 d1d3 f8e7 c1e3 c7c6 a1d1 e8g8 a2a3 b8d7 d5c6 b7c6 d3f5 h7h6 h2h3 d7c5 f5e5 d6e5 d1d8 f8d8 f3e5 c8d7 g2g4 a8b8 b2b4 c5e6 e3a7 b8a8 a7b6 a8a3" generation=148 root_fen="3r2k1/3bbpp1/1Bp1nn1p/4N3/1P4P1/r1N4P/2P1PP2/4KB1R w K - 0 18" native_key=11344792269596599491 side=w castling=K ep=- halfmove=0 fullmove=18 native_legal_count=33 shadow_legal_count=33 legal_digest=e100d9ee686c5c41 native_shadow_consistent=true
+command isready
+command go wtime 705 btime 806
+search cancellation requested with generation suppression
+search start generation 150
+search root generation 150 key 11344792269596599491 fen 3r2k1/3bbpp1/1Bp1nn1p/4N3/1P4P1/r1N4P/2P1PP2/4KB1R w K - 0 18
+go_record generation=150 root_fen="3r2k1/3bbpp1/1Bp1nn1p/4N3/1P4P1/r1N4P/2P1PP2/4KB1R w K - 0 18" root_key=11344792269596599491 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=705,btime_ms=806,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 150
+completion_record generation=150 result_generation=150 root_match=true result_key=11344792269596599491 candidate=b6d8 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=b6d8 source=search completed=true cancelled=false failed=false
+command position fen rnbqkbnr/pppp1ppp/8/3Pp3/8/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 2 moves g1f3 d7d6 b1c3 g8f6 d1d3 f8e7 c1e3 c7c6 a1d1 e8g8 a2a3 b8d7 d5c6 b7c6 d3f5 h7h6 h2h3 d7c5 f5e5 d6e5 d1d8 f8d8 f3e5 c8d7 g2g4 a8b8 b2b4 c5e6 e3a7 b8a8 a7b6 a8a3 b6d8 e7b4
+search cancellation requested with generation suppression
+position accepted generation 151 key 8813603408136977837 fen 3B2k1/3b1pp1/2p1nn1p/4N3/1b4P1/r1N4P/2P1PP2/4KB1R w K - 0 19 legal_moves 23
+position_record command="position fen rnbqkbnr/pppp1ppp/8/3Pp3/8/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 2 moves g1f3 d7d6 b1c3 g8f6 d1d3 f8e7 c1e3 c7c6 a1d1 e8g8 a2a3 b8d7 d5c6 b7c6 d3f5 h7h6 h2h3 d7c5 f5e5 d6e5 d1d8 f8d8 f3e5 c8d7 g2g4 a8b8 b2b4 c5e6 e3a7 b8a8 a7b6 a8a3 b6d8 e7b4" generation=151 root_fen="3B2k1/3b1pp1/2p1nn1p/4N3/1b4P1/r1N4P/2P1PP2/4KB1R w K - 0 19" native_key=8813603408136977837 side=w castling=K ep=- halfmove=0 fullmove=19 native_legal_count=23 shadow_legal_count=23 legal_digest=eb554e033c0a9435 native_shadow_consistent=true
+command isready
+command go wtime 691 btime 796
+search cancellation requested with generation suppression
+search start generation 153
+search root generation 153 key 8813603408136977837 fen 3B2k1/3b1pp1/2p1nn1p/4N3/1b4P1/r1N4P/2P1PP2/4KB1R w K - 0 19
+go_record generation=153 root_fen="3B2k1/3b1pp1/2p1nn1p/4N3/1b4P1/r1N4P/2P1PP2/4KB1R w K - 0 19" root_key=8813603408136977837 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=691,btime_ms=796,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 153
+completion_record generation=153 result_generation=153 root_match=true result_key=8813603408136977837 candidate=d8f6 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=d8f6 source=search completed=true cancelled=false failed=false
+command position fen rnbqkbnr/pppp1ppp/8/3Pp3/8/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 2 moves g1f3 d7d6 b1c3 g8f6 d1d3 f8e7 c1e3 c7c6 a1d1 e8g8 a2a3 b8d7 d5c6 b7c6 d3f5 h7h6 h2h3 d7c5 f5e5 d6e5 d1d8 f8d8 f3e5 c8d7 g2g4 a8b8 b2b4 c5e6 e3a7 b8a8 a7b6 a8a3 b6d8 e7b4 d8f6 b4c3
+search cancellation requested with generation suppression
+position accepted generation 154 key 15065838454597965952 fen 6k1/3b1pp1/2p1nB1p/4N3/6P1/r1b4P/2P1PP2/4KB1R w K - 0 20 legal_moves 1
+position_record command="position fen rnbqkbnr/pppp1ppp/8/3Pp3/8/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 2 moves g1f3 d7d6 b1c3 g8f6 d1d3 f8e7 c1e3 c7c6 a1d1 e8g8 a2a3 b8d7 d5c6 b7c6 d3f5 h7h6 h2h3 d7c5 f5e5 d6e5 d1d8 f8d8 f3e5 c8d7 g2g4 a8b8 b2b4 c5e6 e3a7 b8a8 a7b6 a8a3 b6d8 e7b4 d8f6 b4c3" generation=154 root_fen="6k1/3b1pp1/2p1nB1p/4N3/6P1/r1b4P/2P1PP2/4KB1R w K - 0 20" native_key=15065838454597965952 side=w castling=K ep=- halfmove=0 fullmove=20 native_legal_count=1 shadow_legal_count=1 legal_digest=342187c1a608d258 native_shadow_consistent=true
+command isready
+command go wtime 678 btime 796
+search cancellation requested with generation suppression
+search start generation 156
+search root generation 156 key 15065838454597965952 fen 6k1/3b1pp1/2p1nB1p/4N3/6P1/r1b4P/2P1PP2/4KB1R w K - 0 20
+go_record generation=156 root_fen="6k1/3b1pp1/2p1nB1p/4N3/6P1/r1b4P/2P1PP2/4KB1R w K - 0 20" root_key=15065838454597965952 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=678,btime_ms=796,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 156
+completion_record generation=156 result_generation=156 root_match=true result_key=15065838454597965952 candidate=e1d1 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=e1d1 source=search completed=true cancelled=false failed=false
+command position fen rnbqkbnr/pppp1ppp/8/3Pp3/8/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 2 moves g1f3 d7d6 b1c3 g8f6 d1d3 f8e7 c1e3 c7c6 a1d1 e8g8 a2a3 b8d7 d5c6 b7c6 d3f5 h7h6 h2h3 d7c5 f5e5 d6e5 d1d8 f8d8 f3e5 c8d7 g2g4 a8b8 b2b4 c5e6 e3a7 b8a8 a7b6 a8a3 b6d8 e7b4 d8f6 b4c3 e1d1 a3a1
+search cancellation requested with generation suppression
+position accepted generation 157 key 7485680914558648105 fen 6k1/3b1pp1/2p1nB1p/4N3/6P1/2b4P/2P1PP2/r2K1B1R w - - 2 21 legal_moves 0
+position_record command="position fen rnbqkbnr/pppp1ppp/8/3Pp3/8/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 2 moves g1f3 d7d6 b1c3 g8f6 d1d3 f8e7 c1e3 c7c6 a1d1 e8g8 a2a3 b8d7 d5c6 b7c6 d3f5 h7h6 h2h3 d7c5 f5e5 d6e5 d1d8 f8d8 f3e5 c8d7 g2g4 a8b8 b2b4 c5e6 e3a7 b8a8 a7b6 a8a3 b6d8 e7b4 d8f6 b4c3 e1d1 a3a1" generation=157 root_fen="6k1/3b1pp1/2p1nB1p/4N3/6P1/2b4P/2P1PP2/r2K1B1R w - - 2 21" native_key=7485680914558648105 side=w castling=- ep=- halfmove=2 fullmove=21 native_legal_count=0 shadow_legal_count=0 legal_digest=14650fb0739d0383 native_shadow_consistent=true
+command isready
+command debug on
+command ucinewgame
+search cancellation requested with generation suppression
+command setoption name Ponder value false
+search cancellation requested with generation suppression
+command position fen 7k/5p2/8/r5PK/8/8/8/8 b - - 0 1
+search cancellation requested with generation suppression
+position accepted generation 160 key 7620193237320259891 fen 7k/5p2/8/r5PK/8/8/8/8 b - - 0 1 legal_moves 18
+position_record command="position fen 7k/5p2/8/r5PK/8/8/8/8 b - - 0 1" generation=160 root_fen="7k/5p2/8/r5PK/8/8/8/8 b - - 0 1" native_key=7620193237320259891 side=b castling=- ep=- halfmove=0 fullmove=1 native_legal_count=18 shadow_legal_count=18 legal_digest=6865f691c4b04c53 native_shadow_consistent=true
+command isready
+command go wtime 1000 btime 1000
+search cancellation requested with generation suppression
+search start generation 162
+search root generation 162 key 7620193237320259891 fen 7k/5p2/8/r5PK/8/8/8/8 b - - 0 1
+go_record generation=162 root_fen="7k/5p2/8/r5PK/8/8/8/8 b - - 0 1" root_key=7620193237320259891 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=1000,btime_ms=1000,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 162
+completion_record generation=162 result_generation=162 root_match=true result_key=7620193237320259891 candidate=h8h7 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=h8h7 source=search completed=true cancelled=false failed=false
+command position fen 7k/5p2/8/r5PK/8/8/8/8 b - - 0 1 moves h8h7 h5h4
+search cancellation requested with generation suppression
+position accepted generation 163 key 15793338987846114875 fen 8/5p1k/8/r5P1/7K/8/8/8 b - - 2 2 legal_moves 19
+position_record command="position fen 7k/5p2/8/r5PK/8/8/8/8 b - - 0 1 moves h8h7 h5h4" generation=163 root_fen="8/5p1k/8/r5P1/7K/8/8/8 b - - 2 2" native_key=15793338987846114875 side=b castling=- ep=- halfmove=2 fullmove=2 native_legal_count=19 shadow_legal_count=19 legal_digest=dc6bac9f0e91bdf5 native_shadow_consistent=true
+command isready
+command go wtime 985 btime 977
+search cancellation requested with generation suppression
+search start generation 165
+search root generation 165 key 15793338987846114875 fen 8/5p1k/8/r5P1/7K/8/8/8 b - - 2 2
+go_record generation=165 root_fen="8/5p1k/8/r5P1/7K/8/8/8 b - - 2 2" root_key=15793338987846114875 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=985,btime_ms=977,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 165
+completion_record generation=165 result_generation=165 root_match=true result_key=15793338987846114875 candidate=h7g6 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=h7g6 source=search completed=true cancelled=false failed=false
+command position fen 7k/5p2/8/r5PK/8/8/8/8 b - - 0 1 moves h8h7 h5h4 h7g6 h4g3
+search cancellation requested with generation suppression
+position accepted generation 166 key 15690017065836242316 fen 8/5p2/6k1/r5P1/8/6K1/8/8 b - - 4 3 legal_moves 20
+position_record command="position fen 7k/5p2/8/r5PK/8/8/8/8 b - - 0 1 moves h8h7 h5h4 h7g6 h4g3" generation=166 root_fen="8/5p2/6k1/r5P1/8/6K1/8/8 b - - 4 3" native_key=15690017065836242316 side=b castling=- ep=- halfmove=4 fullmove=3 native_legal_count=20 shadow_legal_count=20 legal_digest=445deb4bd794a14b native_shadow_consistent=true
+command isready
+command go wtime 980 btime 955
+search cancellation requested with generation suppression
+search start generation 168
+search root generation 168 key 15690017065836242316 fen 8/5p2/6k1/r5P1/8/6K1/8/8 b - - 4 3
+go_record generation=168 root_fen="8/5p2/6k1/r5P1/8/6K1/8/8 b - - 4 3" root_key=15690017065836242316 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=980,btime_ms=955,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 168
+completion_record generation=168 result_generation=168 root_match=true result_key=15690017065836242316 candidate=g6g5 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=g6g5 source=search completed=true cancelled=false failed=false
+command position fen 7k/5p2/8/r5PK/8/8/8/8 b - - 0 1 moves h8h7 h5h4 h7g6 h4g3 g6g5 g3f3
+search cancellation requested with generation suppression
+position accepted generation 169 key 16970303740682376551 fen 8/5p2/8/r5k1/8/5K2/8/8 b - - 1 4 legal_moves 20
+position_record command="position fen 7k/5p2/8/r5PK/8/8/8/8 b - - 0 1 moves h8h7 h5h4 h7g6 h4g3 g6g5 g3f3" generation=169 root_fen="8/5p2/8/r5k1/8/5K2/8/8 b - - 1 4" native_key=16970303740682376551 side=b castling=- ep=- halfmove=1 fullmove=4 native_legal_count=20 shadow_legal_count=20 legal_digest=93122586b9e26188 native_shadow_consistent=true
+command isready
+command go wtime 966 btime 934
+search cancellation requested with generation suppression
+search start generation 171
+search root generation 171 key 16970303740682376551 fen 8/5p2/8/r5k1/8/5K2/8/8 b - - 1 4
+go_record generation=171 root_fen="8/5p2/8/r5k1/8/5K2/8/8 b - - 1 4" root_key=16970303740682376551 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=966,btime_ms=934,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 171
+completion_record generation=171 result_generation=171 root_match=true result_key=16970303740682376551 candidate=a5e5 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=a5e5 source=search completed=true cancelled=false failed=false
+command position fen 7k/5p2/8/r5PK/8/8/8/8 b - - 0 1 moves h8h7 h5h4 h7g6 h4g3 g6g5 g3f3 a5e5 f3g3
+search cancellation requested with generation suppression
+position accepted generation 172 key 502223181660072206 fen 8/5p2/8/4r1k1/8/6K1/8/8 b - - 3 5 legal_moves 19
+position_record command="position fen 7k/5p2/8/r5PK/8/8/8/8 b - - 0 1 moves h8h7 h5h4 h7g6 h4g3 g6g5 g3f3 a5e5 f3g3" generation=172 root_fen="8/5p2/8/4r1k1/8/6K1/8/8 b - - 3 5" native_key=502223181660072206 side=b castling=- ep=- halfmove=3 fullmove=5 native_legal_count=19 shadow_legal_count=19 legal_digest=d9c2eec384e715e0 native_shadow_consistent=true
+command isready
+command go wtime 961 btime 913
+search cancellation requested with generation suppression
+search start generation 174
+search root generation 174 key 502223181660072206 fen 8/5p2/8/4r1k1/8/6K1/8/8 b - - 3 5
+go_record generation=174 root_fen="8/5p2/8/4r1k1/8/6K1/8/8 b - - 3 5" root_key=502223181660072206 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=961,btime_ms=913,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 174
+completion_record generation=174 result_generation=174 root_match=true result_key=502223181660072206 candidate=e5e3 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=e5e3 source=search completed=true cancelled=false failed=false
+command position fen 7k/5p2/8/r5PK/8/8/8/8 b - - 0 1 moves h8h7 h5h4 h7g6 h4g3 g6g5 g3f3 a5e5 f3g3 e5e3 g3g2
+search cancellation requested with generation suppression
+position accepted generation 175 key 10018770830826493885 fen 8/5p2/8/6k1/8/4r3/6K1/8 b - - 5 6 legal_moves 24
+position_record command="position fen 7k/5p2/8/r5PK/8/8/8/8 b - - 0 1 moves h8h7 h5h4 h7g6 h4g3 g6g5 g3f3 a5e5 f3g3 e5e3 g3g2" generation=175 root_fen="8/5p2/8/6k1/8/4r3/6K1/8 b - - 5 6" native_key=10018770830826493885 side=b castling=- ep=- halfmove=5 fullmove=6 native_legal_count=24 shadow_legal_count=24 legal_digest=fe70316366df954e native_shadow_consistent=true
+command isready
+command go wtime 947 btime 893
+search cancellation requested with generation suppression
+search start generation 177
+search root generation 177 key 10018770830826493885 fen 8/5p2/8/6k1/8/4r3/6K1/8 b - - 5 6
+go_record generation=177 root_fen="8/5p2/8/6k1/8/4r3/6K1/8 b - - 5 6" root_key=10018770830826493885 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=947,btime_ms=893,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 177
+completion_record generation=177 result_generation=177 root_match=true result_key=10018770830826493885 candidate=f7f5 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=f7f5 source=search completed=true cancelled=false failed=false
+command position fen 7k/5p2/8/r5PK/8/8/8/8 b - - 0 1 moves h8h7 h5h4 h7g6 h4g3 g6g5 g3f3 a5e5 f3g3 e5e3 g3g2 f7f5 g2f1
+search cancellation requested with generation suppression
+position accepted generation 178 key 9118247817769763278 fen 8/8/8/5pk1/8/4r3/8/5K2 b - - 1 7 legal_moves 22
+position_record command="position fen 7k/5p2/8/r5PK/8/8/8/8 b - - 0 1 moves h8h7 h5h4 h7g6 h4g3 g6g5 g3f3 a5e5 f3g3 e5e3 g3g2 f7f5 g2f1" generation=178 root_fen="8/8/8/5pk1/8/4r3/8/5K2 b - - 1 7" native_key=9118247817769763278 side=b castling=- ep=- halfmove=1 fullmove=7 native_legal_count=22 shadow_legal_count=22 legal_digest=da94f4f697dc6f01 native_shadow_consistent=true
+command isready
+command go wtime 941 btime 874
+search cancellation requested with generation suppression
+search start generation 180
+search root generation 180 key 9118247817769763278 fen 8/8/8/5pk1/8/4r3/8/5K2 b - - 1 7
+go_record generation=180 root_fen="8/8/8/5pk1/8/4r3/8/5K2 b - - 1 7" root_key=9118247817769763278 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=941,btime_ms=874,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 180
+completion_record generation=180 result_generation=180 root_match=true result_key=9118247817769763278 candidate=f5f4 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=f5f4 source=search completed=true cancelled=false failed=false
+command position fen 7k/5p2/8/r5PK/8/8/8/8 b - - 0 1 moves h8h7 h5h4 h7g6 h4g3 g6g5 g3f3 a5e5 f3g3 e5e3 g3g2 f7f5 g2f1 f5f4 f1g2
+search cancellation requested with generation suppression
+position accepted generation 181 key 13539720152766896094 fen 8/8/8/6k1/5p2/4r3/6K1/8 b - - 1 8 legal_moves 22
+position_record command="position fen 7k/5p2/8/r5PK/8/8/8/8 b - - 0 1 moves h8h7 h5h4 h7g6 h4g3 g6g5 g3f3 a5e5 f3g3 e5e3 g3g2 f7f5 g2f1 f5f4 f1g2" generation=181 root_fen="8/8/8/6k1/5p2/4r3/6K1/8 b - - 1 8" native_key=13539720152766896094 side=b castling=- ep=- halfmove=1 fullmove=8 native_legal_count=22 shadow_legal_count=22 legal_digest=0e1770b3db1aff1a native_shadow_consistent=true
+command isready
+command go wtime 934 btime 855
+search cancellation requested with generation suppression
+search start generation 183
+search root generation 183 key 13539720152766896094 fen 8/8/8/6k1/5p2/4r3/6K1/8 b - - 1 8
+go_record generation=183 root_fen="8/8/8/6k1/5p2/4r3/6K1/8 b - - 1 8" root_key=13539720152766896094 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=934,btime_ms=855,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 183
+completion_record generation=183 result_generation=183 root_match=true result_key=13539720152766896094 candidate=e3d3 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=e3d3 source=search completed=true cancelled=false failed=false
+command position fen 7k/5p2/8/r5PK/8/8/8/8 b - - 0 1 moves h8h7 h5h4 h7g6 h4g3 g6g5 g3f3 a5e5 f3g3 e5e3 g3g2 f7f5 g2f1 f5f4 f1g2 e3d3 g2f2
+search cancellation requested with generation suppression
+position accepted generation 184 key 13774163319129131642 fen 8/8/8/6k1/5p2/3r4/5K2/8 b - - 3 9 legal_moves 22
+position_record command="position fen 7k/5p2/8/r5PK/8/8/8/8 b - - 0 1 moves h8h7 h5h4 h7g6 h4g3 g6g5 g3f3 a5e5 f3g3 e5e3 g3g2 f7f5 g2f1 f5f4 f1g2 e3d3 g2f2" generation=184 root_fen="8/8/8/6k1/5p2/3r4/5K2/8 b - - 3 9" native_key=13774163319129131642 side=b castling=- ep=- halfmove=3 fullmove=9 native_legal_count=22 shadow_legal_count=22 legal_digest=7a4cb33c33f4a62a native_shadow_consistent=true
+command isready
+command go wtime 921 btime 837
+search cancellation requested with generation suppression
+search start generation 186
+search root generation 186 key 13774163319129131642 fen 8/8/8/6k1/5p2/3r4/5K2/8 b - - 3 9
+go_record generation=186 root_fen="8/8/8/6k1/5p2/3r4/5K2/8 b - - 3 9" root_key=13774163319129131642 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=921,btime_ms=837,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 186
+completion_record generation=186 result_generation=186 root_match=true result_key=13774163319129131642 candidate=g5f5 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=g5f5 source=search completed=true cancelled=false failed=false
+command position fen 7k/5p2/8/r5PK/8/8/8/8 b - - 0 1 moves h8h7 h5h4 h7g6 h4g3 g6g5 g3f3 a5e5 f3g3 e5e3 g3g2 f7f5 g2f1 f5f4 f1g2 e3d3 g2f2 g5f5 f2e2
+search cancellation requested with generation suppression
+position accepted generation 187 key 2376737470992574400 fen 8/8/8/5k2/5p2/3r4/4K3/8 b - - 5 10 legal_moves 22
+position_record command="position fen 7k/5p2/8/r5PK/8/8/8/8 b - - 0 1 moves h8h7 h5h4 h7g6 h4g3 g6g5 g3f3 a5e5 f3g3 e5e3 g3g2 f7f5 g2f1 f5f4 f1g2 e3d3 g2f2 g5f5 f2e2" generation=187 root_fen="8/8/8/5k2/5p2/3r4/4K3/8 b - - 5 10" native_key=2376737470992574400 side=b castling=- ep=- halfmove=5 fullmove=10 native_legal_count=22 shadow_legal_count=22 legal_digest=1a5da4fb8e1ac17b native_shadow_consistent=true
+command isready
+command go wtime 918 btime 820
+search cancellation requested with generation suppression
+search start generation 189
+search root generation 189 key 2376737470992574400 fen 8/8/8/5k2/5p2/3r4/4K3/8 b - - 5 10
+go_record generation=189 root_fen="8/8/8/5k2/5p2/3r4/4K3/8 b - - 5 10" root_key=2376737470992574400 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=918,btime_ms=820,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 189
+completion_record generation=189 result_generation=189 root_match=true result_key=2376737470992574400 candidate=f5e4 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=f5e4 source=search completed=true cancelled=false failed=false
+command position fen 7k/5p2/8/r5PK/8/8/8/8 b - - 0 1 moves h8h7 h5h4 h7g6 h4g3 g6g5 g3f3 a5e5 f3g3 e5e3 g3g2 f7f5 g2f1 f5f4 f1g2 e3d3 g2f2 g5f5 f2e2 f5e4 e2f1
+search cancellation requested with generation suppression
+position accepted generation 190 key 3268401406768484361 fen 8/8/8/8/4kp2/3r4/8/5K2 b - - 7 11 legal_moves 21
+position_record command="position fen 7k/5p2/8/r5PK/8/8/8/8 b - - 0 1 moves h8h7 h5h4 h7g6 h4g3 g6g5 g3f3 a5e5 f3g3 e5e3 g3g2 f7f5 g2f1 f5f4 f1g2 e3d3 g2f2 g5f5 f2e2 f5e4 e2f1" generation=190 root_fen="8/8/8/8/4kp2/3r4/8/5K2 b - - 7 11" native_key=3268401406768484361 side=b castling=- ep=- halfmove=7 fullmove=11 native_legal_count=21 shadow_legal_count=21 legal_digest=6a8e2b4275071d9d native_shadow_consistent=true
+command isready
+command go wtime 911 btime 803
+search cancellation requested with generation suppression
+search start generation 192
+search root generation 192 key 3268401406768484361 fen 8/8/8/8/4kp2/3r4/8/5K2 b - - 7 11
+go_record generation=192 root_fen="8/8/8/8/4kp2/3r4/8/5K2 b - - 7 11" root_key=3268401406768484361 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=911,btime_ms=803,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 192
+completion_record generation=192 result_generation=192 root_match=true result_key=3268401406768484361 candidate=d3d2 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=d3d2 source=search completed=true cancelled=false failed=false
+command position fen 7k/5p2/8/r5PK/8/8/8/8 b - - 0 1 moves h8h7 h5h4 h7g6 h4g3 g6g5 g3f3 a5e5 f3g3 e5e3 g3g2 f7f5 g2f1 f5f4 f1g2 e3d3 g2f2 g5f5 f2e2 f5e4 e2f1 d3d2 f1e1
+search cancellation requested with generation suppression
+position accepted generation 193 key 15576025960257576033 fen 8/8/8/8/4kp2/8/3r4/4K3 b - - 9 12 legal_moves 22
+position_record command="position fen 7k/5p2/8/r5PK/8/8/8/8 b - - 0 1 moves h8h7 h5h4 h7g6 h4g3 g6g5 g3f3 a5e5 f3g3 e5e3 g3g2 f7f5 g2f1 f5f4 f1g2 e3d3 g2f2 g5f5 f2e2 f5e4 e2f1 d3d2 f1e1" generation=193 root_fen="8/8/8/8/4kp2/8/3r4/4K3 b - - 9 12" native_key=15576025960257576033 side=b castling=- ep=- halfmove=9 fullmove=12 native_legal_count=22 shadow_legal_count=22 legal_digest=8f59b559bd4154a1 native_shadow_consistent=true
+command isready
+command go wtime 907 btime 786
+search cancellation requested with generation suppression
+search start generation 195
+search root generation 195 key 15576025960257576033 fen 8/8/8/8/4kp2/8/3r4/4K3 b - - 9 12
+go_record generation=195 root_fen="8/8/8/8/4kp2/8/3r4/4K3 b - - 9 12" root_key=15576025960257576033 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=907,btime_ms=786,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 195
+completion_record generation=195 result_generation=195 root_match=true result_key=15576025960257576033 candidate=d2g2 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=d2g2 source=search completed=true cancelled=false failed=false
+command position fen 7k/5p2/8/r5PK/8/8/8/8 b - - 0 1 moves h8h7 h5h4 h7g6 h4g3 g6g5 g3f3 a5e5 f3g3 e5e3 g3g2 f7f5 g2f1 f5f4 f1g2 e3d3 g2f2 g5f5 f2e2 f5e4 e2f1 d3d2 f1e1 d2g2 e1d1
+search cancellation requested with generation suppression
+position accepted generation 196 key 6018309964140189446 fen 8/8/8/8/4kp2/8/6r1/3K4 b - - 11 13 legal_moves 22
+position_record command="position fen 7k/5p2/8/r5PK/8/8/8/8 b - - 0 1 moves h8h7 h5h4 h7g6 h4g3 g6g5 g3f3 a5e5 f3g3 e5e3 g3g2 f7f5 g2f1 f5f4 f1g2 e3d3 g2f2 g5f5 f2e2 f5e4 e2f1 d3d2 f1e1 d2g2 e1d1" generation=196 root_fen="8/8/8/8/4kp2/8/6r1/3K4 b - - 11 13" native_key=6018309964140189446 side=b castling=- ep=- halfmove=11 fullmove=13 native_legal_count=22 shadow_legal_count=22 legal_digest=9d02eae6525279e9 native_shadow_consistent=true
+command isready
+command go wtime 904 btime 769
+search cancellation requested with generation suppression
+search start generation 198
+search root generation 198 key 6018309964140189446 fen 8/8/8/8/4kp2/8/6r1/3K4 b - - 11 13
+go_record generation=198 root_fen="8/8/8/8/4kp2/8/6r1/3K4 b - - 11 13" root_key=6018309964140189446 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=904,btime_ms=769,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 198
+completion_record generation=198 result_generation=198 root_match=true result_key=6018309964140189446 candidate=f4f3 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=f4f3 source=search completed=true cancelled=false failed=false
+command position fen 7k/5p2/8/r5PK/8/8/8/8 b - - 0 1 moves h8h7 h5h4 h7g6 h4g3 g6g5 g3f3 a5e5 f3g3 e5e3 g3g2 f7f5 g2f1 f5f4 f1g2 e3d3 g2f2 g5f5 f2e2 f5e4 e2f1 d3d2 f1e1 d2g2 e1d1 f4f3 d1c1
+search cancellation requested with generation suppression
+position accepted generation 199 key 8802676130418291445 fen 8/8/8/8/4k3/5p2/6r1/2K5 b - - 1 14 legal_moves 22
+position_record command="position fen 7k/5p2/8/r5PK/8/8/8/8 b - - 0 1 moves h8h7 h5h4 h7g6 h4g3 g6g5 g3f3 a5e5 f3g3 e5e3 g3g2 f7f5 g2f1 f5f4 f1g2 e3d3 g2f2 g5f5 f2e2 f5e4 e2f1 d3d2 f1e1 d2g2 e1d1 f4f3 d1c1" generation=199 root_fen="8/8/8/8/4k3/5p2/6r1/2K5 b - - 1 14" native_key=8802676130418291445 side=b castling=- ep=- halfmove=1 fullmove=14 native_legal_count=22 shadow_legal_count=22 legal_digest=88fd0240d3d52f60 native_shadow_consistent=true
+command isready
+command go wtime 898 btime 754
+search cancellation requested with generation suppression
+search start generation 201
+search root generation 201 key 8802676130418291445 fen 8/8/8/8/4k3/5p2/6r1/2K5 b - - 1 14
+go_record generation=201 root_fen="8/8/8/8/4k3/5p2/6r1/2K5 b - - 1 14" root_key=8802676130418291445 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=898,btime_ms=754,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 201
+completion_record generation=201 result_generation=201 root_match=true result_key=8802676130418291445 candidate=f3f2 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=f3f2 source=search completed=true cancelled=false failed=false
+command position fen 7k/5p2/8/r5PK/8/8/8/8 b - - 0 1 moves h8h7 h5h4 h7g6 h4g3 g6g5 g3f3 a5e5 f3g3 e5e3 g3g2 f7f5 g2f1 f5f4 f1g2 e3d3 g2f2 g5f5 f2e2 f5e4 e2f1 d3d2 f1e1 d2g2 e1d1 f4f3 d1c1 f3f2 c1b2
+search cancellation requested with generation suppression
+position accepted generation 202 key 5204490188218439852 fen 8/8/8/8/4k3/8/1K3pr1/8 b - - 1 15 legal_moves 20
+position_record command="position fen 7k/5p2/8/r5PK/8/8/8/8 b - - 0 1 moves h8h7 h5h4 h7g6 h4g3 g6g5 g3f3 a5e5 f3g3 e5e3 g3g2 f7f5 g2f1 f5f4 f1g2 e3d3 g2f2 g5f5 f2e2 f5e4 e2f1 d3d2 f1e1 d2g2 e1d1 f4f3 d1c1 f3f2 c1b2" generation=202 root_fen="8/8/8/8/4k3/8/1K3pr1/8 b - - 1 15" native_key=5204490188218439852 side=b castling=- ep=- halfmove=1 fullmove=15 native_legal_count=20 shadow_legal_count=20 legal_digest=5d5d7b668896c4ef native_shadow_consistent=true
+command isready
+command go wtime 894 btime 739
+search cancellation requested with generation suppression
+search start generation 204
+search root generation 204 key 5204490188218439852 fen 8/8/8/8/4k3/8/1K3pr1/8 b - - 1 15
+go_record generation=204 root_fen="8/8/8/8/4k3/8/1K3pr1/8 b - - 1 15" root_key=5204490188218439852 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=894,btime_ms=739,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 204
+completion_record generation=204 result_generation=204 root_match=true result_key=5204490188218439852 candidate=f2f1q native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=f2f1q source=search completed=true cancelled=false failed=false
+command position fen 7k/5p2/8/r5PK/8/8/8/8 b - - 0 1 moves h8h7 h5h4 h7g6 h4g3 g6g5 g3f3 a5e5 f3g3 e5e3 g3g2 f7f5 g2f1 f5f4 f1g2 e3d3 g2f2 g5f5 f2e2 f5e4 e2f1 d3d2 f1e1 d2g2 e1d1 f4f3 d1c1 f3f2 c1b2 f2f1q b2c3
+search cancellation requested with generation suppression
+position accepted generation 205 key 5981090822935822066 fen 8/8/8/8/4k3/2K5/6r1/5q2 b - - 1 16 legal_moves 39
+position_record command="position fen 7k/5p2/8/r5PK/8/8/8/8 b - - 0 1 moves h8h7 h5h4 h7g6 h4g3 g6g5 g3f3 a5e5 f3g3 e5e3 g3g2 f7f5 g2f1 f5f4 f1g2 e3d3 g2f2 g5f5 f2e2 f5e4 e2f1 d3d2 f1e1 d2g2 e1d1 f4f3 d1c1 f3f2 c1b2 f2f1q b2c3" generation=205 root_fen="8/8/8/8/4k3/2K5/6r1/5q2 b - - 1 16" native_key=5981090822935822066 side=b castling=- ep=- halfmove=1 fullmove=16 native_legal_count=39 shadow_legal_count=39 legal_digest=b995181d11453710 native_shadow_consistent=true
+command isready
+command go wtime 889 btime 724
+search cancellation requested with generation suppression
+search start generation 207
+search root generation 207 key 5981090822935822066 fen 8/8/8/8/4k3/2K5/6r1/5q2 b - - 1 16
+go_record generation=207 root_fen="8/8/8/8/4k3/2K5/6r1/5q2 b - - 1 16" root_key=5981090822935822066 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=889,btime_ms=724,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 207
+completion_record generation=207 result_generation=207 root_match=true result_key=5981090822935822066 candidate=f1d3 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=f1d3 source=search completed=true cancelled=false failed=false
+command position fen 7k/5p2/8/r5PK/8/8/8/8 b - - 0 1 moves h8h7 h5h4 h7g6 h4g3 g6g5 g3f3 a5e5 f3g3 e5e3 g3g2 f7f5 g2f1 f5f4 f1g2 e3d3 g2f2 g5f5 f2e2 f5e4 e2f1 d3d2 f1e1 d2g2 e1d1 f4f3 d1c1 f3f2 c1b2 f2f1q b2c3 f1d3 c3b4
+search cancellation requested with generation suppression
+position accepted generation 208 key 16696337412279725301 fen 8/8/8/8/1K2k3/3q4/6r1/8 b - - 3 17 legal_moves 42
+position_record command="position fen 7k/5p2/8/r5PK/8/8/8/8 b - - 0 1 moves h8h7 h5h4 h7g6 h4g3 g6g5 g3f3 a5e5 f3g3 e5e3 g3g2 f7f5 g2f1 f5f4 f1g2 e3d3 g2f2 g5f5 f2e2 f5e4 e2f1 d3d2 f1e1 d2g2 e1d1 f4f3 d1c1 f3f2 c1b2 f2f1q b2c3 f1d3 c3b4" generation=208 root_fen="8/8/8/8/1K2k3/3q4/6r1/8 b - - 3 17" native_key=16696337412279725301 side=b castling=- ep=- halfmove=3 fullmove=17 native_legal_count=42 shadow_legal_count=42 legal_digest=8b36001c264d565b native_shadow_consistent=true
+command isready
+command go wtime 886 btime 710
+search cancellation requested with generation suppression
+search start generation 210
+search root generation 210 key 16696337412279725301 fen 8/8/8/8/1K2k3/3q4/6r1/8 b - - 3 17
+go_record generation=210 root_fen="8/8/8/8/1K2k3/3q4/6r1/8 b - - 3 17" root_key=16696337412279725301 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=886,btime_ms=710,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 210
+completion_record generation=210 result_generation=210 root_match=true result_key=16696337412279725301 candidate=g2b2 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=g2b2 source=search completed=true cancelled=false failed=false
+command position fen 7k/5p2/8/r5PK/8/8/8/8 b - - 0 1 moves h8h7 h5h4 h7g6 h4g3 g6g5 g3f3 a5e5 f3g3 e5e3 g3g2 f7f5 g2f1 f5f4 f1g2 e3d3 g2f2 g5f5 f2e2 f5e4 e2f1 d3d2 f1e1 d2g2 e1d1 f4f3 d1c1 f3f2 c1b2 f2f1q b2c3 f1d3 c3b4 g2b2 b4c5
+search cancellation requested with generation suppression
+position accepted generation 211 key 4026320396295937697 fen 8/8/8/2K5/4k3/3q4/1r6/8 b - - 5 18 legal_moves 40
+position_record command="position fen 7k/5p2/8/r5PK/8/8/8/8 b - - 0 1 moves h8h7 h5h4 h7g6 h4g3 g6g5 g3f3 a5e5 f3g3 e5e3 g3g2 f7f5 g2f1 f5f4 f1g2 e3d3 g2f2 g5f5 f2e2 f5e4 e2f1 d3d2 f1e1 d2g2 e1d1 f4f3 d1c1 f3f2 c1b2 f2f1q b2c3 f1d3 c3b4 g2b2 b4c5" generation=211 root_fen="8/8/8/2K5/4k3/3q4/1r6/8 b - - 5 18" native_key=4026320396295937697 side=b castling=- ep=- halfmove=5 fullmove=18 native_legal_count=40 shadow_legal_count=40 legal_digest=1917bfd6f3fc7fd6 native_shadow_consistent=true
+command isready
+command go wtime 886 btime 697
+search cancellation requested with generation suppression
+search start generation 213
+search root generation 213 key 4026320396295937697 fen 8/8/8/2K5/4k3/3q4/1r6/8 b - - 5 18
+go_record generation=213 root_fen="8/8/8/2K5/4k3/3q4/1r6/8 b - - 5 18" root_key=4026320396295937697 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=886,btime_ms=697,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 213
+completion_record generation=213 result_generation=213 root_match=true result_key=4026320396295937697 candidate=d3d5 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=d3d5 source=search completed=true cancelled=false failed=false
+command isready
+command debug on
+command ucinewgame
+search cancellation requested with generation suppression
+command setoption name Ponder value false
+search cancellation requested with generation suppression
+command position fen 4k3/P7/8/8/8/8/8/4K3 w - - 0 1
+search cancellation requested with generation suppression
+position accepted generation 216 key 16414027917822387832 fen 4k3/P7/8/8/8/8/8/4K3 w - - 0 1 legal_moves 9
+position_record command="position fen 4k3/P7/8/8/8/8/8/4K3 w - - 0 1" generation=216 root_fen="4k3/P7/8/8/8/8/8/4K3 w - - 0 1" native_key=16414027917822387832 side=w castling=- ep=- halfmove=0 fullmove=1 native_legal_count=9 shadow_legal_count=9 legal_digest=6f57288c41b7d687 native_shadow_consistent=true
+command isready
+command go wtime 1000 btime 1000
+search cancellation requested with generation suppression
+search start generation 218
+search root generation 218 key 16414027917822387832 fen 4k3/P7/8/8/8/8/8/4K3 w - - 0 1
+go_record generation=218 root_fen="4k3/P7/8/8/8/8/8/4K3 w - - 0 1" root_key=16414027917822387832 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=1000,btime_ms=1000,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 218
+completion_record generation=218 result_generation=218 root_match=true result_key=16414027917822387832 candidate=a7a8q native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=a7a8q source=search completed=true cancelled=false failed=false
+command position fen 4k3/P7/8/8/8/8/8/4K3 w - - 0 1 moves a7a8q e8d7
+search cancellation requested with generation suppression
+position accepted generation 219 key 10732608143788560444 fen Q7/3k4/8/8/8/8/8/4K3 w - - 1 2 legal_moves 26
+position_record command="position fen 4k3/P7/8/8/8/8/8/4K3 w - - 0 1 moves a7a8q e8d7" generation=219 root_fen="Q7/3k4/8/8/8/8/8/4K3 w - - 1 2" native_key=10732608143788560444 side=w castling=- ep=- halfmove=1 fullmove=2 native_legal_count=26 shadow_legal_count=26 legal_digest=918df3de58d5445e native_shadow_consistent=true
+command isready
+command go wtime 976 btime 989
+search cancellation requested with generation suppression
+search start generation 221
+search root generation 221 key 10732608143788560444 fen Q7/3k4/8/8/8/8/8/4K3 w - - 1 2
+go_record generation=221 root_fen="Q7/3k4/8/8/8/8/8/4K3 w - - 1 2" root_key=10732608143788560444 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=976,btime_ms=989,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 221
+completion_record generation=221 result_generation=221 root_match=true result_key=10732608143788560444 candidate=a8d5 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=a8d5 source=search completed=true cancelled=false failed=false
+command position fen 4k3/P7/8/8/8/8/8/4K3 w - - 0 1 moves a7a8q e8d7 a8d5 d7e7
+search cancellation requested with generation suppression
+position accepted generation 222 key 5759633604528497003 fen 8/4k3/8/3Q4/8/8/8/4K3 w - - 3 3 legal_moves 32
+position_record command="position fen 4k3/P7/8/8/8/8/8/4K3 w - - 0 1 moves a7a8q e8d7 a8d5 d7e7" generation=222 root_fen="8/4k3/8/3Q4/8/8/8/4K3 w - - 3 3" native_key=5759633604528497003 side=w castling=- ep=- halfmove=3 fullmove=3 native_legal_count=32 shadow_legal_count=32 legal_digest=84a694663533b346 native_shadow_consistent=true
+command isready
+command go wtime 954 btime 974
+search cancellation requested with generation suppression
+search start generation 224
+search root generation 224 key 5759633604528497003 fen 8/4k3/8/3Q4/8/8/8/4K3 w - - 3 3
+go_record generation=224 root_fen="8/4k3/8/3Q4/8/8/8/4K3 w - - 3 3" root_key=5759633604528497003 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=954,btime_ms=974,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 224
+completion_record generation=224 result_generation=224 root_match=true result_key=5759633604528497003 candidate=d5e5 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=d5e5 source=search completed=true cancelled=false failed=false
+command position fen 4k3/P7/8/8/8/8/8/4K3 w - - 0 1 moves a7a8q e8d7 a8d5 d7e7 d5e5 e7d7
+search cancellation requested with generation suppression
+position accepted generation 225 key 4372863646079828102 fen 8/3k4/8/4Q3/8/8/8/4K3 w - - 5 4 legal_moves 31
+position_record command="position fen 4k3/P7/8/8/8/8/8/4K3 w - - 0 1 moves a7a8q e8d7 a8d5 d7e7 d5e5 e7d7" generation=225 root_fen="8/3k4/8/4Q3/8/8/8/4K3 w - - 5 4" native_key=4372863646079828102 side=w castling=- ep=- halfmove=5 fullmove=4 native_legal_count=31 shadow_legal_count=31 legal_digest=77c061fa3c454486 native_shadow_consistent=true
+command isready
+command go wtime 933 btime 961
+search cancellation requested with generation suppression
+search start generation 227
+search root generation 227 key 4372863646079828102 fen 8/3k4/8/4Q3/8/8/8/4K3 w - - 5 4
+go_record generation=227 root_fen="8/3k4/8/4Q3/8/8/8/4K3 w - - 5 4" root_key=4372863646079828102 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=933,btime_ms=961,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 227
+completion_record generation=227 result_generation=227 root_match=true result_key=4372863646079828102 candidate=e5d5 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=e5d5 source=search completed=true cancelled=false failed=false
+command position fen 4k3/P7/8/8/8/8/8/4K3 w - - 0 1 moves a7a8q e8d7 a8d5 d7e7 d5e5 e7d7 e5d5 d7e8
+search cancellation requested with generation suppression
+position accepted generation 228 key 16488430874164316666 fen 4k3/8/8/3Q4/8/8/8/4K3 w - - 7 5 legal_moves 32
+position_record command="position fen 4k3/P7/8/8/8/8/8/4K3 w - - 0 1 moves a7a8q e8d7 a8d5 d7e7 d5e5 e7d7 e5d5 d7e8" generation=228 root_fen="4k3/8/8/3Q4/8/8/8/4K3 w - - 7 5" native_key=16488430874164316666 side=w castling=- ep=- halfmove=7 fullmove=5 native_legal_count=32 shadow_legal_count=32 legal_digest=84a694663533b346 native_shadow_consistent=true
+command isready
+command go wtime 912 btime 960
+search cancellation requested with generation suppression
+search start generation 230
+search root generation 230 key 16488430874164316666 fen 4k3/8/8/3Q4/8/8/8/4K3 w - - 7 5
+go_record generation=230 root_fen="4k3/8/8/3Q4/8/8/8/4K3 w - - 7 5" root_key=16488430874164316666 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=912,btime_ms=960,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 230
+completion_record generation=230 result_generation=230 root_match=true result_key=16488430874164316666 candidate=d5e6 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=d5e6 source=search completed=true cancelled=false failed=false
+command position fen 4k3/P7/8/8/8/8/8/4K3 w - - 0 1 moves a7a8q e8d7 a8d5 d7e7 d5e5 e7d7 e5d5 d7e8 d5e6 e8f8
+search cancellation requested with generation suppression
+position accepted generation 231 key 7881517023174770707 fen 5k2/8/4Q3/8/8/8/8/4K3 w - - 9 6 legal_moves 29
+position_record command="position fen 4k3/P7/8/8/8/8/8/4K3 w - - 0 1 moves a7a8q e8d7 a8d5 d7e7 d5e5 e7d7 e5d5 d7e8 d5e6 e8f8" generation=231 root_fen="5k2/8/4Q3/8/8/8/8/4K3 w - - 9 6" native_key=7881517023174770707 side=w castling=- ep=- halfmove=9 fullmove=6 native_legal_count=29 shadow_legal_count=29 legal_digest=4ce5715829056687 native_shadow_consistent=true
+command isready
+command go wtime 892 btime 943
+search cancellation requested with generation suppression
+search start generation 233
+search root generation 233 key 7881517023174770707 fen 5k2/8/4Q3/8/8/8/8/4K3 w - - 9 6
+go_record generation=233 root_fen="5k2/8/4Q3/8/8/8/8/4K3 w - - 9 6" root_key=7881517023174770707 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=892,btime_ms=943,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 233
+completion_record generation=233 result_generation=233 root_match=true result_key=7881517023174770707 candidate=e6f6 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=e6f6 source=search completed=true cancelled=false failed=false
+command position fen 4k3/P7/8/8/8/8/8/4K3 w - - 0 1 moves a7a8q e8d7 a8d5 d7e7 d5e5 e7d7 e5d5 d7e8 d5e6 e8f8 e6f6 f8e8
+search cancellation requested with generation suppression
+position accepted generation 234 key 13668144199061897404 fen 4k3/8/5Q2/8/8/8/8/4K3 w - - 11 7 legal_moves 30
+position_record command="position fen 4k3/P7/8/8/8/8/8/4K3 w - - 0 1 moves a7a8q e8d7 a8d5 d7e7 d5e5 e7d7 e5d5 d7e8 d5e6 e8f8 e6f6 f8e8" generation=234 root_fen="4k3/8/5Q2/8/8/8/8/4K3 w - - 11 7" native_key=13668144199061897404 side=w castling=- ep=- halfmove=11 fullmove=7 native_legal_count=30 shadow_legal_count=30 legal_digest=5b3bdc0c75a781a2 native_shadow_consistent=true
+command isready
+command go wtime 873 btime 938
+search cancellation requested with generation suppression
+search start generation 236
+search root generation 236 key 13668144199061897404 fen 4k3/8/5Q2/8/8/8/8/4K3 w - - 11 7
+go_record generation=236 root_fen="4k3/8/5Q2/8/8/8/8/4K3 w - - 11 7" root_key=13668144199061897404 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=873,btime_ms=938,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 236
+completion_record generation=236 result_generation=236 root_match=true result_key=13668144199061897404 candidate=f6e6 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=f6e6 source=search completed=true cancelled=false failed=false
+command position fen 4k3/P7/8/8/8/8/8/4K3 w - - 0 1 moves a7a8q e8d7 a8d5 d7e7 d5e5 e7d7 e5d5 d7e8 d5e6 e8f8 e6f6 f8e8 f6e6 e8f8
+search cancellation requested with generation suppression
+position accepted generation 237 key 7881517023174770707 fen 5k2/8/4Q3/8/8/8/8/4K3 w - - 13 8 legal_moves 29
+position_record command="position fen 4k3/P7/8/8/8/8/8/4K3 w - - 0 1 moves a7a8q e8d7 a8d5 d7e7 d5e5 e7d7 e5d5 d7e8 d5e6 e8f8 e6f6 f8e8 f6e6 e8f8" generation=237 root_fen="5k2/8/4Q3/8/8/8/8/4K3 w - - 13 8" native_key=7881517023174770707 side=w castling=- ep=- halfmove=13 fullmove=8 native_legal_count=29 shadow_legal_count=29 legal_digest=4ce5715829056687 native_shadow_consistent=true
+command isready
+command go wtime 854 btime 936
+search cancellation requested with generation suppression
+search start generation 239
+search root generation 239 key 7881517023174770707 fen 5k2/8/4Q3/8/8/8/8/4K3 w - - 13 8
+go_record generation=239 root_fen="5k2/8/4Q3/8/8/8/8/4K3 w - - 13 8" root_key=7881517023174770707 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=854,btime_ms=936,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 239
+completion_record generation=239 result_generation=239 root_match=true result_key=7881517023174770707 candidate=e6f6 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=e6f6 source=search completed=true cancelled=false failed=false
+command position fen 4k3/P7/8/8/8/8/8/4K3 w - - 0 1 moves a7a8q e8d7 a8d5 d7e7 d5e5 e7d7 e5d5 d7e8 d5e6 e8f8 e6f6 f8e8 f6e6 e8f8 e6f6 f8e8
+search cancellation requested with generation suppression
+position accepted generation 240 key 13668144199061897404 fen 4k3/8/5Q2/8/8/8/8/4K3 w - - 15 9 legal_moves 30
+position_record command="position fen 4k3/P7/8/8/8/8/8/4K3 w - - 0 1 moves a7a8q e8d7 a8d5 d7e7 d5e5 e7d7 e5d5 d7e8 d5e6 e8f8 e6f6 f8e8 f6e6 e8f8 e6f6 f8e8" generation=240 root_fen="4k3/8/5Q2/8/8/8/8/4K3 w - - 15 9" native_key=13668144199061897404 side=w castling=- ep=- halfmove=15 fullmove=9 native_legal_count=30 shadow_legal_count=30 legal_digest=5b3bdc0c75a781a2 native_shadow_consistent=true
+command isready
+command go wtime 836 btime 930
+search cancellation requested with generation suppression
+search start generation 242
+search root generation 242 key 13668144199061897404 fen 4k3/8/5Q2/8/8/8/8/4K3 w - - 15 9
+go_record generation=242 root_fen="4k3/8/5Q2/8/8/8/8/4K3 w - - 15 9" root_key=13668144199061897404 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=836,btime_ms=930,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 242
+completion_record generation=242 result_generation=242 root_match=true result_key=13668144199061897404 candidate=f6e5 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=f6e5 source=search completed=true cancelled=false failed=false
+command position fen 4k3/P7/8/8/8/8/8/4K3 w - - 0 1 moves a7a8q e8d7 a8d5 d7e7 d5e5 e7d7 e5d5 d7e8 d5e6 e8f8 e6f6 f8e8 f6e6 e8f8 e6f6 f8e8 f6e5 e8d7
+search cancellation requested with generation suppression
+position accepted generation 243 key 4372863646079828102 fen 8/3k4/8/4Q3/8/8/8/4K3 w - - 17 10 legal_moves 31
+position_record command="position fen 4k3/P7/8/8/8/8/8/4K3 w - - 0 1 moves a7a8q e8d7 a8d5 d7e7 d5e5 e7d7 e5d5 d7e8 d5e6 e8f8 e6f6 f8e8 f6e6 e8f8 e6f6 f8e8 f6e5 e8d7" generation=243 root_fen="8/3k4/8/4Q3/8/8/8/4K3 w - - 17 10" native_key=4372863646079828102 side=w castling=- ep=- halfmove=17 fullmove=10 native_legal_count=31 shadow_legal_count=31 legal_digest=77c061fa3c454486 native_shadow_consistent=true
+command isready
+command go wtime 819 btime 907
+search cancellation requested with generation suppression
+search start generation 245
+search root generation 245 key 4372863646079828102 fen 8/3k4/8/4Q3/8/8/8/4K3 w - - 17 10
+go_record generation=245 root_fen="8/3k4/8/4Q3/8/8/8/4K3 w - - 17 10" root_key=4372863646079828102 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=819,btime_ms=907,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 245
+completion_record generation=245 result_generation=245 root_match=true result_key=4372863646079828102 candidate=e1e2 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=e1e2 source=search completed=true cancelled=false failed=false
+command position fen 4k3/P7/8/8/8/8/8/4K3 w - - 0 1 moves a7a8q e8d7 a8d5 d7e7 d5e5 e7d7 e5d5 d7e8 d5e6 e8f8 e6f6 f8e8 f6e6 e8f8 e6f6 f8e8 f6e5 e8d7 e1e2 d7c6
+search cancellation requested with generation suppression
+position accepted generation 246 key 17487112667227690097 fen 8/8/2k5/4Q3/8/8/4K3/8 w - - 19 11 legal_moves 33
+position_record command="position fen 4k3/P7/8/8/8/8/8/4K3 w - - 0 1 moves a7a8q e8d7 a8d5 d7e7 d5e5 e7d7 e5d5 d7e8 d5e6 e8f8 e6f6 f8e8 f6e6 e8f8 e6f6 f8e8 f6e5 e8d7 e1e2 d7c6" generation=246 root_fen="8/8/2k5/4Q3/8/8/4K3/8 w - - 19 11" native_key=17487112667227690097 side=w castling=- ep=- halfmove=19 fullmove=11 native_legal_count=33 shadow_legal_count=33 legal_digest=43f698ade58efac0 native_shadow_consistent=true
+command isready
+command go wtime 802 btime 903
+search cancellation requested with generation suppression
+search start generation 248
+search root generation 248 key 17487112667227690097 fen 8/8/2k5/4Q3/8/8/4K3/8 w - - 19 11
+go_record generation=248 root_fen="8/8/2k5/4Q3/8/8/4K3/8 w - - 19 11" root_key=17487112667227690097 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=802,btime_ms=903,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 248
+completion_record generation=248 result_generation=248 root_match=true result_key=17487112667227690097 candidate=e2d3 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=e2d3 source=search completed=true cancelled=false failed=false
+command position fen 4k3/P7/8/8/8/8/8/4K3 w - - 0 1 moves a7a8q e8d7 a8d5 d7e7 d5e5 e7d7 e5d5 d7e8 d5e6 e8f8 e6f6 f8e8 f6e6 e8f8 e6f6 f8e8 f6e5 e8d7 e1e2 d7c6 e2d3 c6d7
+search cancellation requested with generation suppression
+position accepted generation 249 key 17078296883039604030 fen 8/3k4/8/4Q3/8/3K4/8/8 w - - 21 12 legal_moves 35
+position_record command="position fen 4k3/P7/8/8/8/8/8/4K3 w - - 0 1 moves a7a8q e8d7 a8d5 d7e7 d5e5 e7d7 e5d5 d7e8 d5e6 e8f8 e6f6 f8e8 f6e6 e8f8 e6f6 f8e8 f6e5 e8d7 e1e2 d7c6 e2d3 c6d7" generation=249 root_fen="8/3k4/8/4Q3/8/3K4/8/8 w - - 21 12" native_key=17078296883039604030 side=w castling=- ep=- halfmove=21 fullmove=12 native_legal_count=35 shadow_legal_count=35 legal_digest=6c1a348a4d99d313 native_shadow_consistent=true
+command isready
+command go wtime 786 btime 897
+search cancellation requested with generation suppression
+search start generation 251
+search root generation 251 key 17078296883039604030 fen 8/3k4/8/4Q3/8/3K4/8/8 w - - 21 12
+go_record generation=251 root_fen="8/3k4/8/4Q3/8/3K4/8/8 w - - 21 12" root_key=17078296883039604030 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=786,btime_ms=897,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 251
+completion_record generation=251 result_generation=251 root_match=true result_key=17078296883039604030 candidate=e5f6 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=e5f6 source=search completed=true cancelled=false failed=false
+command position fen 4k3/P7/8/8/8/8/8/4K3 w - - 0 1 moves a7a8q e8d7 a8d5 d7e7 d5e5 e7d7 e5d5 d7e8 d5e6 e8f8 e6f6 f8e8 f6e6 e8f8 e6f6 f8e8 f6e5 e8d7 e1e2 d7c6 e2d3 c6d7 e5f6 d7e8
+search cancellation requested with generation suppression
+position accepted generation 252 key 7782999082541567236 fen 4k3/8/5Q2/8/8/3K4/8/8 w - - 23 13 legal_moves 33
+position_record command="position fen 4k3/P7/8/8/8/8/8/4K3 w - - 0 1 moves a7a8q e8d7 a8d5 d7e7 d5e5 e7d7 e5d5 d7e8 d5e6 e8f8 e6f6 f8e8 f6e6 e8f8 e6f6 f8e8 f6e5 e8d7 e1e2 d7c6 e2d3 c6d7 e5f6 d7e8" generation=252 root_fen="4k3/8/5Q2/8/8/3K4/8/8 w - - 23 13" native_key=7782999082541567236 side=w castling=- ep=- halfmove=23 fullmove=13 native_legal_count=33 shadow_legal_count=33 legal_digest=597492130058821d native_shadow_consistent=true
+command isready
+command go wtime 770 btime 886
+search cancellation requested with generation suppression
+search start generation 254
+search root generation 254 key 7782999082541567236 fen 4k3/8/5Q2/8/8/3K4/8/8 w - - 23 13
+go_record generation=254 root_fen="4k3/8/5Q2/8/8/3K4/8/8 w - - 23 13" root_key=7782999082541567236 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=770,btime_ms=886,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 254
+completion_record generation=254 result_generation=254 root_match=true result_key=7782999082541567236 candidate=f6e6 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=f6e6 source=search completed=true cancelled=false failed=false
+command position fen 4k3/P7/8/8/8/8/8/4K3 w - - 0 1 moves a7a8q e8d7 a8d5 d7e7 d5e5 e7d7 e5d5 d7e8 d5e6 e8f8 e6f6 f8e8 f6e6 e8f8 e6f6 f8e8 f6e5 e8d7 e1e2 d7c6 e2d3 c6d7 e5f6 d7e8 f6e6 e8f8
+search cancellation requested with generation suppression
+position accepted generation 255 key 13604531354496961963 fen 5k2/8/4Q3/8/8/3K4/8/8 w - - 25 14 legal_moves 33
+position_record command="position fen 4k3/P7/8/8/8/8/8/4K3 w - - 0 1 moves a7a8q e8d7 a8d5 d7e7 d5e5 e7d7 e5d5 d7e8 d5e6 e8f8 e6f6 f8e8 f6e6 e8f8 e6f6 f8e8 f6e5 e8d7 e1e2 d7c6 e2d3 c6d7 e5f6 d7e8 f6e6 e8f8" generation=255 root_fen="5k2/8/4Q3/8/8/3K4/8/8 w - - 25 14" native_key=13604531354496961963 side=w castling=- ep=- halfmove=25 fullmove=14 native_legal_count=33 shadow_legal_count=33 legal_digest=7c5188691d4b7c55 native_shadow_consistent=true
+command isready
+command go wtime 755 btime 881
+search cancellation requested with generation suppression
+search start generation 257
+search root generation 257 key 13604531354496961963 fen 5k2/8/4Q3/8/8/3K4/8/8 w - - 25 14
+go_record generation=257 root_fen="5k2/8/4Q3/8/8/3K4/8/8 w - - 25 14" root_key=13604531354496961963 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=755,btime_ms=881,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 257
+completion_record generation=257 result_generation=257 root_match=true result_key=13604531354496961963 candidate=e6f6 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=e6f6 source=search completed=true cancelled=false failed=false
+command position fen 4k3/P7/8/8/8/8/8/4K3 w - - 0 1 moves a7a8q e8d7 a8d5 d7e7 d5e5 e7d7 e5d5 d7e8 d5e6 e8f8 e6f6 f8e8 f6e6 e8f8 e6f6 f8e8 f6e5 e8d7 e1e2 d7c6 e2d3 c6d7 e5f6 d7e8 f6e6 e8f8 e6f6 f8g8
+search cancellation requested with generation suppression
+position accepted generation 258 key 15732501803760022185 fen 6k1/8/5Q2/8/8/3K4/8/8 w - - 27 15 legal_moves 33
+position_record command="position fen 4k3/P7/8/8/8/8/8/4K3 w - - 0 1 moves a7a8q e8d7 a8d5 d7e7 d5e5 e7d7 e5d5 d7e8 d5e6 e8f8 e6f6 f8e8 f6e6 e8f8 e6f6 f8e8 f6e5 e8d7 e1e2 d7c6 e2d3 c6d7 e5f6 d7e8 f6e6 e8f8 e6f6 f8g8" generation=258 root_fen="6k1/8/5Q2/8/8/3K4/8/8 w - - 27 15" native_key=15732501803760022185 side=w castling=- ep=- halfmove=27 fullmove=15 native_legal_count=33 shadow_legal_count=33 legal_digest=597492130058821d native_shadow_consistent=true
+command isready
+command go wtime 739 btime 875
+search cancellation requested with generation suppression
+search start generation 260
+search root generation 260 key 15732501803760022185 fen 6k1/8/5Q2/8/8/3K4/8/8 w - - 27 15
+go_record generation=260 root_fen="6k1/8/5Q2/8/8/3K4/8/8 w - - 27 15" root_key=15732501803760022185 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=739,btime_ms=875,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 260
+completion_record generation=260 result_generation=260 root_match=true result_key=15732501803760022185 candidate=d3c4 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=d3c4 source=search completed=true cancelled=false failed=false
+command position fen 4k3/P7/8/8/8/8/8/4K3 w - - 0 1 moves a7a8q e8d7 a8d5 d7e7 d5e5 e7d7 e5d5 d7e8 d5e6 e8f8 e6f6 f8e8 f6e6 e8f8 e6f6 f8e8 f6e5 e8d7 e1e2 d7c6 e2d3 c6d7 e5f6 d7e8 f6e6 e8f8 e6f6 f8g8 d3c4 g8h7
+search cancellation requested with generation suppression
+position accepted generation 261 key 4152822454102851772 fen 8/7k/5Q2/8/2K5/8/8/8 w - - 29 16 legal_moves 33
+position_record command="position fen 4k3/P7/8/8/8/8/8/4K3 w - - 0 1 moves a7a8q e8d7 a8d5 d7e7 d5e5 e7d7 e5d5 d7e8 d5e6 e8f8 e6f6 f8e8 f6e6 e8f8 e6f6 f8e8 f6e5 e8d7 e1e2 d7c6 e2d3 c6d7 e5f6 d7e8 f6e6 e8f8 e6f6 f8g8 d3c4 g8h7" generation=261 root_fen="8/7k/5Q2/8/2K5/8/8/8 w - - 29 16" native_key=4152822454102851772 side=w castling=- ep=- halfmove=29 fullmove=16 native_legal_count=33 shadow_legal_count=33 legal_digest=7a4d31636dc2d4b9 native_shadow_consistent=true
+command isready
+command go wtime 724 btime 869
+search cancellation requested with generation suppression
+search start generation 263
+search root generation 263 key 4152822454102851772 fen 8/7k/5Q2/8/2K5/8/8/8 w - - 29 16
+go_record generation=263 root_fen="8/7k/5Q2/8/2K5/8/8/8 w - - 29 16" root_key=4152822454102851772 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=724,btime_ms=869,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 263
+completion_record generation=263 result_generation=263 root_match=true result_key=4152822454102851772 candidate=c4d3 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=c4d3 source=search completed=true cancelled=false failed=false
+command position fen 4k3/P7/8/8/8/8/8/4K3 w - - 0 1 moves a7a8q e8d7 a8d5 d7e7 d5e5 e7d7 e5d5 d7e8 d5e6 e8f8 e6f6 f8e8 f6e6 e8f8 e6f6 f8e8 f6e5 e8d7 e1e2 d7c6 e2d3 c6d7 e5f6 d7e8 f6e6 e8f8 e6f6 f8g8 d3c4 g8h7 c4d3 h7g8
+search cancellation requested with generation suppression
+position accepted generation 264 key 15732501803760022185 fen 6k1/8/5Q2/8/8/3K4/8/8 w - - 31 17 legal_moves 33
+position_record command="position fen 4k3/P7/8/8/8/8/8/4K3 w - - 0 1 moves a7a8q e8d7 a8d5 d7e7 d5e5 e7d7 e5d5 d7e8 d5e6 e8f8 e6f6 f8e8 f6e6 e8f8 e6f6 f8e8 f6e5 e8d7 e1e2 d7c6 e2d3 c6d7 e5f6 d7e8 f6e6 e8f8 e6f6 f8g8 d3c4 g8h7 c4d3 h7g8" generation=264 root_fen="6k1/8/5Q2/8/8/3K4/8/8 w - - 31 17" native_key=15732501803760022185 side=w castling=- ep=- halfmove=31 fullmove=17 native_legal_count=33 shadow_legal_count=33 legal_digest=597492130058821d native_shadow_consistent=true
+command isready
+command go wtime 709 btime 863
+search cancellation requested with generation suppression
+search start generation 266
+search root generation 266 key 15732501803760022185 fen 6k1/8/5Q2/8/8/3K4/8/8 w - - 31 17
+go_record generation=266 root_fen="6k1/8/5Q2/8/8/3K4/8/8 w - - 31 17" root_key=15732501803760022185 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=709,btime_ms=863,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 266
+completion_record generation=266 result_generation=266 root_match=true result_key=15732501803760022185 candidate=d3c4 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=d3c4 source=search completed=true cancelled=false failed=false
+command position fen 4k3/P7/8/8/8/8/8/4K3 w - - 0 1 moves a7a8q e8d7 a8d5 d7e7 d5e5 e7d7 e5d5 d7e8 d5e6 e8f8 e6f6 f8e8 f6e6 e8f8 e6f6 f8e8 f6e5 e8d7 e1e2 d7c6 e2d3 c6d7 e5f6 d7e8 f6e6 e8f8 e6f6 f8g8 d3c4 g8h7 c4d3 h7g8 d3c4 g8h7
+search cancellation requested with generation suppression
+position accepted generation 267 key 4152822454102851772 fen 8/7k/5Q2/8/2K5/8/8/8 w - - 33 18 legal_moves 33
+position_record command="position fen 4k3/P7/8/8/8/8/8/4K3 w - - 0 1 moves a7a8q e8d7 a8d5 d7e7 d5e5 e7d7 e5d5 d7e8 d5e6 e8f8 e6f6 f8e8 f6e6 e8f8 e6f6 f8e8 f6e5 e8d7 e1e2 d7c6 e2d3 c6d7 e5f6 d7e8 f6e6 e8f8 e6f6 f8g8 d3c4 g8h7 c4d3 h7g8 d3c4 g8h7" generation=267 root_fen="8/7k/5Q2/8/2K5/8/8/8 w - - 33 18" native_key=4152822454102851772 side=w castling=- ep=- halfmove=33 fullmove=18 native_legal_count=33 shadow_legal_count=33 legal_digest=7a4d31636dc2d4b9 native_shadow_consistent=true
+command isready
+command go wtime 696 btime 859
+search cancellation requested with generation suppression
+search start generation 269
+search root generation 269 key 4152822454102851772 fen 8/7k/5Q2/8/2K5/8/8/8 w - - 33 18
+go_record generation=269 root_fen="8/7k/5Q2/8/2K5/8/8/8 w - - 33 18" root_key=4152822454102851772 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=696,btime_ms=859,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 269
+completion_record generation=269 result_generation=269 root_match=true result_key=4152822454102851772 candidate=c4d5 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=c4d5 source=search completed=true cancelled=false failed=false
+command position fen 4k3/P7/8/8/8/8/8/4K3 w - - 0 1 moves a7a8q e8d7 a8d5 d7e7 d5e5 e7d7 e5d5 d7e8 d5e6 e8f8 e6f6 f8e8 f6e6 e8f8 e6f6 f8e8 f6e5 e8d7 e1e2 d7c6 e2d3 c6d7 e5f6 d7e8 f6e6 e8f8 e6f6 f8g8 d3c4 g8h7 c4d3 h7g8 d3c4 g8h7 c4d5 h7g8
+search cancellation requested with generation suppression
+position accepted generation 270 key 13164180133922074970 fen 6k1/8/5Q2/3K4/8/8/8/8 w - - 35 19 legal_moves 33
+position_record command="position fen 4k3/P7/8/8/8/8/8/4K3 w - - 0 1 moves a7a8q e8d7 a8d5 d7e7 d5e5 e7d7 e5d5 d7e8 d5e6 e8f8 e6f6 f8e8 f6e6 e8f8 e6f6 f8e8 f6e5 e8d7 e1e2 d7c6 e2d3 c6d7 e5f6 d7e8 f6e6 e8f8 e6f6 f8g8 d3c4 g8h7 c4d3 h7g8 d3c4 g8h7 c4d5 h7g8" generation=270 root_fen="6k1/8/5Q2/3K4/8/8/8/8 w - - 35 19" native_key=13164180133922074970 side=w castling=- ep=- halfmove=35 fullmove=19 native_legal_count=33 shadow_legal_count=33 legal_digest=be792be126b767f1 native_shadow_consistent=true
+command isready
+command go wtime 683 btime 852
+search cancellation requested with generation suppression
+search start generation 272
+search root generation 272 key 13164180133922074970 fen 6k1/8/5Q2/3K4/8/8/8/8 w - - 35 19
+go_record generation=272 root_fen="6k1/8/5Q2/3K4/8/8/8/8 w - - 35 19" root_key=13164180133922074970 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=683,btime_ms=852,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 272
+completion_record generation=272 result_generation=272 root_match=true result_key=13164180133922074970 candidate=f6e7 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=f6e7 source=search completed=true cancelled=false failed=false
+command position fen 4k3/P7/8/8/8/8/8/4K3 w - - 0 1 moves a7a8q e8d7 a8d5 d7e7 d5e5 e7d7 e5d5 d7e8 d5e6 e8f8 e6f6 f8e8 f6e6 e8f8 e6f6 f8e8 f6e5 e8d7 e1e2 d7c6 e2d3 c6d7 e5f6 d7e8 f6e6 e8f8 e6f6 f8g8 d3c4 g8h7 c4d3 h7g8 d3c4 g8h7 c4d5 h7g8 f6e7 g8h8
+search cancellation requested with generation suppression
+position accepted generation 273 key 8391401007087669516 fen 7k/4Q3/8/3K4/8/8/8/8 w - - 37 20 legal_moves 31
+position_record command="position fen 4k3/P7/8/8/8/8/8/4K3 w - - 0 1 moves a7a8q e8d7 a8d5 d7e7 d5e5 e7d7 e5d5 d7e8 d5e6 e8f8 e6f6 f8e8 f6e6 e8f8 e6f6 f8e8 f6e5 e8d7 e1e2 d7c6 e2d3 c6d7 e5f6 d7e8 f6e6 e8f8 e6f6 f8g8 d3c4 g8h7 c4d3 h7g8 d3c4 g8h7 c4d5 h7g8 f6e7 g8h8" generation=273 root_fen="7k/4Q3/8/3K4/8/8/8/8 w - - 37 20" native_key=8391401007087669516 side=w castling=- ep=- halfmove=37 fullmove=20 native_legal_count=31 shadow_legal_count=31 legal_digest=9517a920a71e067d native_shadow_consistent=true
+command isready
+command go wtime 671 btime 850
+search cancellation requested with generation suppression
+search start generation 275
+search root generation 275 key 8391401007087669516 fen 7k/4Q3/8/3K4/8/8/8/8 w - - 37 20
+go_record generation=275 root_fen="7k/4Q3/8/3K4/8/8/8/8 w - - 37 20" root_key=8391401007087669516 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=671,btime_ms=850,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 275
+completion_record generation=275 result_generation=275 root_match=true result_key=8391401007087669516 candidate=e7e3 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=e7e3 source=search completed=true cancelled=false failed=false
+command position fen 4k3/P7/8/8/8/8/8/4K3 w - - 0 1 moves a7a8q e8d7 a8d5 d7e7 d5e5 e7d7 e5d5 d7e8 d5e6 e8f8 e6f6 f8e8 f6e6 e8f8 e6f6 f8e8 f6e5 e8d7 e1e2 d7c6 e2d3 c6d7 e5f6 d7e8 f6e6 e8f8 e6f6 f8g8 d3c4 g8h7 c4d3 h7g8 d3c4 g8h7 c4d5 h7g8 f6e7 g8h8 e7e3 h8g8
+search cancellation requested with generation suppression
+position accepted generation 276 key 11781975644241510677 fen 6k1/8/8/3K4/8/4Q3/8/8 w - - 39 21 legal_moves 33
+position_record command="position fen 4k3/P7/8/8/8/8/8/4K3 w - - 0 1 moves a7a8q e8d7 a8d5 d7e7 d5e5 e7d7 e5d5 d7e8 d5e6 e8f8 e6f6 f8e8 f6e6 e8f8 e6f6 f8e8 f6e5 e8d7 e1e2 d7c6 e2d3 c6d7 e5f6 d7e8 f6e6 e8f8 e6f6 f8g8 d3c4 g8h7 c4d3 h7g8 d3c4 g8h7 c4d5 h7g8 f6e7 g8h8 e7e3 h8g8" generation=276 root_fen="6k1/8/8/3K4/8/4Q3/8/8 w - - 39 21" native_key=11781975644241510677 side=w castling=- ep=- halfmove=39 fullmove=21 native_legal_count=33 shadow_legal_count=33 legal_digest=3f7ab0664ca8836d native_shadow_consistent=true
+command isready
+command go wtime 659 btime 841
+search cancellation requested with generation suppression
+search start generation 278
+search root generation 278 key 11781975644241510677 fen 6k1/8/8/3K4/8/4Q3/8/8 w - - 39 21
+go_record generation=278 root_fen="6k1/8/8/3K4/8/4Q3/8/8 w - - 39 21" root_key=11781975644241510677 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=659,btime_ms=841,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 278
+completion_record generation=278 result_generation=278 root_match=true result_key=11781975644241510677 candidate=e3e7 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=e3e7 source=search completed=true cancelled=false failed=false
+command position fen 4k3/P7/8/8/8/8/8/4K3 w - - 0 1 moves a7a8q e8d7 a8d5 d7e7 d5e5 e7d7 e5d5 d7e8 d5e6 e8f8 e6f6 f8e8 f6e6 e8f8 e6f6 f8e8 f6e5 e8d7 e1e2 d7c6 e2d3 c6d7 e5f6 d7e8 f6e6 e8f8 e6f6 f8g8 d3c4 g8h7 c4d3 h7g8 d3c4 g8h7 c4d5 h7g8 f6e7 g8h8 e7e3 h8g8 e3e7 g8h8
+search cancellation requested with generation suppression
+position accepted generation 279 key 8391401007087669516 fen 7k/4Q3/8/3K4/8/8/8/8 w - - 41 22 legal_moves 31
+position_record command="position fen 4k3/P7/8/8/8/8/8/4K3 w - - 0 1 moves a7a8q e8d7 a8d5 d7e7 d5e5 e7d7 e5d5 d7e8 d5e6 e8f8 e6f6 f8e8 f6e6 e8f8 e6f6 f8e8 f6e5 e8d7 e1e2 d7c6 e2d3 c6d7 e5f6 d7e8 f6e6 e8f8 e6f6 f8g8 d3c4 g8h7 c4d3 h7g8 d3c4 g8h7 c4d5 h7g8 f6e7 g8h8 e7e3 h8g8 e3e7 g8h8" generation=279 root_fen="7k/4Q3/8/3K4/8/8/8/8 w - - 41 22" native_key=8391401007087669516 side=w castling=- ep=- halfmove=41 fullmove=22 native_legal_count=31 shadow_legal_count=31 legal_digest=9517a920a71e067d native_shadow_consistent=true
+command isready
+command go wtime 648 btime 835
+search cancellation requested with generation suppression
+search start generation 281
+search root generation 281 key 8391401007087669516 fen 7k/4Q3/8/3K4/8/8/8/8 w - - 41 22
+go_record generation=281 root_fen="7k/4Q3/8/3K4/8/8/8/8 w - - 41 22" root_key=8391401007087669516 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=648,btime_ms=835,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 281
+completion_record generation=281 result_generation=281 root_match=true result_key=8391401007087669516 candidate=e7f6 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=e7f6 source=search completed=true cancelled=false failed=false
+command position fen 4k3/P7/8/8/8/8/8/4K3 w - - 0 1 moves a7a8q e8d7 a8d5 d7e7 d5e5 e7d7 e5d5 d7e8 d5e6 e8f8 e6f6 f8e8 f6e6 e8f8 e6f6 f8e8 f6e5 e8d7 e1e2 d7c6 e2d3 c6d7 e5f6 d7e8 f6e6 e8f8 e6f6 f8g8 d3c4 g8h7 c4d3 h7g8 d3c4 g8h7 c4d5 h7g8 f6e7 g8h8 e7e3 h8g8 e3e7 g8h8 e7f6 h8g8
+search cancellation requested with generation suppression
+position accepted generation 282 key 13164180133922074970 fen 6k1/8/5Q2/3K4/8/8/8/8 w - - 43 23 legal_moves 33
+position_record command="position fen 4k3/P7/8/8/8/8/8/4K3 w - - 0 1 moves a7a8q e8d7 a8d5 d7e7 d5e5 e7d7 e5d5 d7e8 d5e6 e8f8 e6f6 f8e8 f6e6 e8f8 e6f6 f8e8 f6e5 e8d7 e1e2 d7c6 e2d3 c6d7 e5f6 d7e8 f6e6 e8f8 e6f6 f8g8 d3c4 g8h7 c4d3 h7g8 d3c4 g8h7 c4d5 h7g8 f6e7 g8h8 e7e3 h8g8 e3e7 g8h8 e7f6 h8g8" generation=282 root_fen="6k1/8/5Q2/3K4/8/8/8/8 w - - 43 23" native_key=13164180133922074970 side=w castling=- ep=- halfmove=43 fullmove=23 native_legal_count=33 shadow_legal_count=33 legal_digest=be792be126b767f1 native_shadow_consistent=true
+command isready
+command go wtime 637 btime 831
+search cancellation requested with generation suppression
+search start generation 284
+search root generation 284 key 13164180133922074970 fen 6k1/8/5Q2/3K4/8/8/8/8 w - - 43 23
+go_record generation=284 root_fen="6k1/8/5Q2/3K4/8/8/8/8 w - - 43 23" root_key=13164180133922074970 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=637,btime_ms=831,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 284
+completion_record generation=284 result_generation=284 root_match=true result_key=13164180133922074970 candidate=d5e4 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=d5e4 source=search completed=true cancelled=false failed=false
+command position fen 4k3/P7/8/8/8/8/8/4K3 w - - 0 1 moves a7a8q e8d7 a8d5 d7e7 d5e5 e7d7 e5d5 d7e8 d5e6 e8f8 e6f6 f8e8 f6e6 e8f8 e6f6 f8e8 f6e5 e8d7 e1e2 d7c6 e2d3 c6d7 e5f6 d7e8 f6e6 e8f8 e6f6 f8g8 d3c4 g8h7 c4d3 h7g8 d3c4 g8h7 c4d5 h7g8 f6e7 g8h8 e7e3 h8g8 e3e7 g8h8 e7f6 h8g8 d5e4 g8h7
+search cancellation requested with generation suppression
+position accepted generation 285 key 15205956929106368432 fen 8/7k/5Q2/8/4K3/8/8/8 w - - 45 24 legal_moves 33
+position_record command="position fen 4k3/P7/8/8/8/8/8/4K3 w - - 0 1 moves a7a8q e8d7 a8d5 d7e7 d5e5 e7d7 e5d5 d7e8 d5e6 e8f8 e6f6 f8e8 f6e6 e8f8 e6f6 f8e8 f6e5 e8d7 e1e2 d7c6 e2d3 c6d7 e5f6 d7e8 f6e6 e8f8 e6f6 f8g8 d3c4 g8h7 c4d3 h7g8 d3c4 g8h7 c4d5 h7g8 f6e7 g8h8 e7e3 h8g8 e3e7 g8h8 e7f6 h8g8 d5e4 g8h7" generation=285 root_fen="8/7k/5Q2/8/4K3/8/8/8 w - - 45 24" native_key=15205956929106368432 side=w castling=- ep=- halfmove=45 fullmove=24 native_legal_count=33 shadow_legal_count=33 legal_digest=d6d8eb0ac2a74d7d native_shadow_consistent=true
+command isready
+command go wtime 626 btime 824
+search cancellation requested with generation suppression
+search start generation 287
+search root generation 287 key 15205956929106368432 fen 8/7k/5Q2/8/4K3/8/8/8 w - - 45 24
+go_record generation=287 root_fen="8/7k/5Q2/8/4K3/8/8/8 w - - 45 24" root_key=15205956929106368432 limits="depth=-,nodes=-,movetime_ms=-,wtime_ms=626,btime_ms=824,winc_ms=0,binc_ms=0,movestogo=-,infinite=false,ponder=false,searchmoves=false" threads=1 source=search
+search complete generation 287
+completion_record generation=287 result_generation=287 root_match=true result_key=15205956929106368432 candidate=e4d5 native_legal=true shadow_legal=true searchmoves_legal=true pv_legal=true fallback=none validated=e4d5 source=search completed=true cancelled=false failed=false
+command position fen 4k3/P7/8/8/8/8/8/4K3 w - - 0 1 moves a7a8q e8d7 a8d5 d7e7 d5e5 e7d7 e5d5 d7e8 d5e6 e8f8 e6f6 f8e8 f6e6 e8f8 e6f6 f8e8 f6e5 e8d7 e1e2 d7c6 e2d3 c6d7 e5f6 d7e8 f6e6 e8f8 e6f6 f8g8 d3c4 g8h7 c4d3 h7g8 d3c4 g8h7 c4d5 h7g8 f6e7 g8h8 e7e3 h8g8 e3e7 g8h8 e7f6 h8g8 d5e4 g8h7 e4d5 h7g8
+search cancellation requested with generation suppression
+position accepted generation 288 key 13164180133922074970 fen 6k1/8/5Q2/3K4/8/8/8/8 w - - 47 25 legal_moves 33
+position_record command="position fen 4k3/P7/8/8/8/8/8/4K3 w - - 0 1 moves a7a8q e8d7 a8d5 d7e7 d5e5 e7d7 e5d5 d7e8 d5e6 e8f8 e6f6 f8e8 f6e6 e8f8 e6f6 f8e8 f6e5 e8d7 e1e2 d7c6 e2d3 c6d7 e5f6 d7e8 f6e6 e8f8 e6f6 f8g8 d3c4 g8h7 c4d3 h7g8 d3c4 g8h7 c4d5 h7g8 f6e7 g8h8 e7e3 h8g8 e3e7 g8h8 e7f6 h8g8 d5e4 g8h7 e4d5 h7g8" generation=288 root_fen="6k1/8/5Q2/3K4/8/8/8/8 w - - 47 25" native_key=13164180133922074970 side=w castling=- ep=- halfmove=47 fullmove=25 native_legal_count=33 shadow_legal_count=33 legal_digest=be792be126b767f1 native_shadow_consistent=true
+command isready
+command debug on
+command ucinewgame
+search cancellation requested with generation suppression
+command setoption name Ponder value false
+search cancellation requested with generation suppression
+command position fen r3k2r/p1ppqpb1/bn2pnp1/2qPN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1
+search cancellation requested with generation suppression
+position accepted generation 291 key 5525019177736958019 fen r3k2r/p1ppqpb1/bn2pnp1/2qPN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1 legal_moves 48
+position_record command="position fen r3k2r/p1ppqpb1/bn2pnp1/2qPN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1" generation=291 root_fen="r3k2r/p1ppqpb1/bn2pnp1/2qPN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1" native_key=5525019177736958019 side=w castling=KQkq ep=- halfmove=0 fullmove=1 native_legal_count=48 shadow_legal_count=48 legal_digest=4740b8aeb92b5447 native_shadow_consistent=true
+command isready
+command quit
+search cancellation requested with generation suppression
+search cancellation requested with generation suppression

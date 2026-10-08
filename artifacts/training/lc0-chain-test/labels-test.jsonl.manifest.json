@@ -1,0 +1,16 @@
+{
+  "schema": "koi-lc0-labels-v1",
+  "created_utc": "2026-10-04T00:04:43Z",
+  "input": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\training\\lc0-curriculum-selftest\\general.txt",
+  "output": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\training\\lc0-chain-test\\labels-test.jsonl",
+  "lc0": "C:\\Users\\ntATh\\koi-run\\lc0-v0.32.1-cudnn\\lc0.exe",
+  "lc0_sha256": "ae239d02a12f444146b9a8433514ef7b26c4bf8ca5dcf07fe1ef119e81c45817",
+  "weights": "C:\\Users\\ntATh\\koi-run\\lc0-v0.32.1-cudnn\\791556.pb.gz",
+  "weights_sha256": "b1c7047582a8ad37620849bf328935cb46f2ccbbecb7f2696c30c6b913ed690d",
+  "backend": "cudnn",
+  "nodes": 800,
+  "threads": 2,
+  "minibatch_size": 512,
+  "max_prefetch": 128,
+  "position_count": 4371
+}

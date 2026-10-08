@@ -1,0 +1,11 @@
+# First 10 rows of frozen seed=20260927 sample, preserving original identifiers
+sicilian-closed-sample-1 | e2e4 c7c5 b1c3 b8c6 g2g3 d8c7
+kings-indian-sample-2 | d2d4 g8f6 c2c4 g7g6 b1c3 f8g7 e2e4 b7b6
+kings-gambit-sample-3 | e2e4 e7e5 f2f4 e5f4 b1a3
+bird-opening-sample-4 | f2f4 d7d5 e2e4
+bogo-indian-sample-5 | d2d4 g8f6 c2c4 e7e6 g1f3 f8b4 b1c3
+london-system-sample-6 | d2d4 d7d5 c1f4 g8f6 e2e3 b7b5
+caro-kann-exchange-sample-7 | e2e4 c7c6 d2d4 d7d5 e4d5 g7g6
+reti-opening-sample-8 | g1f3 d7d5 c2c4 c8d7
+queens-gambit-declined-sample-9 | d2d4 d7d5 c2c4 e7e6 b1c3 g8f6 a1b1
+french-advance-sample-10 | e2e4 e7e6 d2d4 d7d5 e4e5 f8c5

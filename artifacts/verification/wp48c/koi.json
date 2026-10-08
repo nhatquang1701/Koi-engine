@@ -1,0 +1,35 @@
+{
+  "schema": "koi-nnue-training-metadata-v3",
+  "created": "2026-09-22T10:10:18Z",
+  "backend": "bullet",
+  "corpus": "artifacts\\training\\bullet\\full\\validation.txt",
+  "checkpoint": "artifacts\\training\\bullet\\wp48v5\\checkpoints\\koi-v5-2\\raw.bin",
+  "rows_used": 500,
+  "val_rows": 500,
+  "feature_set": "halfka-king-bucket-v1+threat-pairs-v1",
+  "quantization": "int16/int8",
+  "architecture": {
+    "input": 36864,
+    "hidden": 512,
+    "l1": 32,
+    "output_buckets": 8,
+    "groups": [
+      "halfka-king-bucket-v1",
+      "threat-pairs-v1"
+    ]
+  },
+  "activation": "crelu-pair-l1",
+  "hidden_shift": 6,
+  "l1_shift": 8,
+  "output_shift": 8,
+  "seed": 20260916,
+  "target_scale": 100.0,
+  "val_mae_cp": null,
+  "val_round_trip_mae_cp": 453.612,
+  "w1_saturation": 0.0,
+  "l1_saturation": 0.0,
+  "w2_saturation": 0.01171875,
+  "payload_sha256": "23dfe22104b00468a2d6c3d2053fdac264585a9e1af859b6ee3523c690882691",
+  "network_sha256": "3cfb9f5b2f5b44ae410d49785a07d75a5923298b0876392b211ec7faaa064eb7",
+  "command": "tools\\measurement\\export_bullet_v5.py --checkpoint artifacts\\training\\bullet\\wp48v5\\checkpoints --validation artifacts\\training\\bullet\\full\\validation.txt --net-out artifacts\\verification\\wp48c\\koi.nnue --meta-out artifacts\\verification\\wp48c\\koi.json --hidden 512 --l1-units 32 --hidden-shifts 6 7 8 --l1-shifts 6 7 8 --tune-samples 500"
+}

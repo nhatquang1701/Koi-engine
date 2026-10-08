@@ -1,0 +1,387 @@
+Koi benchmark
+config threads 1 speed 100 timed 1 hash warm nodes 20000 warmup 1 repeat 5
+position mate_in_one depth 64 nodes 1702 qnodes 38 tt_hits 13 score 99999 expected f7e8 move f7e8 match 1 elapsed_ms 3 nps 580000
+position mate_02 depth 64 nodes 2584 qnodes 66 tt_hits 35 score 99999 expected f7g7 move a1a8 match 1 elapsed_ms 7 nps 378571
+position mate_03 depth 64 nodes 2269 qnodes 80 tt_hits 28 score 99999 expected f5f8 move f5c8 match 1 elapsed_ms 6 nps 391500
+position mate_04 depth 64 nodes 2080 qnodes 69 tt_hits 28 score 99999 expected e2e8 move e2e8 match 1 elapsed_ms 5 nps 429800
+position mate_05 depth 64 nodes 2773 qnodes 157 tt_hits 36 score 99999 expected e7b7 move e7b7 match 1 elapsed_ms 6 nps 488333
+position mate_06 depth 64 nodes 1828 qnodes 70 tt_hits 23 score 99999 expected f1f8 move f1f8 match 1 elapsed_ms 4 nps 474500
+position black_mate depth 64 nodes 1702 qnodes 38 tt_hits 13 score 99999 expected c2a2 move c2a2 match 1 elapsed_ms 3 nps 580000
+position check_01 depth 64 nodes 2080 qnodes 84 tt_hits 29 score 99999 expected e2e7 move e2e7 match 1 elapsed_ms 9 nps 240444
+position check_02 depth 2 nodes 291 qnodes 19709 tt_hits 6356 score 1607 expected d2d7 move d2d7 match 1 elapsed_ms 54 nps 370370
+position check_03 depth 2 nodes 249 qnodes 19751 tt_hits 8121 score 364 expected f2f7 move f2e3 match 1 elapsed_ms 69 nps 289855
+position check_04 depth 3 nodes 504 qnodes 19496 tt_hits 5832 score 99995 expected d2d7 move d2d7 match 1 elapsed_ms 45 nps 444444
+position check_05 depth 3 nodes 765 qnodes 19235 tt_hits 4845 score 0 expected c2c7 move c2c7 match 1 elapsed_ms 66 nps 303030
+position check_06 depth 7 nodes 7355 qnodes 12645 tt_hits 7992 score 199 expected b2g7 move b2g7 match 1 elapsed_ms 55 nps 363636
+position check_07 depth 4 nodes 468 qnodes 19532 tt_hits 7263 score 0 expected d5f6 move d5f6 match 1 elapsed_ms 41 nps 487804
+position evasion_01 depth 2 nodes 1367 qnodes 18633 tt_hits 9560 score -405 expected e1d2 move e1d2 match 1 elapsed_ms 52 nps 384615
+position evasion_02 depth 4 nodes 2196 qnodes 17804 tt_hits 5572 score -102 expected h1g2 move h1g2 match 1 elapsed_ms 69 nps 289855
+position evasion_03 depth 6 nodes 7084 qnodes 12916 tt_hits 7939 score -231 expected e1f2 move e1e2 match 1 elapsed_ms 54 nps 370370
+position evasion_04 depth 1 nodes 181 qnodes 19819 tt_hits 5841 score -1162 expected e1d1 move e1d2 match 1 elapsed_ms 44 nps 454545
+position evasion_05 depth 4 nodes 2404 qnodes 17596 tt_hits 7390 score -175 expected a1b2 move a1b2 match 1 elapsed_ms 50 nps 400000
+position evasion_06 depth 5 nodes 6235 qnodes 13765 tt_hits 5773 score 11 expected e4f3 move e4e5 match 0 elapsed_ms 62 nps 322580
+position evasion_07 depth 4 nodes 2566 qnodes 17434 tt_hits 10139 score -582 expected d1c2 move d1e2 match 1 elapsed_ms 55 nps 363636
+position fork depth 3 nodes 539 qnodes 19461 tt_hits 6084 score 0 expected c3d5 move c3d5 match 1 elapsed_ms 54 nps 370370
+position fork_02 depth 2 nodes 180 qnodes 19820 tt_hits 2051 score -981 expected e4d6 move e4d6 match 1 elapsed_ms 64 nps 312500
+position fork_03 depth 2 nodes 286 qnodes 19714 tt_hits 6552 score -310 expected f3e5 move f3e5 match 1 elapsed_ms 72 nps 277777
+position fork_04 depth 2 nodes 320 qnodes 19680 tt_hits 7081 score 263 expected b3d4 move b3d4 match 1 elapsed_ms 65 nps 307692
+position fork_05 depth 3 nodes 290 qnodes 19710 tt_hits 4360 score -644 expected g3f5 move g3f5 match 1 elapsed_ms 48 nps 416666
+position fork_06 depth 2 nodes 167 qnodes 19833 tt_hits 2397 score -1237 expected c3d5 move c3d5 match 1 elapsed_ms 67 nps 298507
+position fork_07 depth 3 nodes 451 qnodes 19549 tt_hits 3695 score -458 expected h3f4 move h3f4 match 1 elapsed_ms 55 nps 363636
+position pinned_queen depth 3 nodes 1023 qnodes 18977 tt_hits 7354 score 1009 expected e1e7 move e1e7 match 1 elapsed_ms 45 nps 444444
+position pin_02 depth 4 nodes 1620 qnodes 18380 tt_hits 8164 score 0 expected a1a7 move a1a7 match 1 elapsed_ms 50 nps 400000
+position pin_03 depth 5 nodes 2617 qnodes 17383 tt_hits 5507 score 0 expected b1g6 move b1g6 match 1 elapsed_ms 55 nps 363636
+position pin_04 depth 5 nodes 2775 qnodes 17225 tt_hits 3331 score 0 expected h1b7 move h1b7 match 1 elapsed_ms 57 nps 350877
+position pin_05 depth 64 nodes 1828 qnodes 28 tt_hits 90 score 99999 expected d1d7 move d1d7 match 1 elapsed_ms 5 nps 371200
+position pin_06 depth 3 nodes 370 qnodes 19630 tt_hits 4440 score 0 expected h1h7 move h1h7 match 1 elapsed_ms 36 nps 555555
+position pin_07 depth 64 nodes 2143 qnodes 52 tt_hits 30 score 99999 expected a1a7 move a1a7 match 1 elapsed_ms 5 nps 439000
+position poisoned_capture_01 depth 2 nodes 419 qnodes 19581 tt_hits 9813 score 1552 expected c4d5 move c4d5 match 1 elapsed_ms 48 nps 416666
+position poisoned_capture_02 depth 2 nodes 401 qnodes 19599 tt_hits 8994 score 1388 expected c4d5 move c4d5 match 1 elapsed_ms 66 nps 303030
+position poisoned_capture_03 depth 3 nodes 467 qnodes 19533 tt_hits 5766 score 0 expected c1c7 move c1c7 match 1 elapsed_ms 54 nps 370370
+position poisoned_capture_04 depth 1 nodes 185 qnodes 19815 tt_hits 5389 score -1033 expected b2e5 move b2e5 match 1 elapsed_ms 73 nps 273972
+position poisoned_capture_05 depth 4 nodes 635 qnodes 19365 tt_hits 6187 score -179 expected c3d5 move c3d5 match 1 elapsed_ms 48 nps 416666
+position poisoned_capture_06 depth 2 nodes 190 qnodes 19810 tt_hits 5876 score -1191 expected c4g4 move c4d5 match 1 elapsed_ms 63 nps 317460
+position poisoned_capture_07 depth 2 nodes 244 qnodes 19756 tt_hits 5905 score -564 expected c4d4 move c4d4 match 1 elapsed_ms 42 nps 476190
+position queen_capture depth 2 nodes 211 qnodes 19789 tt_hits 7554 score 1033 expected e4d5 move e4d5 match 1 elapsed_ms 41 nps 487804
+position promotion depth 2 nodes 273 qnodes 19727 tt_hits 6529 score 1033 expected a7a8q move a7a8q match 1 elapsed_ms 37 nps 540540
+position promotion_02 depth 2 nodes 251 qnodes 19749 tt_hits 5873 score 1032 expected h7h8q move h7h8q match 1 elapsed_ms 41 nps 487804
+position promotion_03 depth 3 nodes 340 qnodes 19660 tt_hits 7552 score 1021 expected a7b8q move a7b8q match 1 elapsed_ms 42 nps 476190
+position promotion_04 depth 4 nodes 391 qnodes 19609 tt_hits 7132 score 686 expected f7f8q move f7f8q match 1 elapsed_ms 43 nps 465116
+position promotion_05 depth 2 nodes 168 qnodes 19832 tt_hits 8022 score 1033 expected a2a1q move a2a1q match 1 elapsed_ms 34 nps 588235
+position promotion_06 depth 3 nodes 266 qnodes 19734 tt_hits 7700 score 1028 expected h2h1q move h2h1q match 1 elapsed_ms 39 nps 512820
+position promotion_07 depth 2 nodes 191 qnodes 19809 tt_hits 8231 score 1032 expected c2b1q move c2b1q match 1 elapsed_ms 39 nps 512820
+position recapture depth 7 nodes 3492 qnodes 16508 tt_hits 7888 score 179 expected e3d4 move e3d4 match 1 elapsed_ms 58 nps 344827
+position defense_02 depth 6 nodes 4191 qnodes 15809 tt_hits 7911 score 212 expected c3d4 move g1d4 match 1 elapsed_ms 104 nps 192307
+position defense_03 depth 6 nodes 6122 qnodes 13878 tt_hits 9262 score 584 expected f3e4 move f3e4 match 1 elapsed_ms 56 nps 357142
+position defense_04 depth 4 nodes 1650 qnodes 18350 tt_hits 9564 score -53 expected c3d5 move c3d5 match 1 elapsed_ms 57 nps 350877
+position defense_05 depth 6 nodes 5887 qnodes 14113 tt_hits 8812 score 552 expected e6d5 move e6d5 match 1 elapsed_ms 51 nps 392156
+position defense_06 depth 5 nodes 4825 qnodes 15175 tt_hits 6374 score 577 expected c6d4 move e5d4 match 1 elapsed_ms 49 nps 408163
+position defense_07 depth 8 nodes 2076 qnodes 17924 tt_hits 5696 score -242 expected g7d4 move g7d4 match 1 elapsed_ms 43 nps 465116
+position pawn_race_01 depth 3 nodes 257 qnodes 19743 tt_hits 8693 score 1095 expected a7a8q move a7a8q match 1 elapsed_ms 48 nps 416666
+position pawn_race_02 depth 2 nodes 144 qnodes 19856 tt_hits 4098 score 1313 expected h2h1q move h2h1q match 1 elapsed_ms 49 nps 408163
+position pawn_race_03 depth 2 nodes 182 qnodes 19818 tt_hits 6763 score 759 expected a7a8q move a7a8q match 1 elapsed_ms 43 nps 465116
+position pawn_race_04 depth 2 nodes 322 qnodes 19678 tt_hits 7459 score 1128 expected d2d1q move d2d1q match 1 elapsed_ms 64 nps 312500
+position pawn_race_05 depth 2 nodes 181 qnodes 19819 tt_hits 5359 score 1248 expected b7b8q move b7b8q match 1 elapsed_ms 57 nps 350877
+position pawn_race_06 depth 3 nodes 480 qnodes 19520 tt_hits 8525 score 620 expected g2g1q move g2g1q match 1 elapsed_ms 69 nps 289855
+position pawn_race_07 depth 2 nodes 134 qnodes 19866 tt_hits 5135 score 1503 expected e7e8q move e7e8q match 1 elapsed_ms 50 nps 400000
+position mate_in_one depth 64 nodes 1702 qnodes 38 tt_hits 13 score 99999 expected f7e8 move f7e8 match 1 elapsed_ms 2 nps 870000
+position mate_02 depth 64 nodes 2584 qnodes 66 tt_hits 35 score 99999 expected f7g7 move a1a8 match 1 elapsed_ms 6 nps 441666
+position mate_03 depth 64 nodes 2269 qnodes 80 tt_hits 28 score 99999 expected f5f8 move f5c8 match 1 elapsed_ms 4 nps 587250
+position mate_04 depth 64 nodes 2080 qnodes 69 tt_hits 28 score 99999 expected e2e8 move e2e8 match 1 elapsed_ms 4 nps 537250
+position mate_05 depth 64 nodes 2773 qnodes 157 tt_hits 36 score 99999 expected e7b7 move e7b7 match 1 elapsed_ms 5 nps 586000
+position mate_06 depth 64 nodes 1828 qnodes 70 tt_hits 23 score 99999 expected f1f8 move f1f8 match 1 elapsed_ms 3 nps 632666
+position black_mate depth 64 nodes 1702 qnodes 38 tt_hits 13 score 99999 expected c2a2 move c2a2 match 1 elapsed_ms 3 nps 580000
+position check_01 depth 64 nodes 2080 qnodes 84 tt_hits 29 score 99999 expected e2e7 move e2e7 match 1 elapsed_ms 7 nps 309142
+position check_02 depth 2 nodes 291 qnodes 19709 tt_hits 6636 score 1607 expected d2d7 move d2d7 match 1 elapsed_ms 50 nps 400000
+position check_03 depth 2 nodes 252 qnodes 19748 tt_hits 8605 score 364 expected f2f7 move f2e3 match 1 elapsed_ms 54 nps 370370
+position check_04 depth 3 nodes 507 qnodes 19493 tt_hits 6212 score 99995 expected d2d7 move d2d7 match 1 elapsed_ms 42 nps 476190
+position check_05 depth 3 nodes 762 qnodes 19238 tt_hits 8928 score 0 expected c2c7 move c2c7 match 1 elapsed_ms 47 nps 425531
+position check_06 depth 7 nodes 8469 qnodes 11531 tt_hits 10606 score 199 expected b2g7 move b2g7 match 1 elapsed_ms 49 nps 408163
+position check_07 depth 4 nodes 452 qnodes 19548 tt_hits 8887 score 0 expected d5f6 move d5f6 match 1 elapsed_ms 36 nps 555555
+position evasion_01 depth 3 nodes 1453 qnodes 18547 tt_hits 11458 score -412 expected e1d2 move e1d2 match 1 elapsed_ms 41 nps 487804
+position evasion_02 depth 4 nodes 2319 qnodes 17681 tt_hits 10087 score -102 expected h1g2 move h1g2 match 1 elapsed_ms 54 nps 370370
+position evasion_03 depth 6 nodes 7922 qnodes 12078 tt_hits 11683 score -231 expected e1f2 move e1e2 match 1 elapsed_ms 51 nps 392156
+position evasion_04 depth 1 nodes 181 qnodes 19819 tt_hits 5991 score -1162 expected e1d1 move e1d2 match 1 elapsed_ms 44 nps 454545
+position evasion_05 depth 4 nodes 2663 qnodes 17337 tt_hits 10287 score -175 expected a1b2 move a1b2 match 1 elapsed_ms 59 nps 338983
+position evasion_06 depth 5 nodes 6391 qnodes 13609 tt_hits 7669 score 14 expected e4f3 move e4e5 match 0 elapsed_ms 56 nps 357142
+position evasion_07 depth 4 nodes 2559 qnodes 17441 tt_hits 12533 score -582 expected d1c2 move d1e2 match 1 elapsed_ms 41 nps 487804
+position fork depth 3 nodes 556 qnodes 19444 tt_hits 8299 score 0 expected c3d5 move c3d5 match 1 elapsed_ms 41 nps 487804
+position fork_02 depth 2 nodes 180 qnodes 19820 tt_hits 2209 score -981 expected e4d6 move e4d6 match 1 elapsed_ms 54 nps 370370
+position fork_03 depth 2 nodes 286 qnodes 19714 tt_hits 6939 score -310 expected f3e5 move f3e5 match 1 elapsed_ms 66 nps 303030
+position fork_04 depth 2 nodes 320 qnodes 19680 tt_hits 7168 score 263 expected b3d4 move b3d4 match 1 elapsed_ms 58 nps 344827
+position fork_05 depth 3 nodes 292 qnodes 19708 tt_hits 5199 score -644 expected g3f5 move g3f5 match 1 elapsed_ms 41 nps 487804
+position fork_06 depth 2 nodes 168 qnodes 19832 tt_hits 2636 score -1237 expected c3d5 move c3d5 match 1 elapsed_ms 55 nps 363636
+position fork_07 depth 3 nodes 436 qnodes 19564 tt_hits 5892 score -458 expected h3f4 move h3f4 match 1 elapsed_ms 49 nps 408163
+position pinned_queen depth 3 nodes 1021 qnodes 18979 tt_hits 7975 score 1009 expected e1e7 move e1e7 match 1 elapsed_ms 44 nps 454545
+position pin_02 depth 4 nodes 1651 qnodes 18349 tt_hits 10859 score 0 expected a1a7 move a1a7 match 1 elapsed_ms 46 nps 434782
+position pin_03 depth 5 nodes 2867 qnodes 17133 tt_hits 9588 score 0 expected b1g6 move b1g6 match 1 elapsed_ms 57 nps 350877
+position pin_04 depth 5 nodes 3393 qnodes 16607 tt_hits 6708 score 0 expected h1b7 move h1b7 match 1 elapsed_ms 71 nps 281690
+position pin_05 depth 64 nodes 1828 qnodes 28 tt_hits 91 score 99999 expected d1d7 move d1d7 match 1 elapsed_ms 7 nps 265142
+position pin_06 depth 3 nodes 376 qnodes 19624 tt_hits 7737 score 0 expected h1h7 move h1h7 match 1 elapsed_ms 46 nps 434782
+position pin_07 depth 64 nodes 2143 qnodes 52 tt_hits 30 score 99999 expected a1a7 move a1a7 match 1 elapsed_ms 5 nps 439000
+position poisoned_capture_01 depth 2 nodes 419 qnodes 19581 tt_hits 10088 score 1552 expected c4d5 move c4d5 match 1 elapsed_ms 43 nps 465116
+position poisoned_capture_02 depth 2 nodes 402 qnodes 19598 tt_hits 9170 score 1388 expected c4d5 move c4d5 match 1 elapsed_ms 47 nps 425531
+position poisoned_capture_03 depth 3 nodes 478 qnodes 19522 tt_hits 7824 score 0 expected c1c7 move c1c7 match 1 elapsed_ms 37 nps 540540
+position poisoned_capture_04 depth 1 nodes 185 qnodes 19815 tt_hits 5740 score -1033 expected b2e5 move b2e5 match 1 elapsed_ms 51 nps 392156
+position poisoned_capture_05 depth 4 nodes 654 qnodes 19346 tt_hits 7716 score -179 expected c3d5 move c3d5 match 1 elapsed_ms 39 nps 512820
+position poisoned_capture_06 depth 2 nodes 196 qnodes 19804 tt_hits 5976 score -1191 expected c4g4 move c4d5 match 1 elapsed_ms 61 nps 327868
+position poisoned_capture_07 depth 2 nodes 245 qnodes 19755 tt_hits 6625 score -564 expected c4d4 move c4d4 match 1 elapsed_ms 41 nps 487804
+position queen_capture depth 2 nodes 211 qnodes 19789 tt_hits 8883 score 1033 expected e4d5 move e4d5 match 1 elapsed_ms 40 nps 500000
+position promotion depth 3 nodes 336 qnodes 19664 tt_hits 8254 score 1029 expected a7a8q move a7a8q match 1 elapsed_ms 36 nps 555555
+position promotion_02 depth 2 nodes 293 qnodes 19707 tt_hits 9069 score 1032 expected h7h8q move h7h8q match 1 elapsed_ms 39 nps 512820
+position promotion_03 depth 3 nodes 339 qnodes 19661 tt_hits 9177 score 1021 expected a7b8q move a7b8q match 1 elapsed_ms 39 nps 512820
+position promotion_04 depth 4 nodes 389 qnodes 19611 tt_hits 9258 score 686 expected f7f8q move f7f8q match 1 elapsed_ms 40 nps 500000
+position promotion_05 depth 2 nodes 172 qnodes 19828 tt_hits 8826 score 1033 expected a2a1q move a2a1q match 1 elapsed_ms 33 nps 606060
+position promotion_06 depth 3 nodes 268 qnodes 19732 tt_hits 9125 score 1028 expected h2h1q move h2h1q match 1 elapsed_ms 37 nps 540540
+position promotion_07 depth 2 nodes 191 qnodes 19809 tt_hits 9079 score 1032 expected c2b1q move c2b1q match 1 elapsed_ms 36 nps 555555
+position recapture depth 7 nodes 3189 qnodes 16811 tt_hits 8925 score 179 expected e3d4 move e3d4 match 1 elapsed_ms 48 nps 416666
+position defense_02 depth 6 nodes 5100 qnodes 14900 tt_hits 10364 score 212 expected c3d4 move g1d4 match 1 elapsed_ms 58 nps 344827
+position defense_03 depth 6 nodes 7151 qnodes 12849 tt_hits 12702 score 584 expected f3e4 move f3e4 match 1 elapsed_ms 52 nps 384615
+position defense_04 depth 4 nodes 1721 qnodes 18279 tt_hits 9640 score -53 expected c3d5 move c3d5 match 1 elapsed_ms 70 nps 285714
+position defense_05 depth 6 nodes 6434 qnodes 13566 tt_hits 10987 score 552 expected e6d5 move e6d5 match 1 elapsed_ms 63 nps 317460
+position defense_06 depth 5 nodes 5155 qnodes 14845 tt_hits 10384 score 587 expected c6d4 move e5d4 match 1 elapsed_ms 43 nps 465116
+position defense_07 depth 8 nodes 2346 qnodes 17654 tt_hits 7754 score -242 expected g7d4 move g7d4 match 1 elapsed_ms 40 nps 500000
+position pawn_race_01 depth 3 nodes 257 qnodes 19743 tt_hits 8890 score 1095 expected a7a8q move a7a8q match 1 elapsed_ms 46 nps 434782
+position pawn_race_02 depth 2 nodes 144 qnodes 19856 tt_hits 4108 score 1313 expected h2h1q move h2h1q match 1 elapsed_ms 48 nps 416666
+position pawn_race_03 depth 2 nodes 182 qnodes 19818 tt_hits 7332 score 759 expected a7a8q move a7a8q match 1 elapsed_ms 39 nps 512820
+position pawn_race_04 depth 2 nodes 322 qnodes 19678 tt_hits 7555 score 1128 expected d2d1q move d2d1q match 1 elapsed_ms 45 nps 444444
+position pawn_race_05 depth 2 nodes 181 qnodes 19819 tt_hits 5550 score 1248 expected b7b8q move b7b8q match 1 elapsed_ms 46 nps 434782
+position pawn_race_06 depth 3 nodes 480 qnodes 19520 tt_hits 8902 score 620 expected g2g1q move g2g1q match 1 elapsed_ms 65 nps 307692
+position pawn_race_07 depth 2 nodes 134 qnodes 19866 tt_hits 5625 score 1503 expected e7e8q move e7e8q match 1 elapsed_ms 79 nps 253164
+position mate_in_one depth 64 nodes 1702 qnodes 38 tt_hits 13 score 99999 expected f7e8 move f7e8 match 1 elapsed_ms 6 nps 290000
+position mate_02 depth 64 nodes 2584 qnodes 66 tt_hits 35 score 99999 expected f7g7 move a1a8 match 1 elapsed_ms 12 nps 220833
+position mate_03 depth 64 nodes 2269 qnodes 80 tt_hits 28 score 99999 expected f5f8 move f5c8 match 1 elapsed_ms 9 nps 261000
+position mate_04 depth 64 nodes 2080 qnodes 69 tt_hits 28 score 99999 expected e2e8 move e2e8 match 1 elapsed_ms 8 nps 268625
+position mate_05 depth 64 nodes 2773 qnodes 157 tt_hits 36 score 99999 expected e7b7 move e7b7 match 1 elapsed_ms 10 nps 293000
+position mate_06 depth 64 nodes 1828 qnodes 70 tt_hits 23 score 99999 expected f1f8 move f1f8 match 1 elapsed_ms 7 nps 271142
+position black_mate depth 64 nodes 1702 qnodes 38 tt_hits 13 score 99999 expected c2a2 move c2a2 match 1 elapsed_ms 8 nps 217500
+position check_01 depth 64 nodes 2080 qnodes 84 tt_hits 29 score 99999 expected e2e7 move e2e7 match 1 elapsed_ms 28 nps 77285
+position check_02 depth 2 nodes 291 qnodes 19709 tt_hits 6636 score 1607 expected d2d7 move d2d7 match 1 elapsed_ms 164 nps 121951
+position check_03 depth 2 nodes 252 qnodes 19748 tt_hits 8690 score 364 expected f2f7 move f2e3 match 1 elapsed_ms 48 nps 416666
+position check_04 depth 3 nodes 507 qnodes 19493 tt_hits 6312 score 99995 expected d2d7 move d2d7 match 1 elapsed_ms 41 nps 487804
+position check_05 depth 3 nodes 767 qnodes 19233 tt_hits 9541 score 0 expected c2c7 move c2c7 match 1 elapsed_ms 43 nps 465116
+position check_06 depth 7 nodes 9088 qnodes 10912 tt_hits 13422 score 199 expected b2g7 move b2g7 match 1 elapsed_ms 43 nps 465116
+position check_07 depth 4 nodes 433 qnodes 19567 tt_hits 9100 score 0 expected d5f6 move d5f6 match 1 elapsed_ms 34 nps 588235
+position evasion_01 depth 3 nodes 1497 qnodes 18503 tt_hits 11720 score -412 expected e1d2 move e1d2 match 1 elapsed_ms 41 nps 487804
+position evasion_02 depth 4 nodes 2308 qnodes 17692 tt_hits 10532 score -102 expected h1g2 move h1g2 match 1 elapsed_ms 56 nps 357142
+position evasion_03 depth 6 nodes 7663 qnodes 12337 tt_hits 11139 score -225 expected e1f2 move e1e2 match 1 elapsed_ms 52 nps 384615
+position evasion_04 depth 1 nodes 181 qnodes 19819 tt_hits 5991 score -1162 expected e1d1 move e1d2 match 1 elapsed_ms 47 nps 425531
+position evasion_05 depth 4 nodes 2809 qnodes 17191 tt_hits 11715 score -175 expected a1b2 move a1b2 match 1 elapsed_ms 48 nps 416666
+position evasion_06 depth 6 nodes 6629 qnodes 13371 tt_hits 9425 score 0 expected e4f3 move e4e5 match 0 elapsed_ms 52 nps 384615
+position evasion_07 depth 4 nodes 2586 qnodes 17414 tt_hits 13390 score -582 expected d1c2 move d1e2 match 1 elapsed_ms 40 nps 500000
+position fork depth 3 nodes 557 qnodes 19443 tt_hits 9202 score 0 expected c3d5 move c3d5 match 1 elapsed_ms 38 nps 526315
+position fork_02 depth 2 nodes 180 qnodes 19820 tt_hits 2214 score -981 expected e4d6 move e4d6 match 1 elapsed_ms 50 nps 400000
+position fork_03 depth 2 nodes 286 qnodes 19714 tt_hits 6946 score -310 expected f3e5 move f3e5 match 1 elapsed_ms 55 nps 363636
+position fork_04 depth 2 nodes 320 qnodes 19680 tt_hits 7169 score 263 expected b3d4 move b3d4 match 1 elapsed_ms 51 nps 392156
+position fork_05 depth 3 nodes 292 qnodes 19708 tt_hits 5359 score -644 expected g3f5 move g3f5 match 1 elapsed_ms 40 nps 500000
+position fork_06 depth 2 nodes 168 qnodes 19832 tt_hits 2658 score -1237 expected c3d5 move c3d5 match 1 elapsed_ms 62 nps 322580
+position fork_07 depth 3 nodes 436 qnodes 19564 tt_hits 6634 score -458 expected h3f4 move h3f4 match 1 elapsed_ms 54 nps 370370
+position pinned_queen depth 3 nodes 1021 qnodes 18979 tt_hits 7994 score 1009 expected e1e7 move e1e7 match 1 elapsed_ms 44 nps 454545
+position pin_02 depth 4 nodes 1659 qnodes 18341 tt_hits 10988 score 0 expected a1a7 move a1a7 match 1 elapsed_ms 45 nps 444444
+position pin_03 depth 5 nodes 3244 qnodes 16756 tt_hits 11804 score 0 expected b1g6 move b1g6 match 1 elapsed_ms 46 nps 434782
+position pin_04 depth 5 nodes 3743 qnodes 16257 tt_hits 10964 score 0 expected h1b7 move h1b7 match 1 elapsed_ms 47 nps 425531
+position pin_05 depth 64 nodes 1828 qnodes 28 tt_hits 91 score 99999 expected d1d7 move d1d7 match 1 elapsed_ms 5 nps 371200
+position pin_06 depth 3 nodes 376 qnodes 19624 tt_hits 7789 score 0 expected h1h7 move h1h7 match 1 elapsed_ms 34 nps 588235
+position pin_07 depth 64 nodes 2143 qnodes 52 tt_hits 30 score 99999 expected a1a7 move a1a7 match 1 elapsed_ms 5 nps 439000
+position poisoned_capture_01 depth 2 nodes 419 qnodes 19581 tt_hits 10088 score 1552 expected c4d5 move c4d5 match 1 elapsed_ms 44 nps 454545
+position poisoned_capture_02 depth 2 nodes 402 qnodes 19598 tt_hits 9179 score 1388 expected c4d5 move c4d5 match 1 elapsed_ms 48 nps 416666
+position poisoned_capture_03 depth 3 nodes 478 qnodes 19522 tt_hits 8241 score 0 expected c1c7 move c1c7 match 1 elapsed_ms 37 nps 540540
+position poisoned_capture_04 depth 1 nodes 185 qnodes 19815 tt_hits 5758 score -1033 expected b2e5 move b2e5 match 1 elapsed_ms 55 nps 363636
+position poisoned_capture_05 depth 4 nodes 654 qnodes 19346 tt_hits 7928 score -179 expected c3d5 move c3d5 match 1 elapsed_ms 47 nps 425531
+position poisoned_capture_06 depth 2 nodes 196 qnodes 19804 tt_hits 6014 score -1191 expected c4g4 move c4d5 match 1 elapsed_ms 72 nps 277777
+position poisoned_capture_07 depth 2 nodes 245 qnodes 19755 tt_hits 6676 score -564 expected c4d4 move c4d4 match 1 elapsed_ms 41 nps 487804
+position queen_capture depth 2 nodes 211 qnodes 19789 tt_hits 8890 score 1033 expected e4d5 move e4d5 match 1 elapsed_ms 40 nps 500000
+position promotion depth 3 nodes 334 qnodes 19666 tt_hits 8825 score 1029 expected a7a8q move a7a8q match 1 elapsed_ms 36 nps 555555
+position promotion_02 depth 2 nodes 294 qnodes 19706 tt_hits 9194 score 1032 expected h7h8q move h7h8q match 1 elapsed_ms 38 nps 526315
+position promotion_03 depth 3 nodes 339 qnodes 19661 tt_hits 9310 score 1021 expected a7b8q move a7b8q match 1 elapsed_ms 39 nps 512820
+position promotion_04 depth 4 nodes 389 qnodes 19611 tt_hits 9274 score 686 expected f7f8q move f7f8q match 1 elapsed_ms 37 nps 540540
+position promotion_05 depth 2 nodes 172 qnodes 19828 tt_hits 8840 score 1033 expected a2a1q move a2a1q match 1 elapsed_ms 33 nps 606060
+position promotion_06 depth 3 nodes 268 qnodes 19732 tt_hits 9368 score 1028 expected h2h1q move h2h1q match 1 elapsed_ms 46 nps 434782
+position promotion_07 depth 2 nodes 191 qnodes 19809 tt_hits 9079 score 1032 expected c2b1q move c2b1q match 1 elapsed_ms 42 nps 476190
+position recapture depth 7 nodes 3260 qnodes 16740 tt_hits 10446 score 179 expected e3d4 move e3d4 match 1 elapsed_ms 59 nps 338983
+position defense_02 depth 6 nodes 5309 qnodes 14691 tt_hits 10737 score 212 expected c3d4 move g1d4 match 1 elapsed_ms 81 nps 246913
+position defense_03 depth 6 nodes 7321 qnodes 12679 tt_hits 13346 score 584 expected f3e4 move f3e4 match 1 elapsed_ms 51 nps 392156
+position defense_04 depth 4 nodes 1793 qnodes 18207 tt_hits 10658 score -53 expected c3d5 move c3d5 match 1 elapsed_ms 60 nps 333333
+position defense_05 depth 6 nodes 6341 qnodes 13659 tt_hits 12771 score 552 expected e6d5 move e6d5 match 1 elapsed_ms 55 nps 363636
+position defense_06 depth 5 nodes 5528 qnodes 14472 tt_hits 12161 score 587 expected c6d4 move e5d4 match 1 elapsed_ms 50 nps 400000
+position defense_07 depth 8 nodes 2407 qnodes 17593 tt_hits 7821 score -238 expected g7d4 move g7d4 match 1 elapsed_ms 52 nps 384615
+position pawn_race_01 depth 3 nodes 257 qnodes 19743 tt_hits 8891 score 1095 expected a7a8q move a7a8q match 1 elapsed_ms 51 nps 392156
+position pawn_race_02 depth 2 nodes 144 qnodes 19856 tt_hits 4108 score 1313 expected h2h1q move h2h1q match 1 elapsed_ms 49 nps 408163
+position pawn_race_03 depth 2 nodes 182 qnodes 19818 tt_hits 7332 score 759 expected a7a8q move a7a8q match 1 elapsed_ms 39 nps 512820
+position pawn_race_04 depth 2 nodes 322 qnodes 19678 tt_hits 7557 score 1128 expected d2d1q move d2d1q match 1 elapsed_ms 44 nps 454545
+position pawn_race_05 depth 2 nodes 181 qnodes 19819 tt_hits 5551 score 1248 expected b7b8q move b7b8q match 1 elapsed_ms 39 nps 512820
+position pawn_race_06 depth 3 nodes 480 qnodes 19520 tt_hits 8908 score 620 expected g2g1q move g2g1q match 1 elapsed_ms 47 nps 425531
+position pawn_race_07 depth 2 nodes 134 qnodes 19866 tt_hits 5625 score 1503 expected e7e8q move e7e8q match 1 elapsed_ms 47 nps 425531
+position mate_in_one depth 64 nodes 1702 qnodes 38 tt_hits 13 score 99999 expected f7e8 move f7e8 match 1 elapsed_ms 3 nps 580000
+position mate_02 depth 64 nodes 2584 qnodes 66 tt_hits 35 score 99999 expected f7g7 move a1a8 match 1 elapsed_ms 6 nps 441666
+position mate_03 depth 64 nodes 2269 qnodes 80 tt_hits 28 score 99999 expected f5f8 move f5c8 match 1 elapsed_ms 4 nps 587250
+position mate_04 depth 64 nodes 2080 qnodes 69 tt_hits 28 score 99999 expected e2e8 move e2e8 match 1 elapsed_ms 4 nps 537250
+position mate_05 depth 64 nodes 2773 qnodes 157 tt_hits 36 score 99999 expected e7b7 move e7b7 match 1 elapsed_ms 5 nps 586000
+position mate_06 depth 64 nodes 1828 qnodes 70 tt_hits 23 score 99999 expected f1f8 move f1f8 match 1 elapsed_ms 4 nps 474500
+position black_mate depth 64 nodes 1702 qnodes 38 tt_hits 13 score 99999 expected c2a2 move c2a2 match 1 elapsed_ms 3 nps 580000
+position check_01 depth 64 nodes 2080 qnodes 84 tt_hits 29 score 99999 expected e2e7 move e2e7 match 1 elapsed_ms 9 nps 240444
+position check_02 depth 2 nodes 291 qnodes 19709 tt_hits 6636 score 1607 expected d2d7 move d2d7 match 1 elapsed_ms 59 nps 338983
+position check_03 depth 2 nodes 252 qnodes 19748 tt_hits 8691 score 364 expected f2f7 move f2e3 match 1 elapsed_ms 58 nps 344827
+position check_04 depth 3 nodes 507 qnodes 19493 tt_hits 6312 score 99995 expected d2d7 move d2d7 match 1 elapsed_ms 41 nps 487804
+position check_05 depth 3 nodes 767 qnodes 19233 tt_hits 9631 score 0 expected c2c7 move c2c7 match 1 elapsed_ms 44 nps 454545
+position check_06 depth 7 nodes 9335 qnodes 10665 tt_hits 14231 score 199 expected b2g7 move b2g7 match 1 elapsed_ms 42 nps 476190
+position check_07 depth 4 nodes 436 qnodes 19564 tt_hits 9690 score 0 expected d5f6 move d5f6 match 1 elapsed_ms 36 nps 555555
+position evasion_01 depth 3 nodes 1527 qnodes 18473 tt_hits 11963 score -412 expected e1d2 move e1d2 match 1 elapsed_ms 42 nps 476190
+position evasion_02 depth 4 nodes 2320 qnodes 17680 tt_hits 11075 score -102 expected h1g2 move h1g2 match 1 elapsed_ms 54 nps 370370
+position evasion_03 depth 6 nodes 8699 qnodes 11301 tt_hits 14357 score -220 expected e1f2 move e1e2 match 1 elapsed_ms 46 nps 434782
+position evasion_04 depth 1 nodes 181 qnodes 19819 tt_hits 5991 score -1162 expected e1d1 move e1d2 match 1 elapsed_ms 46 nps 434782
+position evasion_05 depth 4 nodes 2891 qnodes 17109 tt_hits 12045 score -175 expected a1b2 move a1b2 match 1 elapsed_ms 48 nps 416666
+position evasion_06 depth 5 nodes 6841 qnodes 13159 tt_hits 8451 score 8 expected e4f3 move e4f4 match 1 elapsed_ms 53 nps 377358
+position evasion_07 depth 4 nodes 2587 qnodes 17413 tt_hits 13545 score -582 expected d1c2 move d1e2 match 1 elapsed_ms 40 nps 500000
+position fork depth 3 nodes 557 qnodes 19443 tt_hits 9255 score 0 expected c3d5 move c3d5 match 1 elapsed_ms 40 nps 500000
+position fork_02 depth 2 nodes 180 qnodes 19820 tt_hits 2214 score -981 expected e4d6 move e4d6 match 1 elapsed_ms 51 nps 392156
+position fork_03 depth 2 nodes 286 qnodes 19714 tt_hits 6946 score -310 expected f3e5 move f3e5 match 1 elapsed_ms 63 nps 317460
+position fork_04 depth 2 nodes 320 qnodes 19680 tt_hits 7169 score 263 expected b3d4 move b3d4 match 1 elapsed_ms 51 nps 392156
+position fork_05 depth 3 nodes 292 qnodes 19708 tt_hits 5359 score -644 expected g3f5 move g3f5 match 1 elapsed_ms 40 nps 500000
+position fork_06 depth 2 nodes 168 qnodes 19832 tt_hits 2658 score -1237 expected c3d5 move c3d5 match 1 elapsed_ms 55 nps 363636
+position fork_07 depth 3 nodes 436 qnodes 19564 tt_hits 6641 score -458 expected h3f4 move h3f4 match 1 elapsed_ms 46 nps 434782
+position pinned_queen depth 3 nodes 1021 qnodes 18979 tt_hits 7994 score 1009 expected e1e7 move e1e7 match 1 elapsed_ms 44 nps 454545
+position pin_02 depth 4 nodes 1660 qnodes 18340 tt_hits 11101 score 0 expected a1a7 move a1a7 match 1 elapsed_ms 45 nps 444444
+position pin_03 depth 5 nodes 3391 qnodes 16609 tt_hits 12910 score 0 expected b1g6 move b1g6 match 1 elapsed_ms 44 nps 454545
+position pin_04 depth 5 nodes 3845 qnodes 16155 tt_hits 12130 score 0 expected h1b7 move h1b7 match 1 elapsed_ms 45 nps 444444
+position pin_05 depth 64 nodes 1828 qnodes 28 tt_hits 91 score 99999 expected d1d7 move d1d7 match 1 elapsed_ms 5 nps 371200
+position pin_06 depth 3 nodes 376 qnodes 19624 tt_hits 7789 score 0 expected h1h7 move h1h7 match 1 elapsed_ms 34 nps 588235
+position pin_07 depth 64 nodes 2143 qnodes 52 tt_hits 30 score 99999 expected a1a7 move a1a7 match 1 elapsed_ms 5 nps 439000
+position poisoned_capture_01 depth 2 nodes 419 qnodes 19581 tt_hits 10088 score 1552 expected c4d5 move c4d5 match 1 elapsed_ms 48 nps 416666
+position poisoned_capture_02 depth 2 nodes 402 qnodes 19598 tt_hits 9179 score 1388 expected c4d5 move c4d5 match 1 elapsed_ms 59 nps 338983
+position poisoned_capture_03 depth 3 nodes 478 qnodes 19522 tt_hits 8241 score 0 expected c1c7 move c1c7 match 1 elapsed_ms 37 nps 540540
+position poisoned_capture_04 depth 1 nodes 185 qnodes 19815 tt_hits 5758 score -1033 expected b2e5 move b2e5 match 1 elapsed_ms 53 nps 377358
+position poisoned_capture_05 depth 4 nodes 654 qnodes 19346 tt_hits 7936 score -179 expected c3d5 move c3d5 match 1 elapsed_ms 45 nps 444444
+position poisoned_capture_06 depth 2 nodes 196 qnodes 19804 tt_hits 6014 score -1191 expected c4g4 move c4d5 match 1 elapsed_ms 71 nps 281690
+position poisoned_capture_07 depth 2 nodes 245 qnodes 19755 tt_hits 6676 score -564 expected c4d4 move c4d4 match 1 elapsed_ms 49 nps 408163
+position queen_capture depth 2 nodes 211 qnodes 19789 tt_hits 8890 score 1033 expected e4d5 move e4d5 match 1 elapsed_ms 41 nps 487804
+position promotion depth 3 nodes 334 qnodes 19666 tt_hits 8881 score 1029 expected a7a8q move a7a8q match 1 elapsed_ms 36 nps 555555
+position promotion_02 depth 2 nodes 294 qnodes 19706 tt_hits 9197 score 1032 expected h7h8q move h7h8q match 1 elapsed_ms 37 nps 540540
+position promotion_03 depth 3 nodes 339 qnodes 19661 tt_hits 9310 score 1021 expected a7b8q move a7b8q match 1 elapsed_ms 39 nps 512820
+position promotion_04 depth 4 nodes 389 qnodes 19611 tt_hits 9274 score 686 expected f7f8q move f7f8q match 1 elapsed_ms 41 nps 487804
+position promotion_05 depth 2 nodes 172 qnodes 19828 tt_hits 8840 score 1033 expected a2a1q move a2a1q match 1 elapsed_ms 35 nps 571428
+position promotion_06 depth 3 nodes 268 qnodes 19732 tt_hits 9374 score 1028 expected h2h1q move h2h1q match 1 elapsed_ms 39 nps 512820
+position promotion_07 depth 2 nodes 191 qnodes 19809 tt_hits 9079 score 1032 expected c2b1q move c2b1q match 1 elapsed_ms 36 nps 555555
+position recapture depth 7 nodes 3025 qnodes 16975 tt_hits 10160 score 179 expected e3d4 move e3d4 match 1 elapsed_ms 45 nps 444444
+position defense_02 depth 6 nodes 5503 qnodes 14497 tt_hits 13186 score 212 expected c3d4 move g1d4 match 1 elapsed_ms 46 nps 434782
+position defense_03 depth 6 nodes 7301 qnodes 12699 tt_hits 13536 score 584 expected f3e4 move f3e4 match 1 elapsed_ms 43 nps 465116
+position defense_04 depth 4 nodes 1800 qnodes 18200 tt_hits 11235 score -53 expected c3d5 move c3d5 match 1 elapsed_ms 52 nps 384615
+position defense_05 depth 6 nodes 6413 qnodes 13587 tt_hits 13967 score 552 expected e6d5 move e6d5 match 1 elapsed_ms 51 nps 392156
+position defense_06 depth 5 nodes 5830 qnodes 14170 tt_hits 13370 score 587 expected c6d4 move e5d4 match 1 elapsed_ms 47 nps 425531
+position defense_07 depth 8 nodes 2583 qnodes 17417 tt_hits 8934 score -238 expected g7d4 move g7d4 match 1 elapsed_ms 53 nps 377358
+position pawn_race_01 depth 3 nodes 257 qnodes 19743 tt_hits 8891 score 1095 expected a7a8q move a7a8q match 1 elapsed_ms 59 nps 338983
+position pawn_race_02 depth 2 nodes 144 qnodes 19856 tt_hits 4108 score 1313 expected h2h1q move h2h1q match 1 elapsed_ms 48 nps 416666
+position pawn_race_03 depth 2 nodes 182 qnodes 19818 tt_hits 7332 score 759 expected a7a8q move a7a8q match 1 elapsed_ms 40 nps 500000
+position pawn_race_04 depth 2 nodes 322 qnodes 19678 tt_hits 7557 score 1128 expected d2d1q move d2d1q match 1 elapsed_ms 52 nps 384615
+position pawn_race_05 depth 2 nodes 181 qnodes 19819 tt_hits 5551 score 1248 expected b7b8q move b7b8q match 1 elapsed_ms 43 nps 465116
+position pawn_race_06 depth 3 nodes 480 qnodes 19520 tt_hits 8908 score 620 expected g2g1q move g2g1q match 1 elapsed_ms 48 nps 416666
+position pawn_race_07 depth 2 nodes 134 qnodes 19866 tt_hits 5625 score 1503 expected e7e8q move e7e8q match 1 elapsed_ms 47 nps 425531
+position mate_in_one depth 64 nodes 1702 qnodes 38 tt_hits 13 score 99999 expected f7e8 move f7e8 match 1 elapsed_ms 3 nps 580000
+position mate_02 depth 64 nodes 2584 qnodes 66 tt_hits 35 score 99999 expected f7g7 move a1a8 match 1 elapsed_ms 5 nps 530000
+position mate_03 depth 64 nodes 2269 qnodes 80 tt_hits 28 score 99999 expected f5f8 move f5c8 match 1 elapsed_ms 4 nps 587250
+position mate_04 depth 64 nodes 2080 qnodes 69 tt_hits 28 score 99999 expected e2e8 move e2e8 match 1 elapsed_ms 3 nps 716333
+position mate_05 depth 64 nodes 2773 qnodes 157 tt_hits 36 score 99999 expected e7b7 move e7b7 match 1 elapsed_ms 4 nps 732500
+position mate_06 depth 64 nodes 1828 qnodes 70 tt_hits 23 score 99999 expected f1f8 move f1f8 match 1 elapsed_ms 3 nps 632666
+position black_mate depth 64 nodes 1702 qnodes 38 tt_hits 13 score 99999 expected c2a2 move c2a2 match 1 elapsed_ms 2 nps 870000
+position check_01 depth 64 nodes 2080 qnodes 84 tt_hits 29 score 99999 expected e2e7 move e2e7 match 1 elapsed_ms 7 nps 309142
+position check_02 depth 2 nodes 291 qnodes 19709 tt_hits 6636 score 1607 expected d2d7 move d2d7 match 1 elapsed_ms 44 nps 454545
+position check_03 depth 2 nodes 252 qnodes 19748 tt_hits 8691 score 364 expected f2f7 move f2e3 match 1 elapsed_ms 48 nps 416666
+position check_04 depth 3 nodes 507 qnodes 19493 tt_hits 6312 score 99995 expected d2d7 move d2d7 match 1 elapsed_ms 41 nps 487804
+position check_05 depth 3 nodes 767 qnodes 19233 tt_hits 9631 score 0 expected c2c7 move c2c7 match 1 elapsed_ms 44 nps 454545
+position check_06 depth 7 nodes 9550 qnodes 10450 tt_hits 15281 score 199 expected b2g7 move b2g7 match 1 elapsed_ms 41 nps 487804
+position check_07 depth 4 nodes 436 qnodes 19564 tt_hits 9797 score 0 expected d5f6 move d5f6 match 1 elapsed_ms 34 nps 588235
+position evasion_01 depth 3 nodes 1520 qnodes 18480 tt_hits 12077 score -412 expected e1d2 move e1d2 match 1 elapsed_ms 40 nps 500000
+position evasion_02 depth 4 nodes 2324 qnodes 17676 tt_hits 11180 score -102 expected h1g2 move h1g2 match 1 elapsed_ms 52 nps 384615
+position evasion_03 depth 6 nodes 9270 qnodes 10730 tt_hits 16099 score -220 expected e1f2 move e1e2 match 1 elapsed_ms 41 nps 487804
+position evasion_04 depth 1 nodes 181 qnodes 19819 tt_hits 5991 score -1162 expected e1d1 move e1d2 match 1 elapsed_ms 47 nps 425531
+position evasion_05 depth 4 nodes 2900 qnodes 17100 tt_hits 13124 score -175 expected a1b2 move a1b2 match 1 elapsed_ms 46 nps 434782
+position evasion_06 depth 6 nodes 7690 qnodes 12310 tt_hits 11722 score 4 expected e4f3 move e4f4 match 1 elapsed_ms 45 nps 444444
+position evasion_07 depth 4 nodes 2587 qnodes 17413 tt_hits 13545 score -582 expected d1c2 move d1e2 match 1 elapsed_ms 39 nps 512820
+position fork depth 3 nodes 557 qnodes 19443 tt_hits 9255 score 0 expected c3d5 move c3d5 match 1 elapsed_ms 38 nps 526315
+position fork_02 depth 2 nodes 180 qnodes 19820 tt_hits 2214 score -981 expected e4d6 move e4d6 match 1 elapsed_ms 50 nps 400000
+position fork_03 depth 2 nodes 286 qnodes 19714 tt_hits 6946 score -310 expected f3e5 move f3e5 match 1 elapsed_ms 56 nps 357142
+position fork_04 depth 2 nodes 320 qnodes 19680 tt_hits 7169 score 263 expected b3d4 move b3d4 match 1 elapsed_ms 50 nps 400000
+position fork_05 depth 3 nodes 292 qnodes 19708 tt_hits 5359 score -644 expected g3f5 move g3f5 match 1 elapsed_ms 40 nps 500000
+position fork_06 depth 2 nodes 168 qnodes 19832 tt_hits 2658 score -1237 expected c3d5 move c3d5 match 1 elapsed_ms 58 nps 344827
+position fork_07 depth 3 nodes 436 qnodes 19564 tt_hits 6641 score -458 expected h3f4 move h3f4 match 1 elapsed_ms 54 nps 370370
+position pinned_queen depth 3 nodes 1021 qnodes 18979 tt_hits 7994 score 1009 expected e1e7 move e1e7 match 1 elapsed_ms 52 nps 384615
+position pin_02 depth 4 nodes 1660 qnodes 18340 tt_hits 11101 score 0 expected a1a7 move a1a7 match 1 elapsed_ms 48 nps 416666
+position pin_03 depth 5 nodes 3458 qnodes 16542 tt_hits 13471 score 0 expected b1g6 move b1g6 match 1 elapsed_ms 47 nps 425531
+position pin_04 depth 5 nodes 3876 qnodes 16124 tt_hits 12564 score 0 expected h1b7 move h1b7 match 1 elapsed_ms 57 nps 350877
+position pin_05 depth 64 nodes 1828 qnodes 28 tt_hits 91 score 99999 expected d1d7 move d1d7 match 1 elapsed_ms 6 nps 309333
+position pin_06 depth 3 nodes 376 qnodes 19624 tt_hits 7789 score 0 expected h1h7 move h1h7 match 1 elapsed_ms 46 nps 434782
+position pin_07 depth 64 nodes 2143 qnodes 52 tt_hits 30 score 99999 expected a1a7 move a1a7 match 1 elapsed_ms 5 nps 439000
+position poisoned_capture_01 depth 2 nodes 419 qnodes 19581 tt_hits 10088 score 1552 expected c4d5 move c4d5 match 1 elapsed_ms 46 nps 434782
+position poisoned_capture_02 depth 2 nodes 402 qnodes 19598 tt_hits 9179 score 1388 expected c4d5 move c4d5 match 1 elapsed_ms 53 nps 377358
+position poisoned_capture_03 depth 3 nodes 478 qnodes 19522 tt_hits 8241 score 0 expected c1c7 move c1c7 match 1 elapsed_ms 47 nps 425531
+position poisoned_capture_04 depth 1 nodes 185 qnodes 19815 tt_hits 5760 score -1033 expected b2e5 move b2e5 match 1 elapsed_ms 57 nps 350877
+position poisoned_capture_05 depth 4 nodes 654 qnodes 19346 tt_hits 7936 score -179 expected c3d5 move c3d5 match 1 elapsed_ms 39 nps 512820
+position poisoned_capture_06 depth 2 nodes 196 qnodes 19804 tt_hits 6014 score -1191 expected c4g4 move c4d5 match 1 elapsed_ms 61 nps 327868
+position poisoned_capture_07 depth 2 nodes 245 qnodes 19755 tt_hits 6676 score -564 expected c4d4 move c4d4 match 1 elapsed_ms 40 nps 500000
+position queen_capture depth 2 nodes 211 qnodes 19789 tt_hits 8890 score 1033 expected e4d5 move e4d5 match 1 elapsed_ms 39 nps 512820
+position promotion depth 3 nodes 334 qnodes 19666 tt_hits 8881 score 1029 expected a7a8q move a7a8q match 1 elapsed_ms 36 nps 555555
+position promotion_02 depth 2 nodes 294 qnodes 19706 tt_hits 9197 score 1032 expected h7h8q move h7h8q match 1 elapsed_ms 38 nps 526315
+position promotion_03 depth 3 nodes 339 qnodes 19661 tt_hits 9310 score 1021 expected a7b8q move a7b8q match 1 elapsed_ms 39 nps 512820
+position promotion_04 depth 4 nodes 389 qnodes 19611 tt_hits 9274 score 686 expected f7f8q move f7f8q match 1 elapsed_ms 41 nps 487804
+position promotion_05 depth 2 nodes 172 qnodes 19828 tt_hits 8840 score 1033 expected a2a1q move a2a1q match 1 elapsed_ms 35 nps 571428
+position promotion_06 depth 3 nodes 268 qnodes 19732 tt_hits 9374 score 1028 expected h2h1q move h2h1q match 1 elapsed_ms 39 nps 512820
+position promotion_07 depth 2 nodes 191 qnodes 19809 tt_hits 9079 score 1032 expected c2b1q move c2b1q match 1 elapsed_ms 36 nps 555555
+position recapture depth 7 nodes 3331 qnodes 16669 tt_hits 10716 score 179 expected e3d4 move e3d4 match 1 elapsed_ms 47 nps 425531
+position defense_02 depth 6 nodes 5651 qnodes 14349 tt_hits 13379 score 212 expected c3d4 move g1d4 match 1 elapsed_ms 92 nps 217391
+position defense_03 depth 6 nodes 7648 qnodes 12352 tt_hits 14063 score 584 expected f3e4 move f3e4 match 1 elapsed_ms 87 nps 229885
+position defense_04 depth 4 nodes 1801 qnodes 18199 tt_hits 11446 score -53 expected c3d5 move c3d5 match 1 elapsed_ms 89 nps 224719
+position defense_05 depth 6 nodes 6416 qnodes 13584 tt_hits 14266 score 552 expected e6d5 move e6d5 match 1 elapsed_ms 56 nps 357142
+position defense_06 depth 5 nodes 5929 qnodes 14071 tt_hits 13828 score 587 expected c6d4 move e5d4 match 1 elapsed_ms 56 nps 357142
+position defense_07 depth 8 nodes 2531 qnodes 17469 tt_hits 9108 score -238 expected g7d4 move g7d4 match 1 elapsed_ms 62 nps 322580
+position pawn_race_01 depth 3 nodes 257 qnodes 19743 tt_hits 8891 score 1095 expected a7a8q move a7a8q match 1 elapsed_ms 64 nps 312500
+position pawn_race_02 depth 2 nodes 144 qnodes 19856 tt_hits 4108 score 1313 expected h2h1q move h2h1q match 1 elapsed_ms 48 nps 416666
+position pawn_race_03 depth 2 nodes 182 qnodes 19818 tt_hits 7332 score 759 expected a7a8q move a7a8q match 1 elapsed_ms 39 nps 512820
+position pawn_race_04 depth 2 nodes 322 qnodes 19678 tt_hits 7557 score 1128 expected d2d1q move d2d1q match 1 elapsed_ms 44 nps 454545
+position pawn_race_05 depth 2 nodes 181 qnodes 19819 tt_hits 5551 score 1248 expected b7b8q move b7b8q match 1 elapsed_ms 39 nps 512820
+position pawn_race_06 depth 3 nodes 480 qnodes 19520 tt_hits 8908 score 620 expected g2g1q move g2g1q match 1 elapsed_ms 49 nps 408163
+position pawn_race_07 depth 2 nodes 134 qnodes 19866 tt_hits 5625 score 1503 expected e7e8q move e7e8q match 1 elapsed_ms 51 nps 392156
+repeat 5 median summary
+position mate_in_one nodes 1702 qnodes 38 score 99999 elapsed_ms 3 nps 580000
+position mate_02 nodes 2584 qnodes 66 score 99999 elapsed_ms 6 nps 441666
+position mate_03 nodes 2269 qnodes 80 score 99999 elapsed_ms 4 nps 587250
+position mate_04 nodes 2080 qnodes 69 score 99999 elapsed_ms 4 nps 537250
+position mate_05 nodes 2773 qnodes 157 score 99999 elapsed_ms 5 nps 586000
+position mate_06 nodes 1828 qnodes 70 score 99999 elapsed_ms 4 nps 474500
+position black_mate nodes 1702 qnodes 38 score 99999 elapsed_ms 3 nps 580000
+position check_01 nodes 2080 qnodes 84 score 99999 elapsed_ms 9 nps 240444
+position check_02 nodes 291 qnodes 19709 score 1607 elapsed_ms 54 nps 370370
+position check_03 nodes 252 qnodes 19748 score 364 elapsed_ms 54 nps 370370
+position check_04 nodes 507 qnodes 19493 score 99995 elapsed_ms 41 nps 487804
+position check_05 nodes 767 qnodes 19233 score 0 elapsed_ms 44 nps 454545
+position check_06 nodes 9088 qnodes 10912 score 199 elapsed_ms 43 nps 465116
+position check_07 nodes 452 qnodes 19548 score 0 elapsed_ms 36 nps 555555
+position evasion_01 nodes 1497 qnodes 18503 score -412 elapsed_ms 41 nps 487804
+position evasion_02 nodes 2320 qnodes 17680 score -102 elapsed_ms 54 nps 370370
+position evasion_03 nodes 7922 qnodes 12078 score -231 elapsed_ms 51 nps 392156
+position evasion_04 nodes 181 qnodes 19819 score -1162 elapsed_ms 46 nps 434782
+position evasion_05 nodes 2891 qnodes 17109 score -175 elapsed_ms 48 nps 416666
+position evasion_06 nodes 6841 qnodes 13159 score 8 elapsed_ms 53 nps 377358
+position evasion_07 nodes 2587 qnodes 17413 score -582 elapsed_ms 40 nps 500000
+position fork nodes 557 qnodes 19443 score 0 elapsed_ms 40 nps 500000
+position fork_02 nodes 180 qnodes 19820 score -981 elapsed_ms 51 nps 392156
+position fork_03 nodes 286 qnodes 19714 score -310 elapsed_ms 63 nps 317460
+position fork_04 nodes 320 qnodes 19680 score 263 elapsed_ms 51 nps 392156
+position fork_05 nodes 292 qnodes 19708 score -644 elapsed_ms 40 nps 500000
+position fork_06 nodes 168 qnodes 19832 score -1237 elapsed_ms 58 nps 344827
+position fork_07 nodes 436 qnodes 19564 score -458 elapsed_ms 54 nps 370370
+position pinned_queen nodes 1021 qnodes 18979 score 1009 elapsed_ms 44 nps 454545
+position pin_02 nodes 1651 qnodes 18349 score 0 elapsed_ms 46 nps 434782
+position pin_03 nodes 3458 qnodes 16542 score 0 elapsed_ms 47 nps 425531
+position pin_04 nodes 2775 qnodes 17225 score 0 elapsed_ms 57 nps 350877
+position pin_05 nodes 1828 qnodes 28 score 99999 elapsed_ms 5 nps 371200
+position pin_06 nodes 370 qnodes 19630 score 0 elapsed_ms 36 nps 555555
+position pin_07 nodes 2143 qnodes 52 score 99999 elapsed_ms 5 nps 439000
+position poisoned_capture_01 nodes 419 qnodes 19581 score 1552 elapsed_ms 46 nps 434782
+position poisoned_capture_02 nodes 402 qnodes 19598 score 1388 elapsed_ms 53 nps 377358
+position poisoned_capture_03 nodes 478 qnodes 19522 score 0 elapsed_ms 37 nps 540540
+position poisoned_capture_04 nodes 185 qnodes 19815 score -1033 elapsed_ms 55 nps 363636
+position poisoned_capture_05 nodes 654 qnodes 19346 score -179 elapsed_ms 45 nps 444444
+position poisoned_capture_06 nodes 190 qnodes 19810 score -1191 elapsed_ms 63 nps 317460
+position poisoned_capture_07 nodes 245 qnodes 19755 score -564 elapsed_ms 41 nps 487804
+position queen_capture nodes 211 qnodes 19789 score 1033 elapsed_ms 40 nps 500000
+position promotion nodes 334 qnodes 19666 score 1029 elapsed_ms 36 nps 555555
+position promotion_02 nodes 294 qnodes 19706 score 1032 elapsed_ms 38 nps 526315
+position promotion_03 nodes 339 qnodes 19661 score 1021 elapsed_ms 39 nps 512820
+position promotion_04 nodes 389 qnodes 19611 score 686 elapsed_ms 41 nps 487804
+position promotion_05 nodes 168 qnodes 19832 score 1033 elapsed_ms 34 nps 588235
+position promotion_06 nodes 268 qnodes 19732 score 1028 elapsed_ms 39 nps 512820
+position promotion_07 nodes 191 qnodes 19809 score 1032 elapsed_ms 36 nps 555555
+position recapture nodes 3189 qnodes 16811 score 179 elapsed_ms 48 nps 416666
+position defense_02 nodes 5309 qnodes 14691 score 212 elapsed_ms 81 nps 246913
+position defense_03 nodes 7151 qnodes 12849 score 584 elapsed_ms 52 nps 384615
+position defense_04 nodes 1793 qnodes 18207 score -53 elapsed_ms 60 nps 333333
+position defense_05 nodes 6341 qnodes 13659 score 552 elapsed_ms 55 nps 363636
+position defense_06 nodes 4825 qnodes 15175 score 577 elapsed_ms 49 nps 408163
+position defense_07 nodes 2407 qnodes 17593 score -238 elapsed_ms 52 nps 384615
+position pawn_race_01 nodes 257 qnodes 19743 score 1095 elapsed_ms 51 nps 392156
+position pawn_race_02 nodes 144 qnodes 19856 score 1313 elapsed_ms 48 nps 416666
+position pawn_race_03 nodes 182 qnodes 19818 score 759 elapsed_ms 39 nps 512820
+position pawn_race_04 nodes 322 qnodes 19678 score 1128 elapsed_ms 45 nps 444444
+position pawn_race_05 nodes 181 qnodes 19819 score 1248 elapsed_ms 43 nps 465116
+position pawn_race_06 nodes 480 qnodes 19520 score 620 elapsed_ms 49 nps 408163
+position pawn_race_07 nodes 134 qnodes 19866 score 1503 elapsed_ms 50 nps 400000

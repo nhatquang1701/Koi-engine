@@ -1,0 +1,5 @@
+-- Koi Engine AddressSanitizer build enabled (dynamic CRT, no /RTC, no LTO)
+-- Koi Engine Release IPO/LTO is disabled for the sanitizer build
+-- Configuring done (1.7s)
+-- Generating done (0.4s)
+-- Build files have been written to: C:/Users/ntATh/AI test/Koi engine/build/ci-asan

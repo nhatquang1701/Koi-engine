@@ -1,0 +1,75 @@
+Started game 1 of 20 (Koi vs Opponent)
+Finished game 1 (Koi vs Opponent): 1/2-1/2 {Draw by adjudication: maximal game length}
+Score of Koi vs Opponent: 0 - 0 - 1  [0.500] 1
+Started game 2 of 20 (Opponent vs Koi)
+Finished game 2 (Opponent vs Koi): 1/2-1/2 {Draw by adjudication: maximal game length}
+Score of Koi vs Opponent: 0 - 0 - 2  [0.500] 2
+Started game 3 of 20 (Koi vs Opponent)
+Finished game 3 (Koi vs Opponent): 1/2-1/2 {Draw by adjudication: maximal game length}
+Score of Koi vs Opponent: 0 - 0 - 3  [0.500] 3
+Started game 4 of 20 (Opponent vs Koi)
+Finished game 4 (Opponent vs Koi): 1-0 {White mates}
+Score of Koi vs Opponent: 0 - 1 - 3  [0.375] 4
+Started game 5 of 20 (Koi vs Opponent)
+Finished game 5 (Koi vs Opponent): 0-1 {Black mates}
+Score of Koi vs Opponent: 0 - 2 - 3  [0.300] 5
+Started game 6 of 20 (Opponent vs Koi)
+Finished game 6 (Opponent vs Koi): 1/2-1/2 {Draw by adjudication: maximal game length}
+Score of Koi vs Opponent: 0 - 2 - 4  [0.333] 6
+Started game 7 of 20 (Koi vs Opponent)
+Finished game 7 (Koi vs Opponent): 0-1 {Black mates}
+Score of Koi vs Opponent: 0 - 3 - 4  [0.286] 7
+Started game 8 of 20 (Opponent vs Koi)
+Finished game 8 (Opponent vs Koi): 1-0 {White mates}
+Score of Koi vs Opponent: 0 - 4 - 4  [0.250] 8
+Started game 9 of 20 (Koi vs Opponent)
+Finished game 9 (Koi vs Opponent): 0-1 {Black mates}
+Score of Koi vs Opponent: 0 - 5 - 4  [0.222] 9
+Started game 10 of 20 (Opponent vs Koi)
+Finished game 10 (Opponent vs Koi): 1-0 {White mates}
+Score of Koi vs Opponent: 0 - 6 - 4  [0.200] 10
+Started game 11 of 20 (Koi vs Opponent)
+Finished game 11 (Koi vs Opponent): 1/2-1/2 {Draw by adjudication: maximal game length}
+Score of Koi vs Opponent: 0 - 6 - 5  [0.227] 11
+Started game 12 of 20 (Opponent vs Koi)
+Finished game 12 (Opponent vs Koi): 1-0 {White mates}
+Score of Koi vs Opponent: 0 - 7 - 5  [0.208] 12
+Started game 13 of 20 (Koi vs Opponent)
+Finished game 13 (Koi vs Opponent): 0-1 {Black mates}
+Score of Koi vs Opponent: 0 - 8 - 5  [0.192] 13
+Started game 14 of 20 (Opponent vs Koi)
+Finished game 14 (Opponent vs Koi): 1-0 {White mates}
+Score of Koi vs Opponent: 0 - 9 - 5  [0.179] 14
+Started game 15 of 20 (Koi vs Opponent)
+Finished game 15 (Koi vs Opponent): 1/2-1/2 {Draw by adjudication: maximal game length}
+Score of Koi vs Opponent: 0 - 9 - 6  [0.200] 15
+Started game 16 of 20 (Opponent vs Koi)
+Finished game 16 (Opponent vs Koi): 1-0 {White mates}
+Score of Koi vs Opponent: 0 - 10 - 6  [0.188] 16
+Started game 17 of 20 (Koi vs Opponent)
+Finished game 17 (Koi vs Opponent): 0-1 {Black mates}
+Score of Koi vs Opponent: 0 - 11 - 6  [0.176] 17
+Started game 18 of 20 (Opponent vs Koi)
+Finished game 18 (Opponent vs Koi): 1-0 {White mates}
+Score of Koi vs Opponent: 0 - 12 - 6  [0.167] 18
+Started game 19 of 20 (Koi vs Opponent)
+Finished game 19 (Koi vs Opponent): 0-1 {Black mates}
+Score of Koi vs Opponent: 0 - 13 - 6  [0.158] 19
+Started game 20 of 20 (Opponent vs Koi)
+Finished game 20 (Opponent vs Koi): 1-0 {White mates}
+Score of Koi vs Opponent: 0 - 14 - 6  [0.150] 20
+...      Koi playing White: 0 - 6 - 4  [0.200] 10
+...      Koi playing Black: 0 - 8 - 2  [0.100] 10
+...      White vs Black: 8 - 6 - 6  [0.550] 20
+Elo difference: -301.3 +/- 161.0, LOS: 0.0 %, DrawRatio: 30.0 %
+SPRT: llr 0 (0.0%), lbound -inf, ubound inf
+
+Player: Koi
+   "Draw by adjudication: maximal game length": 6
+   "Loss: Black mates": 6
+   "Loss: White mates": 8
+Player: Opponent
+   "Draw by adjudication: maximal game length": 6
+   "Win: Black mates": 6
+   "Win: White mates": 8
+Finished match

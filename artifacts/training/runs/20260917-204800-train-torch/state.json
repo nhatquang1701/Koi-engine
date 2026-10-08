@@ -1,0 +1,18 @@
+{
+  "kind": "train",
+  "backend": "torch",
+  "created": "2026-09-17T13:48:00Z",
+  "status": "completed",
+  "run": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\training\\runs\\20260917-204800-train-torch",
+  "schema": "koi-nnue-studio-run-v1",
+  "progress": {
+    "epoch": 1,
+    "epochs": 1,
+    "val_mae_cp": 452.6,
+    "history": [
+      452.6
+    ]
+  },
+  "exit_code": 0,
+  "finished": "2026-09-17T13:48:04Z"
+}

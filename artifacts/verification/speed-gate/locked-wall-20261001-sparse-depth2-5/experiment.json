@@ -1,0 +1,22 @@
+{
+  "schema": "koi-speed-gate-experiment-v1",
+  "recorded_utc": "2026-10-01T09:22:00Z",
+  "gate_script": "tools/build/speed_gate.ps1",
+  "gate_script_sha256": "B743DD45DC5409A2073ACD11602934E740925C57992222B4596211D12BF3F15E",
+  "baseline_exe": "artifacts/verification/speed-gate/locked-wall-20261001-sparse-depth2-5/baseline/koi-bench-baseline.exe",
+  "baseline_exe_sha256": "7CAFA0DF834D32F5BC0658734803E9D4F644EDDEE1DFA65425DDDAE7786F4166",
+  "candidate_exe": "build/roadmap-visit-win-release/koi-bench.exe",
+  "candidate_exe_sha256": "42915ADB712DB4B03D3A6CCDA68C6D4EE15A958CC2EB7B722A7A569203828AC0",
+  "source_revision": "73b180d3480fd43aec8c11341a5fd3c19e243b78",
+  "baseline_note": "isolated Release build of 73b180d from build/roadmap-lockedwall-baseline-src (BuildTools MSVC 14.44.35207, Ninja, modules/shadow/GPU/PGO/sanitize/static-runtime OFF)",
+  "candidate": "locked-wall occupancy gate: is_known_locked_pawn_wall compares state.occupied against the pattern's constant occupancy mask before the 64-square pattern scan",
+  "fen_file": "artifacts/verification/speed-gate/locked-wall-20261001-sparse-depth2-5/sparse-qsearch-fens.txt",
+  "fen_sha256": "07855F78D6544FD4D9ED8E6000FDA3B279208AFC608F389569D85DE3026D930C",
+  "threads": 1,
+  "speed": 100,
+  "depth_sweep": "2..5",
+  "runs": 5,
+  "max_total_nps_regression_percent": 2.0,
+  "max_row_nps_regression_percent": 2.0,
+  "min_row_elapsed_ms": 20.0
+}

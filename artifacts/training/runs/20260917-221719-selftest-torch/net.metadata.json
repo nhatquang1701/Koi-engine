@@ -1,0 +1,28 @@
+{
+  "schema": "koi-nnue-training-metadata-v1",
+  "created": "2026-09-17T15:17:23Z",
+  "corpus": "C:\\Users\\ntATh\\AppData\\Local\\Temp\\koi-studio-test-y_dynn9e\\tiny-corpus.txt",
+  "rows_used": 400,
+  "val_rows": 20,
+  "feature_set": "piece-square-king-pawn-v2",
+  "quantization": "int16/int8",
+  "architecture": [
+    960,
+    256,
+    32,
+    1
+  ],
+  "epochs": 1,
+  "batch_size": 1024,
+  "learning_rate": 0.002,
+  "seed": 20260916,
+  "target_scale": 100.0,
+  "format": "v3",
+  "hidden_shift": 7,
+  "bottleneck_shift": 7,
+  "output_shift": 6,
+  "val_mae_cp": 13.05,
+  "payload_sha256": "217466628d77f0de6b84abca42791565467be87ad370a04fc260137d8f731da8",
+  "network_sha256": "86f79630191eddb5f2e7c706bfcab518f6819f016c4b414f1cf061c57f26cf48",
+  "command": "C:\\Users\\ntATh\\AI test\\Koi engine\\tools\\measurement\\train_nnue_sf.py --corpus C:\\Users\\ntATh\\AppData\\Local\\Temp\\koi-studio-test-y_dynn9e\\tiny-corpus.txt --net-out C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\training\\runs\\20260917-221719-selftest-torch\\net.nnue --meta-out C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\training\\runs\\20260917-221719-selftest-torch\\net.metadata.json --epochs 1 --batch-size 1024 --learning-rate 0.002 --threads 2 --val-fraction 0.05 --seed 20260916 --format v3 --hidden-shift 7 --bottleneck-shift 7 --output-shifts 3 4 5 6 --rows 400 --float-out C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\training\\runs\\20260917-221719-selftest-torch\\net.pt"
+}

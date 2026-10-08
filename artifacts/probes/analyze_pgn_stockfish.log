@@ -1,0 +1,24 @@
+stockfish-19-2
+  f6g4 +379 depth 14 pv f6g4 c3a4 d8a5 c2c3 f8c5 a4c5
+  f8c5 +366 depth 14 pv f8c5 c3a4 c5d6 g2g3 e5f4 c1f4
+  d8c7 +210 depth 14 pv d8c7 c3a4 e5f4 d1d4 f6e4 g2g3
+  a8b8 +209 depth 14 pv a8b8 f4e5 f6g4 d1d4 d8a5 e2e3
+  d8a5 +142 depth 14 pv d8a5 f4e5 f6e4 c1d2 e4d2 d1d2
+koi-vs-koi
+  g2g3 +56 depth 14 pv g2g3 g7g6 c1f4 c8f5 d3d2 d6e6
+  c1g5 +24 depth 14 pv c1g5 g7g6 e2e3 c8f5 d3d1 d6d7
+  e2e4 +18 depth 14 pv e2e4 d5e4 c3e4 d6e6 f3g5 e6d5
+  h2h3 +10 depth 14 pv h2h3 g7g6 c1g5 f8g7 e2e3 c8f5
+  c1e3 +5 depth 14 pv c1e3 g7g6 d3d2 f6e4 c3e4 d5e4
+stockfish-19
+  e8g8 +174 depth 14 pv e8g8 g5h4 b7b5 a2a3 d6e7 h4g3
+  h8g8 +112 depth 14 pv h8g8 e5g4 b8d7 d4c5 c7c5 c1d2
+  e8f8 +98 depth 14 pv e8f8 g5h4 b7b5 f1e2 h7h6 f2f3
+  c5d4 +89 depth 14 pv c5d4 e3d4 e8g8 g5h4 b8c6 e5c6
+  d6f8 +60 depth 14 pv d6f8 g5g3 b8c6 e5c6 c7c6 d4c5
+lc0
+  f8c5 +197 depth 14 pv f8c5 e2e3 e8g8 f1d3 d8e7 e3e4
+  a8b8 +165 depth 14 pv a8b8 d2g5 d8c7 f2f3 f8e7 g5g7
+  c8e6 +164 depth 14 pv c8e6 f2f3 f8c5 c3a4 c5d6 b2b3
+  h7h5 +164 depth 14 pv h7h5 d2g5 d8c7 f2f3 f8e7 g5g7
+  d5d4 +160 depth 14 pv d5d4 c3a4 f6e4 d2d3 d8a5 c2c3

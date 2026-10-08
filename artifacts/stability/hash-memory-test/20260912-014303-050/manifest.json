@@ -1,0 +1,18 @@
+{
+  "schema": "koi-hash-memory-soak-v1",
+  "generated_utc": "2026-09-12T01:43:03.6864258Z",
+  "repository_root": "C:\\Users\\ntATh\\AI test\\Koi engine",
+  "engine_path": "C:\\Users\\ntATh\\AI test\\Koi engine\\build\\debug\\koi-engine.exe",
+  "engine_sha256": "AF7A5615E09B0C13B57DE716DF54FF6EFCAA2862A8C09C9C3922290B4790B1B2",
+  "hash_values_mb": [
+    1,
+    2
+  ],
+  "cycles": 1,
+  "records": [],
+  "failures": [
+    "Hash=1 cycle=1 exception=Exception calling \"WriteLine\" with \"1\" argument(s): \"The pipe is being closed.\"",
+    "Hash=2 cycle=1 exception=Exception calling \"WriteLine\" with \"1\" argument(s): \"The pipe is being closed.\""
+  ],
+  "status": "fail"
+}

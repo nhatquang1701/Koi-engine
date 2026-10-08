@@ -1,0 +1,22 @@
+{
+  "schema": "koi-speed-gate-experiment-v1",
+  "recorded_utc": "2026-10-01T18:05:21Z",
+  "gate_script": "tools/build/speed_gate.ps1",
+  "gate_script_sha256": "B743DD45DC5409A2073ACD11602934E740925C57992222B4596211D12BF3F15E",
+  "baseline_exe": "artifacts\\verification\\speed-gate\\king-move-direct-20261002-sparse-depth2-5/baseline/koi-bench-baseline.exe",
+  "baseline_exe_sha256": "9E5B725D7DC5B516DA720E62156A6AA1B4B1FE2107848C7F655EF9CDCF44543E",
+  "candidate_exe": "build/roadmap-visit-win-release/koi-bench.exe",
+  "candidate_exe_sha256": "40F3BD4C0A31472E2F3584898772C3049DD97F81E80D658A88D690E89DD76440",
+  "source_revision": "0eb5c0e95340230fd6a67b360eed1cca434cb3b6",
+  "baseline_note": "isolated Release build of HEAD 0eb5c0e from build/roadmap-featurecache-baseline-src (BuildTools MSVC 14.44.35207, Ninja, modules/shadow/GPU/PGO/sanitize/static-runtime OFF); reused from the feature-cache gate, hash re-verified",
+  "candidate": "king-move direct legality: king moves are decided by clearing the vacated origin from the maintained occupancy and testing the destination with square_attacked; castling needs no probe because generation already validates path, transit, and destination; other moves keep the snapshot/apply/is_checked/restore probe",
+  "fen_file": "artifacts\\verification\\speed-gate\\king-move-direct-20261002-sparse-depth2-5/sparse-qsearch-fens.txt",
+  "fen_sha256": "07855F78D6544FD4D9ED8E6000FDA3B279208AFC608F389569D85DE3026D930C",
+  "threads": 1,
+  "speed": 100,
+  "depth_sweep": "2..5",
+  "runs": 5,
+  "max_total_nps_regression_percent": 2.0,
+  "max_row_nps_regression_percent": 2.0,
+  "min_row_elapsed_ms": 20.0
+}

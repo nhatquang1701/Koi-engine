@@ -1,0 +1,5 @@
+[31;1mException: [0mC:\Users\ntATh\AI test\Koi engine\tools\build\speed_gate.ps1:115[0m
+[31;1m[0m[36;1mLine |[0m
+[31;1m[0m[36;1m[36;1m 115 | [0m         [36;1mthrow "$Label exited with $($process.ExitCode): $stderr"[0m
+[31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m     | [31;1m         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+[31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m     | [31;1mBaseline run 5 exited with -1: [0m

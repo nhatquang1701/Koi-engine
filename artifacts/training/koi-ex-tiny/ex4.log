@@ -1,0 +1,69 @@
+training device cuda (torch 2.14.0+cu126, cuda 12.6)
+loaded 485755 rows (50 own, 50 opp, pad 50) in 0.00s
+epoch 1/20 train_loss 4.01788 val_loss 4.41833 val_mae_cp 441.83 time 13.7s
+epoch 2/20 train_loss 3.36356 val_loss 4.20728 val_mae_cp 420.73 time 13.5s
+epoch 3/20 train_loss 2.52280 val_loss 4.03159 val_mae_cp 403.16 time 13.5s
+epoch 4/20 train_loss 1.92120 val_loss 3.93697 val_mae_cp 393.70 time 13.5s
+epoch 5/20 train_loss 1.55316 val_loss 3.87776 val_mae_cp 387.78 time 13.5s
+epoch 6/20 train_loss 1.33591 val_loss 3.87532 val_mae_cp 387.53 time 13.5s
+epoch 7/20 train_loss 1.16534 val_loss 3.82914 val_mae_cp 382.91 time 13.5s
+epoch 8/20 train_loss 1.01411 val_loss 3.82964 val_mae_cp 382.96 time 13.5s
+epoch 9/20 train_loss 0.88583 val_loss 3.77850 val_mae_cp 377.85 time 13.5s
+epoch 10/20 train_loss 0.77987 val_loss 3.74534 val_mae_cp 374.53 time 13.5s
+epoch 11/20 train_loss 0.69216 val_loss 3.75204 val_mae_cp 375.20 time 13.5s
+epoch 12/20 train_loss 0.61739 val_loss 3.72153 val_mae_cp 372.15 time 13.5s
+epoch 13/20 train_loss 0.53896 val_loss 3.71377 val_mae_cp 371.38 time 13.5s
+epoch 14/20 train_loss 0.47076 val_loss 3.70462 val_mae_cp 370.46 time 13.5s
+epoch 15/20 train_loss 0.41161 val_loss 3.69501 val_mae_cp 369.50 time 13.5s
+epoch 16/20 train_loss 0.36671 val_loss 3.69529 val_mae_cp 369.53 time 13.5s
+epoch 17/20 train_loss 0.34246 val_loss 3.69243 val_mae_cp 369.24 time 13.5s
+epoch 18/20 train_loss 0.32963 val_loss 3.68968 val_mae_cp 368.97 time 13.5s
+epoch 19/20 train_loss 0.32163 val_loss 3.68947 val_mae_cp 368.95 time 13.5s
+epoch 20/20 train_loss 0.31643 val_loss 3.68908 val_mae_cp 368.91 time 13.6s
+quantization v5 s1=6 s_l1=6 k3=4 val_mae_cp 457.94 saturation 0.0000
+quantization v5 s1=6 s_l1=6 k3=5 val_mae_cp 457.86 saturation 0.0000
+quantization v5 s1=6 s_l1=6 k3=6 val_mae_cp 457.88 saturation 0.0000
+quantization v5 s1=6 s_l1=6 k3=7 val_mae_cp 457.85 saturation 0.3438
+quantization v5 s1=6 s_l1=6 k3=8 val_mae_cp 458.81 saturation 0.8359
+quantization v5 s1=6 s_l1=7 k3=4 val_mae_cp 413.78 saturation 0.0000
+quantization v5 s1=6 s_l1=7 k3=5 val_mae_cp 413.80 saturation 0.0000
+quantization v5 s1=6 s_l1=7 k3=6 val_mae_cp 413.79 saturation 0.0000
+quantization v5 s1=6 s_l1=7 k3=7 val_mae_cp 417.79 saturation 0.3438
+quantization v5 s1=6 s_l1=7 k3=8 val_mae_cp 435.32 saturation 0.8359
+quantization v5 s1=6 s_l1=8 k3=4 val_mae_cp 413.57 saturation 0.0000
+quantization v5 s1=6 s_l1=8 k3=5 val_mae_cp 413.59 saturation 0.0000
+quantization v5 s1=6 s_l1=8 k3=6 val_mae_cp 413.61 saturation 0.0000
+quantization v5 s1=6 s_l1=8 k3=7 val_mae_cp 417.58 saturation 0.3438
+quantization v5 s1=6 s_l1=8 k3=8 val_mae_cp 435.62 saturation 0.8359
+quantization v5 s1=7 s_l1=6 k3=4 val_mae_cp 459.75 saturation 0.0000
+quantization v5 s1=7 s_l1=6 k3=5 val_mae_cp 459.69 saturation 0.0000
+quantization v5 s1=7 s_l1=6 k3=6 val_mae_cp 459.75 saturation 0.0000
+quantization v5 s1=7 s_l1=6 k3=7 val_mae_cp 459.44 saturation 0.3438
+quantization v5 s1=7 s_l1=6 k3=8 val_mae_cp 458.48 saturation 0.8359
+quantization v5 s1=7 s_l1=7 k3=4 val_mae_cp 387.08 saturation 0.0000
+quantization v5 s1=7 s_l1=7 k3=5 val_mae_cp 386.86 saturation 0.0000
+quantization v5 s1=7 s_l1=7 k3=6 val_mae_cp 386.85 saturation 0.0000
+quantization v5 s1=7 s_l1=7 k3=7 val_mae_cp 390.12 saturation 0.3438
+quantization v5 s1=7 s_l1=7 k3=8 val_mae_cp 416.25 saturation 0.8359
+quantization v5 s1=7 s_l1=8 k3=4 val_mae_cp 376.46 saturation 0.0000
+quantization v5 s1=7 s_l1=8 k3=5 val_mae_cp 376.30 saturation 0.0000
+quantization v5 s1=7 s_l1=8 k3=6 val_mae_cp 376.28 saturation 0.0000
+quantization v5 s1=7 s_l1=8 k3=7 val_mae_cp 379.74 saturation 0.3438
+quantization v5 s1=7 s_l1=8 k3=8 val_mae_cp 409.79 saturation 0.8359
+quantization v5 s1=8 s_l1=6 k3=4 val_mae_cp 473.39 saturation 0.0000
+quantization v5 s1=8 s_l1=6 k3=5 val_mae_cp 473.20 saturation 0.0000
+quantization v5 s1=8 s_l1=6 k3=6 val_mae_cp 473.35 saturation 0.0000
+quantization v5 s1=8 s_l1=6 k3=7 val_mae_cp 471.35 saturation 0.3438
+quantization v5 s1=8 s_l1=6 k3=8 val_mae_cp 463.46 saturation 0.8359
+quantization v5 s1=8 s_l1=7 k3=4 val_mae_cp 398.68 saturation 0.0000
+quantization v5 s1=8 s_l1=7 k3=5 val_mae_cp 398.39 saturation 0.0000
+quantization v5 s1=8 s_l1=7 k3=6 val_mae_cp 398.38 saturation 0.0000
+quantization v5 s1=8 s_l1=7 k3=7 val_mae_cp 399.88 saturation 0.3438
+quantization v5 s1=8 s_l1=7 k3=8 val_mae_cp 420.59 saturation 0.8359
+quantization v5 s1=8 s_l1=8 k3=4 val_mae_cp 390.79 saturation 0.0000
+quantization v5 s1=8 s_l1=8 k3=5 val_mae_cp 390.62 saturation 0.0000
+quantization v5 s1=8 s_l1=8 k3=6 val_mae_cp 390.65 saturation 0.0000
+quantization v5 s1=8 s_l1=8 k3=7 val_mae_cp 391.39 saturation 0.3438
+quantization v5 s1=8 s_l1=8 k3=8 val_mae_cp 413.17 saturation 0.8359
+selected v5 s1=7 s_l1=8 k3=6 val_mae_cp 376.28
+wrote artifacts\training\koi-ex-tiny\ex4.nnue (113302043 bytes) and artifacts\training\koi-ex-tiny\ex4.metadata.json

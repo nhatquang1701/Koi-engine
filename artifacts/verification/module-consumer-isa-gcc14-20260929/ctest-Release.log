@@ -1,0 +1,11 @@
+Internal ctest changing into directory: /work/build/roadmap-current-linux-gcc14-release-20260929
+Test project /work/build/roadmap-current-linux-gcc14-release-20260929
+    Start 10: koi_module_tests
+1/1 Test #10: koi_module_tests .................   Passed    0.01 sec
+
+100% tests passed, 0 tests failed out of 1
+
+Label Time Summary:
+unit    =   0.01 sec*proc (1 test)
+
+Total Test time (real) =   0.02 sec

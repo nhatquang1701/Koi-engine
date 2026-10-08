@@ -1,0 +1,4 @@
+[1/4] Scanning "C:\Users\ntATh\AI test\Koi engine\tests\unit\runtime\transposition_table_tests.cpp" for CXX dependencies
+[2/4] Generating CXX dyndep file CMakeFiles\transposition_table_tests.dir\CXX.dd
+[3/4] Building CXX object CMakeFiles\transposition_table_tests.dir\tests\unit\runtime\transposition_table_tests.cpp.obj
+[4/4] Linking CXX executable transposition_table_tests.exe

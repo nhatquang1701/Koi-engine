@@ -1,0 +1,9 @@
+PROF-BEGIN
+PROF negamax          calls=82035560 cycles=84802512427293
+PROF quiescence       calls=850965908 cycles=38682216776567
+PROF evaluate         calls=349602044 cycles=1090680456099
+PROF make             calls=861113052 cycles=645676542109
+PROF unmake           calls=861113052 cycles=37688044509
+PROF picker_prepare   calls=505575628 cycles=749930820577
+PROF picker_next      calls=1211244752 cycles=887114767783
+PROF-END

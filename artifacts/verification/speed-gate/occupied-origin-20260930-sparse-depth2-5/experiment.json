@@ -1,0 +1,15 @@
+{
+  "runs": 5,
+  "baseline_exe_sha256": "F5F7A3DF549E064393736DD865D86264E6FA586794EFFD9DFEA16C593283C2E6",
+  "min_row_elapsed_ms": 20.0,
+  "fen_sha256": "07855F78D6544FD4D9ED8E6000FDA3B279208AFC608F389569D85DE3026D930C",
+  "speed": 100,
+  "threads": 1,
+  "max_total_nps_regression_percent": 2.0,
+  "candidate_exe_sha256": "874EF1389951FD9F4A10F9C1F4CAE608732D06C138FAC40F59FF2D0B6F21BB27",
+  "max_row_nps_regression_percent": 2.0,
+  "fen_file": "artifacts\\verification\\speed-gate\\occupied-origin-20260930-sparse-depth2-5\\sparse-qsearch-fens.txt",
+  "gate_script_sha256": "B743DD45DC5409A2073ACD11602934E740925C57992222B4596211D12BF3F15E",
+  "source_revision": "b40feb1c8447e4e8c56589409f9a5ccb47e3edfd",
+  "depth_sweep": "2..5"
+}

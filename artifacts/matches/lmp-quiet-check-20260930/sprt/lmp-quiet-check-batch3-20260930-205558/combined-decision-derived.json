@@ -1,0 +1,142 @@
+{
+  "baseline_sha256": "da08c26912a5fce8dce2d85efc28cc33503345b26018d82b961181df2ad2af20",
+  "candidate_change_commit": "uncommitted-lmp-quiet-check",
+  "candidate_sha256": "1fbf7321466bf83bcdd2983d26514b3d647720a48b73a718e841062cb29a05c6",
+  "colors": {
+    "black": {
+      "aborted": 0,
+      "decision": "inconclusive",
+      "draws": 86,
+      "elo": -8.144513059083131,
+      "games": 256,
+      "llr": -0.418284,
+      "losses": 88,
+      "pgn": {
+        "path": "artifacts/matches/lmp-quiet-check-20260930/sprt/lmp-quiet-check-batch3-20260930-205558/black/koi-uci-match-20260930-145251-440.pgn",
+        "sha256": "1491778fafdb77fd5f2c0fa9c6e9fac470fa41be60833601a469a0e6180b3acf"
+      },
+      "report": {
+        "path": "artifacts/matches/lmp-quiet-check-20260930/sprt/lmp-quiet-check-batch3-20260930-205558/black/koi-uci-match-20260930-145251-440.json",
+        "sha256": "5085b2016de1232987517cfcee2e06bf4fad8998a96926b71e7b477e7896a7ee"
+      },
+      "unique_roots_played": 128,
+      "validation": "official validate_release_candidate_games.py passed",
+      "wins": 82
+    },
+    "white": {
+      "aborted": 0,
+      "decision": "inconclusive",
+      "draws": 94,
+      "elo": 8.144513059083145,
+      "games": 256,
+      "llr": 0.10503,
+      "losses": 78,
+      "pgn": {
+        "path": "artifacts/matches/lmp-quiet-check-20260930/sprt/lmp-quiet-check-batch3-20260930-205558/white/koi-uci-match-20260930-145227-230.pgn",
+        "sha256": "fcebd8a44dbe9dcfb06df98128df31d2a2779f067607d89a53f6c0558b650d52"
+      },
+      "report": {
+        "path": "artifacts/matches/lmp-quiet-check-20260930/sprt/lmp-quiet-check-batch3-20260930-205558/white/koi-uci-match-20260930-145227-230.json",
+        "sha256": "bca0ebc6317255b14d5a505f1632c8c8d58b9d6cb2859e6467cf9b1a425b32d3"
+      },
+      "unique_roots_played": 128,
+      "validation": "official validate_release_candidate_games.py passed",
+      "wins": 84
+    }
+  },
+  "combined": {
+    "decision": "inconclusive",
+    "draws": 180,
+    "games": 512,
+    "llr": -0.313254,
+    "losses": 166,
+    "lower_threshold": -2.9444389791664403,
+    "score": 0.5,
+    "upper_threshold": 2.9444389791664403,
+    "wins": 166
+  },
+  "cumulative": {
+    "decision": "inconclusive",
+    "draws": 576,
+    "games": 1536,
+    "llr": -1.382887,
+    "losses": 484,
+    "lower_threshold": -2.9444389791664403,
+    "score": 0.4973958333333333,
+    "upper_threshold": 2.9444389791664403,
+    "wins": 476
+  },
+  "derived_utc": "2026-09-30T14:53:37.583064+00:00",
+  "engine_source_commit": "68e4f2ec3b8bee7b7d068bbb503d7b83a36fd276",
+  "experiment": {
+    "path": "artifacts/verification/lmp-quiet-check-20260930/experiment-batch3.json",
+    "sha256": "d94837129210aef771cd23db5a357a41d0f0ce4cafc290a62675f970e3f9ac6b"
+  },
+  "harness_binding": {
+    "harness_git_blob": "de0de5bce59c2d650a7f1c872d730b9d82e76952",
+    "harness_path": "tools/stability/uci_match.ps1",
+    "harness_sha256": "9df4f67a4632a05e070eb44fde202814a9692befd3a63c880688b946feedfb3e",
+    "workspace_commit": "68e4f2ec3b8bee7b7d068bbb503d7b83a36fd276"
+  },
+  "method": "sum of independent color SPRT LLRs; alpha=beta=0.05 thresholds are plus/minus ln(19)",
+  "opening_file_sha256": "41d357ac0f08dbbf20da5f52d677c6036199926fcd9ab34a52d84d5cae77ebb6",
+  "opening_set": {
+    "count": 128,
+    "generator_path": "artifacts/verification/lmp-quiet-check-20260930/generate_openings_batch3.py",
+    "generator_sha256": "795d84d368b61e7aa9352ddfad90f626c7c2945927ae56d19e85f49078dc749c",
+    "manifest_path": "artifacts/manifests/lmp-quiet-check-20260930-openings-batch3.json",
+    "manifest_sha256": "a1dce8e1fc64083fc556299438abba3650042a7ab79a570525b8858732067c31",
+    "opening_state_overlap_count": 0,
+    "unique_opening_count": 128
+  },
+  "options": {
+    "algorithm": "AlphaBeta",
+    "evaluator": "classical",
+    "games_per_opening": 2,
+    "hash_mb": 512,
+    "max_plies": 512,
+    "nodes": 20000,
+    "own_book": false,
+    "protocol_timeout_ms": 5000,
+    "random_seed": 0,
+    "speed": 100,
+    "threads": 1,
+    "time_control": "nodes 20000"
+  },
+  "prior_cumulative": {
+    "decision": "inconclusive",
+    "derived_path": "artifacts/matches/lmp-quiet-check-20260930/sprt/lmp-quiet-check-batch2-20260930-172655/combined-decision-derived.json",
+    "derived_sha256": "dd07d7c2c22781248987cba440c91ee5853c9fc0340c306b4a70cbcdb262ed0b",
+    "draws": 396,
+    "games": 1024,
+    "llr": -1.069633,
+    "losses": 318,
+    "lower_threshold": -2.9444389791664403,
+    "score": 0.49609375,
+    "upper_threshold": 2.9444389791664403,
+    "wins": 310
+  },
+  "replay_sha256": "36c4f05ec6569048985cbf75f91b46512b212eec632327dfc49eb788e8924f93",
+  "runner_state": {
+    "exit_codes": {
+      "black": 0,
+      "white": 0
+    },
+    "path": "artifacts/matches/lmp-quiet-check-20260930/sprt/lmp-quiet-check-batch3-20260930-205558/runner-state.json",
+    "runner_pid": 18244,
+    "sha256": "dd689332a2c76d630f6a7a31fb7ffab8f431bd0af7b975d6b47939eca977a0a7",
+    "workers": {
+      "black": 23188,
+      "white": 24620
+    }
+  },
+  "schema": "koi-sprt-combined-derived-v1",
+  "sprt_hypotheses": {
+    "alpha": 0.05,
+    "beta": 0.05,
+    "elo0": 0,
+    "elo1": 10,
+    "max_games_per_color": 256,
+    "min_games_per_color": 40
+  }
+}

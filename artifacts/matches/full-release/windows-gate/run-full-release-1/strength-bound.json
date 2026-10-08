@@ -1,0 +1,33 @@
+{
+  "adverse_opening_pairs": 0,
+  "adverse_probability_upper_bound": 0.009317979408884292,
+  "baseline_sha256": "133832cfb5b642f49958a303ac97847b5ea663299e7c2501be8486eabf9aaaf1",
+  "candidate_sha256": "2616d15afed28229083f9eec1090efa8340efbf33e0271fd0d9470ca3c5a36e2",
+  "capped_games_counted_as_draws": 322,
+  "cp_lower_elo_bound": -3.237491332097433,
+  "cp_lower_score_bound": 0.4953410102955579,
+  "decision": "pass",
+  "decision_bound": "exact_cp_adverse_pair",
+  "draws": 414,
+  "expected_configuration": {
+    "hash_mb": 64,
+    "max_plies": 80,
+    "nodes": 1000,
+    "speed": 100,
+    "threads": 1
+  },
+  "games": 640,
+  "hoeffding_lower_elo_bound": -47.84081089738887,
+  "hoeffding_lower_score_bound": 0.4315833961861003,
+  "losses": 113,
+  "lower_bound_above_threshold": true,
+  "lower_elo_bound": -3.237491332097433,
+  "lower_score_bound": 0.4953410102955579,
+  "mean_score": 0.5,
+  "method": "Exact one-sided Clopper-Pearson upper bound for adverse paired-opening events (pair score < 0.5), with conservative mean score lower bound 0.5*(1-p_upper). Assumes IID paired-opening draws sampled with replacement: a curated root uniformly at random, then a legal one-ply continuation uniformly at random. The separate Hoeffding score bound is diagnostic only and does not drive the decision. Max-plies games are scored as draws.",
+  "one_sided_confidence": 0.95,
+  "paired_openings": 320,
+  "schema": "koi-strength-bound-v1",
+  "threshold_elo": -10.0,
+  "wins": 113
+}

@@ -1,0 +1,10 @@
+{
+  "kind": "train",
+  "backend": "koi",
+  "created": "2026-09-18T09:53:35Z",
+  "status": "stopped",
+  "run": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\training\\runs\\20260918-165335-train-koi",
+  "schema": "koi-nnue-studio-run-v1",
+  "pid": 22140,
+  "stopped": "2026-09-18T09:53:57Z"
+}

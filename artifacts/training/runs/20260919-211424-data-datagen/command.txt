@@ -1,0 +1,1 @@
+C:\Python314\python.exe "C:\Users\ntATh\AI test\Koi engine\tools\measurement\gen_training_data.py" label --workers 7 --label-depth 9 --limit 0 --positions "C:\Users\ntATh\AI test\Koi engine\artifacts\training\positions.txt" --output "C:\Users\ntATh\AI test\Koi engine\artifacts\training\labels.txt" --resume

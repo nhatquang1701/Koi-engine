@@ -1,0 +1,20 @@
+[OUTPUT] 
+Internal ctest changing into directory: /work/build/roadmap-current-linux-gcc14-release-20260929
+
+[HANDLER_OUTPUT] 
+Test project /work/build/roadmap-current-linux-gcc14-release-20260929
+
+    Start 15: uci_controller_tests
+1/2 Test #15: uci_controller_tests .............   Passed    7.38 sec
+    Start 38: koi_engine_process
+2/2 Test #38: koi_engine_process ...............   Passed    2.92 sec
+
+100% tests passed, 0 tests failed out of 2
+
+Label Time Summary:
+process    =   2.92 sec*proc (1 test)
+runtime    =   7.38 sec*proc (1 test)
+uci        =   2.92 sec*proc (1 test)
+unit       =   7.38 sec*proc (1 test)
+
+Total Test time (real) =  10.33 sec

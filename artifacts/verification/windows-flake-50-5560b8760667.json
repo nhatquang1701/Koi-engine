@@ -1,0 +1,66 @@
+{
+  "source_commit": "5560b876066749f0f20a86c304e3b6faafa7526f",
+  "generated_utc": "2026-09-26T15:57:00Z",
+  "repetitions_per_case": 50,
+  "cases": [
+    "incomplete root forcing fallback",
+    "threaded short forcing root research",
+    "timed poisoned capture"
+  ],
+  "records": [
+    {
+      "configuration": "Release",
+      "case": "incomplete root forcing fallback",
+      "executable_sha256": "88ddc20469919a4266f59e23ac9066d19c3f65e8d3527b6d4c8fb713da01baf9",
+      "attempts": 50,
+      "passed": 50,
+      "retries": 0,
+      "elapsed_ms": 9910
+    },
+    {
+      "configuration": "Release",
+      "case": "threaded short forcing root research",
+      "executable_sha256": "88ddc20469919a4266f59e23ac9066d19c3f65e8d3527b6d4c8fb713da01baf9",
+      "attempts": 50,
+      "passed": 50,
+      "retries": 0,
+      "elapsed_ms": 9440
+    },
+    {
+      "configuration": "Release",
+      "case": "timed poisoned capture",
+      "executable_sha256": "88ddc20469919a4266f59e23ac9066d19c3f65e8d3527b6d4c8fb713da01baf9",
+      "attempts": 50,
+      "passed": 50,
+      "retries": 0,
+      "elapsed_ms": 9426
+    },
+    {
+      "configuration": "Debug",
+      "case": "incomplete root forcing fallback",
+      "executable_sha256": "1d23a996b53f00e4e0f13a498191d0b822dc0ff3971dea4b74210ade35e31991",
+      "attempts": 50,
+      "passed": 50,
+      "retries": 0,
+      "elapsed_ms": 32882
+    },
+    {
+      "configuration": "Debug",
+      "case": "threaded short forcing root research",
+      "executable_sha256": "1d23a996b53f00e4e0f13a498191d0b822dc0ff3971dea4b74210ade35e31991",
+      "attempts": 50,
+      "passed": 50,
+      "retries": 0,
+      "elapsed_ms": 29276
+    },
+    {
+      "configuration": "Debug",
+      "case": "timed poisoned capture",
+      "executable_sha256": "1d23a996b53f00e4e0f13a498191d0b822dc0ff3971dea4b74210ade35e31991",
+      "attempts": 50,
+      "passed": 50,
+      "retries": 0,
+      "elapsed_ms": 31964
+    }
+  ]
+}

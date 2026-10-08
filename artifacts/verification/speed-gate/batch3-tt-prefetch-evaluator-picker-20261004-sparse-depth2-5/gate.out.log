@@ -1,0 +1,76 @@
+output_directory=C:\Users\ntATh\AI test\Koi engine\artifacts\verification\speed-gate\batch3-tt-prefetch-evaluator-picker-20261004-sparse-depth2-5
+baseline_executable=C:\Users\ntATh\AI test\Koi engine\artifacts\verification\speed-gate\batch3-tt-prefetch-evaluator-picker-20261004-sparse-depth2-5\baseline\koi-bench-baseline.exe
+candidate_executable=C:\Users\ntATh\AI test\Koi engine\build\roadmap-visit-win-release\koi-bench.exe
+runs=5 threads=1 speed=100 timed=1 fen-file=C:\Users\ntATh\AI test\Koi engine\artifacts\verification\speed-gate\batch3-tt-prefetch-evaluator-picker-20261004-sparse-depth2-5\sparse-qsearch-fens.txt depth-sweep=2..5
+nps_regression_limit=2.00% row_nps_regression_limit=2.00% min_row_elapsed_ms=20.0
+run=1 baseline_nps=391,993 candidate_nps=384,887 order=baseline,candidate
+run=2 baseline_nps=393,895 candidate_nps=383,911 order=candidate,baseline
+run=3 baseline_nps=392,703 candidate_nps=384,194 order=baseline,candidate
+run=4 baseline_nps=393,162 candidate_nps=384,291 order=candidate,baseline
+run=5 baseline_nps=392,001 candidate_nps=384,405 order=baseline,candidate
+baseline_total_nps=392,703 candidate_total_nps=384,291 delta=-2.14%
+median_row_nps_delta=-1.31% excluded_noise_rows=14
+row=fen-001#2 baseline_nps=460750 candidate_nps=460750 nps_delta=0.00% baseline_ms=8 candidate_ms=8
+row=fen-001#3 baseline_nps=431666 candidate_nps=437272 nps_delta=1.30% baseline_ms=234 candidate_ms=231
+row=fen-001#4 baseline_nps=460648 candidate_nps=454114 nps_delta=-1.42% baseline_ms=1390 candidate_ms=1410
+row=fen-001#5 baseline_nps=441701 candidate_nps=435758 nps_delta=-1.35% baseline_ms=19430 candidate_ms=19695
+row=fen-002#2 baseline_nps=515000 candidate_nps=515000 nps_delta=0.00% baseline_ms=3 candidate_ms=3
+row=fen-002#3 baseline_nps=526597 candidate_nps=526597 nps_delta=0.00% baseline_ms=77 candidate_ms=77
+row=fen-002#4 baseline_nps=531161 candidate_nps=526595 nps_delta=-0.86% baseline_ms=346 candidate_ms=349
+row=fen-002#5 baseline_nps=495124 candidate_nps=488710 nps_delta=-1.30% baseline_ms=4038 candidate_ms=4091
+row=fen-003#2 baseline_nps=430666 candidate_nps=430666 nps_delta=0.00% baseline_ms=3 candidate_ms=3
+row=fen-003#3 baseline_nps=513162 candidate_nps=507264 nps_delta=-1.15% baseline_ms=86 candidate_ms=87
+row=fen-003#4 baseline_nps=440752 candidate_nps=434928 nps_delta=-1.32% baseline_ms=672 candidate_ms=681
+row=fen-003#5 baseline_nps=526127 candidate_nps=520677 nps_delta=-1.04% baseline_ms=1242 candidate_ms=1255
+row=fen-004#2 baseline_nps=340000 candidate_nps=340000 nps_delta=0.00% baseline_ms=1 candidate_ms=1
+row=fen-004#3 baseline_nps=638285 candidate_nps=638285 nps_delta=0.00% baseline_ms=42 candidate_ms=42
+row=fen-004#4 baseline_nps=496900 candidate_nps=483993 nps_delta=-2.60% baseline_ms=600 candidate_ms=616
+row=fen-004#5 baseline_nps=572838 candidate_nps=561870 nps_delta=-1.91% baseline_ms=2920 candidate_ms=2977
+row=fen-005#2 baseline_nps=583534 candidate_nps=583534 nps_delta=0.00% baseline_ms=43 candidate_ms=43
+row=fen-005#3 baseline_nps=569225 candidate_nps=564304 nps_delta=-0.86% baseline_ms=688 candidate_ms=694
+row=fen-005#4 baseline_nps=637830 candidate_nps=633668 nps_delta=-0.65% baseline_ms=1218 candidate_ms=1226
+row=fen-005#5 baseline_nps=560578 candidate_nps=554341 nps_delta=-1.11% baseline_ms=26483 candidate_ms=26781
+row=fen-006#2 baseline_nps=255000 candidate_nps=255000 nps_delta=0.00% baseline_ms=1 candidate_ms=1
+row=fen-006#3 baseline_nps=435818 candidate_nps=435818 nps_delta=0.00% baseline_ms=11 candidate_ms=11
+row=fen-006#4 baseline_nps=502717 candidate_nps=500323 nps_delta=-0.48% baseline_ms=209 candidate_ms=210
+row=fen-006#5 baseline_nps=456161 candidate_nps=450534 nps_delta=-1.23% baseline_ms=3683 candidate_ms=3729
+row=fen-007#2 baseline_nps=531000 candidate_nps=531000 nps_delta=0.00% baseline_ms=4 candidate_ms=4
+row=fen-007#3 baseline_nps=518845 candidate_nps=514171 nps_delta=-0.90% baseline_ms=110 candidate_ms=111
+row=fen-007#4 baseline_nps=484840 candidate_nps=476300 nps_delta=-1.76% baseline_ms=2454 candidate_ms=2498
+row=fen-007#5 baseline_nps=514490 candidate_nps=506297 nps_delta=-1.59% baseline_ms=3708 candidate_ms=3768
+row=fen-008#2 baseline_nps=523500 candidate_nps=523500 nps_delta=0.00% baseline_ms=2 candidate_ms=2
+row=fen-008#3 baseline_nps=630489 candidate_nps=630489 nps_delta=0.00% baseline_ms=47 candidate_ms=47
+row=fen-008#4 baseline_nps=571554 candidate_nps=565132 nps_delta=-1.12% baseline_ms=1408 candidate_ms=1424
+row=fen-008#5 baseline_nps=639292 candidate_nps=635821 nps_delta=-0.54% baseline_ms=2565 candidate_ms=2579
+row=fen-009#2 baseline_nps=268000 candidate_nps=268000 nps_delta=0.00% baseline_ms=1 candidate_ms=1
+row=fen-009#3 baseline_nps=554727 candidate_nps=554727 nps_delta=0.00% baseline_ms=33 candidate_ms=33
+row=fen-009#4 baseline_nps=577025 candidate_nps=573326 nps_delta=-0.64% baseline_ms=155 candidate_ms=156
+row=fen-009#5 baseline_nps=511571 candidate_nps=506722 nps_delta=-0.95% baseline_ms=418 candidate_ms=422
+row=fen-010#2 baseline_nps=356000 candidate_nps=356000 nps_delta=0.00% baseline_ms=7 candidate_ms=7
+row=fen-010#3 baseline_nps=420113 candidate_nps=414237 nps_delta=-1.40% baseline_ms=141 candidate_ms=143
+row=fen-010#4 baseline_nps=450712 candidate_nps=445747 nps_delta=-1.10% baseline_ms=808 candidate_ms=817
+row=fen-010#5 baseline_nps=400908 candidate_nps=394655 nps_delta=-1.56% baseline_ms=8457 candidate_ms=8591
+row=fen-011#2 baseline_nps=495093 candidate_nps=495093 nps_delta=0.00% baseline_ms=43 candidate_ms=43
+row=fen-011#3 baseline_nps=465034 candidate_nps=459808 nps_delta=-1.12% baseline_ms=704 candidate_ms=712
+row=fen-011#4 baseline_nps=527091 candidate_nps=519889 nps_delta=-1.37% baseline_ms=1155 candidate_ms=1171
+row=fen-011#5 baseline_nps=501424 candidate_nps=492960 nps_delta=-1.69% baseline_ms=4077 candidate_ms=4147
+row=fen-012#2 baseline_nps=402000 candidate_nps=402000 nps_delta=0.00% baseline_ms=2 candidate_ms=2
+row=fen-012#3 baseline_nps=530071 candidate_nps=530071 nps_delta=0.00% baseline_ms=28 candidate_ms=28
+row=fen-012#4 baseline_nps=490534 candidate_nps=481712 nps_delta=-1.80% baseline_ms=273 candidate_ms=278
+row=fen-012#5 baseline_nps=520708 candidate_nps=512079 nps_delta=-1.66% baseline_ms=1899 candidate_ms=1931
+row=fen-013#2 baseline_nps=480625 candidate_nps=480625 nps_delta=0.00% baseline_ms=8 candidate_ms=8
+row=fen-013#3 baseline_nps=449996 candidate_nps=441937 nps_delta=-1.79% baseline_ms=329 candidate_ms=335
+row=fen-013#4 baseline_nps=439484 candidate_nps=428725 nps_delta=-2.45% baseline_ms=6057 candidate_ms=6209
+row=fen-013#5 baseline_nps=497136 candidate_nps=487004 nps_delta=-2.04% baseline_ms=81181 candidate_ms=82870
+row=fen-014#2 baseline_nps=365500 candidate_nps=365500 nps_delta=0.00% baseline_ms=4 candidate_ms=4
+row=fen-014#3 baseline_nps=468716 candidate_nps=461823 nps_delta=-1.47% baseline_ms=67 candidate_ms=68
+row=fen-014#4 baseline_nps=467996 candidate_nps=459667 nps_delta=-1.78% baseline_ms=883 candidate_ms=899
+row=fen-014#5 baseline_nps=442949 candidate_nps=435843 nps_delta=-1.60% baseline_ms=6378 candidate_ms=6482
+row=fen-015#2 baseline_nps=355743 candidate_nps=346850 nps_delta=-2.50% baseline_ms=39 candidate_ms=40
+row=fen-015#3 baseline_nps=396531 candidate_nps=388230 nps_delta=-2.09% baseline_ms=608 candidate_ms=621
+row=fen-015#4 baseline_nps=396067 candidate_nps=387852 nps_delta=-2.07% baseline_ms=12274 candidate_ms=12534
+row=fen-015#5 baseline_nps=340467 candidate_nps=331838 nps_delta=-2.53% baseline_ms=380485 candidate_ms=390379
+row=fen-016#2 baseline_nps=465000 candidate_nps=465000 nps_delta=0.00% baseline_ms=1 candidate_ms=1
+row=fen-016#3 baseline_nps=546701 candidate_nps=546701 nps_delta=0.00% baseline_ms=57 candidate_ms=57
+row=fen-016#4 baseline_nps=522616 candidate_nps=514931 nps_delta=-1.47% baseline_ms=603 candidate_ms=612
+row=fen-016#5 baseline_nps=442407 candidate_nps=433724 nps_delta=-1.96% baseline_ms=13985 candidate_ms=14265

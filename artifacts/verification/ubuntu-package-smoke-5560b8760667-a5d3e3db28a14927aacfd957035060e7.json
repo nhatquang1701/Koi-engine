@@ -1,0 +1,11 @@
+{
+  "source_commit": "5560b876066749f0f20a86c304e3b6faafa7526f",
+  "source_checkout": "C:\\Users\\ntATh\\AppData\\Local\\Temp\\koi-linux-source-5560b8760667-a5d3e3db28a14927aacfd957035060e7",
+  "smoke_script_sha256": "dba7edd4452b6f6a920fd3f7223dc1213e153e6824b5c5eda766b9c826830260",
+  "package_archive": "C:\\Users\\ntATh\\AppData\\Local\\Temp\\koi-linux-source-5560b8760667-a5d3e3db28a14927aacfd957035060e7\\artifacts\\packages\\koi-engine-v1.0.0-linux-x86_64.tar.gz",
+  "package_archive_sha256": "b6eaf86d1be094cea7fadc5a33ce5350a14ffc9c37721b8b1a5249aa76d76202",
+  "package_manifest": "C:\\Users\\ntATh\\AppData\\Local\\Temp\\koi-linux-source-5560b8760667-a5d3e3db28a14927aacfd957035060e7\\artifacts\\packages\\koi-engine-v1.0.0-linux-x86_64\\package.json",
+  "package_manifest_sha256": "6811cff708d40ef6d1d26073d2f7dcf98172ade074c811a1b79e6c34c1bafbb9",
+  "v4_fixture_sha256": "f1fd40a19f3fafccb7715671d61e655294e75fe6322b2d3eaf4b5f73c0a14aa2",
+  "v5_fixture_sha256": "45ab9be6a873ee00eaba1864ceec6acdb46fa963c805ad667019beada5224e39"
+}

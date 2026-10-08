@@ -1,0 +1,18 @@
+Koi hardening NPS report
+generated 2026-09-24T21:27:47
+commit c20a99a
+command: koi-bench --threads N --speed 100 --timed
+
+threads positions matches      nodes      qnodes elapsed_ms        nps
+      1        64      64      16469      753552       3394     226877
+      2        64      64      34460     1506564       3685     418188
+      4        64      64      64004     3047424       4503     690967
+      8        64      64     138583     6095642       6886     905347
+
+live info probe: koi_chess engine client, startpos, go movetime 700
+  threads 1: depth 5 nodes 25116 nps 93022 time_ms 270
+  threads 4: depth 5 nodes 74850 nps 206198 time_ms 363
+  threads 8: depth 5 nodes 116373 nps 238469 time_ms 488
+
+note: the live rows above include Lazy SMP helper traffic in the info node count;
+the timed rows report the merged end-of-search totals per position.

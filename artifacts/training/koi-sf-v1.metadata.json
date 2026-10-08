@@ -1,0 +1,28 @@
+{
+  "schema": "koi-nnue-training-metadata-v1",
+  "created": "2026-09-16T17:01:27Z",
+  "corpus": "artifacts\\training\\labels.txt",
+  "rows_used": 1133693,
+  "val_rows": 56684,
+  "feature_set": "piece-square-king-pawn-v2",
+  "quantization": "int16/int8",
+  "architecture": [
+    960,
+    256,
+    32,
+    1
+  ],
+  "epochs": 4,
+  "batch_size": 4096,
+  "learning_rate": 0.001,
+  "seed": 20260916,
+  "target_scale": 100.0,
+  "format": "v3",
+  "hidden_shift": 7,
+  "bottleneck_shift": 7,
+  "output_shift": 4,
+  "val_mae_cp": 122.8915,
+  "payload_sha256": "d00215184ff75503bda86a0b96f271843f6b15f0c39b0a04c5b8b41c6096bf7d",
+  "network_sha256": "0b1649cd9364b315ac2091197f036e4b33a46f90c05fc46bda003246fa109b1a",
+  "command": "tools\\measurement\\train_nnue_sf.py --float-in artifacts\\training\\koi-sf-v1.pt --format v3 --hidden-shift 7 --bottleneck-shift 7 --output-shifts 3 4 5 6 --net-out artifacts\\training\\koi-sf-v1.nnue --meta-out artifacts\\training\\koi-sf-v1.metadata.json"
+}

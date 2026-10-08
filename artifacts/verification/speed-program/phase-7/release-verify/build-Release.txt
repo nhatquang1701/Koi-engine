@@ -1,0 +1,87 @@
+[1/233] Generating CXX dyndep file CMakeFiles\koi_cpu_features.dir\CXX.dd
+[2/232] Generating CXX dyndep file CMakeFiles\uci_match_fixture.dir\CXX.dd
+[3/230] Generating CXX dyndep file CMakeFiles\koi_engine.dir\CXX.dd
+[4/229] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\position.cpp" for CXX dependencies
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[5/229] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\position.cpp" for CXX dependencies
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[6/229] Generating CXX dyndep file CMakeFiles\koi_engine_avx512.dir\CXX.dd
+[7/228] Generating CXX dyndep file CMakeFiles\koi_core.dir\CXX.dd
+[8/186] Generating CXX dyndep file CMakeFiles\koi_gpu_probe.dir\CXX.dd
+[9/185] Generating CXX dyndep file CMakeFiles\gpu_nnue_tests.dir\CXX.dd
+[10/184] Generating CXX dyndep file CMakeFiles\koi_core_generic.dir\CXX.dd
+[11/151] Generating CXX dyndep file CMakeFiles\koi_core_avx512.dir\CXX.dd
+[12/118] Linking CXX executable koi_gpu_probe.exe
+[13/118] Generating CXX dyndep file CMakeFiles\koi_core_tests.dir\CXX.dd
+[14/117] Building CXX object CMakeFiles\koi_core_avx512.dir\src\koi\position.cpp.obj
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[15/117] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\position.cpp.obj
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[16/117] Linking CXX executable koi_core_tests.exe
+[17/117] Generating CXX dyndep file CMakeFiles\evaluation_boundary_tests.dir\CXX.dd
+[18/116] Linking CXX static library koi_core_avx512.lib
+[19/116] Linking CXX static library koi_core_generic.lib
+[20/116] Generating CXX dyndep file CMakeFiles\nnue_boundary_tests.dir\CXX.dd
+[21/115] Generating CXX dyndep file CMakeFiles\evaluation_architecture_tests.dir\CXX.dd
+[22/114] Linking CXX executable evaluation_boundary_tests.exe
+[23/114] Generating CXX dyndep file CMakeFiles\koi_cpu_features_tests.dir\CXX.dd
+[24/113] Linking CXX executable gpu_nnue_tests.exe
+[25/113] Generating CXX dyndep file CMakeFiles\koi_cpu_variant_tests.dir\CXX.dd
+[26/112] Linking CXX executable evaluation_architecture_tests.exe
+[27/112] Generating CXX dyndep file CMakeFiles\koi_module_tests.dir\CXX.dd
+[28/111] Linking CXX executable koi_cpu_features_tests.exe
+[29/111] Generating CXX dyndep file CMakeFiles\syzygy_tablebase_tests.dir\CXX.dd
+[30/110] Linking CXX executable koi_cpu_variant_tests.exe
+[31/110] Generating CXX dyndep file CMakeFiles\koi_rules_tests.dir\CXX.dd
+[32/109] Linking CXX executable koi_module_tests.exe
+[33/109] Generating CXX dyndep file CMakeFiles\native_rule_state_tests.dir\CXX.dd
+[34/108] Linking CXX executable syzygy_tablebase_tests.exe
+[35/108] Generating CXX dyndep file CMakeFiles\opening_book_tests.dir\CXX.dd
+[36/107] Linking CXX executable koi_rules_tests.exe
+[37/107] Generating CXX dyndep file CMakeFiles\uci_controller_tests.dir\CXX.dd
+[38/106] Linking CXX executable native_rule_state_tests.exe
+[39/106] Generating CXX dyndep file CMakeFiles\completion_gate_tests.dir\CXX.dd
+[40/105] Linking CXX executable opening_book_tests.exe
+[41/105] Generating CXX dyndep file CMakeFiles\koi_search_tests.dir\CXX.dd
+[42/104] Linking CXX executable nnue_boundary_tests.exe
+[43/104] Generating CXX dyndep file CMakeFiles\search_ordering_tests.dir\CXX.dd
+[44/103] Linking CXX executable completion_gate_tests.exe
+[45/103] Generating CXX dyndep file CMakeFiles\search_architecture_tests.dir\CXX.dd
+[46/102] Linking CXX executable search_architecture_tests.exe
+[47/102] Generating CXX dyndep file CMakeFiles\search_policy_tests.dir\CXX.dd
+[48/101] Linking CXX executable search_ordering_tests.exe
+[49/101] Generating CXX dyndep file CMakeFiles\search_runtime_tests.dir\CXX.dd
+[50/100] Linking CXX executable search_policy_tests.exe
+[51/100] Generating CXX dyndep file CMakeFiles\static_exchange_tests.dir\CXX.dd
+[52/99] Linking CXX executable search_runtime_tests.exe
+[53/99] Generating CXX dyndep file CMakeFiles\transposition_table_tests.dir\CXX.dd
+[54/98] Linking CXX executable static_exchange_tests.exe
+[55/98] Generating CXX dyndep file CMakeFiles\search_service_tests.dir\CXX.dd
+[56/97] Linking CXX executable transposition_table_tests.exe
+[57/97] Generating CXX dyndep file CMakeFiles\koi_soak_tests.dir\CXX.dd
+[58/96] Linking CXX executable koi_search_tests.exe
+[59/96] Generating CXX dyndep file CMakeFiles\classical_evaluator_tests.dir\CXX.dd
+[60/95] Linking CXX executable classical_evaluator_tests.exe
+[61/95] Generating CXX dyndep file CMakeFiles\evaluation_features_tests.dir\CXX.dd
+[62/94] Linking CXX executable koi_soak_tests.exe
+[63/94] Generating CXX dyndep file CMakeFiles\time_manager_tests.dir\CXX.dd
+[64/93] Linking CXX executable search_service_tests.exe
+[65/93] Linking CXX executable uci_controller_tests.exe
+[66/93] Generating CXX dyndep file CMakeFiles\koi_strength_tests.dir\CXX.dd
+[67/92] Generating CXX dyndep file CMakeFiles\perft_tests.dir\CXX.dd
+[68/91] Linking CXX executable evaluation_features_tests.exe
+[69/91] Generating CXX dyndep file CMakeFiles\koi_perft.dir\CXX.dd
+[70/90] Linking CXX executable time_manager_tests.exe
+[71/90] Generating CXX dyndep file CMakeFiles\koi_bench.dir\CXX.dd
+[72/88] Generating CXX dyndep file CMakeFiles\koi_replay.dir\CXX.dd
+[73/87] Linking CXX executable perft_tests.exe
+[74/87] Generating CXX dyndep file CMakeFiles\koi_eval_features.dir\CXX.dd
+[75/86] Linking CXX executable koi-replay.exe
+[76/86] Generating CXX dyndep file CMakeFiles\koi_replay_tests.dir\CXX.dd
+[77/84] Linking CXX executable koi-perft.exe
+[78/84] Generating CXX dyndep file CMakeFiles\koi_engine_avx2.dir\CXX.dd
+[79/83] Linking CXX executable koi-eval-features.exe
+[80/83] Linking CXX executable koi_strength_tests.exe
+[81/83] Linking CXX executable koi-engine.exe
+[82/83] Linking CXX executable koi-engine-avx2.exe
+[83/83] Linking CXX executable koi-engine-avx512.exe

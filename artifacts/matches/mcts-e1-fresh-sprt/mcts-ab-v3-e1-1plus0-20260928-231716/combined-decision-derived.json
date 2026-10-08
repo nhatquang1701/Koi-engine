@@ -1,0 +1,58 @@
+{
+  "schema": "koi-sprt-combined-derivation-v1",
+  "derived_from": "tools/stability/sprt_compare.ps1 Get-CombinedSprtResult; sum independent color LLRs; bounds ln(19), alpha=beta=0.05",
+  "hypotheses": {
+    "elo0": 0,
+    "elo1": 10,
+    "alpha": 0.05,
+    "beta": 0.05,
+    "accept_threshold": 2.9444389791664403,
+    "reject_threshold": -2.9444389791664403
+  },
+  "candidate": {
+    "algorithm": "MCTS",
+    "model_sha256": "c56d5055d403e471c982d4f967cdd742178f6418b1ff2eb46b2ba66ddf879c05",
+    "executable_sha256": "e152c7d114515deee90cda5fdaedcd16fb0151fde411ad6d97d51fc66061e13f",
+    "baseline_algorithm": "AlphaBeta",
+    "threads": 1,
+    "hash_mb": 512,
+    "time_control": "1+0",
+    "own_book": false,
+    "opening_corpus_sha256": "f80ece98db12cafcba50bdf10ec2bcf010b429f6ed56cef02cc1d6969cc56050"
+  },
+  "white": {
+    "report": "white/koi-uci-match-20260928-191023-212.json",
+    "report_sha256": "2e20708be5e010ee29988f21f67fdc91659c146cac04258a29e7145073d72737",
+    "pgn_sha256": "bb3fd6348b86cc184a2fa895e4765e9394202037abd4fb24001b2fc8e533af3f",
+    "validator_openings_sha256": "e54d0efdc2d946dc54acf3bbcd8bc0db891128ca5a40d4dcc62f4ce67b896928",
+    "games": 101,
+    "wins": 0,
+    "draws": 0,
+    "losses": 101,
+    "llr": -2.948023,
+    "decision": "reject",
+    "validator": "PASS: 101 legal completed games; all 101 openings covered"
+  },
+  "black": {
+    "report": "black/koi-uci-match-20260928-174957-348.json",
+    "report_sha256": "951b8bdbe66174b1a6ac93874ab18e9828c191de94e8e80d15bd735a647ec5d7",
+    "pgn_sha256": "c7f43819e7eb64f977d92570b57b185fc5c065118dd94f95488e65c172cc883a",
+    "validator_openings_sha256": "e9d52077899b819b2c42b037d47515ec6adcead727185aabc31583821297c00c",
+    "games": 53,
+    "wins": 0,
+    "draws": 1,
+    "losses": 52,
+    "llr": -80.465035,
+    "decision": "reject",
+    "validator": "PASS: 53 legal completed games; all 53 openings covered"
+  },
+  "combined": {
+    "games": 154,
+    "wins": 0,
+    "draws": 1,
+    "losses": 153,
+    "score": 0.003246753246753247,
+    "llr": -83.413058,
+    "decision": "reject"
+  }
+}

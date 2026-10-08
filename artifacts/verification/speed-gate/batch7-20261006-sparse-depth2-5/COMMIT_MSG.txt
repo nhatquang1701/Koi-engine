@@ -1,0 +1,31 @@
+perf(search): fill snapshots in place, scan pins from one ray, and reuse feature slots
+
+- record_snapshot(state, snapshot()) becomes snapshot_into(state, null_move):
+  the history slot is filled field by field straight from the state, so
+  make/unmake pays no intermediate Snapshot temporary. The full-history
+  memmove path, slot selection, and every stored field are unchanged; only
+  struct padding in the shifted slot differs and nothing reads it. unapply
+  now restores directly from the history slot instead of copying it out first.
+- refresh_king_masks fetches each ray word (ray_attacks & occupied) once per
+  direction and derives both nearest blockers from that single word; the ray
+  is monotone and starts next to the king, so the near end follows the ray's
+  step sign. Same pin condition and iteration order.
+- FeatureState gains get_or_compute_into (the by-value get_or_compute becomes
+  a thin NRVO wrapper) and GameState gains position_features_into; the
+  evaluator extractor and the two search fetch sites (ensure_features and
+  lmr_parent_features) fill their slots directly, removing one full
+  PositionFeatures copy per fetch. Fresh-local sites already elide and were
+  left alone.
+
+Candidate 10 (reusing picker-computed quiet-history scores in the negamax
+loop) was dropped: the ordering tables mutate during a picker's lifetime
+(completed capture subtrees run history updates while the parent picker is
+still alive), so a value captured at prepare time is stale for later
+candidates and bit-identity is unprovable.
+
+Local verification before the gate: koi_core builds clean; the candidate full
+build completes with FULL-BUILD-EXIT 0; the 18-target ctest suite passes 18/18
+(exit 0, 121.7 s wall) with TMP/TEMP redirected to build\koi-test-temp (the
+agent sandbox denies directory creation under system %TEMP%).
+
+Speed gate on the macOS arm64 worker against the isolated 8d3bdd3 baseline: PASS (+0.57% total NPS, +1.10% median row NPS; 5 runs, depth sweep 2..5, 22 noise rows excluded).

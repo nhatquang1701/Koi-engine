@@ -1,0 +1,9 @@
+output_directory=C:\Users\ntATh\AI test\Koi engine\artifacts\verification\speed-gate\batch2-metadata-evaluator-20261003-sparse-depth2-5
+baseline_executable=C:\Users\ntATh\AI test\Koi engine\artifacts\verification\speed-gate\batch2-metadata-evaluator-20261003-sparse-depth2-5\baseline\koi-bench-baseline.exe
+candidate_executable=C:\Users\ntATh\AI test\Koi engine\build\roadmap-visit-win-release\koi-bench.exe
+runs=5 threads=1 speed=100 timed=1 fen-file=C:\Users\ntATh\AI test\Koi engine\artifacts\verification\speed-gate\batch2-metadata-evaluator-20261003-sparse-depth2-5\sparse-qsearch-fens.txt depth-sweep=2..5
+nps_regression_limit=2.00% row_nps_regression_limit=2.00% min_row_elapsed_ms=20.0
+run=1 baseline_nps=169,483 candidate_nps=177,313 order=baseline,candidate
+run=2 baseline_nps=216,615 candidate_nps=163,697 order=candidate,baseline
+run=3 baseline_nps=234,228 candidate_nps=266,304 order=baseline,candidate
+run=4 baseline_nps=234,177 candidate_nps=262,483 order=candidate,baseline

@@ -1,0 +1,129 @@
+# deterministic, no-replacement sample; seed=20261016; 4 unseen 2-ply continuations per curated root
+lmp-quiet-check-b9-italian-game-1 | e2e4 e7e5 g1f3 b8c6 f1c4 f8c5 d1e2 d7d5
+lmp-quiet-check-b9-italian-game-2 | e2e4 e7e5 g1f3 b8c6 f1c4 f8c5 c4b5 a7a5
+lmp-quiet-check-b9-italian-game-3 | e2e4 e7e5 g1f3 b8c6 f1c4 f8c5 h2h3 c6b4
+lmp-quiet-check-b9-italian-game-4 | e2e4 e7e5 g1f3 b8c6 f1c4 f8c5 e1e2 c6a5
+lmp-quiet-check-b9-ruy-lopez-1 | e2e4 e7e5 g1f3 b8c6 f1b5 a7a6 a2a4 d8e7
+lmp-quiet-check-b9-ruy-lopez-2 | e2e4 e7e5 g1f3 b8c6 f1b5 a7a6 c2c4 d7d5
+lmp-quiet-check-b9-ruy-lopez-3 | e2e4 e7e5 g1f3 b8c6 f1b5 a7a6 b5a6 d7d5
+lmp-quiet-check-b9-ruy-lopez-4 | e2e4 e7e5 g1f3 b8c6 f1b5 a7a6 b5c4 c6a7
+lmp-quiet-check-b9-scotch-game-1 | e2e4 e7e5 g1f3 b8c6 d2d4 e5d4 f3h4 h7h5
+lmp-quiet-check-b9-scotch-game-2 | e2e4 e7e5 g1f3 b8c6 d2d4 e5d4 a2a3 c6a5
+lmp-quiet-check-b9-scotch-game-3 | e2e4 e7e5 g1f3 b8c6 d2d4 e5d4 e1e2 c6b4
+lmp-quiet-check-b9-scotch-game-4 | e2e4 e7e5 g1f3 b8c6 d2d4 e5d4 c1g5 c6e5
+lmp-quiet-check-b9-four-knights-1 | e2e4 e7e5 g1f3 b8c6 b1c3 g8f6 f3e5 d7d5
+lmp-quiet-check-b9-four-knights-2 | e2e4 e7e5 g1f3 b8c6 b1c3 g8f6 f1a6 g7g6
+lmp-quiet-check-b9-four-knights-3 | e2e4 e7e5 g1f3 b8c6 b1c3 g8f6 b2b3 d7d5
+lmp-quiet-check-b9-four-knights-4 | e2e4 e7e5 g1f3 b8c6 b1c3 g8f6 f3d4 c6a5
+lmp-quiet-check-b9-kings-gambit-1 | e2e4 e7e5 f2f4 e5f4 b2b3 f8e7
+lmp-quiet-check-b9-kings-gambit-2 | e2e4 e7e5 f2f4 e5f4 c2c3 g8h6
+lmp-quiet-check-b9-kings-gambit-3 | e2e4 e7e5 f2f4 e5f4 b2b4 d7d5
+lmp-quiet-check-b9-kings-gambit-4 | e2e4 e7e5 f2f4 e5f4 d1e2 a7a6
+lmp-quiet-check-b9-vienna-game-1 | e2e4 e7e5 b1c3 d8f6 d2d4
+lmp-quiet-check-b9-vienna-game-2 | e2e4 e7e5 b1c3 c7c5 c3b1
+lmp-quiet-check-b9-vienna-game-3 | e2e4 e7e5 b1c3 a7a5 f1c4
+lmp-quiet-check-b9-vienna-game-4 | e2e4 e7e5 b1c3 f8b4 g1f3
+lmp-quiet-check-b9-ponziani-1 | e2e4 e7e5 g1f3 b8c6 c2c3 d7d6 f3h4
+lmp-quiet-check-b9-ponziani-2 | e2e4 e7e5 g1f3 b8c6 c2c3 b7b5 g2g4
+lmp-quiet-check-b9-ponziani-3 | e2e4 e7e5 g1f3 b8c6 c2c3 a8b8 b1a3
+lmp-quiet-check-b9-ponziani-4 | e2e4 e7e5 g1f3 b8c6 c2c3 e8e7 d1b3
+lmp-quiet-check-b9-center-game-1 | e2e4 e7e5 d2d4 e5d4 d1e2 g8e7
+lmp-quiet-check-b9-center-game-2 | e2e4 e7e5 d2d4 e5d4 c2c3 f8e7
+lmp-quiet-check-b9-center-game-3 | e2e4 e7e5 d2d4 e5d4 e4e5 g8e7
+lmp-quiet-check-b9-center-game-4 | e2e4 e7e5 d2d4 e5d4 d1d4 f8e7
+lmp-quiet-check-b9-french-advance-1 | e2e4 e7e6 d2d4 d7d5 e4e5 e8d7 e1e2
+lmp-quiet-check-b9-french-advance-2 | e2e4 e7e6 d2d4 d7d5 e4e5 g8e7 e1d2
+lmp-quiet-check-b9-french-advance-3 | e2e4 e7e6 d2d4 d7d5 e4e5 g8f6 d1g4
+lmp-quiet-check-b9-french-advance-4 | e2e4 e7e6 d2d4 d7d5 e4e5 g7g5 a2a4
+lmp-quiet-check-b9-french-exchange-1 | e2e4 e7e6 d2d4 d7d5 e4d5 g8h6 d1e2
+lmp-quiet-check-b9-french-exchange-2 | e2e4 e7e6 d2d4 d7d5 e4d5 b8a6 d1e2
+lmp-quiet-check-b9-french-exchange-3 | e2e4 e7e6 d2d4 d7d5 e4d5 g8f6 h2h4
+lmp-quiet-check-b9-french-exchange-4 | e2e4 e7e6 d2d4 d7d5 e4d5 d8d6 c1d2
+lmp-quiet-check-b9-caro-kann-advance-1 | e2e4 c7c6 d2d4 d7d5 e4e5 c8e6 b1d2
+lmp-quiet-check-b9-caro-kann-advance-2 | e2e4 c7c6 d2d4 d7d5 e4e5 d8c7 g2g3
+lmp-quiet-check-b9-caro-kann-advance-3 | e2e4 c7c6 d2d4 d7d5 e4e5 a7a5 c1f4
+lmp-quiet-check-b9-caro-kann-advance-4 | e2e4 c7c6 d2d4 d7d5 e4e5 c8f5 c2c4
+lmp-quiet-check-b9-caro-kann-exchange-1 | e2e4 c7c6 d2d4 d7d5 e4d5 c8e6 c2c4
+lmp-quiet-check-b9-caro-kann-exchange-2 | e2e4 c7c6 d2d4 d7d5 e4d5 g7g5 f1d3
+lmp-quiet-check-b9-caro-kann-exchange-3 | e2e4 c7c6 d2d4 d7d5 e4d5 f7f5 c1e3
+lmp-quiet-check-b9-caro-kann-exchange-4 | e2e4 c7c6 d2d4 d7d5 e4d5 c6c5 f1a6
+lmp-quiet-check-b9-sicilian-najdorf-1 | e2e4 c7c5 g1f3 d7d6 d2d4 c5d4 f3d4 g8f6 b1c3 a7a6 b2b3 e8d7
+lmp-quiet-check-b9-sicilian-najdorf-2 | e2e4 c7c5 g1f3 d7d6 d2d4 c5d4 f3d4 g8f6 b1c3 a7a6 b2b4 b7b5
+lmp-quiet-check-b9-sicilian-najdorf-3 | e2e4 c7c5 g1f3 d7d6 d2d4 c5d4 f3d4 g8f6 b1c3 a7a6 h1g1 b8c6
+lmp-quiet-check-b9-sicilian-najdorf-4 | e2e4 c7c5 g1f3 d7d6 d2d4 c5d4 f3d4 g8f6 b1c3 a7a6 f1a6 a8a6
+lmp-quiet-check-b9-sicilian-dragon-1 | e2e4 c7c5 g1f3 d7d6 d2d4 c5d4 f3d4 g8f6 b1c3 g7g6 d1f3 f6d7
+lmp-quiet-check-b9-sicilian-dragon-2 | e2e4 c7c5 g1f3 d7d6 d2d4 c5d4 f3d4 g8f6 b1c3 g7g6 e1d2 e7e6
+lmp-quiet-check-b9-sicilian-dragon-3 | e2e4 c7c5 g1f3 d7d6 d2d4 c5d4 f3d4 g8f6 b1c3 g7g6 h2h3 c8d7
+lmp-quiet-check-b9-sicilian-dragon-4 | e2e4 c7c5 g1f3 d7d6 d2d4 c5d4 f3d4 g8f6 b1c3 g7g6 c1f4 d8b6
+lmp-quiet-check-b9-sicilian-alapin-1 | e2e4 c7c5 c2c3 b7b5 f1b5
+lmp-quiet-check-b9-sicilian-alapin-2 | e2e4 c7c5 c2c3 d7d5 g1f3
+lmp-quiet-check-b9-sicilian-alapin-3 | e2e4 c7c5 c2c3 b8c6 e1e2
+lmp-quiet-check-b9-sicilian-alapin-4 | e2e4 c7c5 c2c3 e7e5 g1e2
+lmp-quiet-check-b9-sicilian-closed-1 | e2e4 c7c5 b1c3 b8c6 g2g3 g7g6 c3a4
+lmp-quiet-check-b9-sicilian-closed-2 | e2e4 c7c5 b1c3 b8c6 g2g3 c6d4 c3b5
+lmp-quiet-check-b9-sicilian-closed-3 | e2e4 c7c5 b1c3 b8c6 g2g3 d8b6 e4e5
+lmp-quiet-check-b9-sicilian-closed-4 | e2e4 c7c5 b1c3 b8c6 g2g3 a8b8 d1g4
+lmp-quiet-check-b9-queens-gambit-declined-1 | d2d4 d7d5 c2c4 e7e6 b1c3 g8f6 h2h3 h8g8
+lmp-quiet-check-b9-queens-gambit-declined-2 | d2d4 d7d5 c2c4 e7e6 b1c3 g8f6 b2b4 d5c4
+lmp-quiet-check-b9-queens-gambit-declined-3 | d2d4 d7d5 c2c4 e7e6 b1c3 g8f6 d1d3 h7h5
+lmp-quiet-check-b9-queens-gambit-declined-4 | d2d4 d7d5 c2c4 e7e6 b1c3 g8f6 c1h6 e8e7
+lmp-quiet-check-b9-queens-gambit-accepted-1 | d2d4 d7d5 c2c4 d5c4 d4d5 e7e5
+lmp-quiet-check-b9-queens-gambit-accepted-2 | d2d4 d7d5 c2c4 d5c4 b1a3 b7b5
+lmp-quiet-check-b9-queens-gambit-accepted-3 | d2d4 d7d5 c2c4 d5c4 d1d3 f7f5
+lmp-quiet-check-b9-queens-gambit-accepted-4 | d2d4 d7d5 c2c4 d5c4 g2g4 g7g6
+lmp-quiet-check-b9-slav-defense-1 | d2d4 d7d5 c2c4 c7c6 b1c3 g8f6 d1d2 c8d7
+lmp-quiet-check-b9-slav-defense-2 | d2d4 d7d5 c2c4 c7c6 b1c3 g8f6 c3a4 g7g6
+lmp-quiet-check-b9-slav-defense-3 | d2d4 d7d5 c2c4 c7c6 b1c3 g8f6 c1g5 c8h3
+lmp-quiet-check-b9-slav-defense-4 | d2d4 d7d5 c2c4 c7c6 b1c3 g8f6 c3e4 d8a5
+lmp-quiet-check-b9-london-system-1 | d2d4 d7d5 c1f4 g8f6 e2e3 c8e6 d1d3
+lmp-quiet-check-b9-london-system-2 | d2d4 d7d5 c1f4 g8f6 e2e3 a7a6 d1c1
+lmp-quiet-check-b9-london-system-3 | d2d4 d7d5 c1f4 g8f6 e2e3 c7c5 f1a6
+lmp-quiet-check-b9-london-system-4 | d2d4 d7d5 c1f4 g8f6 e2e3 h8g8 d1c1
+lmp-quiet-check-b9-kings-indian-1 | d2d4 g8f6 c2c4 g7g6 b1c3 f8g7 e2e4 a7a5 e1e2
+lmp-quiet-check-b9-kings-indian-2 | d2d4 g8f6 c2c4 g7g6 b1c3 f8g7 e2e4 h7h5 c3d5
+lmp-quiet-check-b9-kings-indian-3 | d2d4 g8f6 c2c4 g7g6 b1c3 f8g7 e2e4 b7b5 d1d3
+lmp-quiet-check-b9-kings-indian-4 | d2d4 g8f6 c2c4 g7g6 b1c3 f8g7 e2e4 e8g8 a1b1
+lmp-quiet-check-b9-grunfeld-defense-1 | d2d4 g8f6 c2c4 g7g6 b1c3 d7d5 b2b4 d8d6
+lmp-quiet-check-b9-grunfeld-defense-2 | d2d4 g8f6 c2c4 g7g6 b1c3 d7d5 a2a3 h8g8
+lmp-quiet-check-b9-grunfeld-defense-3 | d2d4 g8f6 c2c4 g7g6 b1c3 d7d5 c3a4 h7h5
+lmp-quiet-check-b9-grunfeld-defense-4 | d2d4 g8f6 c2c4 g7g6 b1c3 d7d5 e2e4 h7h6
+lmp-quiet-check-b9-nimzo-indian-1 | d2d4 g8f6 c2c4 e7e6 b1c3 f8b4 a2a4 b7b6
+lmp-quiet-check-b9-nimzo-indian-2 | d2d4 g8f6 c2c4 e7e6 b1c3 f8b4 g2g3 d8e7
+lmp-quiet-check-b9-nimzo-indian-3 | d2d4 g8f6 c2c4 e7e6 b1c3 f8b4 d1d3 d8e7
+lmp-quiet-check-b9-nimzo-indian-4 | d2d4 g8f6 c2c4 e7e6 b1c3 f8b4 c1f4 b7b6
+lmp-quiet-check-b9-bogo-indian-1 | d2d4 g8f6 c2c4 e7e6 g1f3 f8b4 d1d2 f6e4
+lmp-quiet-check-b9-bogo-indian-2 | d2d4 g8f6 c2c4 e7e6 g1f3 f8b4 b1d2 d7d6
+lmp-quiet-check-b9-bogo-indian-3 | d2d4 g8f6 c2c4 e7e6 g1f3 f8b4 c1d2 b4c5
+lmp-quiet-check-b9-bogo-indian-4 | d2d4 g8f6 c2c4 e7e6 g1f3 f8b4 b1c3 e8g8
+lmp-quiet-check-b9-benoni-defense-1 | d2d4 g8f6 c2c4 c7c5 d4d5 e7e6 d1a4 e6e5
+lmp-quiet-check-b9-benoni-defense-2 | d2d4 g8f6 c2c4 c7c5 d4d5 e7e6 h2h4 f8e7
+lmp-quiet-check-b9-benoni-defense-3 | d2d4 g8f6 c2c4 c7c5 d4d5 e7e6 f2f4 a7a6
+lmp-quiet-check-b9-benoni-defense-4 | d2d4 g8f6 c2c4 c7c5 d4d5 e7e6 h2h4 e8e7
+lmp-quiet-check-b9-catalan-opening-1 | d2d4 g8f6 c2c4 e7e6 g2g3 f6d5 h2h4
+lmp-quiet-check-b9-catalan-opening-2 | d2d4 g8f6 c2c4 e7e6 g2g3 h8g8 e2e4
+lmp-quiet-check-b9-catalan-opening-3 | d2d4 g8f6 c2c4 e7e6 g2g3 a7a6 f1g2
+lmp-quiet-check-b9-catalan-opening-4 | d2d4 g8f6 c2c4 e7e6 g2g3 f8d6 d1d2
+lmp-quiet-check-b9-english-symmetrical-1 | c2c4 c7c5 b1c3 b8c6 f2f4 a7a6
+lmp-quiet-check-b9-english-symmetrical-2 | c2c4 c7c5 b1c3 b8c6 f2f4 c6b4
+lmp-quiet-check-b9-english-symmetrical-3 | c2c4 c7c5 b1c3 b8c6 d2d3 f7f5
+lmp-quiet-check-b9-english-symmetrical-4 | c2c4 c7c5 b1c3 b8c6 h2h3 g7g6
+lmp-quiet-check-b9-english-four-knights-1 | c2c4 e7e5 b1c3 g8f6 g1f3 b8c6 a1b1 e8e7
+lmp-quiet-check-b9-english-four-knights-2 | c2c4 e7e5 b1c3 g8f6 g1f3 b8c6 g2g3 g7g5
+lmp-quiet-check-b9-english-four-knights-3 | c2c4 e7e5 b1c3 g8f6 g1f3 b8c6 c3d5 h7h5
+lmp-quiet-check-b9-english-four-knights-4 | c2c4 e7e5 b1c3 g8f6 g1f3 b8c6 f3g1 g7g5
+lmp-quiet-check-b9-english-reversed-sicilian-1 | c2c4 e7e5 b1c3 g8f6 c3b1 f6e4
+lmp-quiet-check-b9-english-reversed-sicilian-2 | c2c4 e7e5 b1c3 g8f6 h2h3 h7h6
+lmp-quiet-check-b9-english-reversed-sicilian-3 | c2c4 e7e5 b1c3 g8f6 e2e3 f8c5
+lmp-quiet-check-b9-english-reversed-sicilian-4 | c2c4 e7e5 b1c3 g8f6 d1a4 d8e7
+lmp-quiet-check-b9-reti-opening-1 | g1f3 d7d5 c2c4 b7b5 d2d4
+lmp-quiet-check-b9-reti-opening-2 | g1f3 d7d5 c2c4 a7a6 d1c2
+lmp-quiet-check-b9-reti-opening-3 | g1f3 d7d5 c2c4 f7f5 b1c3
+lmp-quiet-check-b9-reti-opening-4 | g1f3 d7d5 c2c4 c7c6 g2g3
+lmp-quiet-check-b9-dutch-defense-1 | d2d4 f7f5 f2f3 h7h5
+lmp-quiet-check-b9-dutch-defense-2 | d2d4 f7f5 b2b4 a7a6
+lmp-quiet-check-b9-dutch-defense-3 | d2d4 f7f5 f2f4 g7g5
+lmp-quiet-check-b9-dutch-defense-4 | d2d4 f7f5 c2c4 b8c6
+lmp-quiet-check-b9-bird-opening-1 | f2f4 d7d5 g2g4 a7a5
+lmp-quiet-check-b9-bird-opening-2 | f2f4 d7d5 c2c3 g7g5
+lmp-quiet-check-b9-bird-opening-3 | f2f4 d7d5 d2d4 f7f6
+lmp-quiet-check-b9-bird-opening-4 | f2f4 d7d5 g1f3 b8d7

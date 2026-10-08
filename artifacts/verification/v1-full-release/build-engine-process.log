@@ -1,0 +1,154 @@
+**********************************************************************
+** Visual Studio 2022 Developer Command Prompt v17.14.39
+** Copyright (c) 2025 Microsoft Corporation
+**********************************************************************
+[1/78] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\classical_evaluator.cpp" for CXX dependencies
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[2/78] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\detail\evaluation_context.cpp" for CXX dependencies
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[3/78] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\detail\attack_tables.cpp" for CXX dependencies
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[4/78] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\detail\compatibility_mirror.cpp" for CXX dependencies
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[5/78] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\detail\root_coordinator.cpp" for CXX dependencies
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[6/78] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\detail\feature_state.cpp" for CXX dependencies
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[7/78] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\detail\search_context.cpp" for CXX dependencies
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[8/78] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\detail\search_context_support.cpp" for CXX dependencies
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[9/78] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\detail\search_ordering_tables.cpp" for CXX dependencies
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[10/78] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\detail\search_runner.cpp" for CXX dependencies
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[11/78] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\detail\search_session.cpp" for CXX dependencies
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[12/78] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\completion_gate.cpp" for CXX dependencies
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[13/78] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\cpu_variant.cpp" for CXX dependencies
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[14/78] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\evaluation_features.cpp" for CXX dependencies
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[15/78] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\executable_path.cpp" for CXX dependencies
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[16/78] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\game_state.cpp" for CXX dependencies
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[17/78] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\move.cpp" for CXX dependencies
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[18/78] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\gpu\cuda_driver.cpp" for CXX dependencies
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[19/78] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\gpu\nnue_gpu_evaluator.cpp" for CXX dependencies
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[20/78] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\gpu\gpu_nnue_service.cpp" for CXX dependencies
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[21/78] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\move_chooser.cpp" for CXX dependencies
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[22/78] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\perft.cpp" for CXX dependencies
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[23/78] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\nnue.cpp" for CXX dependencies
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[24/78] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\opening_book.cpp" for CXX dependencies
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[25/78] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\position.cpp" for CXX dependencies
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[26/78] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\search_service.cpp" for CXX dependencies
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[27/78] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\search_ordering.cpp" for CXX dependencies
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[28/78] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\static_exchange.cpp" for CXX dependencies
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[29/78] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\strength_suite.cpp" for CXX dependencies
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[30/78] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\syzygy_tablebase.cpp" for CXX dependencies
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[31/78] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\time_manager.cpp" for CXX dependencies
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[32/78] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\uci_controller.cpp" for CXX dependencies
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[33/78] Scanning "C:\Users\ntATh\AI test\Koi engine\tools\engine\koi_replay.cpp" for CXX dependencies
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[34/78] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\transposition_table.cpp" for CXX dependencies
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[35/78] Scanning "C:\Users\ntATh\AI test\Koi engine\third_party\fathom\tbprobe.c" for CXX dependencies
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[36/78] Generating CXX dyndep file CMakeFiles\koi_replay.dir\CXX.dd
+[37/78] Scanning "C:\Users\ntATh\AI test\Koi engine\src\main.cpp" for CXX dependencies
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[38/78] Generating CXX dyndep file CMakeFiles\koi_engine.dir\CXX.dd
+[39/78] Generating CXX dyndep file CMakeFiles\koi_core_generic.dir\CXX.dd
+[40/78] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\classical_evaluator.cpp.obj
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[41/78] Building CXX object CMakeFiles\koi_replay.dir\tools\engine\koi_replay.cpp.obj
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[42/78] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\detail\attack_tables.cpp.obj
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[43/78] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\detail\evaluation_context.cpp.obj
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[44/78] Building CXX object CMakeFiles\koi_engine.dir\src\main.cpp.obj
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[45/78] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\detail\feature_state.cpp.obj
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[46/78] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\detail\compatibility_mirror.cpp.obj
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[47/78] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\detail\root_coordinator.cpp.obj
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[48/78] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\detail\search_ordering_tables.cpp.obj
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[49/78] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\detail\search_context_support.cpp.obj
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[50/78] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\detail\search_context.cpp.obj
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[51/78] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\detail\search_session.cpp.obj
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[52/78] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\completion_gate.cpp.obj
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[53/78] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\detail\search_runner.cpp.obj
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[54/78] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\evaluation_features.cpp.obj
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[55/78] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\cpu_variant.cpp.obj
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[56/78] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\gpu\cuda_driver.cpp.obj
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[57/78] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\executable_path.cpp.obj
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[58/78] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\move.cpp.obj
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[59/78] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\gpu\nnue_gpu_evaluator.cpp.obj
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[60/78] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\game_state.cpp.obj
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[61/78] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\gpu\gpu_nnue_service.cpp.obj
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[62/78] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\perft.cpp.obj
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[63/78] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\move_chooser.cpp.obj
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[64/78] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\nnue.cpp.obj
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[65/78] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\opening_book.cpp.obj
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[66/78] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\static_exchange.cpp.obj
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[67/78] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\search_ordering.cpp.obj
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[68/78] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\search_service.cpp.obj
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[69/78] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\position.cpp.obj
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[70/78] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\strength_suite.cpp.obj
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[71/78] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\transposition_table.cpp.obj
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[72/78] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\time_manager.cpp.obj
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[73/78] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\syzygy_tablebase.cpp.obj
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[74/78] Building CXX object CMakeFiles\koi_core_generic.dir\third_party\fathom\tbprobe.c.obj
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[75/78] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\uci_controller.cpp.obj
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[76/78] Linking CXX executable koi-replay.exe
+[77/78] Linking CXX static library koi_core_generic.lib
+[78/78] Linking CXX executable koi-engine.exe

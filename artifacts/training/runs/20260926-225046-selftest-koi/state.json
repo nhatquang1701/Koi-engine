@@ -1,0 +1,29 @@
+{
+  "kind": "selftest",
+  "backend": "koi",
+  "created": "2026-09-26T15:50:46Z",
+  "status": "completed",
+  "run": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\training\\runs\\20260926-225046-selftest-koi",
+  "schema": "koi-nnue-studio-run-v1",
+  "progress": {
+    "rows_loaded": 400,
+    "epoch": 1,
+    "epochs": 1,
+    "val_mae_cp": 94.38,
+    "history": [
+      94.38
+    ],
+    "train_loss_history": [
+      2.52719
+    ],
+    "val_loss_history": [
+      0.94376
+    ],
+    "seconds_history": [
+      0.0
+    ],
+    "quantized_val_mae_cp": 9.8
+  },
+  "exit_code": 0,
+  "finished": "2026-09-26T15:50:51Z"
+}

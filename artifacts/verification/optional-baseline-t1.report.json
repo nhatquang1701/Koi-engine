@@ -1,0 +1,57 @@
+{
+  "acceptance_rate": null,
+  "accepted_count": 0,
+  "build": "Koi Engine 1.1.0",
+  "categories": {
+    "endgame": {
+      "acceptance_rate": null,
+      "accepted_count": 0,
+      "expected_move_count": 0,
+      "mean_elapsed_ms": 2.238095,
+      "mean_score_cp": 406.47619,
+      "mismatch_ids": [],
+      "position_count": 42,
+      "total_nodes": 42,
+      "total_qnodes": 1672
+    },
+    "king_safety": {
+      "acceptance_rate": null,
+      "accepted_count": 0,
+      "expected_move_count": 0,
+      "mean_elapsed_ms": 1.674419,
+      "mean_score_cp": 614.348837,
+      "mismatch_ids": [],
+      "position_count": 43,
+      "total_nodes": 43,
+      "total_qnodes": 1114
+    },
+    "positional": {
+      "acceptance_rate": null,
+      "accepted_count": 0,
+      "expected_move_count": 0,
+      "mean_elapsed_ms": 5.372093,
+      "mean_score_cp": 388.44186,
+      "mismatch_ids": [],
+      "position_count": 43,
+      "total_nodes": 43,
+      "total_qnodes": 3280
+    }
+  },
+  "engine": "Koi Engine",
+  "expected_move_count": 0,
+  "hash_mb": 512,
+  "hash_state": "cold",
+  "mean_elapsed_ms": 3.101562,
+  "mean_score_cp": 470.25,
+  "mismatch_ids": [],
+  "position_count": 128,
+  "profile_count": 1,
+  "profile_sha256": "baa44882fb491f7732e6fb26e846f98d578418313dd478c5c4f94165b161a5fb",
+  "schema": "koi-strength-report-v1",
+  "speed": 100,
+  "suite": "optional_strength",
+  "threads": 1,
+  "timed": true,
+  "total_nodes": 128,
+  "total_qnodes": 6066
+}

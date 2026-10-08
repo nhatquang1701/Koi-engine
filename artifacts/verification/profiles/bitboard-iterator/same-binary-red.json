@@ -1,0 +1,46 @@
+{
+  "schema": "koi-perft-speed-gate-v1",
+  "source_commit": "9310d2911b0e3b507ebd27a4af088b29451f1064",
+  "source": "startpos",
+  "depth": 5,
+  "expected_output": "nodes 4865609",
+  "baseline_sha256": "48B41C3284D418C175DF6EC3180F15C3B6DEEBA90955441A2FB40A036B529AFB",
+  "candidate_sha256": "48B41C3284D418C175DF6EC3180F15C3B6DEEBA90955441A2FB40A036B529AFB",
+  "baseline_median_ms": 5866.9899,
+  "candidate_median_ms": 5863.1873,
+  "speedup_percent": 0.06481347445306263,
+  "minimum_speedup_percent": 2.0,
+  "runs": [
+    {
+      "run": 1,
+      "depth": 5,
+      "output": "nodes 4865609",
+      "elapsed_ms": 5917.9036
+    },
+    {
+      "run": 2,
+      "depth": 5,
+      "output": "nodes 4865609",
+      "elapsed_ms": 5858.4612
+    },
+    {
+      "run": 3,
+      "depth": 5,
+      "output": "nodes 4865609",
+      "elapsed_ms": 5863.1873
+    },
+    {
+      "run": 4,
+      "depth": 5,
+      "output": "nodes 4865609",
+      "elapsed_ms": 5852.7067
+    },
+    {
+      "run": 5,
+      "depth": 5,
+      "output": "nodes 4865609",
+      "elapsed_ms": 5876.1038
+    }
+  ],
+  "passed": false
+}

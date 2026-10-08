@@ -1,0 +1,120 @@
+Internal ctest changing into directory: C:/Users/ntATh/AI test/Koi engine/build/debug
+Test project C:/Users/ntATh/AI test/Koi engine/build/debug
+      Start 36: koi_uci_match_clock
+      Start 57: koi_trainer_python
+      Start 37: cutechess_stability_diagnostics
+ 1/50 Test #57: koi_trainer_python ................   Passed   19.11 sec
+      Start 55: nnue_studio_python
+ 2/50 Test #37: cutechess_stability_diagnostics ...   Passed   19.96 sec
+      Start 34: koi_uci_match_process
+ 3/50 Test #55: nnue_studio_python ................   Passed    8.70 sec
+      Start 11: uci_controller_tests
+ 4/50 Test #34: koi_uci_match_process .............   Passed   13.95 sec
+      Start 35: koi_stockfish_strength_option
+ 5/50 Test #35: koi_stockfish_strength_option .....   Passed    2.84 sec
+      Start 50: koi_dataset_python
+ 6/50 Test #11: uci_controller_tests ..............   Passed    9.13 sec
+      Start 28: perft_tests
+ 7/50 Test #50: koi_dataset_python ................   Passed    2.33 sec
+      Start 43: elo_oracle_python
+ 8/50 Test #28: perft_tests .......................   Passed    6.25 sec
+      Start 58: tune_classical_python
+ 9/50 Test #43: elo_oracle_python .................   Passed    4.36 sec
+      Start 42: package_release_layout
+10/50 Test #58: tune_classical_python .............   Passed    0.38 sec
+      Start 44: elo_estimate_python
+11/50 Test #44: elo_estimate_python ...............   Passed    3.23 sec
+      Start 31: koi_engine_en_croissant_process
+12/50 Test #42: package_release_layout ............   Passed    3.72 sec
+      Start 53: measurement_forensics_python
+13/50 Test #31: koi_engine_en_croissant_process ...   Passed    2.24 sec
+      Start 23: search_service_tests
+14/50 Test #53: measurement_forensics_python ......   Passed    2.42 sec
+      Start 46: elo_openings_python
+15/50 Test #23: search_service_tests ..............   Passed    1.35 sec
+      Start  1: koi_core_tests
+16/50 Test #46: elo_openings_python ...............   Passed    2.27 sec
+      Start 39: hash_memory_stability
+17/50 Test  #1: koi_core_tests ....................   Passed    2.36 sec
+      Start 48: nnue_training_python
+18/50 Test #39: hash_memory_stability .............   Passed    1.32 sec
+      Start 51: gen_training_data_python
+19/50 Test #51: gen_training_data_python ..........   Passed    0.38 sec
+      Start  4: nnue_boundary_tests
+20/50 Test #48: nnue_training_python ..............   Passed    1.18 sec
+      Start 29: koi_replay_tests
+21/50 Test  #4: nnue_boundary_tests ...............   Passed    0.93 sec
+      Start 41: install_book_script
+22/50 Test #29: koi_replay_tests ..................   Passed    1.07 sec
+      Start 54: strength_report_python
+23/50 Test #41: install_book_script ...............   Passed    0.79 sec
+      Start 52: measurement_phase_python
+24/50 Test #54: strength_report_python ............   Passed    0.82 sec
+      Start 47: tune_eval_python
+25/50 Test #52: measurement_phase_python ..........   Passed    0.65 sec
+      Start 49: nnue_wrapper_python
+26/50 Test #49: nnue_wrapper_python ...............   Passed    0.42 sec
+      Start 40: windows_ci_configuration
+27/50 Test #47: tune_eval_python ..................   Passed    0.54 sec
+      Start  7: syzygy_tablebase_tests
+28/50 Test #40: windows_ci_configuration ..........   Passed    0.38 sec
+      Start 45: stockfish_match_python
+29/50 Test #45: stockfish_match_python ............   Passed    0.21 sec
+      Start 25: evaluation_features_tests
+30/50 Test  #7: syzygy_tablebase_tests ............   Passed    0.85 sec
+      Start 24: classical_evaluator_tests
+31/50 Test #25: evaluation_features_tests .........   Passed    0.58 sec
+      Start 22: transposition_table_tests
+32/50 Test #24: classical_evaluator_tests .........   Passed    0.71 sec
+      Start 10: opening_book_tests
+33/50 Test #22: transposition_table_tests .........   Passed    0.74 sec
+      Start  3: evaluation_architecture_tests
+34/50 Test #10: opening_book_tests ................   Passed    0.62 sec
+      Start 17: search_ordering_tests
+35/50 Test  #3: evaluation_architecture_tests .....   Passed    0.59 sec
+      Start  9: native_rule_state_tests
+36/50 Test #17: search_ordering_tests .............   Passed    0.58 sec
+      Start  8: koi_rules_tests
+37/50 Test  #9: native_rule_state_tests ...........   Passed    0.56 sec
+      Start  2: evaluation_boundary_tests
+38/50 Test  #8: koi_rules_tests ...................   Passed    0.58 sec
+      Start 18: search_architecture_tests
+39/50 Test  #2: evaluation_boundary_tests .........   Passed    0.59 sec
+      Start 21: static_exchange_tests
+40/50 Test #18: search_architecture_tests .........   Passed    0.58 sec
+      Start 12: completion_gate_tests
+41/50 Test #21: static_exchange_tests .............   Passed    0.57 sec
+      Start 26: time_manager_tests
+42/50 Test #12: completion_gate_tests .............   Passed    0.64 sec
+      Start 20: search_runtime_tests
+43/50 Test #26: time_manager_tests ................   Passed    0.77 sec
+      Start 19: search_policy_tests
+44/50 Test #20: search_runtime_tests ..............   Passed    0.68 sec
+      Start  6: koi_module_tests
+45/50 Test #19: search_policy_tests ...............   Passed    0.43 sec
+      Start  5: koi_cpu_features_tests
+46/50 Test  #6: koi_module_tests ..................   Passed    0.29 sec
+      Start 56: nnue_studio_ui_python
+47/50 Test  #5: koi_cpu_features_tests ............   Passed    0.14 sec
+48/50 Test #56: nnue_studio_ui_python .............   Passed    0.33 sec
+49/50 Test #36: koi_uci_match_clock ...............   Passed   69.98 sec
+      Start 30: koi_engine_process
+50/50 Test #30: koi_engine_process ................   Passed    3.92 sec
+
+100% tests passed, 0 tests failed out of 50
+
+Label Time Summary:
+evaluation     =   3.40 sec*proc (5 tests)
+integration    =   1.07 sec*proc (1 test)
+matches        = 176.71 sec*proc (4 tests)
+measurement    =   4.36 sec*proc (1 test)
+packaging      =   4.89 sec*proc (3 tests)
+process        = 189.08 sec*proc (10 tests)
+python         =  47.32 sec*proc (16 tests)
+runtime        =  11.18 sec*proc (3 tests)
+search         =   1.35 sec*proc (1 test)
+tools          =   1.07 sec*proc (1 test)
+uci            =   6.16 sec*proc (2 tests)
+unit           =  30.50 sec*proc (23 tests)
+
+Total Test time (real) =  73.91 sec

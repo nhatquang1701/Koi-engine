@@ -1,0 +1,64 @@
+Internal ctest changing into directory: C:/Users/ntATh/AI test/Koi engine/build/debug
+Test project C:/Users/ntATh/AI test/Koi engine/build/debug
+    Start 14: koi_search_tests_2of4
+1/3 Test #14: koi_search_tests_2of4 ............   Passed  1054.20 sec
+    Start 15: koi_search_tests_3of4
+2/3 Test #15: koi_search_tests_3of4 ............***Failed   84.47 sec
+PASS development center pressure
+PASS evaluator passed pawn blockade
+PASS evaluator endgame king activity
+PASS evaluator complete breakdown
+PASS low-clock emergency pacing
+PASS explicit limits remain untimed
+PASS deterministic multipv
+PASS low clock forcing root
+PASS short timed threaded authoritative root
+XPASS timed poisoned capture: known failure now passes; remove it from the known_failures list
+PASS short defensive rook lift
+PASS short oracle b2b4 rook lift
+PASS short forced king escape
+PASS short a5c5 forcing check
+PASS short recapture before material capture
+PASS short safe forcing exchange
+PASS short second check horizon
+XFAIL root king safety escape: a threatened king escape must survive the quiet horizon (best=b7e4, escape_eval=125, queen_eval=148, escape_king_safety=31, queen_king_safety=57, escape_activity=30, queen_activity=17, escape_initiative=0, queen_initiative=0, escape_piece_square=-4, queen_piece_square=-8, escape_king_zone=1, queen_king_zone=3)
+PASS threaded single-PV root is authoritative
+XFAIL threaded multipv ordered root ties: equal-score threaded MultiPV must retain the earliest stable ordered root move
+PASS threaded node parity
+PASS feature cache restoration
+PASS terminal search
+PASS search result legal PV
+PASS forced quiet evasion
+PASS low-phase null safety
+PASS high-history LMR exclusion
+PASS shallow futility accounting
+PASS static evaluation cache
+PASS shallow root near-tie research
+PASS near-root quiet forcing extension
+XFAIL poisoned capture quiescence: a shallow search must reject the poisoned knight capture in the unrestricted root search (move g4e3, score 23, selective researches 0)
+PASS infinite search lifecycle
+PASS ponder time and node limits
+PASS hash bounds and clear
+PASS transposition table unchanged cap
+PASS transposition table mate normalization
+koi-test-summary run=37 pass=33 fail=1 xfail=3 xpass=0 skip=0 unseen=0 intermittent=0
+
+    Start 16: koi_search_tests_4of4
+3/3 Test #16: koi_search_tests_4of4 ............   Passed  241.78 sec
+
+67% tests passed, 1 tests failed out of 3
+
+Label Time Summary:
+heavy     = 2760.89 sec*proc (3 tests)
+search    = 2760.89 sec*proc (3 tests)
+unit      = 2760.89 sec*proc (3 tests)
+
+Total Test time (real) = 1380.45 sec
+
+The following tests FAILED:
+	 15 - koi_search_tests_3of4 (Failed)
+Errors while running CTest
+XPASS threaded short forcing root research: intermittent known failure now passes
+koi-test-summary run=1 pass=0 fail=0 xfail=0 xpass=1 skip=0 unseen=0 intermittent=1
+XPASS timed poisoned capture: intermittent known failure now passes
+koi-test-summary run=1 pass=0 fail=0 xfail=0 xpass=1 skip=0 unseen=0 intermittent=1

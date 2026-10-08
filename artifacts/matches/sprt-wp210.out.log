@@ -1,0 +1,7 @@
+sprt-compare: candidate C:\Users\ntATh\AI test\Koi engine\artifacts\verification\wp210\koi-engine-cand.exe vs baseline C:\Users\ntATh\AI test\Koi engine\artifacts\verification\baseline-wp28\koi-engine-baseline.exe
+sprt-compare: 20000 nodes, 2 game(s) per opening and color
+sprt-compare: white pid 16864, black pid 21152
+white: 64 games 20W/28D/16L elo 21.74306492903707 llr 0.089758 decision inconclusive
+black: 64 games 14W/42D/8L elo 32.668018580527814 llr 0.234263 decision inconclusive
+combined: 128 games 34W/70D/24L score 0.5391 elo 27.2 llr 0.324 decision inconclusive
+sprt-compare: results under C:\Users\ntATh\AI test\Koi engine\artifacts\matches\sprt-wp210\wp210-20260920-234727

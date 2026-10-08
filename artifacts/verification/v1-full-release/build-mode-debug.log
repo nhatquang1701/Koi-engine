@@ -1,0 +1,19 @@
+**********************************************************************
+** Visual Studio 2022 Developer Command Prompt v17.14.39
+** Copyright (c) 2025 Microsoft Corporation
+**********************************************************************
+[1/51] Generating CXX dyndep file CMakeFiles\uci_match_fixture.dir\CXX.dd
+[2/49] Generating CXX dyndep file CMakeFiles\koi_replay.dir\CXX.dd
+[3/48] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\detail\search_context.cpp" for CXX dependencies
+[4/48] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\detail\search_runner.cpp" for CXX dependencies
+[5/48] Scanning "C:\Users\ntATh\AI test\Koi engine\tools\engine\koi_nnue_fixture.cpp" for CXX dependencies
+[6/48] Generating CXX dyndep file CMakeFiles\koi_engine.dir\CXX.dd
+[7/47] Generating CXX dyndep file CMakeFiles\koi_nnue_fixture.dir\CXX.dd
+[8/47] Generating CXX dyndep file CMakeFiles\koi_core_generic.dir\CXX.dd
+[9/15] Linking CXX executable koi-replay.exe
+[10/15] Building CXX object CMakeFiles\koi_nnue_fixture.dir\tools\engine\koi_nnue_fixture.cpp.obj
+[11/15] Linking CXX executable koi-nnue-fixture.exe
+[12/15] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\detail\search_context.cpp.obj
+[13/15] Building CXX object CMakeFiles\koi_core_generic.dir\src\koi\detail\search_runner.cpp.obj
+[14/15] Linking CXX static library koi_core_generic.lib
+[15/15] Linking CXX executable koi-engine.exe

@@ -1,0 +1,51 @@
+Run root: C:\Users\ntATh\AI test\Koi engine\artifacts\matches\full-release\windows-gate\run-full-release-1
+Source commit: 5560b876066749f0f20a86c304e3b6faafa7526f
+Candidate executable SHA-256: 2616d15afed28229083f9eec1090efa8340efbf33e0271fd0d9470ca3c5a36e2
+Package archive SHA-256: eedaf3727eb5a9443bb19a09f1552cbac72d0a667332add7fd43ef2479e5ea61
+Frozen beta executable SHA-256: 133832cfb5b642f49958a303ac97847b5ea663299e7c2501be8486eabf9aaaf1
+v4 network SHA-256: f1fd40a19f3fafccb7715671d61e655294e75fe6322b2d3eaf4b5f73c0a14aa2
+v5 network SHA-256: 45ab9be6a873ee00eaba1864ceec6acdb46fa963c805ad667019beada5224e39
+Counts: {"paired_classical_games":640,"cpu_v4_games":60,"cpu_v5_games":60,"gpu_v5_games":120,"total_games":880,"match_reports":14}
+Plan fingerprint: a99258c48bb174e08cf8ad97a5cf1c0a3e37d50f7530e3c06b4185bf9356b757
+json C:\Users\ntATh\AI test\Koi engine\artifacts\matches\full-release\windows-gate\run-full-release-1\cells\classical-node1000\white\koi-uci-match-20260926-165402-483.json
+pgn C:\Users\ntATh\AI test\Koi engine\artifacts\matches\full-release\windows-gate\run-full-release-1\cells\classical-node1000\white\koi-uci-match-20260926-165402-483.pgn
+PASS: 320 legal, completed games; Koi white; nodes 1000; Threads=1; OwnBook=false; max plies=80; all 320 curated openings covered; evaluator=classical
+PASS: classical-node1000-white validated (320 games).
+json C:\Users\ntATh\AI test\Koi engine\artifacts\matches\full-release\windows-gate\run-full-release-1\cells\classical-node1000\black\koi-uci-match-20260926-170649-180.json
+pgn C:\Users\ntATh\AI test\Koi engine\artifacts\matches\full-release\windows-gate\run-full-release-1\cells\classical-node1000\black\koi-uci-match-20260926-170649-180.pgn
+PASS: 320 legal, completed games; Koi black; nodes 1000; Threads=1; OwnBook=false; max plies=80; all 320 curated openings covered; evaluator=classical
+PASS: classical-node1000-black validated (320 games).
+decision=pass lower_elo_bound=-3.237491332097433
+PASS: 640 classical paired games; one-sided 95% lower Elo bound=-3.23749133209743.
+json C:\Users\ntATh\AI test\Koi engine\artifacts\matches\full-release\windows-gate\run-full-release-1\cells\nnue-v4-1p0\white\koi-uci-match-20260926-174159-063.json
+pgn C:\Users\ntATh\AI test\Koi engine\artifacts\matches\full-release\windows-gate\run-full-release-1\cells\nnue-v4-1p0\white\koi-uci-match-20260926-174159-063.pgn
+PASS: 20 legal, completed games; Koi white; 1+0; Threads=1; OwnBook=false; max plies=80; all 20 curated openings covered; evaluator=nnue-v4; EvalFile SHA-256=f1fd40a19f3fafccb7715671d61e655294e75fe6322b2d3eaf4b5f73c0a14aa2
+PASS: nnue-v4-1p0-white validated (20 games).
+json C:\Users\ntATh\AI test\Koi engine\artifacts\matches\full-release\windows-gate\run-full-release-1\cells\nnue-v4-1p0\black\koi-uci-match-20260926-181747-699.json
+pgn C:\Users\ntATh\AI test\Koi engine\artifacts\matches\full-release\windows-gate\run-full-release-1\cells\nnue-v4-1p0\black\koi-uci-match-20260926-181747-699.pgn
+PASS: 20 legal, completed games; Koi black; 1+0; Threads=1; OwnBook=false; max plies=80; all 20 curated openings covered; evaluator=nnue-v4; EvalFile SHA-256=f1fd40a19f3fafccb7715671d61e655294e75fe6322b2d3eaf4b5f73c0a14aa2
+PASS: nnue-v4-1p0-black validated (20 games).
+json C:\Users\ntATh\AI test\Koi engine\artifacts\matches\full-release\windows-gate\run-full-release-1\cells\nnue-v4-5p3\white\koi-uci-match-20260926-200251-577.json
+pgn C:\Users\ntATh\AI test\Koi engine\artifacts\matches\full-release\windows-gate\run-full-release-1\cells\nnue-v4-5p3\white\koi-uci-match-20260926-200251-577.pgn
+PASS: 10 legal, completed games; Koi white; 5+3; Threads=4; OwnBook=false; max plies=80; all 10 curated openings covered; evaluator=nnue-v4; EvalFile SHA-256=f1fd40a19f3fafccb7715671d61e655294e75fe6322b2d3eaf4b5f73c0a14aa2
+PASS: nnue-v4-5p3-white validated (10 games).
+json C:\Users\ntATh\AI test\Koi engine\artifacts\matches\full-release\windows-gate\run-full-release-1\cells\nnue-v4-5p3\black\koi-uci-match-20260926-214743-761.json
+pgn C:\Users\ntATh\AI test\Koi engine\artifacts\matches\full-release\windows-gate\run-full-release-1\cells\nnue-v4-5p3\black\koi-uci-match-20260926-214743-761.pgn
+PASS: 10 legal, completed games; Koi black; 5+3; Threads=4; OwnBook=false; max plies=80; all 10 curated openings covered; evaluator=nnue-v4; EvalFile SHA-256=f1fd40a19f3fafccb7715671d61e655294e75fe6322b2d3eaf4b5f73c0a14aa2
+PASS: nnue-v4-5p3-black validated (10 games).
+json C:\Users\ntATh\AI test\Koi engine\artifacts\matches\full-release\windows-gate\run-full-release-1\cells\nnue-v5-1p0\white\koi-uci-match-20260926-222306-893.json
+pgn C:\Users\ntATh\AI test\Koi engine\artifacts\matches\full-release\windows-gate\run-full-release-1\cells\nnue-v5-1p0\white\koi-uci-match-20260926-222306-893.pgn
+PASS: 20 legal, completed games; Koi white; 1+0; Threads=1; OwnBook=false; max plies=80; all 20 curated openings covered; evaluator=nnue-v5; EvalFile SHA-256=45ab9be6a873ee00eaba1864ceec6acdb46fa963c805ad667019beada5224e39
+PASS: nnue-v5-1p0-white validated (20 games).
+json C:\Users\ntATh\AI test\Koi engine\artifacts\matches\full-release\windows-gate\run-full-release-1\cells\nnue-v5-1p0\black\koi-uci-match-20260926-225720-850.json
+pgn C:\Users\ntATh\AI test\Koi engine\artifacts\matches\full-release\windows-gate\run-full-release-1\cells\nnue-v5-1p0\black\koi-uci-match-20260926-225720-850.pgn
+PASS: 20 legal, completed games; Koi black; 1+0; Threads=1; OwnBook=false; max plies=80; all 20 curated openings covered; evaluator=nnue-v5; EvalFile SHA-256=45ab9be6a873ee00eaba1864ceec6acdb46fa963c805ad667019beada5224e39
+PASS: nnue-v5-1p0-black validated (20 games).
+json C:\Users\ntATh\AI test\Koi engine\artifacts\matches\full-release\windows-gate\run-full-release-1\cells\nnue-v5-5p3\white\koi-uci-match-20260927-004351-717.json
+pgn C:\Users\ntATh\AI test\Koi engine\artifacts\matches\full-release\windows-gate\run-full-release-1\cells\nnue-v5-5p3\white\koi-uci-match-20260927-004351-717.pgn
+PASS: 10 legal, completed games; Koi white; 5+3; Threads=4; OwnBook=false; max plies=80; all 10 curated openings covered; evaluator=nnue-v5; EvalFile SHA-256=45ab9be6a873ee00eaba1864ceec6acdb46fa963c805ad667019beada5224e39
+PASS: nnue-v5-5p3-white validated (10 games).
+json C:\Users\ntATh\AI test\Koi engine\artifacts\matches\full-release\windows-gate\run-full-release-1\cells\nnue-v5-5p3\black\koi-uci-match-20260927-023203-892.json
+pgn C:\Users\ntATh\AI test\Koi engine\artifacts\matches\full-release\windows-gate\run-full-release-1\cells\nnue-v5-5p3\black\koi-uci-match-20260927-023203-892.pgn
+PASS: 10 legal, completed games; Koi black; 5+3; Threads=4; OwnBook=false; max plies=80; all 10 curated openings covered; evaluator=nnue-v5; EvalFile SHA-256=45ab9be6a873ee00eaba1864ceec6acdb46fa963c805ad667019beada5224e39
+PASS: nnue-v5-5p3-black validated (10 games).

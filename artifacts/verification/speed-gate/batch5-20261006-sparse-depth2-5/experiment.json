@@ -1,0 +1,22 @@
+{
+  "schema": "koi-speed-gate-experiment-v1",
+  "recorded_utc": "2026-10-06T01:15:00Z",
+  "gate_script": "tools/build/speed_gate.ps1",
+  "gate_script_sha256": "CB5A41FBCD75CC2CFFB57E714CEF961343CB8492AEDFFD40812585443C54CFD5",
+  "baseline_exe": "artifacts\\verification\\speed-gate\\batch5-20261006-sparse-depth2-5/baseline/koi-bench-baseline.exe",
+  "baseline_exe_sha256": "B00C1860A400DDD0A4ADE5E052D3F1A145B17F7CF189D86DB54F9039548D0E39",
+  "candidate_exe": "build/roadmap-visit-win-release/koi-bench.exe",
+  "candidate_exe_sha256": "8755F5C2FF86F6E663171E8A3DEDFE73477DCD2C25F2189A100C2F6ABD07BE37",
+  "source_revision": "0288b2d77d57e9d169d26b063c5dc310188f869e",
+  "baseline_note": "isolated Release build of HEAD 0288b2d from build/roadmap-batch5-baseline-src (BuildTools MSVC 14.44.35207, CMake 3.31.6, Ninja, modules/shadow/GPU/PGO/sanitize/static-runtime OFF)",
+  "candidate": "Batch 5: packed picker stage sort key (single uint64 key replacing the three-key comparator); one-colour refresh_king_masks (only the side to move gets checkers/pinned recomputed); Position::copy_board_to block copy used by the SEE exchange contexts.",
+  "fen_file": "artifacts\\verification\\speed-gate\\batch5-20261006-sparse-depth2-5/sparse-qsearch-fens.txt",
+  "fen_sha256": "07855F78D6544FD4D9ED8E6000FDA3B279208AFC608F389569D85DE3026D930C",
+  "threads": 1,
+  "speed": 100,
+  "depth_sweep": "2..5",
+  "runs": 5,
+  "max_total_nps_regression_percent": 2.0,
+  "max_row_nps_regression_percent": 2.0,
+  "min_row_elapsed_ms": 20.0
+}

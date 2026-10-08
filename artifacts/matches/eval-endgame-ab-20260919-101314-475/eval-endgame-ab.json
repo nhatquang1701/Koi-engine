@@ -1,0 +1,217 @@
+{
+  "schema": "koi-eval-endgame-ab-v1",
+  "generated_utc": "2026-09-19T10:17:01.2769309Z",
+  "candidate": "C:\\Users\\ntATh\\AI test\\Koi engine\\build\\release\\koi-engine.exe",
+  "baseline": "C:\\Users\\ntATh\\AppData\\Local\\Temp\\opencode\\koi-eval-baseline\\build\\release\\koi-engine.exe",
+  "nodes": 20000,
+  "threads": 1,
+  "hash_mb": 64,
+  "games": 40,
+  "wins": 6,
+  "draws": 28,
+  "losses": 6,
+  "aborted": 0,
+  "percent": 50.0,
+  "games_detail": [
+    {
+      "leg": "white",
+      "result": "1-0",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "white",
+      "result": "1-0",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "white",
+      "result": "1/2-1/2",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "white",
+      "result": "1/2-1/2",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "white",
+      "result": "1/2-1/2",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "white",
+      "result": "1/2-1/2",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "white",
+      "result": "1/2-1/2",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "white",
+      "result": "1/2-1/2",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "white",
+      "result": "1/2-1/2",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "white",
+      "result": "1/2-1/2",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "white",
+      "result": "0-1",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "white",
+      "result": "0-1",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "white",
+      "result": "1/2-1/2",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "white",
+      "result": "1/2-1/2",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "white",
+      "result": "1-0",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "white",
+      "result": "1-0",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "white",
+      "result": "1/2-1/2",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "white",
+      "result": "1/2-1/2",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "white",
+      "result": "0-1",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "white",
+      "result": "0-1",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "black",
+      "result": "1/2-1/2",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "black",
+      "result": "1/2-1/2",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "black",
+      "result": "1/2-1/2",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "black",
+      "result": "1/2-1/2",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "black",
+      "result": "1/2-1/2",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "black",
+      "result": "1/2-1/2",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "black",
+      "result": "1/2-1/2",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "black",
+      "result": "1/2-1/2",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "black",
+      "result": "1/2-1/2",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "black",
+      "result": "1/2-1/2",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "black",
+      "result": "1/2-1/2",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "black",
+      "result": "1/2-1/2",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "black",
+      "result": "1/2-1/2",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "black",
+      "result": "1/2-1/2",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "black",
+      "result": "1-0",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "black",
+      "result": "1-0",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "black",
+      "result": "1/2-1/2",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "black",
+      "result": "1/2-1/2",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "black",
+      "result": "0-1",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "black",
+      "result": "0-1",
+      "termination": "checkmate"
+    }
+  ]
+}

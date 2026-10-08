@@ -1,0 +1,29 @@
+{
+  "schema": "koi-nnue-training-metadata-v2",
+  "created": "2026-09-17T17:36:43Z",
+  "corpus": "C:\\Users\\ntATh\\AppData\\Local\\Temp\\koi-studio-test-ih1ff4nb\\tiny-corpus.txt",
+  "rows_used": 400,
+  "val_rows": 20,
+  "feature_set": "halfka-king-bucket-v1",
+  "quantization": "int16/int8",
+  "architecture": {
+    "input": 9216,
+    "hidden": 64,
+    "output_buckets": 8
+  },
+  "activation": "crelu-pair",
+  "hidden_shift": 6,
+  "output_shift": 12,
+  "epochs": 1,
+  "batch_size": 1024,
+  "learning_rate": 0.002,
+  "seed": 20260916,
+  "target_scale": 100.0,
+  "val_mae_cp": 10.58571321014315,
+  "val_round_trip_mae_cp": 10.45,
+  "w1_saturation": 0.0,
+  "w2_saturation": 0.0,
+  "payload_sha256": "6c4582b7c7adfa1cc82e42d44f759156f7a90b6c8953676d5f29d8f8c44c4550",
+  "network_sha256": "fd948e0b947fd79ef3e2bdc6117192fcbee7b5499373ce22018661ffd8a0e970",
+  "command": "C:\\Users\\ntATh\\AI test\\Koi engine\\tools\\measurement\\train_nnue_koi.py --corpus C:\\Users\\ntATh\\AppData\\Local\\Temp\\koi-studio-test-ih1ff4nb\\tiny-corpus.txt --net-out C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\training\\runs\\20260918-003640-selftest-koi\\net.nnue --meta-out C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\training\\runs\\20260918-003640-selftest-koi\\net.metadata.json --epochs 1 --batch-size 1024 --learning-rate 0.002 --threads 2 --val-fraction 0.05 --seed 20260916 --hidden-units 64 --hidden-shifts 6 7 8 --output-shifts 12 14 16 18 20 --rows 400 --float-out C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\training\\runs\\20260918-003640-selftest-koi\\net.pt"
+}

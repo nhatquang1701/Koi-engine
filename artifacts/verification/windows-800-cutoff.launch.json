@@ -1,0 +1,9 @@
+{
+  "schema": "koi-windows-800-cutoff-launch-v1",
+  "pid": 23356,
+  "started_utc": "2026-09-27T02:37:25.6095494Z",
+  "helper_sha256": "84b88bb73b38f908a6cc2e886e4af30dd017fe9d4dc3e2723bd695f7b7ad1b04",
+  "output": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\verification\\windows-800-cutoff.out.log",
+  "error": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\verification\\windows-800-cutoff.err.log",
+  "target_marker": "PASS: gpu-v5-1p0-white validated (40 games)."
+}

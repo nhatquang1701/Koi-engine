@@ -1,0 +1,25 @@
+{
+  "schema": "koi-qsearch-sprt-runner-v1",
+  "experiment_path": "artifacts/verification/qsearch-tt-followup-20260929/experiment-batch8.json",
+  "experiment_sha256": "71a5e8f778e6d24941853c5f9397eafbfbbc4d996960e44f7025d3f1c0533b74",
+  "runner_pid": 12588,
+  "run_root": "artifacts/matches/qsearch-tt-followup-20260929/sprt-batch8/qsearch-tt-current-source-20k-batch8-20260929-170415",
+  "candidate_sha256": "3c187fc9bdad3572e6c849b077ffee2f612661083602d79261c0c50169da268c",
+  "baseline_sha256": "cbc05d459445eacd9f0ef8749aec18434ce251b105e6d1900f5dd4b5299ce0aa",
+  "opening_sha256": "2e28795306ba1c9f2b07bff9ad7096317a808e1ab0e111c311545a8e93a681a9",
+  "harness_path": "tools/stability/uci_match.ps1",
+  "harness_sha256": "9df4f67a4632a05e070eb44fde202814a9692befd3a63c880688b946feedfb3e",
+  "harness_git_blob": "de0de5bce59c2d650a7f1c872d730b9d82e76952",
+  "launcher_sha256": "cfcb8bb2f3922f07d731c8271d99253cf4e03614935cece2c33eb015d0f5706b",
+  "workers": {
+    "white": 22320,
+    "black": 10552
+  },
+  "started_utc": "2026-09-29T10:04:20.3183719Z",
+  "status": "completed",
+  "exit_codes": {
+    "white": 0,
+    "black": 0
+  },
+  "completed_utc": "2026-09-29T11:18:36.8002830Z"
+}

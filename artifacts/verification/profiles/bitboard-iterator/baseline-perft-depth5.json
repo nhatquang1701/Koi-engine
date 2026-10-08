@@ -1,0 +1,38 @@
+{
+  "schema": "koi-perft-timing-v1",
+  "commit": "9310d2911b0e3b507ebd27a4af088b29451f1064",
+  "binary_sha256": "48B41C3284D418C175DF6EC3180F15C3B6DEEBA90955441A2FB40A036B529AFB",
+  "source": "startpos",
+  "runs": [
+    {
+      "run": 1,
+      "depth": 5,
+      "output": "nodes 4865609",
+      "elapsed_ms": 5939.6376
+    },
+    {
+      "run": 2,
+      "depth": 5,
+      "output": "nodes 4865609",
+      "elapsed_ms": 5862.6749
+    },
+    {
+      "run": 3,
+      "depth": 5,
+      "output": "nodes 4865609",
+      "elapsed_ms": 5866.9899
+    },
+    {
+      "run": 4,
+      "depth": 5,
+      "output": "nodes 4865609",
+      "elapsed_ms": 5901.7562
+    },
+    {
+      "run": 5,
+      "depth": 5,
+      "output": "nodes 4865609",
+      "elapsed_ms": 5864.7367
+    }
+  ]
+}

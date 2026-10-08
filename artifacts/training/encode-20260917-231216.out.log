@@ -1,0 +1,12 @@
+[23:12:16] created artifacts\training\koi-dataset.bin
+[23:12:34] encoded 200000 records
+[23:12:49] encoded 400000 records
+[23:13:04] encoded 600000 records
+[23:13:19] encoded 800000 records
+[23:13:34] encoded 1000000 records
+[23:13:49] encoded 1200000 records
+[23:14:02] encoded 1400000 records
+[23:14:18] encoded 1600000 records
+[23:14:34] encoded 1800000 records
+[23:14:50] encoded 2000000 records
+[23:15:02] wrote artifacts\training\koi-dataset.bin (2172420 records, 92185963 bytes)

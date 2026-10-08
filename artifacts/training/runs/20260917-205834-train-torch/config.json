@@ -1,0 +1,22 @@
+{
+  "backend": "torch",
+  "corpus": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\training\\labels.txt",
+  "epochs": 10,
+  "batch_size": 4096,
+  "learning_rate": 0.002,
+  "threads": 7,
+  "rows": 0,
+  "val_fraction": 0.05,
+  "seed": 20260916,
+  "format": "v3",
+  "hidden_shift": 7,
+  "bottleneck_shift": 7,
+  "output_shifts": [
+    3,
+    4,
+    5,
+    6
+  ],
+  "net_name": "koi.nnue",
+  "float_out": true
+}

@@ -1,0 +1,36 @@
+{
+  "schema": "koi-nnue-training-metadata-v3",
+  "created": "2026-10-05T20:42:59Z",
+  "corpus": "artifacts\\training\\koi-ex-tiny\\corpus-v5sub500k.txt",
+  "rows_used": 485755,
+  "val_rows": 24287,
+  "feature_set": "halfka-king-bucket-v1+threat-pairs-v1",
+  "quantization": "int16/int8",
+  "architecture": {
+    "input": 36864,
+    "hidden": 1536,
+    "l1": 32,
+    "output_buckets": 8,
+    "groups": [
+      "halfka-king-bucket-v1",
+      "threat-pairs-v1"
+    ]
+  },
+  "activation": "crelu-pair-l1",
+  "hidden_shift": 7,
+  "l1_shift": 8,
+  "output_shift": 6,
+  "epochs": 20,
+  "batch_size": 4096,
+  "learning_rate": 0.0015,
+  "seed": 20261006,
+  "target_scale": 100.0,
+  "val_mae_cp": 368.9080187436613,
+  "val_round_trip_mae_cp": 376.2808,
+  "w1_saturation": 0.0,
+  "l1_saturation": 0.0,
+  "w2_saturation": 0.0,
+  "payload_sha256": "866a6a462180b8921abd7926b5510a430ca55533857942b6db2990cda41655e9",
+  "network_sha256": "2f595b2638846a2d67982cd53cf319b2348a318985ad75aaa7036fb15d61c78d",
+  "command": "tools\\measurement\\train_nnue_koi.py --corpus artifacts\\training\\koi-ex-tiny\\corpus-v5sub500k.txt --net-out artifacts\\training\\koi-ex-tiny\\ex4.nnue --meta-out artifacts\\training\\koi-ex-tiny\\ex4.metadata.json --epochs 20 --batch-size 4096 --learning-rate 0.0015 --threads 2 --val-fraction 0.05 --seed 20261006 --arch v5 --hidden-units 1536 --l1-units 32 --hidden-shifts 6 7 8 --l1-shifts 6 7 8 --tune-samples 5000"
+}

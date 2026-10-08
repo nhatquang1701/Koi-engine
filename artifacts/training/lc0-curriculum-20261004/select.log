@@ -1,0 +1,27 @@
+[07:04:11] scanned 100,000 lines in 65.7s (1,522/s)
+[07:05:17] scanned 200,000 lines in 131.5s (1,521/s)
+[07:06:15] scanned 300,000 lines in 189.8s (1,581/s)
+[07:07:22] scanned 400,000 lines in 255.8s (1,564/s)
+[07:08:27] scanned 500,000 lines in 321.7s (1,554/s)
+[07:09:31] scanned 600,000 lines in 385.6s (1,556/s)
+[07:10:40] scanned 700,000 lines in 454.3s (1,541/s)
+[07:11:43] scanned 800,000 lines in 517.6s (1,545/s)
+[07:12:49] scanned 900,000 lines in 583.3s (1,543/s)
+[07:13:54] scanned 1,000,000 lines in 648.5s (1,542/s)
+[07:15:00] scanned 1,100,000 lines in 714.8s (1,539/s)
+[07:15:58] scanned 1,200,000 lines in 772.6s (1,553/s)
+[07:16:51] scanned 1,300,000 lines in 825.3s (1,575/s)
+[07:17:47] scanned 1,400,000 lines in 881.6s (1,588/s)
+[07:18:49] scanned 1,500,000 lines in 942.9s (1,591/s)
+[07:19:54] scanned 1,600,000 lines in 1008.2s (1,587/s)
+[07:20:54] scanned 1,700,000 lines in 1067.8s (1,592/s)
+[07:21:51] scanned 1,800,000 lines in 1125.6s (1,599/s)
+[07:22:37] scanned 1,900,000 lines in 1171.4s (1,622/s)
+[07:23:23] scanned 2,000,000 lines in 1216.8s (1,644/s)
+[07:23:59] scanned 2,100,000 lines in 1253.3s (1,676/s)
+[07:24:13] scan complete: 2,138,346 lines, 18,696 skipped, 1267.1s
+[07:24:13] general: sampled 427,150 of 427,150 seen
+[07:24:13] tactical: sampled 300,000 of 938,521 seen
+[07:24:13] endgame: sampled 150,000 of 753,979 seen
+[07:24:13] wrote artifacts\training\lc0-curriculum-20261004\stats.json
+EXITCODE 0 

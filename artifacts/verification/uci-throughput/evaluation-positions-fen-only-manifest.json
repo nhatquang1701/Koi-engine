@@ -1,0 +1,50 @@
+{
+  "schema": "koi-throughput-fen-corpus-v1",
+  "source": "tests\\data\\positions\\evaluation-positions.txt",
+  "source_sha256": "b5b211554eef981a8d31ed00c6f5ef4b3ef4e5e606f6e6ff6d9a885bad769db0",
+  "derived_corpus": "artifacts\\verification\\uci-throughput\\evaluation-positions-fen-only.txt",
+  "derived_sha256": "1c40fcfefbbb53846e69d7636de0b168ce95498a85d9a311a2b67917bd4e510c",
+  "position_count": 10,
+  "positions": [
+    {
+      "name": "advanced_passed",
+      "fen": "4k3/8/8/4P3/8/8/8/4K3 w - - 0 1"
+    },
+    {
+      "name": "blockaded_passed",
+      "fen": "4k3/8/4n3/4P3/8/8/8/4K3 w - - 0 1"
+    },
+    {
+      "name": "black_advanced_passed",
+      "fen": "4k3/8/8/8/4p3/8/8/4K3 b - - 0 1"
+    },
+    {
+      "name": "black_blockaded_passed",
+      "fen": "4k3/8/8/8/4p3/4N3/8/4K3 b - - 0 1"
+    },
+    {
+      "name": "term_mirror_white",
+      "fen": "4k3/p7/2b5/8/3Q4/8/5PPP/4K3 w - - 0 1"
+    },
+    {
+      "name": "term_mirror_black",
+      "fen": "4k3/5ppp/8/3q4/8/2B5/P7/4K3 b - - 0 1"
+    },
+    {
+      "name": "endgame_passer_white",
+      "fen": "4k3/8/8/3P4/8/8/8/4K3 w - - 0 1"
+    },
+    {
+      "name": "middlegame_passer_white",
+      "fen": "4q2k/8/8/3P4/8/8/8/4Q2K w - - 0 1"
+    },
+    {
+      "name": "endgame_passer_black",
+      "fen": "4k3/8/8/8/3p4/8/8/4K3 b - - 0 1"
+    },
+    {
+      "name": "middlegame_passer_black",
+      "fen": "4q2k/8/8/8/3p4/8/8/4Q2K b - - 0 1"
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+Internal ctest changing into directory: /work/build/roadmap-current-linux-gcc14-release-20260929
+Test project /work/build/roadmap-current-linux-gcc14-release-20260929
+    Start 45: koi_uci_match_process
+1/1 Test #45: koi_uci_match_process ............   Passed   38.50 sec
+
+100% tests passed, 0 tests failed out of 1
+
+Label Time Summary:
+matches    =  38.50 sec*proc (1 test)
+process    =  38.50 sec*proc (1 test)
+
+Total Test time (real) =  38.52 sec

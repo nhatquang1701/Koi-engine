@@ -1,0 +1,29 @@
+{
+  "schema": "koi-nnue-training-metadata-v2",
+  "created": "2026-09-17T16:15:37Z",
+  "corpus": "artifacts\\training\\koi-dataset.bin",
+  "rows_used": 20000,
+  "val_rows": 1000,
+  "feature_set": "halfka-king-bucket-v1",
+  "quantization": "int16/int8",
+  "architecture": {
+    "input": 9216,
+    "hidden": 1024,
+    "output_buckets": 8
+  },
+  "activation": "crelu-pair",
+  "hidden_shift": 7,
+  "output_shift": 15,
+  "epochs": 1,
+  "batch_size": 8192,
+  "learning_rate": 0.002,
+  "seed": 20260916,
+  "target_scale": 100.0,
+  "val_mae_cp": 389.6608818398579,
+  "val_round_trip_mae_cp": 389.652,
+  "w1_saturation": 0.0,
+  "w2_saturation": 0.0,
+  "payload_sha256": "dee74c57640e873cb5dda62e1d39716b010eb876e656fa0139d20b56fd1268cd",
+  "network_sha256": "c3acc70d880c197dc525567abcda16f3356e5ef64c994d344c04e5c9d95fed86",
+  "command": "tools/measurement/train_nnue_koi.py --dataset artifacts/training/koi-dataset.bin --rows 20000 --epochs 1 --hidden-units 1024 --batch-size 8192 --hidden-shifts 7 --output-shifts 15 --threads 4 --net-out artifacts/verification/nnue-evaluation-overhaul/probe-nnue.nnue --meta-out artifacts/verification/nnue-evaluation-overhaul/probe-nnue.metadata.json --float-out artifacts/training/probe-v4.pt"
+}

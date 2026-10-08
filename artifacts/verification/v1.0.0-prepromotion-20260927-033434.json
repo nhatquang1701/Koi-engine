@@ -1,0 +1,100 @@
+{
+  "release": {
+    "assets": [
+      {
+        "apiUrl": "https://api.github.com/repos/nhatquang1701/Koi-engine/releases/assets/590447390",
+        "contentType": "application/x-gtar",
+        "createdAt": "2026-09-26T10:28:30Z",
+        "digest": "sha256:a2a766af6e6f5a2e37ac270ffc2add2e7b20f6802dd8849b09e6e450ce25ea08",
+        "downloadCount": 3,
+        "id": "RA_kwDOUYBUo84jMYMe",
+        "label": "",
+        "name": "koi-engine-v1.0.0-linux-x86_64.tar.gz",
+        "size": 5070669,
+        "state": "uploaded",
+        "updatedAt": "2026-09-26T10:28:31Z",
+        "url": "https://github.com/nhatquang1701/Koi-engine/releases/download/1.0.0/koi-engine-v1.0.0-linux-x86_64.tar.gz"
+      },
+      {
+        "apiUrl": "https://api.github.com/repos/nhatquang1701/Koi-engine/releases/assets/590447389",
+        "contentType": "application/octet-stream",
+        "createdAt": "2026-09-26T10:28:30Z",
+        "digest": "sha256:0fc08befeb2348bd834580d94cf156803651bdd259d68c12778292e1a72df855",
+        "downloadCount": 3,
+        "id": "RA_kwDOUYBUo84jMYMd",
+        "label": "",
+        "name": "koi-engine-v1.0.0-linux-x86_64.tar.gz.sha256",
+        "size": 104,
+        "state": "uploaded",
+        "updatedAt": "2026-09-26T10:28:30Z",
+        "url": "https://github.com/nhatquang1701/Koi-engine/releases/download/1.0.0/koi-engine-v1.0.0-linux-x86_64.tar.gz.sha256"
+      },
+      {
+        "apiUrl": "https://api.github.com/repos/nhatquang1701/Koi-engine/releases/assets/590447393",
+        "contentType": "application/zip",
+        "createdAt": "2026-09-26T10:28:30Z",
+        "digest": "sha256:feb07389d04a6b31b66446d03314306ca8fa4f54d7ec5ade2444702c10b73f65",
+        "downloadCount": 4,
+        "id": "RA_kwDOUYBUo84jMYMh",
+        "label": "",
+        "name": "koi-engine-v1.0.0.zip",
+        "size": 2750262,
+        "state": "uploaded",
+        "updatedAt": "2026-09-26T10:28:31Z",
+        "url": "https://github.com/nhatquang1701/Koi-engine/releases/download/1.0.0/koi-engine-v1.0.0.zip"
+      },
+      {
+        "apiUrl": "https://api.github.com/repos/nhatquang1701/Koi-engine/releases/assets/590447396",
+        "contentType": "application/octet-stream",
+        "createdAt": "2026-09-26T10:28:30Z",
+        "digest": "sha256:39fd96c06fd7f650360cd4e90f5ace46beea9ebeab02ba129a8c55ecb014c8a8",
+        "downloadCount": 3,
+        "id": "RA_kwDOUYBUo84jMYMk",
+        "label": "",
+        "name": "koi-engine-v1.0.0.zip.sha256",
+        "size": 89,
+        "state": "uploaded",
+        "updatedAt": "2026-09-26T10:28:30Z",
+        "url": "https://github.com/nhatquang1701/Koi-engine/releases/download/1.0.0/koi-engine-v1.0.0.zip.sha256"
+      }
+    ],
+    "body": "# Koi Engine 1.0.0 pre-release\r\n\r\nThe first public release candidate of Koi Engine's classical CPU UCI engine for Windows x64 and Linux x86-64. The launcher selects the fastest supported bundled CPU variant and retains a baseline x86-64 fallback.\r\n\r\n## Downloads\r\n\r\n| Platform | Archive | SHA-256 |\r\n| --- | --- | --- |\r\n| Windows x64 | `koi-engine-v1.0.0.zip` | `FEB07389D04A6B31B66446D03314306CA8FA4F54D7EC5ADE2444702C10B73F65` |\r\n| Linux x86-64 | `koi-engine-v1.0.0-linux-x86_64.tar.gz` | `A2A766AF6E6F5A2E37AC270FFC2ADD2E7B20F6802DD8849B09E6E450CE25EA08` |\r\n\r\nVerify the matching `.sha256` file before extracting. Add `koi-engine.exe` on Windows or `koi-engine` on Linux to a UCI chess GUI. Each archive includes `INSTALL.txt`, the project and third-party licenses, and a `package.json` manifest with per-file hashes. The Linux archive targets Ubuntu 22.04 and newer glibc 2.35 systems.\r\n\r\n## Configuration\r\n\r\nStart with `Threads=1`, `Hash=512`, and `Speed=100`. The default `OwnBook=true` requires a user-supplied `book.bin`; no book or Syzygy files are included. Optional NNUE and GPU NNUE require separate assets or hardware. Koi 1.0.0 does not advertise `UCI_LimitStrength` or `UCI_Elo` and makes no absolute Elo rating claim.\r\n",
+    "databaseId": 397191724,
+    "isDraft": false,
+    "isImmutable": false,
+    "isPrerelease": true,
+    "name": "Koi Engine v1.0.0 beta",
+    "tagName": "1.0.0",
+    "url": "https://github.com/nhatquang1701/Koi-engine/releases/tag/1.0.0"
+  },
+  "remote_branch": "5560b876066749f0f20a86c304e3b6faafa7526f",
+  "remote_tag": "84dd8d57f62ba96315e6634be45148f5bd39fc29",
+  "source_commit": "5560b876066749f0f20a86c304e3b6faafa7526f",
+  "windows_games": 760,
+  "windows_report_pairs": 10,
+  "linux_smoke_games": 1,
+  "linux_smoke_report": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\matches\\full-release\\linux-smoke-760\\one-classical-1p0-white\\koi-uci-match-20260927-032830-573.json",
+  "notes_sha256": "3c5106c0aef8285187ed19e1c483fba4d3130083d911e7770bbced8c7d9ca660",
+  "asset_paths": [
+    {
+      "Path": "artifacts/packages/full-release-windows-gpu/koi-engine-v1.0.0.zip",
+      "Sha": "eedaf3727eb5a9443bb19a09f1552cbac72d0a667332add7fd43ef2479e5ea61"
+    },
+    {
+      "Path": "artifacts/packages/full-release-windows-gpu/koi-engine-v1.0.0.zip.sha256",
+      "Sha": "71878a65e84b38f5357e08e9e02e151d9f23657f8699c3843bed8201fcfa0696"
+    },
+    {
+      "Path": "artifacts/packages/full-release-linux/koi-engine-v1.0.0-linux-x86_64.tar.gz",
+      "Sha": "b6eaf86d1be094cea7fadc5a33ce5350a14ffc9c37721b8b1a5249aa76d76202"
+    },
+    {
+      "Path": "artifacts/packages/full-release-linux/koi-engine-v1.0.0-linux-x86_64.tar.gz.sha256",
+      "Sha": "60ce36f23cf59568943c1b164fb08dfc34613ddd365ddfe1feb4887300e1429a"
+    },
+    {
+      "Path": "artifacts/packages/full-release-windows-gpu/extracted/package.json",
+      "Sha": "e848359ffaae9ad28d467a6aed0acf997c5750b2d13b32f5547b3fdade556b90"
+    }
+  ]
+}

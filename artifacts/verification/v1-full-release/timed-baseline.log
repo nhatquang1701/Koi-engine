@@ -1,0 +1,15 @@
+incomplete root forcing fallback run=1 XFAIL incomplete root forcing fallback: an incomplete root must prefer the near-tied forcing move over the shallow quiet lead
+incomplete root forcing fallback run=2 XFAIL incomplete root forcing fallback: an incomplete root must prefer the near-tied forcing move over the shallow quiet lead
+incomplete root forcing fallback run=3 XFAIL incomplete root forcing fallback: an incomplete root must prefer the near-tied forcing move over the shallow quiet lead
+incomplete root forcing fallback run=4 XFAIL incomplete root forcing fallback: an incomplete root must prefer the near-tied forcing move over the shallow quiet lead
+incomplete root forcing fallback run=5 XFAIL incomplete root forcing fallback: an incomplete root must prefer the near-tied forcing move over the shallow quiet lead
+threaded short forcing root research run=1 XFAIL threaded short forcing root research: a forcing quiet root must retain its tactical move in a short search (got f6e4, score -26)
+threaded short forcing root research run=2 XFAIL threaded short forcing root research: a forcing quiet root must retain its tactical move in a short search (got f6e4, score -26)
+threaded short forcing root research run=3 XFAIL threaded short forcing root research: a forcing quiet root must retain its tactical move in a short search (got f6e4, score -26)
+threaded short forcing root research run=4 XFAIL threaded short forcing root research: a forcing quiet root must retain its tactical move in a short search (got f6e4, score -26)
+threaded short forcing root research run=5 XFAIL threaded short forcing root research: a forcing quiet root must retain its tactical move in a short search (got f6e4, score -26)
+timed poisoned capture run=1 XPASS timed poisoned capture: intermittent known failure now passes
+timed poisoned capture run=2 XPASS timed poisoned capture: intermittent known failure now passes
+timed poisoned capture run=3 XPASS timed poisoned capture: intermittent known failure now passes
+timed poisoned capture run=4 XPASS timed poisoned capture: intermittent known failure now passes
+timed poisoned capture run=5 XPASS timed poisoned capture: intermittent known failure now passes

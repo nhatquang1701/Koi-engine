@@ -1,0 +1,26 @@
+{
+  "schema": "koi-nnue-training-metadata-v1",
+  "created": "2026-09-16T16:03:04Z",
+  "corpus": "artifacts\\training\\labels.txt",
+  "rows_used": 20000,
+  "val_rows": 1000,
+  "feature_set": "piece-square-king-pawn-v2",
+  "quantization": "int16/int8",
+  "architecture": [
+    960,
+    256,
+    32,
+    1
+  ],
+  "epochs": 1,
+  "batch_size": 2048,
+  "learning_rate": 0.001,
+  "seed": 20260916,
+  "target_scale": 100.0,
+  "hidden_scale": 8,
+  "bottleneck_scale": 16,
+  "val_mae_cp": 392.207,
+  "payload_sha256": "d36b4cfad966208e1fc18b88a8b5c2ccebeadeaace5892dfc61a43fa285649ef",
+  "network_sha256": "98d04e26ed7c4c465068fdb0fb05f7e9a0b72d34661c314e0b7593491d18573c",
+  "command": "tools/measurement/train_nnue_sf.py --rows 20000 --epochs 1 --batch-size 2048 --net-out artifacts/training/smoke-v1.nnue --meta-out artifacts/training/smoke-v1.metadata.json"
+}

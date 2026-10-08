@@ -1,0 +1,36 @@
+{
+  "schema": "koi-nnue-training-metadata-v3",
+  "created": "2026-09-21T14:01:42Z",
+  "corpus": "artifacts\\training\\labels.txt",
+  "rows_used": 20000,
+  "val_rows": 1000,
+  "feature_set": "halfka-king-bucket-v1+threat-pairs-v1",
+  "quantization": "int16/int8",
+  "architecture": {
+    "input": 36864,
+    "hidden": 512,
+    "l1": 32,
+    "output_buckets": 8,
+    "groups": [
+      "halfka-king-bucket-v1",
+      "threat-pairs-v1"
+    ]
+  },
+  "activation": "crelu-pair-l1",
+  "hidden_shift": 6,
+  "l1_shift": 6,
+  "output_shift": 12,
+  "epochs": 2,
+  "batch_size": 4096,
+  "learning_rate": 0.002,
+  "seed": 20260916,
+  "target_scale": 100.0,
+  "val_mae_cp": 391.6393362980662,
+  "val_round_trip_mae_cp": 391.434,
+  "w1_saturation": 0.0,
+  "l1_saturation": 0.0,
+  "w2_saturation": 0.21875,
+  "payload_sha256": "2955e1b366a050f2cb50ee41d508b6295453d1f4cc6118bdcda90711fdb8fbfc",
+  "network_sha256": "c1b0b697e9c6f4968a668810cb36018c2cf23dd599bc955ef5b876a933299791",
+  "command": "tools\\measurement\\train_nnue_koi.py --arch v5 --corpus artifacts\\training\\labels.txt --rows 20000 --epochs 2 --hidden-units 512 --l1-units 32 --batch-size 4096 --net-out artifacts\\training\\wp48\\koi-v5-smoke.nnue --meta-out artifacts\\training\\wp48\\koi-v5-smoke.json"
+}

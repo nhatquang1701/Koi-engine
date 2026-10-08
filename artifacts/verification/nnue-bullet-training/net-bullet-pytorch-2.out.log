@@ -1,0 +1,2 @@
+nnue net match 20: +0 =0 -20 (0%) candidate-weaker
+json artifacts\verification\nnue-bullet-training\net-bullet-pytorch-2\net-match.json

@@ -1,0 +1,22 @@
+{
+  "schema": "koi-speed-gate-experiment-v1",
+  "recorded_utc": "2026-10-02T11:05:15Z",
+  "gate_script": "tools/build/speed_gate.ps1",
+  "gate_script_sha256": "B743DD45DC5409A2073ACD11602934E740925C57992222B4596211D12BF3F15E",
+  "baseline_exe": "artifacts\\verification\\speed-gate\\metadata-fill-20261002-sparse-depth2-5/baseline/koi-bench-baseline.exe",
+  "baseline_exe_sha256": "9025713EBD1C715DA96B17999C53792E026F383A2CEC5BD1145384865B383166",
+  "candidate_exe": "build/roadmap-visit-win-release/koi-bench.exe",
+  "candidate_exe_sha256": "F413DB5A4A52B4BE19255C6A6E214C6BD9E28A5C1BF371E2C3AAAF0D0260F9C0",
+  "source_revision": "2c6d2e1a381ba323e0cd86fa39b98fb2e1139ca9",
+  "baseline_note": "isolated Release build of HEAD 2c6d2e1 from build/roadmap-metadata-baseline-src (BuildTools MSVC 14.44.35207, Ninja, modules/shadow/GPU/PGO/sanitize/static-runtime OFF)",
+  "candidate": "metadata fill refactor: legal_moves_with_metadata and legal_tactical_moves_with_metadata fill MoveMetadata in place through the private fill_native_move_metadata helper instead of returning std::optional<MoveMetadata> per move and copying it into the list; metadata_for_native_move keeps the optional interface for other callers",
+  "fen_file": "artifacts\\verification\\speed-gate\\metadata-fill-20261002-sparse-depth2-5/sparse-qsearch-fens.txt",
+  "fen_sha256": "07855F78D6544FD4D9ED8E6000FDA3B279208AFC608F389569D85DE3026D930C",
+  "threads": 1,
+  "speed": 100,
+  "depth_sweep": "2..5",
+  "runs": 5,
+  "max_total_nps_regression_percent": 2.0,
+  "max_row_nps_regression_percent": 2.0,
+  "min_row_elapsed_ms": 20.0
+}

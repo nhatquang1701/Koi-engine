@@ -1,0 +1,12 @@
+Traceback (most recent call last):
+  File "C:\Users\ntATh\AI test\Koi engine\tools\measurement\train_nnue_koi.py", line 1019, in <module>
+    raise SystemExit(main())
+                     ~~~~^^
+  File "C:\Users\ntATh\AI test\Koi engine\tools\measurement\train_nnue_koi.py", line 870, in main
+    return main_v5(args, rng)
+  File "C:\Users\ntATh\AI test\Koi engine\tools\measurement\train_nnue_koi.py", line 709, in main_v5
+    buckets) = load_binary_dataset_v2(pathlib.Path(args.dataset), args.rows)
+               ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ntATh\AI test\Koi engine\tools\measurement\train_nnue_koi.py", line 204, in load_binary_dataset_v2
+    raise TrainerError(f"{path} has dataset version {version}; expected 2")
+TrainerError: artifacts\training\koi-dataset-full.bin has dataset version 1; expected 2

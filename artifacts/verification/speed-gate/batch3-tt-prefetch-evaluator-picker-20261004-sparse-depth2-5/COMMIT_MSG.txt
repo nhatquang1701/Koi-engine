@@ -1,0 +1,28 @@
+perf(search): hoist TT cluster bases, hazard-free prefetch, counting picker grouping
+
+Search and evaluation micro-optimizations (batch 3).
+
+- TranspositionTable::Storage resolves the cluster base once per probe/store
+  instead of per entry through at(); every kClusterSize cluster lives inside a
+  single segment, so the hot loops drop up to eight dependent index
+  computations without changing addresses, bounds, stripe locking, aging, or
+  generation handling.
+- prefetch() resolves the address from the published hot storage without a
+  hazard lease: the per-node lease publish/revalidate/clear bought nothing for
+  a pure cache hint, and the UCI controller joins the active search before a
+  Hash resize can replace storage.  Retaining a pin between calls was rejected
+  because resize spins on hazard slots.
+- qsearch and negamax consume the probe optional directly, removing the second
+  32-byte TranspositionEntry copy after probe().
+- SearchMovePicker replaces the whole-array stage-rank std::sort with an
+  in-place counting partition.  stage_begin_/stage_end_ keep identical values,
+  and the per-stage comparator (priority, tie-break, unique source_index) is a
+  strict total order, so the per-stage sort still fixes the emission order
+  bit-identically.
+- The classical evaluator fills the endgame-scale piece census during the
+  existing material/piece-square pass when the position is not dead and the
+  phase is at or below the endgame scale start phase, removing a second
+  whole-board scan; scores stay bit-identical.
+
+Local verification before the gate: koi_core builds clean; the 15-target ctest suite passes 18/18 (exit 0) on the candidate build; uci_controller_tests needs TMP/TEMP redirected into the workspace (the agent sandbox denies directory creation under system %TEMP%; its default-TEMP create_directories failures are environmental, not regressions).
+Speed gate against the isolated 5394e14 baseline: VERDICT_PENDING.

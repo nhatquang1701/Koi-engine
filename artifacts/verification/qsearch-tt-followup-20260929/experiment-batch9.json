@@ -1,0 +1,140 @@
+{
+  "schema": "koi-qsearch-tt-sprt-extension-v1",
+  "experiment_id": "qsearch-tt-current-source-20k-batch9",
+  "recorded_utc": "2026-09-29T11:41:36.823827+00:00",
+  "workspace_branch": "koi-engine",
+  "workspace_head": "b40feb1c8447e4e8c56589409f9a5ccb47e3edfd",
+  "engine_source_commit": "18c2f9ae9e9aec480112af32b63b893ae030e32e",
+  "candidate_change_commit": "b49dee4",
+  "baseline_source_commit": "b49dee4^",
+  "candidate_sha256": "3c187fc9bdad3572e6c849b077ffee2f612661083602d79261c0c50169da268c",
+  "baseline_sha256": "cbc05d459445eacd9f0ef8749aec18434ce251b105e6d1900f5dd4b5299ce0aa",
+  "replay_sha256": "3bfc8758939531e8c5b2a07adabe9d23fd11e9a64e0b39b95265d2b4dcc14003",
+  "opening_generator": {
+    "path": "artifacts/verification/qsearch-tt-followup-20260929/generate_openings_batch9.py",
+    "sha256": "990aec0edf5d5470f3f0208579b9fcacb3f87a2845002ee975cbf9d811a7bed6"
+  },
+  "opening_file": {
+    "path": "artifacts/matches/qsearch-tt-followup-20260929/openings-128-batch9.txt",
+    "sha256": "4ab18651cd854a9eccb1ff4fc90f1f9713c369f6c15b81337f29af8cf30c816b",
+    "count": 128,
+    "unique": 128,
+    "overlap_with_previous_batches": 0
+  },
+  "opening_manifest": {
+    "path": "artifacts/manifests/qsearch-tt-followup-20260929-batch9.json",
+    "sha256": "af958b0b5ece93bbebd3f66a7cd94391c0603db3109c74df80d180731c92f207"
+  },
+  "options": {
+    "speed": 100,
+    "max_plies": 512,
+    "threads": 1,
+    "games_per_opening": 2,
+    "evaluator": "classical",
+    "algorithm": "AlphaBeta",
+    "own_book": false,
+    "random_seed": 0,
+    "nodes": 20000,
+    "hash_mb": 512,
+    "time_control": "nodes 20000",
+    "protocol_timeout_ms": 5000
+  },
+  "sprt": {
+    "elo1": 10,
+    "max_games_per_color": 256,
+    "beta": 0.05,
+    "alpha": 0.05,
+    "min_games_per_color": 40,
+    "elo0": 0
+  },
+  "hardware": {
+    "build": "26200",
+    "cpu": "Intel(R) Core(TM) i3-10100F CPU @ 3.60GHz",
+    "ram_gib": 31.87,
+    "cores": 4,
+    "os_version": "10.0.26200",
+    "os": "Microsoft Windows 11 Home",
+    "gpu": "NVIDIA GeForce GTX 1060 6GB",
+    "logical_processors": 8
+  },
+  "prior_batches": [
+    {
+      "label": "batch-1",
+      "sha256": "84b8255fedf021e26d5611f0006e12859355b76610a6d96ee6fa68682db20b96",
+      "games": 256,
+      "decision": "inconclusive",
+      "llr": -0.17975799999999997,
+      "path": "artifacts/matches/qsearch-tt-followup-20260929/sprt/qsearch-tt-current-source-20k-20260929-034116/combined-decision-derived.json"
+    },
+    {
+      "label": "batch-2",
+      "sha256": "17904e9e816a28c890a279fe304553e5561b08a367ab4ce0e61f50e463c72ff9",
+      "games": 477,
+      "decision": "inconclusive",
+      "llr": -0.29965600000000014,
+      "path": "artifacts/matches/qsearch-tt-followup-20260929/sprt-batch2/qsearch-tt-current-source-20k-batch2-20260929-043312/combined-decision-derived.json"
+    },
+    {
+      "label": "cumulative-batches-1-3",
+      "sha256": "bddeb5ae4821ed49455ad40fa60c34aea64cfb87e2dc7c2f796ed683b2f9e09a",
+      "games": 1245,
+      "decision": "inconclusive",
+      "llr": -0.8446140000000002,
+      "path": "artifacts/matches/qsearch-tt-followup-20260929/sprt-batch3/qsearch-tt-current-source-20k-batch3-20260929-065150/combined-decision-derived.json"
+    },
+    {
+      "label": "batch-4",
+      "sha256": "36498088610e5e462c5c4b947ebffebc5ca74cca529d7688a88dd9d429fb26ff",
+      "games": 512,
+      "decision": "inconclusive",
+      "llr": -0.356175,
+      "path": "artifacts/matches/qsearch-tt-followup-20260929/sprt-batch4/qsearch-tt-current-source-20k-batch4-20260929-115759/combined-decision-derived.json"
+    },
+    {
+      "label": "batch-5",
+      "sha256": "71c9b5908bf1a336ccc5fb93f127cfd6f372c739ac805193a9aebe5f0e1587d4",
+      "games": 512,
+      "decision": "inconclusive",
+      "llr": -0.37055899999999997,
+      "path": "artifacts/matches/qsearch-tt-followup-20260929/sprt-batch5/qsearch-tt-current-source-20k-batch5-20260929-131648/combined-decision-derived.json"
+    },
+    {
+      "label": "batch-6",
+      "sha256": "1bcea78e438c5f80b838f61cf5b5f9a82d3de5e7b88d554f43c90bdb724453fc",
+      "games": 512,
+      "decision": "inconclusive",
+      "llr": -0.34262800000000015,
+      "path": "artifacts/matches/qsearch-tt-followup-20260929/sprt-batch6/qsearch-tt-current-source-20k-batch6-20260929-143123/combined-decision-derived.json"
+    },
+    {
+      "label": "batch-7",
+      "sha256": "4473e3908798cfc187ddf765cf821e1c857b8cdae9dccd0386d54346d4b94275",
+      "games": 512,
+      "decision": "inconclusive",
+      "llr": -0.36659299999999995,
+      "path": "artifacts/matches/qsearch-tt-followup-20260929/sprt-batch7/qsearch-tt-current-source-20k-batch7-20260929-155026/combined-decision-derived.json"
+    },
+    {
+      "label": "batch-8",
+      "sha256": "e01f63a3dbe6e88e0acceeeaaf7710b0dede9a44bd20a8d8607e3c8d8e3998df",
+      "games": 512,
+      "decision": "inconclusive",
+      "llr": -0.351007,
+      "path": "artifacts/matches/qsearch-tt-followup-20260929/sprt-batch8/qsearch-tt-current-source-20k-batch8-20260929-170415/combined-decision-derived.json"
+    }
+  ],
+  "prior_cumulative": {
+    "label": "cumulative-batches-1-8",
+    "sha256": "e01f63a3dbe6e88e0acceeeaaf7710b0dede9a44bd20a8d8607e3c8d8e3998df",
+    "games": 3805,
+    "decision": "inconclusive",
+    "llr": -2.631576000000001,
+    "path": "artifacts/matches/qsearch-tt-followup-20260929/sprt-batch8/qsearch-tt-current-source-20k-batch8-20260929-170415/combined-decision-derived.json"
+  },
+  "match_harness": {
+    "path": "tools/stability/uci_match.ps1",
+    "sha256": "9df4f67a4632a05e070eb44fde202814a9692befd3a63c880688b946feedfb3e",
+    "git_blob": "de0de5bce59c2d650a7f1c872d730b9d82e76952",
+    "source_commit": "b40feb1c8447e4e8c56589409f9a5ccb47e3edfd"
+  }
+}

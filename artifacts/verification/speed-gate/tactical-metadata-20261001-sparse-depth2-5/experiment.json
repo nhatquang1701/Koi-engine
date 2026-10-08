@@ -1,0 +1,18 @@
+{
+  "depth_sweep": "2..5",
+  "runs": 5,
+  "max_total_nps_regression_percent": 2.0,
+  "gate_script_sha256": "B743DD45DC5409A2073ACD11602934E740925C57992222B4596211D12BF3F15E",
+  "candidate_exe_sha256": "82251792FF2BA5E04233F81F3A19BE709880B4AEDCBF0ED284917839665CF295",
+  "source_revision": "78f521e468b6a49779a503d54589d8d9d2d1b571",
+  "max_row_nps_regression_percent": 2.0,
+  "baseline_exe_sha256": "A1BC754EDD280E6F8BABA9E21632D17E5A7BBFC274DB29A0306CCA50AFDB2689",
+  "fen_file": "artifacts\\verification\\speed-gate\\tactical-metadata-20261001-sparse-depth2-5\\sparse-qsearch-fens.txt",
+  "fen_sha256": "07855F78D6544FD4D9ED8E6000FDA3B279208AFC608F389569D85DE3026D930C",
+  "baseline_exe": "artifacts\\verification\\speed-gate\\tactical-metadata-20261001-sparse-depth2-5\\baseline\\koi-bench-baseline.exe",
+  "min_row_elapsed_ms": 20.0,
+  "candidate": "tactical metadata: legal_tactical_moves_with_metadata builds each pushed/probed entry once and skips discarded quiet metadata",
+  "threads": 1,
+  "speed": 100,
+  "candidate_exe": "build\\roadmap-visit-win-release\\koi-bench.exe"
+}

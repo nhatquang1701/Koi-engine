@@ -1,0 +1,126 @@
+2026-10-04T07:12:36 waiting for KoiLabelValidation to finish
+2026-10-04T07:48:04 validation task no longer running
+2026-10-04T07:48:04 converting labels to corpus
+[07:48:04] done: total=4371 written=3711 skipped_cp=660 skipped_dup=0 bad=0
+2026-10-04T07:48:05 convert exit=0
+2026-10-04T07:48:05 short training run (pipeline validation only)
+training device cuda (torch 2.14.0+cu126, cuda 12.6)
+loaded 3711 rows (43 own, 43 opp, pad 43) in 0.00s
+epoch 1/60 train_loss 2.82850 val_loss 2.65282 val_mae_cp 265.28 time 0.9s
+epoch 2/60 train_loss 2.20333 val_loss 2.56877 val_mae_cp 256.88 time 0.3s
+epoch 3/60 train_loss 1.96033 val_loss 2.52384 val_mae_cp 252.38 time 0.3s
+epoch 4/60 train_loss 1.83861 val_loss 2.49879 val_mae_cp 249.88 time 0.3s
+epoch 5/60 train_loss 1.76998 val_loss 2.49052 val_mae_cp 249.05 time 0.3s
+epoch 6/60 train_loss 1.72272 val_loss 2.49108 val_mae_cp 249.11 time 0.3s
+epoch 7/60 train_loss 1.69071 val_loss 2.48960 val_mae_cp 248.96 time 0.3s
+epoch 8/60 train_loss 1.66576 val_loss 2.48594 val_mae_cp 248.59 time 0.3s
+epoch 9/60 train_loss 1.64749 val_loss 2.49201 val_mae_cp 249.20 time 0.3s
+epoch 10/60 train_loss 1.62873 val_loss 2.48980 val_mae_cp 248.98 time 0.3s
+epoch 11/60 train_loss 1.61233 val_loss 2.49586 val_mae_cp 249.59 time 0.3s
+epoch 12/60 train_loss 1.59827 val_loss 2.50030 val_mae_cp 250.03 time 0.3s
+epoch 13/60 train_loss 1.58503 val_loss 2.49945 val_mae_cp 249.94 time 0.3s
+epoch 14/60 train_loss 1.57318 val_loss 2.50425 val_mae_cp 250.43 time 0.3s
+epoch 15/60 train_loss 1.56235 val_loss 2.51138 val_mae_cp 251.14 time 0.3s
+epoch 16/60 train_loss 1.55273 val_loss 2.51081 val_mae_cp 251.08 time 0.3s
+epoch 17/60 train_loss 1.54387 val_loss 2.51765 val_mae_cp 251.76 time 0.3s
+epoch 18/60 train_loss 1.53534 val_loss 2.51774 val_mae_cp 251.77 time 0.3s
+epoch 19/60 train_loss 1.52817 val_loss 2.51243 val_mae_cp 251.24 time 0.3s
+epoch 20/60 train_loss 1.52110 val_loss 2.51509 val_mae_cp 251.51 time 0.3s
+epoch 21/60 train_loss 1.51400 val_loss 2.50627 val_mae_cp 250.63 time 0.3s
+epoch 22/60 train_loss 1.50810 val_loss 2.51327 val_mae_cp 251.33 time 0.3s
+epoch 23/60 train_loss 1.50301 val_loss 2.50436 val_mae_cp 250.44 time 0.3s
+epoch 24/60 train_loss 1.49810 val_loss 2.51141 val_mae_cp 251.14 time 0.3s
+epoch 25/60 train_loss 1.49387 val_loss 2.50414 val_mae_cp 250.41 time 0.3s
+epoch 26/60 train_loss 1.49011 val_loss 2.51646 val_mae_cp 251.65 time 0.3s
+epoch 27/60 train_loss 1.48645 val_loss 2.50682 val_mae_cp 250.68 time 0.3s
+epoch 28/60 train_loss 1.48314 val_loss 2.51815 val_mae_cp 251.82 time 0.3s
+epoch 29/60 train_loss 1.47890 val_loss 2.50426 val_mae_cp 250.43 time 0.3s
+epoch 30/60 train_loss 1.47732 val_loss 2.51167 val_mae_cp 251.17 time 0.3s
+epoch 31/60 train_loss 1.47119 val_loss 2.51302 val_mae_cp 251.30 time 0.3s
+epoch 32/60 train_loss 1.46751 val_loss 2.51227 val_mae_cp 251.23 time 0.3s
+epoch 33/60 train_loss 1.46464 val_loss 2.50696 val_mae_cp 250.70 time 0.3s
+epoch 34/60 train_loss 1.46148 val_loss 2.51392 val_mae_cp 251.39 time 0.3s
+epoch 35/60 train_loss 1.45866 val_loss 2.51165 val_mae_cp 251.16 time 0.3s
+epoch 36/60 train_loss 1.45610 val_loss 2.50782 val_mae_cp 250.78 time 0.4s
+epoch 37/60 train_loss 1.45392 val_loss 2.51115 val_mae_cp 251.12 time 0.3s
+epoch 38/60 train_loss 1.45167 val_loss 2.51105 val_mae_cp 251.10 time 0.3s
+epoch 39/60 train_loss 1.44970 val_loss 2.50983 val_mae_cp 250.98 time 0.3s
+epoch 40/60 train_loss 1.44816 val_loss 2.51030 val_mae_cp 251.03 time 0.3s
+epoch 41/60 train_loss 1.44668 val_loss 2.51008 val_mae_cp 251.01 time 0.3s
+epoch 42/60 train_loss 1.44542 val_loss 2.50934 val_mae_cp 250.93 time 0.3s
+epoch 43/60 train_loss 1.44429 val_loss 2.50999 val_mae_cp 251.00 time 0.3s
+epoch 44/60 train_loss 1.44322 val_loss 2.51053 val_mae_cp 251.05 time 0.3s
+epoch 45/60 train_loss 1.44223 val_loss 2.51040 val_mae_cp 251.04 time 0.3s
+epoch 46/60 train_loss 1.44134 val_loss 2.51042 val_mae_cp 251.04 time 0.3s
+epoch 47/60 train_loss 1.44060 val_loss 2.51070 val_mae_cp 251.07 time 0.3s
+epoch 48/60 train_loss 1.43995 val_loss 2.51094 val_mae_cp 251.09 time 0.3s
+epoch 49/60 train_loss 1.43942 val_loss 2.51080 val_mae_cp 251.08 time 0.3s
+epoch 50/60 train_loss 1.43898 val_loss 2.51073 val_mae_cp 251.07 time 0.3s
+epoch 51/60 train_loss 1.43864 val_loss 2.51080 val_mae_cp 251.08 time 0.3s
+epoch 52/60 train_loss 1.43835 val_loss 2.51096 val_mae_cp 251.10 time 0.3s
+epoch 53/60 train_loss 1.43812 val_loss 2.51107 val_mae_cp 251.11 time 0.3s
+epoch 54/60 train_loss 1.43793 val_loss 2.51103 val_mae_cp 251.10 time 0.3s
+epoch 55/60 train_loss 1.43780 val_loss 2.51102 val_mae_cp 251.10 time 0.3s
+epoch 56/60 train_loss 1.43770 val_loss 2.51104 val_mae_cp 251.10 time 0.3s
+epoch 57/60 train_loss 1.43763 val_loss 2.51106 val_mae_cp 251.11 time 0.3s
+epoch 58/60 train_loss 1.43758 val_loss 2.51107 val_mae_cp 251.11 time 0.3s
+epoch 59/60 train_loss 1.43756 val_loss 2.51107 val_mae_cp 251.11 time 0.3s
+epoch 60/60 train_loss 1.43755 val_loss 2.51107 val_mae_cp 251.11 time 0.3s
+saved float checkpoint to C:\Users\ntATh\AI test\Koi engine\artifacts\training\lc0-validation-20261004\net.pt
+quantization v5 s1=6 s_l1=6 k3=4 val_mae_cp 253.97
+quantization v5 s1=6 s_l1=6 k3=5 val_mae_cp 253.97
+quantization v5 s1=6 s_l1=6 k3=6 val_mae_cp 253.97
+quantization v5 s1=6 s_l1=6 k3=7 val_mae_cp 253.97
+quantization v5 s1=6 s_l1=6 k3=8 val_mae_cp 253.97
+quantization v5 s1=6 s_l1=7 k3=4 val_mae_cp 248.35
+quantization v5 s1=6 s_l1=7 k3=5 val_mae_cp 248.54
+quantization v5 s1=6 s_l1=7 k3=6 val_mae_cp 248.24
+quantization v5 s1=6 s_l1=7 k3=7 val_mae_cp 248.28
+quantization v5 s1=6 s_l1=7 k3=8 val_mae_cp 248.66
+quantization v5 s1=6 s_l1=8 k3=4 val_mae_cp 249.93
+quantization v5 s1=6 s_l1=8 k3=5 val_mae_cp 250.41
+quantization v5 s1=6 s_l1=8 k3=6 val_mae_cp 250.16
+quantization v5 s1=6 s_l1=8 k3=7 val_mae_cp 250.13
+quantization v5 s1=6 s_l1=8 k3=8 val_mae_cp 249.98
+quantization v5 s1=7 s_l1=6 k3=4 val_mae_cp 253.97
+quantization v5 s1=7 s_l1=6 k3=5 val_mae_cp 253.97
+quantization v5 s1=7 s_l1=6 k3=6 val_mae_cp 253.97
+quantization v5 s1=7 s_l1=6 k3=7 val_mae_cp 253.97
+quantization v5 s1=7 s_l1=6 k3=8 val_mae_cp 253.97
+quantization v5 s1=7 s_l1=7 k3=4 val_mae_cp 256.33
+quantization v5 s1=7 s_l1=7 k3=5 val_mae_cp 257.31
+quantization v5 s1=7 s_l1=7 k3=6 val_mae_cp 256.81
+quantization v5 s1=7 s_l1=7 k3=7 val_mae_cp 256.64
+quantization v5 s1=7 s_l1=7 k3=8 val_mae_cp 254.74
+quantization v5 s1=7 s_l1=8 k3=4 val_mae_cp 253.53
+quantization v5 s1=7 s_l1=8 k3=5 val_mae_cp 254.75
+quantization v5 s1=7 s_l1=8 k3=6 val_mae_cp 254.44
+quantization v5 s1=7 s_l1=8 k3=7 val_mae_cp 254.20
+quantization v5 s1=7 s_l1=8 k3=8 val_mae_cp 252.74
+quantization v5 s1=8 s_l1=6 k3=4 val_mae_cp 253.97
+quantization v5 s1=8 s_l1=6 k3=5 val_mae_cp 253.97
+quantization v5 s1=8 s_l1=6 k3=6 val_mae_cp 253.97
+quantization v5 s1=8 s_l1=6 k3=7 val_mae_cp 253.97
+quantization v5 s1=8 s_l1=6 k3=8 val_mae_cp 253.97
+quantization v5 s1=8 s_l1=7 k3=4 val_mae_cp 262.71
+quantization v5 s1=8 s_l1=7 k3=5 val_mae_cp 263.53
+quantization v5 s1=8 s_l1=7 k3=6 val_mae_cp 263.10
+quantization v5 s1=8 s_l1=7 k3=7 val_mae_cp 262.95
+quantization v5 s1=8 s_l1=7 k3=8 val_mae_cp 260.15
+quantization v5 s1=8 s_l1=8 k3=4 val_mae_cp 261.17
+quantization v5 s1=8 s_l1=8 k3=5 val_mae_cp 262.43
+quantization v5 s1=8 s_l1=8 k3=6 val_mae_cp 262.10
+quantization v5 s1=8 s_l1=8 k3=7 val_mae_cp 261.80
+quantization v5 s1=8 s_l1=8 k3=8 val_mae_cp 258.88
+selected v5 s1=6 s_l1=7 k3=6 val_mae_cp 248.24
+wrote C:\Users\ntATh\AI test\Koi engine\artifacts\training\lc0-validation-20261004\net.nnue (113302043 bytes) and C:\Users\ntATh\AI test\Koi engine\artifacts\training\lc0-validation-20261004\net.metadata.json
+2026-10-04T07:48:44 train exit=0
+2026-10-04T07:48:44 probing the trained net with the engine (absolute paths)
+[C:\Users\ntATh\AI test\Koi engine\artifacts\training\lc0-validation-20261004\net.nnue] 4k3/8/8/8/8/8/P7/4K3 w - - 0 1
+    option name EvalFile type string default
+    info depth 1 seldepth 1 multipv 1 score cp 10 nodes 10 nps 5000 hashfull 0 time 2 pv e1f1
+    info depth 2 seldepth 2 multipv 1 score cp -3 nodes 53 nps 17666 hashfull 0 time 3 pv a2a4 e8e7
+    bestmove a2a4 ponder e8e7
+
+2026-10-04T07:48:45 probe exit=0
+2026-10-04T07:48:45 DONE

@@ -1,0 +1,38 @@
+{
+  "schema": "koi-bench-speed-v1",
+  "engine": "Koi Engine",
+  "build": "Koi Engine 1.0.0",
+  "suite": "fen_file",
+  "source": "artifacts\\verification\\speed-gate\\locked-wall-20261001-sparse-depth2-5\\sparse-qsearch-fens.txt",
+  "evaluator": "classical",
+  "threads": 1,
+  "speed": 100,
+  "hash_mb": 512,
+  "hash_state": "cold",
+  "timed": true,
+  "warmup": 0,
+  "repeat": 1,
+  "node_limit": 0,
+  "depth": null,
+  "depth_sweep": {"from": 4, "to": 4},
+  "positions": [
+    {"id": "fen-001", "fen": "k7/4r3/5q2/3p4/4P3/2N5/8/7K w - - 0 1", "depth": 4, "nodes": 4435, "qnodes": 635892, "tt_hits": 58968, "score_cp": -99992, "best_move": "c3e2", "elapsed_ms": 2107, "nps": 303904},
+    {"id": "fen-002", "fen": "2r1k3/5q1b/8/8/4N3/8/8/K7 w - - 0 1", "depth": 4, "nodes": 2241, "qnodes": 181550, "tt_hits": 12674, "score_cp": -964, "best_move": "e4d6", "elapsed_ms": 536, "nps": 342893},
+    {"id": "fen-003", "fen": "r3k3/P7/8/8/8/8/7p/1N2K3 b - - 0 1", "depth": 4, "nodes": 2467, "qnodes": 293789, "tt_hits": 28233, "score_cp": 1514, "best_move": "h2h1q", "elapsed_ms": 1026, "nps": 288748},
+    {"id": "fen-004", "fen": "4k2r/P7/8/8/8/8/7p/4K3 w - - 0 1", "depth": 4, "nodes": 6044, "qnodes": 292216, "tt_hits": 68116, "score_cp": 941, "best_move": "a7a8q", "elapsed_ms": 962, "nps": 310041},
+    {"id": "fen-005", "fen": "kn2q3/8/8/8/8/8/P7/4K3 w - - 0 1", "depth": 4, "nodes": 7675, "qnodes": 770059, "tt_hits": 129787, "score_cp": -1241, "best_move": "e1d2", "elapsed_ms": 1854, "nps": 419489},
+    {"id": "fen-006", "fen": "8/8/4r1q1/7k/8/7N/P7/K7 w - - 0 1", "depth": 4, "nodes": 1467, "qnodes": 104303, "tt_hits": 14271, "score_cp": -465, "best_move": "h3f4", "elapsed_ms": 318, "nps": 332610},
+    {"id": "fen-007", "fen": "k7/4P3/8/8/8/8/p7/4R1K1 w - - 0 1", "depth": 4, "nodes": 5955, "qnodes": 1184630, "tt_hits": 272950, "score_cp": 1556, "best_move": "e7e8q", "elapsed_ms": 3791, "nps": 314055},
+    {"id": "fen-008", "fen": "4k3/1P6/8/8/8/8/6p1/4K1N1 w - - 0 1", "depth": 4, "nodes": 7280, "qnodes": 806239, "tt_hits": 127870, "score_cp": 1292, "best_move": "b7b8q", "elapsed_ms": 2296, "nps": 354320},
+    {"id": "fen-009", "fen": "b7/8/3q3k/8/7r/6N1/8/K7 w - - 0 1", "depth": 4, "nodes": 1139, "qnodes": 88475, "tt_hits": 8729, "score_cp": -628, "best_move": "g3f5", "elapsed_ms": 243, "nps": 368781},
+    {"id": "fen-010", "fen": "8/3q1r2/2k5/8/8/5N2/8/K1B5 w - - 0 1", "depth": 4, "nodes": 6544, "qnodes": 358250, "tt_hits": 47510, "score_cp": -255, "best_move": "f3e5", "elapsed_ms": 1281, "nps": 284772},
+    {"id": "fen-011", "fen": "4k3/8/3q4/4r3/8/8/1B6/4K3 w - - 0 1", "depth": 4, "nodes": 7453, "qnodes": 601441, "tt_hits": 98529, "score_cp": -1049, "best_move": "b2e5", "elapsed_ms": 1814, "nps": 335663},
+    {"id": "fen-012", "fen": "4k3/1P6/8/8/8/8/6p1/2B1K3 b - - 0 1", "depth": 4, "nodes": 4244, "qnodes": 131060, "tt_hits": 34055, "score_cp": 601, "best_move": "g2g1q", "elapsed_ms": 435, "nps": 311043},
+    {"id": "fen-013", "fen": "4k3/3q4/8/8/8/8/3Q4/3R2K1 w - - 0 1", "depth": 4, "nodes": 39612, "qnodes": 2607827, "tt_hits": 589479, "score_cp": 99993, "best_move": "d2d7", "elapsed_ms": 9995, "nps": 264876},
+    {"id": "fen-014", "fen": "2b1k3/7P/8/8/8/8/3p4/5K1R b - - 0 1", "depth": 4, "nodes": 7465, "qnodes": 406063, "tt_hits": 82988, "score_cp": 1294, "best_move": "d2d1q", "elapsed_ms": 1465, "nps": 282271},
+    {"id": "fen-015", "fen": "4k1r1/8/8/3Q4/2q3N1/8/4B1B1/4R1K1 b - - 0 1", "depth": 4, "nodes": 41492, "qnodes": 4820326, "tt_hits": 622265, "score_cp": -1151, "best_move": "c4d5", "elapsed_ms": 19787, "nps": 245707},
+    {"id": "fen-016", "fen": "4k3/8/8/8/2rQ4/8/8/3R2K1 b - - 0 1", "depth": 4, "nodes": 3183, "qnodes": 312906, "tt_hits": 39030, "score_cp": -577, "best_move": "c4d4", "elapsed_ms": 946, "nps": 334132}
+
+  ],
+  "totals": {"samples": 16, "nodes": 148696, "qnodes": 13595026, "visited": 13743722, "elapsed_ms": 48856, "nps": 281310}
+}

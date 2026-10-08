@@ -1,0 +1,517 @@
+# Koi policy/value opening corpus v2
+# split=train
+# seed=20260929
+# prefix_plies=6..18
+# heldout_states_sha256=4a80b900fcb82f253df156bc3fc1496e18ba106a9e6e6cf3b51803e36bc53cb2
+policy-v2-train-0001 | g2g3 d7d6 f2f3 b8a6 f1g2 c7c6 h2h3 c8g4 f3g4 h7h6 b1a3 e7e5
+policy-v2-train-0002 | d2d4 g8f6 e2e3 g7g6 g1e2 f6g4
+policy-v2-train-0003 | g2g3 g7g5 b2b3 a7a6 c1a3 g5g4 e2e3 b8c6 d1e2 c6b8 e3e4 e7e6 e2b5
+policy-v2-train-0004 | a2a3 b8a6 g2g4 g8h6 f2f4 g7g5 e2e4 d7d6
+policy-v2-train-0005 | f2f4 g7g5 c2c3 h7h6 a2a4 h6h5 e1f2 a7a5 f2e1
+policy-v2-train-0006 | g2g3 h7h5 c2c4 e7e5 e2e4 g7g6 g1h3 f8d6 d2d4 g6g5
+policy-v2-train-0007 | c2c3 a7a5 c3c4 b8a6 b2b3 g8f6 c1a3 a6b8 a3c5 h7h5 d1c2 a8a7 b1c3
+policy-v2-train-0008 | d2d3 e7e5 c1d2 f8c5 g2g4 c5e7 b2b4 b8a6
+policy-v2-train-0009 | f2f4 g8f6 g2g4 d7d6 h2h3 g7g5 b2b3 f6d7 a2a3 b7b6
+policy-v2-train-0010 | h2h3 f7f6 b2b3 d7d6 g2g4 e7e5 g4g5 d8e7 b1c3 e7e6 a2a3 c8d7 a1b1 e6e7 f2f4 h7h6 c3b5
+policy-v2-train-0011 | g1h3 d7d5 d2d3 c8h3 g2g3 h3g2 c1e3
+policy-v2-train-0012 | e2e3 b8a6 e3e4 a6c5 g1e2 d7d6 b1a3 a8b8
+policy-v2-train-0013 | a2a3 c7c6 h2h3 d8c7 b1c3 h7h6
+policy-v2-train-0014 | f2f4 b7b5 e2e3 d7d5 e1f2 b8c6 g1h3 g8h6 d1e2 c8f5 c2c4 d8b8 h1g1 f5b1
+policy-v2-train-0015 | e2e3 b8c6 f1c4 a7a5 a2a3 e7e5 e1f1 c6e7
+policy-v2-train-0016 | g2g4 h7h5 h2h3 b8c6 d2d4 c6b8 b2b3 e7e6 g4h5
+policy-v2-train-0017 | e2e3 g8h6 f1c4 b8c6 b2b3 b7b6 c4f7 h6f7 c1b2 a7a6 b2a3 c6b8 g2g4 a8a7 d2d4 a7b7
+policy-v2-train-0018 | g1h3 b8a6 b1c3 a8b8 f2f4 h7h5 c3b1 b8a8
+policy-v2-train-0019 | g1h3 d7d6 c2c4 g7g5 d2d3 c8f5 e2e3
+policy-v2-train-0020 | g1h3 a7a5 a2a4 b7b6 f2f4 a8a6 b1a3 d7d6 b2b3 h7h6 a3b1
+policy-v2-train-0021 | a2a4 g8h6 f2f3 a7a6 c2c3 a8a7 b2b3 d7d5 g1h3 e7e6 h3f2 h6f5 f2e4 g7g5
+policy-v2-train-0022 | g1f3 c7c6 h1g1 d7d5 f3h4 c8g4 b2b3 g7g5 c1a3 d8a5 d1c1 a5c7 a3c5 b7b6
+policy-v2-train-0023 | h2h3 b8a6 d2d3 g7g5 g2g4 d7d5 c2c3 f7f6 e2e4 d5e4
+policy-v2-train-0024 | c2c4 f7f6 a2a3 e8f7 b2b3 e7e6
+policy-v2-train-0025 | h2h3 e7e5 e2e4 g7g6 d1f3 c7c6 f3f5 f8e7 f2f3 a7a5 f1e2 d7d5 b1a3 f7f6 f3f4
+policy-v2-train-0026 | e2e4 b7b5 d2d4 a7a5 g1f3 g8h6 c2c3 c8b7 d4d5 e7e5 c1e3 a5a4 e1e2 h6g8 d1d3 e8e7
+policy-v2-train-0027 | g2g4 g7g6 f2f3 g6g5 e2e3 f8g7 a2a4 e8f8
+policy-v2-train-0028 | b2b4 h7h5 g2g3 h8h7 a2a3 h5h4 d2d4 h7h8 d4d5 b8a6 a1a2 e7e6
+policy-v2-train-0029 | f2f3 e7e6 e1f2 f7f5 a2a3 g8h6 b1c3 a7a5 a1b1 d8g5 g2g4 e8e7 g4f5 g5f6 c3a2
+policy-v2-train-0030 | b1a3 b8a6 a3b5 c7c5 b5d6 e7d6 a1b1 g8f6 c2c3 c5c4 b2b4
+policy-v2-train-0031 | b2b3 h7h5 g2g3 a7a5 h2h4 h8h6 g3g4 a8a6 g4h5 c7c6 g1f3 c6c5 f3e5 h6h8 e2e4 f7f6 f1g2 a6a8
+policy-v2-train-0032 | b2b4 h7h6 f2f3 b8a6 g1h3 d7d5 b1a3 c7c6 a3c4 b7b6 h3f2
+policy-v2-train-0033 | g1f3 a7a6 f3g5 a6a5 h1g1 f7f5 f2f4 e7e6 g1h1 f8b4
+policy-v2-train-0034 | f2f4 b7b5 h2h3 g7g6 e2e4 b5b4 h3h4 b8a6
+policy-v2-train-0035 | a2a3 b8c6 b1c3 h7h6 h2h4 g7g6 a1a2 c6e5 c3b1 h6h5 g2g4 f8h6 e2e3 h5g4 e1e2 g8f6
+policy-v2-train-0036 | c2c4 e7e5 g1f3 g8f6 b2b4 d7d6
+policy-v2-train-0037 | c2c4 g8f6 g1h3 b8a6 h3f4 h7h6 f4h3 c7c6 b2b4
+policy-v2-train-0038 | d2d4 e7e5 f2f3 g8e7 a2a4 h8g8
+policy-v2-train-0039 | a2a3 f7f5 g2g3 b8a6 f1g2 a8b8 g1f3 h7h5 e2e3 h8h6 b2b3 e7e6 a3a4
+policy-v2-train-0040 | f2f4 f7f6 g1f3 g7g6 g2g4 e8f7 b2b3 b7b6 b3b4 c7c6 f3e5 f7e6 b1c3 f6e5
+policy-v2-train-0041 | d2d3 d7d6 f2f3 e7e5 e1d2 g8e7 d2e3 e5e4 d1e1 d8d7 g1h3 d7a4 f3e4
+policy-v2-train-0042 | h2h4 f7f5 b2b4 g8h6 c1a3 h6f7 d2d4 e7e6 h1h3 g7g6
+policy-v2-train-0043 | g2g4 e7e6 g1f3 d7d6 b2b4 b7b6 c2c4 c8b7 d1b3 d8g5 e1d1 b8a6 h1g1 c7c6 b1a3 g5d8 f1g2
+policy-v2-train-0044 | g2g4 b8a6 b2b3 a6b4 f1h3 b4c6 c1a3 d7d6 b1c3 g8f6 d2d3 c6a5
+policy-v2-train-0045 | g1h3 d7d6 a2a4 b7b6 h3f4 g8h6 f4h3 h6f5
+policy-v2-train-0046 | g1h3 g8f6 g2g3 h7h6 c2c4 h8g8
+policy-v2-train-0047 | g1f3 h7h5 c2c3 b7b5 d1b3 g7g6 a2a4 f8g7 e1d1 g7e5 e2e4 c8b7 a1a3 g8f6 f3e5 b5a4 d1c2 h8h6
+policy-v2-train-0048 | e2e3 b7b5 g1e2 g7g5 e2g1 c7c6 e3e4 f8g7 b2b4 f7f6 h2h4 g5g4 g1f3 d8c7 c1a3 c7g3 h4h5 g7h6
+policy-v2-train-0049 | h2h4 g8h6 a2a3 h6g4 b1c3 g7g5 e2e4 c7c6 f2f4 g5f4 b2b4 g4f2 f1d3 f2h1 c3a2
+policy-v2-train-0050 | c2c3 g8f6 b2b3 d7d5 a2a3 d5d4 c1b2 b8c6 h2h4 h8g8
+policy-v2-train-0051 | b1a3 g8f6 e2e3 e7e6 e1e2 d7d6
+policy-v2-train-0052 | d2d4 e7e5 c1d2 b7b5 d2c3 g8e7 d1c1
+policy-v2-train-0053 | c2c3 c7c5 b1a3 b8c6 b2b3 d7d5 a1b1 c6d4 d1c2 c8d7 c3c4 d4e6 c2d3 f7f5 d3f5 g7g5 e1d1 f8g7
+policy-v2-train-0054 | g1h3 g7g6 f2f3 b8a6 g2g3 g6g5 b1c3 h7h6 h3f2 a6c5 d2d4 g5g4 h2h3 b7b6
+policy-v2-train-0055 | f2f3 g8h6 b2b3 e7e6 b1a3 d8f6 c2c4 g7g5 g2g4 b8c6 c1b2 a7a6 a3b5 f6d4 b2c3 d4e5 e1f2
+policy-v2-train-0056 | d2d4 c7c6 d1d2 b8a6 g2g3 c6c5 d2e3
+policy-v2-train-0057 | b1c3 e7e5 c3b5 a7a5 g2g3 f7f5 b2b3 g8h6 d2d4 f8b4 b5c3 a5a4 h2h4
+policy-v2-train-0058 | e2e3 g8f6 f1b5 g7g5 b5f1 c7c6 f2f4 f6d5 f1b5 f7f5 c2c3 d5f4 d1b3 d8b6 g2g3
+policy-v2-train-0059 | f2f4 b8a6 b2b4 h7h6 e1f2 d7d6 g1f3 g7g6 c2c3 c8f5 d1a4 f5d7 f3h4
+policy-v2-train-0060 | c2c4 h7h6 b1c3 f7f5 h2h4 b7b6 c3d5
+policy-v2-train-0061 | h2h4 f7f5 e2e4 f5e4 f1e2 d7d5 e2b5 b8c6 f2f4 c8g4 e1f2
+policy-v2-train-0062 | g1f3 d7d6 f3g1 a7a6 c2c4 b8c6 b2b3
+policy-v2-train-0063 | a2a4 h7h5 c2c3 f7f6 a1a2 g7g5 a2a3
+policy-v2-train-0064 | a2a3 g8h6 b2b3 h6g4 c1b2 g7g6 e2e3 g4f6 b3b4 g6g5
+policy-v2-train-0065 | a2a4 d7d6 e2e4 f7f5 a4a5 b7b6 h2h3 e7e5 f2f3
+policy-v2-train-0066 | d2d3 c7c6 g1h3 d8c7 g2g4 c7b6 h3g5 b6b3 c1e3 e8d8
+policy-v2-train-0067 | g1h3 b8a6 g2g4 g7g6 f2f4 e7e6 d2d3 a6b4
+policy-v2-train-0068 | d2d3 d7d5 a2a4 c8g4 g2g3 a7a5 h2h3 g8h6 e2e3 g4e2 b1d2 e7e5 h1h2 d8f6
+policy-v2-train-0069 | b2b3 h7h6 c1b2 d7d5 e2e4 b7b6 b2a3 a7a6 d1c1 h8h7 f1d3 d5e4
+policy-v2-train-0070 | h2h3 b7b6 g2g3 g8h6 d2d4 f7f5 h3h4 c7c5
+policy-v2-train-0071 | b2b3 d7d5 c2c3 c7c6 h2h3 e7e5 f2f3 e5e4 c1b2 d8f6 a2a4 c6c5 f3f4 f6g5 g2g4 c8f5 c3c4
+policy-v2-train-0072 | a2a4 b8a6 g2g4 e7e5 a1a3 d7d5 f2f4 c8d7 c2c4
+policy-v2-train-0073 | g2g3 a7a5 e2e3 a8a6 c2c3 e7e5 f2f3 a6e6 d2d3 c7c5 f1e2 h7h5 g3g4 e6d6
+policy-v2-train-0074 | b1c3 c7c6 g2g4 b8a6 c3b5 d7d6 b5a7 a8a7 b2b4
+policy-v2-train-0075 | a2a3 b8c6 a1a2 e7e6 f2f3 f8b4 g1h3 b4d6 g2g4 c6d4 f3f4 d8f6
+policy-v2-train-0076 | c2c4 g7g5 d1c2 e7e6 c4c5 f7f6 a2a3 c7c6 c2c3 f8c5 c3c2
+policy-v2-train-0077 | f2f4 e7e6 f4f5 f7f6 d2d3 f8d6 c1e3 a7a6 e3f4 d6e7 b2b4 e7d6 f4e5 b8c6 e1d2
+policy-v2-train-0078 | h2h4 b8a6 g2g3 a6c5 h1h3 d7d5 c2c3 h7h6 d1b3 c5d7 g1f3 e7e6 b3d5 f8e7
+policy-v2-train-0079 | g2g3 g8f6 b2b4 d7d6 b1a3 a7a5 a3b5 c8d7 e2e3 h7h6 a2a4 d7f5 c2c4 h8g8 f1g2 f5e6 h2h3
+policy-v2-train-0080 | a2a4 g7g6 d2d3 f7f5 g2g4 a7a5 c2c3 b8c6 g1h3 g8h6 b2b4 a8b8 c1d2
+policy-v2-train-0081 | g1f3 e7e5 f3d4 a7a6 a2a3 a8a7 e2e3 g8f6 d1e2 f6g8
+policy-v2-train-0082 | e2e4 e7e5 b2b3 b8c6 g1f3 h7h5 h2h3 d7d6 b3b4 e8e7 e1e2 a7a6 e2d3 e7d7 b4b5
+policy-v2-train-0083 | h2h4 f7f6 e2e3 a7a5 a2a3 b8c6 e3e4 e7e5 g2g3 d7d5 e4d5 f8b4 g1f3 e8f8 f3g1 c6d4
+policy-v2-train-0084 | c2c3 g7g6 b2b3 g8h6 f2f4 c7c6 g2g4 d8a5 d1c2 a5c7 c2g6 h6g8
+policy-v2-train-0085 | b1c3 d7d5 g1h3 e7e6 h3g5 b7b5 h1g1 h7h5 d2d3 b8d7 g5e6 c7c5 c1h6
+policy-v2-train-0086 | b2b4 g7g5 c1a3 h7h6 g1h3 a7a6 b1c3 b8c6 g2g3 c6b8 g3g4 f7f6 f2f3 a8a7
+policy-v2-train-0087 | b2b4 c7c5 b1c3 g7g6 g2g3 b8a6 c3a4
+policy-v2-train-0088 | d2d4 e7e5 b2b3 e5d4 c1a3 c7c5 b1c3 g8h6 c3d5 c5c4 a3b2 d8c7
+policy-v2-train-0089 | h2h3 g8f6 h1h2 f6d5 f2f4 a7a6 a2a4 d5c3 e1f2 c3d1 f2g3 d7d5 g3h4
+policy-v2-train-0090 | c2c4 b7b6 d1a4 c7c5 a4a5 c8b7 h2h4
+policy-v2-train-0091 | b2b4 b8c6 b4b5 a7a6 e2e4 d7d5 b5a6 d8d6 a2a3 d6e6 a6b7
+policy-v2-train-0092 | b1c3 b8c6 c3b1 g8h6 f2f3 h6g4 g1h3
+policy-v2-train-0093 | a2a3 a7a6 h2h4 d7d5 b2b4 b7b5
+policy-v2-train-0094 | f2f3 h7h5 g1h3 g8f6 g2g4 f6g8 c2c4 b8c6 h3f4 h5h4
+policy-v2-train-0095 | a2a3 h7h5 b1c3 d7d6 e2e4 g7g6 g1h3 f8g7 g2g4 h8h7 a3a4 c8d7 e1e2 f7f6 d2d4 d7g4 e2e3
+policy-v2-train-0096 | d2d4 b8c6 e2e4 c6b4 c1e3 b4a6 a2a4 d7d5 f2f4 a6b4 e1d2
+policy-v2-train-0097 | a2a4 d7d5 h2h3 f7f5 c2c4 d5d4 c4c5 e7e5 g2g4 f8c5 e2e3 e8f8 f1g2 h7h6
+policy-v2-train-0098 | h2h4 c7c5 a2a4 h7h5 b1a3 g7g5 h1h2 b7b5 a3c4 f8g7 c4b6 g7f6 b6d5
+policy-v2-train-0099 | f2f3 a7a6 b1c3 f7f5 c3d5 c7c6 g2g4 c6d5 g4g5 f5f4
+policy-v2-train-0100 | a2a3 e7e6 f2f4 d8e7 e1f2 b8c6 c2c4 c6e5 e2e4 e5f3
+policy-v2-train-0101 | a2a4 b8c6 c2c4 d7d5 e2e4 e7e5 f2f4 d8d6 g2g3 c8h3 f1h3 e8e7 g3g4 f7f5
+policy-v2-train-0102 | b1c3 f7f6 f2f3 a7a5 c3e4 a8a6 d2d3 e7e5 b2b4 f8b4 e4c3 b4f8
+policy-v2-train-0103 | b2b4 h7h5 e2e4 c7c6 d2d4 b7b5 g1e2 d8c7 c1f4 g7g6
+policy-v2-train-0104 | f2f3 b8c6 g2g3 a7a5 h2h4 c6b4 c2c4 b4a2 d2d3
+policy-v2-train-0105 | b1a3 b8a6 e2e3 e7e5 f2f3 b7b5 h2h4 d8f6 f3f4 f6e7 d2d3 a6b8 g1f3 e7d6 h1g1 e8d8 c1d2 f7f6
+policy-v2-train-0106 | b1a3 a7a5 h2h4 f7f6 b2b3 d7d6 h1h2 a8a7 g1f3 c8g4 h2h1 g4d7 a1b1 e7e5 f3g1 g7g5
+policy-v2-train-0107 | g1h3 b7b6 f2f4 g7g5 e1f2 e7e5 a2a4
+policy-v2-train-0108 | c2c3 b8c6 c3c4 e7e5 d2d4 d8f6 d4e5 f8d6
+policy-v2-train-0109 | e2e3 f7f5 d2d4 b8c6 f1b5 e7e5 g2g3 d8f6 c2c3 h7h5 g1h3 e8e7 b5d3 f5f4 d1h5 f4g3 d3c2
+policy-v2-train-0110 | e2e4 g8h6 d1g4 h6g8 g4g3 c7c6 d2d3
+policy-v2-train-0111 | a2a4 a7a5 g2g4 d7d6 d2d4 c8f5 g1h3 e7e6
+policy-v2-train-0112 | g2g3 b7b6 e2e4 g7g5 g1f3 e7e6 b1a3 f8d6 f3d4 a7a5 d4c6 g8h6 f1h3 d8f6 c6e5 d6f8 h3g2
+policy-v2-train-0113 | g1f3 b7b6 g2g4 f7f6 b2b3 e7e5 b1a3 c8b7 a3b1 f8b4 h2h3 g7g5
+policy-v2-train-0114 | d2d3 h7h6 c1h6 c7c5 g1f3 b8a6 h6e3 e7e6 g2g4 g7g6 b1a3 d8f6 d1b1 f6c3
+policy-v2-train-0115 | d2d4 e7e6 d1d3 b7b5 b1a3 g8h6 g2g4 f8b4 e1d1 b4c5 d4c5
+policy-v2-train-0116 | b2b3 a7a5 c2c3 e7e6 e2e3 d8f6 f1b5 f8c5 b5a4
+policy-v2-train-0117 | a2a4 a7a6 a1a2 e7e5 d2d4 f8d6 c1g5 d8f6 e2e4 d6f8 f1a6 g8e7 g2g3 f6f2 e1f2 b7b6 g1e2
+policy-v2-train-0118 | b2b3 b8c6 g1f3 c6b8 g2g3 b8c6 a2a3 e7e5
+policy-v2-train-0119 | h2h3 f7f5 c2c3 e8f7 d2d3 d7d5 d1b3 f7e6 b3b7 h7h5 g2g4 h5h4
+policy-v2-train-0120 | e2e4 a7a5 h2h4 a8a7 f2f3 h7h5 f1b5 b8c6 e1f1 d7d6 d1e1 a5a4 c2c4 b7b6 h1h3 a4a3 d2d4 e8d7
+policy-v2-train-0121 | d2d4 e7e6 d1d2 d7d6 d2d1 c7c5 f2f3 b8c6 a2a4 a7a6 g1h3 c6b4 h1g1 c5c4 a1a3 a6a5 a3a1
+policy-v2-train-0122 | d2d4 g8f6 f2f4 g7g6 e1d2 a7a6 b1c3 h7h5
+policy-v2-train-0123 | b1c3 c7c6 h2h4 f7f6 c3a4 g7g6 f2f4 d7d5 e2e3 a7a6 g2g3 c8g4 e3e4 g4f5 a1b1 h7h5
+policy-v2-train-0124 | b1c3 d7d6 a2a3 b8d7 g1h3 d7b6 b2b4 d6d5 a1a2 e7e5
+policy-v2-train-0125 | e2e4 g7g5 g1f3 g5g4 b1c3 f7f5 f1d3 f8h6 f3e5
+policy-v2-train-0126 | g2g3 h7h6 h2h4 g8f6 g1f3 g7g6 f3d4 h6h5 b1a3 c7c5 g3g4
+policy-v2-train-0127 | g2g3 h7h6 b2b4 b7b6 g1f3 d7d6 f3e5 g7g5 h1g1 c7c5 f2f3 d8c7 b1c3 c8d7 g1h1
+policy-v2-train-0128 | b1c3 b8a6 e2e3 h7h5 c3e2 g8h6 e2c3 h5h4 f2f3 a6b8 d2d3 e7e5 g1h3 d8e7
+policy-v2-train-0129 | b1c3 f7f6 g1h3 h7h6 c3b5 b8a6 b5a7 g7g6 c2c3 b7b5 b2b4 e7e5 g2g3 f8c5 a7b5
+policy-v2-train-0130 | b2b4 g7g6 d2d4 f8h6 d1d3 c7c6 d3e4 b7b6
+policy-v2-train-0131 | a2a4 b8c6 c2c3 c6b8 g1h3 g7g5 b2b3 f8h6 d1c2 b8c6 g2g3 h6g7 b3b4 g7f6 f1g2
+policy-v2-train-0132 | f2f4 g8h6 e1f2 b8a6 d2d3 b7b5 b1d2 a6c5 d2b1 g7g5 c1d2 b5b4 d1c1 d7d5 g2g4 c5b7 f1g2 c8f5
+policy-v2-train-0133 | c2c3 b7b5 h2h3 c7c5 b1a3 b5b4 e2e3 f7f5 f1e2 e8f7 b2b3 g8h6
+policy-v2-train-0134 | d2d4 a7a5 b2b3 b7b5 b1d2 d7d6 a2a4 c8g4 h2h3 g8h6 g1f3 e7e5 c2c3 f7f6 c1a3
+policy-v2-train-0135 | c2c3 b7b5 b1a3 e7e5 a1b1 g7g6 d2d3
+policy-v2-train-0136 | h2h4 g8h6 d2d4 e7e5 b2b4 a7a5 d1d2 e8e7 e1d1 f7f5
+policy-v2-train-0137 | b1c3 h7h5 g1f3 h8h7 e2e4 g7g5 g2g4 f7f6 d2d4 h7g7 c3a4 b7b5
+policy-v2-train-0138 | b1c3 e7e5 c3b5 g8e7 a2a3 a7a5 f2f3 h7h6 e2e3 g7g6 e3e4 h6h5
+policy-v2-train-0139 | f2f4 f7f6 c2c3 a7a5 d1a4 b8a6 d2d3
+policy-v2-train-0140 | g2g4 b7b5 b2b4 a7a5 h2h4 d7d5 c1a3 c8b7 f1h3 f7f6
+policy-v2-train-0141 | a2a4 g7g5 d2d4 e7e6 d4d5 c7c6 h2h4 b8a6 c1e3 b7b6 g1h3 d8f6 b2b4 e8e7 b1c3 c8b7 h1g1 a8c8
+policy-v2-train-0142 | f2f4 b7b6 g1h3 g7g5 h1g1 g5f4 g1h1 g8h6 h3g5 h6f5 g2g4 f4g3 d2d3 a7a6
+policy-v2-train-0143 | e2e3 h7h5 g1e2 a7a6 b2b4 a8a7 e2f4 h8h7 d1f3
+policy-v2-train-0144 | e2e4 b7b5 b1a3 g8f6 b2b3 b5b4 a3c4 f6d5 c4a3 d5b6 a3c4 g7g6 c4a3 e7e6 g2g3 b6d5 f1c4 d7d6
+policy-v2-train-0145 | f2f4 h7h6 d2d3 e7e6 c2c4 f8e7 a2a4 e7a3 a1a2 e8e7 b1c3 f7f6 e2e3 b8c6
+policy-v2-train-0146 | c2c4 g8f6 d1a4 g7g5 e2e4 b8c6
+policy-v2-train-0147 | b2b4 h7h5 c1b2 a7a6 g2g4 d7d6
+policy-v2-train-0148 | f2f3 e7e5 g2g4 g7g5 b1c3 g8e7 a2a3 b8a6 f3f4 d7d5 g1f3 e5e4
+policy-v2-train-0149 | g1f3 d7d6 g2g3 d6d5 g3g4 b7b6 f3e5
+policy-v2-train-0150 | f2f3 d7d5 g2g3 f7f6 g1h3 c7c6 b1a3 c8g4 h3f4 a7a5 f4d5 g4d7 d5e7 b7b6 a3b5 e8f7 e2e3 d8e7
+policy-v2-train-0151 | e2e4 b8a6 e1e2 f7f5 f2f4 a6b8 g1h3 a7a6 b2b3 f5e4 d1e1 e4e3 e1d1 d7d6 h1g1 c7c5
+policy-v2-train-0152 | b1a3 e7e6 e2e4 a7a6 a3b5 d7d6 g2g3 b7b6 d1g4 c7c5 a1b1 e8e7 c2c4 a8a7 d2d4 d6d5 f2f3 b8c6
+policy-v2-train-0153 | g1h3 e7e6 g2g4 d7d5 e2e4 b7b5 h1g1 d8h4 g1g2 h4h3 b2b3 g8h6
+policy-v2-train-0154 | g1f3 d7d6 h1g1 g7g5 a2a3 f8h6 f3g5 e7e5
+policy-v2-train-0155 | g1f3 c7c6 h1g1 c6c5 a2a3 g8h6
+policy-v2-train-0156 | b1a3 b7b6 g2g4 c7c6 f1g2 d7d6 g2f3 e7e5 h2h3 b8a6
+policy-v2-train-0157 | c2c3 g7g6 b1a3 f8h6 h2h4 b8c6 h4h5 a8b8 f2f4 e8f8 e2e3 b8a8 f1c4 e7e6
+policy-v2-train-0158 | h2h3 e7e6 g1f3 b7b6 b1a3 b8c6 c2c3 e6e5 b2b4
+policy-v2-train-0159 | h2h3 g8h6 f2f4 h6g4 e2e3 g4f6 c2c4 d7d5 d1g4 b8a6 h3h4 d5c4 g4c8 a6b8 b1c3
+policy-v2-train-0160 | h2h3 g7g5 a2a3 h7h5 a1a2 h5h4 f2f3 c7c6
+policy-v2-train-0161 | f2f3 f7f5 f3f4 g8h6 e1f2 b8a6 d2d4 h6g4 f2e1 e7e6 c1e3 g4e5 c2c3 a6b8
+policy-v2-train-0162 | a2a4 c7c6 a1a2 g7g5 c2c3 f7f5 h2h3 h7h5 g2g4 a7a5 g4f5 g5g4 b2b3 f8g7 c1a3 e8f8 f2f4
+policy-v2-train-0163 | d2d3 c7c5 d3d4 d8a5 d1d2 c5d4 f2f3 a5f5 g1h3
+policy-v2-train-0164 | h2h4 c7c5 h4h5 d7d6 h1h3 d8c7 b1c3 c8g4
+policy-v2-train-0165 | b1c3 g8h6 c3b1 e7e5 g1h3 c7c6 g2g4 f8a3 h1g1 d8b6 g1g3 b6b2 g4g5 b2a1 c2c4 e5e4 g5g6 h6g8
+policy-v2-train-0166 | h2h3 e7e6 f2f3 c7c6 c2c4 f8e7 c4c5 g7g6 d1a4 e7h4 e1d1 d8g5 d2d4 b7b6
+policy-v2-train-0167 | g1f3 f7f6 h2h3 a7a5 h1h2 g7g6 b1a3 f8h6 h2h1 h6f4 f3d4 c7c5 e2e4 f4d6 d4e2
+policy-v2-train-0168 | d2d4 b7b5 c1d2 g8f6 c2c4 f6g8 d2e3
+policy-v2-train-0169 | h2h3 b7b6 h1h2 d7d5 b1a3 c8f5 f2f4 f5g4 e1f2 g4f5 f2f3
+policy-v2-train-0170 | a2a3 e7e6 c2c3 d7d5 g1f3 g8h6 a3a4 b8c6 c3c4 a7a5 d1b3 d5d4 e1d1 e6e5 b3b6
+policy-v2-train-0171 | d2d4 g7g5 b2b3 f7f5 d4d5 b7b6 b1d2 a7a6 f2f4 c7c5 d5d6 a8a7 g1f3 f8h6 d6e7 d7d5 f3e5 c8e6
+policy-v2-train-0172 | h2h4 g7g6 b2b3 h7h6 d2d4 g6g5 b1c3 a7a6 e1d2 h8h7
+policy-v2-train-0173 | c2c4 g7g5 f2f4 b8c6 g2g3 c6d4 f1g2 c7c5 g1h3 g8f6 h3g5
+policy-v2-train-0174 | h2h4 d7d5 c2c3 d5d4 h1h2 c8g4 h2h1 h7h5 c3c4 g7g6 d2d3 d8c8 f2f3
+policy-v2-train-0175 | c2c3 b7b5 d2d3 c7c6 c1f4 c8b7 g2g3 c6c5 b2b4 g8h6 f4h6 b7c6 f1g2 c6b7 h6f4
+policy-v2-train-0176 | g1f3 c7c6 b1c3 g8f6 e2e3 e7e5 b2b3 f8e7 c3b5 e7c5 c2c3
+policy-v2-train-0177 | b2b3 e7e6 e2e3 e6e5 c1b2 b8c6 e3e4 g8f6 b2c3 c6d4 d1g4 c7c6 f1d3
+policy-v2-train-0178 | f2f3 c7c6 c2c4 b7b5 h2h3 c8a6 h1h2 h7h6 e2e4 g7g5
+policy-v2-train-0179 | a2a3 h7h5 f2f4 a7a6 d2d4 d7d6 c1e3 d6d5 e3d2 d8d7 e2e3 b7b6 a3a4 h8h6 g1e2 g8f6 b2b4 e8d8
+policy-v2-train-0180 | b1c3 f7f5 h2h3 d7d6 f2f4 g8f6 e1f2 h8g8 d1e1 b8d7 c3d5 d7e5 d5c7
+policy-v2-train-0181 | c2c4 g7g6 d1c2 f8g7 c2g6 b7b5
+policy-v2-train-0182 | c2c4 c7c6 d2d3 h7h5 d1d2 g7g5 d2a5 e7e5 b1d2 g8e7 a5a7 b7b5 g1h3 h8h6 a1b1
+policy-v2-train-0183 | c2c3 b8c6 a2a4 c6b4 d2d4 a8b8 f2f4
+policy-v2-train-0184 | c2c3 d7d6 b2b3 e8d7 c3c4 h7h6 d2d3 g8f6
+policy-v2-train-0185 | g2g3 h7h6 e2e4 a7a5 g1e2 f7f5 d2d3 f5e4 c1d2 g7g5 d2f4 c7c6 d3d4 e4e3
+policy-v2-train-0186 | g1f3 c7c5 c2c4 e7e6 f3e5 b7b5 b1c3 d8f6 c3a4 f6d8 h2h3 a7a5 h1h2 d8h4 e2e3 h4c4 e5c4
+policy-v2-train-0187 | g2g4 b7b6 d2d4 f7f5 c1h6 f5f4 h2h3 e7e6 g4g5
+policy-v2-train-0188 | c2c4 a7a5 a2a4 b8a6 f2f3 g8h6 a1a2 h6g8 e2e3 d7d6 h2h4 g8f6 b2b3 f6g8 a2a1 c7c5
+policy-v2-train-0189 | h2h4 f7f5 g2g3 g7g5 h4g5 g8f6 d2d3 f8g7 e1d2
+policy-v2-train-0190 | b1c3 b8a6 d2d4 a6b4 f2f4 f7f6 g2g3
+policy-v2-train-0191 | g2g4 f7f5 g1h3 a7a6 h3g1 d7d5 g4f5
+policy-v2-train-0192 | d2d3 d7d6 h2h4 b8a6 d3d4 c7c5 d1d2 e7e5 d2e3 g8h6 g2g4 e5e4
+policy-v2-train-0193 | b1c3 a7a6 d2d4 g8h6 d1d3 a8a7 e1d1 d7d6 f2f4 b8c6 d3g6 c8e6 g6h6 e6g4 h6e6 g4e2 d1e1 c6b4
+policy-v2-train-0194 | g1h3 h7h5 d2d4 c7c5 g2g4 h5g4 c2c4 a7a6
+policy-v2-train-0195 | b2b3 g8f6 f2f3 h7h5 c2c3 e7e5 e1f2 f8b4
+policy-v2-train-0196 | b1a3 h7h6 c2c4 e7e6 f2f3 e8e7 a3c2 g7g6 a2a3 g6g5 d2d4 e7e8 d1d3 d7d5 c1g5
+policy-v2-train-0197 | f2f4 g8h6 b1a3 b8c6 e2e4 h6g4 e4e5 b7b5 a3c4 e7e6
+policy-v2-train-0198 | f2f4 h7h5 b2b4 f7f6 c1a3 h5h4 c2c3 b7b6 f4f5 c7c5 g2g3 d8c7 d1b3 b8c6 f1h3 c6d4 b3d5
+policy-v2-train-0199 | a2a3 c7c6 f2f3 b7b6 a3a4 c8a6 g2g3 b6b5 f3f4 e7e6
+policy-v2-train-0200 | c2c4 d7d6 g1f3 h7h5 f3g5 c7c5 b2b3 b8a6 c1a3 f7f6 g2g4 c8g4 g5h7 d8a5 f1g2 a8b8 h7f6 g7f6
+policy-v2-train-0201 | c2c4 e7e6 a2a4 f7f6 h2h4 e8f7 e2e4 f8e7 f2f4 e7f8 f1d3 e6e5 d3c2 b7b6 g1e2 f6f5
+policy-v2-train-0202 | b2b3 d7d5 e2e4 c8h3 g2h3 d5e4 f1c4
+policy-v2-train-0203 | g2g3 b7b6 b2b3 g8h6 c2c3 h6g4 g1f3 g4e3 g3g4 d7d6 f3h4 a7a5 c1b2
+policy-v2-train-0204 | f2f3 b8c6 e1f2 d7d5 c2c4 f7f5 e2e3 e8d7 d1e1 c6b4 e1d1 b4c2 h2h3 b7b5 d2d4 a7a6
+policy-v2-train-0205 | c2c4 f7f6 h2h4 c7c5 d2d4 e8f7 d1a4 d8c7 c1d2 c7d8 b2b3 f7e8 g1f3 h7h6 a4a7 h6h5 h1h2 g8h6
+policy-v2-train-0206 | b2b3 e7e6 g1f3 e8e7 f3d4 h7h6 d4c6 e7d6 c6d8
+policy-v2-train-0207 | f2f4 f7f6 d2d3 b8a6 a2a4 h7h5 e1f2 b7b5 e2e3 h5h4 e3e4 b5b4 a1a3 b4b3 f2e3 a6c5 c1d2
+policy-v2-train-0208 | f2f3 h7h6 a2a3 b8c6 h2h3 b7b6 d2d4 b6b5
+policy-v2-train-0209 | a2a4 b7b6 f2f4 b8a6 e1f2 c8b7 a1a3 b7e4 g2g3 c7c5 a3c3 g7g6
+policy-v2-train-0210 | b2b3 g7g5 e2e3 f7f6 a2a4 d7d5 c2c4 b8d7 a1a3
+policy-v2-train-0211 | a2a4 b7b6 b1a3 a7a5 c2c3 a8a7 d1b3
+policy-v2-train-0212 | f2f4 g7g6 g1h3 g8f6 e1f2 d7d6 b1c3 c7c6 b2b3 e7e6 d1e1 f6g4 f2f3
+policy-v2-train-0213 | h2h4 g7g6 e2e4 h7h5 b1c3 h8h6 d1g4 b7b6 b2b4 e7e6 g1h3 c8b7 f1d3 f8e7 d3b5 h6h8
+policy-v2-train-0214 | h2h4 e7e5 h1h3 g8e7 c2c3 a7a5 h3g3 b7b5 g3d3
+policy-v2-train-0215 | b1a3 a7a6 f2f4 b7b6 g1h3 e7e5 a1b1 d7d5 h3g5 g8h6 g2g3 a6a5 g5f3 c7c6 a3c4
+policy-v2-train-0216 | g1f3 c7c5 h1g1 h7h6 a2a3 d7d5 e2e4
+policy-v2-train-0217 | g2g3 d7d6 h2h3 c8g4 c2c4 a7a5 f2f3 d8d7
+policy-v2-train-0218 | b1c3 e7e6 g2g4 g7g5 e2e4 d7d5 g1f3 f8b4 f1e2 h7h6 c3d5 g8f6 e2f1
+policy-v2-train-0219 | g2g4 a7a6 e2e3 g8f6 b1a3 f6g4
+policy-v2-train-0220 | h2h3 e7e5 c2c3 f8b4 a2a3 g8e7 a3b4 c7c5 d1b3
+policy-v2-train-0221 | b2b4 b8c6 f2f3 c6d4 e1f2 a7a6 c2c4 c7c5 e2e4 e7e6 e4e5 d8e7 b4c5 d4b3 f2e1 b3a5
+policy-v2-train-0222 | g2g3 c7c6 b2b4 h7h5 f1h3 f7f6 f2f4 b8a6
+policy-v2-train-0223 | g2g3 b8a6 f2f3 a6b4 g1h3 b4a6 h3g5 e7e6 h2h3 f7f5
+policy-v2-train-0224 | c2c3 a7a5 g2g3 h7h6 h2h4 e7e5 d1a4 f8a3 a4a5 c7c6 e2e4 a3d6
+policy-v2-train-0225 | g1f3 b8c6 b2b3 g8f6 c1a3 a7a5
+policy-v2-train-0226 | c2c3 c7c6 f2f3 d7d6 f3f4 h7h6 d1b3 d8d7
+policy-v2-train-0227 | b1a3 b7b5 d2d4 d7d6 a1b1 g7g5 g2g4 f8g7 a3b5 h7h6 h2h3 a7a6 c2c4 b8d7 d1d3 a8a7
+policy-v2-train-0228 | f2f3 c7c6 f3f4 h7h6 d2d3 f7f6 g1f3 a7a6 f3g1 b7b6 g1f3 f6f5
+policy-v2-train-0229 | e2e3 b8a6 c2c4 b7b6 h2h3 f7f6 g1f3 h7h6 d2d3 c7c6 d1e2 g7g6 e1d1
+policy-v2-train-0230 | f2f3 f7f5 f3f4 g7g5 b2b4 h7h5 c2c3 b7b6 d1a4 f8g7 c3c4 e7e6 c1b2 b8c6 e2e4 e8f8
+policy-v2-train-0231 | f2f3 a7a6 h2h4 a6a5 d2d3 c7c6 d1d2 c6c5 c2c4 g7g5 d2c2 g8f6 c2c3
+policy-v2-train-0232 | d2d4 a7a6 g1f3 a6a5 b1c3 g7g6 c3b5 g8f6 h1g1 g6g5 c1f4 h8g8 f3h4 a5a4 h4g6
+policy-v2-train-0233 | f2f4 f7f5 d2d4 d7d5 g2g4 b7b6 b1a3 g7g6 e1d2 e7e5 h2h4 d8g5 c2c4 c7c5 d1e1 g5f4 e2e3
+policy-v2-train-0234 | b1a3 g7g6 a3c4 g6g5 b2b4 e7e6 g1h3 f8g7 c4e5 b8a6 b4b5 g7e5 f2f4 h7h5 g2g4 d8e7 c1a3
+policy-v2-train-0235 | c2c3 b8a6 c3c4 g8h6 g1f3 f7f5 g2g3 h6f7
+policy-v2-train-0236 | g2g3 g7g5 e2e4 f8g7 a2a4 c7c6 a1a2 d7d5 f1c4 a7a5 e1f1
+policy-v2-train-0237 | b2b3 f7f6 c2c4 d7d5 e2e3 d5c4 f1c4 g8h6 d1h5 g7g6 b3b4 d8d5 b1c3 c7c5 c4e2
+policy-v2-train-0238 | h2h4 e7e6 b1a3 f8e7 g2g3 b7b6 h1h2
+policy-v2-train-0239 | b1a3 g7g6 h2h4 b7b5 e2e3 c8a6 a3b5 a6b7
+policy-v2-train-0240 | e2e4 b7b5 b1c3 c7c5 g1e2 d8a5 b2b3 d7d5 e2f4 e8d7 f4h5 d7c7 a1b1 c8a6 a2a3
+policy-v2-train-0241 | h2h4 b8a6 h1h3 g7g6 h3g3 h7h6
+policy-v2-train-0242 | e2e4 e7e6 e4e5 b7b5 a2a4 d8f6 a1a3
+policy-v2-train-0243 | g1f3 c7c5 a2a3 d8b6 g2g3 b6a5 b2b4 a5b4 f1h3 g8h6 a1a2 b7b5
+policy-v2-train-0244 | a2a4 d7d6 g1f3 d8d7 b1a3 f7f6 h1g1 d7a4 f3d4 b7b5 d4b5
+policy-v2-train-0245 | c2c4 d7d5 d1b3 d8d6 b3e3 c7c5 g2g3 d6b6 b1a3 b6a5 b2b3 g8h6 e3e5 c8h3 e2e4
+policy-v2-train-0246 | g1h3 e7e5 d2d4 b7b6 c1h6 c7c6 h6c1 d7d6
+policy-v2-train-0247 | g1f3 f7f6 g2g4 e7e5 f3h4 f8a3 d2d4 a7a6 g4g5 h7h6 c1e3 a8a7 c2c3 f6g5 c3c4
+policy-v2-train-0248 | h2h3 b8a6 g2g3 g8f6 f2f3 a8b8 a2a4 h8g8 f1g2
+policy-v2-train-0249 | f2f4 a7a6 g2g3 b7b6 f1h3 a6a5
+policy-v2-train-0250 | g1f3 f7f6 d2d3 b8c6 b2b3 a8b8
+policy-v2-train-0251 | h2h3 b8a6 g2g4 e7e5 e2e3 a6c5 f2f3 f8e7 e1e2 c5e4
+policy-v2-train-0252 | g1h3 d7d6 d2d3 c8e6 c2c4 e8d7 c1g5 c7c6 d1d2 h7h5 g5f4 f7f6 d2c3 a7a6 f4c1 h5h4 f2f4 d7c7
+policy-v2-train-0253 | d2d3 b8a6 h2h3 e7e6 g2g3 d7d6 a2a3 a6b4 f2f3 b4c6 b1d2 g8f6 d2c4 f6e4
+policy-v2-train-0254 | b1c3 b8c6 e2e4 h7h6 g1h3 d7d5 g2g3 f7f6 d1e2 h8h7 f1g2 c8f5 c3a4 e8d7 d2d3 a8b8
+policy-v2-train-0255 | d2d4 a7a6 e1d2 c7c6 f2f3 d8a5 b1c3 d7d5 g2g4 a5a4 d2e3 b7b5 c3e4 c8b7 e4g5 a4b4
+policy-v2-train-0256 | e2e4 b7b6 d2d4 b8c6 a2a4 a7a5 f1e2
+policy-v2-train-0257 | f2f3 e7e6 e2e3 g7g5 f1a6 g8f6 h2h4 f6d5 b1a3 f7f6 e1f1 e8f7 f1f2
+policy-v2-train-0258 | f2f3 d7d6 d2d4 b8d7 c1g5 d6d5
+policy-v2-train-0259 | e2e4 a7a6 g2g3 f7f6 f1g2 a6a5
+policy-v2-train-0260 | f2f4 f7f6 a2a3 a7a5 e1f2 e8f7 e2e3 f7e6 f1d3 h7h5 d3e4 g7g5
+policy-v2-train-0261 | f2f3 d7d5 e2e4 c8g4 b1a3 f7f5
+policy-v2-train-0262 | d2d3 a7a6 c2c3 e7e5 b1a3 f7f5 c1e3 b7b6 a1b1 d8h4 e3c5 d7d6 e1d2 h4h6 d2c2
+policy-v2-train-0263 | d2d4 f7f5 c1h6 e7e5 d1d2 g8e7 b2b3 h8g8 h6f4 b7b5 d2c1 e5d4 c1b2 e7c6 h2h4
+policy-v2-train-0264 | b1a3 h7h5 a1b1 h5h4 a3c4 h8h7 b1a1
+policy-v2-train-0265 | c2c3 b8a6 d1b3 g8f6 g1f3 h7h5 d2d4 h8h6 c1e3 f6h7 f3h4 b7b5 h1g1 h6f6 b3c4 f6f2 c4c5 d7d6
+policy-v2-train-0266 | a2a4 a7a5 b1c3 h7h5 f2f3 g7g6 e2e3 h5h4 a1a2
+policy-v2-train-0267 | h2h3 g7g6 b2b4 d7d6 g2g4 f8g7 b1c3 d8d7 c3b1 c7c6 d2d3 e7e5 c1h6 b7b6
+policy-v2-train-0268 | h2h4 b7b5 f2f4 d7d6 h1h3 g7g5 b1a3 f7f6
+policy-v2-train-0269 | f2f3 b8a6 c2c4 a6b4 b1a3 d7d5 e2e3 b7b6
+policy-v2-train-0270 | g2g4 g8h6 d2d3 g7g6 c1d2 b7b6 d2e3
+policy-v2-train-0271 | e2e3 a7a6 g2g3 c7c5 h2h4 b8c6 f1a6
+policy-v2-train-0272 | h2h3 g8f6 f2f3 b7b6 a2a3 h7h5 c2c4 e7e6 g2g3 d8e7 e2e3 e8d8 d1b3 h8g8 b3b6
+policy-v2-train-0273 | a2a3 c7c6 f2f4 b7b5 e2e4 d8b6
+policy-v2-train-0274 | c2c4 b7b6 a2a4 b8c6 g1h3 h7h5 a4a5 c6b4
+policy-v2-train-0275 | b2b3 c7c5 e2e3 d7d6 c1b2 b8d7 d1h5 d7b8 b2a3 c8g4
+policy-v2-train-0276 | e2e4 h7h5 f2f3 b8c6 f1d3 g7g5 f3f4 f7f6 d3e2 c6e5 g1h3 b7b5 h1f1 e5c6
+policy-v2-train-0277 | e2e3 g7g5 f1b5 f7f5 b5a4 b7b5 g2g4 a7a5
+policy-v2-train-0278 | b2b4 a7a6 f2f4 e7e6 a2a4 d8f6 b1a3 f6d4 h2h3 f7f6 f4f5 b7b6 c1b2 d4d5 b2c1 f8d6 c2c3 g7g5
+policy-v2-train-0279 | f2f4 c7c6 b1a3 h7h6 a3b1 g7g5 d2d3 b8a6 h2h3 f8g7 b1d2 g8f6
+policy-v2-train-0280 | h2h3 b8a6 b1a3 a6b8 a3b1 f7f6 f2f4 c7c5 b1a3 h7h6 h3h4 g7g5 a1b1 a7a6 e1f2
+policy-v2-train-0281 | g1h3 a7a6 b1a3 d7d5 c2c3 a6a5 h3f4 b7b5 e2e4 c8h3 h1g1 f7f5 g2h3 g7g5 e4f5 c7c6 d1g4 d8d6
+policy-v2-train-0282 | b2b4 c7c6 g2g3 a7a6 a2a4 e7e5 e2e3 d7d5 f1h3 a8a7 d2d3 e8e7 b4b5 c8d7 d3d4 d8c7 b1a3
+policy-v2-train-0283 | g2g4 c7c5 d2d4 b8a6 f1g2 c5c4
+policy-v2-train-0284 | g1h3 b7b6 e2e3 b8c6 f1b5 a8b8 a2a3 e7e5 c2c4 b8a8 h1g1 g8f6 b2b3 g7g5 h3g5 a7a5
+policy-v2-train-0285 | e2e4 g7g6 a2a3 b8c6 e1e2 h7h6 b2b4
+policy-v2-train-0286 | a2a4 a7a5 c2c3 e7e5 b2b4 c7c6 c1b2 f7f6 d1c2 c6c5 c2d3 g8e7 b4a5 h8g8 h2h4 b8c6 g1f3 e7f5
+policy-v2-train-0287 | e2e4 g8h6 f2f4 c7c5 b2b3 a7a6 c1b2 e7e6 d2d4 c5c4 b3c4
+policy-v2-train-0288 | h2h4 b7b5 b1a3 c7c6 f2f3 a7a5 h4h5 d8b6 a3c4 b6c7 g2g3 g8h6 h1h4 e8d8 d2d4 c7d6 h4f4
+policy-v2-train-0289 | g1h3 g8f6 c2c3 f6e4 h3g5 e4d6 d2d3 f7f5 d1c2 d6f7 c2b3 a7a6 d3d4 c7c5 g5e6 d8b6
+policy-v2-train-0290 | f2f3 e7e6 c2c3 g7g5 d1c2 b7b6 c2e4 a7a5 e4e6 d8e7 f3f4
+policy-v2-train-0291 | f2f4 h7h5 a2a4 b8a6 f4f5 e7e6 e2e3 h8h6 f1a6 g8e7 h2h3 h6h8 b2b3 b7a6 d2d3
+policy-v2-train-0292 | b1c3 a7a5 c3d5 b8a6 e2e3 g8h6 d5c3 g7g5 c3e2 a5a4 h2h4 h6g8 g1h3 a8b8 g2g3 a6c5
+policy-v2-train-0293 | b2b3 e7e5 e2e4 f8c5 d2d3 c5f8 c1g5 f8a3 b3b4 h7h6 g5h6 f7f5 h2h4 a3b4 b1c3 c7c5 h6e3
+policy-v2-train-0294 | d2d4 b7b6 f2f4 b8a6 c1d2 e7e6 d4d5 f8d6
+policy-v2-train-0295 | h2h3 e7e6 g1f3 f8a3 e2e3 f7f5 f3h2 g7g6
+policy-v2-train-0296 | f2f3 g7g6 d2d4 c7c6 c1d2 f8g7 d2g5 a7a5 e2e3
+policy-v2-train-0297 | h2h4 h7h5 a2a4 g8f6 a1a3 b7b6 g2g3 d7d6 e2e4 b8a6 a4a5 g7g6 f1d3 e7e6 b1c3 h8g8 d3c4 c7c6
+policy-v2-train-0298 | e2e3 d7d6 f1d3 f7f6 g1f3 c8g4 e1f1 g8h6 f3h4 b8c6 d3b5 g4d7 d1e2
+policy-v2-train-0299 | h2h3 h7h5 g2g4 c7c5 d2d4 e7e5 a2a3 d8h4 b1c3
+policy-v2-train-0300 | g1f3 b7b6 b2b3 f7f6 g2g3 f6f5 c1a3 g8f6 d2d3 e8f7 f3g5 f7e8 f2f3 c8a6 a3b2 c7c5 b2a3 d7d6
+policy-v2-train-0301 | h2h4 b7b6 g2g4 h7h6 b2b3 e7e5 g1h3 b8a6 c1b2 h8h7 a2a3 g7g6 d2d4 e8e7 b1c3 h7h8 d1d3
+policy-v2-train-0302 | d2d4 b8c6 d1d3 d7d6 d3g6 g8f6 g6f7 e8f7 c1g5 f6e8 g5f4 c8g4 f4c1 d6d5 b1d2 g7g6 d2c4 h7h5
+policy-v2-train-0303 | b1a3 h7h6 c2c3 a7a6 b2b4 f7f6 e2e4 e8f7 f2f3 a6a5 f1d3 f7g6 a3c2 a8a7
+policy-v2-train-0304 | e2e4 f7f5 d1h5 g7g6 h5d1 g6g5 f2f3
+policy-v2-train-0305 | e2e3 d7d5 b2b3 c8e6 f1a6 e6h3 d1h5 e7e6 e1d1 b7b5 g1h3 f8d6 h5d5 b8a6 h1f1 d8c8 f1h1 d6c5
+policy-v2-train-0306 | g2g3 b7b6 g1f3 c8b7 c2c4 g8h6 f3e5
+policy-v2-train-0307 | b2b4 f7f5 c2c3 b7b6 d2d4 h7h6 b4b5
+policy-v2-train-0308 | h2h3 g7g5 a2a4 a7a6 d2d3 g8f6 d3d4 f8h6 b1a3 h8f8 d4d5 e7e5 b2b3
+policy-v2-train-0309 | h2h4 f7f5 g1f3 b8c6 c2c3 b7b6
+policy-v2-train-0310 | h2h4 d7d5 e2e4 a7a5 g1e2 b7b6 h1g1 b8d7 e2g3 e7e5 b2b3 g7g6 c2c4 f7f5 d2d4 a8a7
+policy-v2-train-0311 | f2f4 g8h6 c2c4 g7g6 c4c5 a7a6 d2d3 d7d5 e2e4 c8f5 d1c2 d5e4 c1d2 a6a5 d3e4 f5e4 c2e4 d8d4
+policy-v2-train-0312 | b2b4 b8a6 g2g3 c7c5 c2c3 a6b8 f1g2 h7h5 g2f1 h5h4 f2f3 d7d5 f1h3 d8c7
+policy-v2-train-0313 | f2f4 c7c5 g2g3 h7h5 g1f3 a7a5 c2c3 g8f6 f3e5 d7d5 g3g4
+policy-v2-train-0314 | c2c4 d7d5 b2b3 f7f5 a2a4 d5c4 b1c3 d8d7 e2e4 d7c6 d1f3 c6g6 f3h3 a7a6 b3b4 c8d7 h3d3 c4d3
+policy-v2-train-0315 | g2g3 b7b6 g3g4 b8c6 b2b3 d7d5 f2f4 d8d7 c2c3 a7a5 e1f2 d7e6 f2g3 f7f5 g3f2 e6e3 f2g2
+policy-v2-train-0316 | b2b4 c7c5 d2d3 d8c7 b1c3 c7e5 f2f4 e5e3 c3b1 g8h6
+policy-v2-train-0317 | f2f4 f7f5 d2d4 b7b5 c1e3 c7c6 h2h4
+policy-v2-train-0318 | d2d4 b7b5 c2c3 c8a6 b1a3 f7f6 a3c2 c7c6 c1h6 g8h6 c3c4
+policy-v2-train-0319 | a2a3 f7f5 a1a2 d7d5 f2f4 e7e5 e1f2 g8f6 f2e3 f6g8 h2h4 d8e7 e3d3 h7h5 e2e4 e7h4 c2c3
+policy-v2-train-0320 | e2e3 h7h6 d1h5 g7g5 g1h3 g5g4 h5g4 f7f5 g4f3 b7b5 c2c3 b5b4 f1e2 c8a6 f3d5 g8f6 h3f4 b4b3
+policy-v2-train-0321 | e2e4 h7h6 f1e2 e7e5 g1h3 d7d5 d2d4 b8d7
+policy-v2-train-0322 | d2d3 f7f6 g2g4 b7b6 c1g5 g7g6 f1h3
+policy-v2-train-0323 | b2b4 e7e5 a2a4 f7f6 c1a3 f8d6 f2f3
+policy-v2-train-0324 | f2f3 g8f6 g2g3 a7a5 c2c3 h7h5 e2e4 f6h7 b2b3 a5a4 g1e2 h5h4 b1a3 h7f6 g3g4 h8g8
+policy-v2-train-0325 | c2c3 a7a5 g2g4 g7g5 d2d4 d7d6 f1g2 g8f6 e2e4 d8d7 e1f1 d7g4 g1f3
+policy-v2-train-0326 | a2a3 h7h6 e2e4 d7d6 c2c3 h8h7 d2d3 c8f5 b2b3 b8a6 a3a4 f5h3 e1d2 e7e5 d1g4 g8f6 g4h4
+policy-v2-train-0327 | b2b3 b8c6 b3b4 g8h6 a2a4 h6g4 f2f4 b7b6 h2h4 e7e6 g1f3 c6a5 b4a5 g4f2
+policy-v2-train-0328 | d2d4 f7f5 e2e4 a7a6 d1d3 g7g6 f2f3 f8h6
+policy-v2-train-0329 | g2g4 c7c6 g1f3 h7h5 b1a3 d7d5 b2b4 h5g4 d2d3 d8a5 c2c4 c8e6 c1e3 a7a6 a3c2 e6c8
+policy-v2-train-0330 | e2e4 g8h6 h2h3 g7g6 d1g4 f7f6 g4h5 e7e6 h5g4 d8e7 g4g6 e7f7 f1e2 b7b6
+policy-v2-train-0331 | d2d4 a7a5 g2g4 b7b6 e1d2 a8a6 b1a3 d7d5
+policy-v2-train-0332 | b2b3 g8h6 d2d3 g7g5 f2f4 f7f6 c2c3
+policy-v2-train-0333 | e2e3 c7c6 f2f4 e7e6 d2d4 d8b6 c2c3 e8d8
+policy-v2-train-0334 | a2a4 h7h5 d2d4 d7d6 g1f3 d8d7 c2c4 c7c5 c1f4 d7b5 f3g1
+policy-v2-train-0335 | f2f4 h7h5 b1c3 f7f5 d2d4 g8f6 g1h3 a7a6 a2a3 a8a7 g2g4 b7b5 e2e4 h8h7 c3b1 e8f7
+policy-v2-train-0336 | b1a3 g7g5 c2c4 b8a6 d1c2 a6c5
+policy-v2-train-0337 | c2c3 g7g6 f2f4 d7d6 f4f5 g8f6 e2e3 g6f5 d1h5 c7c6 h5g6 c8e6 g6g5 e6d7 d2d3
+policy-v2-train-0338 | g2g4 b8c6 f1h3 b7b5 g4g5 d7d5 h3f5 e7e6 e1f1 g8e7 f5h7 c6e5 h7g8 h8h5
+policy-v2-train-0339 | g2g4 b8c6 d2d4 b7b5 g4g5 e7e5 d4e5 d8g5 g1h3 a7a5 d1d3 c6e5 a2a4
+policy-v2-train-0340 | b2b3 b7b6 f2f4 b8c6 g1h3 e7e5 e2e4 c8b7 d1e2 e8e7
+policy-v2-train-0341 | c2c4 a7a6 a2a4 g8h6 d1b3 b7b5 b3c3 f7f6 c3a3 c7c6 a3b4
+policy-v2-train-0342 | d2d3 g7g5 g2g3 h7h6 d3d4 b7b6 g1h3 c7c5 e1d2 g5g4 e2e4 e7e6 h3g1 c5d4 d2e1
+policy-v2-train-0343 | g2g4 f7f5 d2d4 g7g5 c1e3 b7b5 d1c1
+policy-v2-train-0344 | d2d3 g7g6 c1h6 e7e5 b2b4 f8h6 e2e3 b8a6 h2h4 a6b4 d1d2 b4a6 e1d1 a8b8
+policy-v2-train-0345 | g2g4 b8a6 c2c3 a6b4 c3b4 d7d5 d1a4 d8d7 b2b3
+policy-v2-train-0346 | f2f3 e7e6 e1f2 b8c6 e2e3 c6b4 d2d4 g8h6 d1e1 b4a2 b1c3
+policy-v2-train-0347 | e2e4 c7c6 f1a6 e7e6 d1f3 f7f5 a6d3 e6e5 d3a6 b7a6 g2g4 g8f6
+policy-v2-train-0348 | b1c3 e7e5 g2g4 e8e7 f2f4 f7f5 f1g2 e7d6 d2d4 d8e7
+policy-v2-train-0349 | f2f3 f7f5 b1a3 e8f7 f3f4 g7g5 a3c4 b8c6 g2g4 e7e5
+policy-v2-train-0350 | g1h3 c7c5 h3g1 b7b5 g1h3 h7h6 h3f4 c8b7 f4g6 b7g2
+policy-v2-train-0351 | e2e4 a7a5 d1e2 b7b5 b1c3 h7h5 g1h3 e7e6 c3a4 b8a6 h3g1 c8b7 a2a3 b7c6 a4c3 d8c8 c3d1 e8e7
+policy-v2-train-0352 | b1a3 c7c5 g1f3 c5c4 g2g4 b7b5 e2e3
+policy-v2-train-0353 | a2a3 f7f5 a3a4 e8f7 h2h4 b8a6 g1f3 f7e6 e2e4 g8f6 f1b5 a6c5 f3e5 h8g8 h1g1 f5e4 e1e2 e4e3
+policy-v2-train-0354 | f2f3 h7h6 b2b4 g7g5 b4b5 c7c5 b1c3 d7d6 a1b1 c8f5 b1b2 a7a6 g1h3 e7e6
+policy-v2-train-0355 | a2a3 h7h5 a3a4 g7g6 d2d4 b8a6 b1d2 g6g5 d2b3 e7e5 g2g3 e8e7 f2f4 f8h6 c1e3
+policy-v2-train-0356 | a2a3 c7c6 e2e3 b8a6 a3a4 a8b8 a1a3 b8a8 f2f3 d7d5
+policy-v2-train-0357 | g1h3 d7d5 f2f3 e8d7 c2c3 f7f5 a2a3 d7c6 a3a4 g8h6
+policy-v2-train-0358 | h2h4 d7d5 g2g3 c8e6 e2e4 d8c8 d2d3 b7b5
+policy-v2-train-0359 | b1a3 g7g6 c2c4 h7h6 d2d3 g8f6 g2g3
+policy-v2-train-0360 | e2e4 a7a6 f1b5 e7e6 g2g3 e8e7 b5f1 h7h5 f2f3 h8h6 d2d3 h5h4 c2c4 h6h5 c1d2 e7e8 c4c5 h5h7
+policy-v2-train-0361 | e2e4 g8f6 e1e2 h7h5 g2g3 f6d5 c2c4 d5b4 f1g2 h8g8 e2f1 b4a6
+policy-v2-train-0362 | c2c4 e7e6 d2d3 d8f6 h2h3 f8b4 c1d2 f6h4 e2e4 e8f8
+policy-v2-train-0363 | c2c3 a7a5 a2a4 h7h6 f2f4 g7g5 f4g5 d7d5
+policy-v2-train-0364 | g2g3 g8f6 g3g4 d7d5 a2a4 h7h6 b2b4
+policy-v2-train-0365 | f2f4 d7d5 h2h3 b8d7 b1c3 h7h5 a1b1 d7e5 a2a3 g7g5 f4f5 d8d7 g2g4 g8h6 e1f2 d7b5 f2e3
+policy-v2-train-0366 | h2h4 c7c5 h4h5 e7e5 e2e3 f7f6 f1d3
+policy-v2-train-0367 | b1c3 e7e6 a1b1 a7a6 d2d3 b7b5 c3b5 g8e7 h2h4 c8b7 a2a3 e6e5 e1d2 f7f5 b2b4
+policy-v2-train-0368 | g1f3 b7b5 c2c4 c8b7 b1a3 g8h6
+policy-v2-train-0369 | a2a4 c7c6 a1a2 b7b5 e2e4 c6c5 d1f3 d7d6 a2a1 e7e5 f3b3 d8f6 b3b4 b8c6 e1d1 g8h6
+policy-v2-train-0370 | e2e3 a7a6 f2f4 a6a5 a2a4 b7b6 b1c3 f7f6 b2b3 b6b5 e1e2 a8a6 a1a2 a6c6 c3d5
+policy-v2-train-0371 | h2h3 g8h6 f2f3 c7c6 h3h4 a7a6 d2d4 c6c5 c1d2 h6f5 b2b3
+policy-v2-train-0372 | b1a3 d7d5 h2h3 d8d7 e2e4 a7a6 g2g4 a6a5 d2d3 b7b6 e4d5 e7e6 c1e3
+policy-v2-train-0373 | a2a3 b7b5 f2f3 h7h5 e2e4 a7a5 g2g3 c7c5 g3g4 g8f6 b2b4
+policy-v2-train-0374 | e2e3 d7d5 e1e2 b8d7 h2h4 e7e6 a2a3 e8e7 d2d4 g7g6 f2f4 f8h6 b1c3 d7b6 f4f5
+policy-v2-train-0375 | f2f3 g7g6 g2g3 e7e6 b1a3 d8e7 f3f4 e7a3 f1h3 e8d8
+policy-v2-train-0376 | d2d4 b7b6 d4d5 c8b7 c2c3 c7c5 e1d2 e7e5 g2g3
+policy-v2-train-0377 | g2g4 f7f5 g4f5 h7h5 e2e4 g8h6 c2c3 e7e5 d2d3 a7a6
+policy-v2-train-0378 | e2e4 g8h6 g1e2 h8g8 g2g3 a7a5 g3g4 a8a6 c2c4 h6g4 a2a4 a6a7
+policy-v2-train-0379 | b1c3 g7g5 b2b4 d7d6 g2g3 g5g4 f1h3 c7c6
+policy-v2-train-0380 | d2d3 g7g5 c2c3 c7c6 g1f3 f7f6 h2h3 g5g4
+policy-v2-train-0381 | d2d4 e7e5 h2h4 g8f6 b1a3 f8c5 h1h2 e5e4 e1d2 d7d6 f2f3 e8g8 g2g3 c8e6 h2h3 g7g6 d2e3
+policy-v2-train-0382 | a2a4 h7h6 b1c3 f7f6 b2b4 g7g6
+policy-v2-train-0383 | b1c3 b7b6 g2g3 h7h5 c3e4 d7d6 g1h3 c7c5 e4f6
+policy-v2-train-0384 | c2c3 f7f5 g2g4 b8a6 b2b4 e7e6 g4f5 e6f5 c1a3 d7d5 h2h4
+policy-v2-train-0385 | g1h3 d7d6 a2a3 a7a6 b2b4 c8g4 a1a2 a6a5 a3a4 e7e6 h1g1 d6d5 a2a3 g7g6 c2c3 g8f6 c3c4
+policy-v2-train-0386 | b1a3 e7e5 a3b5 g8f6 b5a3 d8e7 c2c4 f6g4 d1c2 e7a3
+policy-v2-train-0387 | c2c3 h7h5 a2a4 g7g5 h2h3 g8f6 g2g4 b7b6 c3c4 c8b7 e2e4 h8g8 d1c2 f6g4
+policy-v2-train-0388 | c2c4 d7d5 d2d4 b8d7 h2h4 d7f6 c4c5 c7c6 f2f3 c8d7 d1c2 g7g5 c1d2 a8c8 f3f4 a7a5 b2b4
+policy-v2-train-0389 | b2b3 b7b6 g2g3 g8h6 f2f4 b6b5 b1a3 b8c6 d2d3 f7f6 f1g2 c6b8 e1f1 f6f5 h2h3
+policy-v2-train-0390 | b2b3 b7b5 g2g4 d7d5 f1h3 g7g6 h3f1
+policy-v2-train-0391 | h2h4 b7b6 e2e4 f7f6 e4e5 b8a6 h4h5 c8b7 b1c3 a8b8 h1h2 g7g5 a2a3 a6c5 g2g3 f6e5
+policy-v2-train-0392 | g1h3 a7a6 g2g3 f7f5 e2e3 g7g5 c2c3 h7h5 f2f3 e7e5 h3f4 f8e7 f1e2 e5e4 f3e4
+policy-v2-train-0393 | f2f3 g8h6 d2d4 g7g6 e2e4 h8g8 f1c4
+policy-v2-train-0394 | g2g3 a7a6 f2f3 d7d6 b2b4 c8d7 f1g2 d7b5
+policy-v2-train-0395 | b2b4 b8c6 e2e3 c6a5 h2h4 d7d6 h1h3 c8d7 c1a3 d7b5 d2d3 g8f6 g1f3 f6d7 a3c1
+policy-v2-train-0396 | e2e4 a7a6 d1e2 e7e6 a2a3 f8b4 e2f3 b4e7 b1c3 g7g5 f3f5 b8c6 c3b1 b7b6 f1d3 c6a7 g2g4 e7a3
+policy-v2-train-0397 | a2a4 f7f5 h2h4 a7a6 e2e3 e8f7 a1a2 f7g6 g1h3 b7b6 d2d3 e7e5 b1d2
+policy-v2-train-0398 | g1h3 a7a6 h3f4 b7b5 e2e4 f7f6 f1b5
+policy-v2-train-0399 | b2b3 e7e5 d2d4 b7b5 a2a4 h7h6 b1a3 c8a6
+policy-v2-train-0400 | a2a4 b8a6 c2c4 d7d6 g2g4 d8d7 b2b3 d7b5 f2f3 b5b3 f3f4 f7f6 f4f5 d6d5 c1b2
+policy-v2-train-0401 | b2b3 b7b6 g2g4 e7e5 f2f3 g8h6 f3f4 c7c6 f1h3 a7a5 c1b2 f7f6 e1f1 c6c5 c2c4 h6g4 e2e4 g7g5
+policy-v2-train-0402 | f2f3 a7a5 d2d3 e7e5 c1g5 f8e7 d1c1
+policy-v2-train-0403 | a2a4 g8f6 h2h4 g7g5 a1a2 f6g8
+policy-v2-train-0404 | b2b3 d7d6 g1h3 c8e6 e2e4 b8d7 a2a4 c7c5 d1g4 e6b3
+policy-v2-train-0405 | g1f3 e7e5 f3h4 d8e7 b1c3 e7h4 h1g1 h4h3 a2a4
+policy-v2-train-0406 | d2d3 b7b6 e2e4 f7f5 c1g5 a7a6 g2g3 g8h6 f1e2 h6g4 a2a3 a6a5 e2g4 g7g6 g5d2 b8c6 d1f3 d7d6
+policy-v2-train-0407 | d2d4 a7a5 e1d2 h7h6 b1a3 g8f6 d1e1 b7b6 e2e4 g7g5 g1f3 c8a6
+policy-v2-train-0408 | g2g3 g8h6 b2b4 h6g8 g1h3 c7c6 h3g1 e7e5 b1c3 a7a5
+policy-v2-train-0409 | g2g4 c7c5 h2h3 d8b6 b1c3 b8a6 c3e4 b6c7
+policy-v2-train-0410 | e2e4 c7c5 e1e2 b7b6 a2a4 c8a6 e2e3 d8c7 g2g4
+policy-v2-train-0411 | a2a3 h7h6 g1f3 b8a6 c2c4 a6b4 f3g1 b7b5 a1a2 c8b7 g2g3 b4c6 e2e4
+policy-v2-train-0412 | e2e4 f7f5 b1c3 g7g6 f1b5 f8h6
+policy-v2-train-0413 | f2f4 g8h6 f4f5 b7b6 b1c3 c7c5 a2a3 c8a6 e2e3 e7e5 d1f3
+policy-v2-train-0414 | h2h3 c7c5 d2d3 a7a5 e2e4 d7d5 c1d2 h7h5 d2b4 c8g4 b1c3
+policy-v2-train-0415 | h2h4 b7b5 d2d4 d7d6 b2b4 c8g4
+policy-v2-train-0416 | c2c3 b8a6 b1a3 f7f6 d1b3 g7g6 d2d4 e7e6 g1f3
+policy-v2-train-0417 | h2h3 e7e5 a2a4 h7h6 g2g4 f8e7 a1a2 a7a5 b2b3 e7f8 g1f3 a8a6 b1c3 e8e7 c1a3
+policy-v2-train-0418 | d2d4 b7b5 e2e3 c7c6 a2a3 c8a6 f2f3 d7d6 b1c3 d8d7 c1d2 e7e6 g2g4
+policy-v2-train-0419 | e2e4 f7f5 h2h4 d7d5 d1h5 e8d7
+policy-v2-train-0420 | d2d4 b7b6 d1d2 f7f5 c2c3 d7d6 h2h3 b8d7 e2e4 h7h5 f2f4
+policy-v2-train-0421 | f2f3 h7h5 b2b4 e7e6 h2h3 a7a6
+policy-v2-train-0422 | a2a4 g7g6 h2h4 e7e6 a1a2 c7c6 d2d3 h7h5 h1h2 f8a3 d3d4 b7b6 g1h3 g8h6
+policy-v2-train-0423 | a2a4 a7a6 b2b4 g7g5 e2e3 d7d6 h2h3 g8f6 d1e2 b7b5 c1a3 c8e6 e2f3 e6b3 f3g4
+policy-v2-train-0424 | d2d4 e7e6 a2a4 f8b4 b1c3 f7f6 a1a2 d7d6 a2a1 g7g5 d4d5 b4c3 d1d2 a7a6 d2c3 c7c5 a1b1
+policy-v2-train-0425 | g1h3 b8a6 g2g3 h7h5 h1g1 f7f5 d2d3 c7c6 c1d2 a8b8 d2c1 g8h6 d3d4 d7d5 b2b3 h6g4 e2e3 a6c7
+policy-v2-train-0426 | h2h4 b8a6 h1h3 f7f6 f2f4 a6b4 g2g4 g7g6 g4g5 e8f7 b2b3 b7b5 a2a4 e7e5 d2d3 e5e4 h4h5
+policy-v2-train-0427 | e2e4 g7g6 f1d3 b8a6 g1e2 g8f6 h1f1 a6b8 f1h1 f6g8 e2d4 g8h6 d3e2 h6g8 g2g4 g8f6 d4e6
+policy-v2-train-0428 | g1f3 e7e6 f3e5 b7b6 h2h4 g7g5 c2c3 f8b4 d1c2 g5g4 d2d3 e8e7 b1d2 f7f6 e1d1
+policy-v2-train-0429 | a2a4 f7f6 g1h3 b8c6 g2g4 g7g6 b2b4 h7h6 f2f3 a7a6 b4b5 e7e6 h3f4 f6f5 f4e6
+policy-v2-train-0430 | h2h4 f7f5 a2a4 a7a6 d2d3 b7b5 c1e3 b8c6 e3c1 g8h6 g2g4 e7e6 a1a2
+policy-v2-train-0431 | d2d3 b7b6 b1d2 f7f6 c2c4 g7g5 d1a4 g8h6 b2b3 h6g4 g1h3 g4h2 d2f3 h7h6 f3h2
+policy-v2-train-0432 | d2d3 c7c5 g2g3 d8a5 c2c3 g8h6 c1g5 a5b6 d1d2 b6d6 a2a4 d6e6 d2d1
+policy-v2-train-0433 | a2a3 g7g6 d2d3 f8h6 h2h3 g8f6 c1h6 g6g5 e2e3 b7b5 e3e4
+policy-v2-train-0434 | f2f3 a7a6 g2g3 e7e5 b2b4 f8e7 f1g2
+policy-v2-train-0435 | d2d3 a7a6 g2g3 f7f5 f2f4 d7d5 h2h4 e7e5 h4h5
+policy-v2-train-0436 | f2f4 d7d6 e2e3 h7h5 a2a4 h8h6 d1f3 h6g6 a4a5 d6d5
+policy-v2-train-0437 | e2e3 g7g6 f1b5 c7c6 f2f3 f7f5 g1e2 e8f7 h1f1
+policy-v2-train-0438 | d2d4 g7g6 c2c3 f7f5 c1f4 c7c5
+policy-v2-train-0439 | f2f4 g8h6 g1h3 h8g8 b2b3 f7f5 h3g1 d7d6 g1f3 b8d7 b3b4 d6d5 h2h4 d7f6
+policy-v2-train-0440 | a2a4 g8f6 a1a3 d7d6 g2g3 h7h5 b1c3 f6h7 c3e4 f7f6 a3d3 b8c6 f2f4 a8b8 d3c3 b8a8 d2d3 c8h3
+policy-v2-train-0441 | b2b4 d7d5 c1b2 d5d4 b2c1 c7c5 f2f4 d8b6 b4c5 b6a6 c5c6 b7c6 c2c4 a6b7 g2g4
+policy-v2-train-0442 | b1c3 e7e5 g1f3 b7b5 h2h3 g7g6
+policy-v2-train-0443 | d2d3 b8c6 b1d2 a7a5 g1h3 a5a4 a2a3 c6d4 a1a2 g7g6 h3g1 e7e5 g2g3 f8d6 h2h3 d4e2 c2c3 h7h5
+policy-v2-train-0444 | e2e3 c7c5 b1a3 g7g5 e1e2 f8g7 a3c4 g7b2 c4b2 a7a6 a2a3 a8a7 g2g4 g8f6 a1b1 d7d6 e3e4 d8a5
+policy-v2-train-0445 | h2h3 h7h5 d2d3 d7d5 b2b3 a7a6 g2g4 g8f6 c1g5 f6g8
+policy-v2-train-0446 | h2h3 b7b6 g1f3 a7a5 g2g4 b8a6 f3d4 d7d5 g4g5 c7c5 d4f3 h7h5 b2b3 c8g4 h3g4
+policy-v2-train-0447 | h2h3 e7e5 a2a3 g7g6 a1a2 f8g7 d2d3 g7f6 b1d2 f6g7 f2f3 f7f6 g2g3 b7b6
+policy-v2-train-0448 | h2h3 d7d5 f2f3 c8g4 a2a4 b8a6 e1f2 g4h5 d2d4 e7e5 g2g3 e5e4 a1a2 f8e7 c1d2 g8h6 b1c3
+policy-v2-train-0449 | c2c3 a7a5 d1a4 h7h6 a4b3 b7b5 e2e3 g8f6 b3c4 f6d5 f1d3 f7f6 d3h7 b8c6 c4a4
+policy-v2-train-0450 | c2c3 e7e6 h2h3 f7f6 g1f3 f8c5 d1a4 b7b5 a4a7 b8c6 g2g4 c6a7 f3h2 e6e5
+policy-v2-train-0451 | g2g4 g8f6 b1a3 a7a6 g4g5 h7h5 b2b4
+policy-v2-train-0452 | c2c4 c7c5 g1f3 f7f5 f3g1 b8a6 b1a3 e7e6 h2h3 d7d5
+policy-v2-train-0453 | d2d3 d7d6 h2h3 a7a5 b2b3 e8d7 c1g5 d8e8 f2f3
+policy-v2-train-0454 | a2a4 f7f5 a1a2 d7d6 c2c4 f5f4 e2e4 b8d7 d1b3
+policy-v2-train-0455 | g2g3 c7c5 b2b3 g8f6 c2c4 g7g5 c1a3 b8a6
+policy-v2-train-0456 | b1a3 b8a6 d2d3 e7e6 c2c4 f7f5 h2h4 h7h5 c1f4 b7b6 f4c1 d7d5
+policy-v2-train-0457 | a2a3 a7a6 c2c4 d7d5 d1b3 c7c5 a1a2 e7e6 b3b6 d5c4 e2e4 d8d2 c1d2 a8a7 e1d1 b8c6 f1d3 a7a8
+policy-v2-train-0458 | h2h4 b7b6 e2e3 c8a6 g2g4 a6f1 g1f3 d8c8 f3h2 f7f6 b2b4
+policy-v2-train-0459 | g2g4 e7e5 d2d4 d8e7 f1g2 e7d6 b1d2 a7a5
+policy-v2-train-0460 | h2h3 g8f6 b1a3 a7a5 g2g3 a5a4
+policy-v2-train-0461 | e2e4 c7c6 a2a4 c6c5 f1c4 f7f6 b1c3
+policy-v2-train-0462 | h2h4 d7d5 g1h3 g8f6 g2g4 a7a6 a2a4 f6e4 e2e3 e4g3 b2b4 c8f5 a1a3
+policy-v2-train-0463 | c2c3 b8c6 g2g4 c6b4 f1g2 b4d5 d2d3 d7d6 d1a4 c8d7 g1f3 d5b6 a4b4 a8b8 e1d1
+policy-v2-train-0464 | f2f4 f7f6 e2e4 g8h6 b2b4 h6g8 h2h4 h7h6 g2g3 g7g5 d2d4 a7a5 e1e2 h6h5 e2e1 g5h4 g1f3
+policy-v2-train-0465 | f2f4 f7f5 a2a3 b7b5 b1c3 c7c6 c3b1 d7d5 c2c4
+policy-v2-train-0466 | a2a4 d7d6 c2c4 c7c6 a1a2 f7f5 d1c2 d8c7 d2d4 c7b6 a2a1 c8e6 f2f4 b6a5
+policy-v2-train-0467 | g2g4 d7d6 e2e3 a7a5 f1h3 f7f5 g4f5 c7c5 a2a4 d6d5 d1e2 d8d7 h3f1 e8d8 h2h4 d7b5 g1h3 g7g6
+policy-v2-train-0468 | g1f3 a7a5 f3g1 f7f6 f2f3 g8h6 a2a4 e7e6 e1f2 h6g4 f2e1 e8f7 c2c4 e6e5
+policy-v2-train-0469 | d2d3 g8f6 b2b4 b7b6 c2c4 h7h6 h2h3 e7e5 c1b2 d7d6 e1d2 b8c6 f2f3 f6g4 e2e4 b6b5 h3h4
+policy-v2-train-0470 | g1f3 d7d6 f3e5 b8c6 b1c3 c6b8 e5c4 d8d7 e2e4 c7c5 c4a3
+policy-v2-train-0471 | f2f4 a7a6 c2c3 e7e5 d1b3 f7f6 b3b5 a6b5 e2e3 c7c5 f1c4 d8c7 h2h3 f8e7 g1e2 g8h6 e1f1 e7f8
+policy-v2-train-0472 | h2h4 c7c5 e2e3 e7e5 g2g4 h7h5 g4g5 f7f5
+policy-v2-train-0473 | g2g3 c7c5 d2d4 d8c7 c1d2 h7h5
+policy-v2-train-0474 | a2a3 c7c5 a3a4 g7g5 a1a3 e7e6 h2h3 d8f6
+policy-v2-train-0475 | g1f3 h7h6 b2b4 h6h5 c1b2 b7b5 a2a4 c8b7
+policy-v2-train-0476 | b2b3 a7a5 b3b4 e7e5 e2e4 f8e7 d1g4 g7g6 a2a3 e8f8 g4h3 f8g7 h3e6 e7f6 e6f7
+policy-v2-train-0477 | b1a3 g7g5 f2f3 b7b6 e1f2 f7f6 c2c4 e8f7 h2h4 b8c6 a3c2 e7e6 g2g3 d8e7
+policy-v2-train-0478 | f2f3 e7e5 d2d4 d7d5 b1a3 e5e4 c2c3 e4e3 h2h4
+policy-v2-train-0479 | b1a3 a7a5 a3b1 b8a6 a2a4 b7b6 f2f3 e7e5 g2g4 f8e7 f1h3 e7a3 b1c3
+policy-v2-train-0480 | d2d4 h7h5 b2b3 g8h6 b1d2 a7a6 a2a4 c7c5 h2h4 e7e6 h1h2 h8h7
+policy-v2-train-0481 | g2g4 a7a6 a2a4 f7f6 f1g2 d7d6 g4g5 d8d7 b2b3 e7e5 c1b2 e8f7 h2h4 d7f5 b1a3 f5f4 e2e4
+policy-v2-train-0482 | g2g4 a7a5 a2a3 a8a6 g4g5 e7e6 h2h3 h7h5 b2b3 f8e7 b1c3
+policy-v2-train-0483 | g2g3 g8f6 d2d3 f6g4 g1h3 d7d6 b2b3 h7h6
+policy-v2-train-0484 | e2e3 b7b6 b2b3 g8h6 g2g3 d7d5 c1a3 b8a6
+policy-v2-train-0485 | b2b3 a7a5 c2c3 c7c5 f2f3 b7b5
+policy-v2-train-0486 | h2h4 g7g6 h1h3 c7c5 e2e3 a7a5 c2c4 d8b6 b1a3 d7d6 f1e2 e8d7
+policy-v2-train-0487 | b2b3 h7h5 g1f3 d7d6 h2h3 a7a6 f3h2 h8h7 h2g4 b8c6 d2d3 c6a5 g4e5 a5c4
+policy-v2-train-0488 | h2h4 a7a6 b1c3 g7g6 c3d5 a8a7 d5b4 g8f6 a1b1
+policy-v2-train-0489 | g2g4 c7c6 b1c3 b7b6 c3b5 c6c5 b5d6 e7d6 b2b3 g8f6 a1b1 b8a6
+policy-v2-train-0490 | g1h3 d7d6 b2b3 c8e6 a2a4 d8c8 a1a3 e6f5 f2f3 b8c6 h3f2 h7h6 a4a5
+policy-v2-train-0491 | c2c4 h7h5 b2b3 f7f6 g1h3 b8c6 h3g1 c6b4 a2a4 a8b8 a1a3
+policy-v2-train-0492 | c2c3 b7b5 d2d4 f7f6 c1e3 d7d5 e3c1 d8d6 c1f4 a7a6 f4g5 e8f7 g5f6 d6d7 b1a3 e7e6 g2g3 f8a3
+policy-v2-train-0493 | b2b3 h7h6 e2e3 h8h7 b1a3 b7b5 d2d4 c8b7 a3b5 b7a6 c2c4 a6c8 a2a4 g8f6 d1h5 d7d6 e1e2 b8d7
+policy-v2-train-0494 | a2a3 c7c5 a1a2 d7d5 e2e3 d5d4 e3d4 b7b5 e1e2 c5c4 f2f4
+policy-v2-train-0495 | b1a3 g8f6 a3b1 c7c5 g1f3 d8a5 f3d4 b7b6 h2h3 h7h6 b2b3 f6g4 c2c3 a5c3 a2a4
+policy-v2-train-0496 | c2c3 g7g6 d1b3 d7d6 d2d3 c8d7 g1f3 h7h6 f3g5 d7e6 d3d4 h6g5 c1e3 f7f6 b1a3
+policy-v2-train-0497 | f2f4 a7a6 b2b4 d7d6 e2e4 g8h6 f4f5 a6a5 g2g3 h6f5 e1f2 f5h6 g1f3 c8g4 f2e2 a5b4
+policy-v2-train-0498 | a2a3 h7h6 a1a2 c7c6 d2d3 a7a5 c1h6 g7g5 h2h3 e7e5 c2c3 e5e4 e2e3 d7d6
+policy-v2-train-0499 | b2b3 b7b5 c2c3 h7h6 g2g3 a7a6 c1a3 g8f6 a3b2
+policy-v2-train-0500 | a2a4 f7f5 c2c3 b8c6 d2d4 c6b8 a1a3 b8a6 e1d2 d7d6
+policy-v2-train-0501 | e2e3 b8c6 d1f3 g8f6 e3e4 b7b6 a2a4 h7h5 f1d3 c8b7 f3h5 c6e5 h5h3 h8h7 b1c3
+policy-v2-train-0502 | e2e3 e7e6 d1f3 f8b4 h2h3 f7f5 e1e2 b4c3 e2e1 g7g6 f3h5 d8h4 b2c3 e8f7 f1b5 h4a4
+policy-v2-train-0503 | b1a3 c7c6 a3b5 a7a5 a2a3 g8f6 a3a4 f6g8 b5a3 e7e6
+policy-v2-train-0504 | b2b3 h7h5 c1b2 g7g6 e2e3 b8a6 d1e2 g6g5 b2c1 f8h6 b1c3 b7b5 b3b4 h6g7
+policy-v2-train-0505 | g2g3 a7a5 f1g2 h7h6 d2d3 d7d6 c1d2 d6d5 d2e3 a8a6 a2a4 a6d6 d1d2 b8a6 e3d4 e7e5 b1c3
+policy-v2-train-0506 | g1f3 b8c6 b2b4 g7g6 h1g1 e7e6 f3d4 h7h6 b1c3 a7a5
+policy-v2-train-0507 | h2h3 b7b6 b2b3 g8h6 g2g4 h6g8 b3b4 b8a6 f1g2 g8h6 b1a3 a6b8 e1f1 g7g5 a3b1 e7e6 f1e1 e6e5
+policy-v2-train-0508 | b1a3 f7f5 f2f4 a7a5 h2h3 a8a7 a1b1 e7e6 h1h2 f8e7 g2g4 c7c5 a3c4 e7g5 c4d6 e8e7 f1g2
+policy-v2-train-0509 | b1c3 d7d5 b2b4 g8h6 c3e4 g7g5 e4c3
+policy-v2-train-0510 | e2e3 f7f5 b2b4 c7c5 g1e2 h7h6 h1g1 d7d5 d2d4 b8a6 c1d2 a6b4 d1c1
+policy-v2-train-0511 | d2d3 f7f6 b2b4 e7e5 c1h6 d7d5 h2h4 g7g6 a2a4 f8d6 a4a5 c8f5
+policy-v2-train-0512 | a2a4 g7g5 g2g3 e7e5 a1a2 g5g4 b2b3 e8e7 h2h4 d7d6

@@ -1,0 +1,21 @@
+{
+  "threads": [
+    1,
+    4
+  ],
+  "KOI_ENABLE_GPU_NNUE": "OFF",
+  "hash_mb": 512,
+  "KOI_BUILD_SHADOW_DIFF": "OFF",
+  "hash_state": "warm",
+  "source_revision": "b40feb1c8447e4e8c56589409f9a5ccb47e3edfd",
+  "cmake_build_type": "Release",
+  "schema": "occupied-origin-before-v1",
+  "warmup": 1,
+  "KOI_BUILD_MODULES": "OFF",
+  "speed": 100,
+  "executable_sha256": "F5F7A3DF549E064393736DD865D86264E6FA586794EFFD9DFEA16C593283C2E6",
+  "binary_origin": "king-mask-current-source-20260929-before",
+  "repeat": 5,
+  "timed": true,
+  "node_limit": 20000
+}

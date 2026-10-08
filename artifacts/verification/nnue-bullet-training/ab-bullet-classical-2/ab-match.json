@@ -1,0 +1,173 @@
+{
+  "schema": "koi-nnue-studio-ab-match-v1",
+  "generated_utc": "2026-09-18T14:45:36.3955407Z",
+  "nnue_path": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\training\\bullet\\koi-v4-bullet-long\\koi.nnue",
+  "engine_path": "C:\\Users\\ntATh\\AI test\\Koi engine\\build\\release\\koi-engine.exe",
+  "nodes": 20000,
+  "threads": 1,
+  "hash_mb": 64,
+  "games": 20,
+  "wins": 0,
+  "draws": 10,
+  "losses": 10,
+  "aborted": 0,
+  "score": 5.0,
+  "percent": 25.0,
+  "verdict": "classical-stronger",
+  "legs": [
+    {
+      "tag": "white",
+      "koi_color": "white",
+      "games": 10,
+      "report": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\verification\\nnue-bullet-training\\ab-bullet-classical-2\\match-white\\koi-uci-match-20260918-144107-001.json"
+    },
+    {
+      "tag": "black",
+      "koi_color": "black",
+      "games": 10,
+      "report": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\verification\\nnue-bullet-training\\ab-bullet-classical-2\\match-black\\koi-uci-match-20260918-144535-883.json"
+    }
+  ],
+  "game_results": [
+    {
+      "leg": "white",
+      "nnue_color": "white",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "white",
+      "nnue_color": "white",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "white",
+      "nnue_color": "white",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "white",
+      "nnue_color": "white",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "white",
+      "nnue_color": "white",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "white",
+      "nnue_color": "white",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "white",
+      "nnue_color": "white",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "white",
+      "nnue_color": "white",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "white",
+      "nnue_color": "white",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "white",
+      "nnue_color": "white",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "black",
+      "nnue_color": "black",
+      "result": "1-0",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "black",
+      "nnue_color": "black",
+      "result": "1-0",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "black",
+      "nnue_color": "black",
+      "result": "1-0",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "black",
+      "nnue_color": "black",
+      "result": "1-0",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "black",
+      "nnue_color": "black",
+      "result": "1-0",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "black",
+      "nnue_color": "black",
+      "result": "1-0",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "black",
+      "nnue_color": "black",
+      "result": "1-0",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "black",
+      "nnue_color": "black",
+      "result": "1-0",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "black",
+      "nnue_color": "black",
+      "result": "1-0",
+      "outcome": "loss",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "black",
+      "nnue_color": "black",
+      "result": "1-0",
+      "outcome": "loss",
+      "termination": "checkmate"
+    }
+  ]
+}

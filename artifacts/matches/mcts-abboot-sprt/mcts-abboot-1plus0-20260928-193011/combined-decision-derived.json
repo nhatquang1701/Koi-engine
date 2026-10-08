@@ -1,0 +1,60 @@
+{
+  "schema": "koi-sprt-combined-derivation-v1",
+  "derived_from": "tools/stability/sprt_compare.ps1 Get-CombinedSprtResult: sum independent color LLRs; bounds ln(19), alpha=beta=0.05",
+  "hypotheses": {
+    "elo0": 0,
+    "elo1": 10,
+    "alpha": 0.05,
+    "beta": 0.05,
+    "accept_threshold": 2.9444389791664403,
+    "reject_threshold": -2.9444389791664403
+  },
+  "candidate": {
+    "algorithm": "MCTS",
+    "model_sha256": "8080b002768f8765cfc9b433528a5a126c62d4efc2d291230fac32a21aad4d8d",
+    "executable_sha256": "e152c7d114515deee90cda5fdaedcd16fb0151fde411ad6d97d51fc66061e13f",
+    "baseline_algorithm": "AlphaBeta",
+    "threads": 1,
+    "hash_mb": 512,
+    "time_control": "1+0",
+    "own_book": false,
+    "opening_corpus_sha256": "d4e7335ff7d69c86941ab1c8354903e89b17aa8fb13fdb569e76656c047e5e1f"
+  },
+  "white": {
+    "report": "white/koi-uci-match-20260928-142157-401.json",
+    "report_sha256": "246c4493227996cc1edcb5836d5b0b5c8993fcbf3f9677c18da8c3268a8fbb32",
+    "pgn_sha256": "76d7402e4da9b0c7e4185acf816d18d91e870ad16325eb1b5506b071a5c82875",
+    "games": 65,
+    "wins": 0,
+    "draws": 1,
+    "losses": 64,
+    "llr": -121.450447,
+    "decision": "reject",
+    "validator": "PASS: 65 legal completed games; all 65 openings covered"
+  },
+  "black": {
+    "report": "black/koi-uci-match-20260928-151750-877.json",
+    "report_sha256": "ccc64678703151f48daf050ffc9dde62e07af62a2a7563e67493743713d2cd55",
+    "pgn_sha256": "480c65c33166be4a2e9447265944969e80be193e24081215fcac4d7a98766547",
+    "games": 101,
+    "wins": 0,
+    "draws": 0,
+    "losses": 101,
+    "llr": -2.948023,
+    "decision": "reject",
+    "validator": "PASS: 101 legal completed games; all 101 openings covered"
+  },
+  "combined": {
+    "games": 166,
+    "wins": 0,
+    "draws": 1,
+    "losses": 165,
+    "score": 0.0030120481927710845,
+    "llr": -124.39847,
+    "decision": "reject"
+  },
+  "validator_openings": {
+    "white_sha256": "abba1490509fdb4f999a540a25ae247697de597e514ebcbb32123a3989ddf4ad",
+    "black_sha256": "156eb976a771639cdd724e5790bb86b37729c9268be185bf622b50b0f81d8e06"
+  }
+}

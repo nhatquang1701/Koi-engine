@@ -1,0 +1,123 @@
+{
+  "batches": [
+    {
+      "anchor": {
+        "id": "stockfish-1400",
+        "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\third_party\\stockfish-19\\stockfish-windows-x86-64-universal\\stockfish\\stockfish-windows-x86-64-universal.exe",
+        "rating": 1400,
+        "rating_source": "Stockfish 19 UCI_LimitStrength",
+        "stockfish_uci_elo": 1400
+      },
+      "games": 64,
+      "ordinal": 1,
+      "pair_id": "batch-01",
+      "phase": "initial"
+    },
+    {
+      "anchor": {
+        "id": "stockfish-1600",
+        "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\third_party\\stockfish-19\\stockfish-windows-x86-64-universal\\stockfish\\stockfish-windows-x86-64-universal.exe",
+        "rating": 1600,
+        "rating_source": "Stockfish 19 UCI_LimitStrength",
+        "stockfish_uci_elo": 1600
+      },
+      "games": 64,
+      "ordinal": 2,
+      "pair_id": "batch-02",
+      "phase": "initial"
+    },
+    {
+      "anchor": {
+        "id": "stockfish-1800",
+        "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\third_party\\stockfish-19\\stockfish-windows-x86-64-universal\\stockfish\\stockfish-windows-x86-64-universal.exe",
+        "rating": 1800,
+        "rating_source": "Stockfish 19 UCI_LimitStrength",
+        "stockfish_uci_elo": 1800
+      },
+      "games": 64,
+      "ordinal": 3,
+      "pair_id": "batch-03",
+      "phase": "initial"
+    },
+    {
+      "anchor": {
+        "id": "stockfish-1600",
+        "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\third_party\\stockfish-19\\stockfish-windows-x86-64-universal\\stockfish\\stockfish-windows-x86-64-universal.exe",
+        "rating": 1600,
+        "rating_source": "Stockfish 19 UCI_LimitStrength",
+        "stockfish_uci_elo": 1600
+      },
+      "games": 64,
+      "ordinal": 4,
+      "pair_id": "batch-04",
+      "phase": "adaptive"
+    },
+    {
+      "anchor": {
+        "id": "stockfish-1600",
+        "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\third_party\\stockfish-19\\stockfish-windows-x86-64-universal\\stockfish\\stockfish-windows-x86-64-universal.exe",
+        "rating": 1600,
+        "rating_source": "Stockfish 19 UCI_LimitStrength",
+        "stockfish_uci_elo": 1600
+      },
+      "games": 64,
+      "ordinal": 5,
+      "pair_id": "batch-05",
+      "phase": "adaptive"
+    }
+  ],
+  "measurement": {
+    "adaptive_batch_games": 64,
+    "all_anchors": true,
+    "initial_batch_count": 3,
+    "initial_games": 192,
+    "max_games": 320,
+    "prior_elo": 1600,
+    "target_games": 320
+  },
+  "pairing": {
+    "opening_count": 32,
+    "opening_names": [
+      "italian-game",
+      "ruy-lopez",
+      "scotch-game",
+      "four-knights",
+      "kings-gambit",
+      "vienna-game",
+      "ponziani",
+      "center-game",
+      "french-advance",
+      "french-exchange",
+      "caro-kann-advance",
+      "caro-kann-exchange",
+      "sicilian-najdorf",
+      "sicilian-dragon",
+      "sicilian-alapin",
+      "sicilian-closed",
+      "queens-gambit-declined",
+      "queens-gambit-accepted",
+      "slav-defense",
+      "london-system",
+      "kings-indian",
+      "grunfeld-defense",
+      "nimzo-indian",
+      "bogo-indian",
+      "benoni-defense",
+      "catalan-opening",
+      "english-symmetrical",
+      "english-four-knights",
+      "english-reversed-sicilian",
+      "reti-opening",
+      "dutch-defense",
+      "bird-opening"
+    ],
+    "run_labels": [
+      "before",
+      "after"
+    ],
+    "unit": "one opening played once with Koi White and once with Koi Black"
+  },
+  "schedule_sha256": "ce0a231ffed742bab77c6e71eb1e2a14ba8b0353ea0ae76d53f3d3fa0a7bb410",
+  "schema": "koi-elo-schedule-v2",
+  "schema_version": 2
+}

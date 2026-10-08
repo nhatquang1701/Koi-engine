@@ -1,0 +1,37 @@
+PASS classical evaluator
+PASS classical evaluator breakdown
+PASS development center pressure
+PASS evaluator perspective symmetry
+PASS evaluator endgame and mobility
+PASS evaluator passed pawn endgame scaling
+PASS evaluator passed pawn blockade
+PASS evaluator mirrored terms and black blockade
+PASS evaluator color symmetric endgame passer
+PASS evaluator versioned parameters
+PASS evaluator endgame king activity
+PASS evaluator passer support and race
+PASS evaluator tempo
+PASS evaluator pawnless endgame terms
+PASS evaluator complete breakdown
+PASS time manager
+PASS adaptive time manager
+PASS low-clock emergency pacing
+PASS low-clock hard window
+PASS speed budgets
+PASS compatibility timing controls
+PASS explicit limits remain untimed
+PASS search options
+PASS root filtering legal move
+PASS root filtering illegal move
+PASS deterministic multipv
+PASS threaded root search
+PASS short timed threaded search
+PASS medium timed forcing root
+PASS low clock forcing root
+PASS short timed root workers
+PASS very short timed root workers
+PASS ultra short timed completed root
+PASS short timed threaded authoritative root
+PASS queen check mate horizon
+PASS single-PV root forcing extension
+FAIL timed poisoned capture: a short timed search must not emit the shallow poisoned capture (best=g4e3, completed_depth=0, candidates=0, researches=0, elapsed_ms=88)

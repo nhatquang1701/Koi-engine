@@ -1,0 +1,26 @@
+{
+  "schema": "koi-nnue-training-metadata-v1",
+  "created": "2026-09-16T16:12:03Z",
+  "corpus": "artifacts\\training\\labels.txt",
+  "rows_used": 471230,
+  "val_rows": 23561,
+  "feature_set": "piece-square-king-pawn-v2",
+  "quantization": "int16/int8",
+  "architecture": [
+    960,
+    256,
+    32,
+    1
+  ],
+  "epochs": 20,
+  "batch_size": 4096,
+  "learning_rate": 0.003,
+  "seed": 20260916,
+  "target_scale": 100.0,
+  "hidden_scale": 16,
+  "bottleneck_scale": 64,
+  "val_mae_cp": 447.36875,
+  "payload_sha256": "6234860a546d0bb20144512a4e7eac58de2a9ca1dafd62b0ff3cd6027ec07626",
+  "network_sha256": "8fa3db03b4766f39c4c4becc8eadd29842b1f80efd6fdc0db92da1b93d388dde",
+  "command": "tools/measurement/train_nnue_sf.py --rows 0 --epochs 20 --batch-size 4096 --learning-rate 3e-3 --threads 3 --net-out artifacts/training/exp-v2.nnue --meta-out artifacts/training/exp-v2.metadata.json"
+}

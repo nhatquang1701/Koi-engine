@@ -1,0 +1,50 @@
+{
+  "schema": "koi-nnue-net-match-v1",
+  "generated_utc": "2026-10-05T19:44:12.3423503Z",
+  "nnue_path": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\training\\koi-v6-lc0-20261005\\koi-v6.nnue",
+  "opponent_path": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\networks\\koi-v5-official\\koi-v5-official-20261004.nnue",
+  "engine_path": "C:\\Users\\ntATh\\AI test\\Koi engine\\build\\roadmap-visit-win-release\\koi-engine.exe",
+  "nodes": 2000,
+  "threads": 4,
+  "hash_mb": 128,
+  "games_requested": 2,
+  "games": 2,
+  "opening_file": "C:\\Users\\ntATh\\AI test\\Koi engine\\tests\\data\\openings\\openings-curated-32.txt",
+  "wins": 1,
+  "draws": 1,
+  "losses": 0,
+  "aborted": 0,
+  "score": 1.5,
+  "percent": 75.0,
+  "verdict": "candidate-stronger",
+  "legs": [
+    {
+      "tag": "white",
+      "candidate_color": "white",
+      "games": 1,
+      "report": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\matches\\smoke-openings-20261006\\match-white\\koi-uci-match-20261005-194334-581.json"
+    },
+    {
+      "tag": "black",
+      "candidate_color": "black",
+      "games": 1,
+      "report": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\matches\\smoke-openings-20261006\\match-black\\koi-uci-match-20261005-194412-072.json"
+    }
+  ],
+  "game_results": [
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "1-0",
+      "outcome": "win",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    }
+  ]
+}

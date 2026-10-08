@@ -1,0 +1,14 @@
+training device cuda (torch 2.14.0+cu126, cuda 12.6)
+loaded 2138346 rows (50 own, 50 opp, pad 50) in 0.00s
+epoch 1/440 train_loss 4.07264 val_loss 4.47272 val_mae_cp 447.27 time 60.9s
+epoch 2/440 train_loss 3.98480 val_loss 4.39333 val_mae_cp 439.33 time 60.1s
+epoch 3/440 train_loss 3.87594 val_loss 4.38359 val_mae_cp 438.36 time 63.2s
+epoch 4/440 train_loss 3.75986 val_loss 4.40446 val_mae_cp 440.45 time 63.3s
+epoch 5/440 train_loss 3.62539 val_loss 4.44400 val_mae_cp 444.40 time 61.5s
+epoch 6/440 train_loss 3.48727 val_loss 4.48748 val_mae_cp 448.75 time 64.3s
+epoch 7/440 train_loss 3.35573 val_loss 4.53480 val_mae_cp 453.48 time 63.1s
+epoch 8/440 train_loss 3.23205 val_loss 4.58556 val_mae_cp 458.56 time 60.6s
+epoch 9/440 train_loss 3.12158 val_loss 4.62727 val_mae_cp 462.73 time 61.6s
+epoch 10/440 train_loss 3.02382 val_loss 4.66425 val_mae_cp 466.43 time 60.6s
+epoch 11/440 train_loss 2.94032 val_loss 4.69998 val_mae_cp 470.00 time 61.8s
+epoch 12/440 train_loss 2.87652 val_loss 4.76041 val_mae_cp 476.04 time 61.2s

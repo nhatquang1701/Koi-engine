@@ -1,0 +1,4 @@
+legal 1
+result 1/2-1/2
+termination rule draw
+fen rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 8 5

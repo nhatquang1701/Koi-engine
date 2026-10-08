@@ -1,0 +1,2 @@
+# Measurement-tool dependency only; the C++ engine has no Python dependency.
+python-chess==1.11.2

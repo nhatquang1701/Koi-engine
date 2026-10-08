@@ -1,0 +1,43 @@
+{
+  "bestmove_fallbacks": 1,
+  "boot_nnue_path": null,
+  "cpu_variant": "generic",
+  "dataset_sha256": "e7e4b6ce8b692c49bc072f9d39ce71f9a7a029d1c502e2ac33b764a6e3b104a3",
+  "engine_sha256": "c308a468be6581ee25449f35c49d741f1ac4c583d3cf00c69df0744298004c06",
+  "engine_version": "source-facfe766faee",
+  "games_completed": 1,
+  "games_requested": 1,
+  "nnue_sha256": null,
+  "opening_corpus_sha256": "1e2dcccfabb9bf5fa4aa28df6c5b23c81e9feeb782aecd7d5722298d4f235e79",
+  "outcome_counts": {
+    "draw": 1
+  },
+  "record_count": 9,
+  "records_written": 9,
+  "schema": "koi-policy-value-selfplay-manifest-v1",
+  "search_options": {
+    "hash_mb": 512,
+    "max_plies": 16,
+    "multi_pv": 1,
+    "nodes": 1000,
+    "own_book": false,
+    "search_algorithm": "AlphaBeta",
+    "threads": 1
+  },
+  "seed": 7,
+  "selected_openings": [
+    "kings-indian"
+  ],
+  "source_dirty": true,
+  "source_revision": "facfe766faee273edcff62abdfbe8a8b5286c999",
+  "source_sha256": {
+    "tools/measurement/koi_chess/board.py": "66428f81defb6b6ae9b926a71ca29d7d3e48a86c7a78e3d58faa0a5355084693",
+    "tools/measurement/koi_chess/core.py": "2afe2de739b7d80bce8c6cf81074d775e8a9873dd539bcbf530acfc1eb48e9a4",
+    "tools/measurement/koi_chess/engine.py": "db77d22dc55f268f2d47e4acbfb495af00593e4e90a812793996bedd164fbdc5",
+    "tools/measurement/policy_value_dataset.py": "69d7fea413a6d428fc1c7a7a4a207200575919e7854777dfaf183f9390d9d1ae",
+    "tools/measurement/policy_value_selfplay.py": "29d07d6aec6799c61c90f3deccdd12f582438b022f9e3bd73b8f3b8b26dcce04"
+  },
+  "termination_counts": {
+    "ply-limit": 1
+  }
+}

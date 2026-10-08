@@ -1,0 +1,622 @@
+Start testing: Sep 17 20:20 SE Asia Standard Time
+----------------------------------------------------------
+27/53 Testing: time_manager_tests
+27/53 Test: time_manager_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/debug/time_manager_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/debug
+"time_manager_tests" start time: Sep 17 20:20 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS clock budget safety invariants
+PASS fast control keeps the clock
+PASS emergency pacing
+PASS movetime budget
+PASS frozen deadline
+PASS synthetic games never flag
+koi-test-summary run=6 pass=6 fail=0 xfail=0 xpass=0 skip=0 unseen=0
+<end of output>
+Test time =   2.23 sec
+----------------------------------------------------------
+Test Passed.
+"time_manager_tests" end time: Sep 17 20:20 SE Asia Standard Time
+"time_manager_tests" time elapsed: 00:00:02
+----------------------------------------------------------
+
+8/53 Testing: syzygy_tablebase_tests
+8/53 Test: syzygy_tablebase_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/debug/syzygy_tablebase_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/debug
+"syzygy_tablebase_tests" start time: Sep 17 20:20 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+Incomplete tablebase file KQvK..rtbw
+PASS snapshot rule metadata and piece bitboards
+PASS snapshot native rule state after pinned double push
+PASS absent and malformed paths disable probing safely
+PASS empty and valid paths preserve optional fallback
+info string Incomplete tablebase file KQvK..rtbw
+PASS wrong-sized fixture disables probing safely
+PASS tablebase instances share Fathom lifetime in both clear orders
+PASS piece count and castling gate probing
+PASS malformed snapshots are rejected before probing
+PASS WDL conversion and concurrent disabled probes
+PASS 50-move rule selects clock-aware root probe
+PASS seven-piece probe limit is preserved
+koi-test-summary run=11 pass=11 fail=0 xfail=0 xpass=0 skip=0 unseen=0
+<end of output>
+Test time =   1.60 sec
+----------------------------------------------------------
+Test Passed.
+"syzygy_tablebase_tests" end time: Sep 17 20:20 SE Asia Standard Time
+"syzygy_tablebase_tests" time elapsed: 00:00:01
+----------------------------------------------------------
+
+4/53 Testing: evaluation_architecture_tests
+4/53 Test: evaluation_architecture_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/debug/evaluation_architecture_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/debug
+"evaluation_architecture_tests" start time: Sep 17 20:20 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS worker ownership
+PASS base fallback
+PASS search evaluation boundary
+koi-test-summary run=3 pass=3 fail=0 xfail=0 xpass=0 skip=0 unseen=0
+<end of output>
+Test time =   1.57 sec
+----------------------------------------------------------
+Test Passed.
+"evaluation_architecture_tests" end time: Sep 17 20:20 SE Asia Standard Time
+"evaluation_architecture_tests" time elapsed: 00:00:01
+----------------------------------------------------------
+
+5/53 Testing: nnue_boundary_tests
+5/53 Test: nnue_boundary_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/debug/nnue_boundary_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/debug
+"nnue_boundary_tests" start time: Sep 17 20:20 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS NNUE container
+PASS NNUE layer shape
+PASS NNUE fallback
+PASS NNUE worker isolation
+PASS NNUE v2 features
+PASS NNUE v2 container
+PASS NNUE v2 validation
+PASS NNUE v2 inference
+PASS NNUE AVX2 wide accumulation
+PASS NNUE invalid worker guard
+PASS NNUE v3 shifts
+SKIP external NNUE container: no external container path provided
+koi-test-summary run=12 pass=11 fail=0 xfail=0 xpass=0 skip=1 unseen=0
+<end of output>
+Test time =   2.76 sec
+----------------------------------------------------------
+Test Passed.
+"nnue_boundary_tests" end time: Sep 17 20:20 SE Asia Standard Time
+"nnue_boundary_tests" time elapsed: 00:00:02
+----------------------------------------------------------
+
+2/53 Testing: koi_core_tests
+2/53 Test: koi_core_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/debug/koi_core_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/debug
+"koi_core_tests" start time: Sep 17 20:20 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS default position
+PASS legal UCI sequence
+PASS native position undo and key
+PASS special moves
+PASS malformed FEN rejection
+PASS back-rank pawn rejection
+PASS en-passant state validation
+PASS adjacent king rejection
+PASS castling-rights validation
+PASS triple-check rejection
+PASS strict material and double-check rejection
+PASS invalid UCI rejection
+PASS malformed UCI rejection
+PASS compatibility position forwarding
+PASS native search state contract
+PASS checkmate and stalemate
+PASS random chooser legality
+PASS seeded chooser repeatability
+PASS position feature freshness
+PASS position feature concurrent reads
+PASS position feature concurrent copy
+PASS native feature replay
+PASS tactical checking horizon
+PASS metadata SEE cache
+PASS fabricated metadata rejection
+PASS tactical quiet-check probe budget
+PASS fast quiet-check differential
+koi-test-summary run=27 pass=27 fail=0 xfail=0 xpass=0 skip=0 unseen=0
+<end of output>
+Test time =   3.83 sec
+----------------------------------------------------------
+Test Passed.
+"koi_core_tests" end time: Sep 17 20:20 SE Asia Standard Time
+"koi_core_tests" time elapsed: 00:00:03
+----------------------------------------------------------
+
+11/53 Testing: opening_book_tests
+11/53 Test: opening_book_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/debug/opening_book_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/debug
+"opening_book_tests" start time: Sep 17 20:20 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS reference Polyglot keys
+PASS special Polyglot moves
+PASS weighted legal selection
+PASS deterministic highest-weight selection
+PASS book fallback behavior
+PASS oversized book fallback
+PASS book safety
+koi-test-summary run=7 pass=7 fail=0 xfail=0 xpass=0 skip=0 unseen=0
+<end of output>
+Test time =   1.99 sec
+----------------------------------------------------------
+Test Passed.
+"opening_book_tests" end time: Sep 17 20:20 SE Asia Standard Time
+"opening_book_tests" time elapsed: 00:00:01
+----------------------------------------------------------
+
+19/53 Testing: search_architecture_tests
+19/53 Test: search_architecture_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/debug/search_architecture_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/debug
+"search_architecture_tests" start time: Sep 17 20:20 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS fixed search stack
+PASS deterministic root ranking
+PASS session ownership
+PASS context stack boundary
+koi-test-summary run=4 pass=4 fail=0 xfail=0 xpass=0 skip=0 unseen=0
+<end of output>
+Test time =   1.91 sec
+----------------------------------------------------------
+Test Passed.
+"search_architecture_tests" end time: Sep 17 20:20 SE Asia Standard Time
+"search_architecture_tests" time elapsed: 00:00:01
+----------------------------------------------------------
+
+21/53 Testing: search_runtime_tests
+21/53 Test: search_runtime_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/debug/search_runtime_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/debug
+"search_runtime_tests" start time: Sep 17 20:20 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS enabled table access
+PASS disabled table access
+PASS table access generation
+PASS local node budget
+PASS shared node budget
+koi-test-summary run=5 pass=5 fail=0 xfail=0 xpass=0 skip=0 unseen=0
+<end of output>
+Test time =   1.90 sec
+----------------------------------------------------------
+Test Passed.
+"search_runtime_tests" end time: Sep 17 20:20 SE Asia Standard Time
+"search_runtime_tests" time elapsed: 00:00:01
+----------------------------------------------------------
+
+3/53 Testing: evaluation_boundary_tests
+3/53 Test: evaluation_boundary_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/debug/evaluation_boundary_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/debug
+"evaluation_boundary_tests" start time: Sep 17 20:20 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS castling readiness
+PASS early queen development
+PASS central early queen development
+PASS late central queen taper
+PASS pawn break potential
+PASS parameter metadata
+PASS trapped piece
+PASS hanging piece
+PASS weighted king-ring attackers
+PASS castle-ready king-ring deferral
+PASS sparse king-ring taper
+PASS feature extraction context
+koi-test-summary run=12 pass=12 fail=0 xfail=0 xpass=0 skip=0 unseen=0
+<end of output>
+Test time =   1.73 sec
+----------------------------------------------------------
+Test Passed.
+"evaluation_boundary_tests" end time: Sep 17 20:20 SE Asia Standard Time
+"evaluation_boundary_tests" time elapsed: 00:00:01
+----------------------------------------------------------
+
+9/53 Testing: koi_rules_tests
+9/53 Test: koi_rules_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/debug/koi_rules_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/debug
+"koi_rules_tests" start time: Sep 17 20:20 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS Koi-owned move coordinates
+PASS FEN construction
+PASS strict FEN legality
+PASS legal special moves
+PASS special move conversion round trips
+PASS move metadata
+PASS batch move metadata
+PASS search metadata fast path
+PASS generated move application
+PASS all fast generated moves
+PASS draw rule view
+PASS non-pawn material view
+PASS tactical move generation
+PASS position features
+PASS make/unmake restoration
+PASS null move restoration
+PASS transactional rejected move
+PASS start-position move count
+koi-test-summary run=18 pass=18 fail=0 xfail=0 xpass=0 skip=0 unseen=0
+<end of output>
+Test time =   1.61 sec
+----------------------------------------------------------
+Test Passed.
+"koi_rules_tests" end time: Sep 17 20:20 SE Asia Standard Time
+"koi_rules_tests" time elapsed: 00:00:01
+----------------------------------------------------------
+
+18/53 Testing: search_ordering_tests
+18/53 Test: search_ordering_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/debug/search_ordering_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/debug
+"search_ordering_tests" start time: Sep 17 20:20 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS TT and MVV-LVA ordering
+PASS SEE capture ordering
+PASS killer history stable ordering
+PASS killer tier outranks saturated history
+PASS counter move tier
+PASS counter move confidence
+PASS counter move collision confidence
+PASS counter move failure confidence
+PASS quiet checks before quiet moves
+PASS history malus and continuation ordering
+PASS history saturation overflow safety
+PASS cached move scores
+PASS deferred SEE generation
+PASS quiet-only check metadata
+PASS deferred SEE ordering
+koi-test-summary run=15 pass=15 fail=0 xfail=0 xpass=0 skip=0 unseen=0
+<end of output>
+Test time =   1.43 sec
+----------------------------------------------------------
+Test Passed.
+"search_ordering_tests" end time: Sep 17 20:20 SE Asia Standard Time
+"search_ordering_tests" time elapsed: 00:00:01
+----------------------------------------------------------
+
+10/53 Testing: native_rule_state_tests
+10/53 Test: native_rule_state_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/debug/native_rule_state_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/debug
+"native_rule_state_tests" start time: Sep 17 20:20 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS compatibility mirror ownership
+PASS feature state ownership
+PASS FEN rule state and Position facade
+PASS repetition thresholds
+PASS clock, checkmate, and dead positions
+PASS make/unmake and special moves
+PASS legal en-passant repetition identity
+PASS generated move transaction
+PASS search move transaction
+PASS fixed-buffer legal generation
+koi-test-summary run=10 pass=10 fail=0 xfail=0 xpass=0 skip=0 unseen=0
+<end of output>
+Test time =   1.45 sec
+----------------------------------------------------------
+Test Passed.
+"native_rule_state_tests" end time: Sep 17 20:20 SE Asia Standard Time
+"native_rule_state_tests" time elapsed: 00:00:01
+----------------------------------------------------------
+
+22/53 Testing: static_exchange_tests
+22/53 Test: static_exchange_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/debug/static_exchange_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/debug
+"static_exchange_tests" start time: Sep 17 20:20 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS winning capture
+PASS poisoned capture
+PASS non-capture
+PASS quiet promotions
+PASS metadata exchange
+PASS en passant capture
+PASS capturing promotion
+PASS promotion recapture
+PASS pinned recapturer
+PASS unsafe king recapture
+PASS tactical SEE without feature snapshots
+koi-test-summary run=11 pass=11 fail=0 xfail=0 xpass=0 skip=0 unseen=0
+<end of output>
+Test time =   1.56 sec
+----------------------------------------------------------
+Test Passed.
+"static_exchange_tests" end time: Sep 17 20:20 SE Asia Standard Time
+"static_exchange_tests" time elapsed: 00:00:01
+----------------------------------------------------------
+
+20/53 Testing: search_policy_tests
+20/53 Test: search_policy_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/debug/search_policy_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/debug
+"search_policy_tests" start time: Sep 17 20:20 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS null move policy
+PASS check extension policy
+PASS late move policy
+PASS quiet futility policy
+PASS quiescence capture policy
+PASS ordering table ownership
+koi-test-summary run=6 pass=6 fail=0 xfail=0 xpass=0 skip=0 unseen=0
+<end of output>
+Test time =   1.56 sec
+----------------------------------------------------------
+Test Passed.
+"search_policy_tests" end time: Sep 17 20:20 SE Asia Standard Time
+"search_policy_tests" time elapsed: 00:00:01
+----------------------------------------------------------
+
+7/53 Testing: koi_module_tests
+7/53 Test: koi_module_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/debug/koi_module_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/debug
+"koi_module_tests" start time: Sep 17 20:20 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS module contracts
+koi-test-summary run=1 pass=1 fail=0 xfail=0 xpass=0 skip=0 unseen=0
+<end of output>
+Test time =   1.62 sec
+----------------------------------------------------------
+Test Passed.
+"koi_module_tests" end time: Sep 17 20:20 SE Asia Standard Time
+"koi_module_tests" time elapsed: 00:00:01
+----------------------------------------------------------
+
+6/53 Testing: koi_cpu_features_tests
+6/53 Test: koi_cpu_features_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/debug/koi_cpu_features_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/debug
+"koi_cpu_features_tests" start time: Sep 17 20:20 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS AVX2 CPU feature query
+koi-test-summary run=1 pass=1 fail=0 xfail=0 xpass=0 skip=0 unseen=0
+<end of output>
+Test time =   1.74 sec
+----------------------------------------------------------
+Test Passed.
+"koi_cpu_features_tests" end time: Sep 17 20:20 SE Asia Standard Time
+"koi_cpu_features_tests" time elapsed: 00:00:01
+----------------------------------------------------------
+
+13/53 Testing: completion_gate_tests
+13/53 Test: completion_gate_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/debug/completion_gate_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/debug
+"completion_gate_tests" start time: Sep 17 20:20 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS current root move
+PASS stale generation
+PASS mismatched root key
+PASS illegal d4c3 fallback
+PASS searchmoves restriction
+PASS invalid PV fallback
+PASS terminal 0000
+PASS completion once
+PASS request identity helper
+koi-test-summary run=9 pass=9 fail=0 xfail=0 xpass=0 skip=0 unseen=0
+<end of output>
+Test time =   1.63 sec
+----------------------------------------------------------
+Test Passed.
+"completion_gate_tests" end time: Sep 17 20:20 SE Asia Standard Time
+"completion_gate_tests" time elapsed: 00:00:01
+----------------------------------------------------------
+
+23/53 Testing: transposition_table_tests
+23/53 Test: transposition_table_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/debug/transposition_table_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/debug
+"transposition_table_tests" start time: Sep 17 20:20 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS transposition store and probe
+PASS transposition mate normalisation
+PASS transposition replacement depth
+PASS transposition generation ageing
+PASS transposition clear and hashfull
+PASS transposition resize bounds
+PASS transposition concurrent access
+koi-test-summary run=7 pass=7 fail=0 xfail=0 xpass=0 skip=0 unseen=0
+<end of output>
+Test time =   1.34 sec
+----------------------------------------------------------
+Test Passed.
+"transposition_table_tests" end time: Sep 17 20:20 SE Asia Standard Time
+"transposition_table_tests" time elapsed: 00:00:01
+----------------------------------------------------------
+
+29/53 Testing: perft_tests
+29/53 Test: perft_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/debug/perft_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/debug
+"perft_tests" start time: Sep 17 20:20 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS start-position perft
+PASS Kiwipete perft
+PASS endgame pin perft
+koi-test-summary run=3 pass=3 fail=0 xfail=0 xpass=0 skip=0 unseen=0
+<end of output>
+Test time =   7.46 sec
+----------------------------------------------------------
+Test Passed.
+"perft_tests" end time: Sep 17 20:20 SE Asia Standard Time
+"perft_tests" time elapsed: 00:00:07
+----------------------------------------------------------
+
+24/53 Testing: search_service_tests
+24/53 Test: search_service_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/debug/search_service_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/debug
+"search_service_tests" start time: Sep 17 20:20 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS search service depth search
+PASS search service stop
+PASS search service evaluator swap
+PASS search service evaluator pinning
+PASS search service hash controls
+PASS search service sinkless search
+PASS search service ponderhit conversion
+koi-test-summary run=7 pass=7 fail=0 xfail=0 xpass=0 skip=0 unseen=0
+<end of output>
+Test time =   0.92 sec
+----------------------------------------------------------
+Test Passed.
+"search_service_tests" end time: Sep 17 20:20 SE Asia Standard Time
+"search_service_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+25/53 Testing: classical_evaluator_tests
+25/53 Test: classical_evaluator_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/debug/classical_evaluator_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/debug
+"classical_evaluator_tests" start time: Sep 17 20:20 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS classical evaluator perspective
+PASS classical evaluator breakdown sum
+PASS classical evaluator symmetric start
+PASS classical evaluator insufficient material
+PASS classical evaluator material
+PASS classical evaluator mobility
+PASS classical evaluator tempo gate
+koi-test-summary run=7 pass=7 fail=0 xfail=0 xpass=0 skip=0 unseen=0
+<end of output>
+Test time =   0.62 sec
+----------------------------------------------------------
+Test Passed.
+"classical_evaluator_tests" end time: Sep 17 20:20 SE Asia Standard Time
+"classical_evaluator_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+26/53 Testing: evaluation_features_tests
+26/53 Test: evaluation_features_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/debug/evaluation_features_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/debug
+"evaluation_features_tests" start time: Sep 17 20:20 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS evaluation features v1 startpos
+PASS evaluation features v2 startpos
+PASS evaluation features perspective
+PASS evaluation features sparse view
+PASS evaluation features pawn flags
+PASS evaluation features castling rights
+koi-test-summary run=6 pass=6 fail=0 xfail=0 xpass=0 skip=0 unseen=0
+<end of output>
+Test time =   0.35 sec
+----------------------------------------------------------
+Test Passed.
+"evaluation_features_tests" end time: Sep 17 20:20 SE Asia Standard Time
+"evaluation_features_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+12/53 Testing: uci_controller_tests
+12/53 Test: uci_controller_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/debug/uci_controller_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/debug
+"uci_controller_tests" start time: Sep 17 20:20 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS uci handshake and options
+PASS Syzygy option values
+PASS Task 1 handshake
+PASS Task 1 option values
+PASS En Croissant option casing
+PASS Task 1 WDL
+PASS Task 1 hidden diagnostics
+PASS Task 1 option replacement
+PASS Task 6 StrengthMode
+PASS opening-book normal play
+PASS opening-book random option
+PASS opening-book safety option
+PASS opening-book fallback and bypass
+PASS opening-book MultiPV bypass
+PASS ponderhit book bypass
+PASS opening-book depth boundaries
+PASS opening-book option generation replacement
+PASS Hash and Clear Hash contract
+PASS large Hash safety
+PASS Threads and Speed validation
+PASS Threads and Speed generation replacement
+PASS Lucas analysis options and multipv output
+PASS Lucas analysis option generation replacement
+PASS ponderhit continuation lifecycle
+PASS immediate ponderhit completion
+PASS ponderhit shutdown suppression
+PASS idle ponderhit
+PASS ponder stop lifecycle
+PASS ponder root filtering
+PASS ponder terminal result
+PASS ready response
+PASS deterministic search
+PASS disabled strength limit
+PASS position startpos and FEN
+PASS go limits and malformed values
+PASS go limit parser exact mapping
+PASS go limit fallback and clocks
+PASS go limit parser Lucas root options
+PASS go limit parser fallback
+PASS Ponder PV emission
+PASS transactional invalid positions
+PASS terminal 0000
+PASS ready during search
+PASS position generation replacement
+PASS new game and hash generation replacement
+PASS ucinewgame clears the hash
+PASS debug command toggle
+PASS handshake option table
+PASS quit and EOF cleanup
+PASS unknown stop quit
+PASS protocol-clean output
+PASS promptly flushed responses
+koi-test-summary run=52 pass=52 fail=0 xfail=0 xpass=0 skip=0 unseen=0
+<end of output>
+Test time =   9.20 sec
+----------------------------------------------------------
+Test Passed.
+"uci_controller_tests" end time: Sep 17 20:20 SE Asia Standard Time
+"uci_controller_tests" time elapsed: 00:00:09
+----------------------------------------------------------
+
+End testing: Sep 17 20:20 SE Asia Standard Time
+
+evaluation =   7.03 sec*proc
+
+runtime =  10.53 sec*proc
+
+search =   0.92 sec*proc
+
+unit =  51.99 sec*proc
+

@@ -1,0 +1,37 @@
+perf(search): dedupe move metadata reads, hoist check probes, cut evaluator board scans
+
+Move generation and metadata (src/koi/game_state.cpp, src/koi/position.hpp/.cpp):
+- Position::move_facts resolves the moving piece, the target square and the
+  en-passant target in a single pass, replacing up to six piece_at/is_capture
+  lookups per move; both metadata generation loops now fill their records from
+  those facts.
+- The per-list check-probe invariants (enemy king, occupancy, friendly rook|queen
+  and bishop|queen masks, mover colour) are built once per generated list instead
+  of once per move. The legacy probe entry point is kept as a thin wrapper so
+  GameState::move_gives_check stays bit-identical for arbitrary moves.
+- On the search path (include_see == false) the position-key/validation-token
+  stamping now happens inside the generation loop, so finalize_metadata only runs
+  for callers that request SEE. Emission order, metadata values and node counts
+  are unchanged; the fill-failure, list-full and catch(...) paths still produce
+  exactly the previous list contents.
+- MoveBuffer no longer value-initializes its 256-entry move storage: every read
+  is bounded by size_ and every write goes through emplace_back, so the 1 KiB
+  zero-fill per generation call was pure overhead.
+
+Classical evaluator (src/koi/classical_evaluator.cpp):
+- Removed the write-only enemy_file_counts computation from pawn_structure_for.
+- king_ring_attack_units: the phase/fullmove guards now run before the piece
+  count, the count is a popcount over PositionFeatures::occupied, and an O(1)
+  attacked_squares & king_attacks pre-filter rejects the common no-attacker case.
+- Nine whole-board mailbox scans became bitboard-driven visits over the
+  PositionFeatures masks (material+PSQT, activity, initiative, pawn breaks,
+  endgame scale, king-ring attackers, development, pawn iteration) through a
+  shared countr_zero helper; the original board scans remain as the occupied == 0
+  fallback used by synthetic fixtures, and iteration stays ascending-square so
+  the per-piece accumulation order is unchanged.
+
+Verification: koi_core builds clean; classical_evaluator_tests,
+evaluation_features_tests and evaluation_boundary_tests pass 3/3; koi_search_tests
+(all four shards) plus search_policy_tests pass 5/5; perft_tests, koi_rules_tests,
+native_rule_state_tests, search_ordering_tests and koi_core_tests (random metadata
+differential) pass 5/5. Speed gate against the isolated 7bddf7c baseline: PASS (+14.76% total NPS, +14.85% median row NPS; 5 runs, depth sweep 2..5, 14 noise rows excluded).

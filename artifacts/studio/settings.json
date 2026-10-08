@@ -1,0 +1,11 @@
+{
+  "engine_directory": "C:\\Users\\ntATh\\AI test\\Koi engine\\build\\release",
+  "auto_adopt": false,
+  "theme": "light",
+  "geometry": "1000x780+768+184",
+  "ab_games": 20,
+  "ab_nodes": 20000,
+  "gate_games": 20,
+  "net_match_nodes": 20000,
+  "schema": "koi-studio-settings-v1"
+}

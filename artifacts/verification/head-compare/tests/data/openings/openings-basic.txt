@@ -1,0 +1,9 @@
+# Named, legal UCI opening starts for paired Elo measurements.
+e4 | e2e4
+d4 | d2d4
+english | c2c4
+scandinavian | e2e4 d7d5
+french | e2e4 e7e6
+caro-kann | e2e4 c7c6
+sicilian | e2e4 c7c5
+queens-gambit | d2d4 d7d5 c2c4

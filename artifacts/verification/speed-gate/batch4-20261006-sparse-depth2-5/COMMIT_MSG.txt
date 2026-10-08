@@ -1,0 +1,33 @@
+perf(search): reuse SEE contexts, ray-scan pins, and trim movegen glue
+
+- Share one ExchangeContext per picker / ordering call instead of rebuilding a
+  64-square mailbox for every capture. The SEE helpers moved from game_state.cpp
+  into detail/static_exchange.hpp with a context-based entry point; the picker
+  materializes the context lazily, and all order overloads build one per call.
+  SEE values, emission order, and node counts are unchanged: the position is
+  only mutated transactionally between next() calls, and finalize_metadata
+  already used one context per list.
+- Compute pinned with an 8-direction nearest-blocker scan instead of removing
+  each own piece and re-running sliding attacks. A piece is pinned exactly when
+  it is the first blocker on a king ray and the second blocker is an enemy
+  slider of the matching type. The write-only blockers_for_king loop is gone
+  (the field remains as a snapshot/restore surface).
+- native_move_gives_check gained a conservative king-ray prefilter: a discovered
+  check is only possible when the move vacates a square on an empty-board king
+  ray, and a sliding direct check requires the destination on such a ray, so
+  most quiet moves skip the two sliding queries.
+- is_known_locked_pawn_wall rejects boards whose occupancy differs from the
+  pattern's exactly-14 squares before comparing.
+- quiet_history_score and continuation_history_score compute move_index once per
+  candidate and inline the continuation pair hash (same constants, same table
+  reads).
+- Movegen glue: move_requires_legality_probe receives the hoisted per-list
+  legality masks; MoveMetadata is no longer value-initialized at the two
+  list-building sites (the fill helper always assigns); Move::no_move() is
+  constexpr inline.
+- Evaluator development_for scans own-colour squares for the early-queen check;
+  quiet-promotion priorities are no longer recomputed after materialization.
+
+Local verification before the gate: koi_core builds clean; the candidate full build reaches 251/251 targets; the 18-target ctest suite passes 18/18 (exit 0) with TMP/TEMP redirected to build\koi-test-temp (the agent sandbox denies directory creation under system %TEMP%).
+
+Speed gate against the isolated 64bcb56 baseline: PASS (+5.61% total NPS, +4.69% median row NPS; 5 runs, depth sweep 2..5, 14 noise rows excluded).

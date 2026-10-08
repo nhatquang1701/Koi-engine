@@ -1,0 +1,19 @@
+Started game 1 of 2 (Koi vs Opponent)
+Finished game 1 (Koi vs Opponent): 0-1 {White loses on time}
+Score of Koi vs Opponent: 0 - 1 - 0  [0.000] 1
+Started game 2 of 2 (Opponent vs Koi)
+Finished game 2 (Opponent vs Koi): 1-0 {White mates}
+Score of Koi vs Opponent: 0 - 2 - 0  [0.000] 2
+...      Koi playing White: 0 - 1 - 0  [0.000] 1
+...      Koi playing Black: 0 - 1 - 0  [0.000] 1
+...      White vs Black: 1 - 1 - 0  [0.500] 2
+Elo difference: -inf +/- nan, LOS: 7.9 %, DrawRatio: 0.0 %
+SPRT: llr 0 (0.0%), lbound -inf, ubound inf
+
+Player: Koi
+   "Loss: White loses on time": 1
+   "Loss: White mates": 1
+Player: Opponent
+   "Win: White loses on time": 1
+   "Win: White mates": 1
+Finished match

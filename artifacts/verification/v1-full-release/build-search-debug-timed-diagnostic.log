@@ -1,0 +1,13 @@
+**********************************************************************
+** Visual Studio 2022 Developer Command Prompt v17.14.39
+** Copyright (c) 2025 Microsoft Corporation
+**********************************************************************
+[1/4] Scanning "C:\Users\ntATh\AI test\Koi engine\tests\unit\search\koi_search_tests.cpp" for CXX dependencies
+[2/4] Generating CXX dyndep file CMakeFiles\koi_search_tests.dir\CXX.dd
+[3/4] Building CXX object CMakeFiles\koi_search_tests.dir\tests\unit\search\koi_search_tests.cpp.obj
+C:\Users\ntATh\AI test\Koi engine\tests\unit\search\koi_search_tests.cpp(3910): warning C4834: discarding return value of function with [[nodiscard]] attribute
+C:\Users\ntATh\AI test\Koi engine\tests\unit\search\koi_search_tests.cpp(3940): warning C4834: discarding return value of function with [[nodiscard]] attribute
+C:\Users\ntATh\AI test\Koi engine\tests\unit\search\koi_search_tests.cpp(3968): warning C4834: discarding return value of function with [[nodiscard]] attribute
+C:\Users\ntATh\AI test\Koi engine\tests\unit\search\koi_search_tests.cpp(4183): warning C4834: discarding return value of function with [[nodiscard]] attribute
+C:\Users\ntATh\AI test\Koi engine\tests\unit\search\koi_search_tests.cpp(4217): warning C4834: discarding return value of function with [[nodiscard]] attribute
+[4/4] Linking CXX executable koi_search_tests.exe

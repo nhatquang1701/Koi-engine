@@ -1,0 +1,22 @@
+{
+  "schema": "koi-speed-gate-experiment-v1",
+  "recorded_utc": "2026-10-04T03:42:01Z",
+  "gate_script": "tools/build/speed_gate.ps1",
+  "gate_script_sha256": "B743DD45DC5409A2073ACD11602934E740925C57992222B4596211D12BF3F15E",
+  "baseline_exe": "artifacts\\verification\\speed-gate\\batch3-final-4change-20261004-sparse-depth2-5/baseline/koi-bench-baseline.exe",
+  "baseline_exe_sha256": "079616D61FA972383F57443AD43F36F582AAD728E45888037FBB7D92AB2ED0BA",
+  "candidate_exe": "build/roadmap-visit-win-release/koi-bench.exe",
+  "candidate_exe_sha256": "FA55EB92F605F45FC3824314DBF0DB3BF26A8AE613976A80662D87080DB7FC75",
+  "source_revision": "5394e14ae4aeeed0618ab34fb7f711de3a494136",
+  "baseline_note": "isolated Release build of HEAD 5394e14 from build/roadmap-batch3-baseline-src (BuildTools MSVC 14.44.35207, CMake 3.31.6, Ninja, modules/shadow/GPU/PGO/sanitize/static-runtime OFF)",
+  "candidate": "Batch 3 final (4-file): TT cluster-base hoisting, hazard-free prefetch, single probe-optional consumption (transposition_table.cpp/.hpp, detail/search_context.cpp); counting partition for picker stage grouping (search_ordering.cpp). The evaluator endgame-census merge was dropped after an isolated screen measured it as a ~2% NPS regression.",
+  "fen_file": "artifacts\\verification\\speed-gate\\batch3-final-4change-20261004-sparse-depth2-5/sparse-qsearch-fens.txt",
+  "fen_sha256": "07855F78D6544FD4D9ED8E6000FDA3B279208AFC608F389569D85DE3026D930C",
+  "threads": 1,
+  "speed": 100,
+  "depth_sweep": "2..5",
+  "runs": 5,
+  "max_total_nps_regression_percent": 2.0,
+  "max_row_nps_regression_percent": 2.0,
+  "min_row_elapsed_ms": 20.0
+}

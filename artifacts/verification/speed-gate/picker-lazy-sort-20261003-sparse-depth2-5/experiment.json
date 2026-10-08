@@ -1,0 +1,22 @@
+﻿{
+    "schema":  "koi-speed-gate-experiment-v1",
+    "recorded_utc":  "2026-10-03T05:45:38Z",
+    "gate_script":  "tools/build/speed_gate.ps1",
+    "gate_script_sha256":  "B743DD45DC5409A2073ACD11602934E740925C57992222B4596211D12BF3F15E",
+    "baseline_exe":  "artifacts\\verification\\speed-gate\\picker-lazy-sort-20261003-sparse-depth2-5/baseline/koi-bench-baseline.exe",
+    "baseline_exe_sha256":  "5D3A00321DB81FFD8CC60573A4D714547D17E7EC8C18A79D5A7C7D5D5ADCF1CD",
+    "candidate_exe":  "build/roadmap-visit-win-release/koi-bench.exe",
+    "candidate_exe_sha256":  "EDC48BD3D25FAE004E606E02E02C9DD40486D4FC41A93ECCB5D8B82237498FA3",
+    "source_revision":  "5b59196f8858c9bb91bb526db18ab9f106d5d2a5",
+    "baseline_note":  "isolated Release build of HEAD af79d71 from build/roadmap-a2-baseline-src (BuildTools MSVC 14.44.35207, Ninja, modules/shadow/GPU/PGO/sanitize/static-runtime OFF)",
+    "candidate":  "Picker lazy per-stage sort + A2 cache tune: candidates are grouped by stage rank once per preparation and each stage is sorted with the full priority comparator only when its stage is first reached, so pruned stages are never sorted; kEvaluationCacheSize 32k -\u003e 64k entries and kQSearchCacheSize 4k -\u003e 16k entries",
+    "fen_file":  "artifacts\\verification\\speed-gate\\picker-lazy-sort-20261003-sparse-depth2-5/sparse-qsearch-fens.txt",
+    "fen_sha256":  "07855F78D6544FD4D9ED8E6000FDA3B279208AFC608F389569D85DE3026D930C",
+    "threads":  1,
+    "speed":  100,
+    "depth_sweep":  "2..5",
+    "runs":  5,
+    "max_total_nps_regression_percent":  2,
+    "max_row_nps_regression_percent":  2,
+    "min_row_elapsed_ms":  20
+}

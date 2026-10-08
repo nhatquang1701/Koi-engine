@@ -1,0 +1,3 @@
+rows 2138346 sampled 20000
+pearson(stm_material, cp) 0.8698
+PASS: corpus scores look side-to-move relative

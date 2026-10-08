@@ -1,0 +1,2 @@
+json C:\Users\ntATh\AI test\Koi engine\artifacts\verification\release-verify-variants\en-croissant-style-24ply\koi-uci-match-20260923-112331-910.json
+pgn C:\Users\ntATh\AI test\Koi engine\artifacts\verification\release-verify-variants\en-croissant-style-24ply\koi-uci-match-20260923-112331-910.pgn

@@ -1,0 +1,51 @@
+{
+  "bestmove_fallbacks": 0,
+  "boot_nnue_path": null,
+  "cpu_variant": "generic",
+  "dataset_sha256": "a46bd89ef3f785c4cdc61cd5168f3979815e4ec1cca949c24f8afffdc87ea7dd",
+  "engine_sha256": "669dc8279c5b105b1249f3ccba061119b597561a67b65e7b04092c39e0c59583",
+  "engine_version": "source-e77914701f17",
+  "games_completed": 1,
+  "games_requested": 1,
+  "nnue_sha256": null,
+  "opening_corpus_sha256": "fb6a0efce4021e525eb2d1a36be7899cceb647774224a915f1dfa554dca5c350",
+  "outcome_counts": {
+    "draw": 1
+  },
+  "policy_value_file": null,
+  "policy_value_sha256": null,
+  "record_count": 1,
+  "records_written": 1,
+  "schema": "koi-policy-value-selfplay-manifest-v1",
+  "search_options": {
+    "hash_mb": 512,
+    "max_plies": 2,
+    "mcts_visit_output": false,
+    "multi_pv": 1,
+    "nodes": 100,
+    "own_book": false,
+    "policy_temperature": null,
+    "search_algorithm": "AlphaBeta",
+    "threads": 1,
+    "value_target_transform": "tanh(cp/400) when an unbounded score is present; otherwise game result"
+  },
+  "seed": 23,
+  "selected_openings": [
+    "validation-e4"
+  ],
+  "source_dirty": true,
+  "source_revision": "e77914701f17488dd33c54d126c46cb7997a20c8",
+  "source_sha256": {
+    "tools/measurement/koi_chess/__init__.py": "c0f15babf0fea462091dd6360a815c0fe9df7f8781c80c66efd02d3179553115",
+    "tools/measurement/koi_chess/attacks.py": "dc017a9347b0e0fbfac15599cdb0fbbb454b9777e4b1b3135c529ea235b45080",
+    "tools/measurement/koi_chess/board.py": "66428f81defb6b6ae9b926a71ca29d7d3e48a86c7a78e3d58faa0a5355084693",
+    "tools/measurement/koi_chess/core.py": "2afe2de739b7d80bce8c6cf81074d775e8a9873dd539bcbf530acfc1eb48e9a4",
+    "tools/measurement/koi_chess/engine.py": "58ca1762d04b82b2ec16251196a90759b6d6fba2209474d41e6c8b33eb375cfc",
+    "tools/measurement/koi_chess/pgn.py": "3ed89525f5fa5ca3a7b1e3a070b0c327727ec2dd3cc09e024fa3051a5dba76d7",
+    "tools/measurement/policy_value_dataset.py": "69d7fea413a6d428fc1c7a7a4a207200575919e7854777dfaf183f9390d9d1ae",
+    "tools/measurement/policy_value_selfplay.py": "e800e9d6f5d3ee8bf2f9b08780774dbfafd6f90fa7c9cc35a41c249e894a3c2e"
+  },
+  "termination_counts": {
+    "ply-limit": 1
+  }
+}

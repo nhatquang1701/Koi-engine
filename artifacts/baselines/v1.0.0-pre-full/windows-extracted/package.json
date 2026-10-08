@@ -1,0 +1,71 @@
+{
+  "schema": "koi-engine-package-v1",
+  "version": "1.0.0",
+  "platform": "windows-x86_64",
+  "build_configuration": "Release",
+  "files": [
+    {
+      "path": "INSTALL.txt",
+      "size_bytes": 1082,
+      "sha256": "a58453e191f20e4947f5754bf559d6ce1d6e166e59bb3042893be86c3611d314"
+    },
+    {
+      "path": "koi-bench.exe",
+      "size_bytes": 1332736,
+      "sha256": "98a4dfec7f8c219fde506a76ee719126ce66e1bb0e39e9c8aff38d9e1be2f28e"
+    },
+    {
+      "path": "koi-engine-avx2.exe",
+      "size_bytes": 1448448,
+      "sha256": "bdb46d0b4ae679503032ab254e21e1b44148266abed0c33a8b528e16093d290e"
+    },
+    {
+      "path": "koi-engine-avx512.exe",
+      "size_bytes": 1448448,
+      "sha256": "2716e7df4ff35dd1aab741351a2d8caf02c7e947890669b8994eb567465a2fe7"
+    },
+    {
+      "path": "koi-engine.exe",
+      "size_bytes": 1455616,
+      "sha256": "133832cfb5b642f49958a303ac97847b5ea663299e7c2501be8486eabf9aaaf1"
+    },
+    {
+      "path": "koi-perft.exe",
+      "size_bytes": 349184,
+      "sha256": "8d8e1c00b0e95ba5af2125338b9876bc55d1cbfa76e82e238cc0fc841a9bb7c6"
+    },
+    {
+      "path": "koi-replay.exe",
+      "size_bytes": 373760,
+      "sha256": "9c2df2515e713bde4eb5728b78a38b726e47f00a2d5d1ada4c9fc12cf60c6974"
+    },
+    {
+      "path": "LICENSE",
+      "size_bytes": 1091,
+      "sha256": "a5c5b906dcdc682f174760b4da30bba3e098f4533918cb96ca71aebee9e6259a"
+    },
+    {
+      "path": "licenses/chess-library-MIT.txt",
+      "size_bytes": 1087,
+      "sha256": "6272375921d96a6e55966fd6c991a192d5211e6b20e4c3338d23b79f02abc428"
+    },
+    {
+      "path": "licenses/fathom-MIT.txt",
+      "size_bytes": 1173,
+      "sha256": "42de39a3f2d5d6260946332fd557e50cbb38bb4c0dc210f63c52b38d69c3a070"
+    },
+    {
+      "path": "README.md",
+      "size_bytes": 60943,
+      "sha256": "a383d432c360e4f74e603d0be1c22ca878d5b8b27423a4672289fe569aa9d468"
+    }
+  ],
+  "book_included": false,
+  "tablebases_included": false,
+  "provenance": {
+    "source_commit": "84dd8d57f62ba96315e6634be45148f5bd39fc29",
+    "source_dirty": false,
+    "source_ref": null,
+    "created_utc": "2026-09-26T10:03:57Z"
+  }
+}

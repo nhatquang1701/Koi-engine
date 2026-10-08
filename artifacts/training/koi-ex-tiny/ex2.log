@@ -1,0 +1,150 @@
+training device cuda (torch 2.14.0+cu126, cuda 12.6)
+loaded 242336 rows (47 own, 47 opp, pad 47) in 0.00s
+epoch 1/100 train_loss 0.84823 val_loss 1.16831 val_mae_cp 116.83 time 2.2s
+epoch 2/100 train_loss 0.78870 val_loss 1.17016 val_mae_cp 117.02 time 2.0s
+epoch 3/100 train_loss 0.74433 val_loss 1.16976 val_mae_cp 116.98 time 2.0s
+epoch 4/100 train_loss 0.70381 val_loss 1.17240 val_mae_cp 117.24 time 2.0s
+epoch 5/100 train_loss 0.66801 val_loss 1.18057 val_mae_cp 118.06 time 2.0s
+epoch 6/100 train_loss 0.63932 val_loss 1.19022 val_mae_cp 119.02 time 2.0s
+epoch 7/100 train_loss 0.61560 val_loss 1.19211 val_mae_cp 119.21 time 2.0s
+epoch 8/100 train_loss 0.60127 val_loss 1.20510 val_mae_cp 120.51 time 2.0s
+epoch 9/100 train_loss 0.58766 val_loss 1.21496 val_mae_cp 121.50 time 2.0s
+epoch 10/100 train_loss 0.57176 val_loss 1.21550 val_mae_cp 121.55 time 2.0s
+epoch 11/100 train_loss 0.55666 val_loss 1.21362 val_mae_cp 121.36 time 2.0s
+epoch 12/100 train_loss 0.54032 val_loss 1.23107 val_mae_cp 123.11 time 2.0s
+epoch 13/100 train_loss 0.52413 val_loss 1.24273 val_mae_cp 124.27 time 2.0s
+epoch 14/100 train_loss 0.50937 val_loss 1.23627 val_mae_cp 123.63 time 2.0s
+epoch 15/100 train_loss 0.49665 val_loss 1.24213 val_mae_cp 124.21 time 2.0s
+epoch 16/100 train_loss 0.48614 val_loss 1.26384 val_mae_cp 126.38 time 2.0s
+epoch 17/100 train_loss 0.47188 val_loss 1.26404 val_mae_cp 126.40 time 2.0s
+epoch 18/100 train_loss 0.45814 val_loss 1.24368 val_mae_cp 124.37 time 2.0s
+epoch 19/100 train_loss 0.44244 val_loss 1.25640 val_mae_cp 125.64 time 2.0s
+epoch 20/100 train_loss 0.42942 val_loss 1.27047 val_mae_cp 127.05 time 2.0s
+epoch 21/100 train_loss 0.41442 val_loss 1.25657 val_mae_cp 125.66 time 2.0s
+epoch 22/100 train_loss 0.40181 val_loss 1.24020 val_mae_cp 124.02 time 2.0s
+epoch 23/100 train_loss 0.39376 val_loss 1.24891 val_mae_cp 124.89 time 2.0s
+epoch 24/100 train_loss 0.38597 val_loss 1.25950 val_mae_cp 125.95 time 2.0s
+epoch 25/100 train_loss 0.37605 val_loss 1.26367 val_mae_cp 126.37 time 2.0s
+epoch 26/100 train_loss 0.36837 val_loss 1.26112 val_mae_cp 126.11 time 2.0s
+epoch 27/100 train_loss 0.35947 val_loss 1.26182 val_mae_cp 126.18 time 2.0s
+epoch 28/100 train_loss 0.35112 val_loss 1.26792 val_mae_cp 126.79 time 2.0s
+epoch 29/100 train_loss 0.34272 val_loss 1.27008 val_mae_cp 127.01 time 2.0s
+epoch 30/100 train_loss 0.33419 val_loss 1.25997 val_mae_cp 126.00 time 2.0s
+epoch 31/100 train_loss 0.32673 val_loss 1.24539 val_mae_cp 124.54 time 2.0s
+epoch 32/100 train_loss 0.32015 val_loss 1.25026 val_mae_cp 125.03 time 2.0s
+epoch 33/100 train_loss 0.31386 val_loss 1.26704 val_mae_cp 126.70 time 2.0s
+epoch 34/100 train_loss 0.30677 val_loss 1.26804 val_mae_cp 126.80 time 2.0s
+epoch 35/100 train_loss 0.30018 val_loss 1.25438 val_mae_cp 125.44 time 2.0s
+epoch 36/100 train_loss 0.29479 val_loss 1.25240 val_mae_cp 125.24 time 2.0s
+epoch 37/100 train_loss 0.29031 val_loss 1.25642 val_mae_cp 125.64 time 2.0s
+epoch 38/100 train_loss 0.28648 val_loss 1.27273 val_mae_cp 127.27 time 2.0s
+epoch 39/100 train_loss 0.28161 val_loss 1.26432 val_mae_cp 126.43 time 2.0s
+epoch 40/100 train_loss 0.27660 val_loss 1.26043 val_mae_cp 126.04 time 2.0s
+epoch 41/100 train_loss 0.27153 val_loss 1.26572 val_mae_cp 126.57 time 2.0s
+epoch 42/100 train_loss 0.26909 val_loss 1.26965 val_mae_cp 126.96 time 2.0s
+epoch 43/100 train_loss 0.26628 val_loss 1.26807 val_mae_cp 126.81 time 2.0s
+epoch 44/100 train_loss 0.26423 val_loss 1.26596 val_mae_cp 126.60 time 2.0s
+epoch 45/100 train_loss 0.26042 val_loss 1.26591 val_mae_cp 126.59 time 2.0s
+epoch 46/100 train_loss 0.25729 val_loss 1.27749 val_mae_cp 127.75 time 2.0s
+epoch 47/100 train_loss 0.25480 val_loss 1.28789 val_mae_cp 128.79 time 2.0s
+epoch 48/100 train_loss 0.25216 val_loss 1.29178 val_mae_cp 129.18 time 2.0s
+epoch 49/100 train_loss 0.24989 val_loss 1.28339 val_mae_cp 128.34 time 2.0s
+epoch 50/100 train_loss 0.24699 val_loss 1.28764 val_mae_cp 128.76 time 2.0s
+epoch 51/100 train_loss 0.24418 val_loss 1.29496 val_mae_cp 129.50 time 2.0s
+epoch 52/100 train_loss 0.24246 val_loss 1.30007 val_mae_cp 130.01 time 2.0s
+epoch 53/100 train_loss 0.24233 val_loss 1.30017 val_mae_cp 130.02 time 2.0s
+epoch 54/100 train_loss 0.24099 val_loss 1.31630 val_mae_cp 131.63 time 2.0s
+epoch 55/100 train_loss 0.23851 val_loss 1.31434 val_mae_cp 131.43 time 2.0s
+epoch 56/100 train_loss 0.23544 val_loss 1.31217 val_mae_cp 131.22 time 2.0s
+epoch 57/100 train_loss 0.23327 val_loss 1.30750 val_mae_cp 130.75 time 2.0s
+epoch 58/100 train_loss 0.23138 val_loss 1.30819 val_mae_cp 130.82 time 2.0s
+epoch 59/100 train_loss 0.23028 val_loss 1.31545 val_mae_cp 131.54 time 2.0s
+epoch 60/100 train_loss 0.22850 val_loss 1.32003 val_mae_cp 132.00 time 2.0s
+epoch 61/100 train_loss 0.22703 val_loss 1.31531 val_mae_cp 131.53 time 2.0s
+epoch 62/100 train_loss 0.22549 val_loss 1.31176 val_mae_cp 131.18 time 2.0s
+epoch 63/100 train_loss 0.22404 val_loss 1.30852 val_mae_cp 130.85 time 2.0s
+epoch 64/100 train_loss 0.22278 val_loss 1.30835 val_mae_cp 130.84 time 2.0s
+epoch 65/100 train_loss 0.22131 val_loss 1.30455 val_mae_cp 130.46 time 2.0s
+epoch 66/100 train_loss 0.22001 val_loss 1.30164 val_mae_cp 130.16 time 2.0s
+epoch 67/100 train_loss 0.21878 val_loss 1.30068 val_mae_cp 130.07 time 2.0s
+epoch 68/100 train_loss 0.21802 val_loss 1.30274 val_mae_cp 130.27 time 2.0s
+epoch 69/100 train_loss 0.21735 val_loss 1.30660 val_mae_cp 130.66 time 2.0s
+epoch 70/100 train_loss 0.21651 val_loss 1.30972 val_mae_cp 130.97 time 2.0s
+epoch 71/100 train_loss 0.21608 val_loss 1.31268 val_mae_cp 131.27 time 2.0s
+epoch 72/100 train_loss 0.21586 val_loss 1.31347 val_mae_cp 131.35 time 2.0s
+epoch 73/100 train_loss 0.21522 val_loss 1.31509 val_mae_cp 131.51 time 2.0s
+epoch 74/100 train_loss 0.21516 val_loss 1.31252 val_mae_cp 131.25 time 2.0s
+epoch 75/100 train_loss 0.21389 val_loss 1.31324 val_mae_cp 131.32 time 2.0s
+epoch 76/100 train_loss 0.21236 val_loss 1.31745 val_mae_cp 131.74 time 2.0s
+epoch 77/100 train_loss 0.21127 val_loss 1.31975 val_mae_cp 131.97 time 2.0s
+epoch 78/100 train_loss 0.21026 val_loss 1.32030 val_mae_cp 132.03 time 2.0s
+epoch 79/100 train_loss 0.20928 val_loss 1.32001 val_mae_cp 132.00 time 2.0s
+epoch 80/100 train_loss 0.20844 val_loss 1.31782 val_mae_cp 131.78 time 2.0s
+epoch 81/100 train_loss 0.20767 val_loss 1.31569 val_mae_cp 131.57 time 2.0s
+epoch 82/100 train_loss 0.20698 val_loss 1.31439 val_mae_cp 131.44 time 2.0s
+epoch 83/100 train_loss 0.20635 val_loss 1.31439 val_mae_cp 131.44 time 2.0s
+epoch 84/100 train_loss 0.20580 val_loss 1.31510 val_mae_cp 131.51 time 2.0s
+epoch 85/100 train_loss 0.20537 val_loss 1.31561 val_mae_cp 131.56 time 2.0s
+epoch 86/100 train_loss 0.20503 val_loss 1.31600 val_mae_cp 131.60 time 2.0s
+epoch 87/100 train_loss 0.20477 val_loss 1.31628 val_mae_cp 131.63 time 2.0s
+epoch 88/100 train_loss 0.20458 val_loss 1.31658 val_mae_cp 131.66 time 2.0s
+epoch 89/100 train_loss 0.20442 val_loss 1.31687 val_mae_cp 131.69 time 2.0s
+epoch 90/100 train_loss 0.20430 val_loss 1.31710 val_mae_cp 131.71 time 2.0s
+epoch 91/100 train_loss 0.20419 val_loss 1.31743 val_mae_cp 131.74 time 2.0s
+epoch 92/100 train_loss 0.20411 val_loss 1.31757 val_mae_cp 131.76 time 2.0s
+epoch 93/100 train_loss 0.20405 val_loss 1.31764 val_mae_cp 131.76 time 2.0s
+epoch 94/100 train_loss 0.20401 val_loss 1.31779 val_mae_cp 131.78 time 2.0s
+epoch 95/100 train_loss 0.20397 val_loss 1.31793 val_mae_cp 131.79 time 2.0s
+epoch 96/100 train_loss 0.20394 val_loss 1.31804 val_mae_cp 131.80 time 2.0s
+epoch 97/100 train_loss 0.20392 val_loss 1.31807 val_mae_cp 131.81 time 2.0s
+epoch 98/100 train_loss 0.20390 val_loss 1.31809 val_mae_cp 131.81 time 2.0s
+epoch 99/100 train_loss 0.20389 val_loss 1.31810 val_mae_cp 131.81 time 2.0s
+epoch 100/100 train_loss 0.20389 val_loss 1.31811 val_mae_cp 131.81 time 2.0s
+quantization v5 s1=6 s_l1=6 k3=4 val_mae_cp 133.02 saturation 0.0000
+quantization v5 s1=6 s_l1=6 k3=5 val_mae_cp 133.71 saturation 0.0000
+quantization v5 s1=6 s_l1=6 k3=6 val_mae_cp 133.40 saturation 0.0078
+quantization v5 s1=6 s_l1=6 k3=7 val_mae_cp 132.10 saturation 0.8047
+quantization v5 s1=6 s_l1=6 k3=8 val_mae_cp 124.26 saturation 0.9922
+quantization v5 s1=6 s_l1=7 k3=4 val_mae_cp 126.41 saturation 0.0000
+quantization v5 s1=6 s_l1=7 k3=5 val_mae_cp 126.46 saturation 0.0000
+quantization v5 s1=6 s_l1=7 k3=6 val_mae_cp 126.38 saturation 0.0078
+quantization v5 s1=6 s_l1=7 k3=7 val_mae_cp 125.09 saturation 0.8047
+quantization v5 s1=6 s_l1=7 k3=8 val_mae_cp 121.71 saturation 0.9922
+quantization v5 s1=6 s_l1=8 k3=4 val_mae_cp 126.08 saturation 0.0000
+quantization v5 s1=6 s_l1=8 k3=5 val_mae_cp 126.13 saturation 0.0000
+quantization v5 s1=6 s_l1=8 k3=6 val_mae_cp 126.03 saturation 0.0078
+quantization v5 s1=6 s_l1=8 k3=7 val_mae_cp 125.16 saturation 0.8047
+quantization v5 s1=6 s_l1=8 k3=8 val_mae_cp 121.99 saturation 0.9922
+quantization v5 s1=7 s_l1=6 k3=4 val_mae_cp 148.69 saturation 0.0000
+quantization v5 s1=7 s_l1=6 k3=5 val_mae_cp 148.76 saturation 0.0000
+quantization v5 s1=7 s_l1=6 k3=6 val_mae_cp 148.62 saturation 0.0078
+quantization v5 s1=7 s_l1=6 k3=7 val_mae_cp 142.19 saturation 0.8047
+quantization v5 s1=7 s_l1=6 k3=8 val_mae_cp 126.19 saturation 0.9922
+quantization v5 s1=7 s_l1=7 k3=4 val_mae_cp 141.56 saturation 0.0000
+quantization v5 s1=7 s_l1=7 k3=5 val_mae_cp 140.59 saturation 0.0000
+quantization v5 s1=7 s_l1=7 k3=6 val_mae_cp 140.76 saturation 0.0078
+quantization v5 s1=7 s_l1=7 k3=7 val_mae_cp 133.17 saturation 0.8047
+quantization v5 s1=7 s_l1=7 k3=8 val_mae_cp 122.86 saturation 0.9922
+quantization v5 s1=7 s_l1=8 k3=4 val_mae_cp 137.18 saturation 0.0000
+quantization v5 s1=7 s_l1=8 k3=5 val_mae_cp 136.22 saturation 0.0000
+quantization v5 s1=7 s_l1=8 k3=6 val_mae_cp 136.39 saturation 0.0078
+quantization v5 s1=7 s_l1=8 k3=7 val_mae_cp 131.04 saturation 0.8047
+quantization v5 s1=7 s_l1=8 k3=8 val_mae_cp 122.46 saturation 0.9922
+quantization v5 s1=8 s_l1=6 k3=4 val_mae_cp 168.45 saturation 0.0000
+quantization v5 s1=8 s_l1=6 k3=5 val_mae_cp 168.63 saturation 0.0000
+quantization v5 s1=8 s_l1=6 k3=6 val_mae_cp 168.48 saturation 0.0078
+quantization v5 s1=8 s_l1=6 k3=7 val_mae_cp 157.90 saturation 0.8047
+quantization v5 s1=8 s_l1=6 k3=8 val_mae_cp 132.66 saturation 0.9922
+quantization v5 s1=8 s_l1=7 k3=4 val_mae_cp 158.42 saturation 0.0000
+quantization v5 s1=8 s_l1=7 k3=5 val_mae_cp 157.93 saturation 0.0000
+quantization v5 s1=8 s_l1=7 k3=6 val_mae_cp 157.95 saturation 0.0078
+quantization v5 s1=8 s_l1=7 k3=7 val_mae_cp 146.96 saturation 0.8047
+quantization v5 s1=8 s_l1=7 k3=8 val_mae_cp 128.15 saturation 0.9922
+quantization v5 s1=8 s_l1=8 k3=4 val_mae_cp 151.50 saturation 0.0000
+quantization v5 s1=8 s_l1=8 k3=5 val_mae_cp 150.94 saturation 0.0000
+quantization v5 s1=8 s_l1=8 k3=6 val_mae_cp 150.93 saturation 0.0078
+quantization v5 s1=8 s_l1=8 k3=7 val_mae_cp 142.09 saturation 0.8047
+quantization v5 s1=8 s_l1=8 k3=8 val_mae_cp 126.59 saturation 0.9922
+selected v5 s1=6 s_l1=8 k3=4 val_mae_cp 126.08
+wrote artifacts\training\koi-ex-tiny\ex2.nnue (18879835 bytes) and artifacts\training\koi-ex-tiny\ex2.metadata.json
+EX2-EXIT 0 

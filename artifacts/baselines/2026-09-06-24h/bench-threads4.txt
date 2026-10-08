@@ -1,0 +1,34 @@
+Koi benchmark
+config threads 4 speed 100 timed 1 hash cold
+position mate_in_one depth 2 nodes 93 qnodes 195 tt_hits 0 score 99999 expected f7e8 move f7e8 match 1 elapsed_ms 2 nps 144000
+position mate_02 depth 2 nodes 696 qnodes 4131 tt_hits 7 score 99999 expected f7g7 move a1a8 match 1 elapsed_ms 15 nps 321800
+position mate_03 depth 2 nodes 442 qnodes 1965 tt_hits 0 score 99999 expected f5f8 move f5c8 match 1 elapsed_ms 7 nps 343857
+position mate_04 depth 2 nodes 330 qnodes 2496 tt_hits 0 score 99999 expected e2e8 move e2e8 match 1 elapsed_ms 9 nps 314000
+position mate_05 depth 2 nodes 443 qnodes 2900 tt_hits 0 score 99999 expected e7b7 move e7b7 match 1 elapsed_ms 9 nps 371444
+position mate_06 depth 2 nodes 290 qnodes 1071 tt_hits 0 score 99999 expected f1f8 move f1f8 match 1 elapsed_ms 5 nps 272200
+position black_mate depth 2 nodes 94 qnodes 196 tt_hits 0 score 99999 expected c2a2 move c2a2 match 1 elapsed_ms 2 nps 145000
+position check_01 depth 2 nodes 443 qnodes 2883 tt_hits 1 score 99999 expected e2e7 move e2e7 match 1 elapsed_ms 13 nps 255846
+position check_02 depth 2 nodes 1320 qnodes 8153 tt_hits 5 score 1608 expected d2d7 move d2d7 match 1 elapsed_ms 34 nps 278617
+position check_03 depth 2 nodes 951 qnodes 8455 tt_hits 2 score 364 expected f2f7 move f2e3 match 1 elapsed_ms 30 nps 313533
+position check_04 depth 2 nodes 376 qnodes 1543 tt_hits 1 score 1616 expected d2d7 move d2d7 match 1 elapsed_ms 8 nps 239875
+position check_05 depth 2 nodes 394 qnodes 3194 tt_hits 0 score 0 expected c2c7 move c2c7 match 1 elapsed_ms 14 nps 256285
+position check_06 depth 2 nodes 132 qnodes 199 tt_hits 0 score 184 expected b2g7 move b2g7 match 1 elapsed_ms 1 nps 331000
+position check_07 depth 2 nodes 318 qnodes 2916 tt_hits 0 score 0 expected d5f6 move d5f6 match 1 elapsed_ms 11 nps 294000
+position evasion_01 depth 2 nodes 351 qnodes 685 tt_hits 8 score -405 expected e1d2 move e1d2 match 1 elapsed_ms 4 nps 259000
+position evasion_02 depth 2 nodes 248 qnodes 422 tt_hits 20 score -116 expected h1g2 move h1g2 match 1 elapsed_ms 4 nps 167500
+position evasion_03 depth 2 nodes 284 qnodes 286 tt_hits 6 score -239 expected e1f2 move e1e2 match 1 elapsed_ms 3 nps 190000
+position evasion_04 depth 2 nodes 977 qnodes 6413 tt_hits 31 score -1222 expected e1d1 move e1d2 match 1 elapsed_ms 28 nps 263928
+position evasion_05 depth 2 nodes 304 qnodes 801 tt_hits 10 score -187 expected a1b2 move a1b2 match 1 elapsed_ms 5 nps 221000
+position evasion_06 depth 2 nodes 313 qnodes 367 tt_hits 8 score 29 expected e4f3 move e4f4 match 1 elapsed_ms 2 nps 340000
+position evasion_07 depth 2 nodes 256 qnodes 616 tt_hits 5 score -563 expected d1c2 move d1e2 match 1 elapsed_ms 3 nps 290666
+position fork depth 3 nodes 2461 qnodes 10464 tt_hits 72 score 0 expected c3d5 move c3d5 match 1 elapsed_ms 42 nps 307738
+position fork_02 depth 3 nodes 3930 qnodes 20586 tt_hits 47 score -979 expected e4d6 move e4d6 match 1 elapsed_ms 85 nps 288423
+position fork_03 depth 3 nodes 6115 qnodes 32606 tt_hits 139 score -306 expected f3e5 move f3e5 match 1 elapsed_ms 197 nps 196553
+position fork_04 depth 3 nodes 7736 qnodes 30232 tt_hits 86 score 243 expected b3d4 move b3d4 match 1 elapsed_ms 136 nps 279176
+position fork_05 depth 3 nodes 4289 qnodes 22935 tt_hits 30 score -642 expected g3f5 move g3f5 match 1 elapsed_ms 89 nps 305887
+position fork_06 depth 3 nodes 4557 qnodes 25550 tt_hits 37 score -99994 expected c3d5 move c3d5 match 1 elapsed_ms 116 nps 259543
+position fork_07 depth 3 nodes 2174 qnodes 13021 tt_hits 28 score -456 expected h3f4 move h3f4 match 1 elapsed_ms 51 nps 297941
+position pinned_queen depth 2 nodes 368 qnodes 1643 tt_hits 0 score 1004 expected e1e7 move e1e7 match 1 elapsed_ms 5 nps 402200
+position pin_02 depth 2 nodes 178 qnodes 318 tt_hits 0 score 0 expected a1a7 move a1a7 match 1 elapsed_ms 1 nps 496000
+position pin_03 depth 2 nodes 83 qnodes 223 tt_hits 0 score 0 expected b1g6 move b1g6 match 1 elapsed_ms 2 nps 153000
+position pin_04 depth 2 nodes 44 qnodes 51 tt_hits 0 score 0 expected h1b7 move h1b7 match 1 elapsed_ms 1 nps 95000

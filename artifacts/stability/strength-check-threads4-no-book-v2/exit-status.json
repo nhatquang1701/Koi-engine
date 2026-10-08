@@ -1,0 +1,9 @@
+{
+  "schema": "koi-cutechess-stability-exit-v1",
+  "process_id": 20200,
+  "exit_code": 0,
+  "timed_out": false,
+  "start_error": null,
+  "termination_classification": "completed",
+  "generated_utc": "2026-09-10T06:15:43.5631493Z"
+}

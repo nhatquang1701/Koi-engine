@@ -1,0 +1,18 @@
+{
+  "depth_sweep": "2..5",
+  "runs": 5,
+  "max_total_nps_regression_percent": 2.0,
+  "gate_script_sha256": "B743DD45DC5409A2073ACD11602934E740925C57992222B4596211D12BF3F15E",
+  "candidate_exe_sha256": "A1BC754EDD280E6F8BABA9E21632D17E5A7BBFC274DB29A0306CCA50AFDB2689",
+  "source_revision": "68e4f2ec3b8bee7b7d068bbb503d7b83a36fd276",
+  "max_row_nps_regression_percent": 2.0,
+  "baseline_exe_sha256": "6B9104FE0EA71011C6E742A228177A82963131D78BA9A8D868745ACD4B0C70BD",
+  "fen_file": "artifacts\\verification\\speed-gate\\occupancy-accessor-20261001-sparse-depth2-5\\sparse-qsearch-fens.txt",
+  "fen_sha256": "07855F78D6544FD4D9ED8E6000FDA3B279208AFC608F389569D85DE3026D930C",
+  "baseline_exe": "build\\roadmap-lmp-baseline-release\\koi-bench.exe",
+  "min_row_elapsed_ms": 20.0,
+  "candidate": "occupancy accessor: native_move_gives_check reuses maintained state.occupied",
+  "threads": 1,
+  "speed": 100,
+  "candidate_exe": "build\\roadmap-visit-win-release\\koi-bench.exe"
+}

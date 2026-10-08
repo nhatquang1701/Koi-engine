@@ -1,0 +1,78 @@
+output_directory=/Users/quangnn/koi-engine/artifacts/verification/speed-gate/batch8-macos-20261006
+baseline_executable=/Users/quangnn/koi-b8-baseline-release/koi-bench
+candidate_executable=/Users/quangnn/koi-engine/build/release/koi-bench
+runs=5 threads=1 speed=100 timed=1 fen-file=/Users/quangnn/koi-run/sparse-qsearch-fens.txt depth-sweep=2..5
+nps_regression_limit=2,00% row_nps_regression_limit=2,00% min_row_elapsed_ms=20,0
+run=1 baseline_nps=1.291.783 candidate_nps=1.325.941 order=baseline,candidate
+run=2 baseline_nps=1.281.198 candidate_nps=1.314.777 order=candidate,baseline
+run=3 baseline_nps=1.287.963 candidate_nps=1.323.720 order=baseline,candidate
+run=4 baseline_nps=1.284.823 candidate_nps=1.314.245 order=candidate,baseline
+run=5 baseline_nps=1.290.536 candidate_nps=1.320.753 order=baseline,candidate
+baseline_total_nps=1.287.963 candidate_total_nps=1.320.753 delta=2,55%
+median_row_nps_delta=1,20% excluded_noise_rows=22
+row=fen-001#2 baseline_nps=1843000 candidate_nps=1843000 nps_delta=0,00% baseline_ms=2 candidate_ms=2
+row=fen-001#3 baseline_nps=1443000 candidate_nps=1443000 nps_delta=0,00% baseline_ms=70 candidate_ms=70
+row=fen-001#4 baseline_nps=1569365 candidate_nps=1573221 nps_delta=0,25% baseline_ms=408 candidate_ms=407
+row=fen-001#5 baseline_nps=1529814 candidate_nps=1538866 nps_delta=0,59% baseline_ms=5610 candidate_ms=5577
+row=fen-002#2 baseline_nps=1545000 candidate_nps=1545000 nps_delta=0,00% baseline_ms=1 candidate_ms=1
+row=fen-002#3 baseline_nps=1762956 candidate_nps=1762956 nps_delta=0,00% baseline_ms=23 candidate_ms=23
+row=fen-002#4 baseline_nps=1733792 candidate_nps=1750304 nps_delta=0,95% baseline_ms=106 candidate_ms=105
+row=fen-002#5 baseline_nps=1638781 candidate_nps=1650960 nps_delta=0,74% baseline_ms=1220 candidate_ms=1211
+row=fen-003#2 baseline_nps=1292 candidate_nps=1292 nps_delta=0,00% baseline_ms=0 candidate_ms=0
+row=fen-003#3 baseline_nps=1838833 candidate_nps=1838833 nps_delta=0,00% baseline_ms=24 candidate_ms=24
+row=fen-003#4 baseline_nps=1518902 candidate_nps=1558873 nps_delta=2,63% baseline_ms=195 candidate_ms=190
+row=fen-003#5 baseline_nps=1805110 candidate_nps=1840704 nps_delta=1,97% baseline_ms=362 candidate_ms=355
+row=fen-004#2 baseline_nps=340 candidate_nps=340 nps_delta=0,00% baseline_ms=0 candidate_ms=0
+row=fen-004#3 baseline_nps=2234000 candidate_nps=2234000 nps_delta=0,00% baseline_ms=12 candidate_ms=12
+row=fen-004#4 baseline_nps=1693977 candidate_nps=1733372 nps_delta=2,33% baseline_ms=176 candidate_ms=172
+row=fen-004#5 baseline_nps=1920421 candidate_nps=1940472 nps_delta=1,04% baseline_ms=871 candidate_ms=862
+row=fen-005#2 baseline_nps=2091000 candidate_nps=2091000 nps_delta=0,00% baseline_ms=12 candidate_ms=12
+row=fen-005#3 baseline_nps=1977914 candidate_nps=1998096 nps_delta=1,02% baseline_ms=198 candidate_ms=196
+row=fen-005#4 baseline_nps=2170050 candidate_nps=2176128 nps_delta=0,28% baseline_ms=358 candidate_ms=357
+row=fen-005#5 baseline_nps=1970246 candidate_nps=1976279 nps_delta=0,31% baseline_ms=7535 candidate_ms=7512
+row=fen-006#2 baseline_nps=255 candidate_nps=255 nps_delta=0,00% baseline_ms=0 candidate_ms=0
+row=fen-006#3 baseline_nps=1598000 candidate_nps=1598000 nps_delta=0,00% baseline_ms=3 candidate_ms=3
+row=fen-006#4 baseline_nps=1694645 candidate_nps=1722426 nps_delta=1,64% baseline_ms=62 candidate_ms=61
+row=fen-006#5 baseline_nps=1549855 candidate_nps=1564285 nps_delta=0,93% baseline_ms=1084 candidate_ms=1074
+row=fen-007#2 baseline_nps=2124000 candidate_nps=2124000 nps_delta=0,00% baseline_ms=1 candidate_ms=1
+row=fen-007#3 baseline_nps=1783531 candidate_nps=1841064 nps_delta=3,23% baseline_ms=32 candidate_ms=31
+row=fen-007#4 baseline_nps=1654796 candidate_nps=1687658 nps_delta=1,99% baseline_ms=719 candidate_ms=705
+row=fen-007#5 baseline_nps=1739041 candidate_nps=1766415 nps_delta=1,57% baseline_ms=1097 candidate_ms=1080
+row=fen-008#2 baseline_nps=1047 candidate_nps=1047 nps_delta=0,00% baseline_ms=0 candidate_ms=0
+row=fen-008#3 baseline_nps=2116642 candidate_nps=2279461 nps_delta=7,69% baseline_ms=14 candidate_ms=13
+row=fen-008#4 baseline_nps=2032194 candidate_nps=2042510 nps_delta=0,51% baseline_ms=396 candidate_ms=394
+row=fen-008#5 baseline_nps=2212933 candidate_nps=2221929 nps_delta=0,41% baseline_ms=741 candidate_ms=738
+row=fen-009#2 baseline_nps=268 candidate_nps=268 nps_delta=0,00% baseline_ms=0 candidate_ms=0
+row=fen-009#3 baseline_nps=1830600 candidate_nps=2034000 nps_delta=11,11% baseline_ms=10 candidate_ms=9
+row=fen-009#4 baseline_nps=1944326 candidate_nps=1944326 nps_delta=0,00% baseline_ms=46 candidate_ms=46
+row=fen-009#5 baseline_nps=1738512 candidate_nps=1752762 nps_delta=0,82% baseline_ms=123 candidate_ms=122
+row=fen-010#2 baseline_nps=1246000 candidate_nps=1246000 nps_delta=0,00% baseline_ms=2 candidate_ms=2
+row=fen-010#3 baseline_nps=1377581 candidate_nps=1410380 nps_delta=2,38% baseline_ms=43 candidate_ms=42
+row=fen-010#4 baseline_nps=1468451 candidate_nps=1498666 nps_delta=2,06% baseline_ms=248 candidate_ms=243
+row=fen-010#5 baseline_nps=1326479 candidate_nps=1352945 nps_delta=2,00% baseline_ms=2556 candidate_ms=2506
+row=fen-011#2 baseline_nps=1637615 candidate_nps=1637615 nps_delta=0,00% baseline_ms=13 candidate_ms=13
+row=fen-011#3 baseline_nps=1515666 candidate_nps=1537014 nps_delta=1,41% baseline_ms=216 candidate_ms=213
+row=fen-011#4 baseline_nps=1714904 candidate_nps=1734447 nps_delta=1,14% baseline_ms=355 candidate_ms=351
+row=fen-011#5 baseline_nps=1638065 candidate_nps=1662037 nps_delta=1,46% baseline_ms=1248 candidate_ms=1230
+row=fen-012#2 baseline_nps=804 candidate_nps=804 nps_delta=0,00% baseline_ms=0 candidate_ms=0
+row=fen-012#3 baseline_nps=1855250 candidate_nps=1855250 nps_delta=0,00% baseline_ms=8 candidate_ms=8
+row=fen-012#4 baseline_nps=1673950 candidate_nps=1695139 nps_delta=1,27% baseline_ms=80 candidate_ms=79
+row=fen-012#5 baseline_nps=1753237 candidate_nps=1765760 nps_delta=0,71% baseline_ms=564 candidate_ms=560
+row=fen-013#2 baseline_nps=1922500 candidate_nps=1922500 nps_delta=0,00% baseline_ms=2 candidate_ms=2
+row=fen-013#3 baseline_nps=1480490 candidate_nps=1542177 nps_delta=4,17% baseline_ms=100 candidate_ms=96
+row=fen-013#4 baseline_nps=1442794 candidate_nps=1482983 nps_delta=2,79% baseline_ms=1845 candidate_ms=1795
+row=fen-013#5 baseline_nps=1629903 candidate_nps=1675441 nps_delta=2,79% baseline_ms=24761 candidate_ms=24088
+row=fen-014#2 baseline_nps=1462000 candidate_nps=1462000 nps_delta=0,00% baseline_ms=1 candidate_ms=1
+row=fen-014#3 baseline_nps=1570200 candidate_nps=1570200 nps_delta=0,00% baseline_ms=20 candidate_ms=20
+row=fen-014#4 baseline_nps=1571258 candidate_nps=1583298 nps_delta=0,77% baseline_ms=263 candidate_ms=261
+row=fen-014#5 baseline_nps=1476037 candidate_nps=1498745 nps_delta=1,54% baseline_ms=1914 candidate_ms=1885
+row=fen-015#2 baseline_nps=1261272 candidate_nps=1261272 nps_delta=0,00% baseline_ms=11 candidate_ms=11
+row=fen-015#3 baseline_nps=1296188 candidate_nps=1317437 nps_delta=1,64% baseline_ms=186 candidate_ms=183
+row=fen-015#4 baseline_nps=1286408 candidate_nps=1326422 nps_delta=3,11% baseline_ms=3779 candidate_ms=3665
+row=fen-015#5 baseline_nps=1103467 candidate_nps=1135601 nps_delta=2,91% baseline_ms=117396 candidate_ms=114074
+row=fen-016#2 baseline_nps=465 candidate_nps=465 nps_delta=0,00% baseline_ms=0 candidate_ms=0
+row=fen-016#3 baseline_nps=1833058 candidate_nps=1833058 nps_delta=0,00% baseline_ms=17 candidate_ms=17
+row=fen-016#4 baseline_nps=1694290 candidate_nps=1712706 nps_delta=1,09% baseline_ms=186 candidate_ms=184
+row=fen-016#5 baseline_nps=1435849 candidate_nps=1463011 nps_delta=1,89% baseline_ms=4309 candidate_ms=4229
+summary=/Users/quangnn/koi-engine/artifacts/verification/speed-gate/batch8-macos-20261006/speed-gate.json
+result=PASS

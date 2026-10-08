@@ -1,0 +1,46 @@
+{
+  "schema": "koi-current-release-profile-provenance-v1",
+  "created_utc": "2026-09-29T15:48:26.9571846Z",
+  "source_revision": "b40feb1c8447e4e8c56589409f9a5ccb47e3edfd",
+  "build_tree": "build/roadmap-visit-win-release",
+  "engine_path": "build/roadmap-visit-win-release/koi-engine.exe",
+  "engine_sha256": "47f336676e2d201383b49436ed6a318403d864debaf366f5fceee27991ca6594",
+  "koi_bench_path": "build/roadmap-visit-win-release/koi-bench.exe",
+  "koi_bench_sha256": "492f4040bfbdc69037d680f1d35809670cade6071e37650bd2b22c9ab0eda144",
+  "options": {
+    "suite": "strength",
+    "threads": [
+      1,
+      4
+    ],
+    "speed": 100,
+    "hash_mb": 512,
+    "hash_state": "warm",
+    "node_limit": 20000,
+    "timed": true,
+    "warmup": 1,
+    "repeat": 5
+  },
+  "profiles": [
+    {
+      "threads": 1,
+      "profile_path": "artifacts/verification/profiles/roadmap-current-release-20260929-224750/threads1-profile.json",
+      "profile_sha256": "eec35641c359125e8006a97a6cccd77399f8d3c3199dd01fb52c78f804187ef5",
+      "positions": 64,
+      "main_nodes": 105615.0,
+      "qnodes": 996056.0,
+      "elapsed_ms": 2738.0,
+      "visited_nps": 402363.0
+    },
+    {
+      "threads": 4,
+      "profile_path": "artifacts/verification/profiles/roadmap-current-release-20260929-224750/threads4-profile.json",
+      "profile_sha256": "a376a043ba1fe1435c128353aba51dcbee7b178d25b26fa85e8ef818f0175805",
+      "positions": 64,
+      "main_nodes": 107151.0,
+      "qnodes": 994520.0,
+      "elapsed_ms": 2783.0,
+      "visited_nps": 395857.0
+    }
+  ]
+}

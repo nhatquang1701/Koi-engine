@@ -1,0 +1,30 @@
+perf(search): pack the picker stage sort key and refresh one colour of king masks
+
+- detail/search_ordering.hpp/.cpp: SearchMovePicker::Candidate now carries a
+  single packed std::uint64_t sort_key instead of the separate priority
+  tie-break fields. The high half is the offset-binary complement of the
+  priority (ascending key == priority descending) and the low half is the
+  move tie-break, so ascending std::sort reproduces the old three-key
+  comparator exactly. move_tie_break_key is injective for distinct legal
+  moves, so the third key (source_index) was unreachable; the counting
+  partition and per-stage sort are otherwise unchanged.
+- position.cpp: refresh_king_masks now recomputes checkers/pinned for the
+  side to move only (the colour after the flip). A full reader inventory
+  shows every interpreted read of those masks indexes state.side
+  (resolve_move_legality, legal_moves, legal_moves_into_impl,
+  has_legal_move); snapshot/restore still copy both arrays, so unmake
+  reinstates exact values for the side it restores. The off-turn colour's
+  masks are unspecified until it becomes side to move, documented in the
+  function comment.
+- Position::copy_board_to / GameState::copy_board_to: a single block copy of
+  the 64-square board now feeds the SEE exchange contexts
+  (detail/static_exchange.hpp), replacing 64 per-square accessor calls.
+- Candidate "defer quiet priority computation" from the batch-4 recon was
+  dropped: ordering_.priority() reads the live search ordering tables that
+  completed child searches mutate before the quiet stage, so deferring it
+  would change good/bad-quiet splits and node counts. It is not
+  bit-identical and needs a match gate, not a speed gate.
+
+Local verification before the gate: the candidate full build reaches 292/292 targets; the 18-target ctest suite passes 18/18 (exit 0) with TMP/TEMP redirected to build\koi-test-temp.
+
+Speed gate against the isolated 0288b2d baseline: PASS (+6.58% total NPS, +6.57% median row NPS; 5 runs, depth sweep 2..5, 14 noise rows excluded).

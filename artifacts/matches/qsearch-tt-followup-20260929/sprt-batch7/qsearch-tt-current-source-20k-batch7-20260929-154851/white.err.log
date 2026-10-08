@@ -1,0 +1,6 @@
+Exception: C:\Users\ntATh\AI test\Koi engine\tools\stability\uci_match.ps1:385
+Line |
+ 385 |          throw "${Label} executable is missing: $Path"
+     |          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     | koi-replay executable is missing: C:\Users\ntATh\AI test\Koi
+     | engine\artifacts\verification\qsearch-tt-followup-20260929\koi-replay.exe

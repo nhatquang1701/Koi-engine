@@ -1,0 +1,17 @@
+**********************************************************************
+** Visual Studio 2022 Developer Command Prompt v17.14.39
+** Copyright (c) 2025 Microsoft Corporation
+**********************************************************************
+-- KOI_BUILD_MODULES=OFF: skipping the C++26 module interface (MSVC 19.44.35228.0)
+-- Configuring done (1.9s)
+-- Generating done (0.4s)
+-- Build files have been written to: C:/Users/ntATh/AI test/Koi engine/build/full-release-search
+[1/42] Generating CXX dyndep file CMakeFiles\koi_cpu_features.dir\CXX.dd
+[2/41] Generating CXX dyndep file CMakeFiles\koi_search_tests.dir\CXX.dd
+[3/40] Scanning "C:\Users\ntATh\AI test\Koi engine\src\koi\detail\search_runner.cpp" for CXX dependencies
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[4/40] Generating CXX dyndep file CMakeFiles\koi_core.dir\CXX.dd
+[5/7] Building CXX object CMakeFiles\koi_core.dir\src\koi\detail\search_runner.cpp.obj
+cl : Command line warning D9025 : overriding '/Ob2' with '/Ob3'
+[6/7] Linking CXX static library koi_core.lib
+[7/7] Linking CXX executable koi_search_tests.exe

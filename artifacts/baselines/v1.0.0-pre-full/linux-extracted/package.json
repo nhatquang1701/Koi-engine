@@ -1,0 +1,71 @@
+{
+  "schema": "koi-engine-package-v1",
+  "version": "1.0.0",
+  "platform": "linux-x86_64",
+  "build_configuration": "Release",
+  "files": [
+    {
+      "path": "INSTALL.txt",
+      "size_bytes": 1037,
+      "sha256": "4865a2fe8af2873a77b2ef4a6caf8008bdd14bd3ae4594cdfa1778826d1270b8"
+    },
+    {
+      "path": "koi-bench",
+      "size_bytes": 2565496,
+      "sha256": "fc2d65cc1e96aa6e35b6802e75bac9c94dbc18ce2ad67679cc9d658f25229f2d"
+    },
+    {
+      "path": "koi-engine",
+      "size_bytes": 2739648,
+      "sha256": "93f3bd7086c1f438aace17d5364c1f5b98f18a46c31b68af9b7b32a10908350d"
+    },
+    {
+      "path": "koi-engine-avx2",
+      "size_bytes": 2756640,
+      "sha256": "2a3d87414e00af0f70c82b942017c77d8ac4bc43d9e73ccf2c277da104642d35"
+    },
+    {
+      "path": "koi-engine-avx512",
+      "size_bytes": 2756176,
+      "sha256": "8b459e4237a9a17564e1526c4ee56439bc5efde7089cc098b85c48a03e474a52"
+    },
+    {
+      "path": "koi-perft",
+      "size_bytes": 1605856,
+      "sha256": "d18c09db90a989f6904f26fcf1e03901365da886ccee91c3fdf1dcddbc31b7d3"
+    },
+    {
+      "path": "koi-replay",
+      "size_bytes": 1750792,
+      "sha256": "53a25af7f90501541b774860f037cbd79acbf7623bbe7afebe1b95218d51c87a"
+    },
+    {
+      "path": "LICENSE",
+      "size_bytes": 1070,
+      "sha256": "2e26537072260b406f64291497ec3c11bd08dbeb8a0c47dc65a5bc71ed919885"
+    },
+    {
+      "path": "licenses/chess-library-MIT.txt",
+      "size_bytes": 1066,
+      "sha256": "5860e7607afbf4c7e91bad5549b71d16fc4eceb90f0c671cd77a343ae7461a2a"
+    },
+    {
+      "path": "licenses/fathom-MIT.txt",
+      "size_bytes": 1149,
+      "sha256": "c8038055839bd02f995cd7d1bba19657720097f5604411a7977ebcb5b4a37759"
+    },
+    {
+      "path": "README.md",
+      "size_bytes": 59951,
+      "sha256": "8617fc114881a30d27009d87fc89838ff59a84048afeb16285e9cad1767549f7"
+    }
+  ],
+  "book_included": false,
+  "tablebases_included": false,
+  "provenance": {
+    "source_commit": "84dd8d57f62ba96315e6634be45148f5bd39fc29",
+    "source_dirty": false,
+    "source_ref": "refs/heads/koi-engine",
+    "created_utc": "2026-09-26T10:07:08Z"
+  }
+}

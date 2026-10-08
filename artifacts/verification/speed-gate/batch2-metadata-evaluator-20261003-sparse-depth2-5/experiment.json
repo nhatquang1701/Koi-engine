@@ -1,0 +1,22 @@
+﻿{
+    "schema":  "koi-speed-gate-experiment-v1",
+    "recorded_utc":  "2026-10-03T09:01:08Z",
+    "gate_script":  "tools/build/speed_gate.ps1",
+    "gate_script_sha256":  "B743DD45DC5409A2073ACD11602934E740925C57992222B4596211D12BF3F15E",
+    "baseline_exe":  "artifacts\\verification\\speed-gate\\batch2-metadata-evaluator-20261003-sparse-depth2-5/baseline/koi-bench-baseline.exe",
+    "baseline_exe_sha256":  "459192177D50B99524D9BC127EC7D12620E3FC96E0068775C377F51F1D7B76C5",
+    "candidate_exe":  "build/roadmap-visit-win-release/koi-bench.exe",
+    "candidate_exe_sha256":  "AB92C60F884461EC20DA582D78334CC4389AED1B35A2A1A1D5D6EF4759788528",
+    "source_revision":  "7bddf7c2b6bc90538a1b67226fce5f1da1c87104",
+    "baseline_note":  "isolated Release build of HEAD 7bddf7c from build/roadmap-batch2-baseline-src (BuildTools MSVC 14.44.35207, CMake 3.31.6, Ninja, modules/shadow/GPU/PGO/sanitize/static-runtime OFF)",
+    "candidate":  "Batch 2: move-metadata facts dedupe + per-list check-probe hoisting + finalize folding (game_state.cpp, position.hpp/.cpp), MoveBuffer uninitialized storage (position.cpp), classical-evaluator bitboard visits with dead-code removal (classical_evaluator.cpp)",
+    "fen_file":  "artifacts\\verification\\speed-gate\\batch2-metadata-evaluator-20261003-sparse-depth2-5/sparse-qsearch-fens.txt",
+    "fen_sha256":  "07855F78D6544FD4D9ED8E6000FDA3B279208AFC608F389569D85DE3026D930C",
+    "threads":  1,
+    "speed":  100,
+    "depth_sweep":  "2..5",
+    "runs":  5,
+    "max_total_nps_regression_percent":  2,
+    "max_row_nps_regression_percent":  2,
+    "min_row_elapsed_ms":  20
+}

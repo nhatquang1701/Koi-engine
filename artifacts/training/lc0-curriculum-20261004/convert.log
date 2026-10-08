@@ -1,0 +1,4 @@
+[00:20:05] 100000 rows written
+[00:20:11] 200000 rows written
+[00:20:15] done: total=320000 written=266068 skipped_cp=53830 skipped_dup=31 bad=71
+EXITCODE 0 

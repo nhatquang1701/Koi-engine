@@ -1,0 +1,60 @@
+root-score c5f2 -342
+root-score a7a5 -191
+root-score a7a6 -179
+root-score a8b8 -154
+root-score c5a3 -412
+root-score c5b4 -130
+root-score c5b6 -130
+root-score c5d4 -532
+root-score c5d6 -290
+root-score c5e3 -549
+root-score c5e7 -440
+root-score c5f8 -451
+root-score c5g1 -482
+root-score c8a6 -140
+root-score c8b7 -130
+root-score c8d7 -130
+root-score c8e6 -130
+root-score c8f5 -361
+root-score c8g4 -155
+root-score c8h3 -357
+root-score d5d4 -390
+root-score d8a5 -136
+root-score d8b6 -130
+root-score d8c7 -312
+root-score d8d6 -813
+root-score d8d7 -398
+root-score d8e7 -179
+root-score e8d7 -130
+root-score e8e7 -251
+root-score e8f8 -130
+root-score e8g8 -130
+root-score f6d7 -89
+root-score f6e4 -26
+root-score f6g4 -28
+root-score f6g8 -75
+root-score f6h5 -29
+root-score g7g5 -26
+root-score g7g6 -43
+root-score h7h5 -26
+root-score h7h6 -26
+root-score h8f8 -34
+root-score h8g8 -32
+root-confirm f6e4
+root-confirm c5d4
+root-confirm c5d6
+root-confirm d8c7
+root-confirm d8d6
+root-confirm d8e7
+root-confirm f6d7
+root-confirm f6g4
+root-verification f6e4 depth 3 score -59 authoritative 0
+root-verification c5d4 depth 3 score -465 authoritative 0
+root-verification c5d6 depth 3 score -290 authoritative 0
+root-verification d8c7 depth 3 score -312 authoritative 0
+root-verification d8d6 depth 3 score -813 authoritative 0
+root-verification d8e7 depth 3 score -179 authoritative 0
+root-verification f6d7 depth 3 score -58 authoritative 0
+root-verification f6g4 depth 3 score -28 authoritative 0
+XPASS single-PV root forcing extension: known failure now passes; remove it from the known_failures list
+koi-test-summary run=1 pass=0 fail=1 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0

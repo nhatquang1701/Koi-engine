@@ -1,0 +1,65 @@
+# deterministic, no-replacement sample; seed=20260929; 2 unseen 2-ply continuations per curated root
+qsearch-italian-game-1 | e2e4 e7e5 g1f3 b8c6 f1c4 f8c5 g2g3 c5d6
+qsearch-italian-game-2 | e2e4 e7e5 g1f3 b8c6 f1c4 f8c5 f3e5 c5b6
+qsearch-ruy-lopez-1 | e2e4 e7e5 g1f3 b8c6 f1b5 a7a6 b5c6 e8e7
+qsearch-ruy-lopez-2 | e2e4 e7e5 g1f3 b8c6 f1b5 a7a6 f3d4 d7d5
+qsearch-scotch-game-1 | e2e4 e7e5 g1f3 b8c6 d2d4 e5d4 h1g1 f8b4
+qsearch-scotch-game-2 | e2e4 e7e5 g1f3 b8c6 d2d4 e5d4 a2a3 f8d6
+qsearch-four-knights-1 | e2e4 e7e5 g1f3 b8c6 b1c3 g8f6 d1e2 f6e4
+qsearch-four-knights-2 | e2e4 e7e5 g1f3 b8c6 b1c3 g8f6 f3h4 d8e7
+qsearch-kings-gambit-1 | e2e4 e7e5 f2f4 e5f4 d1e2 b8c6
+qsearch-kings-gambit-2 | e2e4 e7e5 f2f4 e5f4 g2g4 e8e7
+qsearch-vienna-game-1 | e2e4 e7e5 b1c3 d8h4 c3a4
+qsearch-vienna-game-2 | e2e4 e7e5 b1c3 b7b5 d2d3
+qsearch-ponziani-1 | e2e4 e7e5 g1f3 b8c6 c2c3 g7g5 f3h4
+qsearch-ponziani-2 | e2e4 e7e5 g1f3 b8c6 c2c3 d8g5 e1e2
+qsearch-center-game-1 | e2e4 e7e5 d2d4 e5d4 f1a6 g7g5
+qsearch-center-game-2 | e2e4 e7e5 d2d4 e5d4 g1f3 f8b4
+qsearch-french-advance-1 | e2e4 e7e6 d2d4 d7d5 e4e5 c8d7 g1f3
+qsearch-french-advance-2 | e2e4 e7e6 d2d4 d7d5 e4e5 c8d7 g2g4
+qsearch-french-exchange-1 | e2e4 e7e6 d2d4 d7d5 e4d5 g7g6 c1f4
+qsearch-french-exchange-2 | e2e4 e7e6 d2d4 d7d5 e4d5 a7a6 c2c4
+qsearch-caro-kann-advance-1 | e2e4 c7c6 d2d4 d7d5 e4e5 c8d7 c1e3
+qsearch-caro-kann-advance-2 | e2e4 c7c6 d2d4 d7d5 e4e5 a7a6 a2a3
+qsearch-caro-kann-exchange-1 | e2e4 c7c6 d2d4 d7d5 e4d5 a7a6 b1c3
+qsearch-caro-kann-exchange-2 | e2e4 c7c6 d2d4 d7d5 e4d5 h7h5 b1a3
+qsearch-sicilian-najdorf-1 | e2e4 c7c5 g1f3 d7d6 d2d4 c5d4 f3d4 g8f6 b1c3 a7a6 b2b3 f6h5
+qsearch-sicilian-najdorf-2 | e2e4 c7c5 g1f3 d7d6 d2d4 c5d4 f3d4 g8f6 b1c3 a7a6 d1d3 c8g4
+qsearch-sicilian-dragon-1 | e2e4 c7c5 g1f3 d7d6 d2d4 c5d4 f3d4 g8f6 b1c3 g7g6 c3d5 b8a6
+qsearch-sicilian-dragon-2 | e2e4 c7c5 g1f3 d7d6 d2d4 c5d4 f3d4 g8f6 b1c3 g7g6 d1d3 f6g4
+qsearch-sicilian-alapin-1 | e2e4 c7c5 c2c3 a7a5 f1b5
+qsearch-sicilian-alapin-2 | e2e4 c7c5 c2c3 d8b6 d1h5
+qsearch-sicilian-closed-1 | e2e4 c7c5 b1c3 b8c6 g2g3 f7f6 g3g4
+qsearch-sicilian-closed-2 | e2e4 c7c5 b1c3 b8c6 g2g3 c6e5 d2d3
+qsearch-queens-gambit-declined-1 | d2d4 d7d5 c2c4 e7e6 b1c3 g8f6 c1e3 b8c6
+qsearch-queens-gambit-declined-2 | d2d4 d7d5 c2c4 e7e6 b1c3 g8f6 c1h6 b7b6
+qsearch-queens-gambit-accepted-1 | d2d4 d7d5 c2c4 d5c4 f2f3 c8h3
+qsearch-queens-gambit-accepted-2 | d2d4 d7d5 c2c4 d5c4 c1g5 b7b5
+qsearch-slav-defense-1 | d2d4 d7d5 c2c4 c7c6 b1c3 g8f6 e2e4 a7a5
+qsearch-slav-defense-2 | d2d4 d7d5 c2c4 c7c6 b1c3 g8f6 c1g5 c8e6
+qsearch-london-system-1 | d2d4 d7d5 c1f4 g8f6 e2e3 b8a6 e3e4
+qsearch-london-system-2 | d2d4 d7d5 c1f4 g8f6 e2e3 h8g8 c2c4
+qsearch-kings-indian-1 | d2d4 g8f6 c2c4 g7g6 b1c3 f8g7 e2e4 b8a6 h2h3
+qsearch-kings-indian-2 | d2d4 g8f6 c2c4 g7g6 b1c3 f8g7 e2e4 f6g8 c4c5
+qsearch-grunfeld-defense-1 | d2d4 g8f6 c2c4 g7g6 b1c3 d7d5 c4c5 g6g5
+qsearch-grunfeld-defense-2 | d2d4 g8f6 c2c4 g7g6 b1c3 d7d5 h2h4 d8d7
+qsearch-nimzo-indian-1 | d2d4 g8f6 c2c4 e7e6 b1c3 f8b4 e2e3 b4a3
+qsearch-nimzo-indian-2 | d2d4 g8f6 c2c4 e7e6 b1c3 f8b4 e2e4 f6g4
+qsearch-bogo-indian-1 | d2d4 g8f6 c2c4 e7e6 g1f3 f8b4 c1d2 b8c6
+qsearch-bogo-indian-2 | d2d4 g8f6 c2c4 e7e6 g1f3 f8b4 f3d2 b4d2
+qsearch-benoni-defense-1 | d2d4 g8f6 c2c4 c7c5 d4d5 e7e6 d1d4 d7d6
+qsearch-benoni-defense-2 | d2d4 g8f6 c2c4 c7c5 d4d5 e7e6 c1d2 e8e7
+qsearch-catalan-opening-1 | d2d4 g8f6 c2c4 e7e6 g2g3 e8e7 h2h3
+qsearch-catalan-opening-2 | d2d4 g8f6 c2c4 e7e6 g2g3 b7b5 a2a3
+qsearch-english-symmetrical-1 | c2c4 c7c5 b1c3 b8c6 b2b4 d8c7
+qsearch-english-symmetrical-2 | c2c4 c7c5 b1c3 b8c6 d1b3 a7a6
+qsearch-english-four-knights-1 | c2c4 e7e5 b1c3 g8f6 g1f3 b8c6 f3d4 f8c5
+qsearch-english-four-knights-2 | c2c4 e7e5 b1c3 g8f6 g1f3 b8c6 c4c5 g7g6
+qsearch-english-reversed-sicilian-1 | c2c4 e7e5 b1c3 g8f6 g2g3 d8e7
+qsearch-english-reversed-sicilian-2 | c2c4 e7e5 b1c3 g8f6 h2h3 f8d6
+qsearch-reti-opening-1 | g1f3 d7d5 c2c4 g8h6 a2a4
+qsearch-reti-opening-2 | g1f3 d7d5 c2c4 c8e6 b2b3
+qsearch-dutch-defense-1 | d2d4 f7f5 c1f4 e7e6
+qsearch-dutch-defense-2 | d2d4 f7f5 f2f3 a7a5
+qsearch-bird-opening-1 | f2f4 d7d5 d2d4 d8d6
+qsearch-bird-opening-2 | f2f4 d7d5 e1f2 b8a6

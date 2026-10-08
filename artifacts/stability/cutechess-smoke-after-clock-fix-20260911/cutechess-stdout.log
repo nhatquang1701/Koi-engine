@@ -1,0 +1,17 @@
+Started game 1 of 2 (Koi vs Opponent)
+Finished game 1 (Koi vs Opponent): 1/2-1/2 {Draw by adjudication: maximal game length}
+Score of Koi vs Opponent: 0 - 0 - 1  [0.500] 1
+Started game 2 of 2 (Opponent vs Koi)
+Finished game 2 (Opponent vs Koi): 1/2-1/2 {Draw by adjudication: maximal game length}
+Score of Koi vs Opponent: 0 - 0 - 2  [0.500] 2
+...      Koi playing White: 0 - 0 - 1  [0.500] 1
+...      Koi playing Black: 0 - 0 - 1  [0.500] 1
+...      White vs Black: 0 - 0 - 2  [0.500] 2
+Elo difference: 0.0 +/- 0.0, LOS: nan %, DrawRatio: 100.0 %
+SPRT: llr 0 (0.0%), lbound -inf, ubound inf
+
+Player: Koi
+   "Draw by adjudication: maximal game length": 2
+Player: Opponent
+   "Draw by adjudication: maximal game length": 2
+Finished match

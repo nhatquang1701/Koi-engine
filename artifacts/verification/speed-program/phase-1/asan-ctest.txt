@@ -1,0 +1,64 @@
+Internal ctest changing into directory: C:/Users/ntATh/AI test/Koi engine/build/ci-asan
+Test project C:/Users/ntATh/AI test/Koi engine/build/ci-asan
+      Start  2: gpu_nnue_tests
+      Start  3: koi_core_tests
+ 1/26 Test  #3: koi_core_tests ...................   Passed    4.56 sec
+      Start  4: evaluation_boundary_tests
+ 2/26 Test  #4: evaluation_boundary_tests ........   Passed    0.25 sec
+      Start  5: evaluation_architecture_tests
+ 3/26 Test  #5: evaluation_architecture_tests ....   Passed    0.22 sec
+      Start  6: nnue_boundary_tests
+ 4/26 Test  #2: gpu_nnue_tests ...................   Passed    6.08 sec
+      Start  7: koi_cpu_features_tests
+ 5/26 Test  #7: koi_cpu_features_tests ...........   Passed    0.14 sec
+      Start  8: koi_cpu_variant_tests
+ 6/26 Test  #8: koi_cpu_variant_tests ............   Passed    0.12 sec
+      Start  9: koi_module_tests
+ 7/26 Test  #9: koi_module_tests .................   Passed    0.12 sec
+      Start 10: syzygy_tablebase_tests
+ 8/26 Test #10: syzygy_tablebase_tests ...........   Passed    0.74 sec
+      Start 11: koi_rules_tests
+ 9/26 Test #11: koi_rules_tests ..................   Passed    0.25 sec
+      Start 12: native_rule_state_tests
+10/26 Test #12: native_rule_state_tests ..........   Passed    0.39 sec
+      Start 13: opening_book_tests
+11/26 Test #13: opening_book_tests ...............   Passed    0.38 sec
+      Start 14: uci_controller_tests
+12/26 Test  #6: nnue_boundary_tests ..............   Passed    4.06 sec
+      Start 15: completion_gate_tests
+13/26 Test #15: completion_gate_tests ............   Passed    0.24 sec
+      Start 20: search_ordering_tests
+14/26 Test #20: search_ordering_tests ............   Passed    0.33 sec
+      Start 21: search_architecture_tests
+15/26 Test #21: search_architecture_tests ........   Passed    0.24 sec
+      Start 22: search_policy_tests
+16/26 Test #22: search_policy_tests ..............   Passed    0.14 sec
+      Start 23: search_runtime_tests
+17/26 Test #23: search_runtime_tests .............   Passed    0.15 sec
+      Start 24: static_exchange_tests
+18/26 Test #24: static_exchange_tests ............   Passed    0.24 sec
+      Start 25: transposition_table_tests
+19/26 Test #25: transposition_table_tests ........   Passed    0.24 sec
+      Start 26: search_service_tests
+20/26 Test #26: search_service_tests .............   Passed    5.84 sec
+      Start 27: koi_soak_tests
+21/26 Test #14: uci_controller_tests .............   Passed   31.05 sec
+      Start 28: classical_evaluator_tests
+22/26 Test #28: classical_evaluator_tests ........   Passed    0.41 sec
+      Start 29: evaluation_features_tests
+23/26 Test #29: evaluation_features_tests ........   Passed    0.40 sec
+      Start 30: time_manager_tests
+24/26 Test #30: time_manager_tests ...............   Passed    0.23 sec
+      Start 32: perft_tests
+25/26 Test #27: koi_soak_tests ...................   Passed   30.51 sec
+26/26 Test #32: perft_tests ......................   Passed   14.70 sec
+
+100% tests passed, 0 tests failed out of 26
+
+Label Time Summary:
+evaluation    =   5.34 sec*proc (5 tests)
+runtime       =  67.88 sec*proc (4 tests)
+search        =   5.84 sec*proc (1 test)
+unit          = 102.01 sec*proc (26 tests)
+
+Total Test time (real) =  55.05 sec

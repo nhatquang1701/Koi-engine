@@ -1,0 +1,22 @@
+{
+  "schema": "koi-speed-gate-experiment-v1",
+  "recorded_utc": "2026-10-06T10:27:22Z",
+  "gate_script": "tools/build/speed_gate.ps1",
+  "gate_script_sha256": "CB5A41FBCD75CC2CFFB57E714CEF961343CB8492AEDFFD40812585443C54CFD5",
+  "baseline_exe": "artifacts\\verification\\speed-gate\\batch7-20261006-sparse-depth2-5/baseline/koi-bench-baseline.exe",
+  "baseline_exe_sha256": "C46286F1A4252D409559773AE45CC99C56247DC9269AEEBC267AD2A46E0230E3",
+  "candidate_exe": "build/roadmap-visit-win-release/koi-bench.exe",
+  "candidate_exe_sha256": "D9F40F10D59DB95D7521C7B680ACC39A798414E0EACCD74E4F33F8257D1AB097",
+  "source_revision": "8d3bdd3ac7305b976eb95ca5712201c6ab49d234",
+  "baseline_note": "isolated Release build of HEAD 8d3bdd3 from build/roadmap-batch7-baseline-src (BuildTools MSVC 14.44.35207, CMake 3.31.6, Ninja, modules/shadow/GPU/PGO/sanitize/static-runtime OFF)",
+  "candidate": "Batch 7: snapshot_into direct history fill + unapply restore from the slot; single-ray pin scan in refresh_king_masks; FeatureState::get_or_compute_into + GameState::position_features_into with extractor and search fetch sites filling slots directly.",
+  "fen_file": "artifacts\\verification\\speed-gate\\batch7-20261006-sparse-depth2-5/sparse-qsearch-fens.txt",
+  "fen_sha256": "07855F78D6544FD4D9ED8E6000FDA3B279208AFC608F389569D85DE3026D930C",
+  "threads": 1,
+  "speed": 100,
+  "depth_sweep": "2..5",
+  "runs": 5,
+  "max_total_nps_regression_percent": 2.0,
+  "max_row_nps_regression_percent": 2.0,
+  "min_row_elapsed_ms": 20.0
+}

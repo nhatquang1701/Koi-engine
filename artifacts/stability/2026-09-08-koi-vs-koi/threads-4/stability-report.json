@@ -1,0 +1,55 @@
+{
+  "schema": "koi-cutechess-stability-v1",
+  "configuration": {
+    "koi_path": "C:\\Koi-results\\koi-next-leap-verify\\Release\\koi-engine.exe",
+    "opponent_path": "C:\\Koi-results\\koi-next-leap-verify\\Release\\koi-engine.exe",
+    "cutechess_path": "C:\\Program Files (x86)\\Cute Chess\\cutechess-cli.exe",
+    "cutechess_version": "cutechess-cli 1.5.1 Using Qt version 6.8.3 Running on Windows 11 Version 25H2/x86_64  Copyright (C) 2008-2023 Ilari Pihlajisto, Arto Jonsson and contributors This is free software; see the source for copying conditions.  There is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. ",
+    "games": 20,
+    "max_moves": 40,
+    "time_control": "1+0",
+    "hash_mb": 512,
+    "threads": 4,
+    "speed": 100,
+    "own_book": false,
+    "book_file": "book.bin",
+    "book_depth": 16,
+    "book_resolved_path": "C:\\Koi-results\\koi-next-leap-verify\\Release\\book.bin",
+    "book_sha256": null,
+    "opening_file": "C:\\Users\\ntATh\\AI test\\Koi engine\\tests\\data\\elo-openings-32.txt",
+    "fen_file": null,
+    "replay_path": "C:\\Koi-results\\koi-next-leap-verify\\Release\\koi-replay.exe",
+    "converted_opening_file": "C:\\Koi-results\\koi-stability-20-koi-vs-koi-t4\\uci-openings.epd",
+    "command": "cutechess-cli.exe -engine cmd=C:\\Koi-results\\koi-next-leap-verify\\Release\\koi-engine.exe name=Koi proto=uci option.Hash=512 option.Threads=4 option.Speed=100 option.OwnBook=false option.BookFile=book.bin option.BookDepth=16 option.BookRandom=false stderr=C:\\Koi-results\\koi-stability-20-koi-vs-koi-t4\\koi-stderr.log -engine cmd=C:\\Koi-results\\koi-next-leap-verify\\Release\\koi-engine.exe name=Opponent proto=uci stderr=C:\\Koi-results\\koi-stability-20-koi-vs-koi-t4\\opponent-stderr.log -each tc=1+0 -rounds 20 -concurrency 1 -maxmoves 40 -variant standard -pgnout C:\\Koi-results\\koi-stability-20-koi-vs-koi-t4\\games.pgn -event Koi stability compatibility -openings file=C:\\Koi-results\\koi-stability-20-koi-vs-koi-t4\\uci-openings.epd format=epd order=sequential policy=round"
+  },
+  "engines": [
+    {
+      "name": "Koi",
+      "path": "C:\\Koi-results\\koi-next-leap-verify\\Release\\koi-engine.exe",
+      "sha256": "A23E662F0327A481ACC3002D730574685E9261087526C6E152ED480B3E2B9F07"
+    },
+    {
+      "name": "Opponent",
+      "path": "C:\\Koi-results\\koi-next-leap-verify\\Release\\koi-engine.exe",
+      "sha256": "A23E662F0327A481ACC3002D730574685E9261087526C6E152ED480B3E2B9F07"
+    }
+  ],
+  "results": {
+    "exit_code": 0,
+    "started_games": 20,
+    "finished_games": 20,
+    "failures": 0,
+    "koi_white": 10,
+    "koi_black": 10,
+    "failure_lines": []
+  },
+  "artifacts": {
+    "pgn": "C:\\Koi-results\\koi-stability-20-koi-vs-koi-t4\\games.pgn",
+    "transcript": "C:\\Koi-results\\koi-stability-20-koi-vs-koi-t4\\cutechess-transcript.log",
+    "koi_stderr": "C:\\Koi-results\\koi-stability-20-koi-vs-koi-t4\\koi-stderr.log",
+    "opponent_stderr": "C:\\Koi-results\\koi-stability-20-koi-vs-koi-t4\\opponent-stderr.log",
+    "koi_debug": null,
+    "converted_opening": "C:\\Koi-results\\koi-stability-20-koi-vs-koi-t4\\uci-openings.epd"
+  },
+  "generated_utc": "2026-09-08T11:49:08.6863305Z"
+}

@@ -1,0 +1,10 @@
+loaded 400 rows in 0.0s
+encoded features: mean 56.0 active, pad 56
+epoch 1/1 train_loss 0.01681 val_loss 0.00801 val_mae_cp 10.7 time 0.1s
+wrote float checkpoint C:\Users\ntATh\AI test\Koi engine\artifacts\training\runs\20260917-220007-selftest-torch\net.pt
+quantization v3 s1=7 s2=7 k3=3 val_mae_cp 10.6
+quantization v3 s1=7 s2=7 k3=4 val_mae_cp 11.1
+quantization v3 s1=7 s2=7 k3=5 val_mae_cp 10.3
+quantization v3 s1=7 s2=7 k3=6 val_mae_cp 10.8
+selected v3 shifts s1=7 s2=7 k3=5 val_mae_cp 10.3
+wrote C:\Users\ntATh\AI test\Koi engine\artifacts\training\runs\20260917-220007-selftest-torch\net.nnue (501011 bytes) and C:\Users\ntATh\AI test\Koi engine\artifacts\training\runs\20260917-220007-selftest-torch\net.metadata.json

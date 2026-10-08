@@ -1,0 +1,1257 @@
+bullet training start net=koi-v4 hidden=1024 batch=8192 batches_per_superbatch=261 superbatches=200
+Training Preamble
+Net Name               : koi-v4
+Batch Size             : 8192
+Batches / Superbatch   : 261
+Positions / Superbatch : 2138112
+Start Superbatch       : 1
+End Superbatch         : 200
+Eval Scale             : 100
+Save Rate              : 20
+WDL Scheduler          : constant 0
+LR Scheduler           : start at 0.002 and cosine decay to 0.0001 at superbatch 200
+Threads                : 4
+Output Path            : artifacts\training\bullet\koi-v4-bullet-long\checkpoints
+Training on NVIDIA GeForce GTX 1060 6GB (sm_61)
+superbatch 1 [0.0% (0/261 batches, 248745 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 1 [49.0% (128/261 batches, 473031 pos/sec)]
+Estimated time to end of superbatch: 2.3s     superbatch 1 [98.1% (256/261 batches, 473468 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 1 | time 4.5s | running loss 0.070889 | 474664 pos/sec | total time 6.0s
+Estimated time remaining in training: 0h 19m 53s
+LR dropped to 0.0019995312
+superbatch 2 [0.0% (0/261 batches, 390030 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 2 [49.0% (128/261 batches, 450554 pos/sec)]
+Estimated time to end of superbatch: 2.4s     superbatch 2 [98.1% (256/261 batches, 455253 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 2 | time 4.7s | running loss 0.044788 | 456152 pos/sec | total time 10.7s
+Estimated time remaining in training: 0h 17m 37s
+LR dropped to 0.0019989456
+superbatch 3 [0.0% (0/261 batches, 569989 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 3 [49.0% (128/261 batches, 500613 pos/sec)]
+Estimated time to end of superbatch: 2.2s     superbatch 3 [98.1% (256/261 batches, 482653 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 3 | time 4.4s | running loss 0.035815 | 484090 pos/sec | total time 15.1s
+Estimated time remaining in training: 0h 16m 31s
+LR dropped to 0.0019981256
+superbatch 4 [0.0% (0/261 batches, 409381 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 4 [49.0% (128/261 batches, 540907 pos/sec)]
+Estimated time to end of superbatch: 2.0s     superbatch 4 [98.1% (256/261 batches, 565583 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 4 | time 3.8s | running loss 0.029369 | 565938 pos/sec | total time 18.9s
+Estimated time remaining in training: 0h 15m 25s
+LR dropped to 0.0019970716
+superbatch 5 [0.0% (0/261 batches, 588582 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 5 [49.0% (128/261 batches, 629136 pos/sec)]
+Estimated time to end of superbatch: 1.7s     superbatch 5 [98.1% (256/261 batches, 626845 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 5 | time 3.4s | running loss 0.025711 | 626286 pos/sec | total time 22.3s
+Estimated time remaining in training: 0h 14m 29s
+LR dropped to 0.001995784
+superbatch 6 [0.0% (0/261 batches, 593202 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 6 [49.0% (128/261 batches, 518034 pos/sec)]
+Estimated time to end of superbatch: 2.1s     superbatch 6 [98.1% (256/261 batches, 532219 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 6 | time 4.0s | running loss 0.022850 | 532916 pos/sec | total time 26.3s
+Estimated time remaining in training: 0h 14m 10s
+LR dropped to 0.001994263
+superbatch 7 [0.0% (0/261 batches, 586244 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 7 [49.0% (128/261 batches, 490789 pos/sec)]
+Estimated time to end of superbatch: 2.2s     superbatch 7 [98.1% (256/261 batches, 535239 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 7 | time 4.0s | running loss 0.020297 | 536129 pos/sec | total time 30.3s
+Estimated time remaining in training: 0h 13m 55s
+LR dropped to 0.0019925092
+superbatch 8 [0.0% (0/261 batches, 589293 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 8 [49.0% (128/261 batches, 605810 pos/sec)]
+Estimated time to end of superbatch: 1.8s     superbatch 8 [98.1% (256/261 batches, 607014 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 8 | time 3.5s | running loss 0.018158 | 606800 pos/sec | total time 33.8s
+Estimated time remaining in training: 0h 13m 31s
+LR dropped to 0.0019905225
+superbatch 9 [0.0% (0/261 batches, 1026129 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 9 [49.0% (128/261 batches, 693087 pos/sec)]
+Estimated time to end of superbatch: 1.6s     superbatch 9 [98.1% (256/261 batches, 670923 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 9 | time 3.2s | running loss 0.017090 | 669784 pos/sec | total time 37.0s
+Estimated time remaining in training: 0h 13m 5s
+LR dropped to 0.001988304
+superbatch 10 [0.0% (0/261 batches, 577467 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 10 [49.0% (128/261 batches, 678887 pos/sec)]
+Estimated time to end of superbatch: 1.6s     superbatch 10 [98.1% (256/261 batches, 682698 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 10 | time 3.1s | running loss 0.016153 | 683239 pos/sec | total time 40.1s
+Estimated time remaining in training: 0h 12m 42s
+LR dropped to 0.001985854
+superbatch 11 [0.0% (0/261 batches, 645344 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 11 [49.0% (128/261 batches, 719219 pos/sec)]
+Estimated time to end of superbatch: 1.5s     superbatch 11 [98.1% (256/261 batches, 710681 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 11 | time 3.0s | running loss 0.015594 | 709627 pos/sec | total time 43.2s
+Estimated time remaining in training: 0h 12m 21s
+LR dropped to 0.001983173
+superbatch 12 [0.0% (0/261 batches, 658632 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 12 [49.0% (128/261 batches, 664293 pos/sec)]
+Estimated time to end of superbatch: 1.7s     superbatch 12 [98.1% (256/261 batches, 669741 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 12 | time 3.2s | running loss 0.014814 | 669396 pos/sec | total time 46.3s
+Estimated time remaining in training: 0h 12m 6s
+LR dropped to 0.0019802616
+superbatch 13 [0.0% (0/261 batches, 647517 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 13 [49.0% (128/261 batches, 686086 pos/sec)]
+Estimated time to end of superbatch: 1.6s     superbatch 13 [98.1% (256/261 batches, 712336 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 13 | time 3.0s | running loss 0.013952 | 712472 pos/sec | total time 49.3s
+Estimated time remaining in training: 0h 11m 49s
+LR dropped to 0.001977121
+superbatch 14 [0.0% (0/261 batches, 661793 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 14 [49.0% (128/261 batches, 721950 pos/sec)]
+Estimated time to end of superbatch: 1.5s     superbatch 14 [98.1% (256/261 batches, 723887 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 14 | time 3.0s | running loss 0.013032 | 722959 pos/sec | total time 52.3s
+Estimated time remaining in training: 0h 11m 34s
+LR dropped to 0.0019737515
+superbatch 15 [0.0% (0/261 batches, 653254 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 15 [49.0% (128/261 batches, 728860 pos/sec)]
+Estimated time to end of superbatch: 1.5s     superbatch 15 [98.1% (256/261 batches, 698010 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 15 | time 3.1s | running loss 0.012360 | 695400 pos/sec | total time 55.4s
+Estimated time remaining in training: 0h 11m 23s
+LR dropped to 0.001970154
+superbatch 16 [0.0% (0/261 batches, 462493 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 16 [49.0% (128/261 batches, 609719 pos/sec)]
+Estimated time to end of superbatch: 1.8s     superbatch 16 [98.1% (256/261 batches, 641920 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 16 | time 3.3s | running loss 0.012344 | 641346 pos/sec | total time 58.7s
+Estimated time remaining in training: 0h 11m 15s
+LR dropped to 0.0019663295
+superbatch 17 [0.0% (0/261 batches, 659836 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 17 [49.0% (128/261 batches, 643268 pos/sec)]
+Estimated time to end of superbatch: 1.7s     superbatch 17 [98.1% (256/261 batches, 644637 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 17 | time 3.3s | running loss 0.012133 | 642700 pos/sec | total time 62.0s
+Estimated time remaining in training: 0h 11m 7s
+LR dropped to 0.001962279
+superbatch 18 [0.0% (0/261 batches, 721654 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 18 [49.0% (128/261 batches, 719846 pos/sec)]
+Estimated time to end of superbatch: 1.5s     superbatch 18 [98.1% (256/261 batches, 712936 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 18 | time 3.0s | running loss 0.011854 | 711936 pos/sec | total time 65.0s
+Estimated time remaining in training: 0h 10m 57s
+LR dropped to 0.0019580035
+superbatch 19 [0.0% (0/261 batches, 652084 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 19 [49.0% (128/261 batches, 572280 pos/sec)]
+Estimated time to end of superbatch: 1.9s     superbatch 19 [98.1% (256/261 batches, 571529 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 19 | time 3.7s | running loss 0.011840 | 571701 pos/sec | total time 68.8s
+Estimated time remaining in training: 0h 10m 55s
+LR dropped to 0.0019535038
+superbatch 20 [0.0% (0/261 batches, 602606 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 20 [49.0% (128/261 batches, 588322 pos/sec)]
+Estimated time to end of superbatch: 1.9s     superbatch 20 [98.1% (256/261 batches, 609866 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 20 | time 3.5s | running loss 0.011754 | 609990 pos/sec | total time 72.3s
+Estimated time remaining in training: 0h 10m 50s
+Saved [koi-v4-20]
+epoch 20/200 train_loss 0.01175 val_loss 0.01175 val_mae_cp 213.0 time 3.5s
+LR dropped to 0.0019487812
+superbatch 21 [0.0% (0/261 batches, 785992 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 21 [49.0% (128/261 batches, 687344 pos/sec)]
+Estimated time to end of superbatch: 1.6s     superbatch 21 [98.1% (256/261 batches, 714123 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 21 | time 3.0s | running loss 0.011379 | 716206 pos/sec | total time 77.0s
+Estimated time remaining in training: 0h 10m 56s
+LR dropped to 0.0019438368
+superbatch 22 [0.0% (0/261 batches, 1141710 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 22 [49.0% (128/261 batches, 707672 pos/sec)]
+Estimated time to end of superbatch: 1.6s     superbatch 22 [98.1% (256/261 batches, 682662 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 22 | time 3.1s | running loss 0.010981 | 681756 pos/sec | total time 80.1s
+Estimated time remaining in training: 0h 10m 48s
+LR dropped to 0.0019386719
+superbatch 23 [0.0% (0/261 batches, 692524 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 23 [49.0% (128/261 batches, 666883 pos/sec)]
+Estimated time to end of superbatch: 1.6s     superbatch 23 [98.1% (256/261 batches, 665145 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 23 | time 3.2s | running loss 0.010371 | 664200 pos/sec | total time 83.3s
+Estimated time remaining in training: 0h 10m 41s
+LR dropped to 0.0019332877
+superbatch 24 [0.0% (0/261 batches, 671294 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 24 [49.0% (128/261 batches, 649352 pos/sec)]
+Estimated time to end of superbatch: 1.7s     superbatch 24 [98.1% (256/261 batches, 709139 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 24 | time 3.0s | running loss 0.009629 | 709172 pos/sec | total time 86.3s
+Estimated time remaining in training: 0h 10m 33s
+LR dropped to 0.0019276856
+superbatch 25 [0.0% (0/261 batches, 618208 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 25 [49.0% (128/261 batches, 663676 pos/sec)]
+Estimated time to end of superbatch: 1.7s     superbatch 25 [98.1% (256/261 batches, 654224 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 25 | time 3.3s | running loss 0.008992 | 652253 pos/sec | total time 89.6s
+Estimated time remaining in training: 0h 10m 27s
+LR dropped to 0.001921867
+superbatch 26 [0.0% (0/261 batches, 640085 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 26 [49.0% (128/261 batches, 634277 pos/sec)]
+Estimated time to end of superbatch: 1.7s     superbatch 26 [98.1% (256/261 batches, 642838 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 26 | time 3.3s | running loss 0.008563 | 643781 pos/sec | total time 92.9s
+Estimated time remaining in training: 0h 10m 22s
+LR dropped to 0.0019158331
+superbatch 27 [0.0% (0/261 batches, 665443 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 27 [49.0% (128/261 batches, 671257 pos/sec)]
+Estimated time to end of superbatch: 1.6s     superbatch 27 [98.1% (256/261 batches, 723332 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 27 | time 3.0s | running loss 0.008398 | 724420 pos/sec | total time 95.9s
+Estimated time remaining in training: 0h 10m 14s
+LR dropped to 0.0019095859
+superbatch 28 [0.0% (0/261 batches, 631665 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 28 [49.0% (128/261 batches, 692646 pos/sec)]
+Estimated time to end of superbatch: 1.6s     superbatch 28 [98.1% (256/261 batches, 666990 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 28 | time 3.2s | running loss 0.008353 | 668230 pos/sec | total time 99.1s
+Estimated time remaining in training: 0h 10m 8s
+LR dropped to 0.0019031264
+superbatch 29 [0.0% (0/261 batches, 700530 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 29 [49.0% (128/261 batches, 728587 pos/sec)]
+Estimated time to end of superbatch: 1.5s     superbatch 29 [98.1% (256/261 batches, 741261 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 29 | time 2.9s | running loss 0.008239 | 740508 pos/sec | total time 102.0s
+Estimated time remaining in training: 0h 10m 1s
+LR dropped to 0.0018964562
+superbatch 30 [0.0% (0/261 batches, 630362 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 30 [49.0% (128/261 batches, 777560 pos/sec)]
+Estimated time to end of superbatch: 1.4s     superbatch 30 [98.1% (256/261 batches, 771591 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 30 | time 2.8s | running loss 0.008056 | 772291 pos/sec | total time 104.8s
+Estimated time remaining in training: 0h 9m 53s
+LR dropped to 0.0018895775
+superbatch 31 [0.0% (0/261 batches, 616274 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 31 [49.0% (128/261 batches, 815282 pos/sec)]
+Estimated time to end of superbatch: 1.3s     superbatch 31 [98.1% (256/261 batches, 789263 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 31 | time 2.7s | running loss 0.007651 | 790509 pos/sec | total time 107.5s
+Estimated time remaining in training: 0h 9m 45s
+LR dropped to 0.0018824914
+superbatch 32 [0.0% (0/261 batches, 1088768 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 32 [49.0% (128/261 batches, 706649 pos/sec)]
+Estimated time to end of superbatch: 1.6s     superbatch 32 [98.1% (256/261 batches, 673336 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 32 | time 3.2s | running loss 0.007121 | 674948 pos/sec | total time 110.6s
+Estimated time remaining in training: 0h 9m 40s
+LR dropped to 0.0018752
+superbatch 33 [0.0% (0/261 batches, 604817 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 33 [49.0% (128/261 batches, 741075 pos/sec)]
+Estimated time to end of superbatch: 1.5s     superbatch 33 [98.1% (256/261 batches, 715525 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 33 | time 3.0s | running loss 0.006793 | 713629 pos/sec | total time 113.6s
+Estimated time remaining in training: 0h 9m 35s
+LR dropped to 0.001867705
+superbatch 34 [0.0% (0/261 batches, 473559 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 34 [49.0% (128/261 batches, 652270 pos/sec)]
+Estimated time to end of superbatch: 1.7s     superbatch 34 [98.1% (256/261 batches, 698099 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 34 | time 3.1s | running loss 0.006753 | 700248 pos/sec | total time 116.7s
+Estimated time remaining in training: 0h 9m 29s
+LR dropped to 0.0018600082
+superbatch 35 [0.0% (0/261 batches, 646720 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 35 [49.0% (128/261 batches, 635792 pos/sec)]
+Estimated time to end of superbatch: 1.7s     superbatch 35 [98.1% (256/261 batches, 646086 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 35 | time 3.3s | running loss 0.007063 | 646415 pos/sec | total time 120.0s
+Estimated time remaining in training: 0h 9m 25s
+LR dropped to 0.0018521117
+superbatch 36 [0.0% (0/261 batches, 665216 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 36 [49.0% (128/261 batches, 774837 pos/sec)]
+Estimated time to end of superbatch: 1.4s     superbatch 36 [98.1% (256/261 batches, 781719 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 36 | time 2.7s | running loss 0.007433 | 782351 pos/sec | total time 122.7s
+Estimated time remaining in training: 0h 9m 19s
+LR dropped to 0.0018440171
+superbatch 37 [0.0% (0/261 batches, 1166520 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 37 [49.0% (128/261 batches, 803020 pos/sec)]
+Estimated time to end of superbatch: 1.4s     superbatch 37 [98.1% (256/261 batches, 796802 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 37 | time 2.7s | running loss 0.007425 | 795047 pos/sec | total time 125.4s
+Estimated time remaining in training: 0h 9m 12s
+LR dropped to 0.0018357266
+superbatch 38 [0.0% (0/261 batches, 1174144 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 38 [49.0% (128/261 batches, 790131 pos/sec)]
+Estimated time to end of superbatch: 1.4s     superbatch 38 [98.1% (256/261 batches, 757667 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 38 | time 2.8s | running loss 0.007190 | 757072 pos/sec | total time 128.2s
+Estimated time remaining in training: 0h 9m 6s
+LR dropped to 0.0018272423
+superbatch 39 [0.0% (0/261 batches, 562375 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 39 [49.0% (128/261 batches, 736225 pos/sec)]
+Estimated time to end of superbatch: 1.5s     superbatch 39 [98.1% (256/261 batches, 751808 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 39 | time 2.8s | running loss 0.006900 | 750669 pos/sec | total time 131.1s
+Estimated time remaining in training: 0h 9m 1s
+LR dropped to 0.0018185661
+superbatch 40 [0.0% (0/261 batches, 668707 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 40 [49.0% (128/261 batches, 750564 pos/sec)]
+Estimated time to end of superbatch: 1.5s     superbatch 40 [98.1% (256/261 batches, 755465 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 40 | time 2.8s | running loss 0.006865 | 755616 pos/sec | total time 133.9s
+Estimated time remaining in training: 0h 8m 55s
+Saved [koi-v4-40]
+epoch 40/200 train_loss 0.00686 val_loss 0.00686 val_mae_cp 208.3 time 2.8s
+LR dropped to 0.0018097005
+superbatch 41 [0.0% (0/261 batches, 636430 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 41 [49.0% (128/261 batches, 764807 pos/sec)]
+Estimated time to end of superbatch: 1.4s     superbatch 41 [98.1% (256/261 batches, 777779 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 41 | time 2.8s | running loss 0.006686 | 777228 pos/sec | total time 138.5s
+Estimated time remaining in training: 0h 8m 56s
+LR dropped to 0.0018006474
+superbatch 42 [0.0% (0/261 batches, 1204546 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 42 [49.0% (128/261 batches, 813464 pos/sec)]
+Estimated time to end of superbatch: 1.3s     superbatch 42 [98.1% (256/261 batches, 817653 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 42 | time 2.6s | running loss 0.006746 | 817775 pos/sec | total time 141.1s
+Estimated time remaining in training: 0h 8m 50s
+LR dropped to 0.0017914089
+superbatch 43 [0.0% (0/261 batches, 1247487 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 43 [49.0% (128/261 batches, 814880 pos/sec)]
+Estimated time to end of superbatch: 1.3s     superbatch 43 [98.1% (256/261 batches, 818458 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 43 | time 2.6s | running loss 0.006672 | 818773 pos/sec | total time 143.7s
+Estimated time remaining in training: 0h 8m 44s
+LR dropped to 0.0017819877
+superbatch 44 [0.0% (0/261 batches, 672291 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 44 [49.0% (128/261 batches, 832267 pos/sec)]
+Estimated time to end of superbatch: 1.3s     superbatch 44 [98.1% (256/261 batches, 867760 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 44 | time 2.5s | running loss 0.006165 | 869824 pos/sec | total time 146.1s
+Estimated time remaining in training: 0h 8m 38s
+LR dropped to 0.0017723858
+superbatch 45 [0.0% (0/261 batches, 1248971 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 45 [49.0% (128/261 batches, 775802 pos/sec)]
+Estimated time to end of superbatch: 1.4s     superbatch 45 [98.1% (256/261 batches, 728811 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 45 | time 2.9s | running loss 0.005759 | 729045 pos/sec | total time 149.1s
+Estimated time remaining in training: 0h 8m 33s
+LR dropped to 0.0017626056
+superbatch 46 [0.0% (0/261 batches, 652614 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 46 [49.0% (128/261 batches, 789383 pos/sec)]
+Estimated time to end of superbatch: 1.4s     superbatch 46 [98.1% (256/261 batches, 750429 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 46 | time 2.9s | running loss 0.005469 | 746931 pos/sec | total time 151.9s
+Estimated time remaining in training: 0h 8m 28s
+LR dropped to 0.0017526497
+superbatch 47 [0.0% (0/261 batches, 641473 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 47 [49.0% (128/261 batches, 745886 pos/sec)]
+Estimated time to end of superbatch: 1.5s     superbatch 47 [98.1% (256/261 batches, 765085 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 47 | time 2.8s | running loss 0.005261 | 765929 pos/sec | total time 154.7s
+Estimated time remaining in training: 0h 8m 23s
+LR dropped to 0.0017425203
+superbatch 48 [0.0% (0/261 batches, 773640 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 48 [49.0% (128/261 batches, 725765 pos/sec)]
+Estimated time to end of superbatch: 1.5s     superbatch 48 [98.1% (256/261 batches, 734701 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 48 | time 2.9s | running loss 0.005305 | 735402 pos/sec | total time 157.6s
+Estimated time remaining in training: 0h 8m 19s
+LR dropped to 0.0017322201
+superbatch 49 [0.0% (0/261 batches, 675122 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 49 [49.0% (128/261 batches, 747318 pos/sec)]
+Estimated time to end of superbatch: 1.5s     superbatch 49 [98.1% (256/261 batches, 761043 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 49 | time 2.8s | running loss 0.005571 | 759822 pos/sec | total time 160.5s
+Estimated time remaining in training: 0h 8m 14s
+LR dropped to 0.0017217515
+superbatch 50 [0.0% (0/261 batches, 632348 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 50 [49.0% (128/261 batches, 741681 pos/sec)]
+Estimated time to end of superbatch: 1.5s     superbatch 50 [98.1% (256/261 batches, 746742 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 50 | time 2.9s | running loss 0.005926 | 748691 pos/sec | total time 163.3s
+Estimated time remaining in training: 0h 8m 9s
+LR dropped to 0.0017111173
+superbatch 51 [0.0% (0/261 batches, 1235857 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 51 [49.0% (128/261 batches, 811247 pos/sec)]
+Estimated time to end of superbatch: 1.4s     superbatch 51 [98.1% (256/261 batches, 808535 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 51 | time 2.6s | running loss 0.005743 | 809034 pos/sec | total time 166.0s
+Estimated time remaining in training: 0h 8m 4s
+LR dropped to 0.0017003199
+superbatch 52 [0.0% (0/261 batches, 620907 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 52 [49.0% (128/261 batches, 822453 pos/sec)]
+Estimated time to end of superbatch: 1.3s     superbatch 52 [98.1% (256/261 batches, 817204 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 52 | time 2.6s | running loss 0.005441 | 817704 pos/sec | total time 168.6s
+Estimated time remaining in training: 0h 7m 59s
+LR dropped to 0.0016893619
+superbatch 53 [0.0% (0/261 batches, 658717 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 53 [49.0% (128/261 batches, 829072 pos/sec)]
+Estimated time to end of superbatch: 1.3s     superbatch 53 [98.1% (256/261 batches, 865673 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 53 | time 2.5s | running loss 0.005095 | 867675 pos/sec | total time 171.0s
+Estimated time remaining in training: 0h 7m 54s
+LR dropped to 0.0016782463
+superbatch 54 [0.0% (0/261 batches, 1137557 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 54 [49.0% (128/261 batches, 962744 pos/sec)]
+Estimated time to end of superbatch: 1.1s     superbatch 54 [98.1% (256/261 batches, 945184 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 54 | time 2.3s | running loss 0.004985 | 945932 pos/sec | total time 173.3s
+Estimated time remaining in training: 0h 7m 48s
+LR dropped to 0.0016669757
+superbatch 55 [0.0% (0/261 batches, 634385 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 55 [49.0% (128/261 batches, 952985 pos/sec)]
+Estimated time to end of superbatch: 1.2s     superbatch 55 [98.1% (256/261 batches, 931087 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 55 | time 2.3s | running loss 0.004915 | 930059 pos/sec | total time 175.6s
+Estimated time remaining in training: 0h 7m 42s
+LR dropped to 0.0016555529
+superbatch 56 [0.0% (0/261 batches, 1211494 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 56 [49.0% (128/261 batches, 983853 pos/sec)]
+Estimated time to end of superbatch: 1.1s     superbatch 56 [98.1% (256/261 batches, 953384 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 56 | time 2.2s | running loss 0.004825 | 954605 pos/sec | total time 177.8s
+Estimated time remaining in training: 0h 7m 37s
+LR dropped to 0.0016439806
+superbatch 57 [0.0% (0/261 batches, 670042 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 57 [49.0% (128/261 batches, 989391 pos/sec)]
+Estimated time to end of superbatch: 1.1s     superbatch 57 [98.1% (256/261 batches, 999480 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 57 | time 2.1s | running loss 0.004679 | 997613 pos/sec | total time 180.0s
+Estimated time remaining in training: 0h 7m 31s
+LR dropped to 0.0016322618
+superbatch 58 [0.0% (0/261 batches, 1232269 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 58 [49.0% (128/261 batches, 937062 pos/sec)]
+Estimated time to end of superbatch: 1.2s     superbatch 58 [98.1% (256/261 batches, 763102 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 58 | time 2.8s | running loss 0.004689 | 760803 pos/sec | total time 182.8s
+Estimated time remaining in training: 0h 7m 27s
+LR dropped to 0.0016203993
+superbatch 59 [0.0% (0/261 batches, 1168100 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 59 [49.0% (128/261 batches, 667927 pos/sec)]
+Estimated time to end of superbatch: 1.6s     superbatch 59 [98.1% (256/261 batches, 652425 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 59 | time 3.3s | running loss 0.004624 | 650249 pos/sec | total time 186.1s
+Estimated time remaining in training: 0h 7m 24s
+LR dropped to 0.0016083961
+superbatch 60 [0.0% (0/261 batches, 468476 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 60 [49.0% (128/261 batches, 634596 pos/sec)]
+Estimated time to end of superbatch: 1.7s     superbatch 60 [98.1% (256/261 batches, 648531 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 60 | time 3.3s | running loss 0.004685 | 648842 pos/sec | total time 189.4s
+Estimated time remaining in training: 0h 7m 21s
+Saved [koi-v4-60]
+epoch 60/200 train_loss 0.00468 val_loss 0.00468 val_mae_cp 202.1 time 3.3s
+LR dropped to 0.0015962551
+superbatch 61 [0.0% (0/261 batches, 600129 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 61 [49.0% (128/261 batches, 679561 pos/sec)]
+Estimated time to end of superbatch: 1.6s     superbatch 61 [98.1% (256/261 batches, 655003 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 61 | time 3.3s | running loss 0.004662 | 654697 pos/sec | total time 194.1s
+Estimated time remaining in training: 0h 7m 22s
+LR dropped to 0.0015839792
+superbatch 62 [0.0% (0/261 batches, 489779 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 62 [49.0% (128/261 batches, 667493 pos/sec)]
+Estimated time to end of superbatch: 1.6s     superbatch 62 [98.1% (256/261 batches, 675540 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 62 | time 3.2s | running loss 0.004735 | 674261 pos/sec | total time 197.3s
+Estimated time remaining in training: 0h 7m 19s
+LR dropped to 0.0015715717
+superbatch 63 [0.0% (0/261 batches, 716993 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 63 [49.0% (128/261 batches, 681690 pos/sec)]
+Estimated time to end of superbatch: 1.6s     superbatch 63 [98.1% (256/261 batches, 714561 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 63 | time 3.0s | running loss 0.004658 | 715334 pos/sec | total time 200.3s
+Estimated time remaining in training: 0h 7m 15s
+LR dropped to 0.0015590354
+superbatch 64 [0.0% (0/261 batches, 727279 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 64 [49.0% (128/261 batches, 822805 pos/sec)]
+Estimated time to end of superbatch: 1.3s     superbatch 64 [98.1% (256/261 batches, 817438 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 64 | time 2.6s | running loss 0.004495 | 818896 pos/sec | total time 202.9s
+Estimated time remaining in training: 0h 7m 11s
+LR dropped to 0.0015463737
+superbatch 65 [0.0% (0/261 batches, 757852 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 65 [49.0% (128/261 batches, 826480 pos/sec)]
+Estimated time to end of superbatch: 1.3s     superbatch 65 [98.1% (256/261 batches, 812192 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 65 | time 2.6s | running loss 0.004240 | 812654 pos/sec | total time 205.5s
+Estimated time remaining in training: 0h 7m 6s
+LR dropped to 0.0015335893
+superbatch 66 [0.0% (0/261 batches, 1130227 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 66 [49.0% (128/261 batches, 892786 pos/sec)]
+Estimated time to end of superbatch: 1.2s     superbatch 66 [98.1% (256/261 batches, 806399 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 66 | time 2.7s | running loss 0.004103 | 805799 pos/sec | total time 208.2s
+Estimated time remaining in training: 0h 7m 2s
+LR dropped to 0.0015206857
+superbatch 67 [0.0% (0/261 batches, 756753 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 67 [49.0% (128/261 batches, 720118 pos/sec)]
+Estimated time to end of superbatch: 1.5s     superbatch 67 [98.1% (256/261 batches, 730720 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 67 | time 2.9s | running loss 0.004037 | 730728 pos/sec | total time 211.1s
+Estimated time remaining in training: 0h 6m 59s
+LR dropped to 0.001507666
+superbatch 68 [0.0% (0/261 batches, 714946 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 68 [49.0% (128/261 batches, 745502 pos/sec)]
+Estimated time to end of superbatch: 1.5s     superbatch 68 [98.1% (256/261 batches, 741842 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 68 | time 2.9s | running loss 0.004000 | 745381 pos/sec | total time 214.0s
+Estimated time remaining in training: 0h 6m 55s
+LR dropped to 0.0014945333
+superbatch 69 [0.0% (0/261 batches, 753634 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 69 [49.0% (128/261 batches, 883947 pos/sec)]
+Estimated time to end of superbatch: 1.2s     superbatch 69 [98.1% (256/261 batches, 843141 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 69 | time 2.5s | running loss 0.003981 | 842576 pos/sec | total time 216.5s
+Estimated time remaining in training: 0h 6m 51s
+LR dropped to 0.0014812909
+superbatch 70 [0.0% (0/261 batches, 739063 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 70 [49.0% (128/261 batches, 829409 pos/sec)]
+Estimated time to end of superbatch: 1.3s     superbatch 70 [98.1% (256/261 batches, 768242 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 70 | time 2.8s | running loss 0.004118 | 767577 pos/sec | total time 219.3s
+Estimated time remaining in training: 0h 6m 47s
+LR dropped to 0.0014679424
+superbatch 71 [0.0% (0/261 batches, 698946 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 71 [49.0% (128/261 batches, 690032 pos/sec)]
+Estimated time to end of superbatch: 1.6s     superbatch 71 [98.1% (256/261 batches, 677918 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 71 | time 3.2s | running loss 0.004261 | 678433 pos/sec | total time 222.5s
+Estimated time remaining in training: 0h 6m 44s
+LR dropped to 0.0014544902
+superbatch 72 [0.0% (0/261 batches, 512339 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 72 [49.0% (128/261 batches, 689984 pos/sec)]
+Estimated time to end of superbatch: 1.6s     superbatch 72 [98.1% (256/261 batches, 694942 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 72 | time 3.1s | running loss 0.004187 | 695309 pos/sec | total time 225.5s
+Estimated time remaining in training: 0h 6m 40s
+LR dropped to 0.0014409386
+superbatch 73 [0.0% (0/261 batches, 519385 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 73 [49.0% (128/261 batches, 720948 pos/sec)]
+Estimated time to end of superbatch: 1.5s     superbatch 73 [98.1% (256/261 batches, 720829 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 73 | time 3.0s | running loss 0.004061 | 722026 pos/sec | total time 228.5s
+Estimated time remaining in training: 0h 6m 37s
+LR dropped to 0.0014272905
+superbatch 74 [0.0% (0/261 batches, 725694 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 74 [49.0% (128/261 batches, 705030 pos/sec)]
+Estimated time to end of superbatch: 1.6s     superbatch 74 [98.1% (256/261 batches, 730736 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 74 | time 2.9s | running loss 0.004263 | 729542 pos/sec | total time 231.4s
+Estimated time remaining in training: 0h 6m 34s
+LR dropped to 0.0014135493
+superbatch 75 [0.0% (0/261 batches, 547392 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 75 [49.0% (128/261 batches, 648172 pos/sec)]
+Estimated time to end of superbatch: 1.7s     superbatch 75 [98.1% (256/261 batches, 660525 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 75 | time 3.2s | running loss 0.004436 | 661822 pos/sec | total time 234.7s
+Estimated time remaining in training: 0h 6m 31s
+LR dropped to 0.0013997182
+superbatch 76 [0.0% (0/261 batches, 637272 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 76 [49.0% (128/261 batches, 765511 pos/sec)]
+Estimated time to end of superbatch: 1.4s     superbatch 76 [98.1% (256/261 batches, 772384 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 76 | time 2.8s | running loss 0.004360 | 771868 pos/sec | total time 237.4s
+Estimated time remaining in training: 0h 6m 27s
+LR dropped to 0.0013858012
+superbatch 77 [0.0% (0/261 batches, 1217598 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 77 [49.0% (128/261 batches, 820555 pos/sec)]
+Estimated time to end of superbatch: 1.3s     superbatch 77 [98.1% (256/261 batches, 819647 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 77 | time 2.6s | running loss 0.004011 | 819848 pos/sec | total time 240.0s
+Estimated time remaining in training: 0h 6m 23s
+LR dropped to 0.0013718011
+superbatch 78 [0.0% (0/261 batches, 1290323 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 78 [49.0% (128/261 batches, 1025479 pos/sec)]
+Estimated time to end of superbatch: 1.1s     superbatch 78 [98.1% (256/261 batches, 1152432 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 78 | time 1.9s | running loss 0.003644 | 1154428 pos/sec | total time 241.9s
+Estimated time remaining in training: 0h 6m 18s
+LR dropped to 0.0013577216
+superbatch 79 [0.0% (0/261 batches, 1296264 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 79 [49.0% (128/261 batches, 1259685 pos/sec)]
+Estimated time to end of superbatch: 0.9s     superbatch 79 [98.1% (256/261 batches, 1284350 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 79 | time 1.7s | running loss 0.003309 | 1284589 pos/sec | total time 243.6s
+Estimated time remaining in training: 0h 6m 13s
+LR dropped to 0.0013435662
+superbatch 80 [0.0% (0/261 batches, 1293766 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 80 [49.0% (128/261 batches, 1316974 pos/sec)]
+Estimated time to end of superbatch: 0.8s     superbatch 80 [98.1% (256/261 batches, 1290134 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 80 | time 1.7s | running loss 0.003077 | 1290031 pos/sec | total time 245.2s
+Estimated time remaining in training: 0h 6m 7s
+Saved [koi-v4-80]
+epoch 80/200 train_loss 0.00308 val_loss 0.00308 val_mae_cp 198.4 time 1.7s
+LR dropped to 0.0013293384
+superbatch 81 [0.0% (0/261 batches, 1223472 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 81 [49.0% (128/261 batches, 1326837 pos/sec)]
+Estimated time to end of superbatch: 0.8s     superbatch 81 [98.1% (256/261 batches, 1115977 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 81 | time 1.9s | running loss 0.002977 | 1114262 pos/sec | total time 248.8s
+Estimated time remaining in training: 0h 6m 5s
+LR dropped to 0.0013150416
+superbatch 82 [0.0% (0/261 batches, 662456 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 82 [49.0% (128/261 batches, 944368 pos/sec)]
+Estimated time to end of superbatch: 1.2s     superbatch 82 [98.1% (256/261 batches, 985100 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 82 | time 2.2s | running loss 0.002970 | 985729 pos/sec | total time 250.9s
+Estimated time remaining in training: 0h 6m 1s
+LR dropped to 0.0013006793
+superbatch 83 [0.0% (0/261 batches, 1230067 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 83 [49.0% (128/261 batches, 1012120 pos/sec)]
+Estimated time to end of superbatch: 1.1s     superbatch 83 [98.1% (256/261 batches, 1032645 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 83 | time 2.1s | running loss 0.003084 | 1035573 pos/sec | total time 253.0s
+Estimated time remaining in training: 0h 5m 56s
+LR dropped to 0.0012862554
+superbatch 84 [0.0% (0/261 batches, 630790 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 84 [49.0% (128/261 batches, 1086924 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 84 [98.1% (256/261 batches, 1040851 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 84 | time 2.1s | running loss 0.003273 | 1039535 pos/sec | total time 255.0s
+Estimated time remaining in training: 0h 5m 52s
+LR dropped to 0.0012717731
+superbatch 85 [0.0% (0/261 batches, 652219 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 85 [49.0% (128/261 batches, 1057183 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 85 [98.1% (256/261 batches, 1099176 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 85 | time 1.9s | running loss 0.003478 | 1097562 pos/sec | total time 257.0s
+Estimated time remaining in training: 0h 5m 47s
+LR dropped to 0.0012572361
+superbatch 86 [0.0% (0/261 batches, 1281823 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 86 [49.0% (128/261 batches, 1177756 pos/sec)]
+Estimated time to end of superbatch: 0.9s     superbatch 86 [98.1% (256/261 batches, 1173469 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 86 | time 4.3s | running loss 0.003571 | 501045 pos/sec | total time 261.3s
+Estimated time remaining in training: 0h 5m 46s
+LR dropped to 0.0012426479
+superbatch 87 [0.0% (0/261 batches, 1290160 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 87 [49.0% (128/261 batches, 1189909 pos/sec)]
+Estimated time to end of superbatch: 0.9s     superbatch 87 [98.1% (256/261 batches, 1180253 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 87 | time 1.8s | running loss 0.003398 | 1180520 pos/sec | total time 263.1s
+Estimated time remaining in training: 0h 5m 41s
+LR dropped to 0.0012280123
+superbatch 88 [0.0% (0/261 batches, 662269 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 88 [49.0% (128/261 batches, 1184925 pos/sec)]
+Estimated time to end of superbatch: 0.9s     superbatch 88 [98.1% (256/261 batches, 1187326 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 88 | time 1.8s | running loss 0.003188 | 1188844 pos/sec | total time 264.9s
+Estimated time remaining in training: 0h 5m 37s
+LR dropped to 0.0012133326
+superbatch 89 [0.0% (0/261 batches, 1284596 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 89 [49.0% (128/261 batches, 1169058 pos/sec)]
+Estimated time to end of superbatch: 0.9s     superbatch 89 [98.1% (256/261 batches, 1170177 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 89 | time 1.8s | running loss 0.002975 | 1167027 pos/sec | total time 266.7s
+Estimated time remaining in training: 0h 5m 32s
+LR dropped to 0.0011986129
+superbatch 90 [0.0% (0/261 batches, 1285826 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 90 [49.0% (128/261 batches, 1165406 pos/sec)]
+Estimated time to end of superbatch: 0.9s     superbatch 90 [98.1% (256/261 batches, 1151386 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 90 | time 1.9s | running loss 0.002907 | 1147117 pos/sec | total time 268.6s
+Estimated time remaining in training: 0h 5m 28s
+LR dropped to 0.001183856
+superbatch 91 [0.0% (0/261 batches, 1222614 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 91 [49.0% (128/261 batches, 1131434 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 91 [98.1% (256/261 batches, 1104437 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 91 | time 1.9s | running loss 0.002940 | 1105138 pos/sec | total time 270.5s
+Estimated time remaining in training: 0h 5m 24s
+LR dropped to 0.0011690664
+superbatch 92 [0.0% (0/261 batches, 601986 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 92 [49.0% (128/261 batches, 1085694 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 92 [98.1% (256/261 batches, 1087655 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 92 | time 2.0s | running loss 0.003060 | 1088878 pos/sec | total time 272.5s
+Estimated time remaining in training: 0h 5m 19s
+LR dropped to 0.0011542477
+superbatch 93 [0.0% (0/261 batches, 1288699 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 93 [49.0% (128/261 batches, 1111051 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 93 [98.1% (256/261 batches, 1075471 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 93 | time 2.0s | running loss 0.003210 | 1073773 pos/sec | total time 274.5s
+Estimated time remaining in training: 0h 5m 15s
+LR dropped to 0.001139403
+superbatch 94 [0.0% (0/261 batches, 1269979 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 94 [49.0% (128/261 batches, 1152861 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 94 [98.1% (256/261 batches, 1145866 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 94 | time 1.9s | running loss 0.003188 | 1147857 pos/sec | total time 276.3s
+Estimated time remaining in training: 0h 5m 11s
+LR dropped to 0.0011245362
+superbatch 95 [0.0% (0/261 batches, 1294421 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 95 [49.0% (128/261 batches, 1159786 pos/sec)]
+Estimated time to end of superbatch: 0.9s     superbatch 95 [98.1% (256/261 batches, 1160709 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 95 | time 1.8s | running loss 0.003111 | 1162514 pos/sec | total time 278.2s
+Estimated time remaining in training: 0h 5m 7s
+LR dropped to 0.001109651
+superbatch 96 [0.0% (0/261 batches, 1309568 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 96 [49.0% (128/261 batches, 1160358 pos/sec)]
+Estimated time to end of superbatch: 0.9s     superbatch 96 [98.1% (256/261 batches, 1147952 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 96 | time 1.9s | running loss 0.003019 | 1145776 pos/sec | total time 280.0s
+Estimated time remaining in training: 0h 5m 3s
+LR dropped to 0.0010947511
+superbatch 97 [0.0% (0/261 batches, 1035049 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 97 [49.0% (128/261 batches, 1142450 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 97 [98.1% (256/261 batches, 1072613 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 97 | time 2.0s | running loss 0.002929 | 1074134 pos/sec | total time 282.0s
+Estimated time remaining in training: 0h 4m 59s
+LR dropped to 0.0010798401
+superbatch 98 [0.0% (0/261 batches, 1005993 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 98 [49.0% (128/261 batches, 1022037 pos/sec)]
+Estimated time to end of superbatch: 1.1s     superbatch 98 [98.1% (256/261 batches, 1026296 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 98 | time 2.1s | running loss 0.002731 | 1027552 pos/sec | total time 284.1s
+Estimated time remaining in training: 0h 4m 55s
+LR dropped to 0.001064922
+superbatch 99 [0.0% (0/261 batches, 729618 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 99 [49.0% (128/261 batches, 1080172 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 99 [98.1% (256/261 batches, 1023016 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 99 | time 2.1s | running loss 0.002568 | 1023607 pos/sec | total time 286.2s
+Estimated time remaining in training: 0h 4m 51s
+LR dropped to 0.0010500001
+superbatch 100 [0.0% (0/261 batches, 708344 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 100 [49.0% (128/261 batches, 1011031 pos/sec)]
+Estimated time to end of superbatch: 1.1s     superbatch 100 [98.1% (256/261 batches, 954053 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 100 | time 2.2s | running loss 0.002489 | 952678 pos/sec | total time 288.4s
+Estimated time remaining in training: 0h 4m 48s
+Saved [koi-v4-100]
+epoch 100/200 train_loss 0.00249 val_loss 0.00249 val_mae_cp 194.4 time 2.2s
+LR dropped to 0.001035078
+superbatch 101 [0.0% (0/261 batches, 1115788 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 101 [49.0% (128/261 batches, 659654 pos/sec)]
+Estimated time to end of superbatch: 1.7s     superbatch 101 [98.1% (256/261 batches, 787939 pos/sec)]
+Estimated time to end of superbatch: 0.1s     superbatch 101 | time 2.7s | running loss 0.002468 | 791895 pos/sec | total time 293.3s
+Estimated time remaining in training: 0h 4m 47s
+LR dropped to 0.0010201597
+superbatch 102 [0.0% (0/261 batches, 1193908 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 102 [49.0% (128/261 batches, 1037261 pos/sec)]
+Estimated time to end of superbatch: 1.1s     superbatch 102 [98.1% (256/261 batches, 1021121 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 102 | time 2.1s | running loss 0.002509 | 1023209 pos/sec | total time 295.4s
+Estimated time remaining in training: 0h 4m 43s
+LR dropped to 0.001005249
+superbatch 103 [0.0% (0/261 batches, 884111 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 103 [49.0% (128/261 batches, 1072452 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 103 [98.1% (256/261 batches, 1087083 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 103 | time 2.0s | running loss 0.002545 | 1089055 pos/sec | total time 297.3s
+Estimated time remaining in training: 0h 4m 39s
+LR dropped to 0.0009903491
+superbatch 104 [0.0% (0/261 batches, 1305748 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 104 [49.0% (128/261 batches, 1084652 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 104 [98.1% (256/261 batches, 1089226 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 104 | time 2.0s | running loss 0.002623 | 1086593 pos/sec | total time 299.3s
+Estimated time remaining in training: 0h 4m 36s
+LR dropped to 0.0009754639
+superbatch 105 [0.0% (0/261 batches, 1180199 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 105 [49.0% (128/261 batches, 1109825 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 105 [98.1% (256/261 batches, 1117901 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 105 | time 1.9s | running loss 0.002625 | 1119741 pos/sec | total time 301.2s
+Estimated time remaining in training: 0h 4m 32s
+LR dropped to 0.00096059707
+superbatch 106 [0.0% (0/261 batches, 662242 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 106 [49.0% (128/261 batches, 1120655 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 106 [98.1% (256/261 batches, 1060848 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 106 | time 7.7s | running loss 0.002518 | 275914 pos/sec | total time 308.9s
+Estimated time remaining in training: 0h 4m 33s
+LR dropped to 0.00094575237
+superbatch 107 [0.0% (0/261 batches, 927452 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 107 [49.0% (128/261 batches, 1078161 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 107 [98.1% (256/261 batches, 1058804 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 107 | time 2.0s | running loss 0.002463 | 1060562 pos/sec | total time 311.0s
+Estimated time remaining in training: 0h 4m 30s
+LR dropped to 0.0009309334
+superbatch 108 [0.0% (0/261 batches, 1292929 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 108 [49.0% (128/261 batches, 1010097 pos/sec)]
+Estimated time to end of superbatch: 1.1s     superbatch 108 [98.1% (256/261 batches, 1065176 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 108 | time 2.0s | running loss 0.002548 | 1068021 pos/sec | total time 313.0s
+Estimated time remaining in training: 0h 4m 26s
+LR dropped to 0.00091614376
+superbatch 109 [0.0% (0/261 batches, 1289794 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 109 [49.0% (128/261 batches, 1170940 pos/sec)]
+Estimated time to end of superbatch: 0.9s     superbatch 109 [98.1% (256/261 batches, 1156145 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 109 | time 1.8s | running loss 0.002692 | 1157425 pos/sec | total time 314.8s
+Estimated time remaining in training: 0h 4m 22s
+LR dropped to 0.0009013872
+superbatch 110 [0.0% (0/261 batches, 1173353 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 110 [49.0% (128/261 batches, 1125886 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 110 [98.1% (256/261 batches, 1116899 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 110 | time 1.9s | running loss 0.002668 | 1118236 pos/sec | total time 316.7s
+Estimated time remaining in training: 0h 4m 19s
+LR dropped to 0.0008866673
+superbatch 111 [0.0% (0/261 batches, 619353 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 111 [49.0% (128/261 batches, 1116158 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 111 [98.1% (256/261 batches, 1117013 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 111 | time 1.9s | running loss 0.002517 | 1119135 pos/sec | total time 318.6s
+Estimated time remaining in training: 0h 4m 15s
+LR dropped to 0.0008719878
+superbatch 112 [0.0% (0/261 batches, 1140010 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 112 [49.0% (128/261 batches, 1127372 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 112 [98.1% (256/261 batches, 1120680 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 112 | time 1.9s | running loss 0.002375 | 1117889 pos/sec | total time 320.5s
+Estimated time remaining in training: 0h 4m 11s
+LR dropped to 0.00085735205
+superbatch 113 [0.0% (0/261 batches, 1286654 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 113 [49.0% (128/261 batches, 1083449 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 113 [98.1% (256/261 batches, 1094910 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 113 | time 2.0s | running loss 0.002205 | 1092505 pos/sec | total time 322.5s
+Estimated time remaining in training: 0h 4m 8s
+LR dropped to 0.0008427639
+superbatch 114 [0.0% (0/261 batches, 1247867 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 114 [49.0% (128/261 batches, 1113196 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 114 [98.1% (256/261 batches, 1118148 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 114 | time 1.9s | running loss 0.002036 | 1119439 pos/sec | total time 324.4s
+Estimated time remaining in training: 0h 4m 4s
+LR dropped to 0.0008282269
+superbatch 115 [0.0% (0/261 batches, 1285262 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 115 [49.0% (128/261 batches, 1124056 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 115 [98.1% (256/261 batches, 1130240 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 115 | time 1.9s | running loss 0.001908 | 1127130 pos/sec | total time 326.3s
+Estimated time remaining in training: 0h 4m 1s
+LR dropped to 0.0008137446
+superbatch 116 [0.0% (0/261 batches, 1125862 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 116 [49.0% (128/261 batches, 1098835 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 116 [98.1% (256/261 batches, 1098854 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 116 | time 1.9s | running loss 0.001832 | 1101113 pos/sec | total time 328.3s
+Estimated time remaining in training: 0h 3m 57s
+LR dropped to 0.0007993205
+superbatch 117 [0.0% (0/261 batches, 1291889 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 117 [49.0% (128/261 batches, 1143758 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 117 [98.1% (256/261 batches, 1128930 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 117 | time 1.9s | running loss 0.001810 | 1130356 pos/sec | total time 330.1s
+Estimated time remaining in training: 0h 3m 54s
+LR dropped to 0.0007849586
+superbatch 118 [0.0% (0/261 batches, 597817 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 118 [49.0% (128/261 batches, 1138540 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 118 [98.1% (256/261 batches, 1133396 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 118 | time 1.9s | running loss 0.001808 | 1130604 pos/sec | total time 332.0s
+Estimated time remaining in training: 0h 3m 50s
+LR dropped to 0.00077066163
+superbatch 119 [0.0% (0/261 batches, 1258971 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 119 [49.0% (128/261 batches, 1108110 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 119 [98.1% (256/261 batches, 1107858 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 119 | time 1.9s | running loss 0.001864 | 1105471 pos/sec | total time 334.0s
+Estimated time remaining in training: 0h 3m 47s
+LR dropped to 0.0007564337
+superbatch 120 [0.0% (0/261 batches, 1108060 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 120 [49.0% (128/261 batches, 1102562 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 120 [98.1% (256/261 batches, 1105925 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 120 | time 1.9s | running loss 0.001954 | 1099847 pos/sec | total time 335.9s
+Estimated time remaining in training: 0h 3m 43s
+Saved [koi-v4-120]
+epoch 120/200 train_loss 0.00195 val_loss 0.00195 val_mae_cp 193.3 time 1.9s
+LR dropped to 0.0007422784
+superbatch 121 [0.0% (0/261 batches, 1085335 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 121 [49.0% (128/261 batches, 1113196 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 121 [98.1% (256/261 batches, 1097751 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 121 | time 1.9s | running loss 0.002039 | 1098888 pos/sec | total time 339.8s
+Estimated time remaining in training: 0h 3m 41s
+LR dropped to 0.0007281989
+superbatch 122 [0.0% (0/261 batches, 1253788 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 122 [49.0% (128/261 batches, 1100017 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 122 [98.1% (256/261 batches, 1094513 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 122 | time 2.0s | running loss 0.002115 | 1096279 pos/sec | total time 341.8s
+Estimated time remaining in training: 0h 3m 38s
+LR dropped to 0.0007141989
+superbatch 123 [0.0% (0/261 batches, 584579 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 123 [49.0% (128/261 batches, 1100862 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 123 [98.1% (256/261 batches, 1086526 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 123 | time 2.0s | running loss 0.002212 | 1088193 pos/sec | total time 343.8s
+Estimated time remaining in training: 0h 3m 35s
+LR dropped to 0.0007002816
+superbatch 124 [0.0% (0/261 batches, 1177147 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 124 [49.0% (128/261 batches, 1085673 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 124 [98.1% (256/261 batches, 1077298 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 124 | time 2.0s | running loss 0.002503 | 1073833 pos/sec | total time 345.8s
+Estimated time remaining in training: 0h 3m 31s
+LR dropped to 0.0006864506
+superbatch 125 [0.0% (0/261 batches, 1189677 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 125 [49.0% (128/261 batches, 1094903 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 125 [98.1% (256/261 batches, 1098647 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 125 | time 1.9s | running loss 0.002745 | 1096590 pos/sec | total time 347.7s
+Estimated time remaining in training: 0h 3m 28s
+LR dropped to 0.00067270943
+superbatch 126 [0.0% (0/261 batches, 1107222 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 126 [49.0% (128/261 batches, 1092442 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 126 [98.1% (256/261 batches, 1079236 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 126 | time 6.3s | running loss 0.002463 | 337783 pos/sec | total time 354.0s
+Estimated time remaining in training: 0h 3m 27s
+LR dropped to 0.0006590615
+superbatch 127 [0.0% (0/261 batches, 1050028 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 127 [49.0% (128/261 batches, 1104724 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 127 [98.1% (256/261 batches, 1112470 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 127 | time 1.9s | running loss 0.002021 | 1114386 pos/sec | total time 356.0s
+Estimated time remaining in training: 0h 3m 24s
+LR dropped to 0.0006455096
+superbatch 128 [0.0% (0/261 batches, 1219683 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 128 [49.0% (128/261 batches, 1132945 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 128 [98.1% (256/261 batches, 1128947 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 128 | time 1.9s | running loss 0.001714 | 1130387 pos/sec | total time 357.8s
+Estimated time remaining in training: 0h 3m 21s
+LR dropped to 0.00063205766
+superbatch 129 [0.0% (0/261 batches, 1268033 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 129 [49.0% (128/261 batches, 1140145 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 129 [98.1% (256/261 batches, 1115644 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 129 | time 1.9s | running loss 0.001561 | 1115965 pos/sec | total time 359.8s
+Estimated time remaining in training: 0h 3m 18s
+LR dropped to 0.000618709
+superbatch 130 [0.0% (0/261 batches, 1275933 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 130 [49.0% (128/261 batches, 1109985 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 130 [98.1% (256/261 batches, 1110418 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 130 | time 1.9s | running loss 0.001499 | 1107912 pos/sec | total time 361.7s
+Estimated time remaining in training: 0h 3m 14s
+LR dropped to 0.0006054668
+superbatch 131 [0.0% (0/261 batches, 1159929 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 131 [49.0% (128/261 batches, 1079829 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 131 [98.1% (256/261 batches, 1073502 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 131 | time 2.0s | running loss 0.001470 | 1074901 pos/sec | total time 363.7s
+Estimated time remaining in training: 0h 3m 11s
+LR dropped to 0.00059233385
+superbatch 132 [0.0% (0/261 batches, 1106758 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 132 [49.0% (128/261 batches, 1080096 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 132 [98.1% (256/261 batches, 1085327 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 132 | time 2.0s | running loss 0.001459 | 1086964 pos/sec | total time 365.6s
+Estimated time remaining in training: 0h 3m 8s
+LR dropped to 0.0005793141
+superbatch 133 [0.0% (0/261 batches, 670700 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 133 [49.0% (128/261 batches, 1131381 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 133 [98.1% (256/261 batches, 1119887 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 133 | time 1.9s | running loss 0.001466 | 1120367 pos/sec | total time 367.6s
+Estimated time remaining in training: 0h 3m 5s
+LR dropped to 0.0005664105
+superbatch 134 [0.0% (0/261 batches, 1173202 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 134 [49.0% (128/261 batches, 1048779 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 134 [98.1% (256/261 batches, 1070796 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 134 | time 2.0s | running loss 0.001489 | 1072170 pos/sec | total time 369.6s
+Estimated time remaining in training: 0h 3m 2s
+LR dropped to 0.00055362633
+superbatch 135 [0.0% (0/261 batches, 672871 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 135 [49.0% (128/261 batches, 1118471 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 135 [98.1% (256/261 batches, 1118924 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 135 | time 1.9s | running loss 0.001534 | 1120590 pos/sec | total time 371.5s
+Estimated time remaining in training: 0h 2m 58s
+LR dropped to 0.0005409644
+superbatch 136 [0.0% (0/261 batches, 1282023 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 136 [49.0% (128/261 batches, 1104448 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 136 [98.1% (256/261 batches, 1108969 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 136 | time 1.9s | running loss 0.001575 | 1110367 pos/sec | total time 373.4s
+Estimated time remaining in training: 0h 2m 55s
+LR dropped to 0.00052842824
+superbatch 137 [0.0% (0/261 batches, 1283409 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 137 [49.0% (128/261 batches, 1124087 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 137 [98.1% (256/261 batches, 1125995 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 137 | time 1.9s | running loss 0.001599 | 1123982 pos/sec | total time 375.3s
+Estimated time remaining in training: 0h 2m 52s
+LR dropped to 0.0005160207
+superbatch 138 [0.0% (0/261 batches, 1282907 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 138 [49.0% (128/261 batches, 1137048 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 138 [98.1% (256/261 batches, 1120608 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 138 | time 1.9s | running loss 0.001577 | 1117223 pos/sec | total time 377.2s
+Estimated time remaining in training: 0h 2m 49s
+LR dropped to 0.00050374505
+superbatch 139 [0.0% (0/261 batches, 1278761 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 139 [49.0% (128/261 batches, 1132618 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 139 [98.1% (256/261 batches, 1138786 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 139 | time 1.9s | running loss 0.001555 | 1140729 pos/sec | total time 379.1s
+Estimated time remaining in training: 0h 2m 46s
+LR dropped to 0.000491604
+superbatch 140 [0.0% (0/261 batches, 1079429 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 140 [49.0% (128/261 batches, 1133921 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 140 [98.1% (256/261 batches, 1128536 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 140 | time 1.9s | running loss 0.001591 | 1129680 pos/sec | total time 381.0s
+Estimated time remaining in training: 0h 2m 43s
+Saved [koi-v4-140]
+epoch 140/200 train_loss 0.00159 val_loss 0.00159 val_mae_cp 192.3 time 1.9s
+LR dropped to 0.00047960074
+superbatch 141 [0.0% (0/261 batches, 1172547 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 141 [49.0% (128/261 batches, 1111522 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 141 [98.1% (256/261 batches, 1107518 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 141 | time 1.9s | running loss 0.001564 | 1106062 pos/sec | total time 384.7s
+Estimated time remaining in training: 0h 2m 40s
+LR dropped to 0.00046773837
+superbatch 142 [0.0% (0/261 batches, 1194308 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 142 [49.0% (128/261 batches, 1132975 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 142 [98.1% (256/261 batches, 1125369 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 142 | time 1.9s | running loss 0.001538 | 1126732 pos/sec | total time 386.6s
+Estimated time remaining in training: 0h 2m 37s
+LR dropped to 0.00045601942
+superbatch 143 [0.0% (0/261 batches, 1223819 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 143 [49.0% (128/261 batches, 1123095 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 143 [98.1% (256/261 batches, 1135557 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 143 | time 1.9s | running loss 0.001452 | 1136578 pos/sec | total time 388.5s
+Estimated time remaining in training: 0h 2m 34s
+LR dropped to 0.00044444692
+superbatch 144 [0.0% (0/261 batches, 705732 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 144 [49.0% (128/261 batches, 1121694 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 144 [98.1% (256/261 batches, 1121098 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 144 | time 1.9s | running loss 0.001350 | 1122343 pos/sec | total time 390.4s
+Estimated time remaining in training: 0h 2m 31s
+LR dropped to 0.00043302425
+superbatch 145 [0.0% (0/261 batches, 1238660 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 145 [49.0% (128/261 batches, 1130770 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 145 [98.1% (256/261 batches, 1124045 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 145 | time 1.9s | running loss 0.001303 | 1125496 pos/sec | total time 392.3s
+Estimated time remaining in training: 0h 2m 28s
+LR dropped to 0.0004217535
+superbatch 146 [0.0% (0/261 batches, 1274226 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 146 [49.0% (128/261 batches, 1108386 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 146 [98.1% (256/261 batches, 1100975 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 146 | time 5.9s | running loss 0.001299 | 364267 pos/sec | total time 398.1s
+Estimated time remaining in training: 0h 2m 27s
+LR dropped to 0.00041063782
+superbatch 147 [0.0% (0/261 batches, 1056364 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 147 [49.0% (128/261 batches, 1172699 pos/sec)]
+Estimated time to end of superbatch: 0.9s     superbatch 147 [98.1% (256/261 batches, 1138099 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 147 | time 1.9s | running loss 0.001302 | 1135996 pos/sec | total time 400.0s
+Estimated time remaining in training: 0h 2m 24s
+LR dropped to 0.0003996801
+superbatch 148 [0.0% (0/261 batches, 1261103 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 148 [49.0% (128/261 batches, 1114646 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 148 [98.1% (256/261 batches, 1113374 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 148 | time 1.9s | running loss 0.001301 | 1115439 pos/sec | total time 401.9s
+Estimated time remaining in training: 0h 2m 21s
+LR dropped to 0.00038888282
+superbatch 149 [0.0% (0/261 batches, 607067 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 149 [49.0% (128/261 batches, 1121668 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 149 [98.1% (256/261 batches, 1118557 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 149 | time 1.9s | running loss 0.001321 | 1120167 pos/sec | total time 403.8s
+Estimated time remaining in training: 0h 2m 18s
+LR dropped to 0.00037824851
+superbatch 150 [0.0% (0/261 batches, 611530 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 150 [49.0% (128/261 batches, 1082258 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 150 [98.1% (256/261 batches, 1106486 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 150 | time 1.9s | running loss 0.001390 | 1104446 pos/sec | total time 405.8s
+Estimated time remaining in training: 0h 2m 15s
+LR dropped to 0.00036777998
+superbatch 151 [0.0% (0/261 batches, 1276748 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 151 [49.0% (128/261 batches, 1085636 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 151 [98.1% (256/261 batches, 1089746 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 151 | time 2.0s | running loss 0.001511 | 1092178 pos/sec | total time 407.7s
+Estimated time remaining in training: 0h 2m 12s
+LR dropped to 0.0003574798
+superbatch 152 [0.0% (0/261 batches, 572347 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 152 [49.0% (128/261 batches, 1097171 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 152 [98.1% (256/261 batches, 1094890 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 152 | time 2.0s | running loss 0.001440 | 1096318 pos/sec | total time 409.7s
+Estimated time remaining in training: 0h 2m 9s
+LR dropped to 0.00034735037
+superbatch 153 [0.0% (0/261 batches, 1232417 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 153 [49.0% (128/261 batches, 1108943 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 153 [98.1% (256/261 batches, 1108140 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 153 | time 1.9s | running loss 0.001329 | 1109569 pos/sec | total time 411.6s
+Estimated time remaining in training: 0h 2m 6s
+LR dropped to 0.00033739442
+superbatch 154 [0.0% (0/261 batches, 1284234 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 154 [49.0% (128/261 batches, 1115616 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 154 [98.1% (256/261 batches, 1107293 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 154 | time 1.9s | running loss 0.001276 | 1107892 pos/sec | total time 413.5s
+Estimated time remaining in training: 0h 2m 3s
+LR dropped to 0.00032761425
+superbatch 155 [0.0% (0/261 batches, 594429 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 155 [49.0% (128/261 batches, 1083128 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 155 [98.1% (256/261 batches, 1091983 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 155 | time 2.0s | running loss 0.001238 | 1093472 pos/sec | total time 415.5s
+Estimated time remaining in training: 0h 2m 0s
+LR dropped to 0.00031801232
+superbatch 156 [0.0% (0/261 batches, 1198520 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 156 [49.0% (128/261 batches, 1102634 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 156 [98.1% (256/261 batches, 1104230 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 156 | time 1.9s | running loss 0.001209 | 1100433 pos/sec | total time 417.4s
+Estimated time remaining in training: 0h 1m 57s
+LR dropped to 0.00030859106
+superbatch 157 [0.0% (0/261 batches, 1152942 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 157 [49.0% (128/261 batches, 1100585 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 157 [98.1% (256/261 batches, 1100442 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 157 | time 1.9s | running loss 0.001191 | 1101416 pos/sec | total time 419.4s
+Estimated time remaining in training: 0h 1m 54s
+LR dropped to 0.0002993527
+superbatch 158 [0.0% (0/261 batches, 633203 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 158 [49.0% (128/261 batches, 1099922 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 158 [98.1% (256/261 batches, 1098837 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 158 | time 1.9s | running loss 0.001192 | 1100845 pos/sec | total time 421.3s
+Estimated time remaining in training: 0h 1m 51s
+LR dropped to 0.00029029942
+superbatch 159 [0.0% (0/261 batches, 573441 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 159 [49.0% (128/261 batches, 1100428 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 159 [98.1% (256/261 batches, 1099125 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 159 | time 1.9s | running loss 0.001205 | 1097420 pos/sec | total time 423.3s
+Estimated time remaining in training: 0h 1m 49s
+LR dropped to 0.0002814338
+superbatch 160 [0.0% (0/261 batches, 1286654 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 160 [49.0% (128/261 batches, 1115684 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 160 [98.1% (256/261 batches, 1115062 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 160 | time 1.9s | running loss 0.001208 | 1112225 pos/sec | total time 425.2s
+Estimated time remaining in training: 0h 1m 46s
+Saved [koi-v4-160]
+epoch 160/200 train_loss 0.00121 val_loss 0.00121 val_mae_cp 193.3 time 1.9s
+LR dropped to 0.0002727576
+superbatch 161 [0.0% (0/261 batches, 1170938 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 161 [49.0% (128/261 batches, 1115738 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 161 [98.1% (256/261 batches, 1108629 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 161 | time 1.9s | running loss 0.001207 | 1109846 pos/sec | total time 428.9s
+Estimated time remaining in training: 0h 1m 43s
+LR dropped to 0.00026427337
+superbatch 162 [0.0% (0/261 batches, 585210 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 162 [49.0% (128/261 batches, 1080904 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 162 [98.1% (256/261 batches, 1087988 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 162 | time 2.0s | running loss 0.001207 | 1085322 pos/sec | total time 430.9s
+Estimated time remaining in training: 0h 1m 41s
+LR dropped to 0.00025598297
+superbatch 163 [0.0% (0/261 batches, 1293399 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 163 [49.0% (128/261 batches, 1126882 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 163 [98.1% (256/261 batches, 1118244 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 163 | time 1.9s | running loss 0.001181 | 1115532 pos/sec | total time 432.8s
+Estimated time remaining in training: 0h 1m 38s
+LR dropped to 0.00024788838
+superbatch 164 [0.0% (0/261 batches, 1176826 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 164 [49.0% (128/261 batches, 1122993 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 164 [98.1% (256/261 batches, 1084890 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 164 | time 2.0s | running loss 0.001139 | 1082049 pos/sec | total time 434.8s
+Estimated time remaining in training: 0h 1m 35s
+LR dropped to 0.00023999182
+superbatch 165 [0.0% (0/261 batches, 1109276 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 165 [49.0% (128/261 batches, 1052840 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 165 [98.1% (256/261 batches, 1040752 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 165 | time 2.1s | running loss 0.001109 | 1040073 pos/sec | total time 436.8s
+Estimated time remaining in training: 0h 1m 32s
+LR dropped to 0.00023229502
+superbatch 166 [0.0% (0/261 batches, 1273355 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 166 [49.0% (128/261 batches, 985458 pos/sec)]
+Estimated time to end of superbatch: 1.1s     superbatch 166 [98.1% (256/261 batches, 966171 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 166 | time 5.9s | running loss 0.001081 | 361165 pos/sec | total time 442.7s
+Estimated time remaining in training: 0h 1m 30s
+LR dropped to 0.00022479997
+superbatch 167 [0.0% (0/261 batches, 1187057 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 167 [49.0% (128/261 batches, 860866 pos/sec)]
+Estimated time to end of superbatch: 1.3s     superbatch 167 [98.1% (256/261 batches, 859265 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 167 | time 2.5s | running loss 0.001058 | 858080 pos/sec | total time 445.2s
+Estimated time remaining in training: 0h 1m 27s
+LR dropped to 0.00021750864
+superbatch 168 [0.0% (0/261 batches, 1290729 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 168 [49.0% (128/261 batches, 809031 pos/sec)]
+Estimated time to end of superbatch: 1.4s     superbatch 168 [98.1% (256/261 batches, 824754 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 168 | time 2.6s | running loss 0.001043 | 824522 pos/sec | total time 447.8s
+Estimated time remaining in training: 0h 1m 25s
+LR dropped to 0.00021042256
+superbatch 169 [0.0% (0/261 batches, 1163950 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 169 [49.0% (128/261 batches, 874370 pos/sec)]
+Estimated time to end of superbatch: 1.3s     superbatch 169 [98.1% (256/261 batches, 870545 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 169 | time 2.5s | running loss 0.001033 | 871247 pos/sec | total time 450.3s
+Estimated time remaining in training: 0h 1m 22s
+LR dropped to 0.00020354369
+superbatch 170 [0.0% (0/261 batches, 579829 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 170 [49.0% (128/261 batches, 868879 pos/sec)]
+Estimated time to end of superbatch: 1.3s     superbatch 170 [98.1% (256/261 batches, 873021 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 170 | time 2.5s | running loss 0.001027 | 871808 pos/sec | total time 452.7s
+Estimated time remaining in training: 0h 1m 19s
+LR dropped to 0.00019687368
+superbatch 171 [0.0% (0/261 batches, 1031426 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 171 [49.0% (128/261 batches, 877545 pos/sec)]
+Estimated time to end of superbatch: 1.3s     superbatch 171 [98.1% (256/261 batches, 866628 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 171 | time 2.5s | running loss 0.001024 | 867129 pos/sec | total time 455.2s
+Estimated time remaining in training: 0h 1m 17s
+LR dropped to 0.00019041414
+superbatch 172 [0.0% (0/261 batches, 615917 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 172 [49.0% (128/261 batches, 862503 pos/sec)]
+Estimated time to end of superbatch: 1.3s     superbatch 172 [98.1% (256/261 batches, 856915 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 172 | time 2.5s | running loss 0.001022 | 857805 pos/sec | total time 457.7s
+Estimated time remaining in training: 0h 1m 14s
+LR dropped to 0.00018416671
+superbatch 173 [0.0% (0/261 batches, 1249676 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 173 [49.0% (128/261 batches, 890243 pos/sec)]
+Estimated time to end of superbatch: 1.2s     superbatch 173 [98.1% (256/261 batches, 900948 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 173 | time 2.4s | running loss 0.001024 | 900419 pos/sec | total time 460.1s
+Estimated time remaining in training: 0h 1m 11s
+LR dropped to 0.00017813302
+superbatch 174 [0.0% (0/261 batches, 1196821 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 174 [49.0% (128/261 batches, 911825 pos/sec)]
+Estimated time to end of superbatch: 1.2s     superbatch 174 [98.1% (256/261 batches, 876968 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 174 | time 2.4s | running loss 0.001028 | 876479 pos/sec | total time 462.5s
+Estimated time remaining in training: 0h 1m 9s
+LR dropped to 0.00017231435
+superbatch 175 [0.0% (0/261 batches, 513492 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 175 [49.0% (128/261 batches, 866522 pos/sec)]
+Estimated time to end of superbatch: 1.3s     superbatch 175 [98.1% (256/261 batches, 866789 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 175 | time 2.5s | running loss 0.001033 | 866799 pos/sec | total time 465.0s
+Estimated time remaining in training: 0h 1m 6s
+LR dropped to 0.00016671221
+superbatch 176 [0.0% (0/261 batches, 630479 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 176 [49.0% (128/261 batches, 873811 pos/sec)]
+Estimated time to end of superbatch: 1.3s     superbatch 176 [98.1% (256/261 batches, 865541 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 176 | time 2.5s | running loss 0.001034 | 864186 pos/sec | total time 467.4s
+Estimated time remaining in training: 0h 1m 3s
+LR dropped to 0.00016132812
+superbatch 177 [0.0% (0/261 batches, 543680 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 177 [49.0% (128/261 batches, 835202 pos/sec)]
+Estimated time to end of superbatch: 1.3s     superbatch 177 [98.1% (256/261 batches, 874834 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 177 | time 2.4s | running loss 0.001037 | 876086 pos/sec | total time 469.9s
+Estimated time remaining in training: 0h 1m 1s
+LR dropped to 0.00015616324
+superbatch 178 [0.0% (0/261 batches, 1233252 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 178 [49.0% (128/261 batches, 940367 pos/sec)]
+Estimated time to end of superbatch: 1.2s     superbatch 178 [98.1% (256/261 batches, 952491 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 178 | time 2.2s | running loss 0.001045 | 952818 pos/sec | total time 472.1s
+Estimated time remaining in training: 0h 0m 58s
+LR dropped to 0.00015121885
+superbatch 179 [0.0% (0/261 batches, 1229292 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 179 [49.0% (128/261 batches, 828443 pos/sec)]
+Estimated time to end of superbatch: 1.3s     superbatch 179 [98.1% (256/261 batches, 861669 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 179 | time 2.5s | running loss 0.001046 | 860872 pos/sec | total time 474.6s
+Estimated time remaining in training: 0h 0m 55s
+LR dropped to 0.00014649634
+superbatch 180 [0.0% (0/261 batches, 1162546 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 180 [49.0% (128/261 batches, 942850 pos/sec)]
+Estimated time to end of superbatch: 1.2s     superbatch 180 [98.1% (256/261 batches, 959579 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 180 | time 2.2s | running loss 0.001039 | 959184 pos/sec | total time 476.8s
+Estimated time remaining in training: 0h 0m 52s
+Saved [koi-v4-180]
+epoch 180/200 train_loss 0.00104 val_loss 0.00104 val_mae_cp 193.6 time 2.2s
+LR dropped to 0.00014199654
+superbatch 181 [0.0% (0/261 batches, 1056146 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 181 [49.0% (128/261 batches, 955409 pos/sec)]
+Estimated time to end of superbatch: 1.1s     superbatch 181 [98.1% (256/261 batches, 959540 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 181 | time 2.2s | running loss 0.001027 | 960203 pos/sec | total time 481.0s
+Estimated time remaining in training: 0h 0m 50s
+LR dropped to 0.00013772084
+superbatch 182 [0.0% (0/261 batches, 1009713 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 182 [49.0% (128/261 batches, 963599 pos/sec)]
+Estimated time to end of superbatch: 1.1s     superbatch 182 [98.1% (256/261 batches, 969010 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 182 | time 2.2s | running loss 0.001011 | 967867 pos/sec | total time 483.2s
+Estimated time remaining in training: 0h 0m 47s
+LR dropped to 0.0001336704
+superbatch 183 [0.0% (0/261 batches, 1292684 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 183 [49.0% (128/261 batches, 989636 pos/sec)]
+Estimated time to end of superbatch: 1.1s     superbatch 183 [98.1% (256/261 batches, 970334 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 183 | time 2.2s | running loss 0.000999 | 969157 pos/sec | total time 485.4s
+Estimated time remaining in training: 0h 0m 45s
+LR dropped to 0.00012984592
+superbatch 184 [0.0% (0/261 batches, 1288760 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 184 [49.0% (128/261 batches, 963389 pos/sec)]
+Estimated time to end of superbatch: 1.1s     superbatch 184 [98.1% (256/261 batches, 972251 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 184 | time 2.2s | running loss 0.000991 | 971241 pos/sec | total time 487.6s
+Estimated time remaining in training: 0h 0m 42s
+LR dropped to 0.00012624857
+superbatch 185 [0.0% (0/261 batches, 731350 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 185 [49.0% (128/261 batches, 974147 pos/sec)]
+Estimated time to end of superbatch: 1.1s     superbatch 185 [98.1% (256/261 batches, 961495 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 185 | time 2.2s | running loss 0.000984 | 961515 pos/sec | total time 489.9s
+Estimated time remaining in training: 0h 0m 39s
+LR dropped to 0.00012287905
+superbatch 186 [0.0% (0/261 batches, 650252 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 186 [49.0% (128/261 batches, 880636 pos/sec)]
+Estimated time to end of superbatch: 1.2s     superbatch 186 [98.1% (256/261 batches, 905746 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 186 | time 5.2s | running loss 0.000978 | 411684 pos/sec | total time 495.0s
+Estimated time remaining in training: 0h 0m 37s
+LR dropped to 0.00011973828
+superbatch 187 [0.0% (0/261 batches, 1079457 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 187 [49.0% (128/261 batches, 889328 pos/sec)]
+Estimated time to end of superbatch: 1.2s     superbatch 187 [98.1% (256/261 batches, 877440 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 187 | time 2.4s | running loss 0.000976 | 877184 pos/sec | total time 497.5s
+Estimated time remaining in training: 0h 0m 34s
+LR dropped to 0.00011682708
+superbatch 188 [0.0% (0/261 batches, 679608 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 188 [49.0% (128/261 batches, 946656 pos/sec)]
+Estimated time to end of superbatch: 1.2s     superbatch 188 [98.1% (256/261 batches, 934424 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 188 | time 2.3s | running loss 0.000973 | 932308 pos/sec | total time 499.8s
+Estimated time remaining in training: 0h 0m 31s
+LR dropped to 0.00011414604
+superbatch 189 [0.0% (0/261 batches, 1108885 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 189 [49.0% (128/261 batches, 923438 pos/sec)]
+Estimated time to end of superbatch: 1.2s     superbatch 189 [98.1% (256/261 batches, 929005 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 189 | time 2.3s | running loss 0.000971 | 928918 pos/sec | total time 502.1s
+Estimated time remaining in training: 0h 0m 29s
+LR dropped to 0.00011169608
+superbatch 190 [0.0% (0/261 batches, 1220610 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 190 [49.0% (128/261 batches, 940729 pos/sec)]
+Estimated time to end of superbatch: 1.2s     superbatch 190 [98.1% (256/261 batches, 891780 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 190 | time 2.4s | running loss 0.000969 | 890316 pos/sec | total time 504.5s
+Estimated time remaining in training: 0h 0m 26s
+LR dropped to 0.00010947755
+superbatch 191 [0.0% (0/261 batches, 910091 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 191 [49.0% (128/261 batches, 897476 pos/sec)]
+Estimated time to end of superbatch: 1.2s     superbatch 191 [98.1% (256/261 batches, 894518 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 191 | time 2.4s | running loss 0.000966 | 895699 pos/sec | total time 506.9s
+Estimated time remaining in training: 0h 0m 23s
+LR dropped to 0.00010749092
+superbatch 192 [0.0% (0/261 batches, 1091583 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 192 [49.0% (128/261 batches, 902496 pos/sec)]
+Estimated time to end of superbatch: 1.2s     superbatch 192 [98.1% (256/261 batches, 902294 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 192 | time 2.4s | running loss 0.000960 | 902893 pos/sec | total time 509.2s
+Estimated time remaining in training: 0h 0m 21s
+LR dropped to 0.00010573701
+superbatch 193 [0.0% (0/261 batches, 576094 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 193 [49.0% (128/261 batches, 958405 pos/sec)]
+Estimated time to end of superbatch: 1.1s     superbatch 193 [98.1% (256/261 batches, 959783 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 193 | time 2.2s | running loss 0.000951 | 957697 pos/sec | total time 511.5s
+Estimated time remaining in training: 0h 0m 18s
+LR dropped to 0.00010421593
+superbatch 194 [0.0% (0/261 batches, 1068824 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 194 [49.0% (128/261 batches, 935040 pos/sec)]
+Estimated time to end of superbatch: 1.2s     superbatch 194 [98.1% (256/261 batches, 939040 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 194 | time 2.3s | running loss 0.000944 | 938436 pos/sec | total time 513.7s
+Estimated time remaining in training: 0h 0m 15s
+LR dropped to 0.00010292849
+superbatch 195 [0.0% (0/261 batches, 1160028 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 195 [49.0% (128/261 batches, 882223 pos/sec)]
+Estimated time to end of superbatch: 1.2s     superbatch 195 [98.1% (256/261 batches, 882206 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 195 | time 2.4s | running loss 0.000938 | 881809 pos/sec | total time 516.2s
+Estimated time remaining in training: 0h 0m 13s
+LR dropped to 0.00010187458
+superbatch 196 [0.0% (0/261 batches, 982773 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 196 [49.0% (128/261 batches, 864136 pos/sec)]
+Estimated time to end of superbatch: 1.3s     superbatch 196 [98.1% (256/261 batches, 868674 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 196 | time 2.5s | running loss 0.000933 | 869274 pos/sec | total time 518.6s
+Estimated time remaining in training: 0h 0m 10s
+LR dropped to 0.00010105455
+superbatch 197 [0.0% (0/261 batches, 1295403 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 197 [49.0% (128/261 batches, 889253 pos/sec)]
+Estimated time to end of superbatch: 1.2s     superbatch 197 [98.1% (256/261 batches, 874396 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 197 | time 2.4s | running loss 0.000928 | 874561 pos/sec | total time 521.1s
+Estimated time remaining in training: 0h 0m 7s
+LR dropped to 0.00010046875
+superbatch 198 [0.0% (0/261 batches, 982313 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 198 [49.0% (128/261 batches, 888062 pos/sec)]
+Estimated time to end of superbatch: 1.2s     superbatch 198 [98.1% (256/261 batches, 885975 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 198 | time 2.4s | running loss 0.000923 | 885028 pos/sec | total time 523.5s
+Estimated time remaining in training: 0h 0m 5s
+LR dropped to 0.00010011718
+superbatch 199 [0.0% (0/261 batches, 1270038 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 199 [49.0% (128/261 batches, 969572 pos/sec)]
+Estimated time to end of superbatch: 1.1s     superbatch 199 [98.1% (256/261 batches, 1033848 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 199 | time 2.1s | running loss 0.000919 | 1036318 pos/sec | total time 525.6s
+Estimated time remaining in training: 0h 0m 2s
+LR dropped to 0.0001
+superbatch 200 [0.0% (0/261 batches, 1269113 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 200 [49.0% (128/261 batches, 1089446 pos/sec)]
+Estimated time to end of superbatch: 1.0s     superbatch 200 [98.1% (256/261 batches, 1075878 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 200 | time 2.0s | running loss 0.000916 | 1076864 pos/sec | total time 527.5s
+Estimated time remaining in training: 0h 0m 0s
+Saved [koi-v4-200]
+epoch 200/200 train_loss 0.00092 val_loss 0.00092 val_mae_cp 193.5 time 2.0s
+Total Training Time: 0h 8m 49s
+bullet training finished net=koi-v4
+run_bullet: exporting artifacts\training\bullet\koi-v4-bullet-long\checkpoints\koi-v4-200\raw.bin
+export: checkpoint artifacts\training\bullet\koi-v4-bullet-long\checkpoints\koi-v4-200 hidden=1024
+export: float val_mae_cp 199.1 on 4000 rows
+quantization v4 s1=6 k3=12 val_mae_cp 289.3
+quantization v4 s1=6 k3=14 val_mae_cp 224.2
+quantization v4 s1=6 k3=16 val_mae_cp 371.2
+quantization v4 s1=6 k3=18 val_mae_cp 432.6
+quantization v4 s1=6 k3=20 val_mae_cp 449.1
+quantization v4 s1=7 k3=12 val_mae_cp 199.2
+quantization v4 s1=7 k3=14 val_mae_cp 198.7
+quantization v4 s1=7 k3=16 val_mae_cp 259.6
+quantization v4 s1=7 k3=18 val_mae_cp 399.0
+quantization v4 s1=7 k3=20 val_mae_cp 440.4
+quantization v4 s1=8 k3=12 val_mae_cp 310.5
+quantization v4 s1=8 k3=14 val_mae_cp 310.5
+quantization v4 s1=8 k3=16 val_mae_cp 311.5
+quantization v4 s1=8 k3=18 val_mae_cp 373.1
+quantization v4 s1=8 k3=20 val_mae_cp 432.2
+selected v4 s1=7 k3=14 val_mae_cp 198.7
+wrote artifacts\training\bullet\koi-v4-bullet-long\koi.nnue (18882699 bytes) and artifacts\training\bullet\koi-v4-bullet-long\koi.metadata.json
+run_bullet: finished artifacts\training\bullet\koi-v4-bullet-long\koi.nnue

@@ -1,0 +1,22 @@
+{
+  "schema": "koi-speed-gate-experiment-v1",
+  "recorded_utc": "2026-10-05T21:28:42Z",
+  "gate_script": "tools/build/speed_gate.ps1",
+  "gate_script_sha256": "CB5A41FBCD75CC2CFFB57E714CEF961343CB8492AEDFFD40812585443C54CFD5",
+  "baseline_exe": "artifacts\\verification\\speed-gate\\batch4-20261006-sparse-depth2-5/baseline/koi-bench-baseline.exe",
+  "baseline_exe_sha256": "9674015FF72ECB6E915D29B5E7968DDB0A1BA6A28EFF6790FF2BC2ED2D646BCC",
+  "candidate_exe": "build/roadmap-visit-win-release/koi-bench.exe",
+  "candidate_exe_sha256": "706CEB76D7E099D3FB01D91D8BD7102BC3112DF906474824FF6E37A7D8725CF8",
+  "source_revision": "64bcb565cc7cab2524e852ab34fd409aa2e39fc1",
+  "baseline_note": "isolated Release build of HEAD 64bcb56 from build/roadmap-batch4-baseline-src (BuildTools MSVC 14.44.35207, CMake 3.31.6, Ninja, modules/shadow/GPU/PGO/sanitize/static-runtime OFF)",
+  "candidate": "Batch 4: SEE ExchangeContext reuse per picker/ordering call; 8-ray pin scan in refresh_king_masks; check-probe king-ray prefilter; locked-pawn-wall popcount gate; hoisted move_index in quiet/continuation history; metadata init and constexpr no_move(); own-colour development scan; quiet-promotion priority skip.",
+  "fen_file": "artifacts\\verification\\speed-gate\\batch4-20261006-sparse-depth2-5/sparse-qsearch-fens.txt",
+  "fen_sha256": "07855F78D6544FD4D9ED8E6000FDA3B279208AFC608F389569D85DE3026D930C",
+  "threads": 1,
+  "speed": 100,
+  "depth_sweep": "2..5",
+  "runs": 5,
+  "max_total_nps_regression_percent": 2.0,
+  "max_row_nps_regression_percent": 2.0,
+  "min_row_elapsed_ms": 20.0
+}

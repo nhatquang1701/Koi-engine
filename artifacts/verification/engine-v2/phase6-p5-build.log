@@ -1,0 +1,96 @@
+[1/80] Scanning C:\Users\ntATh\AppData\Local\Temp\opencode\koi-p5\src\koi\detail\attack_tables.cpp for CXX dependencies
+[2/80] Scanning C:\Users\ntATh\AppData\Local\Temp\opencode\koi-p5\src\koi\classical_evaluator.cpp for CXX dependencies
+[3/80] Scanning C:\Users\ntATh\AppData\Local\Temp\opencode\koi-p5\src\koi\detail\evaluation_context.cpp for CXX dependencies
+[4/80] Scanning C:\Users\ntATh\AppData\Local\Temp\opencode\koi-p5\src\koi\detail\compatibility_mirror.cpp for CXX dependencies
+[5/80] Scanning C:\Users\ntATh\AppData\Local\Temp\opencode\koi-p5\src\koi\detail\feature_state.cpp for CXX dependencies
+[6/80] Scanning C:\Users\ntATh\AppData\Local\Temp\opencode\koi-p5\src\koi\detail\root_coordinator.cpp for CXX dependencies
+[7/80] Scanning C:\Users\ntATh\AppData\Local\Temp\opencode\koi-p5\src\koi\detail\search_context.cpp for CXX dependencies
+[8/80] Scanning C:\Users\ntATh\AppData\Local\Temp\opencode\koi-p5\src\koi\detail\search_context_support.cpp for CXX dependencies
+[9/80] Scanning C:\Users\ntATh\AppData\Local\Temp\opencode\koi-p5\src\koi\detail\search_ordering_tables.cpp for CXX dependencies
+[10/80] Scanning C:\Users\ntATh\AppData\Local\Temp\opencode\koi-p5\src\koi\cpu_features.cpp for CXX dependencies
+[11/80] Scanning C:\Users\ntATh\AppData\Local\Temp\opencode\koi-p5\src\koi\detail\search_runner.cpp for CXX dependencies
+[12/80] Scanning C:\Users\ntATh\AppData\Local\Temp\opencode\koi-p5\src\koi\detail\search_session.cpp for CXX dependencies
+[13/80] Scanning C:\Users\ntATh\AppData\Local\Temp\opencode\koi-p5\src\koi\completion_gate.cpp for CXX dependencies
+[14/80] Scanning C:\Users\ntATh\AppData\Local\Temp\opencode\koi-p5\src\koi\evaluation_features.cpp for CXX dependencies
+[15/80] Scanning C:\Users\ntATh\AppData\Local\Temp\opencode\koi-p5\src\koi\move.cpp for CXX dependencies
+[16/80] Scanning C:\Users\ntATh\AppData\Local\Temp\opencode\koi-p5\src\koi\game_state.cpp for CXX dependencies
+[17/80] Scanning C:\Users\ntATh\AppData\Local\Temp\opencode\koi-p5\src\koi\move_chooser.cpp for CXX dependencies
+[18/80] Scanning C:\Users\ntATh\AppData\Local\Temp\opencode\koi-p5\src\koi\nnue.cpp for CXX dependencies
+[19/80] Scanning C:\Users\ntATh\AppData\Local\Temp\opencode\koi-p5\src\koi\perft.cpp for CXX dependencies
+[20/80] Scanning C:\Users\ntATh\AppData\Local\Temp\opencode\koi-p5\src\koi\opening_book.cpp for CXX dependencies
+[21/80] Scanning C:\Users\ntATh\AppData\Local\Temp\opencode\koi-p5\src\koi\position.cpp for CXX dependencies
+[22/80] Scanning C:\Users\ntATh\AppData\Local\Temp\opencode\koi-p5\src\koi\search_ordering.cpp for CXX dependencies
+[23/80] Scanning C:\Users\ntATh\AppData\Local\Temp\opencode\koi-p5\src\koi\search_service.cpp for CXX dependencies
+[24/80] Scanning C:\Users\ntATh\AppData\Local\Temp\opencode\koi-p5\src\koi\static_exchange.cpp for CXX dependencies
+[25/80] Scanning C:\Users\ntATh\AppData\Local\Temp\opencode\koi-p5\src\koi\strength_suite.cpp for CXX dependencies
+[26/80] Scanning C:\Users\ntATh\AppData\Local\Temp\opencode\koi-p5\src\koi\syzygy_tablebase.cpp for CXX dependencies
+[27/80] Scanning C:\Users\ntATh\AppData\Local\Temp\opencode\koi-p5\src\koi\time_manager.cpp for CXX dependencies
+[28/80] Scanning C:\Users\ntATh\AppData\Local\Temp\opencode\koi-p5\src\koi\uci_controller.cpp for CXX dependencies
+[29/80] Scanning C:\Users\ntATh\AppData\Local\Temp\opencode\koi-p5\src\koi\modules\types.ixx for CXX dependencies
+types.ixx
+[30/80] Scanning C:\Users\ntATh\AppData\Local\Temp\opencode\koi-p5\src\koi\modules\position.ixx for CXX dependencies
+position.ixx
+[31/80] Scanning C:\Users\ntATh\AppData\Local\Temp\opencode\koi-p5\src\koi\modules\eval.ixx for CXX dependencies
+eval.ixx
+[32/80] Scanning C:\Users\ntATh\AppData\Local\Temp\opencode\koi-p5\src\koi\modules\tablebase.ixx for CXX dependencies
+tablebase.ixx
+[33/80] Scanning C:\Users\ntATh\AppData\Local\Temp\opencode\koi-p5\src\koi\modules\search.ixx for CXX dependencies
+search.ixx
+[34/80] Scanning C:\Users\ntATh\AppData\Local\Temp\opencode\koi-p5\src\koi\modules\runtime.ixx for CXX dependencies
+runtime.ixx
+[35/80] Scanning C:\Users\ntATh\AppData\Local\Temp\opencode\koi-p5\src\koi\modules\koi.ixx for CXX dependencies
+koi.ixx
+[36/80] Scanning C:\Users\ntATh\AppData\Local\Temp\opencode\koi-p5\src\koi\transposition_table.cpp for CXX dependencies
+[37/80] Scanning C:\Users\ntATh\AppData\Local\Temp\opencode\koi-p5\third_party\fathom\tbprobe.c for CXX dependencies
+[38/80] Generating CXX dyndep file CMakeFiles\koi_core.dir\CXX.dd
+[39/80] Scanning C:\Users\ntATh\AppData\Local\Temp\opencode\koi-p5\src\main.cpp for CXX dependencies
+[40/80] Building CXX object CMakeFiles\koi_core.dir\src\koi\detail\attack_tables.cpp.obj
+[41/80] Building CXX object CMakeFiles\koi_core.dir\src\koi\classical_evaluator.cpp.obj
+[42/80] Building CXX object CMakeFiles\koi_core.dir\src\koi\detail\evaluation_context.cpp.obj
+[43/80] Building CXX object CMakeFiles\koi_core.dir\src\koi\detail\feature_state.cpp.obj
+[44/80] Building CXX object CMakeFiles\koi_core.dir\src\koi\detail\root_coordinator.cpp.obj
+[45/80] Building CXX object CMakeFiles\koi_core.dir\src\koi\detail\compatibility_mirror.cpp.obj
+[46/80] Building CXX object CMakeFiles\koi_core.dir\src\koi\detail\search_ordering_tables.cpp.obj
+[47/80] Building CXX object CMakeFiles\koi_core.dir\src\koi\detail\search_context_support.cpp.obj
+[48/80] Building CXX object CMakeFiles\koi_core.dir\src\koi\detail\search_context.cpp.obj
+[49/80] Building CXX object CMakeFiles\koi_core.dir\src\koi\cpu_features.cpp.obj
+[50/80] Building CXX object CMakeFiles\koi_core.dir\src\koi\evaluation_features.cpp.obj
+[51/80] Building CXX object CMakeFiles\koi_core.dir\src\koi\detail\search_session.cpp.obj
+[52/80] Building CXX object CMakeFiles\koi_core.dir\src\koi\completion_gate.cpp.obj
+[53/80] Building CXX object CMakeFiles\koi_core.dir\src\koi\move.cpp.obj
+[54/80] Building CXX object CMakeFiles\koi_core.dir\src\koi\detail\search_runner.cpp.obj
+[55/80] Building CXX object CMakeFiles\koi_core.dir\src\koi\move_chooser.cpp.obj
+[56/80] Building CXX object CMakeFiles\koi_core.dir\src\koi\game_state.cpp.obj
+[57/80] Building CXX object CMakeFiles\koi_core.dir\src\koi\perft.cpp.obj
+[58/80] Building CXX object CMakeFiles\koi_core.dir\src\koi\nnue.cpp.obj
+[59/80] Building CXX object CMakeFiles\koi_core.dir\src\koi\opening_book.cpp.obj
+[60/80] Building CXX object CMakeFiles\koi_core.dir\src\koi\search_ordering.cpp.obj
+[61/80] Building CXX object CMakeFiles\koi_core.dir\src\koi\static_exchange.cpp.obj
+[62/80] Building CXX object CMakeFiles\koi_core.dir\src\koi\search_service.cpp.obj
+[63/80] Building CXX object CMakeFiles\koi_core.dir\src\koi\position.cpp.obj
+[64/80] Building CXX object CMakeFiles\koi_core.dir\src\koi\strength_suite.cpp.obj
+[65/80] Building CXX object CMakeFiles\koi_core.dir\src\koi\syzygy_tablebase.cpp.obj
+[66/80] Building CXX object CMakeFiles\koi_core.dir\src\koi\transposition_table.cpp.obj
+[67/80] Building CXX object CMakeFiles\koi_core.dir\src\koi\time_manager.cpp.obj
+[68/80] Building CXX object CMakeFiles\koi_core.dir\src\koi\modules\types.ixx.obj
+types.ixx
+[69/80] Generating CXX dyndep file CMakeFiles\koi_engine.dir\CXX.dd
+[70/80] Building CXX object CMakeFiles\koi_core.dir\src\koi\modules\position.ixx.obj
+position.ixx
+[71/80] Building CXX object CMakeFiles\koi_core.dir\src\koi\modules\eval.ixx.obj
+eval.ixx
+[72/80] Building CXX object CMakeFiles\koi_core.dir\src\koi\modules\tablebase.ixx.obj
+tablebase.ixx
+[73/80] Building CXX object CMakeFiles\koi_core.dir\src\koi\modules\search.ixx.obj
+search.ixx
+[74/80] Building CXX object CMakeFiles\koi_core.dir\src\koi\modules\runtime.ixx.obj
+runtime.ixx
+[75/80] Building CXX object CMakeFiles\koi_core.dir\third_party\fathom\tbprobe.c.obj
+[76/80] Building CXX object CMakeFiles\koi_core.dir\src\koi\modules\koi.ixx.obj
+koi.ixx
+[77/80] Building CXX object CMakeFiles\koi_core.dir\src\koi\uci_controller.cpp.obj
+[78/80] Linking CXX static library koi_core.lib
+[79/80] Building CXX object CMakeFiles\koi_engine.dir\src\main.cpp.obj
+[80/80] Linking CXX executable koi-engine.exe
+BUILD_EXIT=0 
+DONE 

@@ -1,0 +1,20 @@
+loaded 400 rows (32.0 active, pad 32) in 0.0s
+epoch 1/1 train_loss 0.00669 val_loss 0.10586 val_mae_cp 10.6 time 0.0s
+wrote float checkpoint C:\Users\ntATh\AI test\Koi engine\artifacts\training\runs\20260918-025054-selftest-koi\net.pt
+quantization v4 s1=6 k3=12 val_mae_cp 10.4
+quantization v4 s1=6 k3=14 val_mae_cp 10.4
+quantization v4 s1=6 k3=16 val_mae_cp 10.4
+quantization v4 s1=6 k3=18 val_mae_cp 10.5
+quantization v4 s1=6 k3=20 val_mae_cp 10.4
+quantization v4 s1=7 k3=12 val_mae_cp 10.4
+quantization v4 s1=7 k3=14 val_mae_cp 10.5
+quantization v4 s1=7 k3=16 val_mae_cp 10.4
+quantization v4 s1=7 k3=18 val_mae_cp 10.4
+quantization v4 s1=7 k3=20 val_mae_cp 10.4
+quantization v4 s1=8 k3=12 val_mae_cp 10.4
+quantization v4 s1=8 k3=14 val_mae_cp 10.7
+quantization v4 s1=8 k3=16 val_mae_cp 10.4
+quantization v4 s1=8 k3=18 val_mae_cp 10.4
+quantization v4 s1=8 k3=20 val_mae_cp 10.4
+selected v4 s1=6 k3=12 val_mae_cp 10.4
+wrote C:\Users\ntATh\AI test\Koi engine\artifacts\training\runs\20260918-025054-selftest-koi\net.nnue (1180299 bytes) and C:\Users\ntATh\AI test\Koi engine\artifacts\training\runs\20260918-025054-selftest-koi\net.metadata.json

@@ -1,0 +1,43 @@
+Started game 1 of 10 (Koi vs Opponent)
+Finished game 1 (Koi vs Opponent): 0-1 {Black mates}
+Score of Koi vs Opponent: 0 - 1 - 0  [0.000] 1
+Started game 2 of 10 (Opponent vs Koi)
+Finished game 2 (Opponent vs Koi): 1-0 {White mates}
+Score of Koi vs Opponent: 0 - 2 - 0  [0.000] 2
+Started game 3 of 10 (Koi vs Opponent)
+Finished game 3 (Koi vs Opponent): 0-1 {Black mates}
+Score of Koi vs Opponent: 0 - 3 - 0  [0.000] 3
+Started game 4 of 10 (Opponent vs Koi)
+Finished game 4 (Opponent vs Koi): 1-0 {White mates}
+Score of Koi vs Opponent: 0 - 4 - 0  [0.000] 4
+Started game 5 of 10 (Koi vs Opponent)
+Finished game 5 (Koi vs Opponent): 0-1 {Black mates}
+Score of Koi vs Opponent: 0 - 5 - 0  [0.000] 5
+Started game 6 of 10 (Opponent vs Koi)
+Finished game 6 (Opponent vs Koi): 1-0 {White mates}
+Score of Koi vs Opponent: 0 - 6 - 0  [0.000] 6
+Started game 7 of 10 (Koi vs Opponent)
+Finished game 7 (Koi vs Opponent): 0-1 {Black mates}
+Score of Koi vs Opponent: 0 - 7 - 0  [0.000] 7
+Started game 8 of 10 (Opponent vs Koi)
+Finished game 8 (Opponent vs Koi): 1-0 {White mates}
+Score of Koi vs Opponent: 0 - 8 - 0  [0.000] 8
+Started game 9 of 10 (Koi vs Opponent)
+Finished game 9 (Koi vs Opponent): 0-1 {Black mates}
+Score of Koi vs Opponent: 0 - 9 - 0  [0.000] 9
+Started game 10 of 10 (Opponent vs Koi)
+Finished game 10 (Opponent vs Koi): 1-0 {White mates}
+Score of Koi vs Opponent: 0 - 10 - 0  [0.000] 10
+...      Koi playing White: 0 - 5 - 0  [0.000] 5
+...      Koi playing Black: 0 - 5 - 0  [0.000] 5
+...      White vs Black: 5 - 5 - 0  [0.500] 10
+Elo difference: -inf +/- nan, LOS: 0.1 %, DrawRatio: 0.0 %
+SPRT: llr 0 (0.0%), lbound -inf, ubound inf
+
+Player: Koi
+   "Loss: Black mates": 5
+   "Loss: White mates": 5
+Player: Opponent
+   "Win: Black mates": 5
+   "Win: White mates": 5
+Finished match

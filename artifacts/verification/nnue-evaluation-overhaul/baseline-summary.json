@@ -1,0 +1,31 @@
+{
+  "schema": "koi-nnue-overhaul-baseline-v1",
+  "created": "2026-09-17",
+  "commit": "54080cd",
+  "engine": "Koi Engine 1.1.0",
+  "ctest": {
+    "release_full": { "tests": 54, "passed": 54, "seconds": 237.84, "log": "ctest-release-baseline.log" },
+    "debug_smoke_non_heavy": { "tests": 46, "passed": 46, "seconds": 75.60, "log": "ctest-debug-baseline.log" }
+  },
+  "bench_hard_suite": {
+    "threads1": { "rows": 64, "matches": 64, "deterministic": true },
+    "threads2": { "rows": 64, "matches": 53, "deterministic": true, "rows_equal_threads1": false },
+    "threads4": { "rows": 64, "matches": 53, "deterministic": true, "rows_equal_threads1": false }
+  },
+  "timed_threads1": {
+    "classical": { "positions": 64, "nodes": 754289, "elapsed_ms": 5238, "nps": 144003 },
+    "nnue": {
+      "network": "artifacts/training/koi-sf-v1.nnue",
+      "positions": 64,
+      "nodes": 445257,
+      "elapsed_ms": 3784,
+      "nps": 117668
+    }
+  },
+  "nnue_gate_hard_suite": { "network": "artifacts/training/koi-sf-v1.nnue", "rows": 64, "matches": 60 },
+  "findings": [
+    "Pre-existing: release_verify.ps1 requires every hard-suite row to be match 1 and requires Threads 1/2/4 rows to be identical after stripping nodes/qnodes/tt_hits. At commit 54080cd Threads=2 and Threads=4 produce deterministic but different rows (11 match-0 rows each), so the harness assertion is stale relative to the documented threaded search behavior (several threaded parity cases are XFAIL by design). No release-verify evidence directory exists for HEAD; the only one (release-verify-eefb3e8e...) contains only cmake-version files.",
+    "koi-bench --help usage text omits --nnue and the profile JSON has no NNUE identity field.",
+    "KOI-NNUE (koi-sf-v1) matches 60/64 on the default hard suite at Threads=1 versus 64/64 for the classical evaluator."
+  ]
+}

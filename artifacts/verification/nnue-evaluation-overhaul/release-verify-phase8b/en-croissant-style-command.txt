@@ -1,0 +1,2 @@
+json C:\Users\ntATh\AI test\Koi engine\artifacts\verification\nnue-evaluation-overhaul\release-verify-phase8b\en-croissant-style-24ply\koi-uci-match-20260917-203414-177.json
+pgn C:\Users\ntATh\AI test\Koi engine\artifacts\verification\nnue-evaluation-overhaul\release-verify-phase8b\en-croissant-style-24ply\koi-uci-match-20260917-203414-177.pgn

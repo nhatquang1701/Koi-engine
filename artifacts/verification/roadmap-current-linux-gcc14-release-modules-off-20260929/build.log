@@ -1,0 +1,498 @@
+[1/399] Scanning /work/src/koi/cpu_features.cpp for CXX dependencies
+[2/399] Scanning /work/src/koi/cpu_variant_guard.cpp for CXX dependencies
+[3/399] Scanning /work/src/koi/cpu_variant_guard.cpp for CXX dependencies
+[4/399] Generating CXX dyndep file CMakeFiles/koi_cpu_features.dir/CXX.dd
+[5/399] Generating CXX dyndep file CMakeFiles/koi_cpu_guard_avx2.dir/CXX.dd
+[6/399] Generating CXX dyndep file CMakeFiles/koi_cpu_guard_avx512.dir/CXX.dd
+[7/399] Building CXX object CMakeFiles/koi_cpu_features.dir/src/koi/cpu_features.cpp.o
+[8/399] Building CXX object CMakeFiles/koi_cpu_guard_avx2.dir/src/koi/cpu_variant_guard.cpp.o
+[9/399] Building CXX object CMakeFiles/koi_cpu_guard_avx512.dir/src/koi/cpu_variant_guard.cpp.o
+[10/399] Scanning /work/src/koi/detail/attack_tables.cpp for CXX dependencies
+[11/399] Scanning /work/src/koi/classical_evaluator.cpp for CXX dependencies
+[12/399] Scanning /work/src/koi/detail/evaluation_context.cpp for CXX dependencies
+[13/399] Scanning /work/src/koi/detail/compatibility_mirror.cpp for CXX dependencies
+[14/399] Scanning /work/src/koi/detail/feature_state.cpp for CXX dependencies
+[15/399] Scanning /work/src/koi/detail/root_coordinator.cpp for CXX dependencies
+[16/399] Scanning /work/src/koi/detail/policy_value_mcts.cpp for CXX dependencies
+[17/399] Scanning /work/src/koi/detail/search_context_support.cpp for CXX dependencies
+[18/399] Scanning /work/src/koi/detail/search_context.cpp for CXX dependencies
+[19/399] Scanning /work/src/koi/detail/search_ordering_tables.cpp for CXX dependencies
+[20/399] Scanning /work/src/koi/detail/search_runner.cpp for CXX dependencies
+[21/399] Scanning /work/src/koi/detail/search_session.cpp for CXX dependencies
+[22/399] Scanning /work/src/koi/cpu_variant.cpp for CXX dependencies
+[23/399] Scanning /work/src/koi/completion_gate.cpp for CXX dependencies
+[24/399] Scanning /work/src/koi/gpu/cuda_driver.cpp for CXX dependencies
+[25/399] Scanning /work/src/koi/executable_path.cpp for CXX dependencies
+[26/399] Scanning /work/src/koi/evaluation_features.cpp for CXX dependencies
+[27/399] Scanning /work/src/koi/game_state.cpp for CXX dependencies
+[28/399] Scanning /work/src/koi/move.cpp for CXX dependencies
+[29/399] Scanning /work/src/koi/gpu/gpu_nnue_service.cpp for CXX dependencies
+[30/399] Scanning /work/src/koi/gpu/nnue_gpu_evaluator.cpp for CXX dependencies
+[31/399] Scanning /work/src/koi/move_chooser.cpp for CXX dependencies
+[32/399] Scanning /work/src/koi/perft.cpp for CXX dependencies
+[33/399] Scanning /work/src/koi/opening_book.cpp for CXX dependencies
+[34/399] Scanning /work/src/koi/nnue.cpp for CXX dependencies
+[35/399] Scanning /work/src/koi/policy_value_model.cpp for CXX dependencies
+[36/399] Scanning /work/src/koi/position.cpp for CXX dependencies
+[37/399] Scanning /work/src/koi/search_ordering.cpp for CXX dependencies
+[38/399] Scanning /work/src/koi/search_service.cpp for CXX dependencies
+[39/399] Scanning /work/src/koi/strength_suite.cpp for CXX dependencies
+[40/399] Scanning /work/src/koi/static_exchange.cpp for CXX dependencies
+[41/399] Scanning /work/src/koi/syzygy_tablebase.cpp for CXX dependencies
+[42/399] Scanning /work/src/koi/time_manager.cpp for CXX dependencies
+[43/399] Scanning /work/third_party/fathom/tbprobe.c for CXX dependencies
+[44/399] Scanning /work/src/koi/transposition_table.cpp for CXX dependencies
+[45/399] Scanning /work/src/koi/detail/attack_tables.cpp for CXX dependencies
+[46/399] Scanning /work/src/koi/uci_controller.cpp for CXX dependencies
+[47/399] Scanning /work/src/koi/classical_evaluator.cpp for CXX dependencies
+[48/399] Scanning /work/src/koi/detail/compatibility_mirror.cpp for CXX dependencies
+[49/399] Generating CXX dyndep file CMakeFiles/koi_core.dir/CXX.dd
+[50/399] Scanning /work/src/koi/detail/evaluation_context.cpp for CXX dependencies
+[51/399] Scanning /work/src/koi/detail/feature_state.cpp for CXX dependencies
+[52/399] Building CXX object CMakeFiles/koi_core.dir/src/koi/detail/attack_tables.cpp.o
+[53/399] Scanning /work/src/koi/detail/policy_value_mcts.cpp for CXX dependencies
+[54/399] Building CXX object CMakeFiles/koi_core.dir/src/koi/classical_evaluator.cpp.o
+[55/399] Building CXX object CMakeFiles/koi_core.dir/src/koi/detail/evaluation_context.cpp.o
+[56/399] Building CXX object CMakeFiles/koi_core.dir/src/koi/detail/feature_state.cpp.o
+[57/399] Building CXX object CMakeFiles/koi_core.dir/src/koi/detail/compatibility_mirror.cpp.o
+[58/399] Building CXX object CMakeFiles/koi_core.dir/src/koi/detail/root_coordinator.cpp.o
+[59/399] Building CXX object CMakeFiles/koi_core.dir/src/koi/detail/policy_value_mcts.cpp.o
+[60/399] Building CXX object CMakeFiles/koi_core.dir/src/koi/detail/search_context_support.cpp.o
+[61/399] Building CXX object CMakeFiles/koi_core.dir/src/koi/detail/search_ordering_tables.cpp.o
+[62/399] Building CXX object CMakeFiles/koi_core.dir/src/koi/detail/search_context.cpp.o
+[63/399] Building CXX object CMakeFiles/koi_core.dir/src/koi/completion_gate.cpp.o
+[64/399] Building CXX object CMakeFiles/koi_core.dir/src/koi/detail/search_session.cpp.o
+[65/399] Building CXX object CMakeFiles/koi_core.dir/src/koi/cpu_variant.cpp.o
+[66/399] Building CXX object CMakeFiles/koi_core.dir/src/koi/executable_path.cpp.o
+[67/399] Building CXX object CMakeFiles/koi_core.dir/src/koi/evaluation_features.cpp.o
+[68/399] Building CXX object CMakeFiles/koi_core.dir/src/koi/detail/search_runner.cpp.o
+[69/399] Building CXX object CMakeFiles/koi_core.dir/src/koi/gpu/cuda_driver.cpp.o
+[70/399] Building CXX object CMakeFiles/koi_core.dir/src/koi/game_state.cpp.o
+[71/399] Building CXX object CMakeFiles/koi_core.dir/src/koi/move.cpp.o
+[72/399] Building CXX object CMakeFiles/koi_core.dir/src/koi/gpu/gpu_nnue_service.cpp.o
+[73/399] Building CXX object CMakeFiles/koi_core.dir/src/koi/gpu/nnue_gpu_evaluator.cpp.o
+[74/399] Building CXX object CMakeFiles/koi_core.dir/src/koi/move_chooser.cpp.o
+[75/399] Building CXX object CMakeFiles/koi_core.dir/src/koi/perft.cpp.o
+[76/399] Building CXX object CMakeFiles/koi_core.dir/src/koi/opening_book.cpp.o
+[77/399] Building CXX object CMakeFiles/koi_core.dir/src/koi/nnue.cpp.o
+[78/399] Building CXX object CMakeFiles/koi_core.dir/src/koi/policy_value_model.cpp.o
+[79/399] Building CXX object CMakeFiles/koi_core.dir/src/koi/position.cpp.o
+[80/399] Building CXX object CMakeFiles/koi_core.dir/src/koi/search_ordering.cpp.o
+[81/399] Building CXX object CMakeFiles/koi_core.dir/src/koi/search_service.cpp.o
+[82/399] Building CXX object CMakeFiles/koi_core.dir/src/koi/strength_suite.cpp.o
+[83/399] Building CXX object CMakeFiles/koi_core.dir/src/koi/static_exchange.cpp.o
+[84/399] Building CXX object CMakeFiles/koi_core.dir/src/koi/syzygy_tablebase.cpp.o
+[85/399] Building CXX object CMakeFiles/koi_core.dir/src/koi/transposition_table.cpp.o
+[86/399] Building CXX object CMakeFiles/koi_core.dir/third_party/fathom/tbprobe.c.o
+[87/399] Building CXX object CMakeFiles/koi_core.dir/src/koi/time_manager.cpp.o
+[88/399] Scanning /work/src/koi/detail/root_coordinator.cpp for CXX dependencies
+[89/399] Scanning /work/src/koi/detail/search_context_support.cpp for CXX dependencies
+[90/399] Scanning /work/src/koi/detail/search_context.cpp for CXX dependencies
+[91/399] Scanning /work/src/koi/detail/search_ordering_tables.cpp for CXX dependencies
+[92/399] Scanning /work/src/koi/detail/search_session.cpp for CXX dependencies
+[93/399] Scanning /work/src/koi/detail/search_runner.cpp for CXX dependencies
+[94/399] Scanning /work/src/koi/completion_gate.cpp for CXX dependencies
+[95/399] Scanning /work/src/koi/cpu_variant.cpp for CXX dependencies
+[96/399] Building CXX object CMakeFiles/koi_core.dir/src/koi/uci_controller.cpp.o
+[97/399] Scanning /work/src/koi/executable_path.cpp for CXX dependencies
+[98/399] Scanning /work/src/koi/evaluation_features.cpp for CXX dependencies
+[99/399] Scanning /work/src/koi/gpu/cuda_driver.cpp for CXX dependencies
+[100/399] Scanning /work/src/koi/game_state.cpp for CXX dependencies
+[101/399] Linking CXX static library libkoi_core.a
+[102/399] Scanning /work/src/koi/gpu/gpu_nnue_service.cpp for CXX dependencies
+[103/399] Scanning /work/src/koi/move.cpp for CXX dependencies
+[104/399] Scanning /work/src/koi/gpu/nnue_gpu_evaluator.cpp for CXX dependencies
+[105/399] Scanning /work/src/koi/move_chooser.cpp for CXX dependencies
+[106/399] Scanning /work/src/koi/perft.cpp for CXX dependencies
+[107/399] Scanning /work/src/koi/nnue.cpp for CXX dependencies
+[108/399] Scanning /work/src/koi/opening_book.cpp for CXX dependencies
+[109/399] Scanning /work/src/koi/policy_value_model.cpp for CXX dependencies
+[110/399] Scanning /work/src/koi/position.cpp for CXX dependencies
+[111/399] Scanning /work/src/koi/search_ordering.cpp for CXX dependencies
+[112/399] Scanning /work/src/koi/search_service.cpp for CXX dependencies
+[113/399] Scanning /work/src/koi/strength_suite.cpp for CXX dependencies
+[114/399] Scanning /work/src/koi/static_exchange.cpp for CXX dependencies
+[115/399] Scanning /work/src/koi/syzygy_tablebase.cpp for CXX dependencies
+[116/399] Scanning /work/src/koi/time_manager.cpp for CXX dependencies
+[117/399] Scanning /work/src/koi/transposition_table.cpp for CXX dependencies
+[118/399] Scanning /work/third_party/fathom/tbprobe.c for CXX dependencies
+[119/399] Scanning /work/src/koi/detail/attack_tables.cpp for CXX dependencies
+[120/399] Scanning /work/src/koi/uci_controller.cpp for CXX dependencies
+[121/399] Scanning /work/src/koi/classical_evaluator.cpp for CXX dependencies
+[122/399] Scanning /work/src/koi/detail/compatibility_mirror.cpp for CXX dependencies
+[123/399] Scanning /work/src/koi/detail/evaluation_context.cpp for CXX dependencies
+[124/399] Generating CXX dyndep file CMakeFiles/koi_core_avx512.dir/CXX.dd
+[125/399] Scanning /work/src/koi/detail/root_coordinator.cpp for CXX dependencies
+[126/399] Scanning /work/src/koi/detail/feature_state.cpp for CXX dependencies
+[127/399] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/detail/attack_tables.cpp.o
+[128/399] Scanning /work/src/koi/detail/policy_value_mcts.cpp for CXX dependencies
+[129/399] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/classical_evaluator.cpp.o
+[130/399] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/detail/evaluation_context.cpp.o
+[131/399] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/detail/feature_state.cpp.o
+[132/399] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/detail/compatibility_mirror.cpp.o
+[133/399] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/detail/root_coordinator.cpp.o
+[134/399] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/detail/policy_value_mcts.cpp.o
+[135/399] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/detail/search_ordering_tables.cpp.o
+[136/399] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/detail/search_context_support.cpp.o
+[137/399] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/detail/search_context.cpp.o
+[138/399] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/detail/search_session.cpp.o
+[139/399] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/cpu_variant.cpp.o
+[140/399] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/completion_gate.cpp.o
+[141/399] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/executable_path.cpp.o
+[142/399] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/evaluation_features.cpp.o
+[143/399] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/detail/search_runner.cpp.o
+[144/399] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/gpu/cuda_driver.cpp.o
+[145/399] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/game_state.cpp.o
+[146/399] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/move.cpp.o
+[147/399] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/gpu/gpu_nnue_service.cpp.o
+[148/399] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/gpu/nnue_gpu_evaluator.cpp.o
+[149/399] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/move_chooser.cpp.o
+[150/399] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/perft.cpp.o
+[151/399] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/opening_book.cpp.o
+[152/399] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/nnue.cpp.o
+[153/399] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/policy_value_model.cpp.o
+[154/399] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/position.cpp.o
+[155/399] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/search_ordering.cpp.o
+[156/399] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/search_service.cpp.o
+[157/399] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/strength_suite.cpp.o
+[158/399] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/static_exchange.cpp.o
+[159/399] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/syzygy_tablebase.cpp.o
+[160/399] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/transposition_table.cpp.o
+[161/399] Building CXX object CMakeFiles/koi_core_avx512.dir/third_party/fathom/tbprobe.c.o
+[162/399] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/time_manager.cpp.o
+[163/399] Scanning /work/src/koi/detail/search_ordering_tables.cpp for CXX dependencies
+[164/399] Scanning /work/src/koi/detail/search_context_support.cpp for CXX dependencies
+[165/399] Scanning /work/src/koi/detail/search_context.cpp for CXX dependencies
+[166/399] Scanning /work/src/koi/detail/search_session.cpp for CXX dependencies
+[167/399] Scanning /work/src/koi/completion_gate.cpp for CXX dependencies
+[168/399] Scanning /work/src/koi/detail/search_runner.cpp for CXX dependencies
+[169/399] Scanning /work/src/koi/cpu_variant.cpp for CXX dependencies
+[170/399] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/uci_controller.cpp.o
+[171/399] Scanning /work/src/koi/executable_path.cpp for CXX dependencies
+[172/399] Scanning /work/src/koi/evaluation_features.cpp for CXX dependencies
+[173/399] Scanning /work/src/koi/gpu/cuda_driver.cpp for CXX dependencies
+[174/399] Scanning /work/src/koi/game_state.cpp for CXX dependencies
+[175/399] Linking CXX static library libkoi_core_avx512.a
+[176/399] Scanning /work/src/koi/gpu/gpu_nnue_service.cpp for CXX dependencies
+[177/399] Scanning /work/src/koi/move.cpp for CXX dependencies
+[178/399] Scanning /work/src/koi/gpu/nnue_gpu_evaluator.cpp for CXX dependencies
+[179/399] Scanning /work/src/koi/move_chooser.cpp for CXX dependencies
+[180/399] Scanning /work/src/koi/nnue.cpp for CXX dependencies
+[181/399] Scanning /work/src/koi/perft.cpp for CXX dependencies
+[182/399] Scanning /work/src/koi/opening_book.cpp for CXX dependencies
+[183/399] Scanning /work/src/koi/position.cpp for CXX dependencies
+[184/399] Scanning /work/src/koi/policy_value_model.cpp for CXX dependencies
+[185/399] Scanning /work/src/koi/search_ordering.cpp for CXX dependencies
+[186/399] Scanning /work/src/koi/search_service.cpp for CXX dependencies
+[187/399] Scanning /work/src/koi/strength_suite.cpp for CXX dependencies
+[188/399] Scanning /work/src/koi/static_exchange.cpp for CXX dependencies
+[189/399] Scanning /work/src/koi/syzygy_tablebase.cpp for CXX dependencies
+[190/399] Scanning /work/src/koi/time_manager.cpp for CXX dependencies
+[191/399] Scanning /work/src/koi/transposition_table.cpp for CXX dependencies
+[192/399] Scanning /work/tools/engine/koi_gpu_probe.cpp for CXX dependencies
+[193/399] Scanning /work/third_party/fathom/tbprobe.c for CXX dependencies
+[194/399] Generating CXX dyndep file CMakeFiles/koi_gpu_probe.dir/CXX.dd
+[195/399] Scanning /work/src/koi/uci_controller.cpp for CXX dependencies
+[196/399] Building CXX object CMakeFiles/koi_gpu_probe.dir/tools/engine/koi_gpu_probe.cpp.o
+[197/399] Linking CXX executable koi_gpu_probe
+[198/399] Scanning /work/tests/unit/runtime/gpu_nnue_tests.cpp for CXX dependencies
+[199/399] Generating CXX dyndep file CMakeFiles/gpu_nnue_tests.dir/CXX.dd
+[200/399] Scanning /work/tests/integration/rules/native_shadow_diff_tests.cpp for CXX dependencies
+[201/399] Generating CXX dyndep file CMakeFiles/koi_core_generic.dir/CXX.dd
+[202/399] Generating CXX dyndep file CMakeFiles/koi_shadow_diff_tests.dir/CXX.dd
+[203/399] Scanning /work/tests/unit/core/koi_core_tests.cpp for CXX dependencies
+[204/399] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/detail/attack_tables.cpp.o
+[205/399] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/classical_evaluator.cpp.o
+[206/399] Building CXX object CMakeFiles/gpu_nnue_tests.dir/tests/unit/runtime/gpu_nnue_tests.cpp.o
+[207/399] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/detail/evaluation_context.cpp.o
+[208/399] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/detail/compatibility_mirror.cpp.o
+[209/399] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/detail/root_coordinator.cpp.o
+[210/399] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/detail/feature_state.cpp.o
+[211/399] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/detail/policy_value_mcts.cpp.o
+[212/399] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/detail/search_context_support.cpp.o
+[213/399] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/detail/search_ordering_tables.cpp.o
+[214/399] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/detail/search_context.cpp.o
+[215/399] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/cpu_variant.cpp.o
+[216/399] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/detail/search_session.cpp.o
+[217/399] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/completion_gate.cpp.o
+[218/399] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/executable_path.cpp.o
+[219/399] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/evaluation_features.cpp.o
+[220/399] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/detail/search_runner.cpp.o
+[221/399] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/gpu/cuda_driver.cpp.o
+[222/399] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/game_state.cpp.o
+[223/399] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/move.cpp.o
+[224/399] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/gpu/gpu_nnue_service.cpp.o
+[225/399] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/gpu/nnue_gpu_evaluator.cpp.o
+[226/399] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/move_chooser.cpp.o
+[227/399] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/nnue.cpp.o
+[228/399] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/perft.cpp.o
+[229/399] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/opening_book.cpp.o
+[230/399] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/policy_value_model.cpp.o
+[231/399] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/position.cpp.o
+[232/399] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/search_ordering.cpp.o
+[233/399] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/search_service.cpp.o
+[234/399] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/strength_suite.cpp.o
+[235/399] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/static_exchange.cpp.o
+[236/399] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/syzygy_tablebase.cpp.o
+[237/399] Building CXX object CMakeFiles/koi_core_generic.dir/third_party/fathom/tbprobe.c.o
+[238/399] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/time_manager.cpp.o
+[239/399] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/transposition_table.cpp.o
+[240/399] Generating CXX dyndep file CMakeFiles/koi_core_tests.dir/CXX.dd
+[241/399] Linking CXX executable gpu_nnue_tests
+[242/399] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/uci_controller.cpp.o
+[243/399] Scanning /work/tests/unit/evaluation/evaluation_boundary_tests.cpp for CXX dependencies
+[244/399] Generating CXX dyndep file CMakeFiles/evaluation_boundary_tests.dir/CXX.dd
+[245/399] Building CXX object CMakeFiles/koi_core_tests.dir/tests/unit/core/koi_core_tests.cpp.o
+[246/399] Linking CXX static library libkoi_core_generic.a
+[247/399] Building CXX object CMakeFiles/koi_shadow_diff_tests.dir/tests/integration/rules/native_shadow_diff_tests.cpp.o
+[248/399] Scanning /work/tests/unit/evaluation/evaluation_architecture_tests.cpp for CXX dependencies
+[249/399] Generating CXX dyndep file CMakeFiles/evaluation_architecture_tests.dir/CXX.dd
+[250/399] Building CXX object CMakeFiles/evaluation_boundary_tests.dir/tests/unit/evaluation/evaluation_boundary_tests.cpp.o
+[251/399] Building CXX object CMakeFiles/evaluation_architecture_tests.dir/tests/unit/evaluation/evaluation_architecture_tests.cpp.o
+[252/399] Linking CXX executable koi_core_tests
+lto-wrapper: warning: using serial compilation of 3 LTRANS jobs
+lto-wrapper: note: see the ‘-flto’ option documentation for more information
+[253/399] Linking CXX executable evaluation_boundary_tests
+lto-wrapper: warning: using serial compilation of 2 LTRANS jobs
+lto-wrapper: note: see the ‘-flto’ option documentation for more information
+[254/399] Linking CXX executable koi_shadow_diff_tests
+lto-wrapper: warning: using serial compilation of 3 LTRANS jobs
+lto-wrapper: note: see the ‘-flto’ option documentation for more information
+[255/399] Scanning /work/tests/unit/evaluation/nnue_boundary_tests.cpp for CXX dependencies
+[256/399] Generating CXX dyndep file CMakeFiles/nnue_boundary_tests.dir/CXX.dd
+[257/399] Scanning /work/tests/unit/runtime/cpu_features_tests.cpp for CXX dependencies
+[258/399] Generating CXX dyndep file CMakeFiles/koi_cpu_features_tests.dir/CXX.dd
+[259/399] Scanning /work/tests/unit/runtime/cpu_variant_tests.cpp for CXX dependencies
+[260/399] Generating CXX dyndep file CMakeFiles/koi_cpu_variant_tests.dir/CXX.dd
+[261/399] Linking CXX executable evaluation_architecture_tests
+lto-wrapper: warning: using serial compilation of 2 LTRANS jobs
+lto-wrapper: note: see the ‘-flto’ option documentation for more information
+[262/399] Scanning /work/tests/unit/runtime/syzygy_tablebase_tests.cpp for CXX dependencies
+[263/399] Generating CXX dyndep file CMakeFiles/syzygy_tablebase_tests.dir/CXX.dd
+[264/399] Building CXX object CMakeFiles/koi_cpu_features_tests.dir/tests/unit/runtime/cpu_features_tests.cpp.o
+[265/399] Building CXX object CMakeFiles/koi_cpu_variant_tests.dir/tests/unit/runtime/cpu_variant_tests.cpp.o
+[266/399] Building CXX object CMakeFiles/nnue_boundary_tests.dir/tests/unit/evaluation/nnue_boundary_tests.cpp.o
+[267/399] Linking CXX executable koi_cpu_features_tests
+[268/399] Building CXX object CMakeFiles/syzygy_tablebase_tests.dir/tests/unit/runtime/syzygy_tablebase_tests.cpp.o
+[269/399] Scanning /work/tests/unit/rules/koi_rules_tests.cpp for CXX dependencies
+[270/399] Generating CXX dyndep file CMakeFiles/koi_rules_tests.dir/CXX.dd
+[271/399] Linking CXX executable koi_cpu_variant_tests
+[272/399] Scanning /work/tests/unit/rules/native_rule_state_tests.cpp for CXX dependencies
+[273/399] Generating CXX dyndep file CMakeFiles/native_rule_state_tests.dir/CXX.dd
+[274/399] Building CXX object CMakeFiles/koi_rules_tests.dir/tests/unit/rules/koi_rules_tests.cpp.o
+[275/399] Building CXX object CMakeFiles/native_rule_state_tests.dir/tests/unit/rules/native_rule_state_tests.cpp.o
+[276/399] Linking CXX executable syzygy_tablebase_tests
+lto-wrapper: warning: using serial compilation of 3 LTRANS jobs
+lto-wrapper: note: see the ‘-flto’ option documentation for more information
+[277/399] Scanning /work/tests/unit/runtime/opening_book_tests.cpp for CXX dependencies
+[278/399] Generating CXX dyndep file CMakeFiles/opening_book_tests.dir/CXX.dd
+[279/399] Linking CXX executable koi_rules_tests
+lto-wrapper: warning: using serial compilation of 3 LTRANS jobs
+lto-wrapper: note: see the ‘-flto’ option documentation for more information
+[280/399] Linking CXX executable nnue_boundary_tests
+lto-wrapper: warning: using serial compilation of 6 LTRANS jobs
+lto-wrapper: note: see the ‘-flto’ option documentation for more information
+[281/399] Scanning /work/tests/unit/runtime/uci_controller_tests.cpp for CXX dependencies
+[282/399] Generating CXX dyndep file CMakeFiles/uci_controller_tests.dir/CXX.dd
+[283/399] Building CXX object CMakeFiles/opening_book_tests.dir/tests/unit/runtime/opening_book_tests.cpp.o
+[284/399] Scanning /work/tests/unit/runtime/completion_gate_tests.cpp for CXX dependencies
+[285/399] Generating CXX dyndep file CMakeFiles/completion_gate_tests.dir/CXX.dd
+[286/399] Linking CXX executable native_rule_state_tests
+lto-wrapper: warning: using serial compilation of 3 LTRANS jobs
+lto-wrapper: note: see the ‘-flto’ option documentation for more information
+[287/399] Scanning /work/tests/unit/search/koi_search_tests.cpp for CXX dependencies
+[288/399] Generating CXX dyndep file CMakeFiles/koi_search_tests.dir/CXX.dd
+[289/399] Building CXX object CMakeFiles/completion_gate_tests.dir/tests/unit/runtime/completion_gate_tests.cpp.o
+[290/399] Building CXX object CMakeFiles/uci_controller_tests.dir/tests/unit/runtime/uci_controller_tests.cpp.o
+[291/399] Linking CXX executable opening_book_tests
+lto-wrapper: warning: using serial compilation of 3 LTRANS jobs
+lto-wrapper: note: see the ‘-flto’ option documentation for more information
+[292/399] Scanning /work/tests/unit/search/search_ordering_tests.cpp for CXX dependencies
+[293/399] Generating CXX dyndep file CMakeFiles/search_ordering_tests.dir/CXX.dd
+[294/399] Building CXX object CMakeFiles/koi_search_tests.dir/tests/unit/search/koi_search_tests.cpp.o
+/work/tests/unit/search/koi_search_tests.cpp: In function ‘void {anonymous}::test_service_hash_configuration_survives_default_start_and_non_default_override()’:
+/work/tests/unit/search/koi_search_tests.cpp:4225:29: warning: ignoring return value of ‘koi::HashResizeResult koi::SearchService::set_hash_size_mb(std::size_t)’, declared with attribute ‘nodiscard’ [-Wunused-result]
+ 4225 |     service.set_hash_size_mb(1);
+      |     ~~~~~~~~~~~~~~~~~~~~~~~~^~~
+In file included from /work/tests/unit/search/koi_search_tests.cpp:25:
+/work/src/koi/search_service.hpp:47:36: note: declared here
+   47 |     [[nodiscard]] HashResizeResult set_hash_size_mb(std::size_t megabytes);
+      |                                    ^~~~~~~~~~~~~~~~
+/work/tests/unit/search/koi_search_tests.cpp: In function ‘void {anonymous}::test_hash_configuration_clamps_to_uci_bounds_and_clear_discards_warmed_entries()’:
+/work/tests/unit/search/koi_search_tests.cpp:4255:29: warning: ignoring return value of ‘koi::HashResizeResult koi::SearchService::set_hash_size_mb(std::size_t)’, declared with attribute ‘nodiscard’ [-Wunused-result]
+ 4255 |     service.set_hash_size_mb(0);
+      |     ~~~~~~~~~~~~~~~~~~~~~~~~^~~
+/work/src/koi/search_service.hpp:47:36: note: declared here
+   47 |     [[nodiscard]] HashResizeResult set_hash_size_mb(std::size_t megabytes);
+      |                                    ^~~~~~~~~~~~~~~~
+/work/tests/unit/search/koi_search_tests.cpp: In function ‘void {anonymous}::test_transposition_table_stores_probes_and_clears_entries()’:
+/work/tests/unit/search/koi_search_tests.cpp:4283:22: warning: ignoring return value of ‘koi::HashResizeResult koi::TranspositionTable::set_size_mb(std::size_t)’, declared with attribute ‘nodiscard’ [-Wunused-result]
+ 4283 |     table.set_size_mb(1);
+      |     ~~~~~~~~~~~~~~~~~^~~
+In file included from /work/src/koi/detail/search_table_access.hpp:8,
+                 from /work/src/koi/detail/search_context.hpp:23,
+                 from /work/tests/unit/search/koi_search_tests.cpp:22:
+/work/src/koi/transposition_table.hpp:108:36: note: declared here
+  108 |     [[nodiscard]] HashResizeResult set_size_mb(std::size_t megabytes) noexcept;
+      |                                    ^~~~~~~~~~~
+/work/tests/unit/search/koi_search_tests.cpp: In function ‘void {anonymous}::test_transposition_table_survives_concurrent_probe_store_and_resize()’:
+/work/tests/unit/search/koi_search_tests.cpp:4498:26: warning: ignoring return value of ‘koi::HashResizeResult koi::TranspositionTable::set_size_mb(std::size_t)’, declared with attribute ‘nodiscard’ [-Wunused-result]
+ 4498 |         table.set_size_mb(megabytes);
+      |         ~~~~~~~~~~~~~~~~~^~~~~~~~~~~
+/work/src/koi/transposition_table.hpp:108:36: note: declared here
+  108 |     [[nodiscard]] HashResizeResult set_size_mb(std::size_t megabytes) noexcept;
+      |                                    ^~~~~~~~~~~
+/work/tests/unit/search/koi_search_tests.cpp: In lambda function:
+/work/tests/unit/search/koi_search_tests.cpp:4532:30: warning: ignoring return value of ‘koi::HashResizeResult koi::TranspositionTable::set_size_mb(std::size_t)’, declared with attribute ‘nodiscard’ [-Wunused-result]
+ 4532 |             table.set_size_mb(megabytes);
+      |             ~~~~~~~~~~~~~~~~~^~~~~~~~~~~
+/work/src/koi/transposition_table.hpp:108:36: note: declared here
+  108 |     [[nodiscard]] HashResizeResult set_size_mb(std::size_t megabytes) noexcept;
+      |                                    ^~~~~~~~~~~
+[295/399] Linking CXX executable completion_gate_tests
+lto-wrapper: warning: using serial compilation of 3 LTRANS jobs
+lto-wrapper: note: see the ‘-flto’ option documentation for more information
+[296/399] Building CXX object CMakeFiles/search_ordering_tests.dir/tests/unit/search/search_ordering_tests.cpp.o
+[297/399] Scanning /work/tests/unit/search/search_architecture_tests.cpp for CXX dependencies
+[298/399] Generating CXX dyndep file CMakeFiles/search_architecture_tests.dir/CXX.dd
+[299/399] Building CXX object CMakeFiles/search_architecture_tests.dir/tests/unit/search/search_architecture_tests.cpp.o
+[300/399] Linking CXX executable search_ordering_tests
+lto-wrapper: warning: using serial compilation of 3 LTRANS jobs
+lto-wrapper: note: see the ‘-flto’ option documentation for more information
+[301/399] Scanning /work/tests/unit/search/search_policy_tests.cpp for CXX dependencies
+[302/399] Generating CXX dyndep file CMakeFiles/search_policy_tests.dir/CXX.dd
+[303/399] Linking CXX executable search_architecture_tests
+lto-wrapper: warning: using serial compilation of 2 LTRANS jobs
+lto-wrapper: note: see the ‘-flto’ option documentation for more information
+[304/399] Scanning /work/tests/unit/search/search_runtime_tests.cpp for CXX dependencies
+[305/399] Generating CXX dyndep file CMakeFiles/search_runtime_tests.dir/CXX.dd
+[306/399] Building CXX object CMakeFiles/search_policy_tests.dir/tests/unit/search/search_policy_tests.cpp.o
+[307/399] Building CXX object CMakeFiles/search_runtime_tests.dir/tests/unit/search/search_runtime_tests.cpp.o
+[308/399] Linking CXX executable search_policy_tests
+[309/399] Scanning /work/tests/unit/search/policy_value_mcts_tests.cpp for CXX dependencies
+[310/399] Generating CXX dyndep file CMakeFiles/policy_value_mcts_tests.dir/CXX.dd
+[311/399] Linking CXX executable search_runtime_tests
+[312/399] Scanning /work/tests/unit/search/static_exchange_tests.cpp for CXX dependencies
+[313/399] Generating CXX dyndep file CMakeFiles/static_exchange_tests.dir/CXX.dd
+[314/399] Building CXX object CMakeFiles/policy_value_mcts_tests.dir/tests/unit/search/policy_value_mcts_tests.cpp.o
+[315/399] Building CXX object CMakeFiles/static_exchange_tests.dir/tests/unit/search/static_exchange_tests.cpp.o
+[316/399] Linking CXX executable static_exchange_tests
+lto-wrapper: warning: using serial compilation of 2 LTRANS jobs
+lto-wrapper: note: see the ‘-flto’ option documentation for more information
+[317/399] Scanning /work/tests/unit/runtime/transposition_table_tests.cpp for CXX dependencies
+[318/399] Generating CXX dyndep file CMakeFiles/transposition_table_tests.dir/CXX.dd
+[319/399] Building CXX object CMakeFiles/transposition_table_tests.dir/tests/unit/runtime/transposition_table_tests.cpp.o
+[320/399] Linking CXX executable policy_value_mcts_tests
+lto-wrapper: warning: using serial compilation of 4 LTRANS jobs
+lto-wrapper: note: see the ‘-flto’ option documentation for more information
+[321/399] Scanning /work/tests/unit/runtime/search_service_tests.cpp for CXX dependencies
+[322/399] Generating CXX dyndep file CMakeFiles/search_service_tests.dir/CXX.dd
+[323/399] Linking CXX executable uci_controller_tests
+lto-wrapper: warning: using serial compilation of 18 LTRANS jobs
+lto-wrapper: note: see the ‘-flto’ option documentation for more information
+[324/399] Scanning /work/tests/unit/runtime/koi_soak_tests.cpp for CXX dependencies
+[325/399] Generating CXX dyndep file CMakeFiles/koi_soak_tests.dir/CXX.dd
+[326/399] Linking CXX executable transposition_table_tests
+[327/399] Scanning /work/tests/unit/evaluation/classical_evaluator_tests.cpp for CXX dependencies
+[328/399] Generating CXX dyndep file CMakeFiles/classical_evaluator_tests.dir/CXX.dd
+[329/399] Linking CXX executable koi_search_tests
+lto-wrapper: warning: using serial compilation of 20 LTRANS jobs
+lto-wrapper: note: see the ‘-flto’ option documentation for more information
+[330/399] Building CXX object CMakeFiles/search_service_tests.dir/tests/unit/runtime/search_service_tests.cpp.o
+[331/399] Scanning /work/tests/unit/evaluation/evaluation_features_tests.cpp for CXX dependencies
+[332/399] Generating CXX dyndep file CMakeFiles/evaluation_features_tests.dir/CXX.dd
+[333/399] Building CXX object CMakeFiles/koi_soak_tests.dir/tests/unit/runtime/koi_soak_tests.cpp.o
+[334/399] Building CXX object CMakeFiles/classical_evaluator_tests.dir/tests/unit/evaluation/classical_evaluator_tests.cpp.o
+[335/399] Building CXX object CMakeFiles/evaluation_features_tests.dir/tests/unit/evaluation/evaluation_features_tests.cpp.o
+[336/399] Linking CXX executable classical_evaluator_tests
+lto-wrapper: warning: using serial compilation of 2 LTRANS jobs
+lto-wrapper: note: see the ‘-flto’ option documentation for more information
+[337/399] Scanning /work/tests/unit/evaluation/policy_value_model_tests.cpp for CXX dependencies
+[338/399] Linking CXX executable evaluation_features_tests
+lto-wrapper: warning: using serial compilation of 2 LTRANS jobs
+lto-wrapper: note: see the ‘-flto’ option documentation for more information
+[339/399] Generating CXX dyndep file CMakeFiles/policy_value_model_tests.dir/CXX.dd
+[340/399] Scanning /work/tests/unit/search/time_manager_tests.cpp for CXX dependencies
+[341/399] Generating CXX dyndep file CMakeFiles/time_manager_tests.dir/CXX.dd
+[342/399] Building CXX object CMakeFiles/policy_value_model_tests.dir/tests/unit/evaluation/policy_value_model_tests.cpp.o
+[343/399] Building CXX object CMakeFiles/time_manager_tests.dir/tests/unit/search/time_manager_tests.cpp.o
+[344/399] Linking CXX executable time_manager_tests
+[345/399] Linking CXX executable policy_value_model_tests
+lto-wrapper: warning: using serial compilation of 2 LTRANS jobs
+lto-wrapper: note: see the ‘-flto’ option documentation for more information
+[346/399] Scanning /work/tests/unit/search/koi_strength_tests.cpp for CXX dependencies
+[347/399] Generating CXX dyndep file CMakeFiles/koi_strength_tests.dir/CXX.dd
+[348/399] Scanning /work/tests/unit/rules/perft_tests.cpp for CXX dependencies
+[349/399] Generating CXX dyndep file CMakeFiles/perft_tests.dir/CXX.dd
+[350/399] Building CXX object CMakeFiles/perft_tests.dir/tests/unit/rules/perft_tests.cpp.o
+[351/399] Building CXX object CMakeFiles/koi_strength_tests.dir/tests/unit/search/koi_strength_tests.cpp.o
+[352/399] Linking CXX executable perft_tests
+lto-wrapper: warning: using serial compilation of 2 LTRANS jobs
+lto-wrapper: note: see the ‘-flto’ option documentation for more information
+[353/399] Scanning /work/tests/integration/tools/uci_match_fixture.cpp for CXX dependencies
+[354/399] Generating CXX dyndep file CMakeFiles/uci_match_fixture.dir/CXX.dd
+[355/399] Linking CXX executable search_service_tests
+lto-wrapper: warning: using serial compilation of 12 LTRANS jobs
+lto-wrapper: note: see the ‘-flto’ option documentation for more information
+[356/399] Scanning /work/tools/engine/perft.cpp for CXX dependencies
+[357/399] Generating CXX dyndep file CMakeFiles/koi_perft.dir/CXX.dd
+[358/399] Linking CXX executable koi_soak_tests
+lto-wrapper: warning: using serial compilation of 12 LTRANS jobs
+lto-wrapper: note: see the ‘-flto’ option documentation for more information
+[359/399] Scanning /work/tools/engine/koi_bench.cpp for CXX dependencies
+[360/399] Generating CXX dyndep file CMakeFiles/koi_bench.dir/CXX.dd
+[361/399] Building CXX object CMakeFiles/uci_match_fixture.dir/tests/integration/tools/uci_match_fixture.cpp.o
+[362/399] Building CXX object CMakeFiles/koi_perft.dir/tools/engine/perft.cpp.o
+[363/399] Linking CXX executable uci_match_fixture
+[364/399] Scanning /work/tools/engine/koi_replay.cpp for CXX dependencies
+[365/399] Generating CXX dyndep file CMakeFiles/koi_replay.dir/CXX.dd
+[366/399] Building CXX object CMakeFiles/koi_bench.dir/tools/engine/koi_bench.cpp.o
+[367/399] Building CXX object CMakeFiles/koi_replay.dir/tools/engine/koi_replay.cpp.o
+[368/399] Linking CXX executable koi-perft
+lto-wrapper: warning: using serial compilation of 2 LTRANS jobs
+lto-wrapper: note: see the ‘-flto’ option documentation for more information
+[369/399] Scanning /work/tools/engine/koi_eval_features.cpp for CXX dependencies
+[370/399] Generating CXX dyndep file CMakeFiles/koi_eval_features.dir/CXX.dd
+[371/399] Building CXX object CMakeFiles/koi_eval_features.dir/tools/engine/koi_eval_features.cpp.o
+[372/399] Linking CXX executable koi-replay
+lto-wrapper: warning: using serial compilation of 2 LTRANS jobs
+lto-wrapper: note: see the ‘-flto’ option documentation for more information
+[373/399] Scanning /work/tests/integration/tools/koi_replay_tests.cpp for CXX dependencies
+[374/399] Generating CXX dyndep file CMakeFiles/koi_replay_tests.dir/CXX.dd
+[375/399] Linking CXX executable koi-eval-features
+lto-wrapper: warning: using serial compilation of 2 LTRANS jobs
+lto-wrapper: note: see the ‘-flto’ option documentation for more information
+[376/399] Scanning /work/tools/engine/koi_nnue_fixture.cpp for CXX dependencies
+[377/399] Generating CXX dyndep file CMakeFiles/koi_nnue_fixture.dir/CXX.dd
+[378/399] Building CXX object CMakeFiles/koi_replay_tests.dir/tests/integration/tools/koi_replay_tests.cpp.o
+[379/399] Building CXX object CMakeFiles/koi_nnue_fixture.dir/tools/engine/koi_nnue_fixture.cpp.o
+[380/399] Linking CXX executable koi_replay_tests
+[381/399] Linking CXX executable koi_strength_tests
+lto-wrapper: warning: using serial compilation of 12 LTRANS jobs
+lto-wrapper: note: see the ‘-flto’ option documentation for more information
+[382/399] Scanning /work/src/main.cpp for CXX dependencies
+[383/399] Generating CXX dyndep file CMakeFiles/koi_engine.dir/CXX.dd
+[384/399] Linking CXX executable koi-nnue-fixture
+[385/399] Scanning /work/src/main.cpp for CXX dependencies
+[386/399] Generating CXX dyndep file CMakeFiles/koi_engine_avx2.dir/CXX.dd
+[387/399] Scanning /work/tests/integration/tools/koi_nnue_fixture_tests.cpp for CXX dependencies
+[388/399] Generating CXX dyndep file CMakeFiles/koi_nnue_fixture_tests.dir/CXX.dd
+[389/399] Building CXX object CMakeFiles/koi_engine.dir/src/main.cpp.o
+[390/399] Building CXX object CMakeFiles/koi_engine_avx2.dir/src/main.cpp.o
+[391/399] Building CXX object CMakeFiles/koi_nnue_fixture_tests.dir/tests/integration/tools/koi_nnue_fixture_tests.cpp.o
+[392/399] Linking CXX executable koi_nnue_fixture_tests
+[393/399] Scanning /work/src/main.cpp for CXX dependencies
+[394/399] Generating CXX dyndep file CMakeFiles/koi_engine_avx512.dir/CXX.dd
+[395/399] Building CXX object CMakeFiles/koi_engine_avx512.dir/src/main.cpp.o
+[396/399] Linking CXX executable koi-bench
+lto-wrapper: warning: using serial compilation of 13 LTRANS jobs
+lto-wrapper: note: see the ‘-flto’ option documentation for more information
+[397/399] Linking CXX executable koi-engine
+lto-wrapper: warning: using serial compilation of 15 LTRANS jobs
+lto-wrapper: note: see the ‘-flto’ option documentation for more information
+[398/399] Linking CXX executable koi-engine-avx2
+lto-wrapper: warning: using serial compilation of 15 LTRANS jobs
+lto-wrapper: note: see the ‘-flto’ option documentation for more information
+[399/399] Linking CXX executable koi-engine-avx512
+lto-wrapper: warning: using serial compilation of 15 LTRANS jobs
+lto-wrapper: note: see the ‘-flto’ option documentation for more information

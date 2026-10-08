@@ -1,0 +1,7 @@
+[31;1muci_match.ps1: [0mC:\Users\ntATh\AI test\Koi engine\tools\nnue\net_match.ps1:106[0m
+[31;1m[0m[36;1mLine |[0m
+[31;1m[0m[36;1m[36;1m 106 | [0m     $output = [36;1m& $UciMatchPath `[0m
+[31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m     | [31;1m               ~~~~~~~~~~~~~~~~~[0m
+[31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m     | [31;1mProgram 'koi-replay.exe' failed to run: StandardOutputEncoding is only supported when standard output is[0m
+[31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m[31;1m[36;1m     | [31;1mredirected.At C:\Users\ntATh\AI test\Koi engine\tools\stability\uci_match.ps1:494 char:15 +     $output = &[0m
+[31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m[31;1m[36;1m[31;1m[36;1m     | [31;1m$replayExecutable @replayArguments +               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~.[0m

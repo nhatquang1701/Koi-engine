@@ -1,0 +1,110 @@
+{
+  "schema": "koi-cutechess-stability-manifest-v1",
+  "run_started_utc": "2026-09-10T22:25:05.5095935Z",
+  "system": {
+    "os": "Microsoft Windows 10.0.26200",
+    "cpu": "Intel(R) Core(TM) i3-10100F CPU @ 3.60GHz"
+  },
+  "executables": [
+    {
+      "name": "Koi",
+      "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\build\\release\\koi-engine.exe",
+      "sha256": "D95E413BD7DB155B4985C73230BA7A9C16863DD1DCC0F39B6AA4FA447BC5296B"
+    },
+    {
+      "name": "Opponent",
+      "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\third_party\\stockfish-19\\stockfish-windows-x86-64-universal\\stockfish\\stockfish-windows-x86-64-universal.exe",
+      "sha256": "45BC8E4969147DB9C2EB533810637994619BFF0EACC81CCFD9854394901BCBD0"
+    },
+    {
+      "name": "Cutechess",
+      "path": "C:\\Program Files (x86)\\Cute Chess\\cutechess-cli.exe",
+      "sha256": "8889F9582DC688C567704CF083F6025BAF77F791CDE903698C70B3420CAF5D7E"
+    }
+  ],
+  "inputs": [],
+  "command": {
+    "schema": "koi-cutechess-command-v1",
+    "executable": "C:\\Program Files (x86)\\Cute Chess\\cutechess-cli.exe",
+    "arguments": [
+      "-engine",
+      "cmd=C:\\Users\\ntATh\\AI test\\Koi engine\\build\\release\\koi-engine.exe",
+      "name=Koi",
+      "proto=uci",
+      "option.Hash=16",
+      "option.Threads=1",
+      "option.Speed=100",
+      "option.OwnBook=false",
+      "option.BookFile=book.bin",
+      "option.BookDepth=16",
+      "option.BookRandom=false",
+      "stderr=C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\cutechess-smoke-after-main-bootstrap-20260911\\koi-stderr.log",
+      "-engine",
+      "cmd=C:\\Users\\ntATh\\AI test\\Koi engine\\third_party\\stockfish-19\\stockfish-windows-x86-64-universal\\stockfish\\stockfish-windows-x86-64-universal.exe",
+      "name=Opponent",
+      "proto=uci",
+      "stderr=C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\cutechess-smoke-after-main-bootstrap-20260911\\opponent-stderr.log",
+      "-each",
+      "tc=1+0",
+      "-rounds",
+      "2",
+      "-concurrency",
+      "1",
+      "-maxmoves",
+      "4",
+      "-variant",
+      "standard",
+      "-pgnout",
+      "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\cutechess-smoke-after-main-bootstrap-20260911\\games.pgn",
+      "-event",
+      "Koi stability compatibility"
+    ],
+    "command_line": "\"C:\\Program Files (x86)\\Cute Chess\\cutechess-cli.exe\" \"-engine\" \"cmd=C:\\Users\\ntATh\\AI test\\Koi engine\\build\\release\\koi-engine.exe\" \"name=Koi\" \"proto=uci\" \"option.Hash=16\" \"option.Threads=1\" \"option.Speed=100\" \"option.OwnBook=false\" \"option.BookFile=book.bin\" \"option.BookDepth=16\" \"option.BookRandom=false\" \"stderr=C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\cutechess-smoke-after-main-bootstrap-20260911\\koi-stderr.log\" \"-engine\" \"cmd=C:\\Users\\ntATh\\AI test\\Koi engine\\third_party\\stockfish-19\\stockfish-windows-x86-64-universal\\stockfish\\stockfish-windows-x86-64-universal.exe\" \"name=Opponent\" \"proto=uci\" \"stderr=C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\cutechess-smoke-after-main-bootstrap-20260911\\opponent-stderr.log\" \"-each\" \"tc=1+0\" \"-rounds\" \"2\" \"-concurrency\" \"1\" \"-maxmoves\" \"4\" \"-variant\" \"standard\" \"-pgnout\" \"C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\cutechess-smoke-after-main-bootstrap-20260911\\games.pgn\" \"-event\" \"Koi stability compatibility\"",
+    "global_debug": false,
+    "diagnostic_mode": "disabled"
+  },
+  "configuration": {
+    "hash_mb": 16,
+    "threads": 1,
+    "speed": 100,
+    "own_book": false,
+    "book_file": "book.bin",
+    "book_depth": 16,
+    "koi_color": "auto",
+    "time_control": "1+0",
+    "games": 2,
+    "max_moves": 4,
+    "opening_file": null,
+    "fen_file": null
+  },
+  "process": {
+    "cutechess_pid": 10316,
+    "exit_code": 0,
+    "timed_out": false
+  },
+  "artifacts": {
+    "manifest": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\cutechess-smoke-after-main-bootstrap-20260911\\manifest.json",
+    "command": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\cutechess-smoke-after-main-bootstrap-20260911\\cutechess-command.json",
+    "version": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\cutechess-smoke-after-main-bootstrap-20260911\\cutechess-version.txt",
+    "cutechess_stdout": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\cutechess-smoke-after-main-bootstrap-20260911\\cutechess-stdout.log",
+    "cutechess_stderr": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\cutechess-smoke-after-main-bootstrap-20260911\\cutechess-stderr.log",
+    "koi_stdout": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\cutechess-smoke-after-main-bootstrap-20260911\\koi-stdout.log",
+    "koi_stderr": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\cutechess-smoke-after-main-bootstrap-20260911\\koi-stderr.log",
+    "opponent_stdout": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\cutechess-smoke-after-main-bootstrap-20260911\\opponent-stdout.log",
+    "opponent_stderr": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\cutechess-smoke-after-main-bootstrap-20260911\\opponent-stderr.log",
+    "opponent_debug": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\cutechess-smoke-after-main-bootstrap-20260911\\opponent-debug.jsonl",
+    "protocol_events": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\cutechess-smoke-after-main-bootstrap-20260911\\protocol-events.jsonl",
+    "per_ply_positions": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\cutechess-smoke-after-main-bootstrap-20260911\\per-ply-positions.jsonl",
+    "debug": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\cutechess-smoke-after-main-bootstrap-20260911\\koi-debug.jsonl",
+    "pgn": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\cutechess-smoke-after-main-bootstrap-20260911\\games.pgn",
+    "failure": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\cutechess-smoke-after-main-bootstrap-20260911\\failure.json",
+    "exit_status": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\cutechess-smoke-after-main-bootstrap-20260911\\exit-status.json"
+  },
+  "results": {
+    "termination_classification": "incomplete",
+    "started_games": 2,
+    "finished_games": 2,
+    "failures": 3
+  },
+  "generated_utc": "2026-09-10T22:25:12.4983418Z"
+}

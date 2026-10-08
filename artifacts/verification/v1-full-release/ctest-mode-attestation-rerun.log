@@ -1,0 +1,12 @@
+Internal ctest changing into directory: C:/Users/ntATh/AI test/Koi engine/build/debug
+Test project C:/Users/ntATh/AI test/Koi engine/build/debug
+    Start 40: koi_uci_match_process
+1/1 Test #40: koi_uci_match_process ............   Passed   85.75 sec
+
+100% tests passed, 0 tests failed out of 1
+
+Label Time Summary:
+matches    =  85.75 sec*proc (1 test)
+process    =  85.75 sec*proc (1 test)
+
+Total Test time (real) =  85.76 sec

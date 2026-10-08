@@ -1,0 +1,22 @@
+feat(tools): support macOS speed gates and the local arm64 test worker
+
+The speed gate and the heavy test workflows now run on Apple Silicon so the
+Windows machine stays free for GPU work (Lc0 labeling, NNUE training).
+
+- tools/build/speed_gate.ps1: join every repository path segment by segment
+  with Join-Path and use DirectorySeparatorChar for the output-directory
+  prefix check.  A backslash is a literal filename character on macOS/Linux,
+  so the previous embedded 'artifacts\verification' strings would not resolve
+  there; Windows behavior is unchanged.
+- tools/build/launch_gate_macos.sh: new nohup + caffeinate -i launcher for
+  multi-hour gates.  It survives the SSH session, prevents idle sleep, and
+  writes gate.out.log, gate.err.log, gate.pid, and gate-status.txt into the
+  gate output directory.
+- tests/README.md: new "Local macOS arm64 heavy-test worker" runbook
+  (Homebrew toolchain, build, ctest label groups, isolated baseline gates,
+  Elo with a macOS anchors manifest, SSH operation).  tools/README.md gets a
+  pointer from the speed-gate section.
+
+Verification: functional smoke gate on Windows after the port (Runs 2,
+DepthSweep 2..3, sparse corpus, relaxed 50% limits while Lc0 generation was
+running) completed with result=PASS; the launcher passes `bash -n`.

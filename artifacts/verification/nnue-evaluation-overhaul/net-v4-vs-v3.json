@@ -1,0 +1,174 @@
+{
+  "schema": "koi-nnue-net-match-v1",
+  "generated_utc": "2026-09-17T17:18:20.2696064Z",
+  "nnue_path": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\training\\koi-v4-1024.nnue",
+  "opponent_path": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\training\\koi-sf-v1.nnue",
+  "engine_path": "C:\\Users\\ntATh\\AI test\\Koi engine\\build\\release\\koi-engine.exe",
+  "nodes": 20000,
+  "threads": 1,
+  "hash_mb": 64,
+  "games": 20,
+  "wins": 0,
+  "draws": 20,
+  "losses": 0,
+  "aborted": 0,
+  "score": 10.0,
+  "percent": 50.0,
+  "verdict": "inconclusive",
+  "legs": [
+    {
+      "tag": "white",
+      "candidate_color": "white",
+      "games": 10,
+      "report": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\verification\\nnue-evaluation-overhaul\\net-v4-vs-v3\\match-white\\koi-uci-match-20260917-171230-167.json"
+    },
+    {
+      "tag": "black",
+      "candidate_color": "black",
+      "games": 10,
+      "report": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\verification\\nnue-evaluation-overhaul\\net-v4-vs-v3\\match-black\\koi-uci-match-20260917-171819-693.json"
+    }
+  ],
+  "game_results": [
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "stalemate"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "stalemate"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "stalemate"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "stalemate"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "stalemate"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "stalemate"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "stalemate"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "stalemate"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "stalemate"
+    },
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "stalemate"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1/2-1/2",
+      "outcome": "draw",
+      "termination": "rule draw"
+    }
+  ]
+}

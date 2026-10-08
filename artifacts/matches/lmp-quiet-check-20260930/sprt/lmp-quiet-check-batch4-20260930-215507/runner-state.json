@@ -1,0 +1,27 @@
+{
+  "schema": "koi-lmp-sprt-runner-v1",
+  "experiment_path": "artifacts/verification/lmp-quiet-check-20260930/experiment-batch4.json",
+  "experiment_sha256": "7a729da4196cc9c2f6b8d0aeb19aa68bf41d773f40e88fb57157a2608185c461",
+  "runner_pid": 22676,
+  "run_root": "artifacts/matches/lmp-quiet-check-20260930/sprt/lmp-quiet-check-batch4-20260930-215507",
+  "candidate_sha256": "1fbf7321466bf83bcdd2983d26514b3d647720a48b73a718e841062cb29a05c6",
+  "baseline_sha256": "da08c26912a5fce8dce2d85efc28cc33503345b26018d82b961181df2ad2af20",
+  "replay_sha256": "36c4f05ec6569048985cbf75f91b46512b212eec632327dfc49eb788e8924f93",
+  "opening_sha256": "5fcab4c195d3af7dc30edfc014dfe7f208870c900aefc2728c4671e7750be9f9",
+  "cpu_variant": "avx2",
+  "harness_path": "tools/stability/uci_match.ps1",
+  "harness_sha256": "9df4f67a4632a05e070eb44fde202814a9692befd3a63c880688b946feedfb3e",
+  "harness_git_blob": "de0de5bce59c2d650a7f1c872d730b9d82e76952",
+  "launcher_sha256": "a0716725e13ff90b4ffc72af07a607db082b9bc5f1f831d945255ba03f701622",
+  "workers": {
+    "white": 19868,
+    "black": 9212
+  },
+  "started_utc": "2026-09-30T14:55:07.9612291Z",
+  "status": "completed",
+  "exit_codes": {
+    "white": 0,
+    "black": 0
+  },
+  "completed_utc": "2026-09-30T15:53:22.5083431Z"
+}

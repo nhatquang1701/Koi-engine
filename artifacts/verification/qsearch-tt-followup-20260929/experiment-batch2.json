@@ -1,0 +1,45 @@
+{
+  "schema": "koi-qsearch-tt-sprt-extension-v1",
+  "source_commit": "18c2f9ae9e9aec480112af32b63b893ae030e32e",
+  "candidate_sha256": "3C187FC9BDAD3572E6C849B077FFEE2F612661083602D79261C0C50169DA268C",
+  "baseline_sha256": "CBC05D459445EACD9F0EF8749AEC18434CE251B105E6D1900F5DD4B5299CE0AA",
+  "replay_sha256": "B6218E828D2F53B33597820F1BEA88C4D31760CBCC0391A8D05395B303C38FAD",
+  "opening_file": {
+    "path": "artifacts/matches/qsearch-tt-followup-20260929/openings-128-batch2.txt",
+    "sha256": "402039AA588D5A03F3A07E929DF0BEC3178E4363E4B100FB7BF5E586482611CA",
+    "count": 128,
+    "unique": 128,
+    "overlap_with_batch1": 0
+  },
+  "opening_manifest": {
+    "path": "artifacts/manifests/qsearch-tt-followup-20260929-batch2.json",
+    "sha256": "C7EDAC2C92A44CE276E7392F6C8E90F3D09764806727787AED398B020B9E4454",
+    "seed": 20260930,
+    "openings_per_root": 4
+  },
+  "options": {
+    "time_control": "nodes 20000",
+    "threads": 1,
+    "hash_mb": 512,
+    "speed": 100,
+    "own_book": false,
+    "random_seed": 0,
+    "evaluator": "classical",
+    "algorithm": "AlphaBeta"
+  },
+  "sprt": {
+    "elo0": 0,
+    "elo1": 10,
+    "alpha": 0.05,
+    "beta": 0.05,
+    "min_games_per_color": 40,
+    "max_games_per_color": 256,
+    "games_per_opening": 2
+  },
+  "prior_batch": {
+    "derived_decision_path": "artifacts/matches/qsearch-tt-followup-20260929/sprt/qsearch-tt-current-source-20k-20260929-034116/combined-decision-derived.json",
+    "sha256": "84B8255FEDF021E26D5611F0006E12859355B76610A6D96EE6FA68682DB20B96",
+    "combined_llr": -0.17975799999999997,
+    "decision": "inconclusive"
+  }
+}

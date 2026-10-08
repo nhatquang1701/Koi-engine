@@ -1,0 +1,1661 @@
+{
+  "schema": "koi-organization-manifest-v1",
+  "generated_utc": "2026-09-09T12:14:53.2823533Z",
+  "repository_root": "C:\\Users\\ntATh\\AI test\\Koi engine",
+  "branch": "koi-engine-v1",
+  "tracked_moves": [
+    {
+      "status": "R100",
+      "from": "third_party/User tests/2026.09.05_Koi Engine - Koi Engine.pgn",
+      "to": "tests/data/games/2026-09-05-koi-vs-koi.pgn"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/User tests/2026.09.05 2_Koi Engine - Stockfish 19.pgn",
+      "to": "tests/data/games/2026-09-05-koi-vs-stockfish-19-2.pgn"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/User tests/2026.09.05_Koi Engine - Stockfish 19.pgn",
+      "to": "tests/data/games/2026-09-05-koi-vs-stockfish-19.pgn"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/User tests/2026.09.06  2_Koi Engine - Leela Chess Zero.pgn",
+      "to": "tests/data/games/2026-09-06-koi-vs-lc0-2.pgn"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/User tests/2026.09.06_Koi Engine - Leela Chess Zero.pgn",
+      "to": "tests/data/games/2026-09-06-koi-vs-lc0.pgn"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/User tests/2026.09.08_Koi Engine - Stockfish 19.pgn",
+      "to": "tests/data/games/2026-09-08-koi-vs-stockfish-19.pgn"
+    },
+    {
+      "status": "R100",
+      "from": "tests/data/elo-openings.txt",
+      "to": "tests/data/openings/openings-basic.txt"
+    },
+    {
+      "status": "R100",
+      "from": "tests/data/elo-openings-32.txt",
+      "to": "tests/data/openings/openings-curated-32.txt"
+    },
+    {
+      "status": "R100",
+      "from": "tests/data/evaluation-positions.txt",
+      "to": "tests/data/positions/evaluation-positions.txt"
+    },
+    {
+      "status": "R100",
+      "from": "tests/data/measurement-forensics.json",
+      "to": "tests/data/positions/measurement-forensics.json"
+    },
+    {
+      "status": "R097",
+      "from": "tests/cutechess_stability_test.ps1",
+      "to": "tests/integration/matches/cutechess_stability_test.ps1"
+    },
+    {
+      "status": "R095",
+      "from": "tests/stockfish_strength_test.ps1",
+      "to": "tests/integration/matches/stockfish_strength_test.ps1"
+    },
+    {
+      "status": "R096",
+      "from": "tests/uci_match_clock_test.ps1",
+      "to": "tests/integration/matches/uci_match_clock_test.ps1"
+    },
+    {
+      "status": "R098",
+      "from": "tests/uci_match_process_test.ps1",
+      "to": "tests/integration/matches/uci_match_process_test.ps1"
+    },
+    {
+      "status": "R069",
+      "from": "tests/ci_configuration_test.ps1",
+      "to": "tests/integration/packaging/ci_configuration_test.ps1"
+    },
+    {
+      "status": "R097",
+      "from": "tools/install_book_test.ps1",
+      "to": "tests/integration/packaging/install_book_test.ps1"
+    },
+    {
+      "status": "R100",
+      "from": "tests/package_release_test.ps1",
+      "to": "tests/integration/packaging/package_release_test.ps1"
+    },
+    {
+      "status": "R100",
+      "from": "tests/native_shadow_diff_tests.cpp",
+      "to": "tests/integration/rules/native_shadow_diff_tests.cpp"
+    },
+    {
+      "status": "R100",
+      "from": "tests/koi_bench_process_test.ps1",
+      "to": "tests/integration/tools/koi_bench_process_test.ps1"
+    },
+    {
+      "status": "R100",
+      "from": "tests/koi_replay_tests.cpp",
+      "to": "tests/integration/tools/koi_replay_tests.cpp"
+    },
+    {
+      "status": "R100",
+      "from": "tests/uci_match_fixture.cpp",
+      "to": "tests/integration/tools/uci_match_fixture.cpp"
+    },
+    {
+      "status": "R100",
+      "from": "tests/en_croissant_uci_test.ps1",
+      "to": "tests/integration/uci/en_croissant_uci_test.ps1"
+    },
+    {
+      "status": "R100",
+      "from": "tests/uci_process_test.ps1",
+      "to": "tests/integration/uci/uci_process_test.ps1"
+    },
+    {
+      "status": "R098",
+      "from": "tests/nnue_training_test.py",
+      "to": "tests/python/evaluation/nnue_training_test.py"
+    },
+    {
+      "status": "R079",
+      "from": "tests/nnue_wrapper_test.py",
+      "to": "tests/python/evaluation/nnue_wrapper_test.py"
+    },
+    {
+      "status": "R096",
+      "from": "tests/tune_eval_test.py",
+      "to": "tests/python/evaluation/tune_eval_test.py"
+    },
+    {
+      "status": "R099",
+      "from": "tests/elo_estimate_test.py",
+      "to": "tests/python/measurement/elo_estimate_test.py"
+    },
+    {
+      "status": "R087",
+      "from": "tests/elo_openings_test.py",
+      "to": "tests/python/measurement/elo_openings_test.py"
+    },
+    {
+      "status": "R096",
+      "from": "tests/elo_oracle_test.py",
+      "to": "tests/python/measurement/elo_oracle_test.py"
+    },
+    {
+      "status": "R094",
+      "from": "tests/measurement_forensics_test.py",
+      "to": "tests/python/measurement/measurement_forensics_test.py"
+    },
+    {
+      "status": "R099",
+      "from": "tests/measurement_phase_test.py",
+      "to": "tests/python/measurement/measurement_phase_test.py"
+    },
+    {
+      "status": "R096",
+      "from": "tests/stockfish_match_test.py",
+      "to": "tests/python/measurement/stockfish_match_test.py"
+    },
+    {
+      "status": "R100",
+      "from": "tests/koi_core_tests.cpp",
+      "to": "tests/unit/core/koi_core_tests.cpp"
+    },
+    {
+      "status": "R100",
+      "from": "tests/koi_module_tests.cpp",
+      "to": "tests/unit/core/koi_module_tests.cpp"
+    },
+    {
+      "status": "R100",
+      "from": "tests/evaluation_boundary_tests.cpp",
+      "to": "tests/unit/evaluation/evaluation_boundary_tests.cpp"
+    },
+    {
+      "status": "R100",
+      "from": "tests/nnue_boundary_tests.cpp",
+      "to": "tests/unit/evaluation/nnue_boundary_tests.cpp"
+    },
+    {
+      "status": "R100",
+      "from": "tests/koi_rules_tests.cpp",
+      "to": "tests/unit/rules/koi_rules_tests.cpp"
+    },
+    {
+      "status": "R100",
+      "from": "tests/native_rule_state_tests.cpp",
+      "to": "tests/unit/rules/native_rule_state_tests.cpp"
+    },
+    {
+      "status": "R100",
+      "from": "tests/perft_tests.cpp",
+      "to": "tests/unit/rules/perft_tests.cpp"
+    },
+    {
+      "status": "R100",
+      "from": "tests/completion_gate_tests.cpp",
+      "to": "tests/unit/runtime/completion_gate_tests.cpp"
+    },
+    {
+      "status": "R100",
+      "from": "tests/cpu_features_tests.cpp",
+      "to": "tests/unit/runtime/cpu_features_tests.cpp"
+    },
+    {
+      "status": "R100",
+      "from": "tests/opening_book_tests.cpp",
+      "to": "tests/unit/runtime/opening_book_tests.cpp"
+    },
+    {
+      "status": "R100",
+      "from": "tests/syzygy_tablebase_tests.cpp",
+      "to": "tests/unit/runtime/syzygy_tablebase_tests.cpp"
+    },
+    {
+      "status": "R100",
+      "from": "tests/uci_controller_tests.cpp",
+      "to": "tests/unit/runtime/uci_controller_tests.cpp"
+    },
+    {
+      "status": "R099",
+      "from": "tests/koi_search_tests.cpp",
+      "to": "tests/unit/search/koi_search_tests.cpp"
+    },
+    {
+      "status": "R100",
+      "from": "tests/koi_strength_tests.cpp",
+      "to": "tests/unit/search/koi_strength_tests.cpp"
+    },
+    {
+      "status": "R100",
+      "from": "tests/search_ordering_tests.cpp",
+      "to": "tests/unit/search/search_ordering_tests.cpp"
+    },
+    {
+      "status": "R100",
+      "from": "tests/static_exchange_tests.cpp",
+      "to": "tests/unit/search/static_exchange_tests.cpp"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/AUTHORS",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/AUTHORS"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/CITATION.cff",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/CITATION.cff"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/CONTRIBUTING.md",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/CONTRIBUTING.md"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/Copying.txt",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/Copying.txt"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/README.md",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/README.md"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/Top CPU Contributors.txt",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/Top CPU Contributors.txt"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/scripts/check_universal.sh",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/scripts/check_universal.sh"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/scripts/check_universal_arm.sh",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/scripts/check_universal_arm.sh"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/scripts/check_universal_macos.sh",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/scripts/check_universal_macos.sh"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/scripts/check_universal_riscv.sh",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/scripts/check_universal_riscv.sh"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/scripts/get_native_properties.sh",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/scripts/get_native_properties.sh"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/scripts/net.sh",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/scripts/net.sh"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/Makefile",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/Makefile"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/attacks.cpp",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/attacks.cpp"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/attacks.h",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/attacks.h"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/benchmark.cpp",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/benchmark.cpp"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/benchmark.h",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/benchmark.h"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/bitboard.cpp",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/bitboard.cpp"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/bitboard.h",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/bitboard.h"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/engine.cpp",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/engine.cpp"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/engine.h",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/engine.h"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/evaluate.cpp",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/evaluate.cpp"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/evaluate.h",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/evaluate.h"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/history.h",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/history.h"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/incbin/UNLICENCE",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/incbin/UNLICENCE"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/incbin/incbin.h",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/incbin/incbin.h"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/main.cpp",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/main.cpp"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/memory.cpp",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/memory.cpp"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/memory.h",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/memory.h"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/misc.cpp",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/misc.cpp"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/misc.h",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/misc.h"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/movegen.cpp",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/movegen.cpp"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/movegen.h",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/movegen.h"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/movepick.cpp",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/movepick.cpp"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/movepick.h",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/movepick.h"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/nnue/features/full_threats.cpp",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/nnue/features/full_threats.cpp"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/nnue/features/full_threats.h",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/nnue/features/full_threats.h"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/nnue/features/half_ka_v2_hm.cpp",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/nnue/features/half_ka_v2_hm.cpp"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/nnue/features/half_ka_v2_hm.h",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/nnue/features/half_ka_v2_hm.h"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/nnue/features/pp_3wide.cpp",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/nnue/features/pp_3wide.cpp"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/nnue/features/pp_3wide.h",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/nnue/features/pp_3wide.h"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/nnue/layers/affine_transform.h",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/nnue/layers/affine_transform.h"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/nnue/layers/affine_transform_sparse_input.h",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/nnue/layers/affine_transform_sparse_input.h"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/nnue/layers/clipped_relu.h",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/nnue/layers/clipped_relu.h"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/nnue/layers/sqr_clipped_relu.h",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/nnue/layers/sqr_clipped_relu.h"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/nnue/network.cpp",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/nnue/network.cpp"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/nnue/network.h",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/nnue/network.h"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/nnue/nnue_accumulator.cpp",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/nnue/nnue_accumulator.cpp"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/nnue/nnue_accumulator.h",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/nnue/nnue_accumulator.h"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/nnue/nnue_architecture.h",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/nnue/nnue_architecture.h"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/nnue/nnue_common.h",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/nnue/nnue_common.h"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/nnue/nnue_feature_transformer.h",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/nnue/nnue_feature_transformer.h"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/nnue/nnue_misc.cpp",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/nnue/nnue_misc.cpp"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/nnue/nnue_misc.h",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/nnue/nnue_misc.h"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/nnue/nnz_helper.h",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/nnue/nnz_helper.h"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/nnue/simd.h",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/nnue/simd.h"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/numa.h",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/numa.h"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/perft.h",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/perft.h"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/position.cpp",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/position.cpp"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/position.h",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/position.h"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/score.cpp",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/score.cpp"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/score.h",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/score.h"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/search.cpp",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/search.cpp"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/search.h",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/search.h"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/shm.h",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/shm.h"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/shm_unix.h",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/shm_unix.h"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/syzygy/tbprobe.cpp",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/syzygy/tbprobe.cpp"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/syzygy/tbprobe.h",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/syzygy/tbprobe.h"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/thread.cpp",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/thread.cpp"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/thread.h",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/thread.h"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/thread_native.h",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/thread_native.h"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/timeman.cpp",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/timeman.cpp"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/timeman.h",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/timeman.h"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/tt.cpp",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/tt.cpp"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/tt.h",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/tt.h"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/tune.cpp",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/tune.cpp"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/tune.h",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/tune.h"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/types.h",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/types.h"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/uci.cpp",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/uci.cpp"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/uci.h",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/uci.h"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/ucioption.cpp",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/ucioption.cpp"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/ucioption.h",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/ucioption.h"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/universal/entry_arm64.cpp",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/universal/entry_arm64.cpp"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/universal/entry_riscv64.cpp",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/universal/entry_riscv64.cpp"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/universal/entry_x86.cpp",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/universal/entry_x86.cpp"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/universal/nnue_embed.cpp",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/universal/nnue_embed.cpp"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/universal/patch_x86_slice.sh",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/universal/patch_x86_slice.sh"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/src/universal/rewrite_asm_sections.awk",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/src/universal/rewrite_asm_sections.awk"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/wiki/Advanced-topics.md",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/wiki/Advanced-topics.md"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/wiki/Compiling-from-source.md",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/wiki/Compiling-from-source.md"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/wiki/Developers.md",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/wiki/Developers.md"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/wiki/Download-and-usage.md",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/wiki/Download-and-usage.md"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/wiki/Governance-and-responsibilities.md",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/wiki/Governance-and-responsibilities.md"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/wiki/Home.md",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/wiki/Home.md"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/wiki/Regression-Tests.md",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/wiki/Regression-Tests.md"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/wiki/Stockfish-FAQ.md",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/wiki/Stockfish-FAQ.md"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/wiki/Terminology.md",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/wiki/Terminology.md"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/wiki/UCI-Protocol-and-Stockfish-Commands.md",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/wiki/UCI-Protocol-and-Stockfish-Commands.md"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/wiki/Useful-data.md",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/wiki/Useful-data.md"
+    },
+    {
+      "status": "R100",
+      "from": "third_party/Stockfish 19/stockfish-windows-x86-64-universal/stockfish/wiki/_Footer.md",
+      "to": "third_party/stockfish-19/stockfish-windows-x86-64-universal/stockfish/wiki/_Footer.md"
+    },
+    {
+      "status": "R100",
+      "from": "tools/install_book.ps1",
+      "to": "tools/build/install_book.ps1"
+    },
+    {
+      "status": "R095",
+      "from": "tools/package_release.ps1",
+      "to": "tools/build/package_release.ps1"
+    },
+    {
+      "status": "R097",
+      "from": "tools/task5_perf_gate.ps1",
+      "to": "tools/build/performance_gate.ps1"
+    },
+    {
+      "status": "R095",
+      "from": "tools/task5_release_verify.ps1",
+      "to": "tools/build/release_verify.ps1"
+    },
+    {
+      "status": "R100",
+      "from": "tools/koi_bench.cpp",
+      "to": "tools/engine/koi_bench.cpp"
+    },
+    {
+      "status": "R100",
+      "from": "tools/koi_replay.cpp",
+      "to": "tools/engine/koi_replay.cpp"
+    },
+    {
+      "status": "R100",
+      "from": "tools/perft.cpp",
+      "to": "tools/engine/perft.cpp"
+    },
+    {
+      "status": "R096",
+      "from": "tools/book_audit.py",
+      "to": "tools/measurement/book_audit.py"
+    },
+    {
+      "status": "R099",
+      "from": "tools/elo_estimate.py",
+      "to": "tools/measurement/elo_estimate.py"
+    },
+    {
+      "status": "R099",
+      "from": "tools/elo_oracle.py",
+      "to": "tools/measurement/elo_oracle.py"
+    },
+    {
+      "status": "R100",
+      "from": "tools/export_nnue.py",
+      "to": "tools/measurement/export_nnue.py"
+    },
+    {
+      "status": "R098",
+      "from": "tools/gigabase_extract.py",
+      "to": "tools/measurement/gigabase_extract.py"
+    },
+    {
+      "status": "R086",
+      "from": "tools/pgn_forensics.py",
+      "to": "tools/measurement/pgn_forensics.py"
+    },
+    {
+      "status": "R100",
+      "from": "tools/requirements-elo-oracle.txt",
+      "to": "tools/measurement/requirements-elo-oracle.txt"
+    },
+    {
+      "status": "R097",
+      "from": "tools/stockfish_match.py",
+      "to": "tools/measurement/stockfish_match.py"
+    },
+    {
+      "status": "R100",
+      "from": "tools/train_nnue.py",
+      "to": "tools/measurement/train_nnue.py"
+    },
+    {
+      "status": "R099",
+      "from": "tools/tune_eval.py",
+      "to": "tools/measurement/tune_eval.py"
+    },
+    {
+      "status": "R099",
+      "from": "tools/cutechess_stability.ps1",
+      "to": "tools/stability/cutechess_stability.ps1"
+    },
+    {
+      "status": "R097",
+      "from": "tools/cutechess_stability_campaign.ps1",
+      "to": "tools/stability/cutechess_stability_campaign.ps1"
+    },
+    {
+      "status": "R099",
+      "from": "tools/uci_match.ps1",
+      "to": "tools/stability/uci_match.ps1"
+    }
+  ],
+  "build_directories": [
+    {
+      "name": "debug",
+      "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\build\\debug",
+      "exists": true
+    },
+    {
+      "name": "release",
+      "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\build\\release",
+      "exists": true
+    },
+    {
+      "name": "ci-debug",
+      "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\build\\ci-debug",
+      "exists": false
+    },
+    {
+      "name": "ci-release",
+      "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\build\\ci-release",
+      "exists": false
+    }
+  ],
+  "release_executables": [
+    {
+      "name": "koi-engine.exe",
+      "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\build\\release\\koi-engine.exe",
+      "sha256": "2357088274d66b6792612865a37aa869945fc3b3e69a4a2d887bb5ba99deb71e"
+    },
+    {
+      "name": "koi-bench.exe",
+      "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\build\\release\\koi-bench.exe",
+      "sha256": "3efb253d773a459cf075c84081268e044bcb9e57559ea2281516b415f738e7b6"
+    },
+    {
+      "name": "koi-replay.exe",
+      "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\build\\release\\koi-replay.exe",
+      "sha256": "efa88f24790864aeb912572163574548df645fc6c01b59635628d8e8ac0805bc"
+    },
+    {
+      "name": "koi-perft.exe",
+      "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\build\\release\\koi-perft.exe",
+      "sha256": "d1e5a8338cfc5a1bbc10a3b783d652b9080c3b5b38c14f447adf54d88c88414b"
+    }
+  ],
+  "toolchain": {
+    "cmake": "cmake version 3.31.6-msvc6\r\n\r\nCMake suite maintained and supported by Kitware (kitware.com/cmake).",
+    "ctest": "ctest version 3.31.6-msvc6\r\n\r\nCMake suite maintained and supported by Kitware (kitware.com/cmake).",
+    "compiler_cache_entry": "CMAKE_CXX_COMPILER:STRING=C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/VC/Tools/MSVC/14.44.35207/bin/Hostx64/x64/cl.exe"
+  },
+  "verification": {
+    "release_build": "passed",
+    "debug_build": "passed",
+    "release_ctest": "100% tests passed, 0 tests failed out of 36",
+    "canonical_output_root": "build/",
+    "canonical_artifact_root": "artifacts/"
+  },
+  "copied_artifacts": [
+    {
+      "source": "C:\\Koi-results\\koi-24h-baseline\\bench-threads1.json",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\baselines\\2026-09-06-24h\\bench-threads1.json",
+      "sha256": "11a06da291e0e5e00d8b1bdcf870a29241f09dfe83e59f125e28c983930e874d"
+    },
+    {
+      "source": "C:\\Koi-results\\koi-24h-baseline\\bench-threads1.txt",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\baselines\\2026-09-06-24h\\bench-threads1.txt",
+      "sha256": "3677f77e71eb5b5fdee0f84cdb6177557efae4294d193d71be61aafc1c04f531"
+    },
+    {
+      "source": "C:\\Koi-results\\koi-24h-baseline\\bench-threads4.txt",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\baselines\\2026-09-06-24h\\bench-threads4.txt",
+      "sha256": "f2ea57ed3ecb28d18778104c788838f3d8528e90ecdf1c243d079ea7bf1fc75f"
+    },
+    {
+      "source": "C:\\Koi-results\\koi-24h-baseline\\checkout.json",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\baselines\\2026-09-06-24h\\checkout.json",
+      "sha256": "525bc610b79632c2b240e80e6aafbf490c9fdf64c638ba893a125fab6f44db5e"
+    },
+    {
+      "source": "C:\\Koi-results\\koi-24h-baseline\\ctest.txt",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\baselines\\2026-09-06-24h\\ctest.txt",
+      "sha256": "73512c83002a9a5d0a686a021eb54a2a6144c38991bcc763b218d45cfa9766f7"
+    },
+    {
+      "source": "C:\\Koi-results\\koi-24h-baseline\\koi-bench-hash.json",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\baselines\\2026-09-06-24h\\koi-bench-hash.json",
+      "sha256": "c930ae750e9195c59fc51f78830e986e86d1d3d9c62351a2d2ed6d1e5304457e"
+    },
+    {
+      "source": "C:\\Koi-results\\koi-24h-baseline\\threaded-benchmark-blocker.txt",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\baselines\\2026-09-06-24h\\threaded-benchmark-blocker.txt",
+      "sha256": "d333ccc34c8c98bdf1522bf2c504dd7f4bc05dc22242cc63203142454a2d5ff1"
+    },
+    {
+      "source": "C:\\Koi-results\\koi-24h-baseline\\pgn-extract\\2026.09.05 2_Koi Engine - Stockfish 19.json",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\baselines\\2026-09-06-24h\\pgn-extract\\2026.09.05 2_Koi Engine - Stockfish 19.json",
+      "sha256": "c21d13bb018a1d6e73136b968774de53c6e272e6cd1812a34c23d9d723daf4b8"
+    },
+    {
+      "source": "C:\\Koi-results\\koi-24h-baseline\\pgn-extract\\2026.09.05_Koi Engine - Koi Engine.json",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\baselines\\2026-09-06-24h\\pgn-extract\\2026.09.05_Koi Engine - Koi Engine.json",
+      "sha256": "8ccbe35bf92c36e28b71b7c7dc61eb712e41abc7b90a4678a559bd48fa5b5af8"
+    },
+    {
+      "source": "C:\\Koi-results\\koi-24h-baseline\\pgn-extract\\2026.09.05_Koi Engine - Stockfish 19.json",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\baselines\\2026-09-06-24h\\pgn-extract\\2026.09.05_Koi Engine - Stockfish 19.json",
+      "sha256": "538abce9d5a9c9ea8630565e01a0214aec702301bdaf1819047989400f15ebbf"
+    },
+    {
+      "source": "C:\\Koi-results\\koi-24h-baseline\\pgn-extract\\2026.09.06  2_Koi Engine - Leela Chess Zero.json",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\baselines\\2026-09-06-24h\\pgn-extract\\2026.09.06  2_Koi Engine - Leela Chess Zero.json",
+      "sha256": "958f830b54fc1207d691678c6b4b2c12c480d70e2fa30279a0863e74d07bd2fd"
+    },
+    {
+      "source": "C:\\Koi-results\\koi-24h-baseline\\pgn-extract\\2026.09.06_Koi Engine - Leela Chess Zero.json",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\baselines\\2026-09-06-24h\\pgn-extract\\2026.09.06_Koi Engine - Leela Chess Zero.json",
+      "sha256": "a71520ca5cbbeb238a9576c0eb2cfd4bfc2986e836ddf0e2190b2e16c8081dc6"
+    },
+    {
+      "source": "C:\\Koi-results\\koi-24h-current\\architecture-baseline-threads1.json",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\baselines\\2026-09-06-current\\architecture-baseline-threads1.json",
+      "sha256": "af5cdfa17765603c6929bc6ad5e36f14bda6b010d8785c05dee9414258068192"
+    },
+    {
+      "source": "C:\\Koi-results\\koi-24h-current\\bench-threads-1.json",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\baselines\\2026-09-06-current\\bench-threads-1.json",
+      "sha256": "33ca06b9819a5d45a671f745f2dad6dc177477cd43f482e8d6f9027000cedf59"
+    },
+    {
+      "source": "C:\\Koi-results\\koi-24h-current\\bench-threads-2.json",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\baselines\\2026-09-06-current\\bench-threads-2.json",
+      "sha256": "8aae3115cc491aa43317f87af8c6094f9bf8e50cb4b2facd359aba8fca2cf61b"
+    },
+    {
+      "source": "C:\\Koi-results\\koi-24h-current\\bench-threads-4.json",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\baselines\\2026-09-06-current\\bench-threads-4.json",
+      "sha256": "412944fa30832b927908ed554501e71bbcc85c798c171f044768e9bed6a0b4cd"
+    },
+    {
+      "source": "C:\\Koi-results\\koi-24h-current\\continuation-current-threads1.json",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\baselines\\2026-09-06-current\\continuation-current-threads1.json",
+      "sha256": "5622009c026b1ee1d9fd4294f1580575436caec86984d6d54cb77483410ec784"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-baseline\\repro-1.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-baseline\\repro-1.log",
+      "sha256": "640d05659c3b7c0f3d01b9e4f13cc3cfbb4d27357d0e198f9f3a3b38a77396ff"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-baseline\\repro-2.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-baseline\\repro-2.log",
+      "sha256": "3e325371cf5c0db8d9837421dfb88fe5a83ca0e375fe61ce8bb2241dbd4932cf"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-baseline\\repro-3.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-baseline\\repro-3.log",
+      "sha256": "a80d7d6c84bdf478eea8a6e56b61272c0b5ce5010f3649700f19a01b5b0f764d"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-baseline\\repro-3.pgn",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-baseline\\repro-3.pgn",
+      "sha256": "b160a27cac4ff125996f3ed072212acdd40ed5d239ce6a7301811083ecf9f919"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-baseline\\repro-5.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-baseline\\repro-5.log",
+      "sha256": "af9a9e8963fded3c9ebebe44b1adcd8f10f7441ba299f8acf5c1b314232cd824"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-baseline\\repro-5.pgn",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-baseline\\repro-5.pgn",
+      "sha256": "84f39f630f8808c0bee839009d311628c75bafd75d0fa730adac7b08f5f20b7d"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\kiwipete-invalid.fen",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\kiwipete-invalid.fen",
+      "sha256": "55ee20cffde48c30ecf9752a1a244caca86fe3085bc9c3ad46b88c9f62cf2c80"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\soak-fens-invalid-fixtures.md",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\soak-fens-invalid-fixtures.md",
+      "sha256": "2290d32bc549271f3fc0b135a1d84a0e69c8cea861ef9a7294e2e256c3d61ee7"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\soak-fens-valid.txt",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\soak-fens-valid.txt",
+      "sha256": "499a065c75da57d59b1de55d699dffb90d497fffc2fbc2b04614e69527bf8224"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\soak-fens.txt",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\soak-fens.txt",
+      "sha256": "614a0e77f2412bacbd9e2b13132d69f17ca7988b0db4fc967bd9fa12377be81b"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\fresh-1game-t1\\cutechess-stderr.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\fresh-1game-t1\\cutechess-stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\fresh-1game-t1\\cutechess-stdout.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\fresh-1game-t1\\cutechess-stdout.log",
+      "sha256": "6b524c63eda37f7fb826d42eb6855863a36a66296721aa239506947203738889"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\fresh-1game-t1\\cutechess-transcript.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\fresh-1game-t1\\cutechess-transcript.log",
+      "sha256": "6b524c63eda37f7fb826d42eb6855863a36a66296721aa239506947203738889"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\fresh-1game-t1\\games.pgn",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\fresh-1game-t1\\games.pgn",
+      "sha256": "af8c2b3f8a7abbb16d01639b875ff31b4a589ae919047d25c3715ba6bff91a54"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\fresh-1game-t1\\koi-debug.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\fresh-1game-t1\\koi-debug.log",
+      "sha256": "9ff342b94156cad09accda05779b8460f52636603a58bbff3e852c32aa996f88"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\fresh-1game-t1\\koi-stderr.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\fresh-1game-t1\\koi-stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\fresh-1game-t1\\opponent-stderr.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\fresh-1game-t1\\opponent-stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\fresh-1game-t1\\stability-report.json",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\fresh-1game-t1\\stability-report.json",
+      "sha256": "cd42cf77dd238358ad3d49e7bedc668fe79088ae2a4aeb8846e249f55dc130d6"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\gate-t4-100-final\\cutechess-stderr.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\gate-t4-100-final\\cutechess-stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\gate-t4-100-final\\cutechess-stdout.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\gate-t4-100-final\\cutechess-stdout.log",
+      "sha256": "64a0a724f0b2fcfc861c5d5c6264f0d0dd7f1ca0e76deb2fbc60f4fe5f792485"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\gate-t4-100-final\\cutechess-transcript.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\gate-t4-100-final\\cutechess-transcript.log",
+      "sha256": "64a0a724f0b2fcfc861c5d5c6264f0d0dd7f1ca0e76deb2fbc60f4fe5f792485"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\gate-t4-100-final\\games.pgn",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\gate-t4-100-final\\games.pgn",
+      "sha256": "c32f41d80b1521045cb5308bd3144d9d450367479b8bce4f070cf643956bfd73"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\gate-t4-100-final\\koi-debug.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\gate-t4-100-final\\koi-debug.log",
+      "sha256": "703d9e3892b9993495a9bf2ab8947f755912181518a00b4983db1f8d295d1903"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\gate-t4-100-final\\koi-stderr.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\gate-t4-100-final\\koi-stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\gate-t4-100-final\\opponent-stderr.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\gate-t4-100-final\\opponent-stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\gate-t4-100-final\\stability-report.json",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\gate-t4-100-final\\stability-report.json",
+      "sha256": "c7c84fed8a99005ecf39376f89387a934d9d71af3b778bb45f27c37cef7c6646"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\gate-t4-100-final\\uci-openings.epd",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\gate-t4-100-final\\uci-openings.epd",
+      "sha256": "936f0668741ef67d8bbfbc757ab50b162b1bb1390e7c1b4fa3dc498dc8d60325"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\gate-t4-100-smoke\\cutechess-stderr.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\gate-t4-100-smoke\\cutechess-stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\gate-t4-100-smoke\\cutechess-stdout.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\gate-t4-100-smoke\\cutechess-stdout.log",
+      "sha256": "c583f5d3bd8d25ba615fdc326db46d9d244fa8dc7c38e5f2762ffc9f397aeecc"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\gate-t4-100-smoke\\cutechess-transcript.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\gate-t4-100-smoke\\cutechess-transcript.log",
+      "sha256": "c583f5d3bd8d25ba615fdc326db46d9d244fa8dc7c38e5f2762ffc9f397aeecc"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\gate-t4-100-smoke\\games.pgn",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\gate-t4-100-smoke\\games.pgn",
+      "sha256": "24832af6c439194aa8e34cf5fab7c02bd5022283e99eb9d56ee8f7f687ba0a5a"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\gate-t4-100-smoke\\koi-debug.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\gate-t4-100-smoke\\koi-debug.log",
+      "sha256": "f0730dc0e415d7be99a1da26b39bf5beff1be687060c1e69a00a335f38a2e301"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\gate-t4-100-smoke\\koi-stderr.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\gate-t4-100-smoke\\koi-stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\gate-t4-100-smoke\\opponent-stderr.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\gate-t4-100-smoke\\opponent-stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\gate-t4-100-smoke\\stability-report.json",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\gate-t4-100-smoke\\stability-report.json",
+      "sha256": "10a7a4fe7d1a87430715cdb563fbb5cde8e96f2715b800bc276e200ee39b48d3"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\gate-t4-100-smoke\\uci-openings.epd",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\gate-t4-100-smoke\\uci-openings.epd",
+      "sha256": "936f0668741ef67d8bbfbc757ab50b162b1bb1390e7c1b4fa3dc498dc8d60325"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\invalid-kiwipete-repro\\cutechess-stderr.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\invalid-kiwipete-repro\\cutechess-stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\invalid-kiwipete-repro\\cutechess-stdout.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\invalid-kiwipete-repro\\cutechess-stdout.log",
+      "sha256": "eb8a4f3fee9c82c514e28868cd3d1b7d18dd1260bca39d59c1f32194a9a2f682"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\invalid-kiwipete-repro\\cutechess-transcript.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\invalid-kiwipete-repro\\cutechess-transcript.log",
+      "sha256": "eb8a4f3fee9c82c514e28868cd3d1b7d18dd1260bca39d59c1f32194a9a2f682"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\invalid-kiwipete-repro\\fen-openings.epd",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\invalid-kiwipete-repro\\fen-openings.epd",
+      "sha256": "4c60b8f4adcf92df8a3a83b63349cfaf4254a7e6cbc766301863545bc0bcc9ab"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\invalid-kiwipete-repro\\games.pgn",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\invalid-kiwipete-repro\\games.pgn",
+      "sha256": "a934514b81658492257ec3dfb8fad464e04c0fb1644e31565e4b52540b197320"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\invalid-kiwipete-repro\\koi-debug.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\invalid-kiwipete-repro\\koi-debug.log",
+      "sha256": "6abffdcfbe5a657222fde79d8c2e81d39072db9eb5ef33f01fa2203d5997afe9"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\invalid-kiwipete-repro\\koi-stderr.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\invalid-kiwipete-repro\\koi-stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\invalid-kiwipete-repro\\opponent-stderr.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\invalid-kiwipete-repro\\opponent-stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\invalid-kiwipete-repro\\stability-report.json",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\invalid-kiwipete-repro\\stability-report.json",
+      "sha256": "f6989d5ee677268e6ea9bb12dddec18212c4ed83c79bc1e085d9af3a2cea6a40"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\matrix-t1-10\\cutechess-stderr.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\matrix-t1-10\\cutechess-stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\matrix-t1-10\\cutechess-stdout.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\matrix-t1-10\\cutechess-stdout.log",
+      "sha256": "973eebaf96b991c2522ed3e719390128c962decbdcc5d98fc27acda6930a558b"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\matrix-t1-10\\cutechess-transcript.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\matrix-t1-10\\cutechess-transcript.log",
+      "sha256": "973eebaf96b991c2522ed3e719390128c962decbdcc5d98fc27acda6930a558b"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\matrix-t1-10\\games.pgn",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\matrix-t1-10\\games.pgn",
+      "sha256": "a3e3a8b9d48ad803f81c33e5de940b62b85f2d176381751afa7fd78718091ee5"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\matrix-t1-10\\koi-debug.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\matrix-t1-10\\koi-debug.log",
+      "sha256": "a473c1e48e41e6517275d09ee87eeab7b44cc04587feb8963ad03a8f8412dcf8"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\matrix-t1-10\\koi-stderr.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\matrix-t1-10\\koi-stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\matrix-t1-10\\opponent-stderr.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\matrix-t1-10\\opponent-stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\matrix-t1-10\\stability-report.json",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\matrix-t1-10\\stability-report.json",
+      "sha256": "1f5fcd032ff45e279750f54ebbc2b21ecb85da8250baaf04bbd1664cf6df6e8e"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\matrix-t2-10\\cutechess-stderr.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\matrix-t2-10\\cutechess-stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\matrix-t2-10\\cutechess-stdout.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\matrix-t2-10\\cutechess-stdout.log",
+      "sha256": "973eebaf96b991c2522ed3e719390128c962decbdcc5d98fc27acda6930a558b"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\matrix-t2-10\\cutechess-transcript.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\matrix-t2-10\\cutechess-transcript.log",
+      "sha256": "973eebaf96b991c2522ed3e719390128c962decbdcc5d98fc27acda6930a558b"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\matrix-t2-10\\games.pgn",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\matrix-t2-10\\games.pgn",
+      "sha256": "d722d970d7c6385396d2e5614a44ed22ff8759565e871d1b74f465c567ebe4da"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\matrix-t2-10\\koi-debug.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\matrix-t2-10\\koi-debug.log",
+      "sha256": "23282e3b2eaa980ee762c4f2b128634e506c46f7d92dd671a62b86e8cc69da64"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\matrix-t2-10\\koi-stderr.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\matrix-t2-10\\koi-stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\matrix-t2-10\\opponent-stderr.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\matrix-t2-10\\opponent-stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\matrix-t2-10\\stability-report.json",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\matrix-t2-10\\stability-report.json",
+      "sha256": "44fdb6353dd2a15196266965a80a3813d9da3d612a3b0ac07c6c1b66920f5daa"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\matrix-t4-10\\cutechess-stderr.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\matrix-t4-10\\cutechess-stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\matrix-t4-10\\cutechess-stdout.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\matrix-t4-10\\cutechess-stdout.log",
+      "sha256": "973eebaf96b991c2522ed3e719390128c962decbdcc5d98fc27acda6930a558b"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\matrix-t4-10\\cutechess-transcript.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\matrix-t4-10\\cutechess-transcript.log",
+      "sha256": "973eebaf96b991c2522ed3e719390128c962decbdcc5d98fc27acda6930a558b"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\matrix-t4-10\\games.pgn",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\matrix-t4-10\\games.pgn",
+      "sha256": "7fd30b4aca59e863473d844dcadb89d105ece63713e6571957aa585bf8fd74ba"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\matrix-t4-10\\koi-debug.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\matrix-t4-10\\koi-debug.log",
+      "sha256": "ea6bd27e7013f2955091d60846003e53649e20646c909449c3e57702b2a32dca"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\matrix-t4-10\\koi-stderr.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\matrix-t4-10\\koi-stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\matrix-t4-10\\opponent-stderr.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\matrix-t4-10\\opponent-stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\matrix-t4-10\\stability-report.json",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\matrix-t4-10\\stability-report.json",
+      "sha256": "b568611790f9d4744669628bb5ab893c70240e1ef7179bb1339faaec60ab3386"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\soak-t1-12\\cutechess-stderr.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\soak-t1-12\\cutechess-stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\soak-t1-12\\cutechess-stdout.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\soak-t1-12\\cutechess-stdout.log",
+      "sha256": "b51d7ed09797df3971158679c5292743b92ee8349d7d5dd1742e9f6627b878de"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\soak-t1-12\\cutechess-transcript.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\soak-t1-12\\cutechess-transcript.log",
+      "sha256": "b51d7ed09797df3971158679c5292743b92ee8349d7d5dd1742e9f6627b878de"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\soak-t1-12\\fen-openings.epd",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\soak-t1-12\\fen-openings.epd",
+      "sha256": "7db6ec14483ed6e6f8e7c772d1607aaf80d2e2347db1960a0ca16b8f37791001"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\soak-t1-12\\games.pgn",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\soak-t1-12\\games.pgn",
+      "sha256": "6b2b4ddf007e5d1e3896e8438046a2d37ba664917d7aa4d2beb55adc8fb72851"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\soak-t1-12\\koi-debug.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\soak-t1-12\\koi-debug.log",
+      "sha256": "4a550289d5f152de2df9dabc73dd5abb0eb7be0e5a18385b231667aa92244e75"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\soak-t1-12\\koi-stderr.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\soak-t1-12\\koi-stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\soak-t1-12\\opponent-stderr.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\soak-t1-12\\opponent-stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\soak-t1-12\\stability-report.json",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\soak-t1-12\\stability-report.json",
+      "sha256": "762f20eb73a18bb41c000f66f4466d7e61242356a2ec4ab34dc1ea6d6e665625"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\soak-t1-valid-10\\cutechess-stderr.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\soak-t1-valid-10\\cutechess-stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\soak-t1-valid-10\\cutechess-stdout.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\soak-t1-valid-10\\cutechess-stdout.log",
+      "sha256": "cca7a512422c1059c50582271d19c76627b4f259ded888fbdb339eaa9b1d5506"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\soak-t1-valid-10\\cutechess-transcript.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\soak-t1-valid-10\\cutechess-transcript.log",
+      "sha256": "cca7a512422c1059c50582271d19c76627b4f259ded888fbdb339eaa9b1d5506"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\soak-t1-valid-10\\fen-openings.epd",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\soak-t1-valid-10\\fen-openings.epd",
+      "sha256": "65754a51467dd98ce61c85d32f8eb0c2a31fdbfe2d263b4f0cf6ac580378f52e"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\soak-t1-valid-10\\games.pgn",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\soak-t1-valid-10\\games.pgn",
+      "sha256": "90c2b4f819bb33ceef00007001d8e4819df4eff832a2b5fe41d024d3cd95ad53"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\soak-t1-valid-10\\koi-debug.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\soak-t1-valid-10\\koi-debug.log",
+      "sha256": "3efe2cc151eb2d6e5e900add1c9b9ff1d611554488b66588f1b43ea0ac8401c1"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\soak-t1-valid-10\\koi-stderr.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\soak-t1-valid-10\\koi-stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\soak-t1-valid-10\\opponent-stderr.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\soak-t1-valid-10\\opponent-stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\soak-t1-valid-10\\stability-report.json",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\soak-t1-valid-10\\stability-report.json",
+      "sha256": "4c22af7611a1dc5f836168e76d3c4c7003e7d0254249c51030968b0a96b27099"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\soak-t2-valid-10\\cutechess-stderr.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\soak-t2-valid-10\\cutechess-stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\soak-t2-valid-10\\cutechess-stdout.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\soak-t2-valid-10\\cutechess-stdout.log",
+      "sha256": "d872aac66bb73b0b078b6740120c07f8c6a4770953806711969f164140673f96"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\soak-t2-valid-10\\cutechess-transcript.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\soak-t2-valid-10\\cutechess-transcript.log",
+      "sha256": "d872aac66bb73b0b078b6740120c07f8c6a4770953806711969f164140673f96"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\soak-t2-valid-10\\fen-openings.epd",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\soak-t2-valid-10\\fen-openings.epd",
+      "sha256": "65754a51467dd98ce61c85d32f8eb0c2a31fdbfe2d263b4f0cf6ac580378f52e"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\soak-t2-valid-10\\games.pgn",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\soak-t2-valid-10\\games.pgn",
+      "sha256": "25a148545ca0b69fdd2dd3efb890248e88c3ae4d9b991f4c7b7f388f9eef0e26"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\soak-t2-valid-10\\koi-debug.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\soak-t2-valid-10\\koi-debug.log",
+      "sha256": "f12dd3ff6de3b5e5cbad83b5682746f478922c0254358a18049ff2315f4c4418"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\soak-t2-valid-10\\koi-stderr.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\soak-t2-valid-10\\koi-stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\soak-t2-valid-10\\opponent-stderr.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\soak-t2-valid-10\\opponent-stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "C:\\Koi-results\\stability-incident\\soak-t2-valid-10\\stability-report.json",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-incident\\soak-t2-valid-10\\stability-report.json",
+      "sha256": "9d994d2cb78595a8d41b597b55cc506f78a1cbbd411f9832ffc31f7e8635d174"
+    },
+    {
+      "source": "C:\\Koi-results\\koi-stability-100-no-book-final\\cutechess-transcript.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-no-book-100\\cutechess-transcript.log",
+      "sha256": "519a870e222a28a279e54217d1af12d8f555a5c6dbbe01977bbd4a3fcde10201"
+    },
+    {
+      "source": "C:\\Koi-results\\koi-stability-100-no-book-final\\games.pgn",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-no-book-100\\games.pgn",
+      "sha256": "2f6b3dd71f4a3c3adf4394b853453ae85365576973e154df4f6ccce8e0df38b6"
+    },
+    {
+      "source": "C:\\Koi-results\\koi-stability-100-no-book-final\\koi-stderr.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-no-book-100\\koi-stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "C:\\Koi-results\\koi-stability-100-no-book-final\\opponent-stderr.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-no-book-100\\opponent-stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "C:\\Koi-results\\koi-stability-100-no-book-final\\stability-report.json",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-no-book-100\\stability-report.json",
+      "sha256": "76eff8c108beadf93cabed390c0d58aba180d45d891dcc61684304933798598a"
+    },
+    {
+      "source": "C:\\Koi-results\\koi-stability-100-no-book-final\\uci-openings.epd",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-no-book-100\\uci-openings.epd",
+      "sha256": "936f0668741ef67d8bbfbc757ab50b162b1bb1390e7c1b4fa3dc498dc8d60325"
+    },
+    {
+      "source": "C:\\Koi-results\\koi-stability-20-book-final\\cutechess-transcript.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-book-20\\cutechess-transcript.log",
+      "sha256": "a6ef1dff6b7fbfb1c92ceaa00984ef692f60844173b22b6d707617129f3717df"
+    },
+    {
+      "source": "C:\\Koi-results\\koi-stability-20-book-final\\games.pgn",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-book-20\\games.pgn",
+      "sha256": "18e06603bb3788cdc77cf1ed52c885f67b28d2a152c3048272aea984f58cbda3"
+    },
+    {
+      "source": "C:\\Koi-results\\koi-stability-20-book-final\\koi-stderr.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-book-20\\koi-stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "C:\\Koi-results\\koi-stability-20-book-final\\opponent-stderr.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-book-20\\opponent-stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "C:\\Koi-results\\koi-stability-20-book-final\\stability-report.json",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-book-20\\stability-report.json",
+      "sha256": "bbf5b9286ba3f471e36e2aceb55f6cdd0f4b74fbeecb7c27a3bb6c0ad4841ce3"
+    },
+    {
+      "source": "C:\\Koi-results\\koi-stability-20-book-final\\uci-openings.epd",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-book-20\\uci-openings.epd",
+      "sha256": "936f0668741ef67d8bbfbc757ab50b162b1bb1390e7c1b4fa3dc498dc8d60325"
+    },
+    {
+      "source": "C:\\Koi-results\\koi-stability-20-koi-vs-koi-t1\\cutechess-transcript.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-koi-vs-koi\\threads-1\\cutechess-transcript.log",
+      "sha256": "0b98771cfb0e75588d1f783346d2102ddc5464a650012298d66f2e7a2548c079"
+    },
+    {
+      "source": "C:\\Koi-results\\koi-stability-20-koi-vs-koi-t1\\games.pgn",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-koi-vs-koi\\threads-1\\games.pgn",
+      "sha256": "9f240d300f4b64470e72e1c0ec7113b88670aa7a782c95edf83fdcfb8ec5e29e"
+    },
+    {
+      "source": "C:\\Koi-results\\koi-stability-20-koi-vs-koi-t1\\koi-stderr.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-koi-vs-koi\\threads-1\\koi-stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "C:\\Koi-results\\koi-stability-20-koi-vs-koi-t1\\opponent-stderr.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-koi-vs-koi\\threads-1\\opponent-stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "C:\\Koi-results\\koi-stability-20-koi-vs-koi-t1\\stability-report.json",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-koi-vs-koi\\threads-1\\stability-report.json",
+      "sha256": "60953ede49144cfaaaea3f4b8a8cd38e2265c0d39540f4a6165c3933f718a0b8"
+    },
+    {
+      "source": "C:\\Koi-results\\koi-stability-20-koi-vs-koi-t1\\uci-openings.epd",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-koi-vs-koi\\threads-1\\uci-openings.epd",
+      "sha256": "936f0668741ef67d8bbfbc757ab50b162b1bb1390e7c1b4fa3dc498dc8d60325"
+    },
+    {
+      "source": "C:\\Koi-results\\koi-stability-20-koi-vs-koi-t2\\cutechess-transcript.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-koi-vs-koi\\threads-2\\cutechess-transcript.log",
+      "sha256": "55b2aff69715dbaad1be3514efe75d9d785a6583607c93ae3dfa8686f30fef0b"
+    },
+    {
+      "source": "C:\\Koi-results\\koi-stability-20-koi-vs-koi-t2\\games.pgn",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-koi-vs-koi\\threads-2\\games.pgn",
+      "sha256": "a61cb502514baecd10c05aad8cf6bbf563e08c541819f68872f4096b6a211fe4"
+    },
+    {
+      "source": "C:\\Koi-results\\koi-stability-20-koi-vs-koi-t2\\koi-stderr.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-koi-vs-koi\\threads-2\\koi-stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "C:\\Koi-results\\koi-stability-20-koi-vs-koi-t2\\opponent-stderr.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-koi-vs-koi\\threads-2\\opponent-stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "C:\\Koi-results\\koi-stability-20-koi-vs-koi-t2\\stability-report.json",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-koi-vs-koi\\threads-2\\stability-report.json",
+      "sha256": "bd7922264279b6bc5128a07a5fd25e8f2d0c9ed417ed6ae64b81db91dd414ba2"
+    },
+    {
+      "source": "C:\\Koi-results\\koi-stability-20-koi-vs-koi-t2\\uci-openings.epd",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-koi-vs-koi\\threads-2\\uci-openings.epd",
+      "sha256": "936f0668741ef67d8bbfbc757ab50b162b1bb1390e7c1b4fa3dc498dc8d60325"
+    },
+    {
+      "source": "C:\\Koi-results\\koi-stability-20-koi-vs-koi-t4\\cutechess-transcript.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-koi-vs-koi\\threads-4\\cutechess-transcript.log",
+      "sha256": "1ce072ccad5a2c4bec662c7e6d200276dd4249a82540d57dc4b49a993c92d459"
+    },
+    {
+      "source": "C:\\Koi-results\\koi-stability-20-koi-vs-koi-t4\\games.pgn",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-koi-vs-koi\\threads-4\\games.pgn",
+      "sha256": "6b1ceb4065be78b54cd82e8e2f7a866acb419c12432bb84a9e0d75bc590776e9"
+    },
+    {
+      "source": "C:\\Koi-results\\koi-stability-20-koi-vs-koi-t4\\koi-stderr.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-koi-vs-koi\\threads-4\\koi-stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "C:\\Koi-results\\koi-stability-20-koi-vs-koi-t4\\opponent-stderr.log",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-koi-vs-koi\\threads-4\\opponent-stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "C:\\Koi-results\\koi-stability-20-koi-vs-koi-t4\\stability-report.json",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-koi-vs-koi\\threads-4\\stability-report.json",
+      "sha256": "4209ec604c3e1bb1932c2cfef602082134f6fb43b0d61680be962419369ef133"
+    },
+    {
+      "source": "C:\\Koi-results\\koi-stability-20-koi-vs-koi-t4\\uci-openings.epd",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\2026-09-08-koi-vs-koi\\threads-4\\uci-openings.epd",
+      "sha256": "936f0668741ef67d8bbfbc757ab50b162b1bb1390e7c1b4fa3dc498dc8d60325"
+    },
+    {
+      "source": "C:\\Koi-results\\koi-match-repro\\koi-uci-match-20260907-140840-046.json",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\matches\\2026-09-07-match-repro\\koi-uci-match-20260907-140840-046.json",
+      "sha256": "bffe74f9b96bd55b73c077b463dcce85a58b55a6c6505a8341aa7cea6953c320"
+    },
+    {
+      "source": "C:\\Koi-results\\koi-match-repro\\koi-uci-match-20260907-140840-046.pgn",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\matches\\2026-09-07-match-repro\\koi-uci-match-20260907-140840-046.pgn",
+      "sha256": "0117859204d2f9211a310758d27c44ef84d509152492816eb4d66ccde241c36f"
+    },
+    {
+      "source": "C:\\Koi-results\\koi-v1.0-baseline-threads1.json",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\baselines\\standalone\\koi-v1.0-baseline-threads1.json",
+      "sha256": "3e202157710fadfbb8cf4c8ac2448d8dbd7b53e7a866f3057378e4d39234eaf2"
+    },
+    {
+      "source": "C:\\Koi-results\\koi-v1.0-baseline-threads1.txt",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\baselines\\standalone\\koi-v1.0-baseline-threads1.txt",
+      "sha256": "114de2ecdb22cbb2e8b74893cd47578c701641a2ecd2145d6dcc5205c7098c48"
+    },
+    {
+      "source": "C:\\Koi-results\\koi-v1.1-native-timed.json",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\baselines\\standalone\\koi-v1.1-native-timed.json",
+      "sha256": "d11fdc451f399c6cf0e7ac55cb106cf084d0277da40a6c1ceecc8e4247c4df68"
+    },
+    {
+      "source": "C:\\Koi-results\\v1.1-thread4-direct.txt",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\baselines\\standalone\\v1.1-thread4-direct.txt",
+      "sha256": "c6fd49e1c24640e31585d4ff2f1682f3774c8f74f85cadce4cb29d11412392d0"
+    },
+    {
+      "source": "C:\\Koi-results\\koi-next-leap-search-fix-report.md",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\baselines\\standalone\\koi-next-leap-search-fix-report.md",
+      "sha256": "4d14c3fde25a46c1da23f53e8c80b8b5a6bdc1fc3f789d54aa81632794e35f73"
+    },
+    {
+      "source": "C:\\Koi-results\\koi-next-leap-search-fix-baseline.index",
+      "destination": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\baselines\\standalone\\koi-next-leap-search-fix-baseline.index",
+      "sha256": "24b168c5398b6981c8fab152781310f99304d2a0d63dc1de5340693c7c43d406"
+    }
+  ]
+}

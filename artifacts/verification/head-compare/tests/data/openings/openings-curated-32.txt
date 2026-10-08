@@ -1,0 +1,32 @@
+italian-game | e2e4 e7e5 g1f3 b8c6 f1c4 f8c5
+ruy-lopez | e2e4 e7e5 g1f3 b8c6 f1b5 a7a6
+scotch-game | e2e4 e7e5 g1f3 b8c6 d2d4 e5d4
+four-knights | e2e4 e7e5 g1f3 b8c6 b1c3 g8f6
+kings-gambit | e2e4 e7e5 f2f4 e5f4
+vienna-game | e2e4 e7e5 b1c3
+ponziani | e2e4 e7e5 g1f3 b8c6 c2c3
+center-game | e2e4 e7e5 d2d4 e5d4
+french-advance | e2e4 e7e6 d2d4 d7d5 e4e5
+french-exchange | e2e4 e7e6 d2d4 d7d5 e4d5
+caro-kann-advance | e2e4 c7c6 d2d4 d7d5 e4e5
+caro-kann-exchange | e2e4 c7c6 d2d4 d7d5 e4d5
+sicilian-najdorf | e2e4 c7c5 g1f3 d7d6 d2d4 c5d4 f3d4 g8f6 b1c3 a7a6
+sicilian-dragon | e2e4 c7c5 g1f3 d7d6 d2d4 c5d4 f3d4 g8f6 b1c3 g7g6
+sicilian-alapin | e2e4 c7c5 c2c3
+sicilian-closed | e2e4 c7c5 b1c3 b8c6 g2g3
+queens-gambit-declined | d2d4 d7d5 c2c4 e7e6 b1c3 g8f6
+queens-gambit-accepted | d2d4 d7d5 c2c4 d5c4
+slav-defense | d2d4 d7d5 c2c4 c7c6 b1c3 g8f6
+london-system | d2d4 d7d5 c1f4 g8f6 e2e3
+kings-indian | d2d4 g8f6 c2c4 g7g6 b1c3 f8g7 e2e4
+grunfeld-defense | d2d4 g8f6 c2c4 g7g6 b1c3 d7d5
+nimzo-indian | d2d4 g8f6 c2c4 e7e6 b1c3 f8b4
+bogo-indian | d2d4 g8f6 c2c4 e7e6 g1f3 f8b4
+benoni-defense | d2d4 g8f6 c2c4 c7c5 d4d5 e7e6
+catalan-opening | d2d4 g8f6 c2c4 e7e6 g2g3
+english-symmetrical | c2c4 c7c5 b1c3 b8c6
+english-four-knights | c2c4 e7e5 b1c3 g8f6 g1f3 b8c6
+english-reversed-sicilian | c2c4 e7e5 b1c3 g8f6
+reti-opening | g1f3 d7d5 c2c4
+dutch-defense | d2d4 f7f5
+bird-opening | f2f4 d7d5

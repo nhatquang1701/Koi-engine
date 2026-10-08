@@ -1,0 +1,110 @@
+{
+  "baseline_sha256": "cbc05d459445eacd9f0ef8749aec18434ce251b105e6d1900f5dd4b5299ce0aa",
+  "batch_two": {
+    "colors": {
+      "black": {
+        "decision": "reject",
+        "draws": 88,
+        "elo": -84.97651243781007,
+        "games": 221,
+        "llr": -2.956506,
+        "losses": 93,
+        "pgn": {
+          "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\matches\\qsearch-tt-followup-20260929\\sprt-batch2\\qsearch-tt-current-source-20k-batch2-20260929-043312\\black\\koi-uci-match-20260928-222721-719.pgn",
+          "sha256": "9866b9d35dc876104374257b447b821b58efc0ffd8295cffd94e4956e8d56ceb"
+        },
+        "report": {
+          "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\matches\\qsearch-tt-followup-20260929\\sprt-batch2\\qsearch-tt-current-source-20k-batch2-20260929-043312\\black\\koi-uci-match-20260928-222721-719.json",
+          "sha256": "35aef9c279c4b5ada27bc13147175ed668afda6075e22aed6d0ee7e946e84799"
+        },
+        "unique_roots_played": 111,
+        "wins": 40
+      },
+      "white": {
+        "decision": "inconclusive",
+        "draws": 112,
+        "elo": 71.5682196298182,
+        "games": 256,
+        "llr": 2.65685,
+        "losses": 46,
+        "pgn": {
+          "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\matches\\qsearch-tt-followup-20260929\\sprt-batch2\\qsearch-tt-current-source-20k-batch2-20260929-043312\\white\\koi-uci-match-20260928-223704-002.pgn",
+          "sha256": "6a727e00581608d9f53fa2bf241ee0cfc7a6f657f9713ef17467b5146fd69c7a"
+        },
+        "report": {
+          "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\matches\\qsearch-tt-followup-20260929\\sprt-batch2\\qsearch-tt-current-source-20k-batch2-20260929-043312\\white\\koi-uci-match-20260928-223704-002.json",
+          "sha256": "893d5972f68f3d86cb1e039f774387b7bf19048dd791224dc331f37fdb5f4101"
+        },
+        "unique_roots_played": 128,
+        "wins": 98
+      }
+    },
+    "combined": {
+      "decision": "inconclusive",
+      "draws": 200,
+      "games": 477,
+      "llr": -0.29965600000000014,
+      "losses": 139,
+      "lower_threshold": -2.9444389791664403,
+      "score": 0.4989517819706499,
+      "upper_threshold": 2.9444389791664403,
+      "wins": 138
+    },
+    "experiment": {
+      "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\verification\\qsearch-tt-followup-20260929\\experiment-batch2.json",
+      "sha256": "653520a7417cc9170ae6eada37dac97d71be07eaa573a394ab48e284013cb98c"
+    },
+    "opening_count": 128,
+    "opening_file_sha256": "402039aa588d5a03f3a07e929df0bec3178e4363e4b100fb7bf5e586482611ca",
+    "opening_state_overlap_count": 0,
+    "unique_opening_count": 128
+  },
+  "candidate_sha256": "3c187fc9bdad3572e6c849b077ffee2f612661083602d79261c0c50169da268c",
+  "cumulative": {
+    "decision": "inconclusive",
+    "draws": 304,
+    "games": 733,
+    "llr": -0.4794140000000001,
+    "losses": 215,
+    "lower_threshold": -2.9444389791664403,
+    "score": 0.49931787175989084,
+    "upper_threshold": 2.9444389791664403,
+    "wins": 214
+  },
+  "method": "sum of independent color SPRT LLRs; batches combined only after matching executable/options and disjoint opening-state checks",
+  "options": {
+    "algorithm": "AlphaBeta",
+    "evaluator": "classical",
+    "hash_mb": 512,
+    "own_book": false,
+    "random_seed": 0,
+    "speed": 100,
+    "threads": 1,
+    "time_control": "nodes 20000"
+  },
+  "prior_batch": {
+    "combined": {
+      "decision": "inconclusive",
+      "draws": 104,
+      "games": 256,
+      "llr": -0.17975799999999997,
+      "losses": 76,
+      "lower_threshold": -2.9444389791664403,
+      "score": 0.5,
+      "upper_threshold": 2.9444389791664403,
+      "wins": 76
+    },
+    "derived": {
+      "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\matches\\qsearch-tt-followup-20260929\\sprt\\qsearch-tt-current-source-20k-20260929-034116\\combined-decision-derived.json",
+      "sha256": "84b8255fedf021e26d5611f0006e12859355b76610a6d96ee6fa68682db20b96"
+    },
+    "opening_file_sha256": "817DE03966270FE468474DA01CF805DC03D23E9271E61CE9518F7644FEA9A190"
+  },
+  "schema": "koi-sprt-combined-derived-v1",
+  "sprt_hypotheses": {
+    "alpha": 0.05,
+    "beta": 0.05,
+    "elo0": 0,
+    "elo1": 10
+  }
+}

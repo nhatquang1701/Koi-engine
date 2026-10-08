@@ -1,0 +1,45 @@
+kings-gambit-sample-1 | e2e4 e7e5 f2f4 e5f4 a2a4
+ruy-lopez-sample-2 | e2e4 e7e5 g1f3 b8c6 f1b5 a7a6 c2c4
+caro-kann-exchange-sample-3 | e2e4 c7c6 d2d4 d7d5 e4d5 e7e6
+scotch-game-sample-4 | e2e4 e7e5 g1f3 b8c6 d2d4 e5d4 c1d2
+bogo-indian-sample-5 | d2d4 g8f6 c2c4 e7e6 g1f3 f8b4 d1d2
+sicilian-closed-sample-6 | e2e4 c7c5 b1c3 b8c6 g2g3 c6b4
+french-advance-sample-7 | e2e4 e7e6 d2d4 d7d5 e4e5 g7g6
+four-knights-sample-8 | e2e4 e7e5 g1f3 b8c6 b1c3 g8f6 f3h4
+london-system-sample-9 | d2d4 d7d5 c1f4 g8f6 e2e3 f6g8
+sicilian-najdorf-sample-10 | e2e4 c7c5 g1f3 d7d6 d2d4 c5d4 f3d4 g8f6 b1c3 a7a6 f2f4
+english-reversed-sicilian-sample-11 | c2c4 e7e5 b1c3 g8f6 g2g3
+caro-kann-advance-sample-12 | e2e4 c7c6 d2d4 d7d5 e4e5 c6c5
+center-game-sample-13 | e2e4 e7e5 d2d4 e5d4 g1h3
+kings-indian-sample-14 | d2d4 g8f6 c2c4 g7g6 b1c3 f8g7 e2e4 e7e6
+queens-gambit-declined-sample-15 | d2d4 d7d5 c2c4 e7e6 b1c3 g8f6 c4c5
+grunfeld-defense-sample-16 | d2d4 g8f6 c2c4 g7g6 b1c3 d7d5 a1b1
+english-four-knights-sample-17 | c2c4 e7e5 b1c3 g8f6 g1f3 b8c6 d1a4
+queens-gambit-declined-sample-18 | d2d4 d7d5 c2c4 e7e6 b1c3 g8f6 a2a3
+vienna-game-sample-19 | e2e4 e7e5 b1c3 b8c6
+benoni-defense-sample-20 | d2d4 g8f6 c2c4 c7c5 d4d5 e7e6 e2e3
+dutch-defense-sample-21 | d2d4 f7f5 g1h3
+caro-kann-exchange-sample-22 | e2e4 c7c6 d2d4 d7d5 e4d5 d8a5
+ponziani-sample-23 | e2e4 e7e5 g1f3 b8c6 c2c3 f7f5
+french-exchange-sample-24 | e2e4 e7e6 d2d4 d7d5 e4d5 f8c5
+french-exchange-sample-25 | e2e4 e7e6 d2d4 d7d5 e4d5 d8d5
+caro-kann-exchange-sample-26 | e2e4 c7c6 d2d4 d7d5 e4d5 f7f6
+sicilian-najdorf-sample-27 | e2e4 c7c5 g1f3 d7d6 d2d4 c5d4 f3d4 g8f6 b1c3 a7a6 c1d2
+bogo-indian-sample-28 | d2d4 g8f6 c2c4 e7e6 g1f3 f8b4 b1c3
+four-knights-sample-29 | e2e4 e7e5 g1f3 b8c6 b1c3 g8f6 f1a6
+sicilian-alapin-sample-30 | e2e4 c7c5 c2c3 d7d6
+london-system-sample-31 | d2d4 d7d5 c1f4 g8f6 e2e3 c8h3
+scotch-game-sample-32 | e2e4 e7e5 g1f3 b8c6 d2d4 e5d4 b2b4
+french-advance-sample-33 | e2e4 e7e6 d2d4 d7d5 e4e5 f8c5
+ponziani-sample-34 | e2e4 e7e5 g1f3 b8c6 c2c3 b7b5
+four-knights-sample-35 | e2e4 e7e5 g1f3 b8c6 b1c3 g8f6 f1e2
+sicilian-alapin-sample-36 | e2e4 c7c5 c2c3 c5c4
+reti-opening-sample-37 | g1f3 d7d5 c2c4 c8g4
+kings-gambit-sample-38 | e2e4 e7e5 f2f4 e5f4 g1h3
+french-advance-sample-39 | e2e4 e7e6 d2d4 d7d5 e4e5 b7b5
+nimzo-indian-sample-40 | d2d4 g8f6 c2c4 e7e6 b1c3 f8b4 c1d2
+english-four-knights-sample-41 | c2c4 e7e5 b1c3 g8f6 g1f3 b8c6 f3g1
+bird-opening-sample-42 | f2f4 d7d5 f4f5
+reti-opening-sample-43 | g1f3 d7d5 c2c4 c8g4
+queens-gambit-declined-sample-44 | d2d4 d7d5 c2c4 e7e6 b1c3 g8f6 d1c2
+scotch-game-sample-45 | e2e4 e7e5 g1f3 b8c6 d2d4 e5d4 f3d4

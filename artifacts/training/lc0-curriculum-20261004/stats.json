@@ -1,0 +1,36 @@
+{
+  "schema": "koi-lc0-curriculum-selection-v1",
+  "timestamp": "2026-10-04T00:24:13+00:00",
+  "seed": 20261004,
+  "limit_scan": 0,
+  "inputs": [
+    "artifacts\\training\\koi-v5-official-20261002\\corpus\\train.txt"
+  ],
+  "scanned": 2138346,
+  "skipped": 18696,
+  "skipped_reasons": {
+    "book": 18375,
+    "game_over": 321
+  },
+  "elapsed_seconds": 1267.07,
+  "buckets": {
+    "general": {
+      "target": 600000,
+      "seen": 427150,
+      "sampled": 427150,
+      "output": "artifacts\\training\\lc0-curriculum-20261004\\general.txt"
+    },
+    "tactical": {
+      "target": 300000,
+      "seen": 938521,
+      "sampled": 300000,
+      "output": "artifacts\\training\\lc0-curriculum-20261004\\tactical.txt"
+    },
+    "endgame": {
+      "target": 150000,
+      "seen": 753979,
+      "sampled": 150000,
+      "output": "artifacts\\training\\lc0-curriculum-20261004\\endgame.txt"
+    }
+  }
+}

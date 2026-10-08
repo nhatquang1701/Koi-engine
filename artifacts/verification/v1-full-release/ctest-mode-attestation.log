@@ -1,0 +1,22 @@
+Internal ctest changing into directory: C:/Users/ntATh/AI test/Koi engine/build/debug
+Test project C:/Users/ntATh/AI test/Koi engine/build/debug
+    Start 40: koi_uci_match_process
+1/1 Test #40: koi_uci_match_process ............***Failed    5.83 sec
+Exception: C:\Users\ntATh\AI test\Koi engine\tests\integration\matches\uci_match_process_test.ps1:200
+Line |
+ 200 |          throw "NNUE fixture generator is missing: $nnueFixturePath"
+     |          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     | NNUE fixture generator is missing: C:\Users\ntATh\AI test\Koi engine\build\debug\koi-nnue-fixture.exe
+
+
+0% tests passed, 1 tests failed out of 1
+
+Label Time Summary:
+matches    =   5.83 sec*proc (1 test)
+process    =   5.83 sec*proc (1 test)
+
+Total Test time (real) =   5.85 sec
+
+The following tests FAILED:
+	 40 - koi_uci_match_process (Failed)                    matches process
+Errors while running CTest

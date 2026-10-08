@@ -1,0 +1,814 @@
+Start testing: Sep 29 11:46 SE Asia Standard Time
+----------------------------------------------------------
+28/82 Testing: koi_soak_tests
+28/82 Test: koi_soak_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/ci-asan/koi_soak_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/ci-asan
+"koi_soak_tests" start time: Sep 29 11:46 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS long replay soak
+PASS hash resize soak
+PASS ponder cycle soak
+PASS thread sweep soak
+koi-test-summary run=4 pass=4 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =  32.79 sec
+----------------------------------------------------------
+Test Passed.
+"koi_soak_tests" end time: Sep 29 11:47 SE Asia Standard Time
+"koi_soak_tests" time elapsed: 00:00:32
+----------------------------------------------------------
+
+34/82 Testing: perft_tests
+34/82 Test: perft_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/ci-asan/perft_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/ci-asan
+"perft_tests" start time: Sep 29 11:47 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS start-position perft
+PASS Kiwipete perft
+PASS endgame pin perft
+PASS interruptible perft count and restore
+PASS interruptible perft stop
+koi-test-summary run=5 pass=5 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =   7.65 sec
+----------------------------------------------------------
+Test Passed.
+"perft_tests" end time: Sep 29 11:47 SE Asia Standard Time
+"perft_tests" time elapsed: 00:00:07
+----------------------------------------------------------
+
+27/82 Testing: search_service_tests
+27/82 Test: search_service_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/ci-asan/search_service_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/ci-asan
+"search_service_tests" start time: Sep 29 11:47 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS search service depth search
+PASS search service stop
+PASS search service evaluator swap
+PASS search service evaluator pinning
+PASS search service hash controls
+PASS search service sinkless search
+PASS search service ponderhit conversion
+PASS search service incremental hooks
+PASS interior tablebase hook cutoff
+PASS interior tablebase hook non-decisive
+PASS interior tablebase hook zero mate
+PASS interior tablebase hook fifty move
+PASS interior tablebase hook exception
+PASS interior tablebase default off
+koi-test-summary run=14 pass=14 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =   4.85 sec
+----------------------------------------------------------
+Test Passed.
+"search_service_tests" end time: Sep 29 11:47 SE Asia Standard Time
+"search_service_tests" time elapsed: 00:00:04
+----------------------------------------------------------
+
+2/82 Testing: gpu_nnue_tests
+2/82 Test: gpu_nnue_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/ci-asan/gpu_nnue_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/ci-asan
+"gpu_nnue_tests" start time: Sep 29 11:47 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS GPU NNUE matches CPU scalar
+PASS GPU NNUE batch sizes agree
+PASS GPU NNUE concurrent requests
+PASS GPU NNUE PTX variant selection
+PASS GPU NNUE PTX candidate list
+koi-test-summary run=5 pass=5 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =   4.62 sec
+----------------------------------------------------------
+Test Passed.
+"gpu_nnue_tests" end time: Sep 29 11:47 SE Asia Standard Time
+"gpu_nnue_tests" time elapsed: 00:00:04
+----------------------------------------------------------
+
+3/82 Testing: koi_core_tests
+3/82 Test: koi_core_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/ci-asan/koi_core_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/ci-asan
+"koi_core_tests" start time: Sep 29 11:47 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS default position
+PASS legal UCI sequence
+PASS native position undo and key
+PASS special moves
+PASS malformed FEN rejection
+PASS back-rank pawn rejection
+PASS en-passant state validation
+PASS adjacent king rejection
+PASS castling-rights validation
+PASS triple-check rejection
+PASS strict material and double-check rejection
+PASS invalid UCI rejection
+PASS malformed UCI rejection
+PASS compatibility position forwarding
+PASS native search state contract
+PASS checkmate and stalemate
+PASS random chooser legality
+PASS seeded chooser repeatability
+PASS position feature freshness
+PASS position feature concurrent reads
+PASS position feature concurrent copy
+PASS native feature replay
+PASS tactical checking horizon
+PASS metadata SEE cache
+PASS fabricated metadata rejection
+PASS tactical quiet-check probe budget
+PASS fast quiet-check differential
+koi-test-summary run=27 pass=27 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =   4.54 sec
+----------------------------------------------------------
+Test Passed.
+"koi_core_tests" end time: Sep 29 11:47 SE Asia Standard Time
+"koi_core_tests" time elapsed: 00:00:04
+----------------------------------------------------------
+
+6/82 Testing: nnue_boundary_tests
+6/82 Test: nnue_boundary_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/ci-asan/nnue_boundary_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/ci-asan
+"nnue_boundary_tests" start time: Sep 29 11:47 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS NNUE container
+PASS NNUE layer shape
+PASS NNUE fallback
+PASS NNUE worker isolation
+PASS NNUE v2 features
+PASS NNUE v2 container
+PASS NNUE v2 validation
+PASS NNUE v2 inference
+PASS NNUE AVX2 wide accumulation
+PASS NNUE invalid worker guard
+PASS NNUE v3 shifts
+PASS NNUE v4 golden score
+PASS NNUE v4 reference
+PASS NNUE v4 path parity
+PASS NNUE v4 piece bucket
+PASS NNUE v4 wide accumulation
+PASS NNUE v4 container
+PASS NNUE v4 validation
+PASS NNUE v4 corruption
+PASS NNUE v4 incremental walk
+PASS NNUE v4 incremental king bucket
+PASS NNUE v4 incremental recovery
+PASS NNUE v4 incremental special moves
+PASS NNUE v4 incremental wide deltas
+PASS NNUE v5 incremental walk
+PASS NNUE v5 incremental king bucket
+PASS NNUE v5 incremental recovery
+PASS NNUE v5 incremental special moves
+PASS NNUE v5 incremental wide deltas
+PASS NNUE v5 container
+PASS NNUE v5 validation
+PASS NNUE v5 corruption
+PASS NNUE v5 reference
+PASS NNUE v5 path parity
+PASS NNUE v5 golden score
+PASS NNUE v2 shifts rejected
+PASS NNUE invalid fallback
+PASS NNUE one-shot stateless
+SKIP external NNUE container: no external container path provided
+koi-test-summary run=39 pass=38 fail=0 xfail=0 xpass=0 skip=1 unseen=0 intermittent=0
+<end of output>
+Test time =   3.70 sec
+----------------------------------------------------------
+Test Passed.
+"nnue_boundary_tests" end time: Sep 29 11:47 SE Asia Standard Time
+"nnue_boundary_tests" time elapsed: 00:00:03
+----------------------------------------------------------
+
+10/82 Testing: syzygy_tablebase_tests
+10/82 Test: syzygy_tablebase_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/ci-asan/syzygy_tablebase_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/ci-asan
+"syzygy_tablebase_tests" start time: Sep 29 11:47 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS snapshot rule metadata and piece bitboards
+PASS snapshot native rule state after pinned double push
+PASS absent and malformed paths disable probing safely
+PASS empty and valid paths preserve optional fallback
+Incomplete tablebase file KQvK..rtbw
+info string Incomplete tablebase file KQvK..rtbw
+PASS wrong-sized fixture disables probing safely
+PASS tablebase instances share Fathom lifetime in both clear orders
+PASS piece count and castling gate probing
+PASS malformed snapshots are rejected before probing
+PASS WDL conversion and concurrent disabled probes
+PASS 50-move rule selects clock-aware root probe
+PASS seven-piece probe limit is preserved
+PASS large table limit reflects the loaded directory
+PASS probe eligibility is a cheap conservative gate
+Corrupted table.
+PASS concurrent enabled WDL probes agree
+koi-test-summary run=14 pass=14 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =   0.84 sec
+----------------------------------------------------------
+Test Passed.
+"syzygy_tablebase_tests" end time: Sep 29 11:47 SE Asia Standard Time
+"syzygy_tablebase_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+29/82 Testing: classical_evaluator_tests
+29/82 Test: classical_evaluator_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/ci-asan/classical_evaluator_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/ci-asan
+"classical_evaluator_tests" start time: Sep 29 11:47 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS classical evaluator perspective
+PASS classical evaluator breakdown sum
+PASS classical evaluator symmetric start
+PASS classical evaluator insufficient material
+PASS classical evaluator locked pawn wall
+PASS classical evaluator material
+PASS classical evaluator mobility
+PASS classical evaluator tempo gate
+PASS classical evaluator minor-piece draw scale
+PASS classical evaluator opposite-bishop scale
+PASS classical evaluator king activity taper
+PASS classical evaluator passed pawn king proximity
+PASS classical evaluator endgame fixture invariants
+koi-test-summary run=13 pass=13 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =   0.25 sec
+----------------------------------------------------------
+Test Passed.
+"classical_evaluator_tests" end time: Sep 29 11:47 SE Asia Standard Time
+"classical_evaluator_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+30/82 Testing: evaluation_features_tests
+30/82 Test: evaluation_features_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/ci-asan/evaluation_features_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/ci-asan
+"evaluation_features_tests" start time: Sep 29 11:47 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS evaluation features v1 startpos
+PASS evaluation features v2 startpos
+PASS evaluation features perspective
+PASS evaluation features sparse view
+PASS evaluation features pawn flags
+PASS evaluation features castling rights
+PASS evaluation features v4 startpos
+PASS evaluation features v4 midgame
+PASS evaluation features v4 king buckets
+PASS evaluation features v4 sparse view
+PASS evaluation features threat startpos
+PASS evaluation features threat golden
+PASS evaluation features threat dedupe
+PASS evaluation features threat families
+PASS evaluation features v5 merge
+koi-test-summary run=15 pass=15 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =   0.23 sec
+----------------------------------------------------------
+Test Passed.
+"evaluation_features_tests" end time: Sep 29 11:47 SE Asia Standard Time
+"evaluation_features_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+12/82 Testing: native_rule_state_tests
+12/82 Test: native_rule_state_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/ci-asan/native_rule_state_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/ci-asan
+"native_rule_state_tests" start time: Sep 29 11:47 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS compatibility mirror ownership
+PASS feature state ownership
+PASS FEN rule state and Position facade
+PASS repetition thresholds
+PASS clock, checkmate, and dead positions
+PASS make/unmake and special moves
+PASS legal en-passant repetition identity
+PASS unusable en-passant repetition identity
+PASS long replay history window
+PASS generated move transaction
+PASS search move transaction
+PASS fixed-buffer legal generation
+PASS sparse piece move ordering
+koi-test-summary run=13 pass=13 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =   0.36 sec
+----------------------------------------------------------
+Test Passed.
+"native_rule_state_tests" end time: Sep 29 11:47 SE Asia Standard Time
+"native_rule_state_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+13/82 Testing: opening_book_tests
+13/82 Test: opening_book_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/ci-asan/opening_book_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/ci-asan
+"opening_book_tests" start time: Sep 29 11:47 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS reference Polyglot keys
+PASS special Polyglot moves
+PASS weighted legal selection
+PASS deterministic highest-weight selection
+PASS book fallback behavior
+PASS oversized book fallback
+PASS book safety
+koi-test-summary run=7 pass=7 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =   0.35 sec
+----------------------------------------------------------
+Test Passed.
+"opening_book_tests" end time: Sep 29 11:47 SE Asia Standard Time
+"opening_book_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+20/82 Testing: search_ordering_tests
+20/82 Test: search_ordering_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/ci-asan/search_ordering_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/ci-asan
+"search_ordering_tests" start time: Sep 29 11:47 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS TT and MVV-LVA ordering
+PASS SEE capture ordering
+PASS killer history stable ordering
+PASS killer tier outranks saturated history
+PASS counter move tier
+PASS counter move confidence
+PASS counter move collision confidence
+PASS counter move failure confidence
+PASS quiet checks before quiet moves
+PASS history malus and continuation ordering
+PASS history saturation overflow safety
+PASS parent move feedback
+PASS cached move scores
+PASS deferred SEE generation
+PASS quiet-only check metadata
+PASS deferred SEE ordering
+PASS correction history saturation
+koi-test-summary run=17 pass=17 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =   0.32 sec
+----------------------------------------------------------
+Test Passed.
+"search_ordering_tests" end time: Sep 29 11:47 SE Asia Standard Time
+"search_ordering_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+11/82 Testing: koi_rules_tests
+11/82 Test: koi_rules_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/ci-asan/koi_rules_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/ci-asan
+"koi_rules_tests" start time: Sep 29 11:47 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS Koi-owned move coordinates
+PASS FEN construction
+PASS strict FEN legality
+PASS legal special moves
+PASS special move conversion round trips
+PASS move metadata
+PASS batch move metadata
+PASS search metadata fast path
+PASS generated move application
+PASS all fast generated moves
+PASS draw rule view
+PASS non-pawn material view
+PASS tactical move generation
+PASS position features
+PASS make/unmake restoration
+PASS null move restoration
+PASS transactional rejected move
+PASS start-position move count
+koi-test-summary run=18 pass=18 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =   0.27 sec
+----------------------------------------------------------
+Test Passed.
+"koi_rules_tests" end time: Sep 29 11:47 SE Asia Standard Time
+"koi_rules_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+25/82 Testing: static_exchange_tests
+25/82 Test: static_exchange_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/ci-asan/static_exchange_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/ci-asan
+"static_exchange_tests" start time: Sep 29 11:47 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS winning capture
+PASS poisoned capture
+PASS non-capture
+PASS quiet promotions
+PASS metadata exchange
+PASS en passant capture
+PASS capturing promotion
+PASS promotion recapture
+PASS pinned recapturer
+PASS unsafe king recapture
+PASS tactical SEE without feature snapshots
+koi-test-summary run=11 pass=11 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =   0.25 sec
+----------------------------------------------------------
+Test Passed.
+"static_exchange_tests" end time: Sep 29 11:47 SE Asia Standard Time
+"static_exchange_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+4/82 Testing: evaluation_boundary_tests
+4/82 Test: evaluation_boundary_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/ci-asan/evaluation_boundary_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/ci-asan
+"evaluation_boundary_tests" start time: Sep 29 11:47 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS castling readiness
+PASS early queen development
+PASS central early queen development
+PASS late central queen taper
+PASS pawn break potential
+PASS parameter metadata
+PASS trapped piece
+PASS hanging piece
+PASS weighted king-ring attackers
+PASS castle-ready king-ring deferral
+PASS sparse king-ring taper
+PASS feature extraction context
+koi-test-summary run=12 pass=12 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =   0.23 sec
+----------------------------------------------------------
+Test Passed.
+"evaluation_boundary_tests" end time: Sep 29 11:47 SE Asia Standard Time
+"evaluation_boundary_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+15/82 Testing: completion_gate_tests
+15/82 Test: completion_gate_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/ci-asan/completion_gate_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/ci-asan
+"completion_gate_tests" start time: Sep 29 11:47 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS current root move
+PASS stale generation
+PASS mismatched root key
+PASS illegal d4c3 fallback
+PASS searchmoves restriction
+PASS invalid PV fallback
+PASS terminal 0000
+PASS completion once
+PASS request identity helper
+koi-test-summary run=9 pass=9 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =   0.24 sec
+----------------------------------------------------------
+Test Passed.
+"completion_gate_tests" end time: Sep 29 11:47 SE Asia Standard Time
+"completion_gate_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+21/82 Testing: search_architecture_tests
+21/82 Test: search_architecture_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/ci-asan/search_architecture_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/ci-asan
+"search_architecture_tests" start time: Sep 29 11:47 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS fixed search stack
+PASS deterministic root ranking
+PASS session ownership
+PASS context stack boundary
+koi-test-summary run=4 pass=4 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =   0.22 sec
+----------------------------------------------------------
+Test Passed.
+"search_architecture_tests" end time: Sep 29 11:47 SE Asia Standard Time
+"search_architecture_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+5/82 Testing: evaluation_architecture_tests
+5/82 Test: evaluation_architecture_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/ci-asan/evaluation_architecture_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/ci-asan
+"evaluation_architecture_tests" start time: Sep 29 11:47 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS worker ownership
+PASS base fallback
+PASS search evaluation boundary
+PASS advisory notification forwarding
+koi-test-summary run=4 pass=4 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =   0.23 sec
+----------------------------------------------------------
+Test Passed.
+"evaluation_architecture_tests" end time: Sep 29 11:47 SE Asia Standard Time
+"evaluation_architecture_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+26/82 Testing: transposition_table_tests
+26/82 Test: transposition_table_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/ci-asan/transposition_table_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/ci-asan
+"transposition_table_tests" start time: Sep 29 11:47 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS transposition store and probe
+PASS transposition mate normalisation
+PASS transposition replacement depth
+PASS transposition generation ageing
+PASS transposition clear and hashfull
+PASS transposition resize bounds
+PASS transposition power of two rounding
+PASS transposition cluster masking
+PASS transposition concurrent access
+koi-test-summary run=9 pass=9 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =   0.22 sec
+----------------------------------------------------------
+Test Passed.
+"transposition_table_tests" end time: Sep 29 11:47 SE Asia Standard Time
+"transposition_table_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+32/82 Testing: time_manager_tests
+32/82 Test: time_manager_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/ci-asan/time_manager_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/ci-asan
+"time_manager_tests" start time: Sep 29 11:47 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS clock budget safety invariants
+PASS fast control keeps the clock
+PASS emergency pacing
+PASS movetime budget
+PASS frozen deadline
+PASS synthetic games never flag
+koi-test-summary run=6 pass=6 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =   0.15 sec
+----------------------------------------------------------
+Test Passed.
+"time_manager_tests" end time: Sep 29 11:47 SE Asia Standard Time
+"time_manager_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+23/82 Testing: search_runtime_tests
+23/82 Test: search_runtime_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/ci-asan/search_runtime_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/ci-asan
+"search_runtime_tests" start time: Sep 29 11:47 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS enabled table access
+PASS disabled table access
+PASS table access generation
+PASS local node budget
+PASS shared node budget
+koi-test-summary run=5 pass=5 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =   0.14 sec
+----------------------------------------------------------
+Test Passed.
+"search_runtime_tests" end time: Sep 29 11:47 SE Asia Standard Time
+"search_runtime_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+7/82 Testing: koi_cpu_features_tests
+7/82 Test: koi_cpu_features_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/ci-asan/koi_cpu_features_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/ci-asan
+"koi_cpu_features_tests" start time: Sep 29 11:47 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS AVX2 CPU feature query
+PASS AVX-512 CPU feature query
+koi-test-summary run=2 pass=2 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =   0.17 sec
+----------------------------------------------------------
+Test Passed.
+"koi_cpu_features_tests" end time: Sep 29 11:47 SE Asia Standard Time
+"koi_cpu_features_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+9/82 Testing: koi_module_tests
+9/82 Test: koi_module_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/ci-asan/koi_module_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/ci-asan
+"koi_module_tests" start time: Sep 29 11:47 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS module contracts
+koi-test-summary run=1 pass=1 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =   0.15 sec
+----------------------------------------------------------
+Test Passed.
+"koi_module_tests" end time: Sep 29 11:47 SE Asia Standard Time
+"koi_module_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+8/82 Testing: koi_cpu_variant_tests
+8/82 Test: koi_cpu_variant_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/ci-asan/koi_cpu_variant_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/ci-asan
+"koi_cpu_variant_tests" start time: Sep 29 11:47 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS CPU variant parsing
+PASS CPU variant executable names
+PASS CPU variant automatic selection
+PASS CPU variant explicit override
+koi-test-summary run=4 pass=4 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =   0.15 sec
+----------------------------------------------------------
+Test Passed.
+"koi_cpu_variant_tests" end time: Sep 29 11:47 SE Asia Standard Time
+"koi_cpu_variant_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+22/82 Testing: search_policy_tests
+22/82 Test: search_policy_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/ci-asan/search_policy_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/ci-asan
+"search_policy_tests" start time: Sep 29 11:47 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS null move policy
+PASS dynamic null move policy
+PASS check extension policy
+PASS late move policy
+PASS quiet futility policy
+PASS quiescence capture policy
+PASS ordering table ownership
+PASS root verification mate provenance
+koi-test-summary run=8 pass=8 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =   0.14 sec
+----------------------------------------------------------
+Test Passed.
+"search_policy_tests" end time: Sep 29 11:47 SE Asia Standard Time
+"search_policy_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+24/82 Testing: policy_value_mcts_tests
+24/82 Test: policy_value_mcts_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/ci-asan/policy_value_mcts_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/ci-asan
+"policy_value_mcts_tests" start time: Sep 29 11:47 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS MCTS visits, depth and deterministic prior selection
+PASS MCTS self-play root noise
+PASS MCTS checkmate WDL backup
+PASS MCTS multi-ply serial value and WDL backup
+PASS MCTS multi-ply batch value and WDL backup
+PASS MCTS bounded tree capacity
+PASS MCTS stop and evaluator failure
+PASS MCTS deadline interruption and recovery
+PASS MCTS claimable root draw ranking
+PASS MCTS bounded leaf batches
+PASS MCTS failed batch rollback
+PASS MCTS batch cancellation rollback
+PASS MCTS batch deadline rollback
+koi-test-summary run=13 pass=13 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =   0.33 sec
+----------------------------------------------------------
+Test Passed.
+"policy_value_mcts_tests" end time: Sep 29 11:47 SE Asia Standard Time
+"policy_value_mcts_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+14/82 Testing: uci_controller_tests
+14/82 Test: uci_controller_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/ci-asan/uci_controller_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/ci-asan
+"uci_controller_tests" start time: Sep 29 11:46 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS uci handshake and options
+PASS Syzygy option values
+PASS legacy strength handshake
+PASS legacy strength unknown options
+PASS surviving UCI strength options
+PASS En Croissant option casing
+PASS Task 1 WDL
+PASS Task 1 hidden diagnostics
+PASS public option replacement
+PASS Task 6 StrengthMode
+PASS opening-book normal play
+PASS opening-book disabled by default
+PASS opening-book random option
+PASS opening-book safety option
+PASS opening-book fallback and bypass
+PASS opening-book MultiPV bypass
+PASS ponderhit book bypass
+PASS opening-book depth boundaries
+PASS opening-book option generation replacement
+PASS Hash and Clear Hash contract
+PASS large Hash safety
+PASS Threads and Speed validation
+PASS Threads and Speed generation replacement
+PASS Lucas analysis options and multipv output
+PASS Lucas analysis option generation replacement
+PASS ponderhit continuation lifecycle
+PASS immediate ponderhit completion
+PASS ponderhit shutdown suppression
+PASS idle ponderhit
+PASS ponder stop lifecycle
+PASS ponder root filtering
+PASS ponder terminal result
+PASS ready response
+PASS deterministic search
+PASS position startpos and FEN
+PASS go limits and malformed values
+PASS go limit parser exact mapping
+PASS go limit fallback and clocks
+PASS go limit parser Lucas root options
+PASS go limit parser fallback
+PASS Ponder PV emission
+PASS transactional invalid positions
+PASS terminal 0000
+PASS ready during search
+PASS position generation replacement
+PASS new game and hash generation replacement
+PASS ucinewgame clears the hash
+PASS debug command toggle
+PASS handshake option table
+PASS MCTS missing-model fallback
+PASS MCTS corrupt-model fallback
+PASS MCTS legal MultiPV and WDL
+PASS MCTS opt-in root visit output
+PASS MCTS threaded leaf evaluation
+PASS MCTS searchmoves root filter
+PASS MCTS stop, quit and EOF lifecycle
+PASS threaded MCTS lifecycle
+PASS MCTS ponder depth deepening
+PASS quit and EOF cleanup
+PASS unknown stop quit
+PASS protocol-clean output
+PASS selective root score provenance
+PASS promptly flushed responses
+PASS go mate mapping
+PASS legacy strength node cap
+PASS same-value option reapplication
+PASS ponder move without the option
+koi-test-summary run=67 pass=67 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =  64.85 sec
+----------------------------------------------------------
+Test Passed.
+"uci_controller_tests" end time: Sep 29 11:47 SE Asia Standard Time
+"uci_controller_tests" time elapsed: 00:01:04
+----------------------------------------------------------
+
+31/82 Testing: policy_value_model_tests
+31/82 Test: policy_value_model_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/ci-asan/policy_value_model_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/ci-asan
+"policy_value_model_tests" start time: Sep 29 11:47 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS policy/value v1 CPU inference and symmetry
+PASS policy/value v1 header and size rejection
+PASS policy/value v1 checksum and nonfinite rejection
+PASS policy/value inference input validation
+PASS policy/value v1 file loader
+koi-test-summary run=5 pass=5 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =   5.14 sec
+----------------------------------------------------------
+Test Passed.
+"policy_value_model_tests" end time: Sep 29 11:47 SE Asia Standard Time
+"policy_value_model_tests" time elapsed: 00:00:05
+----------------------------------------------------------
+
+End testing: Sep 29 11:47 SE Asia Standard Time
+
+evaluation =   9.78 sec*proc
+
+runtime = 102.47 sec*proc
+
+search =   4.85 sec*proc
+
+unit = 133.36 sec*proc
+

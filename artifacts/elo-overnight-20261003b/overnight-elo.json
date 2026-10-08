@@ -1,0 +1,1578 @@
+{
+  "anchors": [
+    {
+      "id": "stockfish-1400",
+      "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\third_party\\stockfish-19\\stockfish-windows-x86-64-universal\\stockfish\\stockfish-windows-x86-64-universal.exe",
+      "rating": 1400,
+      "rating_source": "Stockfish 19 UCI_LimitStrength",
+      "stockfish_uci_elo": 1400
+    },
+    {
+      "id": "stockfish-1600",
+      "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\third_party\\stockfish-19\\stockfish-windows-x86-64-universal\\stockfish\\stockfish-windows-x86-64-universal.exe",
+      "rating": 1600,
+      "rating_source": "Stockfish 19 UCI_LimitStrength",
+      "stockfish_uci_elo": 1600
+    },
+    {
+      "id": "stockfish-1800",
+      "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\third_party\\stockfish-19\\stockfish-windows-x86-64-universal\\stockfish\\stockfish-windows-x86-64-universal.exe",
+      "rating": 1800,
+      "rating_source": "Stockfish 19 UCI_LimitStrength",
+      "stockfish_uci_elo": 1800
+    }
+  ],
+  "artifacts": [
+    {
+      "kind": "json",
+      "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\elo-overnight-20261003b\\overnight-elo-artifacts\\batch-01-stockfish-1400\\white\\koi-uci-match-20261003-095612-317.json",
+      "sha256": "2eeadb4a369b6bd7b0713503404ef13182a2b1700dbb098bce5585508385661f"
+    },
+    {
+      "kind": "pgn",
+      "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\elo-overnight-20261003b\\overnight-elo-artifacts\\batch-01-stockfish-1400\\white\\koi-uci-match-20261003-095612-317.pgn",
+      "sha256": "c9b0ff2511b220ab442b96c4f488c59d1ae7ad4e2f03086b11ed54b2e8a0ed2a"
+    },
+    {
+      "kind": "json",
+      "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\elo-overnight-20261003b\\overnight-elo-artifacts\\batch-01-stockfish-1400\\black\\koi-uci-match-20261003-103555-792.json",
+      "sha256": "c8f481b5d486a098a270ba91461fc641b66c014d1398c62d204bc5a810fb7fa0"
+    },
+    {
+      "kind": "pgn",
+      "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\elo-overnight-20261003b\\overnight-elo-artifacts\\batch-01-stockfish-1400\\black\\koi-uci-match-20261003-103555-792.pgn",
+      "sha256": "dd13cdff3810769d19fcc26c37d5ef47fe751371db55394d5b9c93f75caa8cf9"
+    },
+    {
+      "kind": "json",
+      "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\elo-overnight-20261003b\\overnight-elo-artifacts\\batch-02-stockfish-1600\\white\\koi-uci-match-20261003-112918-259.json",
+      "sha256": "6fd792a7c5ff679def27edcb73e6ffae5b7af5a38be062522b1b40e975540814"
+    },
+    {
+      "kind": "pgn",
+      "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\elo-overnight-20261003b\\overnight-elo-artifacts\\batch-02-stockfish-1600\\white\\koi-uci-match-20261003-112918-259.pgn",
+      "sha256": "c91555132cf48f572da643116db329fe875e2cb7431db38d14c377c0a289bd89"
+    },
+    {
+      "kind": "json",
+      "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\elo-overnight-20261003b\\overnight-elo-artifacts\\batch-02-stockfish-1600\\black\\koi-uci-match-20261003-122557-487.json",
+      "sha256": "ce47633f5d4c003dc1d032e6899eda512b9dcfdff1176b9021ce7e7c30b28bed"
+    },
+    {
+      "kind": "pgn",
+      "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\elo-overnight-20261003b\\overnight-elo-artifacts\\batch-02-stockfish-1600\\black\\koi-uci-match-20261003-122557-487.pgn",
+      "sha256": "cffec092c987b5d15064717d94ea8ce12071526e21724985849f84401832bb95"
+    },
+    {
+      "kind": "json",
+      "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\elo-overnight-20261003b\\overnight-elo-artifacts\\batch-03-stockfish-1800\\white\\koi-uci-match-20261003-132325-302.json",
+      "sha256": "75524fab0115510825e44c8a54b7ab4e7b7b139a8591ba9c2193fdbefcacfef9"
+    },
+    {
+      "kind": "pgn",
+      "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\elo-overnight-20261003b\\overnight-elo-artifacts\\batch-03-stockfish-1800\\white\\koi-uci-match-20261003-132325-302.pgn",
+      "sha256": "496e96d5551401caeb3b75353d9988c6d931b325cc0559e46ff3f0e9f2b35c02"
+    },
+    {
+      "kind": "json",
+      "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\elo-overnight-20261003b\\overnight-elo-artifacts\\batch-03-stockfish-1800\\black\\koi-uci-match-20261003-141730-544.json",
+      "sha256": "c3b2e7fcab4d605ad00288651f8611cd2c88de0d2116b77d50bb22e401538f76"
+    },
+    {
+      "kind": "pgn",
+      "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\elo-overnight-20261003b\\overnight-elo-artifacts\\batch-03-stockfish-1800\\black\\koi-uci-match-20261003-141730-544.pgn",
+      "sha256": "22fc102625873abd5d1ebedee657620926e8c50fdd881be0d3d55730e8eaf42a"
+    },
+    {
+      "kind": "json",
+      "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\elo-overnight-20261003b\\overnight-elo-artifacts\\batch-04-stockfish-1600\\white\\koi-uci-match-20261003-150412-594.json",
+      "sha256": "f18b249bf596f23ee688b16d77735648cb7ba7a356069b52704d26c91599badf"
+    },
+    {
+      "kind": "pgn",
+      "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\elo-overnight-20261003b\\overnight-elo-artifacts\\batch-04-stockfish-1600\\white\\koi-uci-match-20261003-150412-594.pgn",
+      "sha256": "7a8ebd7c1eb18c455ec746b145fe0f491dc30be923effce9c9410e71ec31b567"
+    },
+    {
+      "kind": "json",
+      "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\elo-overnight-20261003b\\overnight-elo-artifacts\\batch-04-stockfish-1600\\black\\koi-uci-match-20261003-155331-447.json",
+      "sha256": "9f64c85f8e85da4f02916bd0bbe138f04e9a15b7410b083a816145314c508c66"
+    },
+    {
+      "kind": "pgn",
+      "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\elo-overnight-20261003b\\overnight-elo-artifacts\\batch-04-stockfish-1600\\black\\koi-uci-match-20261003-155331-447.pgn",
+      "sha256": "e9b1e0902fd9d97d154856fa64a7a0271e26f79de8d334cf22f61b08a7c8bf6f"
+    },
+    {
+      "kind": "json",
+      "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\elo-overnight-20261003b\\overnight-elo-artifacts\\batch-05-stockfish-1600\\white\\koi-uci-match-20261003-164040-011.json",
+      "sha256": "555515b75ae9081a9d5cdf3e28976313ed6cb14e43550ac0611838d0dbbf4932"
+    },
+    {
+      "kind": "pgn",
+      "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\elo-overnight-20261003b\\overnight-elo-artifacts\\batch-05-stockfish-1600\\white\\koi-uci-match-20261003-164040-011.pgn",
+      "sha256": "009c513ebc422d324590506a6d80fb3eead3cd2cc181e9363d40fe0dc4714d1b"
+    },
+    {
+      "kind": "json",
+      "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\elo-overnight-20261003b\\overnight-elo-artifacts\\batch-05-stockfish-1600\\black\\koi-uci-match-20261003-173829-372.json",
+      "sha256": "62bbc37e0fd014f41c265fc3792167b6f3f684323271e7ae4a348da7d8f061fd"
+    },
+    {
+      "kind": "pgn",
+      "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\elo-overnight-20261003b\\overnight-elo-artifacts\\batch-05-stockfish-1600\\black\\koi-uci-match-20261003-173829-372.pgn",
+      "sha256": "4be67e197277abd6ee16a595c62666c66c53888200b2d783deef074edef2882e"
+    },
+    {
+      "kind": "schedule",
+      "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\manifests\\elo-overnight-20261003b-schedule.json",
+      "sha256": "87d86ea17a559e8dec7e36f23064db8aef28e8a0edbb4db63d761417a7a09666"
+    }
+  ],
+  "batches": [
+    {
+      "anchor_id": "stockfish-1400",
+      "anchor_rating": 1400,
+      "games": 64,
+      "opening_names": [
+        "italian-game",
+        "ruy-lopez",
+        "scotch-game",
+        "four-knights",
+        "kings-gambit",
+        "vienna-game",
+        "ponziani",
+        "center-game",
+        "french-advance",
+        "french-exchange",
+        "caro-kann-advance",
+        "caro-kann-exchange",
+        "sicilian-najdorf",
+        "sicilian-dragon",
+        "sicilian-alapin",
+        "sicilian-closed",
+        "queens-gambit-declined",
+        "queens-gambit-accepted",
+        "slav-defense",
+        "london-system",
+        "kings-indian",
+        "grunfeld-defense",
+        "nimzo-indian",
+        "bogo-indian",
+        "benoni-defense",
+        "catalan-opening",
+        "english-symmetrical",
+        "english-four-knights",
+        "english-reversed-sicilian",
+        "reti-opening",
+        "dutch-defense",
+        "bird-opening"
+      ],
+      "ordinal": 1,
+      "pair_id": "batch-01",
+      "phase": "initial"
+    },
+    {
+      "anchor_id": "stockfish-1600",
+      "anchor_rating": 1600,
+      "games": 64,
+      "opening_names": [
+        "italian-game",
+        "ruy-lopez",
+        "scotch-game",
+        "four-knights",
+        "kings-gambit",
+        "vienna-game",
+        "ponziani",
+        "center-game",
+        "french-advance",
+        "french-exchange",
+        "caro-kann-advance",
+        "caro-kann-exchange",
+        "sicilian-najdorf",
+        "sicilian-dragon",
+        "sicilian-alapin",
+        "sicilian-closed",
+        "queens-gambit-declined",
+        "queens-gambit-accepted",
+        "slav-defense",
+        "london-system",
+        "kings-indian",
+        "grunfeld-defense",
+        "nimzo-indian",
+        "bogo-indian",
+        "benoni-defense",
+        "catalan-opening",
+        "english-symmetrical",
+        "english-four-knights",
+        "english-reversed-sicilian",
+        "reti-opening",
+        "dutch-defense",
+        "bird-opening"
+      ],
+      "ordinal": 2,
+      "pair_id": "batch-02",
+      "phase": "initial"
+    },
+    {
+      "anchor_id": "stockfish-1800",
+      "anchor_rating": 1800,
+      "games": 64,
+      "opening_names": [
+        "italian-game",
+        "ruy-lopez",
+        "scotch-game",
+        "four-knights",
+        "kings-gambit",
+        "vienna-game",
+        "ponziani",
+        "center-game",
+        "french-advance",
+        "french-exchange",
+        "caro-kann-advance",
+        "caro-kann-exchange",
+        "sicilian-najdorf",
+        "sicilian-dragon",
+        "sicilian-alapin",
+        "sicilian-closed",
+        "queens-gambit-declined",
+        "queens-gambit-accepted",
+        "slav-defense",
+        "london-system",
+        "kings-indian",
+        "grunfeld-defense",
+        "nimzo-indian",
+        "bogo-indian",
+        "benoni-defense",
+        "catalan-opening",
+        "english-symmetrical",
+        "english-four-knights",
+        "english-reversed-sicilian",
+        "reti-opening",
+        "dutch-defense",
+        "bird-opening"
+      ],
+      "ordinal": 3,
+      "pair_id": "batch-03",
+      "phase": "initial"
+    },
+    {
+      "anchor_id": "stockfish-1600",
+      "anchor_rating": 1600,
+      "games": 64,
+      "opening_names": [
+        "italian-game",
+        "ruy-lopez",
+        "scotch-game",
+        "four-knights",
+        "kings-gambit",
+        "vienna-game",
+        "ponziani",
+        "center-game",
+        "french-advance",
+        "french-exchange",
+        "caro-kann-advance",
+        "caro-kann-exchange",
+        "sicilian-najdorf",
+        "sicilian-dragon",
+        "sicilian-alapin",
+        "sicilian-closed",
+        "queens-gambit-declined",
+        "queens-gambit-accepted",
+        "slav-defense",
+        "london-system",
+        "kings-indian",
+        "grunfeld-defense",
+        "nimzo-indian",
+        "bogo-indian",
+        "benoni-defense",
+        "catalan-opening",
+        "english-symmetrical",
+        "english-four-knights",
+        "english-reversed-sicilian",
+        "reti-opening",
+        "dutch-defense",
+        "bird-opening"
+      ],
+      "ordinal": 4,
+      "pair_id": "batch-04",
+      "phase": "adaptive"
+    },
+    {
+      "anchor_id": "stockfish-1600",
+      "anchor_rating": 1600,
+      "games": 64,
+      "opening_names": [
+        "italian-game",
+        "ruy-lopez",
+        "scotch-game",
+        "four-knights",
+        "kings-gambit",
+        "vienna-game",
+        "ponziani",
+        "center-game",
+        "french-advance",
+        "french-exchange",
+        "caro-kann-advance",
+        "caro-kann-exchange",
+        "sicilian-najdorf",
+        "sicilian-dragon",
+        "sicilian-alapin",
+        "sicilian-closed",
+        "queens-gambit-declined",
+        "queens-gambit-accepted",
+        "slav-defense",
+        "london-system",
+        "kings-indian",
+        "grunfeld-defense",
+        "nimzo-indian",
+        "bogo-indian",
+        "benoni-defense",
+        "catalan-opening",
+        "english-symmetrical",
+        "english-four-knights",
+        "english-reversed-sicilian",
+        "reti-opening",
+        "dutch-defense",
+        "bird-opening"
+      ],
+      "ordinal": 5,
+      "pair_id": "batch-05",
+      "phase": "adaptive"
+    }
+  ],
+  "configuration": {
+    "active_koi_options": {
+      "Hash": 512,
+      "OwnBook": false,
+      "Speed": 100,
+      "Threads": 4
+    },
+    "book_options": null,
+    "bootstrap": {
+      "samples": 2000,
+      "seed": 20260906,
+      "unit": "paired opening (Koi White plus Koi Black)"
+    },
+    "engine_requirements": {
+      "koi": {
+        "options": {
+          "Hash": 512,
+          "OwnBook": false,
+          "Speed": 100,
+          "Threads": 4
+        },
+        "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\build\\roadmap-visit-win-release\\koi-engine.exe"
+      },
+      "stockfish": {
+        "options": {
+          "UCI_LimitStrength": true
+        },
+        "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\third_party\\stockfish-19\\stockfish-windows-x86-64-universal\\stockfish\\stockfish-windows-x86-64-universal.exe"
+      }
+    },
+    "hashes": {
+      "book": null,
+      "executables": {
+        "koi": "04627940848d2c37e714a55b82729c7b808c1f91a2205a8b2bbb882299d943fa",
+        "replay": "35fa53cb88ee617f4c7dfea5aa56fc2b0c9fc22d8e5f6780bae52ac9d5004fff",
+        "stockfish": "45bc8e4969147db9c2eb533810637994619bff0eacc81ccfd9854394901bcbd0"
+      },
+      "manifest": "01ff65e2cfb099435ed754a20089f391f3398c00ab3150ea1fe5bc7053524e41",
+      "openings": "1e2dcccfabb9bf5fa4aa28df6c5b23c81e9feeb782aecd7d5722298d4f235e79"
+    },
+    "measurement": {
+      "all_anchors": true,
+      "label": "Local Stockfish-equivalent Elo at the recorded hardware, engine versions, options, and time control.",
+      "max_games": 320,
+      "min_games": 192,
+      "perspective": "Koi",
+      "prior_elo": 1600
+    },
+    "mode": "no-book",
+    "movetime_ms": 1000,
+    "no_book_options": {
+      "Hash": 512,
+      "OwnBook": false,
+      "Speed": 100,
+      "Threads": 4
+    },
+    "run_label": "measurement",
+    "time_control": null
+  },
+  "engine_provenance": [
+    {
+      "anchor_id": "stockfish-1400",
+      "color": "white",
+      "engine_ids": [
+        {
+          "exit_code": 0,
+          "handshake": [
+            "id name Koi Engine",
+            "id author Koi Engine contributors",
+            "option name RandomSeed type spin default 0 min 0 max 2147483647",
+            "option name Hash type spin default 512 min 1 max 4096",
+            "option name Threads type spin default 1 min 1 max 8",
+            "option name Speed type spin default 100 min 1 max 100",
+            "option name UCI_AnalyseMode type check default false",
+            "option name MultiPV type spin default 1 min 1 max 16",
+            "option name Ponder type check default false",
+            "option name OwnBook type check default false",
+            "option name BookFile type string default book.bin",
+            "option name BookDepth type spin default 16 min 0 max 40",
+            "option name BookRandom type check default false",
+            "option name BookSafety type check default true",
+            "option name BookSafetyDepth type spin default 2 min 0 max 3",
+            "option name Clear Hash type button",
+            "option name UCI_ShowWDL type check default false",
+            "option name Move Overhead type spin default 30 min 0 max 5000",
+            "option name Slow Mover type spin default 100 min 10 max 1000",
+            "option name StrengthMode type check default false",
+            "option name SyzygyPath type string default ",
+            "option name SyzygyProbeDepth type spin default 1 min 1 max 100",
+            "option name SyzygyProbeLimit type spin default 7 min 0 max 7",
+            "option name SyzygyInteriorDepth type spin default 0 min 0 max 100",
+            "option name Syzygy50MoveRule type check default true",
+            "option name EvalFile type string default ",
+            "option name SearchAlgorithm type string default AlphaBeta",
+            "option name PolicyValueFile type string default ",
+            "option name MCTSVisitOutput type check default false",
+            "option name MCTSSelfPlay type check default false",
+            "uciok"
+          ],
+          "hashes": {
+            "executable_sha256": "04627940848d2c37e714a55b82729c7b808c1f91a2205a8b2bbb882299d943fa"
+          },
+          "identity": [
+            "id name Koi Engine",
+            "id author Koi Engine contributors"
+          ],
+          "label": "Koi",
+          "name": "Koi Engine",
+          "options": [
+            "setoption name Hash value 512",
+            "setoption name Threads value 4",
+            "setoption name Speed value 100",
+            "setoption name RandomSeed value 1",
+            "setoption name OwnBook value false",
+            "setoption name BookFile value book.bin",
+            "setoption name BookDepth value 16",
+            "setoption name BookRandom value false"
+          ],
+          "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\build\\roadmap-visit-win-release\\koi-engine.exe",
+          "process_status": "clean shutdown",
+          "stderr": "",
+          "version": "unknown"
+        },
+        {
+          "exit_code": 0,
+          "handshake": [
+            "Stockfish 19 by the Stockfish developers (see AUTHORS file)",
+            "id name Stockfish 19",
+            "id author the Stockfish developers (see AUTHORS file)",
+            "",
+            "option name Debug Log File type string default <empty>",
+            "option name NumaPolicy type string default auto",
+            "option name Threads type spin default 1 min 1 max 1024",
+            "option name Hash type spin default 16 min 1 max 33554432",
+            "option name Clear Hash type button",
+            "option name Ponder type check default false",
+            "option name MultiPV type spin default 1 min 1 max 256",
+            "option name Skill Level type spin default 20 min 0 max 20",
+            "option name Move Overhead type spin default 10 min 0 max 5000",
+            "option name nodestime type spin default 0 min 0 max 10000",
+            "option name UCI_Chess960 type check default false",
+            "option name UCI_LimitStrength type check default false",
+            "option name UCI_Elo type spin default 1320 min 1320 max 3190",
+            "option name UCI_ShowWDL type check default false",
+            "option name SyzygyPath type string default <empty>",
+            "option name SyzygyProbeDepth type spin default 1 min 1 max 100",
+            "option name Syzygy50MoveRule type check default true",
+            "option name SyzygyProbeLimit type spin default 7 min 0 max 7",
+            "option name EvalFile type string default nn-1a298aa575a0.nnue",
+            "uciok"
+          ],
+          "hashes": {
+            "executable_sha256": "45bc8e4969147db9c2eb533810637994619bff0eacc81ccfd9854394901bcbd0"
+          },
+          "identity": [
+            "id name Stockfish 19",
+            "id author the Stockfish developers (see AUTHORS file)"
+          ],
+          "label": "Opponent",
+          "name": "Stockfish 19",
+          "options": [
+            "setoption name Hash value 512",
+            "setoption name Threads value 4",
+            "setoption name Speed value 100",
+            "setoption name UCI_LimitStrength value true",
+            "setoption name UCI_Elo value 1400"
+          ],
+          "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\third_party\\stockfish-19\\stockfish-windows-x86-64-universal\\stockfish\\stockfish-windows-x86-64-universal.exe",
+          "process_status": "clean shutdown",
+          "stderr": "",
+          "version": "unknown"
+        }
+      ]
+    },
+    {
+      "anchor_id": "stockfish-1400",
+      "color": "black",
+      "engine_ids": [
+        {
+          "exit_code": 0,
+          "handshake": [
+            "id name Koi Engine",
+            "id author Koi Engine contributors",
+            "option name RandomSeed type spin default 0 min 0 max 2147483647",
+            "option name Hash type spin default 512 min 1 max 4096",
+            "option name Threads type spin default 1 min 1 max 8",
+            "option name Speed type spin default 100 min 1 max 100",
+            "option name UCI_AnalyseMode type check default false",
+            "option name MultiPV type spin default 1 min 1 max 16",
+            "option name Ponder type check default false",
+            "option name OwnBook type check default false",
+            "option name BookFile type string default book.bin",
+            "option name BookDepth type spin default 16 min 0 max 40",
+            "option name BookRandom type check default false",
+            "option name BookSafety type check default true",
+            "option name BookSafetyDepth type spin default 2 min 0 max 3",
+            "option name Clear Hash type button",
+            "option name UCI_ShowWDL type check default false",
+            "option name Move Overhead type spin default 30 min 0 max 5000",
+            "option name Slow Mover type spin default 100 min 10 max 1000",
+            "option name StrengthMode type check default false",
+            "option name SyzygyPath type string default ",
+            "option name SyzygyProbeDepth type spin default 1 min 1 max 100",
+            "option name SyzygyProbeLimit type spin default 7 min 0 max 7",
+            "option name SyzygyInteriorDepth type spin default 0 min 0 max 100",
+            "option name Syzygy50MoveRule type check default true",
+            "option name EvalFile type string default ",
+            "option name SearchAlgorithm type string default AlphaBeta",
+            "option name PolicyValueFile type string default ",
+            "option name MCTSVisitOutput type check default false",
+            "option name MCTSSelfPlay type check default false",
+            "uciok"
+          ],
+          "hashes": {
+            "executable_sha256": "04627940848d2c37e714a55b82729c7b808c1f91a2205a8b2bbb882299d943fa"
+          },
+          "identity": [
+            "id name Koi Engine",
+            "id author Koi Engine contributors"
+          ],
+          "label": "Koi",
+          "name": "Koi Engine",
+          "options": [
+            "setoption name Hash value 512",
+            "setoption name Threads value 4",
+            "setoption name Speed value 100",
+            "setoption name RandomSeed value 1",
+            "setoption name OwnBook value false",
+            "setoption name BookFile value book.bin",
+            "setoption name BookDepth value 16",
+            "setoption name BookRandom value false"
+          ],
+          "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\build\\roadmap-visit-win-release\\koi-engine.exe",
+          "process_status": "clean shutdown",
+          "stderr": "",
+          "version": "unknown"
+        },
+        {
+          "exit_code": 0,
+          "handshake": [
+            "Stockfish 19 by the Stockfish developers (see AUTHORS file)",
+            "id name Stockfish 19",
+            "id author the Stockfish developers (see AUTHORS file)",
+            "",
+            "option name Debug Log File type string default <empty>",
+            "option name NumaPolicy type string default auto",
+            "option name Threads type spin default 1 min 1 max 1024",
+            "option name Hash type spin default 16 min 1 max 33554432",
+            "option name Clear Hash type button",
+            "option name Ponder type check default false",
+            "option name MultiPV type spin default 1 min 1 max 256",
+            "option name Skill Level type spin default 20 min 0 max 20",
+            "option name Move Overhead type spin default 10 min 0 max 5000",
+            "option name nodestime type spin default 0 min 0 max 10000",
+            "option name UCI_Chess960 type check default false",
+            "option name UCI_LimitStrength type check default false",
+            "option name UCI_Elo type spin default 1320 min 1320 max 3190",
+            "option name UCI_ShowWDL type check default false",
+            "option name SyzygyPath type string default <empty>",
+            "option name SyzygyProbeDepth type spin default 1 min 1 max 100",
+            "option name Syzygy50MoveRule type check default true",
+            "option name SyzygyProbeLimit type spin default 7 min 0 max 7",
+            "option name EvalFile type string default nn-1a298aa575a0.nnue",
+            "uciok"
+          ],
+          "hashes": {
+            "executable_sha256": "45bc8e4969147db9c2eb533810637994619bff0eacc81ccfd9854394901bcbd0"
+          },
+          "identity": [
+            "id name Stockfish 19",
+            "id author the Stockfish developers (see AUTHORS file)"
+          ],
+          "label": "Opponent",
+          "name": "Stockfish 19",
+          "options": [
+            "setoption name Hash value 512",
+            "setoption name Threads value 4",
+            "setoption name Speed value 100",
+            "setoption name UCI_LimitStrength value true",
+            "setoption name UCI_Elo value 1400"
+          ],
+          "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\third_party\\stockfish-19\\stockfish-windows-x86-64-universal\\stockfish\\stockfish-windows-x86-64-universal.exe",
+          "process_status": "clean shutdown",
+          "stderr": "",
+          "version": "unknown"
+        }
+      ]
+    },
+    {
+      "anchor_id": "stockfish-1600",
+      "color": "white",
+      "engine_ids": [
+        {
+          "exit_code": 0,
+          "handshake": [
+            "id name Koi Engine",
+            "id author Koi Engine contributors",
+            "option name RandomSeed type spin default 0 min 0 max 2147483647",
+            "option name Hash type spin default 512 min 1 max 4096",
+            "option name Threads type spin default 1 min 1 max 8",
+            "option name Speed type spin default 100 min 1 max 100",
+            "option name UCI_AnalyseMode type check default false",
+            "option name MultiPV type spin default 1 min 1 max 16",
+            "option name Ponder type check default false",
+            "option name OwnBook type check default false",
+            "option name BookFile type string default book.bin",
+            "option name BookDepth type spin default 16 min 0 max 40",
+            "option name BookRandom type check default false",
+            "option name BookSafety type check default true",
+            "option name BookSafetyDepth type spin default 2 min 0 max 3",
+            "option name Clear Hash type button",
+            "option name UCI_ShowWDL type check default false",
+            "option name Move Overhead type spin default 30 min 0 max 5000",
+            "option name Slow Mover type spin default 100 min 10 max 1000",
+            "option name StrengthMode type check default false",
+            "option name SyzygyPath type string default ",
+            "option name SyzygyProbeDepth type spin default 1 min 1 max 100",
+            "option name SyzygyProbeLimit type spin default 7 min 0 max 7",
+            "option name SyzygyInteriorDepth type spin default 0 min 0 max 100",
+            "option name Syzygy50MoveRule type check default true",
+            "option name EvalFile type string default ",
+            "option name SearchAlgorithm type string default AlphaBeta",
+            "option name PolicyValueFile type string default ",
+            "option name MCTSVisitOutput type check default false",
+            "option name MCTSSelfPlay type check default false",
+            "uciok"
+          ],
+          "hashes": {
+            "executable_sha256": "04627940848d2c37e714a55b82729c7b808c1f91a2205a8b2bbb882299d943fa"
+          },
+          "identity": [
+            "id name Koi Engine",
+            "id author Koi Engine contributors"
+          ],
+          "label": "Koi",
+          "name": "Koi Engine",
+          "options": [
+            "setoption name Hash value 512",
+            "setoption name Threads value 4",
+            "setoption name Speed value 100",
+            "setoption name RandomSeed value 1",
+            "setoption name OwnBook value false",
+            "setoption name BookFile value book.bin",
+            "setoption name BookDepth value 16",
+            "setoption name BookRandom value false"
+          ],
+          "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\build\\roadmap-visit-win-release\\koi-engine.exe",
+          "process_status": "clean shutdown",
+          "stderr": "",
+          "version": "unknown"
+        },
+        {
+          "exit_code": 0,
+          "handshake": [
+            "Stockfish 19 by the Stockfish developers (see AUTHORS file)",
+            "id name Stockfish 19",
+            "id author the Stockfish developers (see AUTHORS file)",
+            "",
+            "option name Debug Log File type string default <empty>",
+            "option name NumaPolicy type string default auto",
+            "option name Threads type spin default 1 min 1 max 1024",
+            "option name Hash type spin default 16 min 1 max 33554432",
+            "option name Clear Hash type button",
+            "option name Ponder type check default false",
+            "option name MultiPV type spin default 1 min 1 max 256",
+            "option name Skill Level type spin default 20 min 0 max 20",
+            "option name Move Overhead type spin default 10 min 0 max 5000",
+            "option name nodestime type spin default 0 min 0 max 10000",
+            "option name UCI_Chess960 type check default false",
+            "option name UCI_LimitStrength type check default false",
+            "option name UCI_Elo type spin default 1320 min 1320 max 3190",
+            "option name UCI_ShowWDL type check default false",
+            "option name SyzygyPath type string default <empty>",
+            "option name SyzygyProbeDepth type spin default 1 min 1 max 100",
+            "option name Syzygy50MoveRule type check default true",
+            "option name SyzygyProbeLimit type spin default 7 min 0 max 7",
+            "option name EvalFile type string default nn-1a298aa575a0.nnue",
+            "uciok"
+          ],
+          "hashes": {
+            "executable_sha256": "45bc8e4969147db9c2eb533810637994619bff0eacc81ccfd9854394901bcbd0"
+          },
+          "identity": [
+            "id name Stockfish 19",
+            "id author the Stockfish developers (see AUTHORS file)"
+          ],
+          "label": "Opponent",
+          "name": "Stockfish 19",
+          "options": [
+            "setoption name Hash value 512",
+            "setoption name Threads value 4",
+            "setoption name Speed value 100",
+            "setoption name UCI_LimitStrength value true",
+            "setoption name UCI_Elo value 1600"
+          ],
+          "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\third_party\\stockfish-19\\stockfish-windows-x86-64-universal\\stockfish\\stockfish-windows-x86-64-universal.exe",
+          "process_status": "clean shutdown",
+          "stderr": "",
+          "version": "unknown"
+        }
+      ]
+    },
+    {
+      "anchor_id": "stockfish-1600",
+      "color": "black",
+      "engine_ids": [
+        {
+          "exit_code": 0,
+          "handshake": [
+            "id name Koi Engine",
+            "id author Koi Engine contributors",
+            "option name RandomSeed type spin default 0 min 0 max 2147483647",
+            "option name Hash type spin default 512 min 1 max 4096",
+            "option name Threads type spin default 1 min 1 max 8",
+            "option name Speed type spin default 100 min 1 max 100",
+            "option name UCI_AnalyseMode type check default false",
+            "option name MultiPV type spin default 1 min 1 max 16",
+            "option name Ponder type check default false",
+            "option name OwnBook type check default false",
+            "option name BookFile type string default book.bin",
+            "option name BookDepth type spin default 16 min 0 max 40",
+            "option name BookRandom type check default false",
+            "option name BookSafety type check default true",
+            "option name BookSafetyDepth type spin default 2 min 0 max 3",
+            "option name Clear Hash type button",
+            "option name UCI_ShowWDL type check default false",
+            "option name Move Overhead type spin default 30 min 0 max 5000",
+            "option name Slow Mover type spin default 100 min 10 max 1000",
+            "option name StrengthMode type check default false",
+            "option name SyzygyPath type string default ",
+            "option name SyzygyProbeDepth type spin default 1 min 1 max 100",
+            "option name SyzygyProbeLimit type spin default 7 min 0 max 7",
+            "option name SyzygyInteriorDepth type spin default 0 min 0 max 100",
+            "option name Syzygy50MoveRule type check default true",
+            "option name EvalFile type string default ",
+            "option name SearchAlgorithm type string default AlphaBeta",
+            "option name PolicyValueFile type string default ",
+            "option name MCTSVisitOutput type check default false",
+            "option name MCTSSelfPlay type check default false",
+            "uciok"
+          ],
+          "hashes": {
+            "executable_sha256": "04627940848d2c37e714a55b82729c7b808c1f91a2205a8b2bbb882299d943fa"
+          },
+          "identity": [
+            "id name Koi Engine",
+            "id author Koi Engine contributors"
+          ],
+          "label": "Koi",
+          "name": "Koi Engine",
+          "options": [
+            "setoption name Hash value 512",
+            "setoption name Threads value 4",
+            "setoption name Speed value 100",
+            "setoption name RandomSeed value 1",
+            "setoption name OwnBook value false",
+            "setoption name BookFile value book.bin",
+            "setoption name BookDepth value 16",
+            "setoption name BookRandom value false"
+          ],
+          "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\build\\roadmap-visit-win-release\\koi-engine.exe",
+          "process_status": "clean shutdown",
+          "stderr": "",
+          "version": "unknown"
+        },
+        {
+          "exit_code": 0,
+          "handshake": [
+            "Stockfish 19 by the Stockfish developers (see AUTHORS file)",
+            "id name Stockfish 19",
+            "id author the Stockfish developers (see AUTHORS file)",
+            "",
+            "option name Debug Log File type string default <empty>",
+            "option name NumaPolicy type string default auto",
+            "option name Threads type spin default 1 min 1 max 1024",
+            "option name Hash type spin default 16 min 1 max 33554432",
+            "option name Clear Hash type button",
+            "option name Ponder type check default false",
+            "option name MultiPV type spin default 1 min 1 max 256",
+            "option name Skill Level type spin default 20 min 0 max 20",
+            "option name Move Overhead type spin default 10 min 0 max 5000",
+            "option name nodestime type spin default 0 min 0 max 10000",
+            "option name UCI_Chess960 type check default false",
+            "option name UCI_LimitStrength type check default false",
+            "option name UCI_Elo type spin default 1320 min 1320 max 3190",
+            "option name UCI_ShowWDL type check default false",
+            "option name SyzygyPath type string default <empty>",
+            "option name SyzygyProbeDepth type spin default 1 min 1 max 100",
+            "option name Syzygy50MoveRule type check default true",
+            "option name SyzygyProbeLimit type spin default 7 min 0 max 7",
+            "option name EvalFile type string default nn-1a298aa575a0.nnue",
+            "uciok"
+          ],
+          "hashes": {
+            "executable_sha256": "45bc8e4969147db9c2eb533810637994619bff0eacc81ccfd9854394901bcbd0"
+          },
+          "identity": [
+            "id name Stockfish 19",
+            "id author the Stockfish developers (see AUTHORS file)"
+          ],
+          "label": "Opponent",
+          "name": "Stockfish 19",
+          "options": [
+            "setoption name Hash value 512",
+            "setoption name Threads value 4",
+            "setoption name Speed value 100",
+            "setoption name UCI_LimitStrength value true",
+            "setoption name UCI_Elo value 1600"
+          ],
+          "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\third_party\\stockfish-19\\stockfish-windows-x86-64-universal\\stockfish\\stockfish-windows-x86-64-universal.exe",
+          "process_status": "clean shutdown",
+          "stderr": "",
+          "version": "unknown"
+        }
+      ]
+    },
+    {
+      "anchor_id": "stockfish-1800",
+      "color": "white",
+      "engine_ids": [
+        {
+          "exit_code": 0,
+          "handshake": [
+            "id name Koi Engine",
+            "id author Koi Engine contributors",
+            "option name RandomSeed type spin default 0 min 0 max 2147483647",
+            "option name Hash type spin default 512 min 1 max 4096",
+            "option name Threads type spin default 1 min 1 max 8",
+            "option name Speed type spin default 100 min 1 max 100",
+            "option name UCI_AnalyseMode type check default false",
+            "option name MultiPV type spin default 1 min 1 max 16",
+            "option name Ponder type check default false",
+            "option name OwnBook type check default false",
+            "option name BookFile type string default book.bin",
+            "option name BookDepth type spin default 16 min 0 max 40",
+            "option name BookRandom type check default false",
+            "option name BookSafety type check default true",
+            "option name BookSafetyDepth type spin default 2 min 0 max 3",
+            "option name Clear Hash type button",
+            "option name UCI_ShowWDL type check default false",
+            "option name Move Overhead type spin default 30 min 0 max 5000",
+            "option name Slow Mover type spin default 100 min 10 max 1000",
+            "option name StrengthMode type check default false",
+            "option name SyzygyPath type string default ",
+            "option name SyzygyProbeDepth type spin default 1 min 1 max 100",
+            "option name SyzygyProbeLimit type spin default 7 min 0 max 7",
+            "option name SyzygyInteriorDepth type spin default 0 min 0 max 100",
+            "option name Syzygy50MoveRule type check default true",
+            "option name EvalFile type string default ",
+            "option name SearchAlgorithm type string default AlphaBeta",
+            "option name PolicyValueFile type string default ",
+            "option name MCTSVisitOutput type check default false",
+            "option name MCTSSelfPlay type check default false",
+            "uciok"
+          ],
+          "hashes": {
+            "executable_sha256": "04627940848d2c37e714a55b82729c7b808c1f91a2205a8b2bbb882299d943fa"
+          },
+          "identity": [
+            "id name Koi Engine",
+            "id author Koi Engine contributors"
+          ],
+          "label": "Koi",
+          "name": "Koi Engine",
+          "options": [
+            "setoption name Hash value 512",
+            "setoption name Threads value 4",
+            "setoption name Speed value 100",
+            "setoption name RandomSeed value 1",
+            "setoption name OwnBook value false",
+            "setoption name BookFile value book.bin",
+            "setoption name BookDepth value 16",
+            "setoption name BookRandom value false"
+          ],
+          "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\build\\roadmap-visit-win-release\\koi-engine.exe",
+          "process_status": "clean shutdown",
+          "stderr": "",
+          "version": "unknown"
+        },
+        {
+          "exit_code": 0,
+          "handshake": [
+            "Stockfish 19 by the Stockfish developers (see AUTHORS file)",
+            "id name Stockfish 19",
+            "id author the Stockfish developers (see AUTHORS file)",
+            "",
+            "option name Debug Log File type string default <empty>",
+            "option name NumaPolicy type string default auto",
+            "option name Threads type spin default 1 min 1 max 1024",
+            "option name Hash type spin default 16 min 1 max 33554432",
+            "option name Clear Hash type button",
+            "option name Ponder type check default false",
+            "option name MultiPV type spin default 1 min 1 max 256",
+            "option name Skill Level type spin default 20 min 0 max 20",
+            "option name Move Overhead type spin default 10 min 0 max 5000",
+            "option name nodestime type spin default 0 min 0 max 10000",
+            "option name UCI_Chess960 type check default false",
+            "option name UCI_LimitStrength type check default false",
+            "option name UCI_Elo type spin default 1320 min 1320 max 3190",
+            "option name UCI_ShowWDL type check default false",
+            "option name SyzygyPath type string default <empty>",
+            "option name SyzygyProbeDepth type spin default 1 min 1 max 100",
+            "option name Syzygy50MoveRule type check default true",
+            "option name SyzygyProbeLimit type spin default 7 min 0 max 7",
+            "option name EvalFile type string default nn-1a298aa575a0.nnue",
+            "uciok"
+          ],
+          "hashes": {
+            "executable_sha256": "45bc8e4969147db9c2eb533810637994619bff0eacc81ccfd9854394901bcbd0"
+          },
+          "identity": [
+            "id name Stockfish 19",
+            "id author the Stockfish developers (see AUTHORS file)"
+          ],
+          "label": "Opponent",
+          "name": "Stockfish 19",
+          "options": [
+            "setoption name Hash value 512",
+            "setoption name Threads value 4",
+            "setoption name Speed value 100",
+            "setoption name UCI_LimitStrength value true",
+            "setoption name UCI_Elo value 1800"
+          ],
+          "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\third_party\\stockfish-19\\stockfish-windows-x86-64-universal\\stockfish\\stockfish-windows-x86-64-universal.exe",
+          "process_status": "clean shutdown",
+          "stderr": "",
+          "version": "unknown"
+        }
+      ]
+    },
+    {
+      "anchor_id": "stockfish-1800",
+      "color": "black",
+      "engine_ids": [
+        {
+          "exit_code": 0,
+          "handshake": [
+            "id name Koi Engine",
+            "id author Koi Engine contributors",
+            "option name RandomSeed type spin default 0 min 0 max 2147483647",
+            "option name Hash type spin default 512 min 1 max 4096",
+            "option name Threads type spin default 1 min 1 max 8",
+            "option name Speed type spin default 100 min 1 max 100",
+            "option name UCI_AnalyseMode type check default false",
+            "option name MultiPV type spin default 1 min 1 max 16",
+            "option name Ponder type check default false",
+            "option name OwnBook type check default false",
+            "option name BookFile type string default book.bin",
+            "option name BookDepth type spin default 16 min 0 max 40",
+            "option name BookRandom type check default false",
+            "option name BookSafety type check default true",
+            "option name BookSafetyDepth type spin default 2 min 0 max 3",
+            "option name Clear Hash type button",
+            "option name UCI_ShowWDL type check default false",
+            "option name Move Overhead type spin default 30 min 0 max 5000",
+            "option name Slow Mover type spin default 100 min 10 max 1000",
+            "option name StrengthMode type check default false",
+            "option name SyzygyPath type string default ",
+            "option name SyzygyProbeDepth type spin default 1 min 1 max 100",
+            "option name SyzygyProbeLimit type spin default 7 min 0 max 7",
+            "option name SyzygyInteriorDepth type spin default 0 min 0 max 100",
+            "option name Syzygy50MoveRule type check default true",
+            "option name EvalFile type string default ",
+            "option name SearchAlgorithm type string default AlphaBeta",
+            "option name PolicyValueFile type string default ",
+            "option name MCTSVisitOutput type check default false",
+            "option name MCTSSelfPlay type check default false",
+            "uciok"
+          ],
+          "hashes": {
+            "executable_sha256": "04627940848d2c37e714a55b82729c7b808c1f91a2205a8b2bbb882299d943fa"
+          },
+          "identity": [
+            "id name Koi Engine",
+            "id author Koi Engine contributors"
+          ],
+          "label": "Koi",
+          "name": "Koi Engine",
+          "options": [
+            "setoption name Hash value 512",
+            "setoption name Threads value 4",
+            "setoption name Speed value 100",
+            "setoption name RandomSeed value 1",
+            "setoption name OwnBook value false",
+            "setoption name BookFile value book.bin",
+            "setoption name BookDepth value 16",
+            "setoption name BookRandom value false"
+          ],
+          "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\build\\roadmap-visit-win-release\\koi-engine.exe",
+          "process_status": "clean shutdown",
+          "stderr": "",
+          "version": "unknown"
+        },
+        {
+          "exit_code": 0,
+          "handshake": [
+            "Stockfish 19 by the Stockfish developers (see AUTHORS file)",
+            "id name Stockfish 19",
+            "id author the Stockfish developers (see AUTHORS file)",
+            "",
+            "option name Debug Log File type string default <empty>",
+            "option name NumaPolicy type string default auto",
+            "option name Threads type spin default 1 min 1 max 1024",
+            "option name Hash type spin default 16 min 1 max 33554432",
+            "option name Clear Hash type button",
+            "option name Ponder type check default false",
+            "option name MultiPV type spin default 1 min 1 max 256",
+            "option name Skill Level type spin default 20 min 0 max 20",
+            "option name Move Overhead type spin default 10 min 0 max 5000",
+            "option name nodestime type spin default 0 min 0 max 10000",
+            "option name UCI_Chess960 type check default false",
+            "option name UCI_LimitStrength type check default false",
+            "option name UCI_Elo type spin default 1320 min 1320 max 3190",
+            "option name UCI_ShowWDL type check default false",
+            "option name SyzygyPath type string default <empty>",
+            "option name SyzygyProbeDepth type spin default 1 min 1 max 100",
+            "option name Syzygy50MoveRule type check default true",
+            "option name SyzygyProbeLimit type spin default 7 min 0 max 7",
+            "option name EvalFile type string default nn-1a298aa575a0.nnue",
+            "uciok"
+          ],
+          "hashes": {
+            "executable_sha256": "45bc8e4969147db9c2eb533810637994619bff0eacc81ccfd9854394901bcbd0"
+          },
+          "identity": [
+            "id name Stockfish 19",
+            "id author the Stockfish developers (see AUTHORS file)"
+          ],
+          "label": "Opponent",
+          "name": "Stockfish 19",
+          "options": [
+            "setoption name Hash value 512",
+            "setoption name Threads value 4",
+            "setoption name Speed value 100",
+            "setoption name UCI_LimitStrength value true",
+            "setoption name UCI_Elo value 1800"
+          ],
+          "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\third_party\\stockfish-19\\stockfish-windows-x86-64-universal\\stockfish\\stockfish-windows-x86-64-universal.exe",
+          "process_status": "clean shutdown",
+          "stderr": "",
+          "version": "unknown"
+        }
+      ]
+    },
+    {
+      "anchor_id": "stockfish-1600",
+      "color": "white",
+      "engine_ids": [
+        {
+          "exit_code": 0,
+          "handshake": [
+            "id name Koi Engine",
+            "id author Koi Engine contributors",
+            "option name RandomSeed type spin default 0 min 0 max 2147483647",
+            "option name Hash type spin default 512 min 1 max 4096",
+            "option name Threads type spin default 1 min 1 max 8",
+            "option name Speed type spin default 100 min 1 max 100",
+            "option name UCI_AnalyseMode type check default false",
+            "option name MultiPV type spin default 1 min 1 max 16",
+            "option name Ponder type check default false",
+            "option name OwnBook type check default false",
+            "option name BookFile type string default book.bin",
+            "option name BookDepth type spin default 16 min 0 max 40",
+            "option name BookRandom type check default false",
+            "option name BookSafety type check default true",
+            "option name BookSafetyDepth type spin default 2 min 0 max 3",
+            "option name Clear Hash type button",
+            "option name UCI_ShowWDL type check default false",
+            "option name Move Overhead type spin default 30 min 0 max 5000",
+            "option name Slow Mover type spin default 100 min 10 max 1000",
+            "option name StrengthMode type check default false",
+            "option name SyzygyPath type string default ",
+            "option name SyzygyProbeDepth type spin default 1 min 1 max 100",
+            "option name SyzygyProbeLimit type spin default 7 min 0 max 7",
+            "option name SyzygyInteriorDepth type spin default 0 min 0 max 100",
+            "option name Syzygy50MoveRule type check default true",
+            "option name EvalFile type string default ",
+            "option name SearchAlgorithm type string default AlphaBeta",
+            "option name PolicyValueFile type string default ",
+            "option name MCTSVisitOutput type check default false",
+            "option name MCTSSelfPlay type check default false",
+            "uciok"
+          ],
+          "hashes": {
+            "executable_sha256": "04627940848d2c37e714a55b82729c7b808c1f91a2205a8b2bbb882299d943fa"
+          },
+          "identity": [
+            "id name Koi Engine",
+            "id author Koi Engine contributors"
+          ],
+          "label": "Koi",
+          "name": "Koi Engine",
+          "options": [
+            "setoption name Hash value 512",
+            "setoption name Threads value 4",
+            "setoption name Speed value 100",
+            "setoption name RandomSeed value 1",
+            "setoption name OwnBook value false",
+            "setoption name BookFile value book.bin",
+            "setoption name BookDepth value 16",
+            "setoption name BookRandom value false"
+          ],
+          "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\build\\roadmap-visit-win-release\\koi-engine.exe",
+          "process_status": "clean shutdown",
+          "stderr": "",
+          "version": "unknown"
+        },
+        {
+          "exit_code": 0,
+          "handshake": [
+            "Stockfish 19 by the Stockfish developers (see AUTHORS file)",
+            "id name Stockfish 19",
+            "id author the Stockfish developers (see AUTHORS file)",
+            "",
+            "option name Debug Log File type string default <empty>",
+            "option name NumaPolicy type string default auto",
+            "option name Threads type spin default 1 min 1 max 1024",
+            "option name Hash type spin default 16 min 1 max 33554432",
+            "option name Clear Hash type button",
+            "option name Ponder type check default false",
+            "option name MultiPV type spin default 1 min 1 max 256",
+            "option name Skill Level type spin default 20 min 0 max 20",
+            "option name Move Overhead type spin default 10 min 0 max 5000",
+            "option name nodestime type spin default 0 min 0 max 10000",
+            "option name UCI_Chess960 type check default false",
+            "option name UCI_LimitStrength type check default false",
+            "option name UCI_Elo type spin default 1320 min 1320 max 3190",
+            "option name UCI_ShowWDL type check default false",
+            "option name SyzygyPath type string default <empty>",
+            "option name SyzygyProbeDepth type spin default 1 min 1 max 100",
+            "option name Syzygy50MoveRule type check default true",
+            "option name SyzygyProbeLimit type spin default 7 min 0 max 7",
+            "option name EvalFile type string default nn-1a298aa575a0.nnue",
+            "uciok"
+          ],
+          "hashes": {
+            "executable_sha256": "45bc8e4969147db9c2eb533810637994619bff0eacc81ccfd9854394901bcbd0"
+          },
+          "identity": [
+            "id name Stockfish 19",
+            "id author the Stockfish developers (see AUTHORS file)"
+          ],
+          "label": "Opponent",
+          "name": "Stockfish 19",
+          "options": [
+            "setoption name Hash value 512",
+            "setoption name Threads value 4",
+            "setoption name Speed value 100",
+            "setoption name UCI_LimitStrength value true",
+            "setoption name UCI_Elo value 1600"
+          ],
+          "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\third_party\\stockfish-19\\stockfish-windows-x86-64-universal\\stockfish\\stockfish-windows-x86-64-universal.exe",
+          "process_status": "clean shutdown",
+          "stderr": "",
+          "version": "unknown"
+        }
+      ]
+    },
+    {
+      "anchor_id": "stockfish-1600",
+      "color": "black",
+      "engine_ids": [
+        {
+          "exit_code": 0,
+          "handshake": [
+            "id name Koi Engine",
+            "id author Koi Engine contributors",
+            "option name RandomSeed type spin default 0 min 0 max 2147483647",
+            "option name Hash type spin default 512 min 1 max 4096",
+            "option name Threads type spin default 1 min 1 max 8",
+            "option name Speed type spin default 100 min 1 max 100",
+            "option name UCI_AnalyseMode type check default false",
+            "option name MultiPV type spin default 1 min 1 max 16",
+            "option name Ponder type check default false",
+            "option name OwnBook type check default false",
+            "option name BookFile type string default book.bin",
+            "option name BookDepth type spin default 16 min 0 max 40",
+            "option name BookRandom type check default false",
+            "option name BookSafety type check default true",
+            "option name BookSafetyDepth type spin default 2 min 0 max 3",
+            "option name Clear Hash type button",
+            "option name UCI_ShowWDL type check default false",
+            "option name Move Overhead type spin default 30 min 0 max 5000",
+            "option name Slow Mover type spin default 100 min 10 max 1000",
+            "option name StrengthMode type check default false",
+            "option name SyzygyPath type string default ",
+            "option name SyzygyProbeDepth type spin default 1 min 1 max 100",
+            "option name SyzygyProbeLimit type spin default 7 min 0 max 7",
+            "option name SyzygyInteriorDepth type spin default 0 min 0 max 100",
+            "option name Syzygy50MoveRule type check default true",
+            "option name EvalFile type string default ",
+            "option name SearchAlgorithm type string default AlphaBeta",
+            "option name PolicyValueFile type string default ",
+            "option name MCTSVisitOutput type check default false",
+            "option name MCTSSelfPlay type check default false",
+            "uciok"
+          ],
+          "hashes": {
+            "executable_sha256": "04627940848d2c37e714a55b82729c7b808c1f91a2205a8b2bbb882299d943fa"
+          },
+          "identity": [
+            "id name Koi Engine",
+            "id author Koi Engine contributors"
+          ],
+          "label": "Koi",
+          "name": "Koi Engine",
+          "options": [
+            "setoption name Hash value 512",
+            "setoption name Threads value 4",
+            "setoption name Speed value 100",
+            "setoption name RandomSeed value 1",
+            "setoption name OwnBook value false",
+            "setoption name BookFile value book.bin",
+            "setoption name BookDepth value 16",
+            "setoption name BookRandom value false"
+          ],
+          "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\build\\roadmap-visit-win-release\\koi-engine.exe",
+          "process_status": "clean shutdown",
+          "stderr": "",
+          "version": "unknown"
+        },
+        {
+          "exit_code": 0,
+          "handshake": [
+            "Stockfish 19 by the Stockfish developers (see AUTHORS file)",
+            "id name Stockfish 19",
+            "id author the Stockfish developers (see AUTHORS file)",
+            "",
+            "option name Debug Log File type string default <empty>",
+            "option name NumaPolicy type string default auto",
+            "option name Threads type spin default 1 min 1 max 1024",
+            "option name Hash type spin default 16 min 1 max 33554432",
+            "option name Clear Hash type button",
+            "option name Ponder type check default false",
+            "option name MultiPV type spin default 1 min 1 max 256",
+            "option name Skill Level type spin default 20 min 0 max 20",
+            "option name Move Overhead type spin default 10 min 0 max 5000",
+            "option name nodestime type spin default 0 min 0 max 10000",
+            "option name UCI_Chess960 type check default false",
+            "option name UCI_LimitStrength type check default false",
+            "option name UCI_Elo type spin default 1320 min 1320 max 3190",
+            "option name UCI_ShowWDL type check default false",
+            "option name SyzygyPath type string default <empty>",
+            "option name SyzygyProbeDepth type spin default 1 min 1 max 100",
+            "option name Syzygy50MoveRule type check default true",
+            "option name SyzygyProbeLimit type spin default 7 min 0 max 7",
+            "option name EvalFile type string default nn-1a298aa575a0.nnue",
+            "uciok"
+          ],
+          "hashes": {
+            "executable_sha256": "45bc8e4969147db9c2eb533810637994619bff0eacc81ccfd9854394901bcbd0"
+          },
+          "identity": [
+            "id name Stockfish 19",
+            "id author the Stockfish developers (see AUTHORS file)"
+          ],
+          "label": "Opponent",
+          "name": "Stockfish 19",
+          "options": [
+            "setoption name Hash value 512",
+            "setoption name Threads value 4",
+            "setoption name Speed value 100",
+            "setoption name UCI_LimitStrength value true",
+            "setoption name UCI_Elo value 1600"
+          ],
+          "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\third_party\\stockfish-19\\stockfish-windows-x86-64-universal\\stockfish\\stockfish-windows-x86-64-universal.exe",
+          "process_status": "clean shutdown",
+          "stderr": "",
+          "version": "unknown"
+        }
+      ]
+    },
+    {
+      "anchor_id": "stockfish-1600",
+      "color": "white",
+      "engine_ids": [
+        {
+          "exit_code": 0,
+          "handshake": [
+            "id name Koi Engine",
+            "id author Koi Engine contributors",
+            "option name RandomSeed type spin default 0 min 0 max 2147483647",
+            "option name Hash type spin default 512 min 1 max 4096",
+            "option name Threads type spin default 1 min 1 max 8",
+            "option name Speed type spin default 100 min 1 max 100",
+            "option name UCI_AnalyseMode type check default false",
+            "option name MultiPV type spin default 1 min 1 max 16",
+            "option name Ponder type check default false",
+            "option name OwnBook type check default false",
+            "option name BookFile type string default book.bin",
+            "option name BookDepth type spin default 16 min 0 max 40",
+            "option name BookRandom type check default false",
+            "option name BookSafety type check default true",
+            "option name BookSafetyDepth type spin default 2 min 0 max 3",
+            "option name Clear Hash type button",
+            "option name UCI_ShowWDL type check default false",
+            "option name Move Overhead type spin default 30 min 0 max 5000",
+            "option name Slow Mover type spin default 100 min 10 max 1000",
+            "option name StrengthMode type check default false",
+            "option name SyzygyPath type string default ",
+            "option name SyzygyProbeDepth type spin default 1 min 1 max 100",
+            "option name SyzygyProbeLimit type spin default 7 min 0 max 7",
+            "option name SyzygyInteriorDepth type spin default 0 min 0 max 100",
+            "option name Syzygy50MoveRule type check default true",
+            "option name EvalFile type string default ",
+            "option name SearchAlgorithm type string default AlphaBeta",
+            "option name PolicyValueFile type string default ",
+            "option name MCTSVisitOutput type check default false",
+            "option name MCTSSelfPlay type check default false",
+            "uciok"
+          ],
+          "hashes": {
+            "executable_sha256": "04627940848d2c37e714a55b82729c7b808c1f91a2205a8b2bbb882299d943fa"
+          },
+          "identity": [
+            "id name Koi Engine",
+            "id author Koi Engine contributors"
+          ],
+          "label": "Koi",
+          "name": "Koi Engine",
+          "options": [
+            "setoption name Hash value 512",
+            "setoption name Threads value 4",
+            "setoption name Speed value 100",
+            "setoption name RandomSeed value 1",
+            "setoption name OwnBook value false",
+            "setoption name BookFile value book.bin",
+            "setoption name BookDepth value 16",
+            "setoption name BookRandom value false"
+          ],
+          "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\build\\roadmap-visit-win-release\\koi-engine.exe",
+          "process_status": "clean shutdown",
+          "stderr": "",
+          "version": "unknown"
+        },
+        {
+          "exit_code": 0,
+          "handshake": [
+            "Stockfish 19 by the Stockfish developers (see AUTHORS file)",
+            "id name Stockfish 19",
+            "id author the Stockfish developers (see AUTHORS file)",
+            "",
+            "option name Debug Log File type string default <empty>",
+            "option name NumaPolicy type string default auto",
+            "option name Threads type spin default 1 min 1 max 1024",
+            "option name Hash type spin default 16 min 1 max 33554432",
+            "option name Clear Hash type button",
+            "option name Ponder type check default false",
+            "option name MultiPV type spin default 1 min 1 max 256",
+            "option name Skill Level type spin default 20 min 0 max 20",
+            "option name Move Overhead type spin default 10 min 0 max 5000",
+            "option name nodestime type spin default 0 min 0 max 10000",
+            "option name UCI_Chess960 type check default false",
+            "option name UCI_LimitStrength type check default false",
+            "option name UCI_Elo type spin default 1320 min 1320 max 3190",
+            "option name UCI_ShowWDL type check default false",
+            "option name SyzygyPath type string default <empty>",
+            "option name SyzygyProbeDepth type spin default 1 min 1 max 100",
+            "option name Syzygy50MoveRule type check default true",
+            "option name SyzygyProbeLimit type spin default 7 min 0 max 7",
+            "option name EvalFile type string default nn-1a298aa575a0.nnue",
+            "uciok"
+          ],
+          "hashes": {
+            "executable_sha256": "45bc8e4969147db9c2eb533810637994619bff0eacc81ccfd9854394901bcbd0"
+          },
+          "identity": [
+            "id name Stockfish 19",
+            "id author the Stockfish developers (see AUTHORS file)"
+          ],
+          "label": "Opponent",
+          "name": "Stockfish 19",
+          "options": [
+            "setoption name Hash value 512",
+            "setoption name Threads value 4",
+            "setoption name Speed value 100",
+            "setoption name UCI_LimitStrength value true",
+            "setoption name UCI_Elo value 1600"
+          ],
+          "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\third_party\\stockfish-19\\stockfish-windows-x86-64-universal\\stockfish\\stockfish-windows-x86-64-universal.exe",
+          "process_status": "clean shutdown",
+          "stderr": "",
+          "version": "unknown"
+        }
+      ]
+    },
+    {
+      "anchor_id": "stockfish-1600",
+      "color": "black",
+      "engine_ids": [
+        {
+          "exit_code": 0,
+          "handshake": [
+            "id name Koi Engine",
+            "id author Koi Engine contributors",
+            "option name RandomSeed type spin default 0 min 0 max 2147483647",
+            "option name Hash type spin default 512 min 1 max 4096",
+            "option name Threads type spin default 1 min 1 max 8",
+            "option name Speed type spin default 100 min 1 max 100",
+            "option name UCI_AnalyseMode type check default false",
+            "option name MultiPV type spin default 1 min 1 max 16",
+            "option name Ponder type check default false",
+            "option name OwnBook type check default false",
+            "option name BookFile type string default book.bin",
+            "option name BookDepth type spin default 16 min 0 max 40",
+            "option name BookRandom type check default false",
+            "option name BookSafety type check default true",
+            "option name BookSafetyDepth type spin default 2 min 0 max 3",
+            "option name Clear Hash type button",
+            "option name UCI_ShowWDL type check default false",
+            "option name Move Overhead type spin default 30 min 0 max 5000",
+            "option name Slow Mover type spin default 100 min 10 max 1000",
+            "option name StrengthMode type check default false",
+            "option name SyzygyPath type string default ",
+            "option name SyzygyProbeDepth type spin default 1 min 1 max 100",
+            "option name SyzygyProbeLimit type spin default 7 min 0 max 7",
+            "option name SyzygyInteriorDepth type spin default 0 min 0 max 100",
+            "option name Syzygy50MoveRule type check default true",
+            "option name EvalFile type string default ",
+            "option name SearchAlgorithm type string default AlphaBeta",
+            "option name PolicyValueFile type string default ",
+            "option name MCTSVisitOutput type check default false",
+            "option name MCTSSelfPlay type check default false",
+            "uciok"
+          ],
+          "hashes": {
+            "executable_sha256": "04627940848d2c37e714a55b82729c7b808c1f91a2205a8b2bbb882299d943fa"
+          },
+          "identity": [
+            "id name Koi Engine",
+            "id author Koi Engine contributors"
+          ],
+          "label": "Koi",
+          "name": "Koi Engine",
+          "options": [
+            "setoption name Hash value 512",
+            "setoption name Threads value 4",
+            "setoption name Speed value 100",
+            "setoption name RandomSeed value 1",
+            "setoption name OwnBook value false",
+            "setoption name BookFile value book.bin",
+            "setoption name BookDepth value 16",
+            "setoption name BookRandom value false"
+          ],
+          "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\build\\roadmap-visit-win-release\\koi-engine.exe",
+          "process_status": "clean shutdown",
+          "stderr": "",
+          "version": "unknown"
+        },
+        {
+          "exit_code": 0,
+          "handshake": [
+            "Stockfish 19 by the Stockfish developers (see AUTHORS file)",
+            "id name Stockfish 19",
+            "id author the Stockfish developers (see AUTHORS file)",
+            "",
+            "option name Debug Log File type string default <empty>",
+            "option name NumaPolicy type string default auto",
+            "option name Threads type spin default 1 min 1 max 1024",
+            "option name Hash type spin default 16 min 1 max 33554432",
+            "option name Clear Hash type button",
+            "option name Ponder type check default false",
+            "option name MultiPV type spin default 1 min 1 max 256",
+            "option name Skill Level type spin default 20 min 0 max 20",
+            "option name Move Overhead type spin default 10 min 0 max 5000",
+            "option name nodestime type spin default 0 min 0 max 10000",
+            "option name UCI_Chess960 type check default false",
+            "option name UCI_LimitStrength type check default false",
+            "option name UCI_Elo type spin default 1320 min 1320 max 3190",
+            "option name UCI_ShowWDL type check default false",
+            "option name SyzygyPath type string default <empty>",
+            "option name SyzygyProbeDepth type spin default 1 min 1 max 100",
+            "option name Syzygy50MoveRule type check default true",
+            "option name SyzygyProbeLimit type spin default 7 min 0 max 7",
+            "option name EvalFile type string default nn-1a298aa575a0.nnue",
+            "uciok"
+          ],
+          "hashes": {
+            "executable_sha256": "45bc8e4969147db9c2eb533810637994619bff0eacc81ccfd9854394901bcbd0"
+          },
+          "identity": [
+            "id name Stockfish 19",
+            "id author the Stockfish developers (see AUTHORS file)"
+          ],
+          "label": "Opponent",
+          "name": "Stockfish 19",
+          "options": [
+            "setoption name Hash value 512",
+            "setoption name Threads value 4",
+            "setoption name Speed value 100",
+            "setoption name UCI_LimitStrength value true",
+            "setoption name UCI_Elo value 1600"
+          ],
+          "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\third_party\\stockfish-19\\stockfish-windows-x86-64-universal\\stockfish\\stockfish-windows-x86-64-universal.exe",
+          "process_status": "clean shutdown",
+          "stderr": "",
+          "version": "unknown"
+        }
+      ]
+    }
+  ],
+  "estimate": {
+    "ci95_high": 1611,
+    "ci95_low": 1547,
+    "elo": 1579,
+    "half_width": 32.0,
+    "jeffreys_smoothed_scores": {
+      "1400": 0.9153846153846154,
+      "1600": 0.39896373056994816,
+      "1800": 0.25384615384615383
+    },
+    "low_confidence": false,
+    "lower_bound": 1400,
+    "raw_logistic_elo": 1579.468,
+    "reliability": "moderate",
+    "upper_bound": 1800
+  },
+  "reproducibility_hash": "5a03e9b2eaca43c409e2d619456add40112ddeee96d9df637aadfc89337c2864",
+  "results": {
+    "draws": 23,
+    "games": 320,
+    "losses": 157,
+    "score": 0.4734375,
+    "wins": 140
+  },
+  "schedule": {
+    "path": "artifacts\\manifests\\elo-overnight-20261003-schedule.json",
+    "schedule_sha256": "ce0a231ffed742bab77c6e71eb1e2a14ba8b0353ea0ae76d53f3d3fa0a7bb410",
+    "schema": "koi-elo-schedule-v2",
+    "source": "imported"
+  },
+  "schema": "koi-rough-elo-estimate-v1",
+  "schema_version": 1,
+  "timestamp": "2026-10-03T17:38:34Z"
+}

@@ -1,0 +1,1552 @@
+Start testing: Sep 17 20:51 SE Asia Standard Time
+----------------------------------------------------------
+54/54 Testing: nnue_studio_python
+54/54 Test: nnue_studio_python
+Command: "C:/Python314/python.exe" "-m" "unittest" "tests/python/nnue/studio_test.py" "-v"
+Directory: C:/Users/ntATh/AI test/Koi engine
+"nnue_studio_python" start time: Sep 17 20:51 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+test_epoch_line_is_parsed (tests.python.nnue.studio_test.ProgressParserTests.test_epoch_line_is_parsed) ... ok
+test_presets_have_ordered_effort (tests.python.nnue.studio_test.ProgressParserTests.test_presets_have_ordered_effort) ... ok
+test_quantization_and_selection_lines_are_parsed (tests.python.nnue.studio_test.ProgressParserTests.test_quantization_and_selection_lines_are_parsed) ... ok
+test_unrelated_lines_are_ignored (tests.python.nnue.studio_test.ProgressParserTests.test_unrelated_lines_are_ignored) ... ok
+test_wrote_line_reports_the_network (tests.python.nnue.studio_test.ProgressParserTests.test_wrote_line_reports_the_network) ... ok
+test_selftest_trains_a_tiny_network (tests.python.nnue.studio_test.SelftestTests.test_selftest_trains_a_tiny_network) ... ok
+test_dry_run_builds_a_v3_trainer_command (tests.python.nnue.studio_test.StudioCliTests.test_dry_run_builds_a_v3_trainer_command) ... ok
+test_dry_run_rejects_the_unimplemented_bullet_backend (tests.python.nnue.studio_test.StudioCliTests.test_dry_run_rejects_the_unimplemented_bullet_backend) ... ok
+test_gui_selftest_constructs_the_window (tests.python.nnue.studio_test.StudioCliTests.test_gui_selftest_constructs_the_window) ... ok
+test_list_backends_reports_torch (tests.python.nnue.studio_test.StudioCliTests.test_list_backends_reports_torch) ... ok
+
+----------------------------------------------------------------------
+Ran 10 tests in 7.094s
+
+OK
+<end of output>
+Test time =  10.91 sec
+----------------------------------------------------------
+Test Passed.
+"nnue_studio_python" end time: Sep 17 20:51 SE Asia Standard Time
+"nnue_studio_python" time elapsed: 00:00:10
+----------------------------------------------------------
+
+38/54 Testing: cutechess_stability_diagnostics
+38/54 Test: cutechess_stability_diagnostics
+Command: "C:/Program Files/PowerShell/7/pwsh.exe" "-NoProfile" "-ExecutionPolicy" "Bypass" "-File" "C:/Users/ntATh/AI test/Koi engine/tests/integration/matches/cutechess_stability_test.ps1" "-EnginePath" "C:/Users/ntATh/AI test/Koi engine/build/release/koi-engine.exe" "-DiagnosticsOnly"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/release
+"cutechess_stability_diagnostics" start time: Sep 17 20:51 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+Started game 1 (Koi vs Opponent)
+Finished game 1 (Koi vs Opponent)
+Started game 2 (Opponent vs Koi)
+Finished game 2 (Opponent vs Koi)
+Started game 1 (Koi vs Opponent)
+Finished game 1 (Koi vs Opponent)
+Started game 1 (Koi vs Opponent)
+Finished game 1 (Koi vs Opponent)
+Started game 2 (Opponent vs Koi)
+Finished game 2 (Opponent vs Koi)
+Started game 1 (Koi vs Opponent)
+partial stderr 
+partial stdout
+Started game 1 (Koi vs Opponent)
+engine disconnect
+no-result stderr 
+Started game 1 (Koi vs Opponent)
+timeout stderr 
+Started game 1 (Koi vs Opponent)
+Finished game 1 (Koi vs Opponent): 0-1 {White loses on time}
+PASS cutechess diagnostic harness
+<end of output>
+Test time =  21.22 sec
+----------------------------------------------------------
+Test Passed.
+"cutechess_stability_diagnostics" end time: Sep 17 20:51 SE Asia Standard Time
+"cutechess_stability_diagnostics" time elapsed: 00:00:21
+----------------------------------------------------------
+
+35/54 Testing: koi_uci_match_process
+35/54 Test: koi_uci_match_process
+Command: "C:/Program Files/PowerShell/7/pwsh.exe" "-NoProfile" "-ExecutionPolicy" "Bypass" "-File" "C:/Users/ntATh/AI test/Koi engine/tests/integration/matches/uci_match_process_test.ps1" "-EnginePath" "C:/Users/ntATh/AI test/Koi engine/build/release/koi-engine.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/release
+"koi_uci_match_process" start time: Sep 17 20:51 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+[31;1mException: [0mC:\Users\ntATh\AI test\Koi engine\tools\stability\uci_match.ps1:684[0m
+[31;1m[0m[36;1mLine |[0m
+[31;1m[0m[36;1m[36;1m 684 | [0m             [36;1mthrow "Opening '$($position.Name)' contains an illegal mo[0m .[0m
+[31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m     | [31;1m             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+[31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m     | [31;1mOpening 'illegal' contains an illegal move sequence.[0m
+<end of output>
+Test time =  10.41 sec
+----------------------------------------------------------
+Test Passed.
+"koi_uci_match_process" end time: Sep 17 20:51 SE Asia Standard Time
+"koi_uci_match_process" time elapsed: 00:00:10
+----------------------------------------------------------
+
+36/54 Testing: koi_stockfish_strength_option
+36/54 Test: koi_stockfish_strength_option
+Command: "C:/Program Files/PowerShell/7/pwsh.exe" "-NoProfile" "-ExecutionPolicy" "Bypass" "-File" "C:/Users/ntATh/AI test/Koi engine/tests/integration/matches/stockfish_strength_test.ps1" "-EnginePath" "C:/Users/ntATh/AI test/Koi engine/build/release/koi-engine.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/release
+"koi_stockfish_strength_option" start time: Sep 17 20:51 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS stockfish strength option integration
+<end of output>
+Test time =   2.75 sec
+----------------------------------------------------------
+Test Passed.
+"koi_stockfish_strength_option" end time: Sep 17 20:51 SE Asia Standard Time
+"koi_stockfish_strength_option" time elapsed: 00:00:02
+----------------------------------------------------------
+
+44/54 Testing: elo_oracle_python
+44/54 Test: elo_oracle_python
+Command: "C:/Python314/python.exe" "-m" "unittest" "tests/python/measurement/elo_oracle_test.py" "-v"
+Directory: C:/Users/ntATh/AI test/Koi engine
+"elo_oracle_python" start time: Sep 17 20:51 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+test_analysis_records_separate_cpl_values_and_engine_options (tests.python.measurement.elo_oracle_test.EloOracleExtractionTests.test_analysis_records_separate_cpl_values_and_engine_options) ... ok
+test_analysis_requires_external_engine_paths (tests.python.measurement.elo_oracle_test.EloOracleExtractionTests.test_analysis_requires_external_engine_paths) ... ok
+test_book_audit_entrypoint_defaults_to_a_repository_artifact (tests.python.measurement.elo_oracle_test.EloOracleExtractionTests.test_book_audit_entrypoint_defaults_to_a_repository_artifact) ... ok
+test_book_audit_entrypoint_forwards_to_the_existing_report_schema (tests.python.measurement.elo_oracle_test.EloOracleExtractionTests.test_book_audit_entrypoint_forwards_to_the_existing_report_schema) ... ok
+test_book_audit_keeps_book_hits_and_cpl_outside_search_metrics (tests.python.measurement.elo_oracle_test.EloOracleExtractionTests.test_book_audit_keeps_book_hits_and_cpl_outside_search_metrics) ... ok
+test_classify_cpl_uses_stable_forensic_bands (tests.python.measurement.elo_oracle_test.EloOracleExtractionTests.test_classify_cpl_uses_stable_forensic_bands) ... ok
+test_cli_rejects_threads_other_than_the_approved_four (tests.python.measurement.elo_oracle_test.EloOracleExtractionTests.test_cli_rejects_threads_other_than_the_approved_four) ... ok
+test_cpl_is_loss_from_the_moving_side (tests.python.measurement.elo_oracle_test.EloOracleExtractionTests.test_cpl_is_loss_from_the_moving_side) ... ok
+test_extract_only_defaults_to_a_repository_artifact_and_announces_path (tests.python.measurement.elo_oracle_test.EloOracleExtractionTests.test_extract_only_defaults_to_a_repository_artifact_and_announces_path) ... ok
+test_extract_only_records_mainline_san_positions_and_metadata (tests.python.measurement.elo_oracle_test.EloOracleExtractionTests.test_extract_only_records_mainline_san_positions_and_metadata) ... ok
+test_extract_preserves_annotations_on_mainline_positions (tests.python.measurement.elo_oracle_test.EloOracleExtractionTests.test_extract_preserves_annotations_on_mainline_positions) ... C:\Users\ntATh\AppData\Roaming\Python\Python314\site-packages\chess\engine.py:54: DeprecationWarning: 'asyncio.DefaultEventLoopPolicy' is deprecated and slated for removal in Python 3.16
+  EventLoopPolicy = asyncio.DefaultEventLoopPolicy
+ok
+test_match_entrypoint_preserves_zero_random_seed_and_shell_free_arguments (tests.python.measurement.elo_oracle_test.EloOracleExtractionTests.test_match_entrypoint_preserves_zero_random_seed_and_shell_free_arguments) ... ok
+test_named_tool_entrypoints_have_safe_help_without_starting_engines (tests.python.measurement.elo_oracle_test.EloOracleExtractionTests.test_named_tool_entrypoints_have_safe_help_without_starting_engines) ... ok
+test_normalize_score_uses_white_perspective_and_fixed_mate_scale (tests.python.measurement.elo_oracle_test.EloOracleExtractionTests.test_normalize_score_uses_white_perspective_and_fixed_mate_scale) ... ok
+test_parse_stockfish_terminal_none_bestmove_as_no_move (tests.python.measurement.elo_oracle_test.EloOracleExtractionTests.test_parse_stockfish_terminal_none_bestmove_as_no_move) ... ok
+
+----------------------------------------------------------------------
+Ran 15 tests in 5.648s
+
+OK
+<end of output>
+Test time =   5.96 sec
+----------------------------------------------------------
+Test Passed.
+"elo_oracle_python" end time: Sep 17 20:51 SE Asia Standard Time
+"elo_oracle_python" time elapsed: 00:00:05
+----------------------------------------------------------
+
+45/54 Testing: elo_estimate_python
+45/54 Test: elo_estimate_python
+Command: "C:/Python314/python.exe" "-m" "unittest" "tests/python/measurement/elo_estimate_test.py" "-v"
+Directory: C:/Users/ntATh/AI test/Koi engine
+"elo_estimate_python" start time: Sep 17 20:51 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+test_anchor_manifest_requires_schema_matching_stockfish_and_lower_anchor_when_needed (tests.python.measurement.elo_estimate_test.EloEstimateTests.test_anchor_manifest_requires_schema_matching_stockfish_and_lower_anchor_when_needed) ... ok
+test_dry_run_validates_and_writes_full_schedule_without_launching (tests.python.measurement.elo_estimate_test.EloEstimateTests.test_dry_run_validates_and_writes_full_schedule_without_launching) ... ok
+test_fit_uses_jeffreys_smoothing_and_reports_bounds_outside_bracket (tests.python.measurement.elo_estimate_test.EloEstimateTests.test_fit_uses_jeffreys_smoothing_and_reports_bounds_outside_bracket) ... ok
+test_logistic_helpers_have_known_50_75_and_25_percent_values (tests.python.measurement.elo_estimate_test.EloEstimateTests.test_logistic_helpers_have_known_50_75_and_25_percent_values) ... ok
+test_low_confidence_non_dry_run_adds_an_adaptive_64_game_batch_up_to_maximum (tests.python.measurement.elo_estimate_test.EloEstimateTests.test_low_confidence_non_dry_run_adds_an_adaptive_64_game_batch_up_to_maximum) ... ok
+test_mocked_non_dry_run_invokes_powershell_harness_and_preserves_artifacts (tests.python.measurement.elo_estimate_test.EloEstimateTests.test_mocked_non_dry_run_invokes_powershell_harness_and_preserves_artifacts) ... ok
+test_no_book_and_book_options_are_distinct_and_book_random_is_false (tests.python.measurement.elo_estimate_test.EloEstimateTests.test_no_book_and_book_options_are_distinct_and_book_random_is_false) ... ok
+test_paired_bootstrap_is_deterministic_uses_2000_samples_and_has_ci (tests.python.measurement.elo_estimate_test.EloEstimateTests.test_paired_bootstrap_is_deterministic_uses_2000_samples_and_has_ci) ... ok
+test_report_validation_binds_opening_positions_to_the_requested_sequences (tests.python.measurement.elo_estimate_test.EloEstimateTests.test_report_validation_binds_opening_positions_to_the_requested_sequences) ... ok
+test_report_validation_rejects_conflicting_options_and_configuration_drift (tests.python.measurement.elo_estimate_test.EloEstimateTests.test_report_validation_rejects_conflicting_options_and_configuration_drift) ... ok
+test_reproducibility_hash_excludes_timestamp_fields (tests.python.measurement.elo_estimate_test.EloEstimateTests.test_reproducibility_hash_excludes_timestamp_fields) ... ok
+test_result_normalization_and_report_validation_rejects_bad_game_evidence (tests.python.measurement.elo_estimate_test.EloEstimateTests.test_result_normalization_and_report_validation_rejects_bad_game_evidence) ... ok
+test_schedule_cli_options_are_available_for_reproducible_before_after_runs (tests.python.measurement.elo_estimate_test.EloEstimateTests.test_schedule_cli_options_are_available_for_reproducible_before_after_runs) ... ok
+test_schedule_import_rejects_inconsistent_target_and_missing_opening_contract (tests.python.measurement.elo_estimate_test.EloEstimateTests.test_schedule_import_rejects_inconsistent_target_and_missing_opening_contract) ... ok
+test_schedule_sizes_are_exact_and_initial_batch_brackets_prior (tests.python.measurement.elo_estimate_test.EloEstimateTests.test_schedule_sizes_are_exact_and_initial_batch_brackets_prior) ... ok
+
+----------------------------------------------------------------------
+Ran 15 tests in 3.526s
+
+OK
+report C:\Users\ntATh\AppData\Local\Temp\tmpjspcjmo5\external-report.json
+report C:\Users\ntATh\AppData\Local\Temp\tmppttbs6l2\external-report.json
+report C:\Users\ntATh\AppData\Local\Temp\tmp1gq4ifq2\external-report.json
+<end of output>
+Test time =   4.02 sec
+----------------------------------------------------------
+Test Passed.
+"elo_estimate_python" end time: Sep 17 20:52 SE Asia Standard Time
+"elo_estimate_python" time elapsed: 00:00:04
+----------------------------------------------------------
+
+12/54 Testing: uci_controller_tests
+12/54 Test: uci_controller_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/release/uci_controller_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/release
+"uci_controller_tests" start time: Sep 17 20:52 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS uci handshake and options
+PASS Syzygy option values
+PASS Task 1 handshake
+PASS Task 1 option values
+PASS En Croissant option casing
+PASS Task 1 WDL
+PASS Task 1 hidden diagnostics
+PASS Task 1 option replacement
+PASS Task 6 StrengthMode
+PASS opening-book normal play
+PASS opening-book random option
+PASS opening-book safety option
+PASS opening-book fallback and bypass
+PASS opening-book MultiPV bypass
+PASS ponderhit book bypass
+PASS opening-book depth boundaries
+PASS opening-book option generation replacement
+PASS Hash and Clear Hash contract
+PASS large Hash safety
+PASS Threads and Speed validation
+PASS Threads and Speed generation replacement
+PASS Lucas analysis options and multipv output
+PASS Lucas analysis option generation replacement
+PASS ponderhit continuation lifecycle
+PASS immediate ponderhit completion
+PASS ponderhit shutdown suppression
+PASS idle ponderhit
+PASS ponder stop lifecycle
+PASS ponder root filtering
+PASS ponder terminal result
+PASS ready response
+PASS deterministic search
+PASS disabled strength limit
+PASS position startpos and FEN
+PASS go limits and malformed values
+PASS go limit parser exact mapping
+PASS go limit fallback and clocks
+PASS go limit parser Lucas root options
+PASS go limit parser fallback
+PASS Ponder PV emission
+PASS transactional invalid positions
+PASS terminal 0000
+PASS ready during search
+PASS position generation replacement
+PASS new game and hash generation replacement
+PASS ucinewgame clears the hash
+PASS debug command toggle
+PASS handshake option table
+PASS quit and EOF cleanup
+PASS unknown stop quit
+PASS protocol-clean output
+PASS promptly flushed responses
+koi-test-summary run=52 pass=52 fail=0 xfail=0 xpass=0 skip=0 unseen=0
+<end of output>
+Test time =   2.40 sec
+----------------------------------------------------------
+Test Passed.
+"uci_controller_tests" end time: Sep 17 20:52 SE Asia Standard Time
+"uci_controller_tests" time elapsed: 00:00:02
+----------------------------------------------------------
+
+52/54 Testing: measurement_forensics_python
+52/54 Test: measurement_forensics_python
+Command: "C:/Python314/python.exe" "-m" "unittest" "tests/python/measurement/measurement_forensics_test.py" "-v"
+Directory: C:/Users/ntATh/AI test/Koi engine
+"measurement_forensics_python" start time: Sep 17 20:51 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+test_forensic_fixture_categories_are_legal (tests.python.measurement.measurement_forensics_test.MeasurementForensicsTests.test_forensic_fixture_categories_are_legal) ... ok
+test_gigabase_sampling_is_read_only_deterministic_and_bounded (tests.python.measurement.measurement_forensics_test.MeasurementForensicsTests.test_gigabase_sampling_is_read_only_deterministic_and_bounded) ... ok
+test_gigabase_sampling_rejects_repository_local_output (tests.python.measurement.measurement_forensics_test.MeasurementForensicsTests.test_gigabase_sampling_rejects_repository_local_output) ... ok
+test_pgn_corpus_is_deterministic_and_preserves_schema (tests.python.measurement.measurement_forensics_test.MeasurementForensicsTests.test_pgn_corpus_is_deterministic_and_preserves_schema) ... ok
+test_pgn_corpus_rejects_repository_local_output (tests.python.measurement.measurement_forensics_test.MeasurementForensicsTests.test_pgn_corpus_rejects_repository_local_output) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 3.254s
+
+OK
+<end of output>
+Test time =   3.70 sec
+----------------------------------------------------------
+Test Passed.
+"measurement_forensics_python" end time: Sep 17 20:52 SE Asia Standard Time
+"measurement_forensics_python" time elapsed: 00:00:03
+----------------------------------------------------------
+
+40/54 Testing: hash_memory_stability
+40/54 Test: hash_memory_stability
+Command: "C:/Program Files/PowerShell/7/pwsh.exe" "-NoProfile" "-ExecutionPolicy" "Bypass" "-File" "C:/Users/ntATh/AI test/Koi engine/tests/integration/runtime/hash_memory_stability_test.ps1" "-EnginePath" "C:/Users/ntATh/AI test/Koi engine/build/release/koi-engine.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/release
+"hash_memory_stability" start time: Sep 17 20:52 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+{
+  "schema": "koi-hash-memory-soak-v1",
+  "generated_utc": "2026-09-17T13:52:04.8072109Z",
+  "repository_root": "C:\\Users\\ntATh\\AI test\\Koi engine",
+  "engine_path": "C:\\Users\\ntATh\\AI test\\Koi engine\\build\\release\\koi-engine.exe",
+  "engine_sha256": "960FEED5526436D9F43AA9D92D1EFF83B6154498E056B0E927F00BC3BE97B782",
+  "hash_values_mb": [
+    1,
+    2
+  ],
+  "cycles": 1,
+  "records": [
+    {
+      "hash_requested_mb": 1,
+      "hash_effective_mb": 1,
+      "hash_status": "unchanged",
+      "hash_reason": "none",
+      "cycle": 1,
+      "exit_code": 0,
+      "duration_ms": 428,
+      "peak_working_set_bytes": 11382784,
+      "peak_commit_bytes": 4194304,
+      "bestmove_count": 2,
+      "stdout": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\hash-memory-1a80f942af2c43f7a33f3ec5ed962e27\\20260917-135203-921\\hash-0001-cycle-01\\stdout.log",
+      "stderr": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\hash-memory-1a80f942af2c43f7a33f3ec5ed962e27\\20260917-135203-921\\hash-0001-cycle-01\\stderr.log",
+      "diagnostics": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\hash-memory-1a80f942af2c43f7a33f3ec5ed962e27\\20260917-135203-921\\hash-0001-cycle-01\\koi-debug.jsonl"
+    },
+    {
+      "hash_requested_mb": 2,
+      "hash_effective_mb": 2,
+      "hash_status": "applied",
+      "hash_reason": "none",
+      "cycle": 1,
+      "exit_code": 0,
+      "duration_ms": 386,
+      "peak_working_set_bytes": 12709888,
+      "peak_commit_bytes": 5500928,
+      "bestmove_count": 2,
+      "stdout": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\hash-memory-1a80f942af2c43f7a33f3ec5ed962e27\\20260917-135203-921\\hash-0002-cycle-01\\stdout.log",
+      "stderr": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\hash-memory-1a80f942af2c43f7a33f3ec5ed962e27\\20260917-135203-921\\hash-0002-cycle-01\\stderr.log",
+      "diagnostics": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\hash-memory-1a80f942af2c43f7a33f3ec5ed962e27\\20260917-135203-921\\hash-0002-cycle-01\\koi-debug.jsonl"
+    }
+  ],
+  "failures": [],
+  "status": "pass"
+}
+<end of output>
+Test time =   1.88 sec
+----------------------------------------------------------
+Test Passed.
+"hash_memory_stability" end time: Sep 17 20:52 SE Asia Standard Time
+"hash_memory_stability" time elapsed: 00:00:01
+----------------------------------------------------------
+
+49/54 Testing: nnue_training_python
+49/54 Test: nnue_training_python
+Command: "C:/Python314/python.exe" "-m" "unittest" "tests/python/evaluation/nnue_training_test.py" "-v"
+Directory: C:/Users/ntATh/AI test/Koi engine
+"nnue_training_python" start time: Sep 17 20:52 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+test_manifest_input_resolves_relative_split_paths (tests.python.evaluation.nnue_training_test.NnueTrainingBoundaryTest.test_manifest_input_resolves_relative_split_paths) ... ok
+test_synthetic_export_is_deterministic_and_records_provenance (tests.python.evaluation.nnue_training_test.NnueTrainingBoundaryTest.test_synthetic_export_is_deterministic_and_records_provenance) ... ok
+test_synthetic_export_is_small_corpus_and_gpu_independent (tests.python.evaluation.nnue_training_test.NnueTrainingBoundaryTest.test_synthetic_export_is_small_corpus_and_gpu_independent) ... ok
+test_torch_backend_reports_missing_optional_dependency (tests.python.evaluation.nnue_training_test.NnueTrainingBoundaryTest.test_torch_backend_reports_missing_optional_dependency) ... skipped 'PyTorch is installed; dependency-missing branch is not applicable'
+
+----------------------------------------------------------------------
+Ran 4 tests in 1.995s
+
+OK (skipped=1)
+<end of output>
+Test time =   2.35 sec
+----------------------------------------------------------
+Test Passed.
+"nnue_training_python" end time: Sep 17 20:52 SE Asia Standard Time
+"nnue_training_python" time elapsed: 00:00:02
+----------------------------------------------------------
+
+24/54 Testing: search_service_tests
+24/54 Test: search_service_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/release/search_service_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/release
+"search_service_tests" start time: Sep 17 20:52 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS search service depth search
+PASS search service stop
+PASS search service evaluator swap
+PASS search service evaluator pinning
+PASS search service hash controls
+PASS search service sinkless search
+PASS search service ponderhit conversion
+koi-test-summary run=7 pass=7 fail=0 xfail=0 xpass=0 skip=0 unseen=0
+<end of output>
+Test time =   0.19 sec
+----------------------------------------------------------
+Test Passed.
+"search_service_tests" end time: Sep 17 20:52 SE Asia Standard Time
+"search_service_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+53/54 Testing: strength_report_python
+53/54 Test: strength_report_python
+Command: "C:/Python314/python.exe" "-m" "unittest" "tests/python/evaluation/strength_report_test.py" "-v"
+Directory: C:/Users/ntATh/AI test/Koi engine
+"strength_report_python" start time: Sep 17 20:52 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+test_category_aggregation_and_deterministic_output (tests.python.evaluation.strength_report_test.StrengthReportTests.test_category_aggregation_and_deterministic_output) ... ok
+test_malformed_json_is_rejected (tests.python.evaluation.strength_report_test.StrengthReportTests.test_malformed_json_is_rejected) ... ok
+test_missing_pv_is_rejected (tests.python.evaluation.strength_report_test.StrengthReportTests.test_missing_pv_is_rejected) ... ok
+test_mixed_options_are_rejected (tests.python.evaluation.strength_report_test.StrengthReportTests.test_mixed_options_are_rejected) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.952s
+
+OK
+<end of output>
+Test time =   1.23 sec
+----------------------------------------------------------
+Test Passed.
+"strength_report_python" end time: Sep 17 20:52 SE Asia Standard Time
+"strength_report_python" time elapsed: 00:00:01
+----------------------------------------------------------
+
+47/54 Testing: elo_openings_python
+47/54 Test: elo_openings_python
+Command: "C:/Python314/python.exe" "-m" "unittest" "tests/python/measurement/elo_openings_test.py" "-v"
+Directory: C:/Users/ntATh/AI test/Koi engine
+"elo_openings_python" start time: Sep 17 20:52 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+test_corpus_has_32_legal_named_opening_lines (tests.python.measurement.elo_openings_test.EloOpeningCorpusTests.test_corpus_has_32_legal_named_opening_lines) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 1.026s
+
+OK
+<end of output>
+Test time =   1.30 sec
+----------------------------------------------------------
+Test Passed.
+"elo_openings_python" end time: Sep 17 20:52 SE Asia Standard Time
+"elo_openings_python" time elapsed: 00:00:01
+----------------------------------------------------------
+
+32/54 Testing: koi_engine_en_croissant_process
+32/54 Test: koi_engine_en_croissant_process
+Command: "C:/Program Files/PowerShell/7/pwsh.exe" "-NoProfile" "-ExecutionPolicy" "Bypass" "-File" "C:/Users/ntATh/AI test/Koi engine/tests/integration/uci/en_croissant_uci_test.ps1" "-EnginePath" "C:/Users/ntATh/AI test/Koi engine/build/release/koi-engine.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/release
+"koi_engine_en_croissant_process" start time: Sep 17 20:52 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+En Croissant UCI transcript passed.
+<end of output>
+Test time =   1.29 sec
+----------------------------------------------------------
+Test Passed.
+"koi_engine_en_croissant_process" end time: Sep 17 20:52 SE Asia Standard Time
+"koi_engine_en_croissant_process" time elapsed: 00:00:01
+----------------------------------------------------------
+
+2/54 Testing: koi_core_tests
+2/54 Test: koi_core_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/release/koi_core_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/release
+"koi_core_tests" start time: Sep 17 20:52 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS default position
+PASS legal UCI sequence
+PASS native position undo and key
+PASS special moves
+PASS malformed FEN rejection
+PASS back-rank pawn rejection
+PASS en-passant state validation
+PASS adjacent king rejection
+PASS castling-rights validation
+PASS triple-check rejection
+PASS strict material and double-check rejection
+PASS invalid UCI rejection
+PASS malformed UCI rejection
+PASS compatibility position forwarding
+PASS native search state contract
+PASS checkmate and stalemate
+PASS random chooser legality
+PASS seeded chooser repeatability
+PASS position feature freshness
+PASS position feature concurrent reads
+PASS position feature concurrent copy
+PASS native feature replay
+PASS tactical checking horizon
+PASS metadata SEE cache
+PASS fabricated metadata rejection
+PASS tactical quiet-check probe budget
+PASS fast quiet-check differential
+koi-test-summary run=27 pass=27 fail=0 xfail=0 xpass=0 skip=0 unseen=0
+<end of output>
+Test time =   1.01 sec
+----------------------------------------------------------
+Test Passed.
+"koi_core_tests" end time: Sep 17 20:52 SE Asia Standard Time
+"koi_core_tests" time elapsed: 00:00:01
+----------------------------------------------------------
+
+43/54 Testing: package_release_layout
+43/54 Test: package_release_layout
+Command: "C:/Program Files/PowerShell/7/pwsh.exe" "-NoProfile" "-ExecutionPolicy" "Bypass" "-File" "C:/Users/ntATh/AI test/Koi engine/tests/integration/packaging/package_release_test.ps1" "-BuildDirectory" "C:/Users/ntATh/AI test/Koi engine/build/release" "-PackageScript" "C:/Users/ntATh/AI test/Koi engine/tools/build/package_release.ps1"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/release
+"package_release_layout" start time: Sep 17 20:52 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS release package layout
+<end of output>
+Test time =   2.58 sec
+----------------------------------------------------------
+Test Passed.
+"package_release_layout" end time: Sep 17 20:52 SE Asia Standard Time
+"package_release_layout" time elapsed: 00:00:02
+----------------------------------------------------------
+
+51/54 Testing: measurement_phase_python
+51/54 Test: measurement_phase_python
+Command: "C:/Python314/python.exe" "-m" "unittest" "tests/python/measurement/measurement_phase_test.py" "-v"
+Directory: C:/Users/ntATh/AI test/Koi engine
+"measurement_phase_python" start time: Sep 17 20:52 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+test_schedule_export_import_preserves_paired_openings_for_before_after_runs (tests.python.measurement.measurement_phase_test.EloScheduleMeasurementTests.test_schedule_export_import_preserves_paired_openings_for_before_after_runs) ... ok
+test_gigabase_caps_decoded_legal_positions_when_source_count_understates (tests.python.measurement.measurement_phase_test.GigaBaseMeasurementTests.test_gigabase_caps_decoded_legal_positions_when_source_count_understates) ... C:\Users\ntATh\AppData\Roaming\Python\Python314\site-packages\chess\engine.py:54: DeprecationWarning: 'asyncio.DefaultEventLoopPolicy' is deprecated and slated for removal in Python 3.16
+  EventLoopPolicy = asyncio.DefaultEventLoopPolicy
+ok
+test_gigabase_decodes_deduplicates_stratifies_and_is_reproducible (tests.python.measurement.measurement_phase_test.GigaBaseMeasurementTests.test_gigabase_decodes_deduplicates_stratifies_and_is_reproducible) ... ok
+test_gigabase_malformed_move_decoding_falls_back_without_breaking_caps (tests.python.measurement.measurement_phase_test.GigaBaseMeasurementTests.test_gigabase_malformed_move_decoding_falls_back_without_breaking_caps) ... ok
+test_extraction_report_declares_measurement_state_and_position_classification (tests.python.measurement.measurement_phase_test.OracleMeasurementMetadataTests.test_extraction_report_declares_measurement_state_and_position_classification) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.479s
+
+OK
+<end of output>
+Test time =   0.87 sec
+----------------------------------------------------------
+Test Passed.
+"measurement_phase_python" end time: Sep 17 20:52 SE Asia Standard Time
+"measurement_phase_python" time elapsed: 00:00:00
+----------------------------------------------------------
+
+48/54 Testing: tune_eval_python
+48/54 Test: tune_eval_python
+Command: "C:/Python314/python.exe" "-m" "unittest" "tests/python/evaluation/tune_eval_test.py" "-v"
+Directory: C:/Users/ntATh/AI test/Koi engine
+"tune_eval_python" start time: Sep 17 20:52 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+test_output_tracks_every_canonical_parameter (tests.python.evaluation.tune_eval_test.TuneEvalTest.test_output_tracks_every_canonical_parameter) ... ok
+test_split_corpora_emit_independent_hashes_and_counts (tests.python.evaluation.tune_eval_test.TuneEvalTest.test_split_corpora_emit_independent_hashes_and_counts) ... ok
+
+----------------------------------------------------------------------
+Ran 2 tests in 0.457s
+
+OK
+<end of output>
+Test time =   0.68 sec
+----------------------------------------------------------
+Test Passed.
+"tune_eval_python" end time: Sep 17 20:52 SE Asia Standard Time
+"tune_eval_python" time elapsed: 00:00:00
+----------------------------------------------------------
+
+29/54 Testing: perft_tests
+29/54 Test: perft_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/release/perft_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/release
+"perft_tests" start time: Sep 17 20:52 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS start-position perft
+PASS Kiwipete perft
+PASS endgame pin perft
+koi-test-summary run=3 pass=3 fail=0 xfail=0 xpass=0 skip=0 unseen=0
+<end of output>
+Test time =   0.82 sec
+----------------------------------------------------------
+Test Passed.
+"perft_tests" end time: Sep 17 20:52 SE Asia Standard Time
+"perft_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+30/54 Testing: koi_replay_tests
+30/54 Test: koi_replay_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/release/koi_replay_tests.exe" "C:/Users/ntATh/AI test/Koi engine/build/release/koi-replay.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/release
+"koi_replay_tests" start time: Sep 17 20:52 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+usage: koi-replay <startpos|fen six-field-fen> [moves <coordinate>...]
+PASS startpos replay
+PASS castling replay
+PASS en passant replay
+PASS promotion replay
+PASS illegal move transaction
+PASS checkmate classification
+PASS stalemate classification
+PASS rule draw classification
+PASS repetition draw classification
+PASS stray move rejection
+koi-test-summary run=10 pass=10 fail=0 xfail=0 xpass=0 skip=0 unseen=0
+<end of output>
+Test time =   0.64 sec
+----------------------------------------------------------
+Test Passed.
+"koi_replay_tests" end time: Sep 17 20:52 SE Asia Standard Time
+"koi_replay_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+23/54 Testing: transposition_table_tests
+23/54 Test: transposition_table_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/release/transposition_table_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/release
+"transposition_table_tests" start time: Sep 17 20:52 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS transposition store and probe
+PASS transposition mate normalisation
+PASS transposition replacement depth
+PASS transposition generation ageing
+PASS transposition clear and hashfull
+PASS transposition resize bounds
+PASS transposition concurrent access
+koi-test-summary run=7 pass=7 fail=0 xfail=0 xpass=0 skip=0 unseen=0
+<end of output>
+Test time =   0.09 sec
+----------------------------------------------------------
+Test Passed.
+"transposition_table_tests" end time: Sep 17 20:52 SE Asia Standard Time
+"transposition_table_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+50/54 Testing: nnue_wrapper_python
+50/54 Test: nnue_wrapper_python
+Command: "C:/Python314/python.exe" "-m" "unittest" "tests/python/evaluation/nnue_wrapper_test.py" "-v"
+Directory: C:/Users/ntATh/AI test/Koi engine
+"nnue_wrapper_python" start time: Sep 17 20:52 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+test_export_wrapper_exposes_the_same_versioned_cli (tests.python.evaluation.nnue_wrapper_test.NnueWrapperTest.test_export_wrapper_exposes_the_same_versioned_cli) ... ok
+test_training_wrapper_exposes_the_koi_nnue_cli (tests.python.evaluation.nnue_wrapper_test.NnueWrapperTest.test_training_wrapper_exposes_the_koi_nnue_cli) ... ok
+
+----------------------------------------------------------------------
+Ran 2 tests in 0.428s
+
+OK
+<end of output>
+Test time =   0.66 sec
+----------------------------------------------------------
+Test Passed.
+"nnue_wrapper_python" end time: Sep 17 20:52 SE Asia Standard Time
+"nnue_wrapper_python" time elapsed: 00:00:00
+----------------------------------------------------------
+
+26/54 Testing: evaluation_features_tests
+26/54 Test: evaluation_features_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/release/evaluation_features_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/release
+"evaluation_features_tests" start time: Sep 17 20:52 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS evaluation features v1 startpos
+PASS evaluation features v2 startpos
+PASS evaluation features perspective
+PASS evaluation features sparse view
+PASS evaluation features pawn flags
+PASS evaluation features castling rights
+koi-test-summary run=6 pass=6 fail=0 xfail=0 xpass=0 skip=0 unseen=0
+<end of output>
+Test time =   0.10 sec
+----------------------------------------------------------
+Test Passed.
+"evaluation_features_tests" end time: Sep 17 20:52 SE Asia Standard Time
+"evaluation_features_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+25/54 Testing: classical_evaluator_tests
+25/54 Test: classical_evaluator_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/release/classical_evaluator_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/release
+"classical_evaluator_tests" start time: Sep 17 20:52 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS classical evaluator perspective
+PASS classical evaluator breakdown sum
+PASS classical evaluator symmetric start
+PASS classical evaluator insufficient material
+PASS classical evaluator material
+PASS classical evaluator mobility
+PASS classical evaluator tempo gate
+koi-test-summary run=7 pass=7 fail=0 xfail=0 xpass=0 skip=0 unseen=0
+<end of output>
+Test time =   0.10 sec
+----------------------------------------------------------
+Test Passed.
+"classical_evaluator_tests" end time: Sep 17 20:52 SE Asia Standard Time
+"classical_evaluator_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+46/54 Testing: stockfish_match_python
+46/54 Test: stockfish_match_python
+Command: "C:/Python314/python.exe" "-m" "unittest" "tests/python/measurement/stockfish_match_test.py" "-v"
+Directory: C:/Users/ntATh/AI test/Koi engine
+"stockfish_match_python" start time: Sep 17 20:52 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+test_book_random_and_explicit_opponent_elo_are_forwarded_and_clamped (tests.python.measurement.stockfish_match_test.StockfishMatchOptionsTests.test_book_random_and_explicit_opponent_elo_are_forwarded_and_clamped) ... ok
+test_defaults_keep_hash_16_and_send_book_random_false_for_koi (tests.python.measurement.stockfish_match_test.StockfishMatchOptionsTests.test_defaults_keep_hash_16_and_send_book_random_false_for_koi) ... ok
+test_explicit_opponent_elo_is_forwarded (tests.python.measurement.stockfish_match_test.StockfishMatchOptionsTests.test_explicit_opponent_elo_is_forwarded) ... ok
+test_invalid_book_random_and_opponent_elo_are_rejected (tests.python.measurement.stockfish_match_test.StockfishMatchOptionsTests.test_invalid_book_random_and_opponent_elo_are_rejected) ... ok
+test_operator_documentation_covers_strength_aliases_clamping_and_omission (tests.python.measurement.stockfish_match_test.StockfishMatchOptionsTests.test_operator_documentation_covers_strength_aliases_clamping_and_omission) ... ok
+test_paired_run_metadata_is_forwarded_to_the_uci_harness (tests.python.measurement.stockfish_match_test.StockfishMatchOptionsTests.test_paired_run_metadata_is_forwarded_to_the_uci_harness) ... ok
+
+----------------------------------------------------------------------
+Ran 6 tests in 0.016s
+
+OK
+<end of output>
+Test time =   0.31 sec
+----------------------------------------------------------
+Test Passed.
+"stockfish_match_python" end time: Sep 17 20:52 SE Asia Standard Time
+"stockfish_match_python" time elapsed: 00:00:00
+----------------------------------------------------------
+
+42/54 Testing: install_book_script
+42/54 Test: install_book_script
+Command: "C:/Program Files/PowerShell/7/pwsh.exe" "-NoProfile" "-ExecutionPolicy" "Bypass" "-File" "C:/Users/ntATh/AI test/Koi engine/tests/integration/packaging/install_book_test.ps1"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/release
+"install_book_script" start time: Sep 17 20:52 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+install_book tests passed.
+<end of output>
+Test time =   1.14 sec
+----------------------------------------------------------
+Test Passed.
+"install_book_script" end time: Sep 17 20:52 SE Asia Standard Time
+"install_book_script" time elapsed: 00:00:01
+----------------------------------------------------------
+
+8/54 Testing: syzygy_tablebase_tests
+8/54 Test: syzygy_tablebase_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/release/syzygy_tablebase_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/release
+"syzygy_tablebase_tests" start time: Sep 17 20:52 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+Incomplete tablebase file KQvK..rtbw
+PASS snapshot rule metadata and piece bitboards
+PASS snapshot native rule state after pinned double push
+PASS absent and malformed paths disable probing safely
+PASS empty and valid paths preserve optional fallback
+info string Incomplete tablebase file KQvK..rtbw
+PASS wrong-sized fixture disables probing safely
+PASS tablebase instances share Fathom lifetime in both clear orders
+PASS piece count and castling gate probing
+PASS malformed snapshots are rejected before probing
+PASS WDL conversion and concurrent disabled probes
+PASS 50-move rule selects clock-aware root probe
+PASS seven-piece probe limit is preserved
+koi-test-summary run=11 pass=11 fail=0 xfail=0 xpass=0 skip=0 unseen=0
+<end of output>
+Test time =   0.35 sec
+----------------------------------------------------------
+Test Passed.
+"syzygy_tablebase_tests" end time: Sep 17 20:52 SE Asia Standard Time
+"syzygy_tablebase_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+27/54 Testing: time_manager_tests
+27/54 Test: time_manager_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/release/time_manager_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/release
+"time_manager_tests" start time: Sep 17 20:52 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS clock budget safety invariants
+PASS fast control keeps the clock
+PASS emergency pacing
+PASS movetime budget
+PASS frozen deadline
+PASS synthetic games never flag
+koi-test-summary run=6 pass=6 fail=0 xfail=0 xpass=0 skip=0 unseen=0
+<end of output>
+Test time =   0.09 sec
+----------------------------------------------------------
+Test Passed.
+"time_manager_tests" end time: Sep 17 20:52 SE Asia Standard Time
+"time_manager_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+41/54 Testing: windows_ci_configuration
+41/54 Test: windows_ci_configuration
+Command: "C:/Program Files/PowerShell/7/pwsh.exe" "-NoProfile" "-ExecutionPolicy" "Bypass" "-File" "C:/Users/ntATh/AI test/Koi engine/tests/integration/packaging/ci_configuration_test.ps1"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/release
+"windows_ci_configuration" start time: Sep 17 20:52 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.62 sec
+----------------------------------------------------------
+Test Passed.
+"windows_ci_configuration" end time: Sep 17 20:52 SE Asia Standard Time
+"windows_ci_configuration" time elapsed: 00:00:00
+----------------------------------------------------------
+
+5/54 Testing: nnue_boundary_tests
+5/54 Test: nnue_boundary_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/release/nnue_boundary_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/release
+"nnue_boundary_tests" start time: Sep 17 20:52 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS NNUE container
+PASS NNUE layer shape
+PASS NNUE fallback
+PASS NNUE worker isolation
+PASS NNUE v2 features
+PASS NNUE v2 container
+PASS NNUE v2 validation
+PASS NNUE v2 inference
+PASS NNUE AVX2 wide accumulation
+PASS NNUE invalid worker guard
+PASS NNUE v3 shifts
+SKIP external NNUE container: no external container path provided
+koi-test-summary run=12 pass=11 fail=0 xfail=0 xpass=0 skip=1 unseen=0
+<end of output>
+Test time =   0.18 sec
+----------------------------------------------------------
+Test Passed.
+"nnue_boundary_tests" end time: Sep 17 20:52 SE Asia Standard Time
+"nnue_boundary_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+11/54 Testing: opening_book_tests
+11/54 Test: opening_book_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/release/opening_book_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/release
+"opening_book_tests" start time: Sep 17 20:52 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS reference Polyglot keys
+PASS special Polyglot moves
+PASS weighted legal selection
+PASS deterministic highest-weight selection
+PASS book fallback behavior
+PASS oversized book fallback
+PASS book safety
+koi-test-summary run=7 pass=7 fail=0 xfail=0 xpass=0 skip=0 unseen=0
+<end of output>
+Test time =   0.17 sec
+----------------------------------------------------------
+Test Passed.
+"opening_book_tests" end time: Sep 17 20:52 SE Asia Standard Time
+"opening_book_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+4/54 Testing: evaluation_architecture_tests
+4/54 Test: evaluation_architecture_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/release/evaluation_architecture_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/release
+"evaluation_architecture_tests" start time: Sep 17 20:52 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS worker ownership
+PASS base fallback
+PASS search evaluation boundary
+koi-test-summary run=3 pass=3 fail=0 xfail=0 xpass=0 skip=0 unseen=0
+<end of output>
+Test time =   0.11 sec
+----------------------------------------------------------
+Test Passed.
+"evaluation_architecture_tests" end time: Sep 17 20:52 SE Asia Standard Time
+"evaluation_architecture_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+1/54 Testing: koi_shadow_diff_tests
+1/54 Test: koi_shadow_diff_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/release/koi_shadow_diff_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/release
+"koi_shadow_diff_tests" start time: Sep 17 20:52 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS fixture differential
+PASS sequential differential
+PASS game state consistency snapshot
+PASS fixed-seed generated move replay stays consistent
+PASS special generated moves are transactional
+PASS fixed-seed make/unmake restores diagnostic snapshots
+PASS repetition and rejected generated metadata preserve consistency
+koi-test-summary run=7 pass=7 fail=0 xfail=0 xpass=0 skip=0 unseen=0
+<end of output>
+Test time =   0.11 sec
+----------------------------------------------------------
+Test Passed.
+"koi_shadow_diff_tests" end time: Sep 17 20:52 SE Asia Standard Time
+"koi_shadow_diff_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+21/54 Testing: search_runtime_tests
+21/54 Test: search_runtime_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/release/search_runtime_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/release
+"search_runtime_tests" start time: Sep 17 20:52 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS enabled table access
+PASS disabled table access
+PASS table access generation
+PASS local node budget
+PASS shared node budget
+koi-test-summary run=5 pass=5 fail=0 xfail=0 xpass=0 skip=0 unseen=0
+<end of output>
+Test time =   0.12 sec
+----------------------------------------------------------
+Test Passed.
+"search_runtime_tests" end time: Sep 17 20:52 SE Asia Standard Time
+"search_runtime_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+20/54 Testing: search_policy_tests
+20/54 Test: search_policy_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/release/search_policy_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/release
+"search_policy_tests" start time: Sep 17 20:52 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS null move policy
+PASS check extension policy
+PASS late move policy
+PASS quiet futility policy
+PASS quiescence capture policy
+PASS ordering table ownership
+koi-test-summary run=6 pass=6 fail=0 xfail=0 xpass=0 skip=0 unseen=0
+<end of output>
+Test time =   0.13 sec
+----------------------------------------------------------
+Test Passed.
+"search_policy_tests" end time: Sep 17 20:52 SE Asia Standard Time
+"search_policy_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+19/54 Testing: search_architecture_tests
+19/54 Test: search_architecture_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/release/search_architecture_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/release
+"search_architecture_tests" start time: Sep 17 20:52 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS fixed search stack
+PASS deterministic root ranking
+PASS session ownership
+PASS context stack boundary
+koi-test-summary run=4 pass=4 fail=0 xfail=0 xpass=0 skip=0 unseen=0
+<end of output>
+Test time =   0.13 sec
+----------------------------------------------------------
+Test Passed.
+"search_architecture_tests" end time: Sep 17 20:52 SE Asia Standard Time
+"search_architecture_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+6/54 Testing: koi_cpu_features_tests
+6/54 Test: koi_cpu_features_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/release/koi_cpu_features_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/release
+"koi_cpu_features_tests" start time: Sep 17 20:52 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS AVX2 CPU feature query
+koi-test-summary run=1 pass=1 fail=0 xfail=0 xpass=0 skip=0 unseen=0
+<end of output>
+Test time =   0.12 sec
+----------------------------------------------------------
+Test Passed.
+"koi_cpu_features_tests" end time: Sep 17 20:52 SE Asia Standard Time
+"koi_cpu_features_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+13/54 Testing: completion_gate_tests
+13/54 Test: completion_gate_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/release/completion_gate_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/release
+"completion_gate_tests" start time: Sep 17 20:52 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS current root move
+PASS stale generation
+PASS mismatched root key
+PASS illegal d4c3 fallback
+PASS searchmoves restriction
+PASS invalid PV fallback
+PASS terminal 0000
+PASS completion once
+PASS request identity helper
+koi-test-summary run=9 pass=9 fail=0 xfail=0 xpass=0 skip=0 unseen=0
+<end of output>
+Test time =   0.12 sec
+----------------------------------------------------------
+Test Passed.
+"completion_gate_tests" end time: Sep 17 20:52 SE Asia Standard Time
+"completion_gate_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+3/54 Testing: evaluation_boundary_tests
+3/54 Test: evaluation_boundary_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/release/evaluation_boundary_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/release
+"evaluation_boundary_tests" start time: Sep 17 20:52 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS castling readiness
+PASS early queen development
+PASS central early queen development
+PASS late central queen taper
+PASS pawn break potential
+PASS parameter metadata
+PASS trapped piece
+PASS hanging piece
+PASS weighted king-ring attackers
+PASS castle-ready king-ring deferral
+PASS sparse king-ring taper
+PASS feature extraction context
+koi-test-summary run=12 pass=12 fail=0 xfail=0 xpass=0 skip=0 unseen=0
+<end of output>
+Test time =   0.12 sec
+----------------------------------------------------------
+Test Passed.
+"evaluation_boundary_tests" end time: Sep 17 20:52 SE Asia Standard Time
+"evaluation_boundary_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+9/54 Testing: koi_rules_tests
+9/54 Test: koi_rules_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/release/koi_rules_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/release
+"koi_rules_tests" start time: Sep 17 20:52 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS Koi-owned move coordinates
+PASS FEN construction
+PASS strict FEN legality
+PASS legal special moves
+PASS special move conversion round trips
+PASS move metadata
+PASS batch move metadata
+PASS search metadata fast path
+PASS generated move application
+PASS all fast generated moves
+PASS draw rule view
+PASS non-pawn material view
+PASS tactical move generation
+PASS position features
+PASS make/unmake restoration
+PASS null move restoration
+PASS transactional rejected move
+PASS start-position move count
+koi-test-summary run=18 pass=18 fail=0 xfail=0 xpass=0 skip=0 unseen=0
+<end of output>
+Test time =   0.13 sec
+----------------------------------------------------------
+Test Passed.
+"koi_rules_tests" end time: Sep 17 20:52 SE Asia Standard Time
+"koi_rules_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+7/54 Testing: koi_module_tests
+7/54 Test: koi_module_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/release/koi_module_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/release
+"koi_module_tests" start time: Sep 17 20:52 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS module contracts
+koi-test-summary run=1 pass=1 fail=0 xfail=0 xpass=0 skip=0 unseen=0
+<end of output>
+Test time =   0.12 sec
+----------------------------------------------------------
+Test Passed.
+"koi_module_tests" end time: Sep 17 20:52 SE Asia Standard Time
+"koi_module_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+22/54 Testing: static_exchange_tests
+22/54 Test: static_exchange_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/release/static_exchange_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/release
+"static_exchange_tests" start time: Sep 17 20:52 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS winning capture
+PASS poisoned capture
+PASS non-capture
+PASS quiet promotions
+PASS metadata exchange
+PASS en passant capture
+PASS capturing promotion
+PASS promotion recapture
+PASS pinned recapturer
+PASS unsafe king recapture
+PASS tactical SEE without feature snapshots
+koi-test-summary run=11 pass=11 fail=0 xfail=0 xpass=0 skip=0 unseen=0
+<end of output>
+Test time =   0.12 sec
+----------------------------------------------------------
+Test Passed.
+"static_exchange_tests" end time: Sep 17 20:52 SE Asia Standard Time
+"static_exchange_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+10/54 Testing: native_rule_state_tests
+10/54 Test: native_rule_state_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/release/native_rule_state_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/release
+"native_rule_state_tests" start time: Sep 17 20:52 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS compatibility mirror ownership
+PASS feature state ownership
+PASS FEN rule state and Position facade
+PASS repetition thresholds
+PASS clock, checkmate, and dead positions
+PASS make/unmake and special moves
+PASS legal en-passant repetition identity
+PASS generated move transaction
+PASS search move transaction
+PASS fixed-buffer legal generation
+koi-test-summary run=10 pass=10 fail=0 xfail=0 xpass=0 skip=0 unseen=0
+<end of output>
+Test time =   0.12 sec
+----------------------------------------------------------
+Test Passed.
+"native_rule_state_tests" end time: Sep 17 20:52 SE Asia Standard Time
+"native_rule_state_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+18/54 Testing: search_ordering_tests
+18/54 Test: search_ordering_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/release/search_ordering_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/release
+"search_ordering_tests" start time: Sep 17 20:52 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS TT and MVV-LVA ordering
+PASS SEE capture ordering
+PASS killer history stable ordering
+PASS killer tier outranks saturated history
+PASS counter move tier
+PASS counter move confidence
+PASS counter move collision confidence
+PASS counter move failure confidence
+PASS quiet checks before quiet moves
+PASS history malus and continuation ordering
+PASS history saturation overflow safety
+PASS cached move scores
+PASS deferred SEE generation
+PASS quiet-only check metadata
+PASS deferred SEE ordering
+koi-test-summary run=15 pass=15 fail=0 xfail=0 xpass=0 skip=0 unseen=0
+<end of output>
+Test time =   0.09 sec
+----------------------------------------------------------
+Test Passed.
+"search_ordering_tests" end time: Sep 17 20:52 SE Asia Standard Time
+"search_ordering_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+14/54 Testing: koi_search_tests_1of4
+14/54 Test: koi_search_tests_1of4
+Command: "C:/Users/ntATh/AI test/Koi engine/build/release/koi_search_tests.exe" "--shard=0/4"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/release
+"koi_search_tests_1of4" start time: Sep 17 20:51 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS classical evaluator
+PASS evaluator endgame and mobility
+PASS evaluator color symmetric endgame passer
+PASS evaluator tempo
+PASS time manager
+PASS speed budgets
+PASS root filtering legal move
+PASS short timed threaded search
+PASS very short timed root workers
+PASS queen check mate horizon
+PASS short tactical root fallback
+PASS short oracle fallback safety
+PASS short quiet hanging piece
+PASS short c5b4 queen check trap
+PASS short queen retreat over safe capture
+PASS depth seven check extension stack safety
+PASS short broad check horizon
+XFAIL depth-one forcing check: depth-one root research must prefer the near-tied check (best=c2c3)
+PASS threaded root overlap
+XFAIL threaded root-in-check parity: root-in-check threaded search must retain the serial fixed-depth move and score at Threads=2 and Threads=4
+XFAIL threaded multipv warmed hash: warmed threaded MultiPV must retain the stable ordered root prefix
+PASS search info accounting
+PASS threaded timed cancellation
+PASS deterministic legal search
+PASS tactical search statistics
+PASS shorter mate preference
+PASS repetition-sensitive null safety
+PASS eligible null verification
+PASS quiet history hook exceptions
+XFAIL late move full-depth verification: a reduced move that exceeds alpha must receive a full-depth verification search
+XFAIL threaded short forcing root research: a forcing quiet root must retain its tactical move in a short search (got f6e4, score -9)
+PASS near-root pawn break extension
+PASS deep quiescence checks
+PASS ponder search lifecycle
+PASS service hash persistence
+PASS transposition table hashfull
+PASS transposition table depth preservation
+PASS transposition table resize concurrency
+koi-test-summary run=38 pass=33 fail=0 xfail=5 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =  52.75 sec
+----------------------------------------------------------
+Test Passed.
+"koi_search_tests_1of4" end time: Sep 17 20:52 SE Asia Standard Time
+"koi_search_tests_1of4" time elapsed: 00:00:52
+----------------------------------------------------------
+
+17/54 Testing: koi_search_tests_4of4
+17/54 Test: koi_search_tests_4of4
+Command: "C:/Users/ntATh/AI test/Koi engine/build/release/koi_search_tests.exe" "--shard=3/4"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/release
+"koi_search_tests_4of4" start time: Sep 17 20:51 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS evaluator perspective symmetry
+PASS evaluator mirrored terms and black blockade
+PASS evaluator passer support and race
+PASS evaluator bishop pair
+PASS low-clock hard window
+PASS search options
+PASS threaded root search
+PASS short timed root workers
+PASS hard short search deadline
+PASS interrupted root completed candidate
+PASS short queen check trap
+PASS short b2b4 pawn lure
+PASS short d2c1 king trap
+PASS short b2b4 mating rook lift
+PASS short info PV matches bestmove
+PASS short parallel abort safe exchange
+XPASS incomplete root forcing fallback: intermittent known failure now passes
+PASS timed PV and bestmove coherence
+PASS threaded root alpha sharing
+PASS threaded multipv final-depth parity
+PASS depth-zero node accounting
+PASS threaded cancellation
+PASS claimable draw root fallback
+PASS fixed-depth tactical reference
+PASS mate in one distance
+XFAIL sparse phase-rich null safety: a sparse phase-rich search must retain its legal tactical result and score 2 b2e2 135
+XFAIL opening central break: the opening central break must remain visible at the completed diagnostic depth (got c1e3, score 126)
+PASS quiet history moving side
+PASS bounded mirror validation overhead
+PASS threaded shallow root near-tie research
+PASS near-root pawn king-ring extension
+PASS bounded quiescence checks
+PASS search exception lifecycle
+PASS ponderhit in-place conversion
+PASS transposition table
+PASS transposition table allocation failure
+PASS transposition table concurrency
+koi-test-summary run=37 pass=34 fail=0 xfail=2 xpass=1 skip=0 unseen=0 intermittent=1
+<end of output>
+Test time =  56.82 sec
+----------------------------------------------------------
+Test Passed.
+"koi_search_tests_4of4" end time: Sep 17 20:52 SE Asia Standard Time
+"koi_search_tests_4of4" time elapsed: 00:00:56
+----------------------------------------------------------
+
+16/54 Testing: koi_search_tests_3of4
+16/54 Test: koi_search_tests_3of4
+Command: "C:/Users/ntATh/AI test/Koi engine/build/release/koi_search_tests.exe" "--shard=2/4"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/release
+"koi_search_tests_3of4" start time: Sep 17 20:52 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS development center pressure
+PASS evaluator passed pawn blockade
+PASS evaluator endgame king activity
+PASS evaluator complete breakdown
+PASS low-clock emergency pacing
+PASS explicit limits remain untimed
+PASS deterministic multipv
+PASS low clock forcing root
+PASS short timed threaded authoritative root
+XFAIL timed poisoned capture: a short timed search must not emit the shallow poisoned capture (best=g4e3, completed_depth=1, candidates=0, researches=0, fallback_calls=0, fallback_candidates=0, overdue_candidates=0, elapsed_ms=35)
+PASS short defensive rook lift
+PASS short oracle b2b4 rook lift
+PASS short forced king escape
+PASS short a5c5 forcing check
+PASS short recapture before material capture
+PASS short safe forcing exchange
+PASS short second check horizon
+XFAIL root king safety escape: a threatened king escape must survive the quiet horizon (best=b7e4, escape_eval=125, queen_eval=148, escape_king_safety=31, queen_king_safety=57, escape_activity=30, queen_activity=17, escape_initiative=0, queen_initiative=0, escape_piece_square=-4, queen_piece_square=-8, escape_king_zone=1, queen_king_zone=3)
+PASS threaded single-PV root is authoritative
+XFAIL threaded multipv ordered root ties: equal-score threaded MultiPV must retain the earliest stable ordered root move
+PASS threaded node parity
+PASS feature cache restoration
+PASS terminal search
+PASS search result legal PV
+PASS forced quiet evasion
+PASS low-phase null safety
+PASS high-history LMR exclusion
+PASS shallow futility accounting
+PASS static evaluation cache
+PASS shallow root near-tie research
+PASS near-root quiet forcing extension
+XFAIL poisoned capture quiescence: a shallow search must reject the poisoned knight capture in the unrestricted root search (move g4e3, score 23, selective researches 0)
+PASS infinite search lifecycle
+PASS ponder time and node limits
+PASS hash bounds and clear
+PASS transposition table unchanged cap
+PASS transposition table mate normalization
+koi-test-summary run=37 pass=33 fail=0 xfail=4 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =  18.63 sec
+----------------------------------------------------------
+Test Passed.
+"koi_search_tests_3of4" end time: Sep 17 20:52 SE Asia Standard Time
+"koi_search_tests_3of4" time elapsed: 00:00:18
+----------------------------------------------------------
+
+33/54 Testing: koi_engine_time_safety_process
+33/54 Test: koi_engine_time_safety_process
+Command: "C:/Program Files/PowerShell/7/pwsh.exe" "-NoProfile" "-ExecutionPolicy" "Bypass" "-File" "C:/Users/ntATh/AI test/Koi engine/tests/integration/uci/time_safety_test.ps1" "-EnginePath" "C:/Users/ntATh/AI test/Koi engine/build/release/koi-engine.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/release
+"koi_engine_time_safety_process" start time: Sep 17 20:52 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+Time safety UCI transcript passed.
+<end of output>
+Test time =  11.36 sec
+----------------------------------------------------------
+Test Passed.
+"koi_engine_time_safety_process" end time: Sep 17 20:52 SE Asia Standard Time
+"koi_engine_time_safety_process" time elapsed: 00:00:11
+----------------------------------------------------------
+
+39/54 Testing: cutechess_stability_smoke
+39/54 Test: cutechess_stability_smoke
+Command: "C:/Program Files/PowerShell/7/pwsh.exe" "-NoProfile" "-ExecutionPolicy" "Bypass" "-File" "C:/Users/ntATh/AI test/Koi engine/tests/integration/matches/cutechess_stability_test.ps1" "-EnginePath" "C:/Users/ntATh/AI test/Koi engine/build/release/koi-engine.exe" "-CutechessPath" "C:/Program Files (x86)/Cute Chess/cutechess-cli.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/release
+"cutechess_stability_smoke" start time: Sep 17 20:52 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+Started game 1 (Koi vs Opponent)
+Finished game 1 (Koi vs Opponent)
+Started game 2 (Opponent vs Koi)
+Finished game 2 (Opponent vs Koi)
+Started game 1 (Koi vs Opponent)
+Finished game 1 (Koi vs Opponent)
+Started game 1 (Koi vs Opponent)
+Finished game 1 (Koi vs Opponent)
+Started game 2 (Opponent vs Koi)
+Finished game 2 (Opponent vs Koi)
+Started game 1 (Koi vs Opponent)
+partial stderr 
+partial stdout
+Started game 1 (Koi vs Opponent)
+engine disconnect
+no-result stderr 
+Started game 1 (Koi vs Opponent)
+timeout stderr 
+Started game 1 (Koi vs Opponent)
+Finished game 1 (Koi vs Opponent): 0-1 {White loses on time}
+Started game 1 of 2 (Koi vs Opponent)
+Finished game 1 (Koi vs Opponent): 1/2-1/2 {Draw by adjudication: maximal game length}
+Score of Koi vs Opponent: 0 - 0 - 1  [0.500] 1
+Started game 2 of 2 (Opponent vs Koi)
+Finished game 2 (Opponent vs Koi): 1/2-1/2 {Draw by adjudication: maximal game length}
+Score of Koi vs Opponent: 0 - 0 - 2  [0.500] 2
+...      Koi playing White: 0 - 0 - 1  [0.500] 1
+...      Koi playing Black: 0 - 0 - 1  [0.500] 1
+...      White vs Black: 0 - 0 - 2  [0.500] 2
+Elo difference: 0.0 +/- 0.0, LOS: nan %, DrawRatio: 100.0 %
+SPRT: llr 0 (0.0%), lbound -inf, ubound inf
+
+Player: Koi
+   "Draw by adjudication: maximal game length": 2
+Player: Opponent
+   "Draw by adjudication: maximal game length": 2
+Finished match
+Started game 1 of 2 (Koi vs Opponent)
+Finished game 1 (Koi vs Opponent): 1/2-1/2 {Draw by adjudication: maximal game length}
+Score of Koi vs Opponent: 0 - 0 - 1  [0.500] 1
+Started game 2 of 2 (Opponent vs Koi)
+Finished game 2 (Opponent vs Koi): 1/2-1/2 {Draw by adjudication: maximal game length}
+Score of Koi vs Opponent: 0 - 0 - 2  [0.500] 2
+...      Koi playing White: 0 - 0 - 1  [0.500] 1
+...      Koi playing Black: 0 - 0 - 1  [0.500] 1
+...      White vs Black: 0 - 0 - 2  [0.500] 2
+Elo difference: 0.0 +/- 0.0, LOS: nan %, DrawRatio: 100.0 %
+SPRT: llr 0 (0.0%), lbound -inf, ubound inf
+
+Player: Koi
+   "Draw by adjudication: maximal game length": 2
+Player: Opponent
+   "Draw by adjudication: maximal game length": 2
+Finished match
+<end of output>
+Test time =  28.89 sec
+----------------------------------------------------------
+Test Passed.
+"cutechess_stability_smoke" end time: Sep 17 20:53 SE Asia Standard Time
+"cutechess_stability_smoke" time elapsed: 00:00:28
+----------------------------------------------------------
+
+28/54 Testing: koi_strength_tests
+28/54 Test: koi_strength_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/release/koi_strength_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/release
+"koi_strength_tests" start time: Sep 17 20:53 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS strength suite hard gate
+PASS optional strength fixture contract
+PASS optional strength rule draws
+PASS strength corpora cross-distinct and legal
+PASS strength position legacy initialization
+PASS legacy strength rows exact
+PASS strength positions valid and tactical
+koi-test-summary run=7 pass=7 fail=0 xfail=0 xpass=0 skip=0 unseen=0
+<end of output>
+Test time =   6.48 sec
+----------------------------------------------------------
+Test Passed.
+"koi_strength_tests" end time: Sep 17 20:53 SE Asia Standard Time
+"koi_strength_tests" time elapsed: 00:00:06
+----------------------------------------------------------
+
+34/54 Testing: koi_benchmark_process
+34/54 Test: koi_benchmark_process
+Command: "C:/Program Files/PowerShell/7/pwsh.exe" "-NoProfile" "-ExecutionPolicy" "Bypass" "-File" "C:/Users/ntATh/AI test/Koi engine/tests/integration/tools/koi_bench_process_test.ps1" "-BenchPath" "C:/Users/ntATh/AI test/Koi engine/build/release/koi-bench.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/release
+"koi_benchmark_process" start time: Sep 17 20:52 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =  58.39 sec
+----------------------------------------------------------
+Test Passed.
+"koi_benchmark_process" end time: Sep 17 20:53 SE Asia Standard Time
+"koi_benchmark_process" time elapsed: 00:00:58
+----------------------------------------------------------
+
+37/54 Testing: koi_uci_match_clock
+37/54 Test: koi_uci_match_clock
+Command: "C:/Program Files/PowerShell/7/pwsh.exe" "-NoProfile" "-ExecutionPolicy" "Bypass" "-File" "C:/Users/ntATh/AI test/Koi engine/tests/integration/matches/uci_match_clock_test.ps1" "-EnginePath" "C:/Users/ntATh/AI test/Koi engine/build/release/koi-engine.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/release
+"koi_uci_match_clock" start time: Sep 17 20:52 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS UCI match clock deadline integration
+<end of output>
+Test time =  69.15 sec
+----------------------------------------------------------
+Test Passed.
+"koi_uci_match_clock" end time: Sep 17 20:53 SE Asia Standard Time
+"koi_uci_match_clock" time elapsed: 00:01:09
+----------------------------------------------------------
+
+15/54 Testing: koi_search_tests_2of4
+15/54 Test: koi_search_tests_2of4
+Command: "C:/Users/ntATh/AI test/Koi engine/build/release/koi_search_tests.exe" "--shard=1/4"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/release
+"koi_search_tests_2of4" start time: Sep 17 20:51 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS classical evaluator breakdown
+PASS evaluator passed pawn endgame scaling
+PASS evaluator versioned parameters
+PASS evaluator pawnless endgame terms
+PASS adaptive time manager
+PASS compatibility timing controls
+PASS root filtering illegal move
+PASS medium timed forcing root
+PASS ultra short timed completed root
+XFAIL single-PV root forcing extension: single-PV depth-one search must match the root forcing extension (best=f6e4, score=-9, quiet_forcing_extensions=47)
+PASS short poisoned pawn capture
+PASS short oracle b2b1 rook retreat
+PASS short oracle d5c6 mating blunder
+PASS short c5f2 forcing capture
+PASS short safe-looking rook capture horizon mate
+PASS short preserves completed forcing check
+PASS short safe recapture
+XFAIL threaded depth-one forcing check: threaded depth-one root research must prefer the near-tied check (best=c2c3, candidates=1, researches=0)
+PASS classical threaded parity
+PASS stable root ties
+PASS threaded global nodes
+PASS lazy search features
+PASS evaluator cross-handle safety
+PASS search result identity
+PASS check extensions
+PASS pawn-only zugzwang null safety
+XFAIL king-zone LMR exclusion: quiet king-zone pressure moves must be excluded from LMR
+PASS shallow futility tactical safety
+PASS late quiet move reductions
+XFAIL committed PGN tactical fixtures: PGN fixture output changed: 2026-09-05-koi-vs-koi.pgn
+PASS clock short forcing root research
+PASS checked quiescence cap
+PASS aspiration windows
+PASS ponder terminal lifecycle
+PASS search timing context
+PASS transposition table memory cap
+PASS transposition table age refresh
+PASS transposition table mixed maintenance
+koi-test-summary run=38 pass=34 fail=0 xfail=4 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time = 161.64 sec
+----------------------------------------------------------
+Test Passed.
+"koi_search_tests_2of4" end time: Sep 17 20:54 SE Asia Standard Time
+"koi_search_tests_2of4" time elapsed: 00:02:41
+----------------------------------------------------------
+
+31/54 Testing: koi_engine_process
+31/54 Test: koi_engine_process
+Command: "C:/Program Files/PowerShell/7/pwsh.exe" "-NoProfile" "-ExecutionPolicy" "Bypass" "-File" "C:/Users/ntATh/AI test/Koi engine/tests/integration/uci/uci_process_test.ps1" "-EnginePath" "C:/Users/ntATh/AI test/Koi engine/build/release/koi-engine.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/release
+"koi_engine_process" start time: Sep 17 20:54 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   1.55 sec
+----------------------------------------------------------
+Test Passed.
+"koi_engine_process" end time: Sep 17 20:54 SE Asia Standard Time
+"koi_engine_process" time elapsed: 00:00:01
+----------------------------------------------------------
+
+End testing: Sep 17 20:54 SE Asia Standard Time
+
+evaluation =   0.61 sec*proc
+
+heavy = 789.92 sec*proc
+
+integration =   0.75 sec*proc
+
+matches = 230.47 sec*proc
+
+measurement =   5.96 sec*proc
+
+packaging =   4.34 sec*proc
+
+process = 379.02 sec*proc
+
+python =  32.00 sec*proc
+
+rules =   0.11 sec*proc
+
+runtime =   4.37 sec*proc
+
+search = 592.84 sec*proc
+
+tools = 117.41 sec*proc
+
+uci =  25.56 sec*proc
+
+unit = 599.60 sec*proc
+

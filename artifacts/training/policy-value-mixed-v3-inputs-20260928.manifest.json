@@ -1,0 +1,32 @@
+{
+  "combined_train": {
+    "path": "artifacts\\training\\policy-value-mixed-v3-train-20260928.jsonl",
+    "records": 48211,
+    "sha256": "a2a7c0db658ad963795c66d8c4c668d0316b625a5d9b10c840fd648c82f49c05"
+  },
+  "combined_validation": {
+    "path": "artifacts\\training\\policy-value-mcts-v3-validation-20260928.jsonl",
+    "records": 5911,
+    "sha256": "d80a59867d1e8c7e701333b6d22b1a4f7722e5fe375d42022b381a77572fbfc5"
+  },
+  "schema": "koi-policy-value-mixed-inputs-v1",
+  "training_sources": [
+    {
+      "path": "artifacts\\training\\policy-value-alpha-v3-train-20260928.jsonl",
+      "records": 24358,
+      "sha256": "cc72ee9a112542e85bb1f189fc2bb9de922d60376633b9dec51f82b361591926"
+    },
+    {
+      "path": "artifacts\\training\\policy-value-mcts-v3-train-20260928.jsonl",
+      "records": 23853,
+      "sha256": "166e7f20b81cddcc0dd9c1f9ec0fba64e901ea039b33421ece6af0b59b32b6f4"
+    }
+  ],
+  "validation_sources": [
+    {
+      "path": "artifacts\\training\\policy-value-mcts-v3-validation-20260928.jsonl",
+      "records": 5911,
+      "sha256": "d80a59867d1e8c7e701333b6d22b1a4f7722e5fe375d42022b381a77572fbfc5"
+    }
+  ]
+}

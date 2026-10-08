@@ -1,0 +1,48 @@
+{
+  "schema": "koi-nnue-net-match-v1",
+  "generated_utc": "2026-09-17T16:20:15.0866066Z",
+  "nnue_path": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\training\\koi-sf-v1.nnue",
+  "opponent_path": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\training\\koi-sf-v1.nnue",
+  "engine_path": "C:\\Users\\ntATh\\AI test\\Koi engine\\build\\release\\koi-engine.exe",
+  "nodes": 2000,
+  "threads": 1,
+  "hash_mb": 64,
+  "games": 2,
+  "wins": 1,
+  "draws": 0,
+  "losses": 1,
+  "aborted": 0,
+  "score": 1.0,
+  "percent": 50.0,
+  "verdict": "inconclusive",
+  "legs": [
+    {
+      "tag": "white",
+      "candidate_color": "white",
+      "games": 1,
+      "report": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\verification\\nnue-evaluation-overhaul\\netmatch-smoke\\match-white\\koi-uci-match-20260917-162009-282.json"
+    },
+    {
+      "tag": "black",
+      "candidate_color": "black",
+      "games": 1,
+      "report": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\verification\\nnue-evaluation-overhaul\\netmatch-smoke\\match-black\\koi-uci-match-20260917-162014-995.json"
+    }
+  ],
+  "game_results": [
+    {
+      "leg": "white",
+      "candidate_color": "white",
+      "result": "1-0",
+      "outcome": "win",
+      "termination": "checkmate"
+    },
+    {
+      "leg": "black",
+      "candidate_color": "black",
+      "result": "1-0",
+      "outcome": "loss",
+      "termination": "checkmate"
+    }
+  ]
+}

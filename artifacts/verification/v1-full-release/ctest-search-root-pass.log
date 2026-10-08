@@ -1,0 +1,63 @@
+Internal ctest changing into directory: C:/Users/ntATh/AI test/Koi engine/build/full-release-search
+Test project C:/Users/ntATh/AI test/Koi engine/build/full-release-search
+    Start 15: koi_search_tests_1of4
+    Start 16: koi_search_tests_2of4
+1/4 Test #16: koi_search_tests_2of4 ............   Passed   10.75 sec
+    Start 17: koi_search_tests_3of4
+2/4 Test #17: koi_search_tests_3of4 ............   Passed    9.94 sec
+    Start 18: koi_search_tests_4of4
+3/4 Test #15: koi_search_tests_1of4 ............***Failed   60.00 sec
+PASS classical evaluator
+PASS evaluator endgame and mobility
+PASS evaluator color symmetric endgame passer
+PASS evaluator tempo
+PASS time manager
+PASS speed budgets
+PASS root filtering legal move
+PASS short timed threaded search
+PASS very short timed root workers
+PASS queen check mate horizon
+PASS short tactical root fallback
+PASS short oracle fallback safety
+PASS short quiet hanging piece
+PASS short c5b4 queen check trap
+PASS short queen retreat over safe capture
+PASS depth seven check extension stack safety
+PASS short broad check horizon
+PASS depth-one forcing check
+PASS threaded root overlap
+PASS threaded root-in-check parity
+XFAIL threaded multipv warmed hash: warmed threaded MultiPV must retain the stable ordered root prefix
+PASS search info accounting
+PASS threaded timed cancellation
+PASS deterministic legal search
+PASS tactical search statistics
+PASS shorter mate preference
+PASS repetition-sensitive null safety
+PASS shallow null verification off
+PASS quiet history hook exceptions
+PASS true internal iterative deepening
+PASS shallow root near-tie research
+PASS near-root quiet forcing extension
+XPASS poisoned capture quiescence: known failure now passes; remove it from the known_failures list
+PASS infinite search lifecycle
+PASS ponder time and node limits
+PASS hash bounds and clear
+PASS transposition table unchanged cap
+PASS transposition table mate normalization
+koi-test-summary run=38 pass=36 fail=1 xfail=1 xpass=0 skip=0 unseen=0 intermittent=0
+
+4/4 Test #18: koi_search_tests_4of4 ............   Passed  153.86 sec
+
+75% tests passed, 1 tests failed out of 4
+
+Label Time Summary:
+heavy     = 469.10 sec*proc (4 tests)
+search    = 469.10 sec*proc (4 tests)
+unit      = 469.10 sec*proc (4 tests)
+
+Total Test time (real) = 174.57 sec
+
+The following tests FAILED:
+	 15 - koi_search_tests_1of4 (Failed)                    heavy search unit
+Errors while running CTest

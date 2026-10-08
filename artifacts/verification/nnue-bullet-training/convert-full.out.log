@@ -1,0 +1,3 @@
+to_bullet: wrote 2138346 train rows and 112545 validation rows
+to_bullet: converted artifacts\training\bullet\full\train.data (68427072 bytes)
+to_bullet: converted artifacts\training\bullet\full\validation.data (3601440 bytes)

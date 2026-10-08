@@ -1,0 +1,64 @@
+﻿{
+    "schema":  "koi-hash-memory-soak-v1",
+    "generated_utc":  "2026-09-10T12:17:05.8320416Z",
+    "repository_root":  "C:\\Users\\ntATh\\AI test\\Koi engine",
+    "engine_path":  "C:\\Users\\ntATh\\AI test\\Koi engine\\build\\release\\koi-engine.exe",
+    "engine_sha256":  "9FF936F4F56FD9DECAAB40DF261A2E86DEA14079F0EAF7E80DB5FE6C9E439D61",
+    "hash_values_mb":  [
+                           2048,
+                           3072,
+                           4096
+                       ],
+    "cycles":  1,
+    "records":  [
+                    {
+                        "hash_requested_mb":  2048,
+                        "hash_effective_mb":  2048,
+                        "hash_status":  "applied",
+                        "hash_reason":  "none",
+                        "cycle":  1,
+                        "exit_code":  0,
+                        "duration_ms":  755,
+                        "peak_working_set_bytes":  2311315456,
+                        "peak_commit_bytes":  2323144704,
+                        "bestmove_count":  2,
+                        "stdout":  "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\hash-memory\\20260910-121703-109\\hash-2048-cycle-01\\stdout.log",
+                        "stderr":  "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\hash-memory\\20260910-121703-109\\hash-2048-cycle-01\\stderr.log",
+                        "diagnostics":  "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\hash-memory\\20260910-121703-109\\hash-2048-cycle-01\\koi-debug.jsonl"
+                    },
+                    {
+                        "hash_requested_mb":  3072,
+                        "hash_effective_mb":  3072,
+                        "hash_status":  "applied",
+                        "hash_reason":  "none",
+                        "cycle":  1,
+                        "exit_code":  0,
+                        "duration_ms":  856,
+                        "peak_working_set_bytes":  3354288128,
+                        "peak_commit_bytes":  3365494784,
+                        "bestmove_count":  2,
+                        "stdout":  "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\hash-memory\\20260910-121703-109\\hash-3072-cycle-01\\stdout.log",
+                        "stderr":  "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\hash-memory\\20260910-121703-109\\hash-3072-cycle-01\\stderr.log",
+                        "diagnostics":  "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\hash-memory\\20260910-121703-109\\hash-3072-cycle-01\\koi-debug.jsonl"
+                    },
+                    {
+                        "hash_requested_mb":  4096,
+                        "hash_effective_mb":  4096,
+                        "hash_status":  "applied",
+                        "hash_reason":  "none",
+                        "cycle":  1,
+                        "exit_code":  0,
+                        "duration_ms":  1056,
+                        "peak_working_set_bytes":  4668653568,
+                        "peak_commit_bytes":  4676853760,
+                        "bestmove_count":  2,
+                        "stdout":  "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\hash-memory\\20260910-121703-109\\hash-4096-cycle-01\\stdout.log",
+                        "stderr":  "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\hash-memory\\20260910-121703-109\\hash-4096-cycle-01\\stderr.log",
+                        "diagnostics":  "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\hash-memory\\20260910-121703-109\\hash-4096-cycle-01\\koi-debug.jsonl"
+                    }
+                ],
+    "failures":  [
+
+                 ],
+    "status":  "pass"
+}

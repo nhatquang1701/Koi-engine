@@ -1,0 +1,26 @@
+{
+  "schema": "koi-nnue-training-metadata-v2",
+  "created": "2026-09-18T13:12:16Z",
+  "corpus": "artifacts\\training\\bullet\\full\\validation.txt",
+  "rows_used": 4000,
+  "val_rows": 4000,
+  "feature_set": "halfka-king-bucket-v1",
+  "quantization": "int16/int8",
+  "architecture": {
+    "input": 9216,
+    "hidden": 1024,
+    "output_buckets": 8
+  },
+  "activation": "crelu-pair",
+  "hidden_shift": 7,
+  "output_shift": 14,
+  "backend": "bullet",
+  "checkpoint": "artifacts\\training\\bullet\\koi-v4-bullet-long\\checkpoints\\koi-v4-200",
+  "val_mae_cp": 199.10477922249106,
+  "val_round_trip_mae_cp": 198.693,
+  "w1_saturation": 0.0,
+  "w2_saturation": 0.08251953125,
+  "payload_sha256": "3d2e62b5e01951c50de90611be7ab70737b7b9f16f071b3d49110348d9587a72",
+  "network_sha256": "234e3b68e01442414876e4014aa95545d96703cd9e9733b91c92103981cd4be6",
+  "command": "C:\\Users\\ntATh\\AI test\\Koi engine\\tools\\measurement\\export_bullet_v4.py --checkpoint artifacts\\training\\bullet\\koi-v4-bullet-long\\checkpoints --validation artifacts\\training\\bullet\\full\\validation.txt --net-out artifacts\\training\\bullet\\koi-v4-bullet-long\\koi.nnue --meta-out artifacts\\training\\bullet\\koi-v4-bullet-long\\koi.metadata.json --hidden 1024 --hidden-shifts 6 7 8 --output-shifts 12 14 16 18 20 --tune-samples 4000"
+}

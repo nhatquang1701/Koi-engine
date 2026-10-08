@@ -1,0 +1,57 @@
+﻿> uci
+> setoption name OwnBook value false
+> setoption name Threads value 4
+> isready
+> position fen r2r2k1/pQ3ppp/8/4P3/8/KP2n1P1/P1q4P/R6R b - - 1 22
+> go movetime 100
+< bestmove c2c5
+> position fen r2r2k1/pQ3ppp/8/4P3/8/KP2n1P1/P1q4P/R6R b - - 1 22
+> go movetime 100
+< bestmove c2c5
+> position fen r2r2k1/pQ3ppp/8/4P3/8/KP2n1P1/P1q4P/R6R b - - 1 22
+> go movetime 100
+< info depth 1 seldepth 13 multipv 1 score cp 454 nodes 1828 nps 60933 time 30 pv c2c5 a3a4 c5e5
+< info depth 2 seldepth 13 multipv 1 score cp 454 nodes 4083 nps 57507 time 71 pv c2c5
+< bestmove c2c5
+> position fen r2r2k1/pQ3ppp/8/4P3/8/KP2n1P1/P1q4P/R6R b - - 1 22
+> go movetime 100
+< info depth 1 seldepth 8 multipv 1 score cp 454 nodes 183 nps 61000 time 3 pv c2c5
+< info depth 2 seldepth 8 multipv 1 score cp 454 nodes 235 nps 58750 time 4 pv c2c5
+< bestmove c2c5
+> position fen r2r2k1/pQ3ppp/8/4P3/8/KP2n1P1/P1q4P/R6R b - - 1 22
+> go movetime 100
+< info depth 1 seldepth 8 multipv 1 score cp 477 nodes 317 nps 52833 time 6 pv c2c5 b3b4 c5c3
+< info depth 2 seldepth 8 multipv 1 score cp 477 nodes 503 nps 55888 time 9 pv c2c5 b3b4 c5c3
+< bestmove c2c5
+> position fen r2r2k1/pQ3ppp/8/4P3/8/KP2n1P1/P1q4P/R6R b - - 1 22
+> go movetime 100
+< info depth 1 seldepth 9 multipv 1 score cp 473 nodes 336 nps 48000 time 7 pv c2c5 a3a4 c5d4
+< info depth 2 seldepth 9 multipv 1 score cp 473 nodes 543 nps 54300 time 10 pv c2c5 a3a4 c5d4
+< bestmove c2c5
+> position fen r2r2k1/pQ3ppp/8/4P3/8/KP2n1P1/P1q4P/R6R b - - 1 22
+> go movetime 100
+< info depth 1 seldepth 8 multipv 1 score cp 855 nodes 183 nps 26142 time 7 pv c2c5
+< info depth 2 seldepth 8 multipv 1 score cp 855 nodes 235 nps 29375 time 8 pv c2c5
+< info depth 3 seldepth 12 multipv 1 score cp 855 nodes 2655 nps 45000 time 59 pv c2c5
+< bestmove c2c5
+> position fen r2r2k1/pQ3ppp/8/4P3/8/KP2n1P1/P1q4P/R6R b - - 1 22
+> go movetime 100
+< info depth 1 seldepth 12 multipv 1 score cp 855 nodes 3694 nps 52771 time 70 pv c2c5
+< bestmove c2c5
+> position fen r2r2k1/pQ3ppp/8/4P3/8/KP2n1P1/P1q4P/R6R b - - 1 22
+> go movetime 100
+< info depth 1 seldepth 12 multipv 1 score cp 855 nodes 3694 nps 46175 time 80 pv c2c5
+< bestmove c2c5
+> position fen r2r2k1/pQ3ppp/8/4P3/8/KP2n1P1/P1q4P/R6R b - - 1 22
+> go movetime 100
+< info depth 1 seldepth 12 multipv 1 score cp 855 nodes 3694 nps 44506 time 83 pv c2c5
+< bestmove c2c5
+> position fen r2r2k1/pQ3ppp/8/4P3/8/KP2n1P1/P1q4P/R6R b - - 1 22
+> go movetime 100
+< info depth 1 seldepth 12 multipv 1 score cp 855 nodes 3694 nps 55969 time 66 pv c2c5
+< bestmove c2c5
+> position fen r2r2k1/pQ3ppp/8/4P3/8/KP2n1P1/P1q4P/R6R b - - 1 22
+> go movetime 100
+< info depth 1 seldepth 12 multipv 1 score cp 855 nodes 3694 nps 53536 time 69 pv c2c5
+< bestmove c2c5
+> quit

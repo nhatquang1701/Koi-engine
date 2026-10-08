@@ -1,0 +1,4 @@
+SHALLOW_ROOT r1b2rk1/p4ppp/8/3QP3/6n1/4q1P1/PPP1B2P/R3K2R b KQ - 1 16 base=c8e6:259 root_scores= c8e6:259 g4e5:206 e3e5:210 g4h2:130 e3e2:-604 e3g3:-939 e3c1:-1006 e3c3:-969 e3d2:-992 e3f2:231 e3g1:-994 a7a5:75 a7a6:59 a8b8:120 c8a6:43 c8b7:-90 c8d7:100 c8f5:121 e3a3:-61 e3b3:-1005 e3b6:-3 e3c5:-973 e3d3:-1051 e3d4:-935 e3e4:-1021 e3f3:-987 e3f4:-1018 e3g5:-436 e3h6:-40 f8d8:-99998 f8e8:-137 g4f2:-52 g4f6:-300 g4h6:31 g7g5:14 g7g6:45 g8h8:82 h7h5:24 h7h6:43 candidates= c8e6 e3e5 e3f2
+SHALLOW_RESEARCH c8e6:259 aborted=0
+SHALLOW_RESEARCH e3e5:-60 aborted=0
+SHALLOW_RESEARCH e3f2:261 aborted=0

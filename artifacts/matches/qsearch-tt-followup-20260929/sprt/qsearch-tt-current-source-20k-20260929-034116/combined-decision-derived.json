@@ -1,0 +1,65 @@
+{
+  "schema": "koi-sprt-combined-derived-v1",
+  "method": "sum of independent color SPRT LLRs; alpha=beta=0.05 thresholds are plus/minus ln(19)",
+  "candidate_sha256": "3C187FC9BDAD3572E6C849B077FFEE2F612661083602D79261C0C50169DA268C",
+  "baseline_sha256": "CBC05D459445EACD9F0EF8749AEC18434CE251B105E6D1900F5DD4B5299CE0AA",
+  "opening_file_sha256": "817DE03966270FE468474DA01CF805DC03D23E9271E61CE9518F7644FEA9A190",
+  "options": {
+    "time_control": "nodes 20000",
+    "threads": 1,
+    "hash_mb": 512,
+    "speed": 100,
+    "own_book": false,
+    "random_seed": 0,
+    "evaluator": "classical",
+    "algorithm": "AlphaBeta"
+  },
+  "sprt": {
+    "elo0": 0,
+    "elo1": 10,
+    "alpha": 0.05,
+    "beta": 0.05,
+    "min_games_per_color": 40,
+    "max_games_per_color": 128,
+    "games_per_opening": 2
+  },
+  "colors": {
+    "white": {
+      "report": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\matches\\qsearch-tt-followup-20260929\\sprt\\qsearch-tt-current-source-20k-20260929-034116\\white\\koi-uci-match-20260928-211325-030.json",
+      "report_sha256": "5C71625E091633F6E809109D4762BF2B946B23714EB294D1E54E6EFB59CB6C73",
+      "pgn": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\matches\\qsearch-tt-followup-20260929\\sprt\\qsearch-tt-current-source-20k-20260929-034116\\white\\koi-uci-match-20260928-211325-030.pgn",
+      "pgn_sha256": "39B5EAEBB5F0A4CB38652B3DD4095233584C8476998A6B588B4CEAC256FAB594",
+      "games": 128,
+      "wins": 44,
+      "draws": 52,
+      "losses": 32,
+      "llr": 0.495792,
+      "elo": 32.668018580527814,
+      "decision": "inconclusive"
+    },
+    "black": {
+      "report": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\matches\\qsearch-tt-followup-20260929\\sprt\\qsearch-tt-current-source-20k-20260929-034116\\black\\koi-uci-match-20260928-211323-545.json",
+      "report_sha256": "83F7188E87F1DCD51F01E9035FC64B78636383CAF0BAA6FABA719639D4E6077D",
+      "pgn": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\matches\\qsearch-tt-followup-20260929\\sprt\\qsearch-tt-current-source-20k-20260929-034116\\black\\koi-uci-match-20260928-211323-545.pgn",
+      "pgn_sha256": "39B5EAEBB5F0A4CB38652B3DD4095233584C8476998A6B588B4CEAC256FAB594",
+      "games": 128,
+      "wins": 32,
+      "draws": 52,
+      "losses": 44,
+      "llr": -0.67555,
+      "elo": -32.66801858052781,
+      "decision": "inconclusive"
+    }
+  },
+  "combined": {
+    "games": 256,
+    "wins": 76,
+    "draws": 104,
+    "losses": 76,
+    "score": 0.5,
+    "llr": -0.17975799999999997,
+    "lower_threshold": -2.9444389791664403,
+    "upper_threshold": 2.9444389791664403,
+    "decision": "inconclusive"
+  }
+}

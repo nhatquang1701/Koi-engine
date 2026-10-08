@@ -1,0 +1,36 @@
+{
+  "schema": "koi-nnue-training-metadata-v3",
+  "created": "2026-10-04T00:48:42Z",
+  "corpus": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\training\\lc0-validation-20261004\\corpus.txt",
+  "rows_used": 3711,
+  "val_rows": 371,
+  "feature_set": "halfka-king-bucket-v1+threat-pairs-v1",
+  "quantization": "int16/int8",
+  "architecture": {
+    "input": 36864,
+    "hidden": 1536,
+    "l1": 32,
+    "output_buckets": 8,
+    "groups": [
+      "halfka-king-bucket-v1",
+      "threat-pairs-v1"
+    ]
+  },
+  "activation": "crelu-pair-l1",
+  "hidden_shift": 6,
+  "l1_shift": 7,
+  "output_shift": 6,
+  "epochs": 60,
+  "batch_size": 1024,
+  "learning_rate": 0.0015,
+  "seed": 20261004,
+  "target_scale": 100.0,
+  "val_mae_cp": 251.10658233992334,
+  "val_round_trip_mae_cp": 248.23989218328842,
+  "w1_saturation": 0.0,
+  "l1_saturation": 0.0,
+  "w2_saturation": 0.0,
+  "payload_sha256": "a24e5849ec8cd10a3106b68e6c86a6e5182b2df5915683d38b2c1525ef8f2eb0",
+  "network_sha256": "67502fe489961611df126720fe6186f5d6797ccb3963d76680bd96d1b0eae1cf",
+  "command": "tools\\measurement\\train_nnue_koi.py --corpus C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\training\\lc0-validation-20261004\\corpus.txt --net-out C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\training\\lc0-validation-20261004\\net.nnue --meta-out C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\training\\lc0-validation-20261004\\net.metadata.json --epochs 60 --batch-size 1024 --learning-rate 0.0015 --threads 2 --val-fraction 0.1 --seed 20261004 --arch v5 --hidden-units 1536 --l1-units 32 --hidden-shifts 6 7 8 --l1-shifts 6 7 8 --tune-samples 2000 --float-out C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\training\\lc0-validation-20261004\\net.pt"
+}

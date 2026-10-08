@@ -1,0 +1,550 @@
+{
+  "schema": "koi-elo-oracle",
+  "schema_version": 1,
+  "mode": "extract-only",
+  "created_at": "2026-09-06T13:08:14.416Z",
+  "source": {
+    "pgn_path": "C:\\Users\\ntATh\\AI test\\Koi engine\\third_party\\User tests\\2026.09.06_Koi Engine - Leela Chess Zero.pgn",
+    "pgn_sha256": "ee52dca1133e9de9626eb65c42bce0272c2c446fdd819e60b78771e0848517c0"
+  },
+  "evaluation": {
+    "perspective": "white",
+    "mate_score_cp": 100000,
+    "cpl_definition": "max(0, mover_perspective(root_score - resulting_position_score))"
+  },
+  "requested_limits": {
+    "movetime_ms": 250,
+    "threads": 4,
+    "speed": 100
+  },
+  "engines": {},
+  "games": [
+    {
+      "game_index": 1,
+      "headers": {
+        "Event": "Engine Match",
+        "Site": "En Croissant",
+        "Date": "2026.09.06",
+        "Round": "?",
+        "White": "Koi Engine",
+        "Black": "Leela Chess Zero",
+        "Result": "0-1",
+        "Orientation": "white"
+      },
+      "positions": [
+        {
+          "ply": 1,
+          "move_number": 1,
+          "side": "white",
+          "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+          "actual_move_uci": "b1c3",
+          "actual_move_san": "Nc3"
+        },
+        {
+          "ply": 2,
+          "move_number": 1,
+          "side": "black",
+          "fen": "rnbqkbnr/pppppppp/8/8/8/2N5/PPPPPPPP/R1BQKBNR b KQkq - 1 1",
+          "actual_move_uci": "d7d5",
+          "actual_move_san": "d5"
+        },
+        {
+          "ply": 3,
+          "move_number": 2,
+          "side": "white",
+          "fen": "rnbqkbnr/ppp1pppp/8/3p4/8/2N5/PPPPPPPP/R1BQKBNR w KQkq - 0 2",
+          "actual_move_uci": "d2d4",
+          "actual_move_san": "d4"
+        },
+        {
+          "ply": 4,
+          "move_number": 2,
+          "side": "black",
+          "fen": "rnbqkbnr/ppp1pppp/8/3p4/3P4/2N5/PPP1PPPP/R1BQKBNR b KQkq - 0 2",
+          "actual_move_uci": "g8f6",
+          "actual_move_san": "Nf6"
+        },
+        {
+          "ply": 5,
+          "move_number": 3,
+          "side": "white",
+          "fen": "rnbqkb1r/ppp1pppp/5n2/3p4/3P4/2N5/PPP1PPPP/R1BQKBNR w KQkq - 1 3",
+          "actual_move_uci": "g1f3",
+          "actual_move_san": "Nf3"
+        },
+        {
+          "ply": 6,
+          "move_number": 3,
+          "side": "black",
+          "fen": "rnbqkb1r/ppp1pppp/5n2/3p4/3P4/2N2N2/PPP1PPPP/R1BQKB1R b KQkq - 2 3",
+          "actual_move_uci": "c7c5",
+          "actual_move_san": "c5"
+        },
+        {
+          "ply": 7,
+          "move_number": 4,
+          "side": "white",
+          "fen": "rnbqkb1r/pp2pppp/5n2/2pp4/3P4/2N2N2/PPP1PPPP/R1BQKB1R w KQkq - 0 4",
+          "actual_move_uci": "d4c5",
+          "actual_move_san": "dxc5"
+        },
+        {
+          "ply": 8,
+          "move_number": 4,
+          "side": "black",
+          "fen": "rnbqkb1r/pp2pppp/5n2/2Pp4/8/2N2N2/PPP1PPPP/R1BQKB1R b KQkq - 0 4",
+          "actual_move_uci": "b8c6",
+          "actual_move_san": "Nc6"
+        },
+        {
+          "ply": 9,
+          "move_number": 5,
+          "side": "white",
+          "fen": "r1bqkb1r/pp2pppp/2n2n2/2Pp4/8/2N2N2/PPP1PPPP/R1BQKB1R w KQkq - 1 5",
+          "actual_move_uci": "f3d4",
+          "actual_move_san": "Nd4"
+        },
+        {
+          "ply": 10,
+          "move_number": 5,
+          "side": "black",
+          "fen": "r1bqkb1r/pp2pppp/2n2n2/2Pp4/3N4/2N5/PPP1PPPP/R1BQKB1R b KQkq - 2 5",
+          "actual_move_uci": "e7e5",
+          "actual_move_san": "e5"
+        },
+        {
+          "ply": 11,
+          "move_number": 6,
+          "side": "white",
+          "fen": "r1bqkb1r/pp3ppp/2n2n2/2Ppp3/3N4/2N5/PPP1PPPP/R1BQKB1R w KQkq - 0 6",
+          "actual_move_uci": "d4c6",
+          "actual_move_san": "Nxc6"
+        },
+        {
+          "ply": 12,
+          "move_number": 6,
+          "side": "black",
+          "fen": "r1bqkb1r/pp3ppp/2N2n2/2Ppp3/8/2N5/PPP1PPPP/R1BQKB1R b KQkq - 0 6",
+          "actual_move_uci": "b7c6",
+          "actual_move_san": "bxc6"
+        },
+        {
+          "ply": 13,
+          "move_number": 7,
+          "side": "white",
+          "fen": "r1bqkb1r/p4ppp/2p2n2/2Ppp3/8/2N5/PPP1PPPP/R1BQKB1R w KQkq - 0 7",
+          "actual_move_uci": "d1d2",
+          "actual_move_san": "Qd2"
+        },
+        {
+          "ply": 14,
+          "move_number": 7,
+          "side": "black",
+          "fen": "r1bqkb1r/p4ppp/2p2n2/2Ppp3/8/2N5/PPPQPPPP/R1B1KB1R b KQkq - 1 7",
+          "actual_move_uci": "f8c5",
+          "actual_move_san": "Bxc5"
+        },
+        {
+          "ply": 15,
+          "move_number": 8,
+          "side": "white",
+          "fen": "r1bqk2r/p4ppp/2p2n2/2bpp3/8/2N5/PPPQPPPP/R1B1KB1R w KQkq - 0 8",
+          "actual_move_uci": "d2g5",
+          "actual_move_san": "Qg5"
+        },
+        {
+          "ply": 16,
+          "move_number": 8,
+          "side": "black",
+          "fen": "r1bqk2r/p4ppp/2p2n2/2bpp1Q1/8/2N5/PPP1PPPP/R1B1KB1R b KQkq - 1 8",
+          "actual_move_uci": "e8g8",
+          "actual_move_san": "O-O"
+        },
+        {
+          "ply": 17,
+          "move_number": 9,
+          "side": "white",
+          "fen": "r1bq1rk1/p4ppp/2p2n2/2bpp1Q1/8/2N5/PPP1PPPP/R1B1KB1R w KQ - 2 9",
+          "actual_move_uci": "e2e3",
+          "actual_move_san": "e3"
+        },
+        {
+          "ply": 18,
+          "move_number": 9,
+          "side": "black",
+          "fen": "r1bq1rk1/p4ppp/2p2n2/2bpp1Q1/8/2N1P3/PPP2PPP/R1B1KB1R b KQ - 0 9",
+          "actual_move_uci": "d5d4",
+          "actual_move_san": "d4"
+        },
+        {
+          "ply": 19,
+          "move_number": 10,
+          "side": "white",
+          "fen": "r1bq1rk1/p4ppp/2p2n2/2b1p1Q1/3p4/2N1P3/PPP2PPP/R1B1KB1R w KQ - 0 10",
+          "actual_move_uci": "e3d4",
+          "actual_move_san": "exd4"
+        },
+        {
+          "ply": 20,
+          "move_number": 10,
+          "side": "black",
+          "fen": "r1bq1rk1/p4ppp/2p2n2/2b1p1Q1/3P4/2N5/PPP2PPP/R1B1KB1R b KQ - 0 10",
+          "actual_move_uci": "h7h6",
+          "actual_move_san": "h6"
+        },
+        {
+          "ply": 21,
+          "move_number": 11,
+          "side": "white",
+          "fen": "r1bq1rk1/p4pp1/2p2n1p/2b1p1Q1/3P4/2N5/PPP2PPP/R1B1KB1R w KQ - 0 11",
+          "actual_move_uci": "g5g3",
+          "actual_move_san": "Qg3"
+        },
+        {
+          "ply": 22,
+          "move_number": 11,
+          "side": "black",
+          "fen": "r1bq1rk1/p4pp1/2p2n1p/2b1p3/3P4/2N3Q1/PPP2PPP/R1B1KB1R b KQ - 1 11",
+          "actual_move_uci": "e5d4",
+          "actual_move_san": "exd4"
+        },
+        {
+          "ply": 23,
+          "move_number": 12,
+          "side": "white",
+          "fen": "r1bq1rk1/p4pp1/2p2n1p/2b5/3p4/2N3Q1/PPP2PPP/R1B1KB1R w KQ - 0 12",
+          "actual_move_uci": "c1h6",
+          "actual_move_san": "Bxh6"
+        },
+        {
+          "ply": 24,
+          "move_number": 12,
+          "side": "black",
+          "fen": "r1bq1rk1/p4pp1/2p2n1B/2b5/3p4/2N3Q1/PPP2PPP/R3KB1R b KQ - 0 12",
+          "actual_move_uci": "f6h5",
+          "actual_move_san": "Nh5"
+        },
+        {
+          "ply": 25,
+          "move_number": 13,
+          "side": "white",
+          "fen": "r1bq1rk1/p4pp1/2p4B/2b4n/3p4/2N3Q1/PPP2PPP/R3KB1R w KQ - 1 13",
+          "actual_move_uci": "g3g5",
+          "actual_move_san": "Qg5"
+        },
+        {
+          "ply": 26,
+          "move_number": 13,
+          "side": "black",
+          "fen": "r1bq1rk1/p4pp1/2p4B/2b3Qn/3p4/2N5/PPP2PPP/R3KB1R b KQ - 2 13",
+          "actual_move_uci": "d4c3",
+          "actual_move_san": "dxc3"
+        },
+        {
+          "ply": 27,
+          "move_number": 14,
+          "side": "white",
+          "fen": "r1bq1rk1/p4pp1/2p4B/2b3Qn/8/2p5/PPP2PPP/R3KB1R w KQ - 0 14",
+          "actual_move_uci": "g5c5",
+          "actual_move_san": "Qxc5"
+        },
+        {
+          "ply": 28,
+          "move_number": 14,
+          "side": "black",
+          "fen": "r1bq1rk1/p4pp1/2p4B/2Q4n/8/2p5/PPP2PPP/R3KB1R b KQ - 0 14",
+          "actual_move_uci": "g7h6",
+          "actual_move_san": "gxh6"
+        },
+        {
+          "ply": 29,
+          "move_number": 15,
+          "side": "white",
+          "fen": "r1bq1rk1/p4p2/2p4p/2Q4n/8/2p5/PPP2PPP/R3KB1R w KQ - 0 15",
+          "actual_move_uci": "f1d3",
+          "actual_move_san": "Bd3"
+        },
+        {
+          "ply": 30,
+          "move_number": 15,
+          "side": "black",
+          "fen": "r1bq1rk1/p4p2/2p4p/2Q4n/8/2pB4/PPP2PPP/R3K2R b KQ - 1 15",
+          "actual_move_uci": "f8e8",
+          "actual_move_san": "Re8+"
+        },
+        {
+          "ply": 31,
+          "move_number": 16,
+          "side": "white",
+          "fen": "r1bqr1k1/p4p2/2p4p/2Q4n/8/2pB4/PPP2PPP/R3K2R w KQ - 2 16",
+          "actual_move_uci": "e1f1",
+          "actual_move_san": "Kf1"
+        },
+        {
+          "ply": 32,
+          "move_number": 16,
+          "side": "black",
+          "fen": "r1bqr1k1/p4p2/2p4p/2Q4n/8/2pB4/PPP2PPP/R4K1R b - - 3 16",
+          "actual_move_uci": "c3b2",
+          "actual_move_san": "cxb2"
+        },
+        {
+          "ply": 33,
+          "move_number": 17,
+          "side": "white",
+          "fen": "r1bqr1k1/p4p2/2p4p/2Q4n/8/3B4/PpP2PPP/R4K1R w - - 0 17",
+          "actual_move_uci": "a1b1",
+          "actual_move_san": "Rb1"
+        },
+        {
+          "ply": 34,
+          "move_number": 17,
+          "side": "black",
+          "fen": "r1bqr1k1/p4p2/2p4p/2Q4n/8/3B4/PpP2PPP/1R3K1R b - - 1 17",
+          "actual_move_uci": "h5f4",
+          "actual_move_san": "Nf4"
+        },
+        {
+          "ply": 35,
+          "move_number": 18,
+          "side": "white",
+          "fen": "r1bqr1k1/p4p2/2p4p/2Q5/5n2/3B4/PpP2PPP/1R3K1R w - - 2 18",
+          "actual_move_uci": "c5c6",
+          "actual_move_san": "Qxc6"
+        },
+        {
+          "ply": 36,
+          "move_number": 18,
+          "side": "black",
+          "fen": "r1bqr1k1/p4p2/2Q4p/8/5n2/3B4/PpP2PPP/1R3K1R b - - 0 18",
+          "actual_move_uci": "f4d3",
+          "actual_move_san": "Nxd3"
+        },
+        {
+          "ply": 37,
+          "move_number": 19,
+          "side": "white",
+          "fen": "r1bqr1k1/p4p2/2Q4p/8/8/3n4/PpP2PPP/1R3K1R w - - 0 19",
+          "actual_move_uci": "c6f3",
+          "actual_move_san": "Qf3"
+        },
+        {
+          "ply": 38,
+          "move_number": 19,
+          "side": "black",
+          "fen": "r1bqr1k1/p4p2/7p/8/8/3n1Q2/PpP2PPP/1R3K1R b - - 1 19",
+          "actual_move_uci": "c8a6",
+          "actual_move_san": "Ba6"
+        },
+        {
+          "ply": 39,
+          "move_number": 20,
+          "side": "white",
+          "fen": "r2qr1k1/p4p2/b6p/8/8/3n1Q2/PpP2PPP/1R3K1R w - - 2 20",
+          "actual_move_uci": "f1g1",
+          "actual_move_san": "Kg1"
+        },
+        {
+          "ply": 40,
+          "move_number": 20,
+          "side": "black",
+          "fen": "r2qr1k1/p4p2/b6p/8/8/3n1Q2/PpP2PPP/1R4KR b - - 3 20",
+          "actual_move_uci": "e8e1",
+          "actual_move_san": "Re1+"
+        },
+        {
+          "ply": 41,
+          "move_number": 21,
+          "side": "white",
+          "fen": "r2q2k1/p4p2/b6p/8/8/3n1Q2/PpP2PPP/1R2r1KR w - - 4 21",
+          "actual_move_uci": "b1e1",
+          "actual_move_san": "Rxe1"
+        },
+        {
+          "ply": 42,
+          "move_number": 21,
+          "side": "black",
+          "fen": "r2q2k1/p4p2/b6p/8/8/3n1Q2/PpP2PPP/4R1KR b - - 0 21",
+          "actual_move_uci": "d3e1",
+          "actual_move_san": "Nxe1"
+        },
+        {
+          "ply": 43,
+          "move_number": 22,
+          "side": "white",
+          "fen": "r2q2k1/p4p2/b6p/8/8/5Q2/PpP2PPP/4n1KR w - - 0 22",
+          "actual_move_uci": "f3g4",
+          "actual_move_san": "Qg4+"
+        },
+        {
+          "ply": 44,
+          "move_number": 22,
+          "side": "black",
+          "fen": "r2q2k1/p4p2/b6p/8/6Q1/8/PpP2PPP/4n1KR b - - 1 22",
+          "actual_move_uci": "d8g5",
+          "actual_move_san": "Qg5"
+        },
+        {
+          "ply": 45,
+          "move_number": 23,
+          "side": "white",
+          "fen": "r5k1/p4p2/b6p/6q1/6Q1/8/PpP2PPP/4n1KR w - - 2 23",
+          "actual_move_uci": "g4g5",
+          "actual_move_san": "Qxg5+"
+        },
+        {
+          "ply": 46,
+          "move_number": 23,
+          "side": "black",
+          "fen": "r5k1/p4p2/b6p/6Q1/8/8/PpP2PPP/4n1KR b - - 0 23",
+          "actual_move_uci": "h6g5",
+          "actual_move_san": "hxg5"
+        },
+        {
+          "ply": 47,
+          "move_number": 24,
+          "side": "white",
+          "fen": "r5k1/p4p2/b7/6p1/8/8/PpP2PPP/4n1KR w - - 0 24",
+          "actual_move_uci": "h2h4",
+          "actual_move_san": "h4"
+        },
+        {
+          "ply": 48,
+          "move_number": 24,
+          "side": "black",
+          "fen": "r5k1/p4p2/b7/6p1/7P/8/PpP2PP1/4n1KR b - - 0 24",
+          "actual_move_uci": "b2b1q",
+          "actual_move_san": "b1=Q"
+        },
+        {
+          "ply": 49,
+          "move_number": 25,
+          "side": "white",
+          "fen": "r5k1/p4p2/b7/6p1/7P/8/P1P2PP1/1q2n1KR w - - 0 25",
+          "actual_move_uci": "g1h2",
+          "actual_move_san": "Kh2"
+        },
+        {
+          "ply": 50,
+          "move_number": 25,
+          "side": "black",
+          "fen": "r5k1/p4p2/b7/6p1/7P/8/P1P2PPK/1q2n2R b - - 1 25",
+          "actual_move_uci": "b1b4",
+          "actual_move_san": "Qb4"
+        },
+        {
+          "ply": 51,
+          "move_number": 26,
+          "side": "white",
+          "fen": "r5k1/p4p2/b7/6p1/1q5P/8/P1P2PPK/4n2R w - - 2 26",
+          "actual_move_uci": "h4g5",
+          "actual_move_san": "hxg5"
+        },
+        {
+          "ply": 52,
+          "move_number": 26,
+          "side": "black",
+          "fen": "r5k1/p4p2/b7/6P1/1q6/8/P1P2PPK/4n2R b - - 0 26",
+          "actual_move_uci": "b4h4",
+          "actual_move_san": "Qh4+"
+        },
+        {
+          "ply": 53,
+          "move_number": 27,
+          "side": "white",
+          "fen": "r5k1/p4p2/b7/6P1/7q/8/P1P2PPK/4n2R w - - 1 27",
+          "actual_move_uci": "h2g1",
+          "actual_move_san": "Kg1"
+        },
+        {
+          "ply": 54,
+          "move_number": 27,
+          "side": "black",
+          "fen": "r5k1/p4p2/b7/6P1/7q/8/P1P2PP1/4n1KR b - - 2 27",
+          "actual_move_uci": "h4g4",
+          "actual_move_san": "Qg4"
+        },
+        {
+          "ply": 55,
+          "move_number": 28,
+          "side": "white",
+          "fen": "r5k1/p4p2/b7/6P1/6q1/8/P1P2PP1/4n1KR w - - 3 28",
+          "actual_move_uci": "h1h2",
+          "actual_move_san": "Rh2"
+        },
+        {
+          "ply": 56,
+          "move_number": 28,
+          "side": "black",
+          "fen": "r5k1/p4p2/b7/6P1/6q1/8/P1P2PPR/4n1K1 b - - 4 28",
+          "actual_move_uci": "e1f3",
+          "actual_move_san": "Nf3+"
+        },
+        {
+          "ply": 57,
+          "move_number": 29,
+          "side": "white",
+          "fen": "r5k1/p4p2/b7/6P1/6q1/5n2/P1P2PPR/6K1 w - - 5 29",
+          "actual_move_uci": "g1h1",
+          "actual_move_san": "Kh1"
+        },
+        {
+          "ply": 58,
+          "move_number": 29,
+          "side": "black",
+          "fen": "r5k1/p4p2/b7/6P1/6q1/5n2/P1P2PPR/7K b - - 6 29",
+          "actual_move_uci": "a8e8",
+          "actual_move_san": "Re8"
+        },
+        {
+          "ply": 59,
+          "move_number": 30,
+          "side": "white",
+          "fen": "4r1k1/p4p2/b7/6P1/6q1/5n2/P1P2PPR/7K w - - 7 30",
+          "actual_move_uci": "h2h8",
+          "actual_move_san": "Rh8+"
+        },
+        {
+          "ply": 60,
+          "move_number": 30,
+          "side": "black",
+          "fen": "4r1kR/p4p2/b7/6P1/6q1/5n2/P1P2PP1/7K b - - 8 30",
+          "actual_move_uci": "g8h8",
+          "actual_move_san": "Kxh8"
+        },
+        {
+          "ply": 61,
+          "move_number": 31,
+          "side": "white",
+          "fen": "4r2k/p4p2/b7/6P1/6q1/5n2/P1P2PP1/7K w - - 0 31",
+          "actual_move_uci": "g2f3",
+          "actual_move_san": "gxf3"
+        },
+        {
+          "ply": 62,
+          "move_number": 31,
+          "side": "black",
+          "fen": "4r2k/p4p2/b7/6P1/6q1/5P2/P1P2P2/7K b - - 0 31",
+          "actual_move_uci": "g4h3",
+          "actual_move_san": "Qh3+"
+        },
+        {
+          "ply": 63,
+          "move_number": 32,
+          "side": "white",
+          "fen": "4r2k/p4p2/b7/6P1/8/5P1q/P1P2P2/7K w - - 1 32",
+          "actual_move_uci": "h1g1",
+          "actual_move_san": "Kg1"
+        },
+        {
+          "ply": 64,
+          "move_number": 32,
+          "side": "black",
+          "fen": "4r2k/p4p2/b7/6P1/8/5P1q/P1P2P2/6K1 b - - 2 32",
+          "actual_move_uci": "e8e1",
+          "actual_move_san": "Re1#"
+        }
+      ]
+    }
+  ]
+}

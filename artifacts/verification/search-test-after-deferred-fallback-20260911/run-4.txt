@@ -1,0 +1,129 @@
+PASS classical evaluator
+PASS classical evaluator breakdown
+PASS development center pressure
+PASS evaluator perspective symmetry
+PASS evaluator endgame and mobility
+PASS evaluator passed pawn endgame scaling
+PASS evaluator passed pawn blockade
+PASS evaluator mirrored terms and black blockade
+PASS evaluator color symmetric endgame passer
+PASS evaluator versioned parameters
+PASS evaluator endgame king activity
+PASS evaluator passer support and race
+PASS evaluator tempo
+PASS evaluator pawnless endgame terms
+PASS evaluator complete breakdown
+PASS time manager
+PASS adaptive time manager
+PASS low-clock emergency pacing
+PASS low-clock hard window
+PASS speed budgets
+PASS compatibility timing controls
+PASS explicit limits remain untimed
+PASS search options
+PASS root filtering legal move
+PASS root filtering illegal move
+PASS deterministic multipv
+PASS threaded root search
+PASS short timed threaded search
+PASS medium timed forcing root
+PASS low clock forcing root
+PASS short timed root workers
+PASS very short timed root workers
+PASS ultra short timed completed root
+PASS short timed threaded authoritative root
+PASS queen check mate horizon
+PASS single-PV root forcing extension
+PASS timed poisoned capture
+PASS interrupted root completed candidate
+PASS short tactical root fallback
+PASS short poisoned pawn capture
+PASS short defensive rook lift
+PASS short forced king escape
+PASS short d2c1 king trap
+PASS short c5b4 queen check trap
+PASS short c5f2 forcing capture
+PASS short a5c5 forcing check
+PASS short safe forcing exchange
+PASS short second check horizon
+PASS incomplete root forcing fallback
+PASS depth-one forcing check
+PASS threaded depth-one forcing check
+PASS root king safety escape
+PASS timed PV and bestmove coherence
+PASS threaded root overlap
+PASS classical threaded parity
+PASS threaded single-PV root is authoritative
+PASS threaded root alpha sharing
+PASS threaded root-in-check parity
+PASS stable root ties
+PASS threaded multipv ordered root ties
+PASS threaded multipv final-depth parity
+PASS threaded multipv warmed hash
+PASS threaded global nodes
+PASS threaded node parity
+PASS depth-zero node accounting
+PASS search info accounting
+PASS lazy search features
+PASS feature cache restoration
+PASS threaded cancellation
+PASS threaded timed cancellation
+PASS evaluator cross-handle safety
+PASS terminal search
+PASS claimable draw root fallback
+PASS deterministic legal search
+PASS search result identity
+PASS search result legal PV
+PASS fixed-depth tactical reference
+PASS tactical search statistics
+PASS check extensions
+PASS forced quiet evasion
+PASS mate in one distance
+PASS shorter mate preference
+PASS pawn-only zugzwang null safety
+PASS low-phase null safety
+PASS sparse phase-rich null safety
+PASS repetition-sensitive null safety
+PASS king-zone LMR exclusion
+PASS high-history LMR exclusion
+PASS opening central break
+PASS eligible null verification
+PASS shallow futility tactical safety
+PASS shallow futility accounting
+PASS quiet history moving side
+PASS quiet history hook exceptions
+PASS late quiet move reductions
+PASS static evaluation cache
+PASS bounded mirror validation overhead
+PASS late move full-depth verification
+PASS committed PGN tactical fixtures
+PASS shallow root near-tie research
+PASS threaded shallow root near-tie research
+PASS threaded short forcing root research
+PASS clock short forcing root research
+PASS near-root quiet forcing extension
+PASS near-root pawn king-ring extension
+PASS near-root pawn break extension
+PASS checked quiescence cap
+PASS poisoned capture quiescence
+PASS bounded quiescence checks
+PASS deep quiescence checks
+PASS aspiration windows
+PASS infinite search lifecycle
+PASS search exception lifecycle
+PASS ponder search lifecycle
+PASS ponder terminal lifecycle
+PASS ponder time and node limits
+PASS service hash persistence
+PASS search timing context
+PASS hash bounds and clear
+PASS transposition table
+PASS transposition table memory cap
+PASS transposition table unchanged cap
+PASS transposition table allocation failure
+PASS transposition table depth preservation
+PASS transposition table age refresh
+PASS transposition table mate normalization
+PASS transposition table concurrency
+PASS transposition table resize concurrency
+PASS transposition table mixed maintenance

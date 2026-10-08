@@ -1,0 +1,132 @@
+{
+  "schema": "koi-cutechess-stability-v1",
+  "system": {
+    "os": "Microsoft Windows 10.0.26200",
+    "cpu": "Intel(R) Core(TM) i3-10100F CPU @ 3.60GHz"
+  },
+  "run_started_utc": "2026-09-08T13:04:23.7023113Z",
+  "configuration": {
+    "koi_path": "C:\\Users\\ntATh\\AI test\\Koi engine\\out\\stability-incident-release\\koi-engine.exe",
+    "opponent_path": "C:\\Users\\ntATh\\AI test\\Koi engine\\third_party\\Stockfish 19\\stockfish-windows-x86-64-universal\\stockfish\\stockfish-windows-x86-64-universal.exe",
+    "cutechess_path": "C:\\Program Files (x86)\\Cute Chess\\cutechess-cli.exe",
+    "cutechess_version": "cutechess-cli 1.5.1 Using Qt version 6.8.3 Running on Windows 11 Version 25H2/x86_64  Copyright (C) 2008-2023 Ilari Pihlajisto, Arto Jonsson and contributors This is free software; see the source for copying conditions.  There is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. ",
+    "games": 10,
+    "max_moves": 200,
+    "time_control": "1+0",
+    "hash_mb": 512,
+    "threads": 1,
+    "speed": 100,
+    "own_book": false,
+    "book_file": "book.bin",
+    "book_depth": 16,
+    "book_resolved_path": "C:\\Users\\ntATh\\AI test\\Koi engine\\out\\stability-incident-release\\book.bin",
+    "book_sha256": null,
+    "opening_file": null,
+    "fen_file": null,
+    "replay_path": null,
+    "converted_opening_file": null,
+    "timeout_milliseconds": 600000,
+    "arguments": [
+      "-engine",
+      "cmd=C:\\Users\\ntATh\\AI test\\Koi engine\\out\\stability-incident-release\\koi-engine.exe",
+      "name=Koi",
+      "proto=uci",
+      "option.Hash=512",
+      "option.Threads=1",
+      "option.Speed=100",
+      "option.OwnBook=false",
+      "option.BookFile=book.bin",
+      "option.BookDepth=16",
+      "option.BookRandom=false",
+      "stderr=C:\\Koi-results\\stability-incident\\matrix-t1-10\\koi-stderr.log",
+      "debug",
+      "initstr=setoption name DebugFile value C:\\Koi-results\\stability-incident\\matrix-t1-10\\koi-debug.log\\nsetoption name Debug value true",
+      "-engine",
+      "cmd=C:\\Users\\ntATh\\AI test\\Koi engine\\third_party\\Stockfish 19\\stockfish-windows-x86-64-universal\\stockfish\\stockfish-windows-x86-64-universal.exe",
+      "name=Opponent",
+      "proto=uci",
+      "stderr=C:\\Koi-results\\stability-incident\\matrix-t1-10\\opponent-stderr.log",
+      "-each",
+      "tc=1+0",
+      "-rounds",
+      "10",
+      "-concurrency",
+      "1",
+      "-maxmoves",
+      "200",
+      "-variant",
+      "standard",
+      "-pgnout",
+      "C:\\Koi-results\\stability-incident\\matrix-t1-10\\games.pgn",
+      "-event",
+      "Koi stability compatibility"
+    ],
+    "options": {
+      "games": 10,
+      "max_moves": 200,
+      "time_control": "1+0",
+      "hash_mb": 512,
+      "threads": 1,
+      "speed": 100,
+      "own_book": false,
+      "book_depth": 16
+    },
+    "command": "\"C:\\Program Files (x86)\\Cute Chess\\cutechess-cli.exe\" \"-engine\" \"cmd=C:\\Users\\ntATh\\AI test\\Koi engine\\out\\stability-incident-release\\koi-engine.exe\" \"name=Koi\" \"proto=uci\" \"option.Hash=512\" \"option.Threads=1\" \"option.Speed=100\" \"option.OwnBook=false\" \"option.BookFile=book.bin\" \"option.BookDepth=16\" \"option.BookRandom=false\" \"stderr=C:\\Koi-results\\stability-incident\\matrix-t1-10\\koi-stderr.log\" \"debug\" \"initstr=setoption name DebugFile value C:\\Koi-results\\stability-incident\\matrix-t1-10\\koi-debug.log\\nsetoption name Debug value true\" \"-engine\" \"cmd=C:\\Users\\ntATh\\AI test\\Koi engine\\third_party\\Stockfish 19\\stockfish-windows-x86-64-universal\\stockfish\\stockfish-windows-x86-64-universal.exe\" \"name=Opponent\" \"proto=uci\" \"stderr=C:\\Koi-results\\stability-incident\\matrix-t1-10\\opponent-stderr.log\" \"-each\" \"tc=1+0\" \"-rounds\" \"10\" \"-concurrency\" \"1\" \"-maxmoves\" \"200\" \"-variant\" \"standard\" \"-pgnout\" \"C:\\Koi-results\\stability-incident\\matrix-t1-10\\games.pgn\" \"-event\" \"Koi stability compatibility\""
+  },
+  "provenance": {
+    "executables": [
+      {
+        "name": "Koi",
+        "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\out\\stability-incident-release\\koi-engine.exe",
+        "sha256": "77EFF6E888E4272491131CBF81D82EA6D3FA054A9A9A61EEA444F3FA635127FA"
+      },
+      {
+        "name": "Opponent",
+        "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\third_party\\Stockfish 19\\stockfish-windows-x86-64-universal\\stockfish\\stockfish-windows-x86-64-universal.exe",
+        "sha256": "45BC8E4969147DB9C2EB533810637994619BFF0EACC81CCFD9854394901BCBD0"
+      },
+      {
+        "name": "Cutechess",
+        "path": "C:\\Program Files (x86)\\Cute Chess\\cutechess-cli.exe",
+        "sha256": "8889F9582DC688C567704CF083F6025BAF77F791CDE903698C70B3420CAF5D7E"
+      }
+    ],
+    "inputs": []
+  },
+  "engines": [
+    {
+      "name": "Koi",
+      "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\out\\stability-incident-release\\koi-engine.exe",
+      "sha256": "77EFF6E888E4272491131CBF81D82EA6D3FA054A9A9A61EEA444F3FA635127FA"
+    },
+    {
+      "name": "Opponent",
+      "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\third_party\\Stockfish 19\\stockfish-windows-x86-64-universal\\stockfish\\stockfish-windows-x86-64-universal.exe",
+      "sha256": "45BC8E4969147DB9C2EB533810637994619BFF0EACC81CCFD9854394901BCBD0"
+    }
+  ],
+  "results": {
+    "exit_code": 0,
+    "termination_classification": "completed",
+    "started_games": 10,
+    "finished_games": 10,
+    "failures": 0,
+    "koi_white": 5,
+    "koi_black": 5,
+    "color_balance_delta": 0,
+    "color_balanced": true,
+    "failure_lines": []
+  },
+  "artifacts": {
+    "pgn": "C:\\Koi-results\\stability-incident\\matrix-t1-10\\games.pgn",
+    "transcript": "C:\\Koi-results\\stability-incident\\matrix-t1-10\\cutechess-transcript.log",
+    "stdout": "C:\\Koi-results\\stability-incident\\matrix-t1-10\\cutechess-stdout.log",
+    "stderr": "C:\\Koi-results\\stability-incident\\matrix-t1-10\\cutechess-stderr.log",
+    "koi_stderr": "C:\\Koi-results\\stability-incident\\matrix-t1-10\\koi-stderr.log",
+    "opponent_stderr": "C:\\Koi-results\\stability-incident\\matrix-t1-10\\opponent-stderr.log",
+    "koi_debug": "C:\\Koi-results\\stability-incident\\matrix-t1-10\\koi-debug.log",
+    "converted_opening": null
+  },
+  "termination_classification": "completed",
+  "generated_utc": "2026-09-08T13:04:37.0743389Z"
+}

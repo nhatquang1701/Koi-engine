@@ -1,0 +1,2 @@
+rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1;30;d2d4;0.5
+r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1;659;a1a8;1.0

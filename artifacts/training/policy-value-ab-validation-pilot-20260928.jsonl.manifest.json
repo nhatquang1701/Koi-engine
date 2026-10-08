@@ -1,0 +1,66 @@
+{
+  "bestmove_fallbacks": 17,
+  "boot_nnue_path": null,
+  "cpu_variant": "generic",
+  "dataset_sha256": "bed2c1132c96a78e962014528e7403375c656810339873f65bc35792a18654c9",
+  "engine_sha256": "0c144382b30ee43884d0b26254bbeacdd5cd51a7b5aa6563803414719122f76b",
+  "engine_version": "source-37dfbb417744",
+  "games_completed": 8,
+  "games_requested": 8,
+  "nnue_sha256": null,
+  "opening_corpus_sha256": "9c58bb53f4fd1613063c914596f9e21e13d92d2de10365e900b08f8f0c873d8f",
+  "outcome_counts": {
+    "black-win": 1,
+    "draw": 6,
+    "white-win": 1
+  },
+  "policy_value_file": null,
+  "policy_value_sha256": null,
+  "record_count": 466,
+  "records_written": 466,
+  "schema": "koi-policy-value-selfplay-manifest-v1",
+  "search_options": {
+    "hash_mb": 512,
+    "max_plies": 64,
+    "mcts_root_noise": false,
+    "mcts_root_noise_alpha": null,
+    "mcts_root_noise_epsilon": null,
+    "mcts_root_noise_seed": null,
+    "mcts_visit_output": false,
+    "multi_pv": 1,
+    "nodes": 2000,
+    "own_book": false,
+    "policy_temperature": null,
+    "search_algorithm": "AlphaBeta",
+    "threads": 1,
+    "value_target_transform": "tanh(cp/400) when an unbounded score is present; otherwise game result"
+  },
+  "seed": 41,
+  "selected_openings": [
+    "validation-h4",
+    "validation-saragossa",
+    "validation-mieses",
+    "validation-queenside",
+    "validation-larsen",
+    "validation-a4",
+    "validation-fianchetto",
+    "validation-open-game"
+  ],
+  "source_dirty": false,
+  "source_revision": "37dfbb417744844559480f1f59341880f365bad3",
+  "source_sha256": {
+    "tools/measurement/koi_chess/__init__.py": "c0f15babf0fea462091dd6360a815c0fe9df7f8781c80c66efd02d3179553115",
+    "tools/measurement/koi_chess/attacks.py": "dc017a9347b0e0fbfac15599cdb0fbbb454b9777e4b1b3135c529ea235b45080",
+    "tools/measurement/koi_chess/board.py": "66428f81defb6b6ae9b926a71ca29d7d3e48a86c7a78e3d58faa0a5355084693",
+    "tools/measurement/koi_chess/core.py": "2afe2de739b7d80bce8c6cf81074d775e8a9873dd539bcbf530acfc1eb48e9a4",
+    "tools/measurement/koi_chess/engine.py": "58ca1762d04b82b2ec16251196a90759b6d6fba2209474d41e6c8b33eb375cfc",
+    "tools/measurement/koi_chess/pgn.py": "3ed89525f5fa5ca3a7b1e3a070b0c327727ec2dd3cc09e024fa3051a5dba76d7",
+    "tools/measurement/policy_value_dataset.py": "69d7fea413a6d428fc1c7a7a4a207200575919e7854777dfaf183f9390d9d1ae",
+    "tools/measurement/policy_value_selfplay.py": "0654c42fd0a3543e050818cad7b98fb3f1626ecdffd0a740b29020f5eb8b0229"
+  },
+  "termination_counts": {
+    "checkmate": 2,
+    "ply-limit": 5,
+    "threefold_repetition": 1
+  }
+}

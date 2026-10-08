@@ -1,0 +1,33 @@
+{
+  "rows": 50000,
+  "target": "cp",
+  "ridge": 1e-06,
+  "scales": {
+    "material": 0.8775085283161679,
+    "piece_square": 0.7713480635617173,
+    "mobility": 0.1044243097048372,
+    "pawn_structure": 0.5643661050145605,
+    "activity": 1.5062628540968828,
+    "development": 0.6667875252644768,
+    "center_control": -0.18654664498529583,
+    "initiative": 4.311685377383423,
+    "king_safety": 2.2669776856672037,
+    "king_activity": 6.5667374487411845,
+    "passed_pawn": 0.7778143752430424,
+    "tempo": -3.0704347703859587
+  },
+  "offset": 57.095313925197914,
+  "current": {
+    "mae": 196.74134,
+    "r2": 0.7637693651016475
+  },
+  "fitted": {
+    "mae": 181.17019767425828,
+    "r2": 0.8084977281701401
+  },
+  "schema": "koi-classical-tuning-report-v1",
+  "created": "2026-09-17T17:34:10.270572+00:00",
+  "corpus_sha256": "8b470e2dce957ef35f4c8a5389fd93f023bd970dc857e7da2fc26b6309b83b08",
+  "input": "artifacts\\verification\\nnue-evaluation-overhaul\\classical-features-sample.csv",
+  "adopted": false
+}

@@ -1,0 +1,23 @@
+{
+  "schema": "koi-cutechess-stability-failure-v1",
+  "classification": "completed",
+  "failure_lines": [],
+  "d4c3_completion_records": [],
+  "d4c3_invalid_completion_records": [],
+  "d4c3_matching_position_records": [],
+  "d4c3_last_command": null,
+  "last_position_record": null,
+  "root_reconstruction": {
+    "source": "koi-debug.jsonl",
+    "cutechess_root_available": false,
+    "note": "Cutechess 1.5.1 manager output does not expose a per-ply FEN; compare protocol-events.jsonl with Koi position records."
+  },
+  "artifacts": {
+    "protocol_events": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\cutechess-smoke-after-clock-fix-20260911\\protocol-events.jsonl",
+    "per_ply_positions": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\cutechess-smoke-after-clock-fix-20260911\\per-ply-positions.jsonl",
+    "koi_debug": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\cutechess-smoke-after-clock-fix-20260911\\koi-debug.jsonl",
+    "opponent_debug": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\cutechess-smoke-after-clock-fix-20260911\\opponent-debug.jsonl",
+    "transcript": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\stability\\cutechess-smoke-after-clock-fix-20260911\\cutechess-transcript.log"
+  },
+  "generated_utc": "2026-09-10T22:31:42.4248203Z"
+}

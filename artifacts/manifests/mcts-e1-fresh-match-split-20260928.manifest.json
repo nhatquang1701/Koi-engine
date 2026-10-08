@@ -1,0 +1,52 @@
+{
+  "algorithm": "seeded-legal-random-walk-v1",
+  "generator": "policy_value_openings.py",
+  "generator_sha256": "be4deb7ef285a734e0910e743801ea2c3910d0735ef7091898a40369fcb74a4a",
+  "heldout_state_count": 6873,
+  "heldout_states_sha256": "14a4694266a94f899b31c8bbeb2b78bc37b1e1b7fe46c7cd56bd41c57457d398",
+  "match_corpora": [
+    {
+      "opening_count": 8,
+      "path": "tests/data/openings/openings-basic.txt",
+      "sha256": "e836a770ec3c6530b11301400fc83f6c242755b4ef9215d6738b5219eb7415ba"
+    },
+    {
+      "opening_count": 32,
+      "path": "tests/data/openings/openings-curated-32.txt",
+      "sha256": "1e2dcccfabb9bf5fa4aa28df6c5b23c81e9feeb782aecd7d5722298d4f235e79"
+    },
+    {
+      "opening_count": 160,
+      "path": "tests/data/openings/openings-release-strength-160.txt",
+      "sha256": "d4e7335ff7d69c86941ab1c8354903e89b17aa8fb13fdb569e76656c047e5e1f"
+    },
+    {
+      "opening_count": 512,
+      "path": "artifacts/training/policy-value-train-v3-openings.txt",
+      "sha256": "9b837ec874613fa1aefbf65de295b49895388791ee7bd31fb885b501a17d36a1"
+    },
+    {
+      "opening_count": 128,
+      "path": "artifacts/training/policy-value-validation-v3-openings.txt",
+      "sha256": "9d9deddb1f24f73d990dee3527a2f7251b239fa1a846fd6a5a6d490aaeabe3b4"
+    }
+  ],
+  "max_attempts_per_split": 4096,
+  "prefix_plies": {
+    "maximum": 18,
+    "minimum": 6
+  },
+  "root_identity": "standard plus canonical FEN fields 1-5; fullmove omitted",
+  "schema": "koi-policy-value-openings-v2",
+  "seed": 20260930,
+  "train": {
+    "opening_count": 80,
+    "path": "artifacts/training/policy-value-ab-v3-epochtest-a-20260928.txt",
+    "sha256": "33903328877b2717fdb5a771a17c73378df687924bfefc7a9fc46ce6bd4b0464"
+  },
+  "validation": {
+    "opening_count": 80,
+    "path": "artifacts/training/policy-value-ab-v3-epochtest-b-20260928.txt",
+    "sha256": "547fa6c53ec41e47a207530f7399673053348b529efaa0e8ef18bd5d849c1334"
+  }
+}

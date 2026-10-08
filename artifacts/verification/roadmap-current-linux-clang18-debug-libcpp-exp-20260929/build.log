@@ -1,0 +1,658 @@
+[1/417] Scanning /work/src/koi/cpu_features.cpp for CXX dependencies
+[2/417] Scanning /work/src/koi/cpu_variant_guard.cpp for CXX dependencies
+[3/417] Scanning /work/src/koi/cpu_variant_guard.cpp for CXX dependencies
+[4/417] Generating CXX dyndep file CMakeFiles/koi_cpu_features.dir/CXX.dd
+[5/417] Generating CXX dyndep file CMakeFiles/koi_cpu_guard_avx512.dir/CXX.dd
+[6/417] Generating CXX dyndep file CMakeFiles/koi_cpu_guard_avx2.dir/CXX.dd
+[7/417] Building CXX object CMakeFiles/koi_cpu_features.dir/src/koi/cpu_features.cpp.o
+[8/417] Building CXX object CMakeFiles/koi_cpu_guard_avx512.dir/src/koi/cpu_variant_guard.cpp.o
+[9/417] Building CXX object CMakeFiles/koi_cpu_guard_avx2.dir/src/koi/cpu_variant_guard.cpp.o
+[10/417] Scanning /work/src/koi/detail/attack_tables.cpp for CXX dependencies
+[11/417] Scanning /work/src/koi/classical_evaluator.cpp for CXX dependencies
+[12/417] Scanning /work/src/koi/detail/evaluation_context.cpp for CXX dependencies
+[13/417] Scanning /work/src/koi/detail/compatibility_mirror.cpp for CXX dependencies
+[14/417] Scanning /work/src/koi/detail/feature_state.cpp for CXX dependencies
+[15/417] Scanning /work/src/koi/detail/policy_value_mcts.cpp for CXX dependencies
+[16/417] Scanning /work/src/koi/detail/root_coordinator.cpp for CXX dependencies
+[17/417] Scanning /work/src/koi/detail/search_context.cpp for CXX dependencies
+[18/417] Scanning /work/src/koi/detail/search_context_support.cpp for CXX dependencies
+[19/417] Scanning /work/src/koi/detail/search_ordering_tables.cpp for CXX dependencies
+[20/417] Scanning /work/src/koi/detail/search_runner.cpp for CXX dependencies
+[21/417] Scanning /work/src/koi/detail/search_session.cpp for CXX dependencies
+[22/417] Scanning /work/src/koi/completion_gate.cpp for CXX dependencies
+[23/417] Scanning /work/src/koi/cpu_variant.cpp for CXX dependencies
+[24/417] Scanning /work/src/koi/executable_path.cpp for CXX dependencies
+[25/417] Scanning /work/src/koi/gpu/cuda_driver.cpp for CXX dependencies
+[26/417] Scanning /work/src/koi/evaluation_features.cpp for CXX dependencies
+[27/417] Scanning /work/src/koi/game_state.cpp for CXX dependencies
+[28/417] Scanning /work/src/koi/move.cpp for CXX dependencies
+[29/417] Scanning /work/src/koi/gpu/nnue_gpu_evaluator.cpp for CXX dependencies
+[30/417] Scanning /work/src/koi/gpu/gpu_nnue_service.cpp for CXX dependencies
+[31/417] Scanning /work/src/koi/move_chooser.cpp for CXX dependencies
+[32/417] Scanning /work/src/koi/nnue.cpp for CXX dependencies
+[33/417] Scanning /work/src/koi/perft.cpp for CXX dependencies
+[34/417] Scanning /work/src/koi/opening_book.cpp for CXX dependencies
+[35/417] Scanning /work/src/koi/policy_value_model.cpp for CXX dependencies
+[36/417] Scanning /work/src/koi/position.cpp for CXX dependencies
+[37/417] Scanning /work/src/koi/search_ordering.cpp for CXX dependencies
+[38/417] Scanning /work/src/koi/search_service.cpp for CXX dependencies
+[39/417] Scanning /work/src/koi/static_exchange.cpp for CXX dependencies
+[40/417] Scanning /work/src/koi/strength_suite.cpp for CXX dependencies
+[41/417] Scanning /work/src/koi/syzygy_tablebase.cpp for CXX dependencies
+[42/417] Scanning /work/src/koi/time_manager.cpp for CXX dependencies
+[43/417] Scanning /work/third_party/fathom/tbprobe.c for CXX dependencies
+[44/417] Scanning /work/src/koi/transposition_table.cpp for CXX dependencies
+[45/417] Scanning /work/src/koi/modules/types.ixx for CXX dependencies
+[46/417] Scanning /work/src/koi/modules/position.ixx for CXX dependencies
+[47/417] Scanning /work/src/koi/modules/eval.ixx for CXX dependencies
+[48/417] Scanning /work/src/koi/uci_controller.cpp for CXX dependencies
+[49/417] Scanning /work/src/koi/modules/tablebase.ixx for CXX dependencies
+[50/417] Scanning /work/src/koi/modules/koi.ixx for CXX dependencies
+[51/417] Scanning /work/src/koi/modules/runtime.ixx for CXX dependencies
+[52/417] Scanning /work/src/koi/modules/search.ixx for CXX dependencies
+[53/417] Scanning /work/src/koi/detail/attack_tables.cpp for CXX dependencies
+[54/417] Scanning /work/src/koi/classical_evaluator.cpp for CXX dependencies
+[55/417] Scanning /work/src/koi/detail/compatibility_mirror.cpp for CXX dependencies
+[56/417] Scanning /work/src/koi/detail/evaluation_context.cpp for CXX dependencies
+[57/417] Scanning /work/src/koi/detail/feature_state.cpp for CXX dependencies
+[58/417] Scanning /work/src/koi/detail/policy_value_mcts.cpp for CXX dependencies
+[59/417] Scanning /work/src/koi/detail/root_coordinator.cpp for CXX dependencies
+[60/417] Generating CXX dyndep file CMakeFiles/koi_core.dir/CXX.dd
+[61/417] Scanning /work/src/koi/detail/search_context.cpp for CXX dependencies
+[62/417] Scanning /work/src/koi/detail/search_context_support.cpp for CXX dependencies
+[63/417] Scanning /work/src/koi/detail/search_ordering_tables.cpp for CXX dependencies
+[64/417] Building CXX object CMakeFiles/koi_core.dir/src/koi/detail/attack_tables.cpp.o
+[65/417] Building CXX object CMakeFiles/koi_core.dir/src/koi/classical_evaluator.cpp.o
+[66/417] Building CXX object CMakeFiles/koi_core.dir/src/koi/detail/evaluation_context.cpp.o
+[67/417] Building CXX object CMakeFiles/koi_core.dir/src/koi/detail/feature_state.cpp.o
+[68/417] Building CXX object CMakeFiles/koi_core.dir/src/koi/detail/root_coordinator.cpp.o
+[69/417] Building CXX object CMakeFiles/koi_core.dir/src/koi/detail/compatibility_mirror.cpp.o
+[70/417] Building CXX object CMakeFiles/koi_core.dir/src/koi/detail/policy_value_mcts.cpp.o
+[71/417] Building CXX object CMakeFiles/koi_core.dir/src/koi/detail/search_context.cpp.o
+In file included from /work/src/koi/detail/search_context.cpp:1:
+/work/src/koi/detail/search_context.hpp:522:19: warning: operator '<<' has lower precedence than '+'; '+' will be evaluated first [-Wshift-op-parentheses]
+  522 |             (1ULL + static_cast<std::uint64_t>(move.to().index()) << 7U) +
+      |              ~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ~~
+/work/src/koi/detail/search_context.hpp:522:19: note: place parentheses around the '+' expression to silence this warning
+  522 |             (1ULL + static_cast<std::uint64_t>(move.to().index()) << 7U) +
+      |                   ^
+      |              (                                                   )
+/work/src/koi/detail/search_context.hpp:523:19: warning: operator '<<' has lower precedence than '+'; '+' will be evaluated first [-Wshift-op-parentheses]
+  523 |             (1ULL + static_cast<std::uint64_t>(move.promotion()) << 14U);
+      |              ~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ~~
+/work/src/koi/detail/search_context.hpp:523:19: note: place parentheses around the '+' expression to silence this warning
+  523 |             (1ULL + static_cast<std::uint64_t>(move.promotion()) << 14U);
+      |                   ^
+      |              (                                                  )
+2 warnings generated.
+[72/417] Building CXX object CMakeFiles/koi_core.dir/src/koi/detail/search_ordering_tables.cpp.o
+[73/417] Building CXX object CMakeFiles/koi_core.dir/src/koi/detail/search_context_support.cpp.o
+[74/417] Building CXX object CMakeFiles/koi_core.dir/src/koi/cpu_variant.cpp.o
+[75/417] Building CXX object CMakeFiles/koi_core.dir/src/koi/detail/search_session.cpp.o
+[76/417] Building CXX object CMakeFiles/koi_core.dir/src/koi/completion_gate.cpp.o
+[77/417] Building CXX object CMakeFiles/koi_core.dir/src/koi/executable_path.cpp.o
+[78/417] Building CXX object CMakeFiles/koi_core.dir/src/koi/evaluation_features.cpp.o
+[79/417] Building CXX object CMakeFiles/koi_core.dir/src/koi/gpu/cuda_driver.cpp.o
+[80/417] Building CXX object CMakeFiles/koi_core.dir/src/koi/detail/search_runner.cpp.o
+In file included from /work/src/koi/detail/search_runner.cpp:23:
+/work/src/koi/detail/search_context.hpp:522:19: warning: operator '<<' has lower precedence than '+'; '+' will be evaluated first [-Wshift-op-parentheses]
+  522 |             (1ULL + static_cast<std::uint64_t>(move.to().index()) << 7U) +
+      |              ~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ~~
+/work/src/koi/detail/search_context.hpp:522:19: note: place parentheses around the '+' expression to silence this warning
+  522 |             (1ULL + static_cast<std::uint64_t>(move.to().index()) << 7U) +
+      |                   ^
+      |              (                                                   )
+/work/src/koi/detail/search_context.hpp:523:19: warning: operator '<<' has lower precedence than '+'; '+' will be evaluated first [-Wshift-op-parentheses]
+  523 |             (1ULL + static_cast<std::uint64_t>(move.promotion()) << 14U);
+      |              ~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ~~
+/work/src/koi/detail/search_context.hpp:523:19: note: place parentheses around the '+' expression to silence this warning
+  523 |             (1ULL + static_cast<std::uint64_t>(move.promotion()) << 14U);
+      |                   ^
+      |              (                                                  )
+2 warnings generated.
+[81/417] Building CXX object CMakeFiles/koi_core.dir/src/koi/gpu/gpu_nnue_service.cpp.o
+[82/417] Building CXX object CMakeFiles/koi_core.dir/src/koi/move.cpp.o
+[83/417] Building CXX object CMakeFiles/koi_core.dir/src/koi/game_state.cpp.o
+[84/417] Building CXX object CMakeFiles/koi_core.dir/src/koi/gpu/nnue_gpu_evaluator.cpp.o
+[85/417] Building CXX object CMakeFiles/koi_core.dir/src/koi/move_chooser.cpp.o
+[86/417] Building CXX object CMakeFiles/koi_core.dir/src/koi/perft.cpp.o
+[87/417] Building CXX object CMakeFiles/koi_core.dir/src/koi/opening_book.cpp.o
+[88/417] Building CXX object CMakeFiles/koi_core.dir/src/koi/nnue.cpp.o
+[89/417] Building CXX object CMakeFiles/koi_core.dir/src/koi/position.cpp.o
+[90/417] Building CXX object CMakeFiles/koi_core.dir/src/koi/policy_value_model.cpp.o
+[91/417] Building CXX object CMakeFiles/koi_core.dir/src/koi/search_ordering.cpp.o
+[92/417] Building CXX object CMakeFiles/koi_core.dir/src/koi/static_exchange.cpp.o
+[93/417] Building CXX object CMakeFiles/koi_core.dir/src/koi/search_service.cpp.o
+[94/417] Building CXX object CMakeFiles/koi_core.dir/src/koi/strength_suite.cpp.o
+[95/417] Building CXX object CMakeFiles/koi_core.dir/src/koi/syzygy_tablebase.cpp.o
+[96/417] Building CXX object CMakeFiles/koi_core.dir/third_party/fathom/tbprobe.c.o
+/work/third_party/fathom/tbprobe.c:744:3: warning: 'atomic_init<bool>' is deprecated [-Wdeprecated-declarations]
+  744 |   atomic_init(&tbHash[idx].error, false);
+      |   ^
+/usr/lib/llvm-18/bin/../include/c++/v1/__atomic/atomic.h:275:1: note: 'atomic_init<bool>' has been explicitly marked deprecated here
+  275 | _LIBCPP_DEPRECATED_IN_CXX20 _LIBCPP_HIDE_FROM_ABI void
+      | ^
+/usr/lib/llvm-18/bin/../include/c++/v1/__config:1007:41: note: expanded from macro '_LIBCPP_DEPRECATED_IN_CXX20'
+ 1007 | #    define _LIBCPP_DEPRECATED_IN_CXX20 _LIBCPP_DEPRECATED
+      |                                         ^
+/usr/lib/llvm-18/bin/../include/c++/v1/__config:974:49: note: expanded from macro '_LIBCPP_DEPRECATED'
+  974 | #      define _LIBCPP_DEPRECATED __attribute__((__deprecated__))
+      |                                                 ^
+1 warning generated.
+[97/417] Building CXX object CMakeFiles/koi_core.dir/src/koi/time_manager.cpp.o
+[98/417] Building CXX object CMakeFiles/koi_core.dir/src/koi/transposition_table.cpp.o
+[99/417] Building CXX object CMakeFiles/koi_core.dir/src/koi/modules/types.ixx.o
+[100/417] Building CXX object CMakeFiles/koi_core.dir/src/koi/modules/position.ixx.o
+[101/417] Building CXX object CMakeFiles/koi_core.dir/src/koi/modules/eval.ixx.o
+[102/417] Scanning /work/src/koi/detail/search_session.cpp for CXX dependencies
+[103/417] Scanning /work/src/koi/detail/search_runner.cpp for CXX dependencies
+[104/417] Building CXX object CMakeFiles/koi_core.dir/src/koi/modules/tablebase.ixx.o
+[105/417] Building CXX object CMakeFiles/koi_core.dir/src/koi/modules/search.ixx.o
+[106/417] Scanning /work/src/koi/cpu_variant.cpp for CXX dependencies
+[107/417] Building CXX object CMakeFiles/koi_core.dir/src/koi/modules/runtime.ixx.o
+[108/417] Scanning /work/src/koi/completion_gate.cpp for CXX dependencies
+[109/417] Building CXX object CMakeFiles/koi_core.dir/src/koi/modules/koi.ixx.o
+[110/417] Scanning /work/src/koi/executable_path.cpp for CXX dependencies
+[111/417] Scanning /work/src/koi/evaluation_features.cpp for CXX dependencies
+[112/417] Scanning /work/src/koi/gpu/cuda_driver.cpp for CXX dependencies
+[113/417] Scanning /work/src/koi/game_state.cpp for CXX dependencies
+[114/417] Scanning /work/src/koi/gpu/gpu_nnue_service.cpp for CXX dependencies
+[115/417] Scanning /work/src/koi/move.cpp for CXX dependencies
+[116/417] Scanning /work/src/koi/gpu/nnue_gpu_evaluator.cpp for CXX dependencies
+[117/417] Scanning /work/src/koi/move_chooser.cpp for CXX dependencies
+[118/417] Scanning /work/src/koi/nnue.cpp for CXX dependencies
+[119/417] Scanning /work/src/koi/opening_book.cpp for CXX dependencies
+[120/417] Scanning /work/src/koi/perft.cpp for CXX dependencies
+[121/417] Scanning /work/src/koi/policy_value_model.cpp for CXX dependencies
+[122/417] Scanning /work/src/koi/position.cpp for CXX dependencies
+[123/417] Scanning /work/src/koi/search_ordering.cpp for CXX dependencies
+[124/417] Scanning /work/src/koi/search_service.cpp for CXX dependencies
+[125/417] Scanning /work/src/koi/static_exchange.cpp for CXX dependencies
+[126/417] Scanning /work/src/koi/strength_suite.cpp for CXX dependencies
+[127/417] Scanning /work/src/koi/syzygy_tablebase.cpp for CXX dependencies
+[128/417] Scanning /work/src/koi/time_manager.cpp for CXX dependencies
+[129/417] Scanning /work/src/koi/transposition_table.cpp for CXX dependencies
+[130/417] Scanning /work/third_party/fathom/tbprobe.c for CXX dependencies
+[131/417] Building CXX object CMakeFiles/koi_core.dir/src/koi/uci_controller.cpp.o
+[132/417] Scanning /work/src/koi/uci_controller.cpp for CXX dependencies
+[133/417] Scanning /work/src/koi/classical_evaluator.cpp for CXX dependencies
+[134/417] Scanning /work/src/koi/detail/attack_tables.cpp for CXX dependencies
+[135/417] Scanning /work/src/koi/detail/compatibility_mirror.cpp for CXX dependencies
+[136/417] Scanning /work/src/koi/detail/evaluation_context.cpp for CXX dependencies
+[137/417] Scanning /work/src/koi/detail/feature_state.cpp for CXX dependencies
+[138/417] Generating CXX dyndep file CMakeFiles/koi_core_avx512.dir/CXX.dd
+[139/417] Scanning /work/src/koi/detail/policy_value_mcts.cpp for CXX dependencies
+[140/417] Scanning /work/src/koi/detail/root_coordinator.cpp for CXX dependencies
+[141/417] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/detail/attack_tables.cpp.o
+[142/417] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/classical_evaluator.cpp.o
+[143/417] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/detail/evaluation_context.cpp.o
+[144/417] Linking CXX static library libkoi_core.a
+[145/417] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/detail/feature_state.cpp.o
+[146/417] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/detail/compatibility_mirror.cpp.o
+[147/417] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/detail/root_coordinator.cpp.o
+[148/417] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/detail/policy_value_mcts.cpp.o
+[149/417] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/detail/search_context_support.cpp.o
+[150/417] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/detail/search_ordering_tables.cpp.o
+[151/417] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/detail/search_context.cpp.o
+In file included from /work/src/koi/detail/search_context.cpp:1:
+/work/src/koi/detail/search_context.hpp:522:19: warning: operator '<<' has lower precedence than '+'; '+' will be evaluated first [-Wshift-op-parentheses]
+  522 |             (1ULL + static_cast<std::uint64_t>(move.to().index()) << 7U) +
+      |              ~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ~~
+/work/src/koi/detail/search_context.hpp:522:19: note: place parentheses around the '+' expression to silence this warning
+  522 |             (1ULL + static_cast<std::uint64_t>(move.to().index()) << 7U) +
+      |                   ^
+      |              (                                                   )
+/work/src/koi/detail/search_context.hpp:523:19: warning: operator '<<' has lower precedence than '+'; '+' will be evaluated first [-Wshift-op-parentheses]
+  523 |             (1ULL + static_cast<std::uint64_t>(move.promotion()) << 14U);
+      |              ~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ~~
+/work/src/koi/detail/search_context.hpp:523:19: note: place parentheses around the '+' expression to silence this warning
+  523 |             (1ULL + static_cast<std::uint64_t>(move.promotion()) << 14U);
+      |                   ^
+      |              (                                                  )
+2 warnings generated.
+[152/417] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/cpu_variant.cpp.o
+[153/417] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/detail/search_session.cpp.o
+[154/417] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/completion_gate.cpp.o
+[155/417] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/executable_path.cpp.o
+[156/417] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/evaluation_features.cpp.o
+[157/417] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/gpu/cuda_driver.cpp.o
+[158/417] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/detail/search_runner.cpp.o
+In file included from /work/src/koi/detail/search_runner.cpp:23:
+/work/src/koi/detail/search_context.hpp:522:19: warning: operator '<<' has lower precedence than '+'; '+' will be evaluated first [-Wshift-op-parentheses]
+  522 |             (1ULL + static_cast<std::uint64_t>(move.to().index()) << 7U) +
+      |              ~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ~~
+/work/src/koi/detail/search_context.hpp:522:19: note: place parentheses around the '+' expression to silence this warning
+  522 |             (1ULL + static_cast<std::uint64_t>(move.to().index()) << 7U) +
+      |                   ^
+      |              (                                                   )
+/work/src/koi/detail/search_context.hpp:523:19: warning: operator '<<' has lower precedence than '+'; '+' will be evaluated first [-Wshift-op-parentheses]
+  523 |             (1ULL + static_cast<std::uint64_t>(move.promotion()) << 14U);
+      |              ~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ~~
+/work/src/koi/detail/search_context.hpp:523:19: note: place parentheses around the '+' expression to silence this warning
+  523 |             (1ULL + static_cast<std::uint64_t>(move.promotion()) << 14U);
+      |                   ^
+      |              (                                                  )
+2 warnings generated.
+[159/417] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/move.cpp.o
+[160/417] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/gpu/gpu_nnue_service.cpp.o
+[161/417] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/game_state.cpp.o
+[162/417] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/gpu/nnue_gpu_evaluator.cpp.o
+[163/417] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/perft.cpp.o
+[164/417] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/move_chooser.cpp.o
+[165/417] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/opening_book.cpp.o
+[166/417] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/nnue.cpp.o
+[167/417] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/position.cpp.o
+[168/417] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/policy_value_model.cpp.o
+[169/417] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/search_ordering.cpp.o
+[170/417] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/search_service.cpp.o
+[171/417] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/static_exchange.cpp.o
+[172/417] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/strength_suite.cpp.o
+[173/417] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/syzygy_tablebase.cpp.o
+[174/417] Building CXX object CMakeFiles/koi_core_avx512.dir/third_party/fathom/tbprobe.c.o
+/work/third_party/fathom/tbprobe.c:744:3: warning: 'atomic_init<bool>' is deprecated [-Wdeprecated-declarations]
+  744 |   atomic_init(&tbHash[idx].error, false);
+      |   ^
+/usr/lib/llvm-18/bin/../include/c++/v1/__atomic/atomic.h:275:1: note: 'atomic_init<bool>' has been explicitly marked deprecated here
+  275 | _LIBCPP_DEPRECATED_IN_CXX20 _LIBCPP_HIDE_FROM_ABI void
+      | ^
+/usr/lib/llvm-18/bin/../include/c++/v1/__config:1007:41: note: expanded from macro '_LIBCPP_DEPRECATED_IN_CXX20'
+ 1007 | #    define _LIBCPP_DEPRECATED_IN_CXX20 _LIBCPP_DEPRECATED
+      |                                         ^
+/usr/lib/llvm-18/bin/../include/c++/v1/__config:974:49: note: expanded from macro '_LIBCPP_DEPRECATED'
+  974 | #      define _LIBCPP_DEPRECATED __attribute__((__deprecated__))
+      |                                                 ^
+1 warning generated.
+[175/417] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/transposition_table.cpp.o
+[176/417] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/time_manager.cpp.o
+[177/417] Scanning /work/src/koi/detail/search_context.cpp for CXX dependencies
+[178/417] Scanning /work/src/koi/detail/search_context_support.cpp for CXX dependencies
+[179/417] Scanning /work/src/koi/detail/search_ordering_tables.cpp for CXX dependencies
+[180/417] Scanning /work/src/koi/detail/search_runner.cpp for CXX dependencies
+[181/417] Scanning /work/src/koi/detail/search_session.cpp for CXX dependencies
+[182/417] Scanning /work/src/koi/completion_gate.cpp for CXX dependencies
+[183/417] Scanning /work/src/koi/cpu_variant.cpp for CXX dependencies
+[184/417] Scanning /work/src/koi/executable_path.cpp for CXX dependencies
+[185/417] Scanning /work/src/koi/evaluation_features.cpp for CXX dependencies
+[186/417] Scanning /work/src/koi/gpu/cuda_driver.cpp for CXX dependencies
+[187/417] Scanning /work/src/koi/game_state.cpp for CXX dependencies
+[188/417] Scanning /work/src/koi/gpu/gpu_nnue_service.cpp for CXX dependencies
+[189/417] Scanning /work/src/koi/gpu/nnue_gpu_evaluator.cpp for CXX dependencies
+[190/417] Scanning /work/src/koi/move.cpp for CXX dependencies
+[191/417] Scanning /work/src/koi/move_chooser.cpp for CXX dependencies
+[192/417] Scanning /work/src/koi/nnue.cpp for CXX dependencies
+[193/417] Scanning /work/src/koi/opening_book.cpp for CXX dependencies
+[194/417] Scanning /work/src/koi/perft.cpp for CXX dependencies
+[195/417] Scanning /work/src/koi/position.cpp for CXX dependencies
+[196/417] Scanning /work/src/koi/policy_value_model.cpp for CXX dependencies
+[197/417] Scanning /work/src/koi/search_service.cpp for CXX dependencies
+[198/417] Scanning /work/src/koi/search_ordering.cpp for CXX dependencies
+[199/417] Scanning /work/src/koi/static_exchange.cpp for CXX dependencies
+[200/417] Scanning /work/src/koi/strength_suite.cpp for CXX dependencies
+[201/417] Scanning /work/src/koi/syzygy_tablebase.cpp for CXX dependencies
+[202/417] Scanning /work/src/koi/time_manager.cpp for CXX dependencies
+[203/417] Scanning /work/src/koi/transposition_table.cpp for CXX dependencies
+[204/417] Scanning /work/third_party/fathom/tbprobe.c for CXX dependencies
+[205/417] Scanning /work/tools/engine/koi_gpu_probe.cpp for CXX dependencies
+[206/417] Scanning /work/src/koi/uci_controller.cpp for CXX dependencies
+[207/417] Generating CXX dyndep file CMakeFiles/koi_gpu_probe.dir/CXX.dd
+[208/417] Building CXX object CMakeFiles/koi_core_avx512.dir/src/koi/uci_controller.cpp.o
+[209/417] Scanning /work/tests/unit/runtime/gpu_nnue_tests.cpp for CXX dependencies
+[210/417] Generating CXX dyndep file CMakeFiles/gpu_nnue_tests.dir/CXX.dd
+[211/417] Generating CXX dyndep file CMakeFiles/koi_core_generic.dir/CXX.dd
+[212/417] Building CXX object CMakeFiles/koi_gpu_probe.dir/tools/engine/koi_gpu_probe.cpp.o
+[213/417] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/classical_evaluator.cpp.o
+[214/417] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/detail/attack_tables.cpp.o
+[215/417] Building CXX object CMakeFiles/gpu_nnue_tests.dir/tests/unit/runtime/gpu_nnue_tests.cpp.o
+[216/417] Linking CXX static library libkoi_core_avx512.a
+[217/417] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/detail/evaluation_context.cpp.o
+[218/417] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/detail/feature_state.cpp.o
+[219/417] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/detail/compatibility_mirror.cpp.o
+[220/417] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/detail/root_coordinator.cpp.o
+[221/417] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/detail/policy_value_mcts.cpp.o
+[222/417] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/detail/search_context_support.cpp.o
+[223/417] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/detail/search_context.cpp.o
+In file included from /work/src/koi/detail/search_context.cpp:1:
+/work/src/koi/detail/search_context.hpp:522:19: warning: operator '<<' has lower precedence than '+'; '+' will be evaluated first [-Wshift-op-parentheses]
+  522 |             (1ULL + static_cast<std::uint64_t>(move.to().index()) << 7U) +
+      |              ~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ~~
+/work/src/koi/detail/search_context.hpp:522:19: note: place parentheses around the '+' expression to silence this warning
+  522 |             (1ULL + static_cast<std::uint64_t>(move.to().index()) << 7U) +
+      |                   ^
+      |              (                                                   )
+/work/src/koi/detail/search_context.hpp:523:19: warning: operator '<<' has lower precedence than '+'; '+' will be evaluated first [-Wshift-op-parentheses]
+  523 |             (1ULL + static_cast<std::uint64_t>(move.promotion()) << 14U);
+      |              ~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ~~
+/work/src/koi/detail/search_context.hpp:523:19: note: place parentheses around the '+' expression to silence this warning
+  523 |             (1ULL + static_cast<std::uint64_t>(move.promotion()) << 14U);
+      |                   ^
+      |              (                                                  )
+2 warnings generated.
+[224/417] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/detail/search_ordering_tables.cpp.o
+[225/417] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/detail/search_session.cpp.o
+[226/417] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/cpu_variant.cpp.o
+[227/417] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/completion_gate.cpp.o
+[228/417] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/executable_path.cpp.o
+[229/417] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/evaluation_features.cpp.o
+[230/417] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/gpu/cuda_driver.cpp.o
+[231/417] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/detail/search_runner.cpp.o
+In file included from /work/src/koi/detail/search_runner.cpp:23:
+/work/src/koi/detail/search_context.hpp:522:19: warning: operator '<<' has lower precedence than '+'; '+' will be evaluated first [-Wshift-op-parentheses]
+  522 |             (1ULL + static_cast<std::uint64_t>(move.to().index()) << 7U) +
+      |              ~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ~~
+/work/src/koi/detail/search_context.hpp:522:19: note: place parentheses around the '+' expression to silence this warning
+  522 |             (1ULL + static_cast<std::uint64_t>(move.to().index()) << 7U) +
+      |                   ^
+      |              (                                                   )
+/work/src/koi/detail/search_context.hpp:523:19: warning: operator '<<' has lower precedence than '+'; '+' will be evaluated first [-Wshift-op-parentheses]
+  523 |             (1ULL + static_cast<std::uint64_t>(move.promotion()) << 14U);
+      |              ~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ~~
+/work/src/koi/detail/search_context.hpp:523:19: note: place parentheses around the '+' expression to silence this warning
+  523 |             (1ULL + static_cast<std::uint64_t>(move.promotion()) << 14U);
+      |                   ^
+      |              (                                                  )
+2 warnings generated.
+[232/417] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/move.cpp.o
+[233/417] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/gpu/gpu_nnue_service.cpp.o
+[234/417] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/game_state.cpp.o
+[235/417] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/gpu/nnue_gpu_evaluator.cpp.o
+[236/417] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/move_chooser.cpp.o
+[237/417] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/perft.cpp.o
+[238/417] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/opening_book.cpp.o
+[239/417] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/nnue.cpp.o
+[240/417] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/position.cpp.o
+[241/417] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/policy_value_model.cpp.o
+[242/417] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/search_ordering.cpp.o
+[243/417] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/search_service.cpp.o
+[244/417] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/static_exchange.cpp.o
+[245/417] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/strength_suite.cpp.o
+[246/417] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/syzygy_tablebase.cpp.o
+[247/417] Building CXX object CMakeFiles/koi_core_generic.dir/third_party/fathom/tbprobe.c.o
+/work/third_party/fathom/tbprobe.c:744:3: warning: 'atomic_init<bool>' is deprecated [-Wdeprecated-declarations]
+  744 |   atomic_init(&tbHash[idx].error, false);
+      |   ^
+/usr/lib/llvm-18/bin/../include/c++/v1/__atomic/atomic.h:275:1: note: 'atomic_init<bool>' has been explicitly marked deprecated here
+  275 | _LIBCPP_DEPRECATED_IN_CXX20 _LIBCPP_HIDE_FROM_ABI void
+      | ^
+/usr/lib/llvm-18/bin/../include/c++/v1/__config:1007:41: note: expanded from macro '_LIBCPP_DEPRECATED_IN_CXX20'
+ 1007 | #    define _LIBCPP_DEPRECATED_IN_CXX20 _LIBCPP_DEPRECATED
+      |                                         ^
+/usr/lib/llvm-18/bin/../include/c++/v1/__config:974:49: note: expanded from macro '_LIBCPP_DEPRECATED'
+  974 | #      define _LIBCPP_DEPRECATED __attribute__((__deprecated__))
+      |                                                 ^
+1 warning generated.
+[248/417] Linking CXX executable koi_gpu_probe
+[249/417] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/time_manager.cpp.o
+[250/417] Linking CXX executable gpu_nnue_tests
+[251/417] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/transposition_table.cpp.o
+[252/417] Scanning /work/tests/unit/core/koi_core_tests.cpp for CXX dependencies
+[253/417] Generating CXX dyndep file CMakeFiles/koi_core_tests.dir/CXX.dd
+[254/417] Scanning /work/tests/unit/evaluation/evaluation_boundary_tests.cpp for CXX dependencies
+[255/417] Generating CXX dyndep file CMakeFiles/evaluation_boundary_tests.dir/CXX.dd
+[256/417] Scanning /work/tests/integration/rules/native_shadow_diff_tests.cpp for CXX dependencies
+[257/417] Generating CXX dyndep file CMakeFiles/koi_shadow_diff_tests.dir/CXX.dd
+[258/417] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/uci_controller.cpp.o
+[259/417] Building CXX object CMakeFiles/evaluation_boundary_tests.dir/tests/unit/evaluation/evaluation_boundary_tests.cpp.o
+[260/417] Building CXX object CMakeFiles/koi_core_tests.dir/tests/unit/core/koi_core_tests.cpp.o
+[261/417] Building CXX object CMakeFiles/koi_shadow_diff_tests.dir/tests/integration/rules/native_shadow_diff_tests.cpp.o
+[262/417] Linking CXX executable evaluation_boundary_tests
+[263/417] Scanning /work/tests/unit/evaluation/evaluation_architecture_tests.cpp for CXX dependencies
+[264/417] Generating CXX dyndep file CMakeFiles/evaluation_architecture_tests.dir/CXX.dd
+[265/417] Linking CXX executable koi_core_tests
+[266/417] Scanning /work/tests/unit/evaluation/nnue_boundary_tests.cpp for CXX dependencies
+[267/417] Generating CXX dyndep file CMakeFiles/nnue_boundary_tests.dir/CXX.dd
+[268/417] Linking CXX static library libkoi_core_generic.a
+[269/417] Linking CXX executable koi_shadow_diff_tests
+[270/417] Scanning /work/tests/unit/runtime/cpu_features_tests.cpp for CXX dependencies
+[271/417] Generating CXX dyndep file CMakeFiles/koi_cpu_features_tests.dir/CXX.dd
+[272/417] Scanning /work/tests/unit/runtime/cpu_variant_tests.cpp for CXX dependencies
+[273/417] Generating CXX dyndep file CMakeFiles/koi_cpu_variant_tests.dir/CXX.dd
+[274/417] Building CXX object CMakeFiles/evaluation_architecture_tests.dir/tests/unit/evaluation/evaluation_architecture_tests.cpp.o
+In file included from /work/tests/unit/evaluation/evaluation_architecture_tests.cpp:10:
+/work/src/koi/detail/search_context.hpp:522:19: warning: operator '<<' has lower precedence than '+'; '+' will be evaluated first [-Wshift-op-parentheses]
+  522 |             (1ULL + static_cast<std::uint64_t>(move.to().index()) << 7U) +
+      |              ~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ~~
+/work/src/koi/detail/search_context.hpp:522:19: note: place parentheses around the '+' expression to silence this warning
+  522 |             (1ULL + static_cast<std::uint64_t>(move.to().index()) << 7U) +
+      |                   ^
+      |              (                                                   )
+/work/src/koi/detail/search_context.hpp:523:19: warning: operator '<<' has lower precedence than '+'; '+' will be evaluated first [-Wshift-op-parentheses]
+  523 |             (1ULL + static_cast<std::uint64_t>(move.promotion()) << 14U);
+      |              ~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ~~
+/work/src/koi/detail/search_context.hpp:523:19: note: place parentheses around the '+' expression to silence this warning
+  523 |             (1ULL + static_cast<std::uint64_t>(move.promotion()) << 14U);
+      |                   ^
+      |              (                                                  )
+2 warnings generated.
+[275/417] Building CXX object CMakeFiles/koi_cpu_features_tests.dir/tests/unit/runtime/cpu_features_tests.cpp.o
+[276/417] Building CXX object CMakeFiles/koi_cpu_variant_tests.dir/tests/unit/runtime/cpu_variant_tests.cpp.o
+[277/417] Linking CXX executable koi_cpu_features_tests
+[278/417] Scanning /work/tests/unit/core/koi_module_tests.cpp for CXX dependencies
+[279/417] Building CXX object CMakeFiles/nnue_boundary_tests.dir/tests/unit/evaluation/nnue_boundary_tests.cpp.o
+[280/417] Generating CXX dyndep file CMakeFiles/koi_module_tests.dir/CXX.dd
+[281/417] Linking CXX executable evaluation_architecture_tests
+[282/417] Linking CXX executable koi_cpu_variant_tests
+[283/417] Scanning /work/tests/unit/runtime/syzygy_tablebase_tests.cpp for CXX dependencies
+[284/417] Scanning /work/tests/unit/rules/koi_rules_tests.cpp for CXX dependencies
+[285/417] Generating CXX dyndep file CMakeFiles/syzygy_tablebase_tests.dir/CXX.dd
+[286/417] Generating CXX dyndep file CMakeFiles/koi_rules_tests.dir/CXX.dd
+[287/417] Linking CXX executable nnue_boundary_tests
+[288/417] Building CXX object CMakeFiles/koi_module_tests.dir/tests/unit/core/koi_module_tests.cpp.o
+In module 'koi' imported from /work/tests/unit/core/koi_module_tests.cpp:1:
+In module 'koi:types' imported from /work/src/koi/modules/koi.ixx:3:
+/usr/lib/llvm-18/bin/../include/c++/v1/__iterator/reverse_iterator.h:53:14: warning: 'iterator<std::random_access_iterator_tag, std::string_view>' is deprecated [-Wdeprecated-declarations]
+   53 |     : public iterator<typename iterator_traits<_Iter>::iterator_category,
+      |              ^
+/usr/lib/llvm-18/bin/../include/c++/v1/vector:991:33: note: in instantiation of template class 'std::reverse_iterator<std::string_view *>' requested here
+  991 |                      __alloc(), _RevIter(__end_), _RevIter(__begin_), _RevIter(__v.__begin_))
+      |                                 ^
+/usr/lib/llvm-18/bin/../include/c++/v1/vector:1455:3: note: in instantiation of member function 'std::vector<std::string_view>::__swap_out_circular_buffer' requested here
+ 1455 |   __swap_out_circular_buffer(__v);
+      |   ^
+/usr/lib/llvm-18/bin/../include/c++/v1/vector:1467:13: note: in instantiation of function template specialization 'std::vector<std::string_view>::__push_back_slow_path<const std::string_view &>' requested here
+ 1467 |     __end = __push_back_slow_path(__x);
+      |             ^
+/work/tests/support/koi_test_support.hpp:384:33: note: in instantiation of member function 'std::vector<std::string_view>::push_back' requested here
+  384 |             seen_known_failures.push_back(name);
+      |                                 ^
+/usr/lib/llvm-18/bin/../include/c++/v1/__iterator/iterator.h:23:29: note: 'iterator<std::random_access_iterator_tag, std::string_view>' has been explicitly marked deprecated here
+   23 | struct _LIBCPP_TEMPLATE_VIS _LIBCPP_DEPRECATED_IN_CXX17 iterator {
+      |                             ^
+/usr/lib/llvm-18/bin/../include/c++/v1/__config:1001:41: note: expanded from macro '_LIBCPP_DEPRECATED_IN_CXX17'
+ 1001 | #    define _LIBCPP_DEPRECATED_IN_CXX17 _LIBCPP_DEPRECATED
+      |                                         ^
+/usr/lib/llvm-18/bin/../include/c++/v1/__config:974:49: note: expanded from macro '_LIBCPP_DEPRECATED'
+  974 | #      define _LIBCPP_DEPRECATED __attribute__((__deprecated__))
+      |                                                 ^
+1 warning generated.
+[289/417] Scanning /work/tests/unit/rules/native_rule_state_tests.cpp for CXX dependencies
+[290/417] Generating CXX dyndep file CMakeFiles/native_rule_state_tests.dir/CXX.dd
+[291/417] Linking CXX executable koi_module_tests
+[292/417] Building CXX object CMakeFiles/koi_rules_tests.dir/tests/unit/rules/koi_rules_tests.cpp.o
+[293/417] Scanning /work/tests/unit/runtime/opening_book_tests.cpp for CXX dependencies
+[294/417] Generating CXX dyndep file CMakeFiles/opening_book_tests.dir/CXX.dd
+[295/417] Building CXX object CMakeFiles/syzygy_tablebase_tests.dir/tests/unit/runtime/syzygy_tablebase_tests.cpp.o
+[296/417] Linking CXX executable koi_rules_tests
+[297/417] Scanning /work/tests/unit/runtime/uci_controller_tests.cpp for CXX dependencies
+[298/417] Generating CXX dyndep file CMakeFiles/uci_controller_tests.dir/CXX.dd
+[299/417] Linking CXX executable syzygy_tablebase_tests
+[300/417] Scanning /work/tests/unit/runtime/completion_gate_tests.cpp for CXX dependencies
+[301/417] Generating CXX dyndep file CMakeFiles/completion_gate_tests.dir/CXX.dd
+[302/417] Building CXX object CMakeFiles/opening_book_tests.dir/tests/unit/runtime/opening_book_tests.cpp.o
+[303/417] Building CXX object CMakeFiles/native_rule_state_tests.dir/tests/unit/rules/native_rule_state_tests.cpp.o
+[304/417] Linking CXX executable opening_book_tests
+[305/417] Building CXX object CMakeFiles/completion_gate_tests.dir/tests/unit/runtime/completion_gate_tests.cpp.o
+[306/417] Scanning /work/tests/unit/search/koi_search_tests.cpp for CXX dependencies
+[307/417] Generating CXX dyndep file CMakeFiles/koi_search_tests.dir/CXX.dd
+[308/417] Linking CXX executable native_rule_state_tests
+[309/417] Scanning /work/tests/unit/search/search_ordering_tests.cpp for CXX dependencies
+[310/417] Generating CXX dyndep file CMakeFiles/search_ordering_tests.dir/CXX.dd
+[311/417] Linking CXX executable completion_gate_tests
+[312/417] Scanning /work/tests/unit/search/search_architecture_tests.cpp for CXX dependencies
+[313/417] Generating CXX dyndep file CMakeFiles/search_architecture_tests.dir/CXX.dd
+[314/417] Building CXX object CMakeFiles/uci_controller_tests.dir/tests/unit/runtime/uci_controller_tests.cpp.o
+[315/417] Building CXX object CMakeFiles/search_ordering_tests.dir/tests/unit/search/search_ordering_tests.cpp.o
+[316/417] Linking CXX executable search_ordering_tests
+[317/417] Building CXX object CMakeFiles/search_architecture_tests.dir/tests/unit/search/search_architecture_tests.cpp.o
+In file included from /work/tests/unit/search/search_architecture_tests.cpp:10:
+/work/src/koi/detail/search_context.hpp:522:19: warning: operator '<<' has lower precedence than '+'; '+' will be evaluated first [-Wshift-op-parentheses]
+  522 |             (1ULL + static_cast<std::uint64_t>(move.to().index()) << 7U) +
+      |              ~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ~~
+/work/src/koi/detail/search_context.hpp:522:19: note: place parentheses around the '+' expression to silence this warning
+  522 |             (1ULL + static_cast<std::uint64_t>(move.to().index()) << 7U) +
+      |                   ^
+      |              (                                                   )
+/work/src/koi/detail/search_context.hpp:523:19: warning: operator '<<' has lower precedence than '+'; '+' will be evaluated first [-Wshift-op-parentheses]
+  523 |             (1ULL + static_cast<std::uint64_t>(move.promotion()) << 14U);
+      |              ~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ~~
+/work/src/koi/detail/search_context.hpp:523:19: note: place parentheses around the '+' expression to silence this warning
+  523 |             (1ULL + static_cast<std::uint64_t>(move.promotion()) << 14U);
+      |                   ^
+      |              (                                                  )
+2 warnings generated.
+[318/417] Scanning /work/tests/unit/search/search_policy_tests.cpp for CXX dependencies
+[319/417] Generating CXX dyndep file CMakeFiles/search_policy_tests.dir/CXX.dd
+[320/417] Linking CXX executable search_architecture_tests
+[321/417] Scanning /work/tests/unit/search/search_runtime_tests.cpp for CXX dependencies
+[322/417] Generating CXX dyndep file CMakeFiles/search_runtime_tests.dir/CXX.dd
+[323/417] Linking CXX executable uci_controller_tests
+[324/417] Building CXX object CMakeFiles/search_policy_tests.dir/tests/unit/search/search_policy_tests.cpp.o
+In file included from /work/tests/unit/search/search_policy_tests.cpp:9:
+/work/src/koi/detail/search_context.hpp:522:19: warning: operator '<<' has lower precedence than '+'; '+' will be evaluated first [-Wshift-op-parentheses]
+  522 |             (1ULL + static_cast<std::uint64_t>(move.to().index()) << 7U) +
+      |              ~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ~~
+/work/src/koi/detail/search_context.hpp:522:19: note: place parentheses around the '+' expression to silence this warning
+  522 |             (1ULL + static_cast<std::uint64_t>(move.to().index()) << 7U) +
+      |                   ^
+      |              (                                                   )
+/work/src/koi/detail/search_context.hpp:523:19: warning: operator '<<' has lower precedence than '+'; '+' will be evaluated first [-Wshift-op-parentheses]
+  523 |             (1ULL + static_cast<std::uint64_t>(move.promotion()) << 14U);
+      |              ~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ~~
+/work/src/koi/detail/search_context.hpp:523:19: note: place parentheses around the '+' expression to silence this warning
+  523 |             (1ULL + static_cast<std::uint64_t>(move.promotion()) << 14U);
+      |                   ^
+      |              (                                                  )
+2 warnings generated.
+[325/417] Scanning /work/tests/unit/search/policy_value_mcts_tests.cpp for CXX dependencies
+[326/417] Generating CXX dyndep file CMakeFiles/policy_value_mcts_tests.dir/CXX.dd
+[327/417] Building CXX object CMakeFiles/koi_search_tests.dir/tests/unit/search/koi_search_tests.cpp.o
+In file included from /work/tests/unit/search/koi_search_tests.cpp:22:
+/work/src/koi/detail/search_context.hpp:522:19: warning: operator '<<' has lower precedence than '+'; '+' will be evaluated first [-Wshift-op-parentheses]
+  522 |             (1ULL + static_cast<std::uint64_t>(move.to().index()) << 7U) +
+      |              ~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ~~
+/work/src/koi/detail/search_context.hpp:522:19: note: place parentheses around the '+' expression to silence this warning
+  522 |             (1ULL + static_cast<std::uint64_t>(move.to().index()) << 7U) +
+      |                   ^
+      |              (                                                   )
+/work/src/koi/detail/search_context.hpp:523:19: warning: operator '<<' has lower precedence than '+'; '+' will be evaluated first [-Wshift-op-parentheses]
+  523 |             (1ULL + static_cast<std::uint64_t>(move.promotion()) << 14U);
+      |              ~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ~~
+/work/src/koi/detail/search_context.hpp:523:19: note: place parentheses around the '+' expression to silence this warning
+  523 |             (1ULL + static_cast<std::uint64_t>(move.promotion()) << 14U);
+      |                   ^
+      |              (                                                  )
+/work/tests/unit/search/koi_search_tests.cpp:4225:5: warning: ignoring return value of function declared with 'nodiscard' attribute [-Wunused-result]
+ 4225 |     service.set_hash_size_mb(1);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~ ~
+/work/tests/unit/search/koi_search_tests.cpp:4255:5: warning: ignoring return value of function declared with 'nodiscard' attribute [-Wunused-result]
+ 4255 |     service.set_hash_size_mb(0);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~ ~
+/work/tests/unit/search/koi_search_tests.cpp:4283:5: warning: ignoring return value of function declared with 'nodiscard' attribute [-Wunused-result]
+ 4283 |     table.set_size_mb(1);
+      |     ^~~~~~~~~~~~~~~~~ ~
+/work/tests/unit/search/koi_search_tests.cpp:4498:9: warning: ignoring return value of function declared with 'nodiscard' attribute [-Wunused-result]
+ 4498 |         table.set_size_mb(megabytes);
+      |         ^~~~~~~~~~~~~~~~~ ~~~~~~~~~
+/work/tests/unit/search/koi_search_tests.cpp:4532:13: warning: ignoring return value of function declared with 'nodiscard' attribute [-Wunused-result]
+ 4532 |             table.set_size_mb(megabytes);
+      |             ^~~~~~~~~~~~~~~~~ ~~~~~~~~~
+7 warnings generated.
+[328/417] Linking CXX executable search_policy_tests
+[329/417] Scanning /work/tests/unit/search/static_exchange_tests.cpp for CXX dependencies
+[330/417] Generating CXX dyndep file CMakeFiles/static_exchange_tests.dir/CXX.dd
+[331/417] Building CXX object CMakeFiles/search_runtime_tests.dir/tests/unit/search/search_runtime_tests.cpp.o
+[332/417] Linking CXX executable search_runtime_tests
+[333/417] Scanning /work/tests/unit/runtime/transposition_table_tests.cpp for CXX dependencies
+[334/417] Generating CXX dyndep file CMakeFiles/transposition_table_tests.dir/CXX.dd
+[335/417] Building CXX object CMakeFiles/static_exchange_tests.dir/tests/unit/search/static_exchange_tests.cpp.o
+[336/417] Building CXX object CMakeFiles/policy_value_mcts_tests.dir/tests/unit/search/policy_value_mcts_tests.cpp.o
+[337/417] Linking CXX executable static_exchange_tests
+[338/417] Linking CXX executable koi_search_tests
+[339/417] Scanning /work/tests/unit/runtime/search_service_tests.cpp for CXX dependencies
+[340/417] Generating CXX dyndep file CMakeFiles/search_service_tests.dir/CXX.dd
+[341/417] Scanning /work/tests/unit/runtime/koi_soak_tests.cpp for CXX dependencies
+[342/417] Generating CXX dyndep file CMakeFiles/koi_soak_tests.dir/CXX.dd
+[343/417] Building CXX object CMakeFiles/transposition_table_tests.dir/tests/unit/runtime/transposition_table_tests.cpp.o
+[344/417] Linking CXX executable transposition_table_tests
+[345/417] Linking CXX executable policy_value_mcts_tests
+[346/417] Scanning /work/tests/unit/evaluation/classical_evaluator_tests.cpp for CXX dependencies
+[347/417] Generating CXX dyndep file CMakeFiles/classical_evaluator_tests.dir/CXX.dd
+[348/417] Scanning /work/tests/unit/evaluation/evaluation_features_tests.cpp for CXX dependencies
+[349/417] Generating CXX dyndep file CMakeFiles/evaluation_features_tests.dir/CXX.dd
+[350/417] Building CXX object CMakeFiles/koi_soak_tests.dir/tests/unit/runtime/koi_soak_tests.cpp.o
+[351/417] Building CXX object CMakeFiles/classical_evaluator_tests.dir/tests/unit/evaluation/classical_evaluator_tests.cpp.o
+[352/417] Building CXX object CMakeFiles/evaluation_features_tests.dir/tests/unit/evaluation/evaluation_features_tests.cpp.o
+[353/417] Building CXX object CMakeFiles/search_service_tests.dir/tests/unit/runtime/search_service_tests.cpp.o
+[354/417] Linking CXX executable classical_evaluator_tests
+[355/417] Linking CXX executable evaluation_features_tests
+[356/417] Scanning /work/tests/unit/evaluation/policy_value_model_tests.cpp for CXX dependencies
+[357/417] Generating CXX dyndep file CMakeFiles/policy_value_model_tests.dir/CXX.dd
+[358/417] Scanning /work/tests/unit/search/time_manager_tests.cpp for CXX dependencies
+[359/417] Generating CXX dyndep file CMakeFiles/time_manager_tests.dir/CXX.dd
+[360/417] Linking CXX executable koi_soak_tests
+[361/417] Scanning /work/tests/unit/search/koi_strength_tests.cpp for CXX dependencies
+[362/417] Generating CXX dyndep file CMakeFiles/koi_strength_tests.dir/CXX.dd
+[363/417] Building CXX object CMakeFiles/policy_value_model_tests.dir/tests/unit/evaluation/policy_value_model_tests.cpp.o
+[364/417] Building CXX object CMakeFiles/time_manager_tests.dir/tests/unit/search/time_manager_tests.cpp.o
+[365/417] Linking CXX executable search_service_tests
+[366/417] Linking CXX executable policy_value_model_tests
+[367/417] Scanning /work/tests/integration/tools/uci_match_fixture.cpp for CXX dependencies
+[368/417] Generating CXX dyndep file CMakeFiles/uci_match_fixture.dir/CXX.dd
+[369/417] Scanning /work/tests/unit/rules/perft_tests.cpp for CXX dependencies
+[370/417] Generating CXX dyndep file CMakeFiles/perft_tests.dir/CXX.dd
+[371/417] Linking CXX executable time_manager_tests
+[372/417] Scanning /work/tools/engine/perft.cpp for CXX dependencies
+[373/417] Generating CXX dyndep file CMakeFiles/koi_perft.dir/CXX.dd
+[374/417] Building CXX object CMakeFiles/koi_perft.dir/tools/engine/perft.cpp.o
+[375/417] Building CXX object CMakeFiles/koi_strength_tests.dir/tests/unit/search/koi_strength_tests.cpp.o
+[376/417] Building CXX object CMakeFiles/uci_match_fixture.dir/tests/integration/tools/uci_match_fixture.cpp.o
+[377/417] Linking CXX executable uci_match_fixture
+[378/417] Building CXX object CMakeFiles/perft_tests.dir/tests/unit/rules/perft_tests.cpp.o
+[379/417] Scanning /work/tools/engine/koi_bench.cpp for CXX dependencies
+[380/417] Generating CXX dyndep file CMakeFiles/koi_bench.dir/CXX.dd
+[381/417] Linking CXX executable koi-perft
+[382/417] Scanning /work/tools/engine/koi_replay.cpp for CXX dependencies
+[383/417] Generating CXX dyndep file CMakeFiles/koi_replay.dir/CXX.dd
+[384/417] Linking CXX executable perft_tests
+[385/417] Scanning /work/tools/engine/koi_eval_features.cpp for CXX dependencies
+[386/417] Generating CXX dyndep file CMakeFiles/koi_eval_features.dir/CXX.dd
+[387/417] Building CXX object CMakeFiles/koi_replay.dir/tools/engine/koi_replay.cpp.o
+[388/417] Building CXX object CMakeFiles/koi_eval_features.dir/tools/engine/koi_eval_features.cpp.o
+[389/417] Linking CXX executable koi-replay
+[390/417] Linking CXX executable koi_strength_tests
+[391/417] Building CXX object CMakeFiles/koi_bench.dir/tools/engine/koi_bench.cpp.o
+[392/417] Scanning /work/tests/integration/tools/koi_replay_tests.cpp for CXX dependencies
+[393/417] Scanning /work/tools/engine/koi_nnue_fixture.cpp for CXX dependencies
+[394/417] Generating CXX dyndep file CMakeFiles/koi_replay_tests.dir/CXX.dd
+[395/417] Generating CXX dyndep file CMakeFiles/koi_nnue_fixture.dir/CXX.dd
+[396/417] Linking CXX executable koi-eval-features
+[397/417] Scanning /work/src/main.cpp for CXX dependencies
+[398/417] Generating CXX dyndep file CMakeFiles/koi_engine.dir/CXX.dd
+[399/417] Building CXX object CMakeFiles/koi_nnue_fixture.dir/tools/engine/koi_nnue_fixture.cpp.o
+[400/417] Building CXX object CMakeFiles/koi_replay_tests.dir/tests/integration/tools/koi_replay_tests.cpp.o
+[401/417] Linking CXX executable koi_replay_tests
+[402/417] Scanning /work/src/main.cpp for CXX dependencies
+[403/417] Generating CXX dyndep file CMakeFiles/koi_engine_avx2.dir/CXX.dd
+[404/417] Building CXX object CMakeFiles/koi_engine.dir/src/main.cpp.o
+[405/417] Linking CXX executable koi-nnue-fixture
+[406/417] Linking CXX executable koi-bench
+[407/417] Scanning /work/tests/integration/tools/koi_nnue_fixture_tests.cpp for CXX dependencies
+[408/417] Generating CXX dyndep file CMakeFiles/koi_nnue_fixture_tests.dir/CXX.dd
+[409/417] Scanning /work/src/main.cpp for CXX dependencies
+[410/417] Generating CXX dyndep file CMakeFiles/koi_engine_avx512.dir/CXX.dd
+[411/417] Building CXX object CMakeFiles/koi_engine_avx2.dir/src/main.cpp.o
+[412/417] Building CXX object CMakeFiles/koi_engine_avx512.dir/src/main.cpp.o
+[413/417] Building CXX object CMakeFiles/koi_nnue_fixture_tests.dir/tests/integration/tools/koi_nnue_fixture_tests.cpp.o
+[414/417] Linking CXX executable koi-engine
+[415/417] Linking CXX executable koi_nnue_fixture_tests
+[416/417] Linking CXX executable koi-engine-avx2
+[417/417] Linking CXX executable koi-engine-avx512

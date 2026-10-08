@@ -1,0 +1,354 @@
+{
+  "schema": "koi-uci-match-v2",
+  "generated_utc": "2026-09-26T16:24:28.5381256Z",
+  "hardware": {
+    "os": "Microsoft Windows NT 10.0.26200.0",
+    "machine": "AMD64",
+    "processor": "Intel64 Family 6 Model 165 Stepping 3, GenuineIntel",
+    "cpu_count": 8,
+    "powershell_version": "7.6.6"
+  },
+  "measurement": {
+    "network": {
+      "enabled": false,
+      "state": "disabled",
+      "reason": "the local UCI match harness performs no network access"
+    },
+    "book": {
+      "enabled": false,
+      "state": "disabled",
+      "path": null,
+      "random": false
+    },
+    "tablebase": {
+      "enabled": false,
+      "state": "disabled",
+      "path": null
+    },
+    "hardware": {
+      "os": "Microsoft Windows NT 10.0.26200.0",
+      "machine": "AMD64",
+      "processor": "Intel64 Family 6 Model 165 Stepping 3, GenuineIntel",
+      "cpu_count": 8,
+      "powershell_version": "7.6.6"
+    },
+    "time_control": {
+      "kind": "depth",
+      "value": "depth 1",
+      "depth": 1
+    }
+  },
+  "configuration": {
+    "depth": 1,
+    "movetime_ms": 0,
+    "nodes": 0,
+    "threads": 1,
+    "speed": 100,
+    "hash_mb": 16,
+    "max_plies": 2,
+    "timeout_ms": 5000,
+    "protocol_timeout_ms": 5000,
+    "games_per_position": 1,
+    "koi_color": "white",
+    "time_control": "depth 1",
+    "koi_random_seed": 1,
+    "koi_own_book": false,
+    "koi_book_file": "book.bin",
+    "koi_book_depth": 16,
+    "koi_book_random": false,
+    "opponent_own_book": false,
+    "opponent_limit_strength": false,
+    "opponent_elo": null,
+    "batch_id": "batch-00",
+    "run_label": "measurement",
+    "koi_evaluator_mode": "classical",
+    "koi_evalfile_path": null,
+    "koi_evalfile_sha256": null,
+    "koi_gpu_nnue_requested": false,
+    "koi_evaluator_attestation": {
+      "nnue_enabled_confirmation": null,
+      "evalfile_rejections": [],
+      "gpu_enabled_marker": null,
+      "gpu_unavailable_fallbacks": []
+    },
+    "time_control_metadata": {
+      "kind": "depth",
+      "value": "depth 1",
+      "depth": 1
+    }
+  },
+  "engines": [
+    {
+      "label": "Koi",
+      "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\packages\\full-release-windows-gpu\\extracted\\koi-engine.exe",
+      "name": "Koi Engine",
+      "version": "unknown",
+      "hashes": {
+        "executable_sha256": "2616d15afed28229083f9eec1090efa8340efbf33e0271fd0d9470ca3c5a36e2"
+      },
+      "identity": [
+        "id name Koi Engine",
+        "id author Koi Engine contributors"
+      ],
+      "handshake": [
+        "id name Koi Engine",
+        "id author Koi Engine contributors",
+        "option name RandomSeed type spin default 0 min 0 max 2147483647",
+        "option name Hash type spin default 512 min 1 max 4096",
+        "option name Threads type spin default 1 min 1 max 8",
+        "option name Speed type spin default 100 min 1 max 100",
+        "option name UCI_AnalyseMode type check default false",
+        "option name MultiPV type spin default 1 min 1 max 16",
+        "option name Ponder type check default false",
+        "option name OwnBook type check default false",
+        "option name BookFile type string default book.bin",
+        "option name BookDepth type spin default 16 min 0 max 40",
+        "option name BookRandom type check default false",
+        "option name BookSafety type check default true",
+        "option name BookSafetyDepth type spin default 2 min 0 max 3",
+        "option name Clear Hash type button",
+        "option name UCI_ShowWDL type check default false",
+        "option name Move Overhead type spin default 30 min 0 max 5000",
+        "option name Slow Mover type spin default 100 min 10 max 1000",
+        "option name StrengthMode type check default false",
+        "option name SyzygyPath type string default ",
+        "option name SyzygyProbeDepth type spin default 1 min 1 max 100",
+        "option name SyzygyProbeLimit type spin default 7 min 0 max 7",
+        "option name SyzygyInteriorDepth type spin default 0 min 0 max 100",
+        "option name Syzygy50MoveRule type check default true",
+        "option name EvalFile type string default ",
+        "uciok"
+      ],
+      "options": [
+        "setoption name Hash value 16",
+        "setoption name Threads value 1",
+        "setoption name Speed value 100",
+        "setoption name RandomSeed value 1",
+        "setoption name OwnBook value false",
+        "setoption name BookFile value book.bin",
+        "setoption name BookDepth value 16",
+        "setoption name BookRandom value false"
+      ],
+      "process_status": "clean shutdown",
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "label": "Opponent",
+      "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\baselines\\v1.0.0-pre-full\\windows-extracted\\koi-engine.exe",
+      "name": "Koi Engine",
+      "version": "unknown",
+      "hashes": {
+        "executable_sha256": "133832cfb5b642f49958a303ac97847b5ea663299e7c2501be8486eabf9aaaf1"
+      },
+      "identity": [
+        "id name Koi Engine",
+        "id author Koi Engine contributors"
+      ],
+      "handshake": [
+        "id name Koi Engine",
+        "id author Koi Engine contributors",
+        "option name RandomSeed type spin default 0 min 0 max 2147483647",
+        "option name Hash type spin default 512 min 1 max 4096",
+        "option name Threads type spin default 1 min 1 max 8",
+        "option name Speed type spin default 100 min 1 max 100",
+        "option name UCI_AnalyseMode type check default false",
+        "option name MultiPV type spin default 1 min 1 max 16",
+        "option name Ponder type check default false",
+        "option name OwnBook type check default true",
+        "option name BookFile type string default book.bin",
+        "option name BookDepth type spin default 16 min 0 max 40",
+        "option name BookRandom type check default false",
+        "option name BookSafety type check default true",
+        "option name BookSafetyDepth type spin default 2 min 0 max 3",
+        "option name Clear Hash type button",
+        "option name UCI_ShowWDL type check default false",
+        "option name Move Overhead type spin default 30 min 0 max 5000",
+        "option name Slow Mover type spin default 100 min 10 max 1000",
+        "option name StrengthMode type check default false",
+        "option name SyzygyPath type string default ",
+        "option name SyzygyProbeDepth type spin default 1 min 1 max 100",
+        "option name SyzygyProbeLimit type spin default 7 min 0 max 7",
+        "option name SyzygyInteriorDepth type spin default 0 min 0 max 100",
+        "option name Syzygy50MoveRule type check default true",
+        "option name EvalFile type string default ",
+        "uciok"
+      ],
+      "options": [
+        "setoption name Hash value 16",
+        "setoption name Threads value 1",
+        "setoption name Speed value 100",
+        "setoption name OwnBook value false"
+      ],
+      "process_status": "clean shutdown",
+      "exit_code": 0,
+      "stderr": ""
+    }
+  ],
+  "package_binding": {
+    "schema": "koi-package-binding-v1",
+    "package_manifest_filename": "package.json",
+    "package_manifest_sha256": "e848359ffaae9ad28d467a6aed0acf997c5750b2d13b32f5547b3fdade556b90",
+    "package_archive_filename": "koi-engine-v1.0.0.zip",
+    "package_archive_sha256": "eedaf3727eb5a9443bb19a09f1552cbac72d0a667332add7fd43ef2479e5ea61",
+    "source_commit": "5560b876066749f0f20a86c304e3b6faafa7526f",
+    "source_dirty": false,
+    "executable_identity": {
+      "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\packages\\full-release-windows-gpu\\extracted\\koi-engine.exe",
+      "package_relative_path": "koi-engine.exe",
+      "name": "Koi Engine",
+      "version": "unknown",
+      "sha256": "2616d15afed28229083f9eec1090efa8340efbf33e0271fd0d9470ca3c5a36e2"
+    }
+  },
+  "positions": [
+    {
+      "Name": "startpos",
+      "Fen": "startpos",
+      "Moves": []
+    }
+  ],
+  "games": [
+    {
+      "position": "startpos",
+      "initial_fen": "startpos",
+      "round": 1,
+      "koi_color": "white",
+      "result": "*",
+      "winner": null,
+      "termination": "max plies",
+      "process_status": {
+        "koi": "clean shutdown",
+        "opponent": "clean shutdown"
+      },
+      "moves": [
+        {
+          "ply": 1,
+          "root_fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+          "side": "w",
+          "engine": "Koi Engine",
+          "engine_label": "Koi",
+          "position_command": "position startpos",
+          "go_command": "go depth 1",
+          "move": "b1c3",
+          "replay_legal": true,
+          "elapsed_ms": 23,
+          "final_info": {
+            "depth": 1,
+            "seldepth": 1,
+            "score_type": "cp",
+            "score": 102,
+            "nodes": 23,
+            "nps": 23,
+            "time_ms": 0,
+            "pv": "b1c3",
+            "raw": "info depth 1 seldepth 1 multipv 1 score cp 102 nodes 23 nps 23 hashfull 0 time 0 pv b1c3"
+          },
+          "evaluation": {
+            "depth": 1,
+            "seldepth": 1,
+            "score_type": "cp",
+            "score": 102,
+            "nodes": 23,
+            "nps": 23,
+            "time_ms": 0,
+            "pv": "b1c3",
+            "raw": "info depth 1 seldepth 1 multipv 1 score cp 102 nodes 23 nps 23 hashfull 0 time 0 pv b1c3"
+          },
+          "all_info_lines": [
+            "info depth 1 seldepth 1 multipv 1 score cp 102 nodes 23 nps 23 hashfull 0 time 0 pv b1c3"
+          ],
+          "infos": [
+            {
+              "depth": 1,
+              "seldepth": 1,
+              "score_type": "cp",
+              "score": 102,
+              "nodes": 23,
+              "nps": 23,
+              "time_ms": 0,
+              "pv": "b1c3",
+              "raw": "info depth 1 seldepth 1 multipv 1 score cp 102 nodes 23 nps 23 hashfull 0 time 0 pv b1c3"
+            }
+          ],
+          "bestmove_line": "bestmove b1c3",
+          "book_used": false,
+          "book_move": null,
+          "position_classification": {
+            "phase": "opening",
+            "side_to_move": "white",
+            "piece_count": 32,
+            "non_pawn_non_king_count": 14,
+            "castling_rights": "KQkq",
+            "en_passant": "-"
+          }
+        },
+        {
+          "ply": 2,
+          "root_fen": "rnbqkbnr/pppppppp/8/8/8/2N5/PPPPPPPP/R1BQKBNR b KQkq - 1 1",
+          "side": "b",
+          "engine": "Koi Engine",
+          "engine_label": "Opponent",
+          "position_command": "position startpos moves b1c3",
+          "go_command": "go depth 1",
+          "move": "b8c6",
+          "replay_legal": true,
+          "elapsed_ms": 3,
+          "final_info": {
+            "depth": 1,
+            "seldepth": 1,
+            "score_type": "cp",
+            "score": 0,
+            "nodes": 24,
+            "nps": 24,
+            "time_ms": 0,
+            "pv": "b8c6",
+            "raw": "info depth 1 seldepth 1 multipv 1 score cp 0 nodes 24 nps 24 hashfull 0 time 0 pv b8c6"
+          },
+          "evaluation": {
+            "depth": 1,
+            "seldepth": 1,
+            "score_type": "cp",
+            "score": 0,
+            "nodes": 24,
+            "nps": 24,
+            "time_ms": 0,
+            "pv": "b8c6",
+            "raw": "info depth 1 seldepth 1 multipv 1 score cp 0 nodes 24 nps 24 hashfull 0 time 0 pv b8c6"
+          },
+          "all_info_lines": [
+            "info depth 1 seldepth 1 multipv 1 score cp 0 nodes 24 nps 24 hashfull 0 time 0 pv b8c6"
+          ],
+          "infos": [
+            {
+              "depth": 1,
+              "seldepth": 1,
+              "score_type": "cp",
+              "score": 0,
+              "nodes": 24,
+              "nps": 24,
+              "time_ms": 0,
+              "pv": "b8c6",
+              "raw": "info depth 1 seldepth 1 multipv 1 score cp 0 nodes 24 nps 24 hashfull 0 time 0 pv b8c6"
+            }
+          ],
+          "bestmove_line": "bestmove b8c6",
+          "book_used": false,
+          "book_move": null,
+          "position_classification": {
+            "phase": "opening",
+            "side_to_move": "black",
+            "piece_count": 32,
+            "non_pawn_non_king_count": 14,
+            "castling_rights": "KQkq",
+            "en_passant": "-"
+          }
+        }
+      ]
+    }
+  ],
+  "sprt": {
+    "enabled": false,
+    "decision": "disabled"
+  }
+}

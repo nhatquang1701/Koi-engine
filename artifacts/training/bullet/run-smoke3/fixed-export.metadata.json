@@ -1,0 +1,26 @@
+{
+  "schema": "koi-nnue-training-metadata-v2",
+  "created": "2026-09-18T12:40:30Z",
+  "corpus": "artifacts\\training\\bullet\\validation.txt",
+  "rows_used": 25,
+  "val_rows": 25,
+  "feature_set": "halfka-king-bucket-v1",
+  "quantization": "int16/int8",
+  "architecture": {
+    "input": 9216,
+    "hidden": 64,
+    "output_buckets": 8
+  },
+  "activation": "crelu-pair",
+  "hidden_shift": 6,
+  "output_shift": 12,
+  "backend": "bullet",
+  "checkpoint": "artifacts\\training\\bullet\\run-smoke3\\checkpoints\\koi-v4-2",
+  "val_mae_cp": 707.4811565609912,
+  "val_round_trip_mae_cp": 707.08,
+  "w1_saturation": 0.0,
+  "w2_saturation": 0.0,
+  "payload_sha256": "a1e5b4c7bc4dbb83ad32e1cb2e808f34ab3005a93c1a6a61391a247f68ba9edd",
+  "network_sha256": "83db78d77be61604fe61b9202795dde0cba756310b2de73f03951215d26113de",
+  "command": "tools/measurement/export_bullet_v4.py --checkpoint artifacts/training/bullet/run-smoke3 --validation artifacts/training/bullet/validation.txt --net-out artifacts/training/bullet/run-smoke3/fixed-export.nnue --meta-out artifacts/training/bullet/run-smoke3/fixed-export.metadata.json --tune-samples 25"
+}

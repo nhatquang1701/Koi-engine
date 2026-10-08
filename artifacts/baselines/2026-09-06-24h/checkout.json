@@ -1,0 +1,7 @@
+{
+  "timestamp": "2026-09-06T12:49:29.3651211Z",
+  "root": "C:\\Users\\ntATh\\AI test\\Koi engine",
+  "base": "e26691f7b6ef85286559e9b6dcace6759c8b3f10",
+  "branch": "koi-engine-v1",
+  "status": " M CMakeLists.txt\r\n M README.md\r\n M src/koi/game_state.cpp\r\n M src/koi/game_state.hpp\r\n M src/koi/move.hpp\r\n M src/koi/position.cpp\r\n M src/koi/position.hpp\r\n M src/koi/syzygy_tablebase.cpp\r\n M src/koi/uci_controller.cpp\r\n M src/main.cpp\r\n M tests/ci_configuration_test.ps1\r\n M tests/elo_oracle_test.py\r\n M tests/koi_bench_process_test.ps1\r\n M tests/koi_core_tests.cpp\r\n M tests/syzygy_tablebase_tests.cpp\r\n M tests/uci_controller_tests.cpp\r\n M tests/uci_process_test.ps1\r\n M tools/koi_bench.cpp\r\n?? src/koi/cpu_features.cpp\r\n?? src/koi/cpu_features.hpp\r\n?? src/koi/modules/\r\n?? tests/cpu_features_tests.cpp\r\n?? tests/koi_module_tests.cpp\r\n?? tests/native_shadow_diff_tests.cpp\r\n?? tests/package_release_test.ps1\r\n?? \"third_party/User tests/2026.09.06  2_Koi Engine - Leela Chess Zero.pgn\"\r\n?? tools/package_release.ps1\r\n"
+}

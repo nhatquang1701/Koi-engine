@@ -1,0 +1,117 @@
+bullet training start net=koi-v4 hidden=1024 batch=8192 batches_per_superbatch=261 superbatches=10
+Training Preamble
+Net Name               : koi-v4
+Batch Size             : 8192
+Batches / Superbatch   : 261
+Positions / Superbatch : 2138112
+Start Superbatch       : 1
+End Superbatch         : 10
+Eval Scale             : 100
+Save Rate              : 1
+WDL Scheduler          : constant 0
+LR Scheduler           : start at 0.002 and cosine decay to 0.0002 at superbatch 10
+Threads                : 4
+Output Path            : artifacts\training\bullet\koi-v4-bullet\checkpoints
+Training on NVIDIA GeForce GTX 1060 6GB (sm_61)
+superbatch 1 [0.0% (0/261 batches, 225985 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 1 [49.0% (128/261 batches, 901571 pos/sec)]
+Estimated time to end of superbatch: 1.2s     superbatch 1 [98.1% (256/261 batches, 928490 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 1 | time 2.3s | running loss 0.070970 | 930717 pos/sec | total time 4.3s
+Estimated time remaining in training: 0h 0m 38s
+Saved [koi-v4-1]
+epoch 1/10 train_loss 0.07097 val_loss 0.07097 val_mae_cp 290.4 time 2.3s
+LR dropped to 0.0018281153
+superbatch 2 [0.0% (0/261 batches, 1030583 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 2 [49.0% (128/261 batches, 983849 pos/sec)]
+Estimated time to end of superbatch: 1.1s     superbatch 2 [98.1% (256/261 batches, 986210 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 2 | time 2.2s | running loss 0.044642 | 987380 pos/sec | total time 8.1s
+Estimated time remaining in training: 0h 0m 32s
+Saved [koi-v4-2]
+epoch 2/10 train_loss 0.04464 val_loss 0.04464 val_mae_cp 257.2 time 2.2s
+LR dropped to 0.0016290068
+superbatch 3 [0.0% (0/261 batches, 1031219 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 3 [49.0% (128/261 batches, 988375 pos/sec)]
+Estimated time to end of superbatch: 1.1s     superbatch 3 [98.1% (256/261 batches, 990807 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 3 | time 2.2s | running loss 0.035616 | 988732 pos/sec | total time 12.2s
+Estimated time remaining in training: 0h 0m 28s
+Saved [koi-v4-3]
+epoch 3/10 train_loss 0.03562 val_loss 0.03562 val_mae_cp 240.7 time 2.2s
+LR dropped to 0.0013781153
+superbatch 4 [0.0% (0/261 batches, 1058699 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 4 [49.0% (128/261 batches, 990584 pos/sec)]
+Estimated time to end of superbatch: 1.1s     superbatch 4 [98.1% (256/261 batches, 993210 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 4 | time 2.2s | running loss 0.029452 | 994446 pos/sec | total time 16.1s
+Estimated time remaining in training: 0h 0m 24s
+Saved [koi-v4-4]
+epoch 4/10 train_loss 0.02945 val_loss 0.02945 val_mae_cp 234.1 time 2.2s
+LR dropped to 0.0011
+superbatch 5 [0.0% (0/261 batches, 1069103 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 5 [49.0% (128/261 batches, 981362 pos/sec)]
+Estimated time to end of superbatch: 1.1s     superbatch 5 [98.1% (256/261 batches, 973722 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 5 | time 2.2s | running loss 0.025211 | 971647 pos/sec | total time 20.2s
+Estimated time remaining in training: 0h 0m 20s
+Saved [koi-v4-5]
+epoch 5/10 train_loss 0.02521 val_loss 0.02521 val_mae_cp 232.1 time 2.2s
+LR dropped to 0.0008218846
+superbatch 6 [0.0% (0/261 batches, 1062613 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 6 [49.0% (128/261 batches, 982050 pos/sec)]
+Estimated time to end of superbatch: 1.1s     superbatch 6 [98.1% (256/261 batches, 978734 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 6 | time 2.2s | running loss 0.021949 | 980395 pos/sec | total time 24.3s
+Estimated time remaining in training: 0h 0m 16s
+Saved [koi-v4-6]
+epoch 6/10 train_loss 0.02195 val_loss 0.02195 val_mae_cp 226.8 time 2.2s
+LR dropped to 0.0005709933
+superbatch 7 [0.0% (0/261 batches, 1053132 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 7 [49.0% (128/261 batches, 975915 pos/sec)]
+Estimated time to end of superbatch: 1.1s     superbatch 7 [98.1% (256/261 batches, 977611 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 7 | time 2.2s | running loss 0.019667 | 975966 pos/sec | total time 28.2s
+Estimated time remaining in training: 0h 0m 12s
+Saved [koi-v4-7]
+epoch 7/10 train_loss 0.01967 val_loss 0.01967 val_mae_cp 220.8 time 2.2s
+LR dropped to 0.00037188467
+superbatch 8 [0.0% (0/261 batches, 830840 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 8 [49.0% (128/261 batches, 973430 pos/sec)]
+Estimated time to end of superbatch: 1.1s     superbatch 8 [98.1% (256/261 batches, 976690 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 8 | time 2.2s | running loss 0.018208 | 977359 pos/sec | total time 32.2s
+Estimated time remaining in training: 0h 0m 8s
+Saved [koi-v4-8]
+epoch 8/10 train_loss 0.01821 val_loss 0.01821 val_mae_cp 214.6 time 2.2s
+LR dropped to 0.00024404912
+superbatch 9 [0.0% (0/261 batches, 1047209 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 9 [49.0% (128/261 batches, 960716 pos/sec)]
+Estimated time to end of superbatch: 1.1s     superbatch 9 [98.1% (256/261 batches, 965506 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 9 | time 2.2s | running loss 0.017141 | 966916 pos/sec | total time 36.3s
+Estimated time remaining in training: 0h 0m 4s
+Saved [koi-v4-9]
+epoch 9/10 train_loss 0.01714 val_loss 0.01714 val_mae_cp 211.9 time 2.2s
+LR dropped to 0.0002
+superbatch 10 [0.0% (0/261 batches, 1060247 pos/sec)]
+Estimated time to end of superbatch: infs     superbatch 10 [49.0% (128/261 batches, 971874 pos/sec)]
+Estimated time to end of superbatch: 1.1s     superbatch 10 [98.1% (256/261 batches, 973630 pos/sec)]
+Estimated time to end of superbatch: 0.0s     superbatch 10 | time 2.2s | running loss 0.016420 | 972112 pos/sec | total time 40.3s
+Estimated time remaining in training: 0h 0m 0s
+Saved [koi-v4-10]
+epoch 10/10 train_loss 0.01642 val_loss 0.01642 val_mae_cp 210.1 time 2.2s
+Total Training Time: 0h 0m 42s
+bullet training finished net=koi-v4
+run_bullet: exporting artifacts\training\bullet\koi-v4-bullet\checkpoints\koi-v4-10\raw.bin
+export: checkpoint artifacts\training\bullet\koi-v4-bullet\checkpoints\koi-v4-10 hidden=1024
+export: float val_mae_cp 212.2 on 4000 rows
+quantization v4 s1=6 k3=12 val_mae_cp 199.4
+quantization v4 s1=6 k3=14 val_mae_cp 211.3
+quantization v4 s1=6 k3=16 val_mae_cp 366.6
+quantization v4 s1=6 k3=18 val_mae_cp 431.8
+quantization v4 s1=6 k3=20 val_mae_cp 448.8
+quantization v4 s1=7 k3=12 val_mae_cp 213.6
+quantization v4 s1=7 k3=14 val_mae_cp 213.2
+quantization v4 s1=7 k3=16 val_mae_cp 231.8
+quantization v4 s1=7 k3=18 val_mae_cp 379.4
+quantization v4 s1=7 k3=20 val_mae_cp 435.3
+quantization v4 s1=8 k3=12 val_mae_cp 340.9
+quantization v4 s1=8 k3=14 val_mae_cp 340.5
+quantization v4 s1=8 k3=16 val_mae_cp 340.3
+quantization v4 s1=8 k3=18 val_mae_cp 354.4
+quantization v4 s1=8 k3=20 val_mae_cp 422.6
+selected v4 s1=6 k3=12 val_mae_cp 199.4
+wrote artifacts\training\bullet\koi-v4-bullet\koi.nnue (18882699 bytes) and artifacts\training\bullet\koi-v4-bullet\koi.metadata.json
+run_bullet: finished artifacts\training\bullet\koi-v4-bullet\koi.nnue

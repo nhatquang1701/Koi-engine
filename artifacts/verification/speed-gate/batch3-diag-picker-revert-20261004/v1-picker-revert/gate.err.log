@@ -1,0 +1,6 @@
+[31;1mException: [0mC:\Users\ntATh\AI test\Koi engine\tools\build\speed_gate.ps1:318[0m
+[31;1m[0m[36;1mLine |[0m
+[31;1m[0m[36;1m[36;1m 318 | [0m     [36;1mthrow ("Speed gate failed: " + ($failures.ToArray() -join '; ') +[0m .[0m
+[31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m     | [31;1m     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+[31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m     | [31;1mSpeed gate failed: total NPS regressed -2.01% (limit -2.00%). Summary: C:\Users\ntATh\AI test\Koi[0m
+[31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m[31;1m[36;1m     | [31;1mengine\artifacts\verification\speed-gate\batch3-diag-picker-revert-20261004\v1-picker-revert\speed-gate.json[0m

@@ -1,0 +1,19 @@
+Internal ctest changing into directory: C:/Users/ntATh/AI test/Koi engine/build/full-release-search
+Test project C:/Users/ntATh/AI test/Koi engine/build/full-release-search
+    Start 15: koi_search_tests_1of4
+    Start 18: koi_search_tests_4of4
+1/4 Test #15: koi_search_tests_1of4 ............   Passed   61.11 sec
+    Start 16: koi_search_tests_2of4
+2/4 Test #16: koi_search_tests_2of4 ............   Passed   11.69 sec
+    Start 17: koi_search_tests_3of4
+3/4 Test #17: koi_search_tests_3of4 ............   Passed   11.14 sec
+4/4 Test #18: koi_search_tests_4of4 ............   Passed  154.67 sec
+
+100% tests passed, 0 tests failed out of 4
+
+Label Time Summary:
+heavy     = 477.23 sec*proc (4 tests)
+search    = 477.23 sec*proc (4 tests)
+unit      = 477.23 sec*proc (4 tests)
+
+Total Test time (real) = 154.69 sec

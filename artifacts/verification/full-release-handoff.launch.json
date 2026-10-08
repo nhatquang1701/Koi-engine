@@ -1,0 +1,8 @@
+{
+  "schema": "koi-handoff-launch-v1",
+  "pid": 25020,
+  "started_utc": "2026-09-26T19:02:33.3956936Z",
+  "helper": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\probes\\full-release-windows-to-linux-handoff.ps1",
+  "stdout": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\verification\\full-release-handoff.out.log",
+  "stderr": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\verification\\full-release-handoff.err.log"
+}

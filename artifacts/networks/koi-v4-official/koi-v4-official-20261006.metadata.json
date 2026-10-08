@@ -1,0 +1,29 @@
+{
+  "schema": "koi-nnue-training-metadata-v2",
+  "created": "2026-09-17T16:57:28Z",
+  "corpus": "artifacts\\training\\koi-dataset-full.bin",
+  "rows_used": 2249171,
+  "val_rows": 112458,
+  "feature_set": "halfka-king-bucket-v1",
+  "quantization": "int16/int8",
+  "architecture": {
+    "input": 9216,
+    "hidden": 1024,
+    "output_buckets": 8
+  },
+  "activation": "crelu-pair",
+  "hidden_shift": 7,
+  "output_shift": 14,
+  "epochs": 10,
+  "batch_size": 8192,
+  "learning_rate": 0.002,
+  "seed": 20260916,
+  "target_scale": 100.0,
+  "val_mae_cp": 143.29161001994888,
+  "val_round_trip_mae_cp": 144.6595,
+  "w1_saturation": 0.0,
+  "w2_saturation": 0.00048828125,
+  "payload_sha256": "796d2cf0cf96536d07484d64639708b777cc2ba9e644027e5d5ee45e0e7fc670",
+  "network_sha256": "79db2774ef51436f0443e4b4935149f54cb3a299db8e490530476217c6c487c3",
+  "command": "tools/measurement/train_nnue_koi.py --dataset artifacts/training/koi-dataset-full.bin --epochs 10 --hidden-units 1024 --batch-size 8192 --learning-rate 0.002 --weight-decay 0.0001 --threads 6 --net-out artifacts/training/koi-v4-1024-full.nnue --meta-out artifacts/training/koi-v4-1024-full.metadata.json --float-out artifacts/training/koi-v4-1024-full.pt"
+}

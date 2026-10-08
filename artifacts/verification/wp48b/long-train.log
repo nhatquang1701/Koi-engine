@@ -1,0 +1,42 @@
+loaded 100000 rows (47 own, 47 opp, pad 47) in 0.00s
+epoch 1/12 train_loss 3.71689 val_loss 4.07712 val_mae_cp 407.71 time 12.5s
+epoch 2/12 train_loss 3.64571 val_loss 4.08875 val_mae_cp 408.87 time 12.5s
+epoch 3/12 train_loss 3.63200 val_loss 4.12075 val_mae_cp 412.07 time 12.5s
+epoch 4/12 train_loss 3.61613 val_loss 4.16123 val_mae_cp 416.12 time 12.6s
+epoch 5/12 train_loss 3.59697 val_loss 4.21557 val_mae_cp 421.56 time 13.7s
+epoch 6/12 train_loss 3.56057 val_loss 4.28855 val_mae_cp 428.86 time 13.5s
+epoch 7/12 train_loss 3.51039 val_loss 4.37553 val_mae_cp 437.55 time 13.7s
+epoch 8/12 train_loss 3.43446 val_loss 4.44703 val_mae_cp 444.70 time 14.2s
+epoch 9/12 train_loss 3.35014 val_loss 4.52576 val_mae_cp 452.58 time 14.1s
+epoch 10/12 train_loss 3.26604 val_loss 4.58089 val_mae_cp 458.09 time 14.1s
+epoch 11/12 train_loss 3.20257 val_loss 4.62409 val_mae_cp 462.41 time 14.1s
+epoch 12/12 train_loss 3.16278 val_loss 4.63385 val_mae_cp 463.38 time 14.4s
+quantization v5 s1=6 s_l1=6 k3=5 val_mae_cp 447.83
+quantization v5 s1=6 s_l1=6 k3=6 val_mae_cp 447.80
+quantization v5 s1=6 s_l1=6 k3=7 val_mae_cp 444.21
+quantization v5 s1=6 s_l1=7 k3=5 val_mae_cp 445.81
+quantization v5 s1=6 s_l1=7 k3=6 val_mae_cp 445.74
+quantization v5 s1=6 s_l1=7 k3=7 val_mae_cp 442.68
+quantization v5 s1=6 s_l1=8 k3=5 val_mae_cp 447.40
+quantization v5 s1=6 s_l1=8 k3=6 val_mae_cp 447.37
+quantization v5 s1=6 s_l1=8 k3=7 val_mae_cp 444.21
+quantization v5 s1=7 s_l1=6 k3=5 val_mae_cp 461.34
+quantization v5 s1=7 s_l1=6 k3=6 val_mae_cp 461.30
+quantization v5 s1=7 s_l1=6 k3=7 val_mae_cp 456.11
+quantization v5 s1=7 s_l1=7 k3=5 val_mae_cp 460.04
+quantization v5 s1=7 s_l1=7 k3=6 val_mae_cp 459.94
+quantization v5 s1=7 s_l1=7 k3=7 val_mae_cp 455.38
+quantization v5 s1=7 s_l1=8 k3=5 val_mae_cp 461.31
+quantization v5 s1=7 s_l1=8 k3=6 val_mae_cp 461.21
+quantization v5 s1=7 s_l1=8 k3=7 val_mae_cp 456.39
+quantization v5 s1=8 s_l1=6 k3=5 val_mae_cp 460.88
+quantization v5 s1=8 s_l1=6 k3=6 val_mae_cp 460.78
+quantization v5 s1=8 s_l1=6 k3=7 val_mae_cp 455.77
+quantization v5 s1=8 s_l1=7 k3=5 val_mae_cp 457.83
+quantization v5 s1=8 s_l1=7 k3=6 val_mae_cp 457.72
+quantization v5 s1=8 s_l1=7 k3=7 val_mae_cp 453.30
+quantization v5 s1=8 s_l1=8 k3=5 val_mae_cp 459.19
+quantization v5 s1=8 s_l1=8 k3=6 val_mae_cp 459.06
+quantization v5 s1=8 s_l1=8 k3=7 val_mae_cp 454.38
+selected v5 s1=6 s_l1=7 k3=7 val_mae_cp 442.68
+wrote artifacts\verification\wp48b\long.nnue (18884123 bytes) and artifacts\verification\wp48b\long.json

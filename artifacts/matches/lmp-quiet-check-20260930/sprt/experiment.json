@@ -1,0 +1,144 @@
+{
+  "schema": "koi-paired-sprt-experiment-v1",
+  "experiment_id": "lmp-quiet-check-20260930-20knodes",
+  "status": "prepared-prelaunch",
+  "recorded_utc": "2026-09-30T01:48:22.6237352Z",
+  "branch": "koi-engine",
+  "baseline_source_commit": "68e4f2ec3b8bee7b7d068bbb503d7b83a36fd276",
+  "candidate_base_commit": "68e4f2ec3b8bee7b7d068bbb503d7b83a36fd276",
+  "candidate_worktree_patch_sha256": "8af4d79eee769460276a3563c40440ea2936cdaace4ae58f93de07a4cb4b5574",
+  "modified_source_files": [
+    "src/koi/detail/search_ordering.hpp",
+    "src/koi/search_ordering.cpp",
+    "tests/unit/search/koi_search_tests.cpp",
+    "tests/unit/search/search_ordering_tests.cpp"
+  ],
+  "baseline_source_archive": {
+    "path": "build/roadmap-lmp-baseline-source-68e4f2e.tar",
+    "sha256": "b034ccf8c525bf32c5a7f79c290249c673895df98aa05d6090a63b5530bdb1c4"
+  },
+  "builds": {
+    "compiler": "MSVC 19.44.35228.0",
+    "generator": "Ninja",
+    "options": {
+      "KOI_PGO": "OFF",
+      "KOI_STATIC_RUNTIME": false,
+      "KOI_ENABLE_GPU_NNUE": false,
+      "KOI_SANITIZE": false,
+      "KOI_BUILD_MODULES": false,
+      "KOI_BUILD_SHADOW_DIFF": false
+    },
+    "cmake": "3.31.6-msvc6",
+    "configuration": "Release"
+  },
+  "candidate": {
+    "executables": [
+      {
+        "sha256": "1fbf7321466bf83bcdd2983d26514b3d647720a48b73a718e841062cb29a05c6",
+        "variant": "dispatcher",
+        "path": "build/roadmap-visit-win-release/koi-engine.exe"
+      },
+      {
+        "sha256": "72598e971425a6c69bca6c0e9219458053b6013d87203019361cac211f817626",
+        "variant": "avx2",
+        "path": "build/roadmap-visit-win-release/koi-engine-avx2.exe"
+      },
+      {
+        "sha256": "08d981d2a7aebe91433211ae051579ca557cc3387559619bfddeacd55528d83d",
+        "variant": "avx512",
+        "path": "build/roadmap-visit-win-release/koi-engine-avx512.exe"
+      }
+    ],
+    "source": "working tree based on 68e4f2e"
+  },
+  "baseline": {
+    "executables": [
+      {
+        "sha256": "da08c26912a5fce8dce2d85efc28cc33503345b26018d82b961181df2ad2af20",
+        "variant": "dispatcher",
+        "path": "build/roadmap-lmp-baseline-release/koi-engine.exe"
+      },
+      {
+        "sha256": "1c6f621f4f31b3f21cb5d12272c76be12192949b5bcc1fe1dfb65674c759a338",
+        "variant": "avx2",
+        "path": "build/roadmap-lmp-baseline-release/koi-engine-avx2.exe"
+      },
+      {
+        "sha256": "6316eca4014cd36e736b78bebcd7d23721ad58278629597b1594dd8c1f62e683",
+        "variant": "avx512",
+        "path": "build/roadmap-lmp-baseline-release/koi-engine-avx512.exe"
+      }
+    ],
+    "source_commit": "68e4f2ec3b8bee7b7d068bbb503d7b83a36fd276"
+  },
+  "replay": {
+    "path": "build/roadmap-lmp-baseline-release/koi-replay.exe",
+    "sha256": "36c4f05ec6569048985cbf75f91b46512b212eec632327dfc49eb788e8924f93"
+  },
+  "runner": {
+    "sha256": "7cdd13180dc22450883d15796f0cf8b74822c948e95b0f50bdd62fca77ab41fa",
+    "git_blob": "2443970ce07a4c2340048df1c0a5d5aab87cb7d9",
+    "path": "tools/stability/sprt_compare.ps1"
+  },
+  "harness": {
+    "sha256": "9df4f67a4632a05e070eb44fde202814a9692befd3a63c880688b946feedfb3e",
+    "git_blob": "de0de5bce59c2d650a7f1c872d730b9d82e76952",
+    "path": "tools/stability/uci_match.ps1"
+  },
+  "openings": {
+    "generator_sha256": "d8e8f56b350eaaaf1d2f148de7ce468afae6db04199c351ffc0f99a4997b04a8",
+    "generator_path": "artifacts/verification/lmp-quiet-check-20260930/generate_openings.py",
+    "path": "artifacts/matches/lmp-quiet-check-20260930/openings-128.txt",
+    "count": 128,
+    "manifest_sha256": "59cd62ca8072b935946e37d9b4fd884636bc18cee41eb9a2d044a6e3c0ea060e",
+    "sha256": "e9b4752564f418c37196586d367f1e6eda175be8f6ca5cdc470c509b13dd405f",
+    "seed": 20261008,
+    "unique_count": 128,
+    "manifest_path": "artifacts/manifests/lmp-quiet-check-20260930-openings.json",
+    "overlap_with_excluded_sequences": 0
+  },
+  "match": {
+    "own_book": false,
+    "speed": 100,
+    "max_plies": 512,
+    "games_per_opening_per_color": 2,
+    "run_root_policy": "wrapper appends local yyyyMMdd-HHmmss to output directory",
+    "hash_mb": 512,
+    "white_and_black_workers": "one paired runner launches one worker per color",
+    "timeout_ms": 5000,
+    "output_directory": "artifacts/matches/lmp-quiet-check-20260930/sprt",
+    "label": "lmp-quiet-check-batch1",
+    "cpu_variant": "avx2",
+    "threads": 1,
+    "evaluator": "classical",
+    "nodes_per_move": 20000,
+    "search_algorithm": "AlphaBeta",
+    "koi_random_seed": 0,
+    "wrapper": "tools/stability/sprt_compare.ps1"
+  },
+  "sprt": {
+    "hypothesis_1_elo": 10,
+    "max_games_per_color": 256,
+    "max_combined_games": 512,
+    "alpha": 0.05,
+    "beta": 0.05,
+    "hypothesis_0_elo": 0,
+    "min_games_per_color": 40
+  },
+  "validation": {
+    "candidate_uci_node_smoke": "passed",
+    "debug_ctest": "81/81 pass",
+    "release_ctest": "81/81 pass",
+    "release_shadow_diff": "pass",
+    "baseline_uci_node_smoke": "passed"
+  },
+  "hardware": {
+    "physical_cores": 4,
+    "ram_gib": 31.87,
+    "build": "26200",
+    "logical_processors": 8,
+    "cpu": "Intel(R) Core(TM) i3-10100F CPU @ 3.60GHz",
+    "os": "Microsoft Windows 11 Home",
+    "os_version": "10.0.26200"
+  }
+}

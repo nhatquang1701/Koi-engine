@@ -1,0 +1,24 @@
+Started game 1 of 1 (Koi vs Opponent)
+Terminating process of engine Opponent(1)
+...      Koi playing White: 1 - 0 - 0  [1.000] 1
+...      White vs Black: 1 - 0 - 0  [1.000] 1
+Elo difference: inf +/- nan, LOS: 84.1 %, DrawRatio: 0.0 %
+SPRT: llr 0 (0.0%), lbound -inf, ubound inf
+
+Player: Koi
+   "Win: Black disconnects": 1
+Player: Opponent
+   "Loss: Black disconnects": 1
+Finished match
+Finished game 1 (Koi vs Opponent): 1-0 {Black disconnects}
+Score of Koi vs Opponent: 1 - 0 - 0  [1.000] 1
+...      Koi playing White: 1 - 0 - 0  [1.000] 1
+...      White vs Black: 1 - 0 - 0  [1.000] 1
+Elo difference: inf +/- nan, LOS: 84.1 %, DrawRatio: 0.0 %
+SPRT: llr 0 (0.0%), lbound -inf, ubound inf
+
+Player: Koi
+   "Win: Black disconnects": 1
+Player: Opponent
+   "Loss: Black disconnects": 1
+Finished match

@@ -1,0 +1,23 @@
+PROF-BEGIN
+PROF negamax          calls=1717591 cycles=1154895428257
+PROF quiescence       calls=13595026 cycles=555441137403
+PROF evaluate         calls=6104107 cycles=15729965632
+PROF make             calls=13754789 cycles=9375394453
+PROF unmake           calls=13754789 cycles=593609396
+PROF picker_prepare   calls=7771000 cycles=10867097339
+PROF picker_next      calls=19010798 cycles=12773714570
+PROF movegen          calls=13039186 cycles=90282778738
+PROF draw_status      calls=13542722 cycles=1003706926
+PROF tt_probe         calls=13541097 cycles=8599858457
+PROF gen_pseudo       calls=19897434 cycles=10615382234
+PROF legal_probe      calls=123860286 cycles=27807246140
+PROF metadata_build   calls=98668356 cycles=17562207882
+PROF metadata_finalize calls=13039202 cycles=953740952
+PROBE king             calls=75875325
+PROBE checked_single   calls=97883848
+PROBE checked_double   calls=439712
+PROBE pinned           calls=4397057
+PROBE en_passant       calls=0
+PROBE skipped          calls=71037378
+PROBE pseudo_total     calls=196838238
+PROF-END

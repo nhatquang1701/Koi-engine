@@ -1,0 +1,10 @@
+{
+  "kind": "data",
+  "backend": "datagen",
+  "created": "2026-09-18T11:13:23Z",
+  "status": "failed",
+  "run": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\training\\runs\\20260918-181323-data-datagen",
+  "schema": "koi-nnue-studio-run-v1",
+  "pid": 21076,
+  "exit_code": -1073741510
+}

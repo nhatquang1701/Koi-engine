@@ -1,0 +1,2421 @@
+{
+  "schema": "koi-uci-match-v2",
+  "generated_utc": "2026-09-09T19:37:23.3934631Z",
+  "hardware": {
+    "os": "Microsoft Windows NT 10.0.26200.0",
+    "machine": "AMD64",
+    "processor": "Intel64 Family 6 Model 165 Stepping 3, GenuineIntel",
+    "cpu_count": 8,
+    "powershell_version": "7.6.5"
+  },
+  "measurement": {
+    "network": {
+      "enabled": false,
+      "state": "disabled",
+      "reason": "the local UCI match harness performs no network access"
+    },
+    "book": {
+      "enabled": false,
+      "state": "disabled",
+      "path": null,
+      "random": false
+    },
+    "tablebase": {
+      "enabled": false,
+      "state": "disabled",
+      "path": null
+    },
+    "hardware": {
+      "os": "Microsoft Windows NT 10.0.26200.0",
+      "machine": "AMD64",
+      "processor": "Intel64 Family 6 Model 165 Stepping 3, GenuineIntel",
+      "cpu_count": 8,
+      "powershell_version": "7.6.5"
+    },
+    "time_control": {
+      "kind": "depth",
+      "value": "depth 2",
+      "depth": 2
+    }
+  },
+  "configuration": {
+    "depth": 2,
+    "movetime_ms": 0,
+    "nodes": 0,
+    "threads": 1,
+    "speed": 100,
+    "hash_mb": 512,
+    "max_plies": 2,
+    "timeout_ms": 60000,
+    "protocol_timeout_ms": 60000,
+    "games_per_position": 1,
+    "koi_color": "black",
+    "time_control": "depth 2",
+    "koi_random_seed": 1,
+    "koi_own_book": false,
+    "koi_book_file": "book.bin",
+    "koi_book_depth": 16,
+    "koi_book_random": false,
+    "opponent_limit_strength": false,
+    "opponent_elo": null,
+    "batch_id": "batch-00",
+    "run_label": "measurement",
+    "time_control_metadata": {
+      "kind": "depth",
+      "value": "depth 2",
+      "depth": 2
+    }
+  },
+  "engines": [
+    {
+      "label": "Koi",
+      "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\build\\release\\koi-engine.exe",
+      "name": "Koi Engine",
+      "version": "unknown",
+      "hashes": {
+        "executable_sha256": "9e1862eb0c67c721fa6c98184136513e412bd1c3dfee12d95083e75c27daa957"
+      },
+      "identity": [
+        "id name Koi Engine",
+        "id author Koi Engine contributors"
+      ],
+      "handshake": [
+        "id name Koi Engine",
+        "id author Koi Engine contributors",
+        "option name RandomSeed type spin default 0 min 0 max 2147483647",
+        "option name Hash type spin default 512 min 1 max 4096",
+        "option name Threads type spin default 1 min 1 max 8",
+        "option name Speed type spin default 100 min 1 max 100",
+        "option name UCI_AnalyseMode type check default false",
+        "option name MultiPV type spin default 1 min 1 max 16",
+        "option name Ponder type check default false",
+        "option name OwnBook type check default true",
+        "option name BookFile type string default book.bin",
+        "option name BookDepth type spin default 16 min 0 max 40",
+        "option name BookRandom type check default false",
+        "option name BookSafety type check default true",
+        "option name BookSafetyDepth type spin default 2 min 0 max 3",
+        "option name Clear Hash type button",
+        "option name UCI_ShowWDL type check default false",
+        "option name Move Overhead type spin default 10 min 0 max 5000",
+        "option name Slow Mover type spin default 100 min 10 max 1000",
+        "option name UCI_LimitStrength type check default false",
+        "option name UCI_Elo type spin default 1320 min 1320 max 3190",
+        "option name StrengthMode type check default false",
+        "option name SyzygyPath type string default ",
+        "option name SyzygyProbeDepth type spin default 1 min 1 max 100",
+        "option name SyzygyProbeLimit type spin default 5 min 0 max 7",
+        "option name Syzygy50MoveRule type check default true",
+        "uciok"
+      ],
+      "options": [
+        "setoption name Hash value 512",
+        "setoption name Threads value 1",
+        "setoption name Speed value 100",
+        "setoption name RandomSeed value 1",
+        "setoption name OwnBook value false",
+        "setoption name BookFile value book.bin",
+        "setoption name BookDepth value 16",
+        "setoption name BookRandom value false"
+      ],
+      "process_status": "clean shutdown",
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "label": "Opponent",
+      "path": "C:\\Users\\ntATh\\AI test\\Koi engine\\third_party\\stockfish-19\\stockfish-windows-x86-64-universal\\stockfish\\stockfish-windows-x86-64-universal.exe",
+      "name": "Stockfish 19",
+      "version": "unknown",
+      "hashes": {
+        "executable_sha256": "45bc8e4969147db9c2eb533810637994619bff0eacc81ccfd9854394901bcbd0"
+      },
+      "identity": [
+        "id name Stockfish 19",
+        "id author the Stockfish developers (see AUTHORS file)"
+      ],
+      "handshake": [
+        "Stockfish 19 by the Stockfish developers (see AUTHORS file)",
+        "id name Stockfish 19",
+        "id author the Stockfish developers (see AUTHORS file)",
+        "",
+        "option name Debug Log File type string default <empty>",
+        "option name NumaPolicy type string default auto",
+        "option name Threads type spin default 1 min 1 max 1024",
+        "option name Hash type spin default 16 min 1 max 33554432",
+        "option name Clear Hash type button",
+        "option name Ponder type check default false",
+        "option name MultiPV type spin default 1 min 1 max 256",
+        "option name Skill Level type spin default 20 min 0 max 20",
+        "option name Move Overhead type spin default 10 min 0 max 5000",
+        "option name nodestime type spin default 0 min 0 max 10000",
+        "option name UCI_Chess960 type check default false",
+        "option name UCI_LimitStrength type check default false",
+        "option name UCI_Elo type spin default 1320 min 1320 max 3190",
+        "option name UCI_ShowWDL type check default false",
+        "option name SyzygyPath type string default <empty>",
+        "option name SyzygyProbeDepth type spin default 1 min 1 max 100",
+        "option name Syzygy50MoveRule type check default true",
+        "option name SyzygyProbeLimit type spin default 7 min 0 max 7",
+        "option name EvalFile type string default nn-1a298aa575a0.nnue",
+        "uciok"
+      ],
+      "options": [
+        "setoption name Hash value 512",
+        "setoption name Threads value 1",
+        "setoption name Speed value 100"
+      ],
+      "process_status": "clean shutdown",
+      "exit_code": 0,
+      "stderr": ""
+    }
+  ],
+  "positions": [
+    {
+      "Name": "e4",
+      "Fen": "startpos",
+      "Moves": [
+        "e2e4"
+      ]
+    },
+    {
+      "Name": "d4",
+      "Fen": "startpos",
+      "Moves": [
+        "d2d4"
+      ]
+    },
+    {
+      "Name": "english",
+      "Fen": "startpos",
+      "Moves": [
+        "c2c4"
+      ]
+    },
+    {
+      "Name": "scandinavian",
+      "Fen": "startpos",
+      "Moves": [
+        "e2e4",
+        "d7d5"
+      ]
+    },
+    {
+      "Name": "french",
+      "Fen": "startpos",
+      "Moves": [
+        "e2e4",
+        "e7e6"
+      ]
+    },
+    {
+      "Name": "caro-kann",
+      "Fen": "startpos",
+      "Moves": [
+        "e2e4",
+        "c7c6"
+      ]
+    },
+    {
+      "Name": "sicilian",
+      "Fen": "startpos",
+      "Moves": [
+        "e2e4",
+        "c7c5"
+      ]
+    },
+    {
+      "Name": "queens-gambit",
+      "Fen": "startpos",
+      "Moves": [
+        "d2d4",
+        "d7d5",
+        "c2c4"
+      ]
+    }
+  ],
+  "games": [
+    {
+      "position": "e4",
+      "initial_fen": "startpos",
+      "round": 1,
+      "koi_color": "black",
+      "result": "*",
+      "winner": null,
+      "termination": "max plies",
+      "process_status": {
+        "koi": "clean shutdown",
+        "opponent": "clean shutdown"
+      },
+      "moves": [
+        {
+          "ply": 1,
+          "root_fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+          "side": "w",
+          "engine": "opening",
+          "engine_label": "opening",
+          "position_command": "position startpos",
+          "go_command": null,
+          "move": "e2e4",
+          "replay_legal": true,
+          "elapsed_ms": 0,
+          "final_info": null,
+          "evaluation": null,
+          "all_info_lines": [],
+          "infos": [],
+          "bestmove_line": null,
+          "book_used": false,
+          "book_move": null,
+          "position_classification": {
+            "phase": "opening",
+            "side_to_move": "white",
+            "piece_count": 32,
+            "non_pawn_non_king_count": 14,
+            "castling_rights": "KQkq",
+            "en_passant": "-"
+          }
+        },
+        {
+          "ply": 2,
+          "root_fen": "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1",
+          "side": "b",
+          "engine": "Koi Engine",
+          "engine_label": "Koi",
+          "position_command": "position startpos moves e2e4",
+          "go_command": "go depth 2",
+          "move": "d7d5",
+          "replay_legal": true,
+          "elapsed_ms": 55,
+          "final_info": {
+            "depth": 2,
+            "seldepth": 9,
+            "score_type": "cp",
+            "score": -65,
+            "nodes": 271,
+            "nps": 14263,
+            "time_ms": 19,
+            "pv": [
+              "d7d5",
+              "d1f3"
+            ],
+            "raw": "info depth 2 seldepth 9 multipv 1 score cp -65 nodes 271 nps 14263 time 19 pv d7d5 d1f3"
+          },
+          "evaluation": {
+            "depth": 2,
+            "seldepth": 9,
+            "score_type": "cp",
+            "score": -65,
+            "nodes": 271,
+            "nps": 14263,
+            "time_ms": 19,
+            "pv": [
+              "d7d5",
+              "d1f3"
+            ],
+            "raw": "info depth 2 seldepth 9 multipv 1 score cp -65 nodes 271 nps 14263 time 19 pv d7d5 d1f3"
+          },
+          "all_info_lines": [
+            "info depth 1 seldepth 1 multipv 1 score cp 29 nodes 24 nps 12000 time 2 pv b8c6",
+            "info depth 2 seldepth 9 multipv 1 score cp -65 nodes 271 nps 14263 time 19 pv d7d5 d1f3"
+          ],
+          "infos": [
+            {
+              "depth": 1,
+              "seldepth": 1,
+              "score_type": "cp",
+              "score": 29,
+              "nodes": 24,
+              "nps": 12000,
+              "time_ms": 2,
+              "pv": "b8c6",
+              "raw": "info depth 1 seldepth 1 multipv 1 score cp 29 nodes 24 nps 12000 time 2 pv b8c6"
+            },
+            {
+              "depth": 2,
+              "seldepth": 9,
+              "score_type": "cp",
+              "score": -65,
+              "nodes": 271,
+              "nps": 14263,
+              "time_ms": 19,
+              "pv": [
+                "d7d5",
+                "d1f3"
+              ],
+              "raw": "info depth 2 seldepth 9 multipv 1 score cp -65 nodes 271 nps 14263 time 19 pv d7d5 d1f3"
+            }
+          ],
+          "bestmove_line": "bestmove d7d5",
+          "book_used": false,
+          "book_move": null,
+          "position_classification": {
+            "phase": "opening",
+            "side_to_move": "black",
+            "piece_count": 32,
+            "non_pawn_non_king_count": 14,
+            "castling_rights": "KQkq",
+            "en_passant": "-"
+          }
+        },
+        {
+          "ply": 3,
+          "root_fen": "rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2",
+          "side": "w",
+          "engine": "Stockfish 19",
+          "engine_label": "Opponent",
+          "position_command": "position startpos moves e2e4 d7d5",
+          "go_command": "go depth 2",
+          "move": "e4d5",
+          "replay_legal": true,
+          "elapsed_ms": 14,
+          "final_info": {
+            "depth": 2,
+            "seldepth": 3,
+            "score_type": "cp",
+            "score": 15,
+            "nodes": 82,
+            "nps": 82000,
+            "time_ms": 1,
+            "pv": [
+              "e4d5",
+              "d8d5"
+            ],
+            "raw": "info depth 2 seldepth 3 multipv 1 score cp 15 nodes 82 nps 82000 hashfull 0 tbhits 0 time 1 pv e4d5 d8d5"
+          },
+          "evaluation": {
+            "depth": 2,
+            "seldepth": 3,
+            "score_type": "cp",
+            "score": 15,
+            "nodes": 82,
+            "nps": 82000,
+            "time_ms": 1,
+            "pv": [
+              "e4d5",
+              "d8d5"
+            ],
+            "raw": "info depth 2 seldepth 3 multipv 1 score cp 15 nodes 82 nps 82000 hashfull 0 tbhits 0 time 1 pv e4d5 d8d5"
+          },
+          "all_info_lines": [
+            "info string Available processors: 0-7",
+            "info string Using 1 thread",
+            "info string NNUE evaluation using nn-1a298aa575a0.nnue (109MiB, (86896, 1024, 32, 32, 1))",
+            "info string Network replica 1: Shared memory.",
+            "info depth 1 seldepth 3 multipv 1 score cp 15 nodes 37 nps 37000 hashfull 0 tbhits 0 time 1 pv e4d5 d8d5",
+            "info depth 2 seldepth 3 multipv 1 score cp 15 nodes 82 nps 82000 hashfull 0 tbhits 0 time 1 pv e4d5 d8d5"
+          ],
+          "infos": [
+            {
+              "depth": null,
+              "seldepth": null,
+              "score_type": null,
+              "score": null,
+              "nodes": null,
+              "nps": null,
+              "time_ms": null,
+              "pv": null,
+              "raw": "info string Available processors: 0-7"
+            },
+            {
+              "depth": null,
+              "seldepth": null,
+              "score_type": null,
+              "score": null,
+              "nodes": null,
+              "nps": null,
+              "time_ms": null,
+              "pv": null,
+              "raw": "info string Using 1 thread"
+            },
+            {
+              "depth": null,
+              "seldepth": null,
+              "score_type": null,
+              "score": null,
+              "nodes": null,
+              "nps": null,
+              "time_ms": null,
+              "pv": null,
+              "raw": "info string NNUE evaluation using nn-1a298aa575a0.nnue (109MiB, (86896, 1024, 32, 32, 1))"
+            },
+            {
+              "depth": null,
+              "seldepth": null,
+              "score_type": null,
+              "score": null,
+              "nodes": null,
+              "nps": null,
+              "time_ms": null,
+              "pv": null,
+              "raw": "info string Network replica 1: Shared memory."
+            },
+            {
+              "depth": 1,
+              "seldepth": 3,
+              "score_type": "cp",
+              "score": 15,
+              "nodes": 37,
+              "nps": 37000,
+              "time_ms": 1,
+              "pv": [
+                "e4d5",
+                "d8d5"
+              ],
+              "raw": "info depth 1 seldepth 3 multipv 1 score cp 15 nodes 37 nps 37000 hashfull 0 tbhits 0 time 1 pv e4d5 d8d5"
+            },
+            {
+              "depth": 2,
+              "seldepth": 3,
+              "score_type": "cp",
+              "score": 15,
+              "nodes": 82,
+              "nps": 82000,
+              "time_ms": 1,
+              "pv": [
+                "e4d5",
+                "d8d5"
+              ],
+              "raw": "info depth 2 seldepth 3 multipv 1 score cp 15 nodes 82 nps 82000 hashfull 0 tbhits 0 time 1 pv e4d5 d8d5"
+            }
+          ],
+          "bestmove_line": "bestmove e4d5 ponder d8d5",
+          "book_used": false,
+          "book_move": null,
+          "position_classification": {
+            "phase": "opening",
+            "side_to_move": "white",
+            "piece_count": 32,
+            "non_pawn_non_king_count": 14,
+            "castling_rights": "KQkq",
+            "en_passant": "-"
+          }
+        }
+      ]
+    },
+    {
+      "position": "d4",
+      "initial_fen": "startpos",
+      "round": 1,
+      "koi_color": "black",
+      "result": "*",
+      "winner": null,
+      "termination": "max plies",
+      "process_status": {
+        "koi": "clean shutdown",
+        "opponent": "clean shutdown"
+      },
+      "moves": [
+        {
+          "ply": 1,
+          "root_fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+          "side": "w",
+          "engine": "opening",
+          "engine_label": "opening",
+          "position_command": "position startpos",
+          "go_command": null,
+          "move": "d2d4",
+          "replay_legal": true,
+          "elapsed_ms": 0,
+          "final_info": null,
+          "evaluation": null,
+          "all_info_lines": [],
+          "infos": [],
+          "bestmove_line": null,
+          "book_used": false,
+          "book_move": null,
+          "position_classification": {
+            "phase": "opening",
+            "side_to_move": "white",
+            "piece_count": 32,
+            "non_pawn_non_king_count": 14,
+            "castling_rights": "KQkq",
+            "en_passant": "-"
+          }
+        },
+        {
+          "ply": 2,
+          "root_fen": "rnbqkbnr/pppppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR b KQkq - 0 1",
+          "side": "b",
+          "engine": "Koi Engine",
+          "engine_label": "Koi",
+          "position_command": "position startpos moves d2d4",
+          "go_command": "go depth 2",
+          "move": "g8f6",
+          "replay_legal": true,
+          "elapsed_ms": 19,
+          "final_info": {
+            "depth": 2,
+            "seldepth": 6,
+            "score_type": "cp",
+            "score": -70,
+            "nodes": 192,
+            "nps": 16000,
+            "time_ms": 12,
+            "pv": [
+              "g8f6",
+              "b1c3"
+            ],
+            "raw": "info depth 2 seldepth 6 multipv 1 score cp -70 nodes 192 nps 16000 time 12 pv g8f6 b1c3"
+          },
+          "evaluation": {
+            "depth": 2,
+            "seldepth": 6,
+            "score_type": "cp",
+            "score": -70,
+            "nodes": 192,
+            "nps": 16000,
+            "time_ms": 12,
+            "pv": [
+              "g8f6",
+              "b1c3"
+            ],
+            "raw": "info depth 2 seldepth 6 multipv 1 score cp -70 nodes 192 nps 16000 time 12 pv g8f6 b1c3"
+          },
+          "all_info_lines": [
+            "info depth 1 seldepth 1 multipv 1 score cp 32 nodes 25 nps 25000 time 1 pv g8f6",
+            "info depth 2 seldepth 6 multipv 1 score cp -70 nodes 192 nps 16000 time 12 pv g8f6 b1c3"
+          ],
+          "infos": [
+            {
+              "depth": 1,
+              "seldepth": 1,
+              "score_type": "cp",
+              "score": 32,
+              "nodes": 25,
+              "nps": 25000,
+              "time_ms": 1,
+              "pv": "g8f6",
+              "raw": "info depth 1 seldepth 1 multipv 1 score cp 32 nodes 25 nps 25000 time 1 pv g8f6"
+            },
+            {
+              "depth": 2,
+              "seldepth": 6,
+              "score_type": "cp",
+              "score": -70,
+              "nodes": 192,
+              "nps": 16000,
+              "time_ms": 12,
+              "pv": [
+                "g8f6",
+                "b1c3"
+              ],
+              "raw": "info depth 2 seldepth 6 multipv 1 score cp -70 nodes 192 nps 16000 time 12 pv g8f6 b1c3"
+            }
+          ],
+          "bestmove_line": "bestmove g8f6",
+          "book_used": false,
+          "book_move": null,
+          "position_classification": {
+            "phase": "opening",
+            "side_to_move": "black",
+            "piece_count": 32,
+            "non_pawn_non_king_count": 14,
+            "castling_rights": "KQkq",
+            "en_passant": "-"
+          }
+        },
+        {
+          "ply": 3,
+          "root_fen": "rnbqkb1r/pppppppp/5n2/8/3P4/8/PPP1PPPP/RNBQKBNR w KQkq - 1 2",
+          "side": "w",
+          "engine": "Stockfish 19",
+          "engine_label": "Opponent",
+          "position_command": "position startpos moves d2d4 g8f6",
+          "go_command": "go depth 2",
+          "move": "c2c3",
+          "replay_legal": true,
+          "elapsed_ms": 13,
+          "final_info": {
+            "depth": 2,
+            "seldepth": 3,
+            "score_type": "cp",
+            "score": 21,
+            "nodes": 107,
+            "nps": 107000,
+            "time_ms": 1,
+            "pv": [
+              "c2c3",
+              "b7b6"
+            ],
+            "raw": "info depth 2 seldepth 3 multipv 1 score cp 21 nodes 107 nps 107000 hashfull 0 tbhits 0 time 1 pv c2c3 b7b6"
+          },
+          "evaluation": {
+            "depth": 2,
+            "seldepth": 3,
+            "score_type": "cp",
+            "score": 21,
+            "nodes": 107,
+            "nps": 107000,
+            "time_ms": 1,
+            "pv": [
+              "c2c3",
+              "b7b6"
+            ],
+            "raw": "info depth 2 seldepth 3 multipv 1 score cp 21 nodes 107 nps 107000 hashfull 0 tbhits 0 time 1 pv c2c3 b7b6"
+          },
+          "all_info_lines": [
+            "info string Available processors: 0-7",
+            "info string Using 1 thread",
+            "info string NNUE evaluation using nn-1a298aa575a0.nnue (109MiB, (86896, 1024, 32, 32, 1))",
+            "info string Network replica 1: Shared memory.",
+            "info depth 1 seldepth 2 multipv 1 score cp 21 nodes 29 nps 29000 hashfull 0 tbhits 0 time 1 pv c2c3",
+            "info depth 2 seldepth 3 multipv 1 score cp 21 nodes 107 nps 107000 hashfull 0 tbhits 0 time 1 pv c2c3 b7b6"
+          ],
+          "infos": [
+            {
+              "depth": null,
+              "seldepth": null,
+              "score_type": null,
+              "score": null,
+              "nodes": null,
+              "nps": null,
+              "time_ms": null,
+              "pv": null,
+              "raw": "info string Available processors: 0-7"
+            },
+            {
+              "depth": null,
+              "seldepth": null,
+              "score_type": null,
+              "score": null,
+              "nodes": null,
+              "nps": null,
+              "time_ms": null,
+              "pv": null,
+              "raw": "info string Using 1 thread"
+            },
+            {
+              "depth": null,
+              "seldepth": null,
+              "score_type": null,
+              "score": null,
+              "nodes": null,
+              "nps": null,
+              "time_ms": null,
+              "pv": null,
+              "raw": "info string NNUE evaluation using nn-1a298aa575a0.nnue (109MiB, (86896, 1024, 32, 32, 1))"
+            },
+            {
+              "depth": null,
+              "seldepth": null,
+              "score_type": null,
+              "score": null,
+              "nodes": null,
+              "nps": null,
+              "time_ms": null,
+              "pv": null,
+              "raw": "info string Network replica 1: Shared memory."
+            },
+            {
+              "depth": 1,
+              "seldepth": 2,
+              "score_type": "cp",
+              "score": 21,
+              "nodes": 29,
+              "nps": 29000,
+              "time_ms": 1,
+              "pv": "c2c3",
+              "raw": "info depth 1 seldepth 2 multipv 1 score cp 21 nodes 29 nps 29000 hashfull 0 tbhits 0 time 1 pv c2c3"
+            },
+            {
+              "depth": 2,
+              "seldepth": 3,
+              "score_type": "cp",
+              "score": 21,
+              "nodes": 107,
+              "nps": 107000,
+              "time_ms": 1,
+              "pv": [
+                "c2c3",
+                "b7b6"
+              ],
+              "raw": "info depth 2 seldepth 3 multipv 1 score cp 21 nodes 107 nps 107000 hashfull 0 tbhits 0 time 1 pv c2c3 b7b6"
+            }
+          ],
+          "bestmove_line": "bestmove c2c3 ponder b7b6",
+          "book_used": false,
+          "book_move": null,
+          "position_classification": {
+            "phase": "opening",
+            "side_to_move": "white",
+            "piece_count": 32,
+            "non_pawn_non_king_count": 14,
+            "castling_rights": "KQkq",
+            "en_passant": "-"
+          }
+        }
+      ]
+    },
+    {
+      "position": "english",
+      "initial_fen": "startpos",
+      "round": 1,
+      "koi_color": "black",
+      "result": "*",
+      "winner": null,
+      "termination": "max plies",
+      "process_status": {
+        "koi": "clean shutdown",
+        "opponent": "clean shutdown"
+      },
+      "moves": [
+        {
+          "ply": 1,
+          "root_fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+          "side": "w",
+          "engine": "opening",
+          "engine_label": "opening",
+          "position_command": "position startpos",
+          "go_command": null,
+          "move": "c2c4",
+          "replay_legal": true,
+          "elapsed_ms": 0,
+          "final_info": null,
+          "evaluation": null,
+          "all_info_lines": [],
+          "infos": [],
+          "bestmove_line": null,
+          "book_used": false,
+          "book_move": null,
+          "position_classification": {
+            "phase": "opening",
+            "side_to_move": "white",
+            "piece_count": 32,
+            "non_pawn_non_king_count": 14,
+            "castling_rights": "KQkq",
+            "en_passant": "-"
+          }
+        },
+        {
+          "ply": 2,
+          "root_fen": "rnbqkbnr/pppppppp/8/8/2P5/8/PP1PPPPP/RNBQKBNR b KQkq - 0 1",
+          "side": "b",
+          "engine": "Koi Engine",
+          "engine_label": "Koi",
+          "position_command": "position startpos moves c2c4",
+          "go_command": "go depth 2",
+          "move": "b8c6",
+          "replay_legal": true,
+          "elapsed_ms": 31,
+          "final_info": {
+            "depth": 2,
+            "seldepth": 9,
+            "score_type": "cp",
+            "score": -10,
+            "nodes": 321,
+            "nps": 13375,
+            "time_ms": 24,
+            "pv": [
+              "b8c6",
+              "g1f3"
+            ],
+            "raw": "info depth 2 seldepth 9 multipv 1 score cp -10 nodes 321 nps 13375 time 24 pv b8c6 g1f3"
+          },
+          "evaluation": {
+            "depth": 2,
+            "seldepth": 9,
+            "score_type": "cp",
+            "score": -10,
+            "nodes": 321,
+            "nps": 13375,
+            "time_ms": 24,
+            "pv": [
+              "b8c6",
+              "g1f3"
+            ],
+            "raw": "info depth 2 seldepth 9 multipv 1 score cp -10 nodes 321 nps 13375 time 24 pv b8c6 g1f3"
+          },
+          "all_info_lines": [
+            "info depth 1 seldepth 1 multipv 1 score cp 92 nodes 24 nps 24000 time 1 pv b8c6",
+            "info depth 2 seldepth 9 multipv 1 score cp -10 nodes 321 nps 13375 time 24 pv b8c6 g1f3"
+          ],
+          "infos": [
+            {
+              "depth": 1,
+              "seldepth": 1,
+              "score_type": "cp",
+              "score": 92,
+              "nodes": 24,
+              "nps": 24000,
+              "time_ms": 1,
+              "pv": "b8c6",
+              "raw": "info depth 1 seldepth 1 multipv 1 score cp 92 nodes 24 nps 24000 time 1 pv b8c6"
+            },
+            {
+              "depth": 2,
+              "seldepth": 9,
+              "score_type": "cp",
+              "score": -10,
+              "nodes": 321,
+              "nps": 13375,
+              "time_ms": 24,
+              "pv": [
+                "b8c6",
+                "g1f3"
+              ],
+              "raw": "info depth 2 seldepth 9 multipv 1 score cp -10 nodes 321 nps 13375 time 24 pv b8c6 g1f3"
+            }
+          ],
+          "bestmove_line": "bestmove b8c6",
+          "book_used": false,
+          "book_move": null,
+          "position_classification": {
+            "phase": "opening",
+            "side_to_move": "black",
+            "piece_count": 32,
+            "non_pawn_non_king_count": 14,
+            "castling_rights": "KQkq",
+            "en_passant": "-"
+          }
+        },
+        {
+          "ply": 3,
+          "root_fen": "r1bqkbnr/pppppppp/2n5/8/2P5/8/PP1PPPPP/RNBQKBNR w KQkq - 1 2",
+          "side": "w",
+          "engine": "Stockfish 19",
+          "engine_label": "Opponent",
+          "position_command": "position startpos moves c2c4 b8c6",
+          "go_command": "go depth 2",
+          "move": "d2d4",
+          "replay_legal": true,
+          "elapsed_ms": 38,
+          "final_info": {
+            "depth": 2,
+            "seldepth": 3,
+            "score_type": "cp",
+            "score": 60,
+            "nodes": 51,
+            "nps": 51000,
+            "time_ms": 1,
+            "pv": "d2d4",
+            "raw": "info depth 2 seldepth 3 multipv 1 score cp 60 nodes 51 nps 51000 hashfull 0 tbhits 0 time 1 pv d2d4"
+          },
+          "evaluation": {
+            "depth": 2,
+            "seldepth": 3,
+            "score_type": "cp",
+            "score": 60,
+            "nodes": 51,
+            "nps": 51000,
+            "time_ms": 1,
+            "pv": "d2d4",
+            "raw": "info depth 2 seldepth 3 multipv 1 score cp 60 nodes 51 nps 51000 hashfull 0 tbhits 0 time 1 pv d2d4"
+          },
+          "all_info_lines": [
+            "info string Available processors: 0-7",
+            "info string Using 1 thread",
+            "info string NNUE evaluation using nn-1a298aa575a0.nnue (109MiB, (86896, 1024, 32, 32, 1))",
+            "info string Network replica 1: Shared memory.",
+            "info depth 1 seldepth 2 multipv 1 score cp 45 nodes 22 nps 22000 hashfull 0 tbhits 0 time 1 pv d2d4",
+            "info depth 2 seldepth 3 multipv 1 score cp 60 nodes 51 nps 51000 hashfull 0 tbhits 0 time 1 pv d2d4"
+          ],
+          "infos": [
+            {
+              "depth": null,
+              "seldepth": null,
+              "score_type": null,
+              "score": null,
+              "nodes": null,
+              "nps": null,
+              "time_ms": null,
+              "pv": null,
+              "raw": "info string Available processors: 0-7"
+            },
+            {
+              "depth": null,
+              "seldepth": null,
+              "score_type": null,
+              "score": null,
+              "nodes": null,
+              "nps": null,
+              "time_ms": null,
+              "pv": null,
+              "raw": "info string Using 1 thread"
+            },
+            {
+              "depth": null,
+              "seldepth": null,
+              "score_type": null,
+              "score": null,
+              "nodes": null,
+              "nps": null,
+              "time_ms": null,
+              "pv": null,
+              "raw": "info string NNUE evaluation using nn-1a298aa575a0.nnue (109MiB, (86896, 1024, 32, 32, 1))"
+            },
+            {
+              "depth": null,
+              "seldepth": null,
+              "score_type": null,
+              "score": null,
+              "nodes": null,
+              "nps": null,
+              "time_ms": null,
+              "pv": null,
+              "raw": "info string Network replica 1: Shared memory."
+            },
+            {
+              "depth": 1,
+              "seldepth": 2,
+              "score_type": "cp",
+              "score": 45,
+              "nodes": 22,
+              "nps": 22000,
+              "time_ms": 1,
+              "pv": "d2d4",
+              "raw": "info depth 1 seldepth 2 multipv 1 score cp 45 nodes 22 nps 22000 hashfull 0 tbhits 0 time 1 pv d2d4"
+            },
+            {
+              "depth": 2,
+              "seldepth": 3,
+              "score_type": "cp",
+              "score": 60,
+              "nodes": 51,
+              "nps": 51000,
+              "time_ms": 1,
+              "pv": "d2d4",
+              "raw": "info depth 2 seldepth 3 multipv 1 score cp 60 nodes 51 nps 51000 hashfull 0 tbhits 0 time 1 pv d2d4"
+            }
+          ],
+          "bestmove_line": "bestmove d2d4",
+          "book_used": false,
+          "book_move": null,
+          "position_classification": {
+            "phase": "opening",
+            "side_to_move": "white",
+            "piece_count": 32,
+            "non_pawn_non_king_count": 14,
+            "castling_rights": "KQkq",
+            "en_passant": "-"
+          }
+        }
+      ]
+    },
+    {
+      "position": "scandinavian",
+      "initial_fen": "startpos",
+      "round": 1,
+      "koi_color": "black",
+      "result": "*",
+      "winner": null,
+      "termination": "max plies",
+      "process_status": {
+        "koi": "clean shutdown",
+        "opponent": "clean shutdown"
+      },
+      "moves": [
+        {
+          "ply": 1,
+          "root_fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+          "side": "w",
+          "engine": "opening",
+          "engine_label": "opening",
+          "position_command": "position startpos",
+          "go_command": null,
+          "move": "e2e4",
+          "replay_legal": true,
+          "elapsed_ms": 0,
+          "final_info": null,
+          "evaluation": null,
+          "all_info_lines": [],
+          "infos": [],
+          "bestmove_line": null,
+          "book_used": false,
+          "book_move": null,
+          "position_classification": {
+            "phase": "opening",
+            "side_to_move": "white",
+            "piece_count": 32,
+            "non_pawn_non_king_count": 14,
+            "castling_rights": "KQkq",
+            "en_passant": "-"
+          }
+        },
+        {
+          "ply": 2,
+          "root_fen": "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1",
+          "side": "b",
+          "engine": "opening",
+          "engine_label": "opening",
+          "position_command": "position startpos moves e2e4",
+          "go_command": null,
+          "move": "d7d5",
+          "replay_legal": true,
+          "elapsed_ms": 0,
+          "final_info": null,
+          "evaluation": null,
+          "all_info_lines": [],
+          "infos": [],
+          "bestmove_line": null,
+          "book_used": false,
+          "book_move": null,
+          "position_classification": {
+            "phase": "opening",
+            "side_to_move": "black",
+            "piece_count": 32,
+            "non_pawn_non_king_count": 14,
+            "castling_rights": "KQkq",
+            "en_passant": "-"
+          }
+        },
+        {
+          "ply": 3,
+          "root_fen": "rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2",
+          "side": "w",
+          "engine": "Stockfish 19",
+          "engine_label": "Opponent",
+          "position_command": "position startpos moves e2e4 d7d5",
+          "go_command": "go depth 2",
+          "move": "e4d5",
+          "replay_legal": true,
+          "elapsed_ms": 17,
+          "final_info": {
+            "depth": 2,
+            "seldepth": 3,
+            "score_type": "cp",
+            "score": 15,
+            "nodes": 82,
+            "nps": 41000,
+            "time_ms": 2,
+            "pv": [
+              "e4d5",
+              "d8d5"
+            ],
+            "raw": "info depth 2 seldepth 3 multipv 1 score cp 15 nodes 82 nps 41000 hashfull 0 tbhits 0 time 2 pv e4d5 d8d5"
+          },
+          "evaluation": {
+            "depth": 2,
+            "seldepth": 3,
+            "score_type": "cp",
+            "score": 15,
+            "nodes": 82,
+            "nps": 41000,
+            "time_ms": 2,
+            "pv": [
+              "e4d5",
+              "d8d5"
+            ],
+            "raw": "info depth 2 seldepth 3 multipv 1 score cp 15 nodes 82 nps 41000 hashfull 0 tbhits 0 time 2 pv e4d5 d8d5"
+          },
+          "all_info_lines": [
+            "info string Available processors: 0-7",
+            "info string Using 1 thread",
+            "info string NNUE evaluation using nn-1a298aa575a0.nnue (109MiB, (86896, 1024, 32, 32, 1))",
+            "info string Network replica 1: Shared memory.",
+            "info depth 1 seldepth 3 multipv 1 score cp 15 nodes 37 nps 37000 hashfull 0 tbhits 0 time 1 pv e4d5 d8d5",
+            "info depth 2 seldepth 3 multipv 1 score cp 15 nodes 82 nps 41000 hashfull 0 tbhits 0 time 2 pv e4d5 d8d5"
+          ],
+          "infos": [
+            {
+              "depth": null,
+              "seldepth": null,
+              "score_type": null,
+              "score": null,
+              "nodes": null,
+              "nps": null,
+              "time_ms": null,
+              "pv": null,
+              "raw": "info string Available processors: 0-7"
+            },
+            {
+              "depth": null,
+              "seldepth": null,
+              "score_type": null,
+              "score": null,
+              "nodes": null,
+              "nps": null,
+              "time_ms": null,
+              "pv": null,
+              "raw": "info string Using 1 thread"
+            },
+            {
+              "depth": null,
+              "seldepth": null,
+              "score_type": null,
+              "score": null,
+              "nodes": null,
+              "nps": null,
+              "time_ms": null,
+              "pv": null,
+              "raw": "info string NNUE evaluation using nn-1a298aa575a0.nnue (109MiB, (86896, 1024, 32, 32, 1))"
+            },
+            {
+              "depth": null,
+              "seldepth": null,
+              "score_type": null,
+              "score": null,
+              "nodes": null,
+              "nps": null,
+              "time_ms": null,
+              "pv": null,
+              "raw": "info string Network replica 1: Shared memory."
+            },
+            {
+              "depth": 1,
+              "seldepth": 3,
+              "score_type": "cp",
+              "score": 15,
+              "nodes": 37,
+              "nps": 37000,
+              "time_ms": 1,
+              "pv": [
+                "e4d5",
+                "d8d5"
+              ],
+              "raw": "info depth 1 seldepth 3 multipv 1 score cp 15 nodes 37 nps 37000 hashfull 0 tbhits 0 time 1 pv e4d5 d8d5"
+            },
+            {
+              "depth": 2,
+              "seldepth": 3,
+              "score_type": "cp",
+              "score": 15,
+              "nodes": 82,
+              "nps": 41000,
+              "time_ms": 2,
+              "pv": [
+                "e4d5",
+                "d8d5"
+              ],
+              "raw": "info depth 2 seldepth 3 multipv 1 score cp 15 nodes 82 nps 41000 hashfull 0 tbhits 0 time 2 pv e4d5 d8d5"
+            }
+          ],
+          "bestmove_line": "bestmove e4d5 ponder d8d5",
+          "book_used": false,
+          "book_move": null,
+          "position_classification": {
+            "phase": "opening",
+            "side_to_move": "white",
+            "piece_count": 32,
+            "non_pawn_non_king_count": 14,
+            "castling_rights": "KQkq",
+            "en_passant": "-"
+          }
+        },
+        {
+          "ply": 4,
+          "root_fen": "rnbqkbnr/ppp1pppp/8/3P4/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 2",
+          "side": "b",
+          "engine": "Koi Engine",
+          "engine_label": "Koi",
+          "position_command": "position startpos moves e2e4 d7d5 e4d5",
+          "go_command": "go depth 2",
+          "move": "d8d5",
+          "replay_legal": true,
+          "elapsed_ms": 37,
+          "final_info": {
+            "depth": 2,
+            "seldepth": 7,
+            "score_type": "cp",
+            "score": 3,
+            "nodes": 407,
+            "nps": 13129,
+            "time_ms": 31,
+            "pv": [
+              "d8d5",
+              "b1c3"
+            ],
+            "raw": "info depth 2 seldepth 7 multipv 1 score cp 3 nodes 407 nps 13129 time 31 pv d8d5 b1c3"
+          },
+          "evaluation": {
+            "depth": 2,
+            "seldepth": 7,
+            "score_type": "cp",
+            "score": 3,
+            "nodes": 407,
+            "nps": 13129,
+            "time_ms": 31,
+            "pv": [
+              "d8d5",
+              "b1c3"
+            ],
+            "raw": "info depth 2 seldepth 7 multipv 1 score cp 3 nodes 407 nps 13129 time 31 pv d8d5 b1c3"
+          },
+          "all_info_lines": [
+            "info depth 1 seldepth 3 multipv 1 score cp 164 nodes 31 nps 10333 time 3 pv d8d5",
+            "info depth 2 seldepth 7 multipv 1 score cp 3 nodes 407 nps 13129 time 31 pv d8d5 b1c3"
+          ],
+          "infos": [
+            {
+              "depth": 1,
+              "seldepth": 3,
+              "score_type": "cp",
+              "score": 164,
+              "nodes": 31,
+              "nps": 10333,
+              "time_ms": 3,
+              "pv": "d8d5",
+              "raw": "info depth 1 seldepth 3 multipv 1 score cp 164 nodes 31 nps 10333 time 3 pv d8d5"
+            },
+            {
+              "depth": 2,
+              "seldepth": 7,
+              "score_type": "cp",
+              "score": 3,
+              "nodes": 407,
+              "nps": 13129,
+              "time_ms": 31,
+              "pv": [
+                "d8d5",
+                "b1c3"
+              ],
+              "raw": "info depth 2 seldepth 7 multipv 1 score cp 3 nodes 407 nps 13129 time 31 pv d8d5 b1c3"
+            }
+          ],
+          "bestmove_line": "bestmove d8d5",
+          "book_used": false,
+          "book_move": null,
+          "position_classification": {
+            "phase": "opening",
+            "side_to_move": "black",
+            "piece_count": 31,
+            "non_pawn_non_king_count": 14,
+            "castling_rights": "KQkq",
+            "en_passant": "-"
+          }
+        }
+      ]
+    },
+    {
+      "position": "french",
+      "initial_fen": "startpos",
+      "round": 1,
+      "koi_color": "black",
+      "result": "*",
+      "winner": null,
+      "termination": "max plies",
+      "process_status": {
+        "koi": "clean shutdown",
+        "opponent": "clean shutdown"
+      },
+      "moves": [
+        {
+          "ply": 1,
+          "root_fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+          "side": "w",
+          "engine": "opening",
+          "engine_label": "opening",
+          "position_command": "position startpos",
+          "go_command": null,
+          "move": "e2e4",
+          "replay_legal": true,
+          "elapsed_ms": 0,
+          "final_info": null,
+          "evaluation": null,
+          "all_info_lines": [],
+          "infos": [],
+          "bestmove_line": null,
+          "book_used": false,
+          "book_move": null,
+          "position_classification": {
+            "phase": "opening",
+            "side_to_move": "white",
+            "piece_count": 32,
+            "non_pawn_non_king_count": 14,
+            "castling_rights": "KQkq",
+            "en_passant": "-"
+          }
+        },
+        {
+          "ply": 2,
+          "root_fen": "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1",
+          "side": "b",
+          "engine": "opening",
+          "engine_label": "opening",
+          "position_command": "position startpos moves e2e4",
+          "go_command": null,
+          "move": "e7e6",
+          "replay_legal": true,
+          "elapsed_ms": 0,
+          "final_info": null,
+          "evaluation": null,
+          "all_info_lines": [],
+          "infos": [],
+          "bestmove_line": null,
+          "book_used": false,
+          "book_move": null,
+          "position_classification": {
+            "phase": "opening",
+            "side_to_move": "black",
+            "piece_count": 32,
+            "non_pawn_non_king_count": 14,
+            "castling_rights": "KQkq",
+            "en_passant": "-"
+          }
+        },
+        {
+          "ply": 3,
+          "root_fen": "rnbqkbnr/pppp1ppp/4p3/8/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2",
+          "side": "w",
+          "engine": "Stockfish 19",
+          "engine_label": "Opponent",
+          "position_command": "position startpos moves e2e4 e7e6",
+          "go_command": "go depth 2",
+          "move": "d2d4",
+          "replay_legal": true,
+          "elapsed_ms": 20,
+          "final_info": {
+            "depth": 2,
+            "seldepth": 4,
+            "score_type": "cp",
+            "score": 95,
+            "nodes": 69,
+            "nps": 69000,
+            "time_ms": 1,
+            "pv": "d2d4",
+            "raw": "info depth 2 seldepth 4 multipv 1 score cp 95 nodes 69 nps 69000 hashfull 0 tbhits 0 time 1 pv d2d4"
+          },
+          "evaluation": {
+            "depth": 2,
+            "seldepth": 4,
+            "score_type": "cp",
+            "score": 95,
+            "nodes": 69,
+            "nps": 69000,
+            "time_ms": 1,
+            "pv": "d2d4",
+            "raw": "info depth 2 seldepth 4 multipv 1 score cp 95 nodes 69 nps 69000 hashfull 0 tbhits 0 time 1 pv d2d4"
+          },
+          "all_info_lines": [
+            "info string Available processors: 0-7",
+            "info string Using 1 thread",
+            "info string NNUE evaluation using nn-1a298aa575a0.nnue (109MiB, (86896, 1024, 32, 32, 1))",
+            "info string Network replica 1: Shared memory.",
+            "info depth 1 seldepth 2 multipv 1 score cp 60 nodes 30 nps 30000 hashfull 0 tbhits 0 time 1 pv d2d4",
+            "info depth 2 seldepth 4 multipv 1 score cp 95 nodes 69 nps 69000 hashfull 0 tbhits 0 time 1 pv d2d4"
+          ],
+          "infos": [
+            {
+              "depth": null,
+              "seldepth": null,
+              "score_type": null,
+              "score": null,
+              "nodes": null,
+              "nps": null,
+              "time_ms": null,
+              "pv": null,
+              "raw": "info string Available processors: 0-7"
+            },
+            {
+              "depth": null,
+              "seldepth": null,
+              "score_type": null,
+              "score": null,
+              "nodes": null,
+              "nps": null,
+              "time_ms": null,
+              "pv": null,
+              "raw": "info string Using 1 thread"
+            },
+            {
+              "depth": null,
+              "seldepth": null,
+              "score_type": null,
+              "score": null,
+              "nodes": null,
+              "nps": null,
+              "time_ms": null,
+              "pv": null,
+              "raw": "info string NNUE evaluation using nn-1a298aa575a0.nnue (109MiB, (86896, 1024, 32, 32, 1))"
+            },
+            {
+              "depth": null,
+              "seldepth": null,
+              "score_type": null,
+              "score": null,
+              "nodes": null,
+              "nps": null,
+              "time_ms": null,
+              "pv": null,
+              "raw": "info string Network replica 1: Shared memory."
+            },
+            {
+              "depth": 1,
+              "seldepth": 2,
+              "score_type": "cp",
+              "score": 60,
+              "nodes": 30,
+              "nps": 30000,
+              "time_ms": 1,
+              "pv": "d2d4",
+              "raw": "info depth 1 seldepth 2 multipv 1 score cp 60 nodes 30 nps 30000 hashfull 0 tbhits 0 time 1 pv d2d4"
+            },
+            {
+              "depth": 2,
+              "seldepth": 4,
+              "score_type": "cp",
+              "score": 95,
+              "nodes": 69,
+              "nps": 69000,
+              "time_ms": 1,
+              "pv": "d2d4",
+              "raw": "info depth 2 seldepth 4 multipv 1 score cp 95 nodes 69 nps 69000 hashfull 0 tbhits 0 time 1 pv d2d4"
+            }
+          ],
+          "bestmove_line": "bestmove d2d4",
+          "book_used": false,
+          "book_move": null,
+          "position_classification": {
+            "phase": "opening",
+            "side_to_move": "white",
+            "piece_count": 32,
+            "non_pawn_non_king_count": 14,
+            "castling_rights": "KQkq",
+            "en_passant": "-"
+          }
+        },
+        {
+          "ply": 4,
+          "root_fen": "rnbqkbnr/pppp1ppp/4p3/8/3PP3/8/PPP2PPP/RNBQKBNR b KQkq - 0 2",
+          "side": "b",
+          "engine": "Koi Engine",
+          "engine_label": "Koi",
+          "position_command": "position startpos moves e2e4 e7e6 d2d4",
+          "go_command": "go depth 2",
+          "move": "f8b4",
+          "replay_legal": true,
+          "elapsed_ms": 44,
+          "final_info": {
+            "depth": 2,
+            "seldepth": 9,
+            "score_type": "cp",
+            "score": -48,
+            "nodes": 422,
+            "nps": 11405,
+            "time_ms": 37,
+            "pv": [
+              "f8b4",
+              "c1d2",
+              "b8c6"
+            ],
+            "raw": "info depth 2 seldepth 9 multipv 1 score cp -48 nodes 422 nps 11405 time 37 pv f8b4 c1d2 b8c6"
+          },
+          "evaluation": {
+            "depth": 2,
+            "seldepth": 9,
+            "score_type": "cp",
+            "score": -48,
+            "nodes": 422,
+            "nps": 11405,
+            "time_ms": 37,
+            "pv": [
+              "f8b4",
+              "c1d2",
+              "b8c6"
+            ],
+            "raw": "info depth 2 seldepth 9 multipv 1 score cp -48 nodes 422 nps 11405 time 37 pv f8b4 c1d2 b8c6"
+          },
+          "all_info_lines": [
+            "info depth 1 seldepth 4 multipv 1 score cp -2 nodes 43 nps 14333 time 3 pv b8c6",
+            "info depth 2 seldepth 9 multipv 1 score cp -48 nodes 422 nps 11405 time 37 pv f8b4 c1d2 b8c6"
+          ],
+          "infos": [
+            {
+              "depth": 1,
+              "seldepth": 4,
+              "score_type": "cp",
+              "score": -2,
+              "nodes": 43,
+              "nps": 14333,
+              "time_ms": 3,
+              "pv": "b8c6",
+              "raw": "info depth 1 seldepth 4 multipv 1 score cp -2 nodes 43 nps 14333 time 3 pv b8c6"
+            },
+            {
+              "depth": 2,
+              "seldepth": 9,
+              "score_type": "cp",
+              "score": -48,
+              "nodes": 422,
+              "nps": 11405,
+              "time_ms": 37,
+              "pv": [
+                "f8b4",
+                "c1d2",
+                "b8c6"
+              ],
+              "raw": "info depth 2 seldepth 9 multipv 1 score cp -48 nodes 422 nps 11405 time 37 pv f8b4 c1d2 b8c6"
+            }
+          ],
+          "bestmove_line": "bestmove f8b4",
+          "book_used": false,
+          "book_move": null,
+          "position_classification": {
+            "phase": "opening",
+            "side_to_move": "black",
+            "piece_count": 32,
+            "non_pawn_non_king_count": 14,
+            "castling_rights": "KQkq",
+            "en_passant": "-"
+          }
+        }
+      ]
+    },
+    {
+      "position": "caro-kann",
+      "initial_fen": "startpos",
+      "round": 1,
+      "koi_color": "black",
+      "result": "*",
+      "winner": null,
+      "termination": "max plies",
+      "process_status": {
+        "koi": "clean shutdown",
+        "opponent": "clean shutdown"
+      },
+      "moves": [
+        {
+          "ply": 1,
+          "root_fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+          "side": "w",
+          "engine": "opening",
+          "engine_label": "opening",
+          "position_command": "position startpos",
+          "go_command": null,
+          "move": "e2e4",
+          "replay_legal": true,
+          "elapsed_ms": 0,
+          "final_info": null,
+          "evaluation": null,
+          "all_info_lines": [],
+          "infos": [],
+          "bestmove_line": null,
+          "book_used": false,
+          "book_move": null,
+          "position_classification": {
+            "phase": "opening",
+            "side_to_move": "white",
+            "piece_count": 32,
+            "non_pawn_non_king_count": 14,
+            "castling_rights": "KQkq",
+            "en_passant": "-"
+          }
+        },
+        {
+          "ply": 2,
+          "root_fen": "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1",
+          "side": "b",
+          "engine": "opening",
+          "engine_label": "opening",
+          "position_command": "position startpos moves e2e4",
+          "go_command": null,
+          "move": "c7c6",
+          "replay_legal": true,
+          "elapsed_ms": 0,
+          "final_info": null,
+          "evaluation": null,
+          "all_info_lines": [],
+          "infos": [],
+          "bestmove_line": null,
+          "book_used": false,
+          "book_move": null,
+          "position_classification": {
+            "phase": "opening",
+            "side_to_move": "black",
+            "piece_count": 32,
+            "non_pawn_non_king_count": 14,
+            "castling_rights": "KQkq",
+            "en_passant": "-"
+          }
+        },
+        {
+          "ply": 3,
+          "root_fen": "rnbqkbnr/pp1ppppp/2p5/8/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2",
+          "side": "w",
+          "engine": "Stockfish 19",
+          "engine_label": "Opponent",
+          "position_command": "position startpos moves e2e4 c7c6",
+          "go_command": "go depth 2",
+          "move": "d2d4",
+          "replay_legal": true,
+          "elapsed_ms": 11,
+          "final_info": {
+            "depth": 2,
+            "seldepth": 4,
+            "score_type": "cp",
+            "score": 62,
+            "nodes": 70,
+            "nps": 70000,
+            "time_ms": 1,
+            "pv": "d2d4",
+            "raw": "info depth 2 seldepth 4 multipv 1 score cp 62 nodes 70 nps 70000 hashfull 0 tbhits 0 time 1 pv d2d4"
+          },
+          "evaluation": {
+            "depth": 2,
+            "seldepth": 4,
+            "score_type": "cp",
+            "score": 62,
+            "nodes": 70,
+            "nps": 70000,
+            "time_ms": 1,
+            "pv": "d2d4",
+            "raw": "info depth 2 seldepth 4 multipv 1 score cp 62 nodes 70 nps 70000 hashfull 0 tbhits 0 time 1 pv d2d4"
+          },
+          "all_info_lines": [
+            "info string Available processors: 0-7",
+            "info string Using 1 thread",
+            "info string NNUE evaluation using nn-1a298aa575a0.nnue (109MiB, (86896, 1024, 32, 32, 1))",
+            "info string Network replica 1: Shared memory.",
+            "info depth 1 seldepth 2 multipv 1 score cp 58 nodes 30 nps 30000 hashfull 0 tbhits 0 time 1 pv d2d4",
+            "info depth 2 seldepth 4 multipv 1 score cp 62 nodes 70 nps 70000 hashfull 0 tbhits 0 time 1 pv d2d4"
+          ],
+          "infos": [
+            {
+              "depth": null,
+              "seldepth": null,
+              "score_type": null,
+              "score": null,
+              "nodes": null,
+              "nps": null,
+              "time_ms": null,
+              "pv": null,
+              "raw": "info string Available processors: 0-7"
+            },
+            {
+              "depth": null,
+              "seldepth": null,
+              "score_type": null,
+              "score": null,
+              "nodes": null,
+              "nps": null,
+              "time_ms": null,
+              "pv": null,
+              "raw": "info string Using 1 thread"
+            },
+            {
+              "depth": null,
+              "seldepth": null,
+              "score_type": null,
+              "score": null,
+              "nodes": null,
+              "nps": null,
+              "time_ms": null,
+              "pv": null,
+              "raw": "info string NNUE evaluation using nn-1a298aa575a0.nnue (109MiB, (86896, 1024, 32, 32, 1))"
+            },
+            {
+              "depth": null,
+              "seldepth": null,
+              "score_type": null,
+              "score": null,
+              "nodes": null,
+              "nps": null,
+              "time_ms": null,
+              "pv": null,
+              "raw": "info string Network replica 1: Shared memory."
+            },
+            {
+              "depth": 1,
+              "seldepth": 2,
+              "score_type": "cp",
+              "score": 58,
+              "nodes": 30,
+              "nps": 30000,
+              "time_ms": 1,
+              "pv": "d2d4",
+              "raw": "info depth 1 seldepth 2 multipv 1 score cp 58 nodes 30 nps 30000 hashfull 0 tbhits 0 time 1 pv d2d4"
+            },
+            {
+              "depth": 2,
+              "seldepth": 4,
+              "score_type": "cp",
+              "score": 62,
+              "nodes": 70,
+              "nps": 70000,
+              "time_ms": 1,
+              "pv": "d2d4",
+              "raw": "info depth 2 seldepth 4 multipv 1 score cp 62 nodes 70 nps 70000 hashfull 0 tbhits 0 time 1 pv d2d4"
+            }
+          ],
+          "bestmove_line": "bestmove d2d4",
+          "book_used": false,
+          "book_move": null,
+          "position_classification": {
+            "phase": "opening",
+            "side_to_move": "white",
+            "piece_count": 32,
+            "non_pawn_non_king_count": 14,
+            "castling_rights": "KQkq",
+            "en_passant": "-"
+          }
+        },
+        {
+          "ply": 4,
+          "root_fen": "rnbqkbnr/pp1ppppp/2p5/8/3PP3/8/PPP2PPP/RNBQKBNR b KQkq - 0 2",
+          "side": "b",
+          "engine": "Koi Engine",
+          "engine_label": "Koi",
+          "position_command": "position startpos moves e2e4 c7c6 d2d4",
+          "go_command": "go depth 2",
+          "move": "d8a5",
+          "replay_legal": true,
+          "elapsed_ms": 42,
+          "final_info": {
+            "depth": 2,
+            "seldepth": 7,
+            "score_type": "cp",
+            "score": -125,
+            "nodes": 346,
+            "nps": 10176,
+            "time_ms": 34,
+            "pv": [
+              "d8a5",
+              "c1d2",
+              "a5a4"
+            ],
+            "raw": "info depth 2 seldepth 7 multipv 1 score cp -125 nodes 346 nps 10176 time 34 pv d8a5 c1d2 a5a4"
+          },
+          "evaluation": {
+            "depth": 2,
+            "seldepth": 7,
+            "score_type": "cp",
+            "score": -125,
+            "nodes": 346,
+            "nps": 10176,
+            "time_ms": 34,
+            "pv": [
+              "d8a5",
+              "c1d2",
+              "a5a4"
+            ],
+            "raw": "info depth 2 seldepth 7 multipv 1 score cp -125 nodes 346 nps 10176 time 34 pv d8a5 c1d2 a5a4"
+          },
+          "all_info_lines": [
+            "info depth 1 seldepth 4 multipv 1 score cp -83 nodes 42 nps 7000 time 6 pv g8f6",
+            "info depth 2 seldepth 7 multipv 1 score cp -125 nodes 346 nps 10176 time 34 pv d8a5 c1d2 a5a4"
+          ],
+          "infos": [
+            {
+              "depth": 1,
+              "seldepth": 4,
+              "score_type": "cp",
+              "score": -83,
+              "nodes": 42,
+              "nps": 7000,
+              "time_ms": 6,
+              "pv": "g8f6",
+              "raw": "info depth 1 seldepth 4 multipv 1 score cp -83 nodes 42 nps 7000 time 6 pv g8f6"
+            },
+            {
+              "depth": 2,
+              "seldepth": 7,
+              "score_type": "cp",
+              "score": -125,
+              "nodes": 346,
+              "nps": 10176,
+              "time_ms": 34,
+              "pv": [
+                "d8a5",
+                "c1d2",
+                "a5a4"
+              ],
+              "raw": "info depth 2 seldepth 7 multipv 1 score cp -125 nodes 346 nps 10176 time 34 pv d8a5 c1d2 a5a4"
+            }
+          ],
+          "bestmove_line": "bestmove d8a5",
+          "book_used": false,
+          "book_move": null,
+          "position_classification": {
+            "phase": "opening",
+            "side_to_move": "black",
+            "piece_count": 32,
+            "non_pawn_non_king_count": 14,
+            "castling_rights": "KQkq",
+            "en_passant": "-"
+          }
+        }
+      ]
+    },
+    {
+      "position": "sicilian",
+      "initial_fen": "startpos",
+      "round": 1,
+      "koi_color": "black",
+      "result": "*",
+      "winner": null,
+      "termination": "max plies",
+      "process_status": {
+        "koi": "clean shutdown",
+        "opponent": "clean shutdown"
+      },
+      "moves": [
+        {
+          "ply": 1,
+          "root_fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+          "side": "w",
+          "engine": "opening",
+          "engine_label": "opening",
+          "position_command": "position startpos",
+          "go_command": null,
+          "move": "e2e4",
+          "replay_legal": true,
+          "elapsed_ms": 0,
+          "final_info": null,
+          "evaluation": null,
+          "all_info_lines": [],
+          "infos": [],
+          "bestmove_line": null,
+          "book_used": false,
+          "book_move": null,
+          "position_classification": {
+            "phase": "opening",
+            "side_to_move": "white",
+            "piece_count": 32,
+            "non_pawn_non_king_count": 14,
+            "castling_rights": "KQkq",
+            "en_passant": "-"
+          }
+        },
+        {
+          "ply": 2,
+          "root_fen": "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1",
+          "side": "b",
+          "engine": "opening",
+          "engine_label": "opening",
+          "position_command": "position startpos moves e2e4",
+          "go_command": null,
+          "move": "c7c5",
+          "replay_legal": true,
+          "elapsed_ms": 0,
+          "final_info": null,
+          "evaluation": null,
+          "all_info_lines": [],
+          "infos": [],
+          "bestmove_line": null,
+          "book_used": false,
+          "book_move": null,
+          "position_classification": {
+            "phase": "opening",
+            "side_to_move": "black",
+            "piece_count": 32,
+            "non_pawn_non_king_count": 14,
+            "castling_rights": "KQkq",
+            "en_passant": "-"
+          }
+        },
+        {
+          "ply": 3,
+          "root_fen": "rnbqkbnr/pp1ppppp/8/2p5/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2",
+          "side": "w",
+          "engine": "Stockfish 19",
+          "engine_label": "Opponent",
+          "position_command": "position startpos moves e2e4 c7c5",
+          "go_command": "go depth 2",
+          "move": "g1f3",
+          "replay_legal": true,
+          "elapsed_ms": 11,
+          "final_info": {
+            "depth": 2,
+            "seldepth": 3,
+            "score_type": "cp",
+            "score": 22,
+            "nodes": 172,
+            "nps": 86000,
+            "time_ms": 2,
+            "pv": [
+              "g1f3",
+              "d7d6"
+            ],
+            "raw": "info depth 2 seldepth 3 multipv 1 score cp 22 nodes 172 nps 86000 hashfull 0 tbhits 0 time 2 pv g1f3 d7d6"
+          },
+          "evaluation": {
+            "depth": 2,
+            "seldepth": 3,
+            "score_type": "cp",
+            "score": 22,
+            "nodes": 172,
+            "nps": 86000,
+            "time_ms": 2,
+            "pv": [
+              "g1f3",
+              "d7d6"
+            ],
+            "raw": "info depth 2 seldepth 3 multipv 1 score cp 22 nodes 172 nps 86000 hashfull 0 tbhits 0 time 2 pv g1f3 d7d6"
+          },
+          "all_info_lines": [
+            "info string Available processors: 0-7",
+            "info string Using 1 thread",
+            "info string NNUE evaluation using nn-1a298aa575a0.nnue (109MiB, (86896, 1024, 32, 32, 1))",
+            "info string Network replica 1: Shared memory.",
+            "info depth 1 seldepth 2 multipv 1 score cp 25 nodes 32 nps 32000 hashfull 0 tbhits 0 time 1 pv g1f3",
+            "info depth 2 seldepth 3 multipv 1 score cp 22 nodes 172 nps 86000 hashfull 0 tbhits 0 time 2 pv g1f3 d7d6"
+          ],
+          "infos": [
+            {
+              "depth": null,
+              "seldepth": null,
+              "score_type": null,
+              "score": null,
+              "nodes": null,
+              "nps": null,
+              "time_ms": null,
+              "pv": null,
+              "raw": "info string Available processors: 0-7"
+            },
+            {
+              "depth": null,
+              "seldepth": null,
+              "score_type": null,
+              "score": null,
+              "nodes": null,
+              "nps": null,
+              "time_ms": null,
+              "pv": null,
+              "raw": "info string Using 1 thread"
+            },
+            {
+              "depth": null,
+              "seldepth": null,
+              "score_type": null,
+              "score": null,
+              "nodes": null,
+              "nps": null,
+              "time_ms": null,
+              "pv": null,
+              "raw": "info string NNUE evaluation using nn-1a298aa575a0.nnue (109MiB, (86896, 1024, 32, 32, 1))"
+            },
+            {
+              "depth": null,
+              "seldepth": null,
+              "score_type": null,
+              "score": null,
+              "nodes": null,
+              "nps": null,
+              "time_ms": null,
+              "pv": null,
+              "raw": "info string Network replica 1: Shared memory."
+            },
+            {
+              "depth": 1,
+              "seldepth": 2,
+              "score_type": "cp",
+              "score": 25,
+              "nodes": 32,
+              "nps": 32000,
+              "time_ms": 1,
+              "pv": "g1f3",
+              "raw": "info depth 1 seldepth 2 multipv 1 score cp 25 nodes 32 nps 32000 hashfull 0 tbhits 0 time 1 pv g1f3"
+            },
+            {
+              "depth": 2,
+              "seldepth": 3,
+              "score_type": "cp",
+              "score": 22,
+              "nodes": 172,
+              "nps": 86000,
+              "time_ms": 2,
+              "pv": [
+                "g1f3",
+                "d7d6"
+              ],
+              "raw": "info depth 2 seldepth 3 multipv 1 score cp 22 nodes 172 nps 86000 hashfull 0 tbhits 0 time 2 pv g1f3 d7d6"
+            }
+          ],
+          "bestmove_line": "bestmove g1f3 ponder d7d6",
+          "book_used": false,
+          "book_move": null,
+          "position_classification": {
+            "phase": "opening",
+            "side_to_move": "white",
+            "piece_count": 32,
+            "non_pawn_non_king_count": 14,
+            "castling_rights": "KQkq",
+            "en_passant": "-"
+          }
+        },
+        {
+          "ply": 4,
+          "root_fen": "rnbqkbnr/pp1ppppp/8/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2",
+          "side": "b",
+          "engine": "Koi Engine",
+          "engine_label": "Koi",
+          "position_command": "position startpos moves e2e4 c7c5 g1f3",
+          "go_command": "go depth 2",
+          "move": "g8f6",
+          "replay_legal": true,
+          "elapsed_ms": 17,
+          "final_info": {
+            "depth": 2,
+            "seldepth": 7,
+            "score_type": "cp",
+            "score": -163,
+            "nodes": 158,
+            "nps": 14363,
+            "time_ms": 11,
+            "pv": [
+              "g8f6",
+              "b1c3"
+            ],
+            "raw": "info depth 2 seldepth 7 multipv 1 score cp -163 nodes 158 nps 14363 time 11 pv g8f6 b1c3"
+          },
+          "evaluation": {
+            "depth": 2,
+            "seldepth": 7,
+            "score_type": "cp",
+            "score": -163,
+            "nodes": 158,
+            "nps": 14363,
+            "time_ms": 11,
+            "pv": [
+              "g8f6",
+              "b1c3"
+            ],
+            "raw": "info depth 2 seldepth 7 multipv 1 score cp -163 nodes 158 nps 14363 time 11 pv g8f6 b1c3"
+          },
+          "all_info_lines": [
+            "info depth 1 seldepth 2 multipv 1 score cp -73 nodes 28 nps 14000 time 2 pv g8f6",
+            "info depth 2 seldepth 7 multipv 1 score cp -163 nodes 158 nps 14363 time 11 pv g8f6 b1c3"
+          ],
+          "infos": [
+            {
+              "depth": 1,
+              "seldepth": 2,
+              "score_type": "cp",
+              "score": -73,
+              "nodes": 28,
+              "nps": 14000,
+              "time_ms": 2,
+              "pv": "g8f6",
+              "raw": "info depth 1 seldepth 2 multipv 1 score cp -73 nodes 28 nps 14000 time 2 pv g8f6"
+            },
+            {
+              "depth": 2,
+              "seldepth": 7,
+              "score_type": "cp",
+              "score": -163,
+              "nodes": 158,
+              "nps": 14363,
+              "time_ms": 11,
+              "pv": [
+                "g8f6",
+                "b1c3"
+              ],
+              "raw": "info depth 2 seldepth 7 multipv 1 score cp -163 nodes 158 nps 14363 time 11 pv g8f6 b1c3"
+            }
+          ],
+          "bestmove_line": "bestmove g8f6",
+          "book_used": false,
+          "book_move": null,
+          "position_classification": {
+            "phase": "opening",
+            "side_to_move": "black",
+            "piece_count": 32,
+            "non_pawn_non_king_count": 14,
+            "castling_rights": "KQkq",
+            "en_passant": "-"
+          }
+        }
+      ]
+    },
+    {
+      "position": "queens-gambit",
+      "initial_fen": "startpos",
+      "round": 1,
+      "koi_color": "black",
+      "result": "*",
+      "winner": null,
+      "termination": "max plies",
+      "process_status": {
+        "koi": "clean shutdown",
+        "opponent": "clean shutdown"
+      },
+      "moves": [
+        {
+          "ply": 1,
+          "root_fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+          "side": "w",
+          "engine": "opening",
+          "engine_label": "opening",
+          "position_command": "position startpos",
+          "go_command": null,
+          "move": "d2d4",
+          "replay_legal": true,
+          "elapsed_ms": 0,
+          "final_info": null,
+          "evaluation": null,
+          "all_info_lines": [],
+          "infos": [],
+          "bestmove_line": null,
+          "book_used": false,
+          "book_move": null,
+          "position_classification": {
+            "phase": "opening",
+            "side_to_move": "white",
+            "piece_count": 32,
+            "non_pawn_non_king_count": 14,
+            "castling_rights": "KQkq",
+            "en_passant": "-"
+          }
+        },
+        {
+          "ply": 2,
+          "root_fen": "rnbqkbnr/pppppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR b KQkq - 0 1",
+          "side": "b",
+          "engine": "opening",
+          "engine_label": "opening",
+          "position_command": "position startpos moves d2d4",
+          "go_command": null,
+          "move": "d7d5",
+          "replay_legal": true,
+          "elapsed_ms": 0,
+          "final_info": null,
+          "evaluation": null,
+          "all_info_lines": [],
+          "infos": [],
+          "bestmove_line": null,
+          "book_used": false,
+          "book_move": null,
+          "position_classification": {
+            "phase": "opening",
+            "side_to_move": "black",
+            "piece_count": 32,
+            "non_pawn_non_king_count": 14,
+            "castling_rights": "KQkq",
+            "en_passant": "-"
+          }
+        },
+        {
+          "ply": 3,
+          "root_fen": "rnbqkbnr/ppp1pppp/8/3p4/3P4/8/PPP1PPPP/RNBQKBNR w KQkq - 0 2",
+          "side": "w",
+          "engine": "opening",
+          "engine_label": "opening",
+          "position_command": "position startpos moves d2d4 d7d5",
+          "go_command": null,
+          "move": "c2c4",
+          "replay_legal": true,
+          "elapsed_ms": 0,
+          "final_info": null,
+          "evaluation": null,
+          "all_info_lines": [],
+          "infos": [],
+          "bestmove_line": null,
+          "book_used": false,
+          "book_move": null,
+          "position_classification": {
+            "phase": "opening",
+            "side_to_move": "white",
+            "piece_count": 32,
+            "non_pawn_non_king_count": 14,
+            "castling_rights": "KQkq",
+            "en_passant": "-"
+          }
+        },
+        {
+          "ply": 4,
+          "root_fen": "rnbqkbnr/ppp1pppp/8/3p4/2PP4/8/PP2PPPP/RNBQKBNR b KQkq - 0 2",
+          "side": "b",
+          "engine": "Koi Engine",
+          "engine_label": "Koi",
+          "position_command": "position startpos moves d2d4 d7d5 c2c4",
+          "go_command": "go depth 2",
+          "move": "d8d6",
+          "replay_legal": true,
+          "elapsed_ms": 117,
+          "final_info": {
+            "depth": 2,
+            "seldepth": 9,
+            "score_type": "cp",
+            "score": 15,
+            "nodes": 1337,
+            "nps": 12045,
+            "time_ms": 111,
+            "pv": [
+              "d8d6",
+              "d1d3"
+            ],
+            "raw": "info depth 2 seldepth 9 multipv 1 score cp 15 nodes 1337 nps 12045 time 111 pv d8d6 d1d3"
+          },
+          "evaluation": {
+            "depth": 2,
+            "seldepth": 9,
+            "score_type": "cp",
+            "score": 15,
+            "nodes": 1337,
+            "nps": 12045,
+            "time_ms": 111,
+            "pv": [
+              "d8d6",
+              "d1d3"
+            ],
+            "raw": "info depth 2 seldepth 9 multipv 1 score cp 15 nodes 1337 nps 12045 time 111 pv d8d6 d1d3"
+          },
+          "all_info_lines": [
+            "info depth 1 seldepth 9 multipv 1 score cp 107 nodes 65 nps 13000 time 5 pv d5c4",
+            "info depth 2 seldepth 9 multipv 1 score cp 15 nodes 1337 nps 12045 time 111 pv d8d6 d1d3"
+          ],
+          "infos": [
+            {
+              "depth": 1,
+              "seldepth": 9,
+              "score_type": "cp",
+              "score": 107,
+              "nodes": 65,
+              "nps": 13000,
+              "time_ms": 5,
+              "pv": "d5c4",
+              "raw": "info depth 1 seldepth 9 multipv 1 score cp 107 nodes 65 nps 13000 time 5 pv d5c4"
+            },
+            {
+              "depth": 2,
+              "seldepth": 9,
+              "score_type": "cp",
+              "score": 15,
+              "nodes": 1337,
+              "nps": 12045,
+              "time_ms": 111,
+              "pv": [
+                "d8d6",
+                "d1d3"
+              ],
+              "raw": "info depth 2 seldepth 9 multipv 1 score cp 15 nodes 1337 nps 12045 time 111 pv d8d6 d1d3"
+            }
+          ],
+          "bestmove_line": "bestmove d8d6",
+          "book_used": false,
+          "book_move": null,
+          "position_classification": {
+            "phase": "opening",
+            "side_to_move": "black",
+            "piece_count": 32,
+            "non_pawn_non_king_count": 14,
+            "castling_rights": "KQkq",
+            "en_passant": "-"
+          }
+        },
+        {
+          "ply": 5,
+          "root_fen": "rnb1kbnr/ppp1pppp/3q4/3p4/2PP4/8/PP2PPPP/RNBQKBNR w KQkq - 1 3",
+          "side": "w",
+          "engine": "Stockfish 19",
+          "engine_label": "Opponent",
+          "position_command": "position startpos moves d2d4 d7d5 c2c4 d8d6",
+          "go_command": "go depth 2",
+          "move": "b1c3",
+          "replay_legal": true,
+          "elapsed_ms": 10,
+          "final_info": {
+            "depth": 2,
+            "seldepth": 3,
+            "score_type": "cp",
+            "score": 104,
+            "nodes": 86,
+            "nps": 43000,
+            "time_ms": 2,
+            "pv": [
+              "b1c3",
+              "d5c4"
+            ],
+            "raw": "info depth 2 seldepth 3 multipv 1 score cp 104 nodes 86 nps 43000 hashfull 0 tbhits 0 time 2 pv b1c3 d5c4"
+          },
+          "evaluation": {
+            "depth": 2,
+            "seldepth": 3,
+            "score_type": "cp",
+            "score": 104,
+            "nodes": 86,
+            "nps": 43000,
+            "time_ms": 2,
+            "pv": [
+              "b1c3",
+              "d5c4"
+            ],
+            "raw": "info depth 2 seldepth 3 multipv 1 score cp 104 nodes 86 nps 43000 hashfull 0 tbhits 0 time 2 pv b1c3 d5c4"
+          },
+          "all_info_lines": [
+            "info string Available processors: 0-7",
+            "info string Using 1 thread",
+            "info string NNUE evaluation using nn-1a298aa575a0.nnue (109MiB, (86896, 1024, 32, 32, 1))",
+            "info string Network replica 1: Shared memory.",
+            "info depth 1 seldepth 3 multipv 1 score cp 104 nodes 36 nps 36000 hashfull 0 tbhits 0 time 1 pv c4d5 d6d5",
+            "info depth 2 seldepth 3 multipv 1 score cp 104 nodes 86 nps 43000 hashfull 0 tbhits 0 time 2 pv b1c3 d5c4"
+          ],
+          "infos": [
+            {
+              "depth": null,
+              "seldepth": null,
+              "score_type": null,
+              "score": null,
+              "nodes": null,
+              "nps": null,
+              "time_ms": null,
+              "pv": null,
+              "raw": "info string Available processors: 0-7"
+            },
+            {
+              "depth": null,
+              "seldepth": null,
+              "score_type": null,
+              "score": null,
+              "nodes": null,
+              "nps": null,
+              "time_ms": null,
+              "pv": null,
+              "raw": "info string Using 1 thread"
+            },
+            {
+              "depth": null,
+              "seldepth": null,
+              "score_type": null,
+              "score": null,
+              "nodes": null,
+              "nps": null,
+              "time_ms": null,
+              "pv": null,
+              "raw": "info string NNUE evaluation using nn-1a298aa575a0.nnue (109MiB, (86896, 1024, 32, 32, 1))"
+            },
+            {
+              "depth": null,
+              "seldepth": null,
+              "score_type": null,
+              "score": null,
+              "nodes": null,
+              "nps": null,
+              "time_ms": null,
+              "pv": null,
+              "raw": "info string Network replica 1: Shared memory."
+            },
+            {
+              "depth": 1,
+              "seldepth": 3,
+              "score_type": "cp",
+              "score": 104,
+              "nodes": 36,
+              "nps": 36000,
+              "time_ms": 1,
+              "pv": [
+                "c4d5",
+                "d6d5"
+              ],
+              "raw": "info depth 1 seldepth 3 multipv 1 score cp 104 nodes 36 nps 36000 hashfull 0 tbhits 0 time 1 pv c4d5 d6d5"
+            },
+            {
+              "depth": 2,
+              "seldepth": 3,
+              "score_type": "cp",
+              "score": 104,
+              "nodes": 86,
+              "nps": 43000,
+              "time_ms": 2,
+              "pv": [
+                "b1c3",
+                "d5c4"
+              ],
+              "raw": "info depth 2 seldepth 3 multipv 1 score cp 104 nodes 86 nps 43000 hashfull 0 tbhits 0 time 2 pv b1c3 d5c4"
+            }
+          ],
+          "bestmove_line": "bestmove b1c3 ponder d5c4",
+          "book_used": false,
+          "book_move": null,
+          "position_classification": {
+            "phase": "opening",
+            "side_to_move": "white",
+            "piece_count": 32,
+            "non_pawn_non_king_count": 14,
+            "castling_rights": "KQkq",
+            "en_passant": "-"
+          }
+        }
+      ]
+    }
+  ]
+}

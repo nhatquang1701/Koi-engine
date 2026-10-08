@@ -1,0 +1,16 @@
+# Koi Engine 1.0.0 pre-release
+
+The first public release candidate of Koi Engine's classical CPU UCI engine for Windows x64 and Linux x86-64. The launcher selects the fastest supported bundled CPU variant and retains a baseline x86-64 fallback.
+
+## Downloads
+
+| Platform | Archive | SHA-256 |
+| --- | --- | --- |
+| Windows x64 | `koi-engine-v1.0.0.zip` | `FEB07389D04A6B31B66446D03314306CA8FA4F54D7EC5ADE2444702C10B73F65` |
+| Linux x86-64 | `koi-engine-v1.0.0-linux-x86_64.tar.gz` | `A2A766AF6E6F5A2E37AC270FFC2ADD2E7B20F6802DD8849B09E6E450CE25EA08` |
+
+Verify the matching `.sha256` file before extracting. Add `koi-engine.exe` on Windows or `koi-engine` on Linux to a UCI chess GUI. Each archive includes `INSTALL.txt`, the project and third-party licenses, and a `package.json` manifest with per-file hashes. The Linux archive targets Ubuntu 22.04 and newer glibc 2.35 systems.
+
+## Configuration
+
+Start with `Threads=1`, `Hash=512`, and `Speed=100`. The default `OwnBook=true` requires a user-supplied `book.bin`; no book or Syzygy files are included. Optional NNUE and GPU NNUE require separate assets or hardware. Koi 1.0.0 does not advertise `UCI_LimitStrength` or `UCI_Elo` and makes no absolute Elo rating claim.

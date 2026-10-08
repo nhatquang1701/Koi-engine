@@ -1,0 +1,31 @@
+Internal ctest changing into directory: C:/Users/ntATh/AI test/Koi engine/build/roadmap-release
+Test project C:/Users/ntATh/AI test/Koi engine/build/roadmap-release
+    Start 20: koi_search_tests_4of4
+1/8 Test #20: koi_search_tests_4of4 ............   Passed  128.32 sec
+    Start 17: koi_search_tests_1of4
+2/8 Test #17: koi_search_tests_1of4 ............   Passed   55.28 sec
+    Start 19: koi_search_tests_3of4
+3/8 Test #19: koi_search_tests_3of4 ............   Passed   54.44 sec
+    Start 18: koi_search_tests_2of4
+4/8 Test #18: koi_search_tests_2of4 ............   Passed   11.49 sec
+    Start 40: koi_benchmark_process
+5/8 Test #40: koi_benchmark_process ............   Passed   29.25 sec
+    Start 33: perft_tests
+    Start  3: koi_shadow_diff_tests
+6/8 Test  #3: koi_shadow_diff_tests ............   Passed    0.04 sec
+    Start 13: native_rule_state_tests
+7/8 Test #13: native_rule_state_tests ..........   Passed    0.04 sec
+8/8 Test #33: perft_tests ......................   Passed    0.25 sec
+
+100% tests passed, 0 tests failed out of 8
+
+Label Time Summary:
+heavy          = 557.56 sec*proc (5 tests)
+integration    =   0.04 sec*proc (1 test)
+process        =  58.50 sec*proc (1 test)
+rules          =   0.04 sec*proc (1 test)
+search         = 499.06 sec*proc (4 tests)
+tools          =  58.50 sec*proc (1 test)
+unit           = 499.34 sec*proc (6 tests)
+
+Total Test time (real) = 279.04 sec

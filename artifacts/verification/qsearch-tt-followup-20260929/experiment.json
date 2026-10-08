@@ -1,0 +1,66 @@
+{
+  "schema": "koi-qsearch-tt-followup-experiment-v1",
+  "source_commit": "18c2f9ae9e9aec480112af32b63b893ae030e32e",
+  "treatment": "Current AlphaBeta build with the quiescence TT cutoff enabled.",
+  "control": "Same current tracked source snapshot with only src/koi/detail/search_context.cpp restored from b49dee4^.",
+  "qsearch_change_commit": "b49dee4",
+  "candidate_executable": {
+    "path": "artifacts/verification/qsearch-tt-followup-20260929/candidate-koi-engine-avx2.exe",
+    "sha256": "3C187FC9BDAD3572E6C849B077FFEE2F612661083602D79261C0C50169DA268C",
+    "source_build": "build/roadmap-visit-win-release"
+  },
+  "baseline_executable": {
+    "path": "artifacts/verification/qsearch-tt-followup-20260929/baseline-koi-engine-avx2.exe",
+    "sha256": "CBC05D459445EACD9F0EF8749AEC18434CE251B105E6D1900F5DD4B5299CE0AA",
+    "source_tree": "build/roadmap-qsearch-tt-followup-20260929-baseline-src",
+    "qsearch_source": "b49dee4^:src/koi/detail/search_context.cpp",
+    "source_archive_sha256": "8AC5F04408F9C6FF3B6FFF3C8EFAB3739B03DAA0D373B80CA377B0552DB6D46C",
+    "baseline_context_sha256": "576389F47CFF57A915853F77CF3CEA4E8CB7C81936DE9F26321991B175A54D14"
+  },
+  "replay": {
+    "path": "build/roadmap-visit-win-release/koi-replay.exe",
+    "sha256": "B6218E828D2F53B33597820F1BEA88C4D31760CBCC0391A8D05395B303C38FAD"
+  },
+  "toolchain": {
+    "cmake": "3.31.6-msvc6",
+    "compiler": "MSVC 19.44.35228.0",
+    "configuration": "Release",
+    "modules": false,
+    "gpu_nnue": false
+  },
+  "options": {
+    "time_control": "nodes 20000",
+    "threads": 1,
+    "hash_mb": 512,
+    "speed": 100,
+    "own_book": false,
+    "random_seed": 0,
+    "evaluator": "classical",
+    "algorithm": "AlphaBeta"
+  },
+  "sprt": {
+    "elo0": 0,
+    "elo1": 10,
+    "alpha": 0.05,
+    "beta": 0.05,
+    "min_games_per_color": 40,
+    "max_games_per_color": 128,
+    "games_per_opening": 2
+  },
+  "openings": {
+    "path": "artifacts/matches/qsearch-tt-followup-20260929/openings-64.txt",
+    "sha256": "817DE03966270FE468474DA01CF805DC03D23E9271E61CE9518F7644FEA9A190",
+    "manifest": "artifacts/manifests/qsearch-tt-followup-20260929.json",
+    "manifest_sha256": "68578B3E986270452B947F9E81D9297C4D3B28AFCC7378AF29A353246A060F91",
+    "count": 64,
+    "unique": 64,
+    "seed": 20260929
+  },
+  "smoke": {
+    "report": "artifacts/verification/qsearch-tt-followup-20260929/smoke/koi-uci-match-20260928-203856-174.json",
+    "report_sha256": "F5545A9959C0D66AF0318D55B78119A006091FFAAA3FB9F70E8E1935D4102B5E",
+    "pgn": "artifacts/verification/qsearch-tt-followup-20260929/smoke/koi-uci-match-20260928-203856-174.pgn",
+    "pgn_sha256": "4A414476F8482DB549F04E2E77F370B076FFC81263FA53802FB09A386170F8FE",
+    "validation": "PASS: 1 legal, completed game; clean shutdowns; expected nodes/evaluator/options."
+  }
+}

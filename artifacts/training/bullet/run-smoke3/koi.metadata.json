@@ -1,0 +1,26 @@
+{
+  "schema": "koi-nnue-training-metadata-v2",
+  "created": "2026-09-18T12:29:55Z",
+  "corpus": "artifacts\\training\\bullet\\validation.txt",
+  "rows_used": 25,
+  "val_rows": 25,
+  "feature_set": "halfka-king-bucket-v1",
+  "quantization": "int16/int8",
+  "architecture": {
+    "input": 9216,
+    "hidden": 64,
+    "output_buckets": 8
+  },
+  "activation": "crelu-pair",
+  "hidden_shift": 6,
+  "output_shift": 14,
+  "backend": "bullet",
+  "checkpoint": "artifacts\\training\\bullet\\run-smoke3\\checkpoints\\koi-v4-2",
+  "val_mae_cp": 707.4558304891084,
+  "val_round_trip_mae_cp": 707.2,
+  "w1_saturation": 0.0,
+  "w2_saturation": 0.21484375,
+  "payload_sha256": "3175281911a682d657c3dd3cd5562f868f2c1824b0f0487711bfe1af1dc14307",
+  "network_sha256": "87ba7d78df71c259db6fbdeffa1d77d8643d9b90cf5aec4b512f2fa405a20ff2",
+  "command": "C:\\Users\\ntATh\\AI test\\Koi engine\\tools\\measurement\\export_bullet_v4.py --checkpoint artifacts\\training\\bullet\\run-smoke3\\checkpoints --validation artifacts\\training\\bullet\\validation.txt --net-out artifacts\\training\\bullet\\run-smoke3\\koi.nnue --meta-out artifacts\\training\\bullet\\run-smoke3\\koi.metadata.json --hidden 64 --hidden-shifts 6 7 8 --output-shifts 12 14 16 18 20 --tune-samples 25"
+}

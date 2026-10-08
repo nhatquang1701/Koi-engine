@@ -1,0 +1,4 @@
+Baseline observation 2026-09-06:
+- koi-bench --threads 1 --timed completed all 64 positions.
+- koi-bench --threads 4 --timed produced output through pin_04, then remained responsive but idle for over 90 seconds and was stopped by the coordinator.
+- This is a pre-integration baseline issue and is a hard gate for the roadmap's threaded path.

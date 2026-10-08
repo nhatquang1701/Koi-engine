@@ -1,0 +1,104 @@
+[1/105] Scanning /work/src/koi/completion_gate.cpp for CXX dependencies
+[2/105] Scanning /work/src/koi/detail/search_session.cpp for CXX dependencies
+[3/105] Scanning /work/src/koi/time_manager.cpp for CXX dependencies
+[4/105] Scanning /work/src/koi/detail/search_session.cpp for CXX dependencies
+[5/105] Scanning /work/src/koi/search_service.cpp for CXX dependencies
+[6/105] Scanning /work/src/koi/detail/search_runner.cpp for CXX dependencies
+[7/105] Scanning /work/src/koi/detail/search_context.cpp for CXX dependencies
+[8/105] Scanning /work/src/koi/uci_controller.cpp for CXX dependencies
+[9/105] Scanning /work/src/koi/detail/search_context.cpp for CXX dependencies
+[10/105] Scanning /work/src/koi/detail/search_runner.cpp for CXX dependencies
+[11/105] Scanning /work/src/main.cpp for CXX dependencies
+[12/105] Generating CXX dyndep file CMakeFiles/koi_engine.dir/CXX.dd
+[13/105] Scanning /work/src/koi/completion_gate.cpp for CXX dependencies
+[14/105] Scanning /work/src/koi/time_manager.cpp for CXX dependencies
+[15/105] Scanning /work/src/koi/search_service.cpp for CXX dependencies
+[16/105] Scanning /work/tests/unit/runtime/uci_controller_tests.cpp for CXX dependencies
+[17/105] Scanning /work/src/koi/uci_controller.cpp for CXX dependencies
+[18/105] Generating CXX dyndep file CMakeFiles/koi_core.dir/CXX.dd
+[19/69] Generating CXX dyndep file CMakeFiles/koi_core_generic.dir/CXX.dd
+[20/40] Generating CXX dyndep file CMakeFiles/uci_controller_tests.dir/CXX.dd
+[21/40] Building CXX object CMakeFiles/koi_engine.dir/src/main.cpp.o
+[22/40] Building CXX object CMakeFiles/koi_core.dir/src/koi/detail/search_session.cpp.o
+[23/40] Building CXX object CMakeFiles/koi_core.dir/src/koi/time_manager.cpp.o
+[24/40] Building CXX object CMakeFiles/koi_core.dir/src/koi/completion_gate.cpp.o
+[25/40] Building CXX object CMakeFiles/koi_core.dir/src/koi/search_service.cpp.o
+[26/40] Building CXX object CMakeFiles/koi_core.dir/src/koi/detail/search_context.cpp.o
+In file included from /work/src/koi/detail/search_context.cpp:1:
+/work/src/koi/detail/search_context.hpp:522:19: warning: operator '<<' has lower precedence than '+'; '+' will be evaluated first [-Wshift-op-parentheses]
+  522 |             (1ULL + static_cast<std::uint64_t>(move.to().index()) << 7U) +
+      |              ~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ~~
+/work/src/koi/detail/search_context.hpp:522:19: note: place parentheses around the '+' expression to silence this warning
+  522 |             (1ULL + static_cast<std::uint64_t>(move.to().index()) << 7U) +
+      |                   ^
+      |              (                                                   )
+/work/src/koi/detail/search_context.hpp:523:19: warning: operator '<<' has lower precedence than '+'; '+' will be evaluated first [-Wshift-op-parentheses]
+  523 |             (1ULL + static_cast<std::uint64_t>(move.promotion()) << 14U);
+      |              ~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ~~
+/work/src/koi/detail/search_context.hpp:523:19: note: place parentheses around the '+' expression to silence this warning
+  523 |             (1ULL + static_cast<std::uint64_t>(move.promotion()) << 14U);
+      |                   ^
+      |              (                                                  )
+2 warnings generated.
+[27/40] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/detail/search_context.cpp.o
+In file included from /work/src/koi/detail/search_context.cpp:1:
+/work/src/koi/detail/search_context.hpp:522:19: warning: operator '<<' has lower precedence than '+'; '+' will be evaluated first [-Wshift-op-parentheses]
+  522 |             (1ULL + static_cast<std::uint64_t>(move.to().index()) << 7U) +
+      |              ~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ~~
+/work/src/koi/detail/search_context.hpp:522:19: note: place parentheses around the '+' expression to silence this warning
+  522 |             (1ULL + static_cast<std::uint64_t>(move.to().index()) << 7U) +
+      |                   ^
+      |              (                                                   )
+/work/src/koi/detail/search_context.hpp:523:19: warning: operator '<<' has lower precedence than '+'; '+' will be evaluated first [-Wshift-op-parentheses]
+  523 |             (1ULL + static_cast<std::uint64_t>(move.promotion()) << 14U);
+      |              ~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ~~
+/work/src/koi/detail/search_context.hpp:523:19: note: place parentheses around the '+' expression to silence this warning
+  523 |             (1ULL + static_cast<std::uint64_t>(move.promotion()) << 14U);
+      |                   ^
+      |              (                                                  )
+2 warnings generated.
+[28/40] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/detail/search_session.cpp.o
+[29/40] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/search_service.cpp.o
+[30/40] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/time_manager.cpp.o
+[31/40] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/completion_gate.cpp.o
+[32/40] Building CXX object CMakeFiles/koi_core.dir/src/koi/uci_controller.cpp.o
+[33/40] Building CXX object CMakeFiles/koi_core.dir/src/koi/detail/search_runner.cpp.o
+In file included from /work/src/koi/detail/search_runner.cpp:23:
+/work/src/koi/detail/search_context.hpp:522:19: warning: operator '<<' has lower precedence than '+'; '+' will be evaluated first [-Wshift-op-parentheses]
+  522 |             (1ULL + static_cast<std::uint64_t>(move.to().index()) << 7U) +
+      |              ~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ~~
+/work/src/koi/detail/search_context.hpp:522:19: note: place parentheses around the '+' expression to silence this warning
+  522 |             (1ULL + static_cast<std::uint64_t>(move.to().index()) << 7U) +
+      |                   ^
+      |              (                                                   )
+/work/src/koi/detail/search_context.hpp:523:19: warning: operator '<<' has lower precedence than '+'; '+' will be evaluated first [-Wshift-op-parentheses]
+  523 |             (1ULL + static_cast<std::uint64_t>(move.promotion()) << 14U);
+      |              ~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ~~
+/work/src/koi/detail/search_context.hpp:523:19: note: place parentheses around the '+' expression to silence this warning
+  523 |             (1ULL + static_cast<std::uint64_t>(move.promotion()) << 14U);
+      |                   ^
+      |              (                                                  )
+2 warnings generated.
+[34/40] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/detail/search_runner.cpp.o
+In file included from /work/src/koi/detail/search_runner.cpp:23:
+/work/src/koi/detail/search_context.hpp:522:19: warning: operator '<<' has lower precedence than '+'; '+' will be evaluated first [-Wshift-op-parentheses]
+  522 |             (1ULL + static_cast<std::uint64_t>(move.to().index()) << 7U) +
+      |              ~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ~~
+/work/src/koi/detail/search_context.hpp:522:19: note: place parentheses around the '+' expression to silence this warning
+  522 |             (1ULL + static_cast<std::uint64_t>(move.to().index()) << 7U) +
+      |                   ^
+      |              (                                                   )
+/work/src/koi/detail/search_context.hpp:523:19: warning: operator '<<' has lower precedence than '+'; '+' will be evaluated first [-Wshift-op-parentheses]
+  523 |             (1ULL + static_cast<std::uint64_t>(move.promotion()) << 14U);
+      |              ~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ~~
+/work/src/koi/detail/search_context.hpp:523:19: note: place parentheses around the '+' expression to silence this warning
+  523 |             (1ULL + static_cast<std::uint64_t>(move.promotion()) << 14U);
+      |                   ^
+      |              (                                                  )
+2 warnings generated.
+[35/40] Building CXX object CMakeFiles/koi_core_generic.dir/src/koi/uci_controller.cpp.o
+[36/40] Linking CXX static library libkoi_core.a
+[37/40] Linking CXX static library libkoi_core_generic.a
+[38/40] Linking CXX executable koi-engine
+[39/40] Building CXX object CMakeFiles/uci_controller_tests.dir/tests/unit/runtime/uci_controller_tests.cpp.o
+[40/40] Linking CXX executable uci_controller_tests

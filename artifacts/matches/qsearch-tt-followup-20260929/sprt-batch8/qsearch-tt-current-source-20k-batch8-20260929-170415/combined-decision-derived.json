@@ -1,0 +1,135 @@
+{
+  "baseline_sha256": "cbc05d459445eacd9f0ef8749aec18434ce251b105e6d1900f5dd4b5299ce0aa",
+  "candidate_change_commit": "b49dee4",
+  "candidate_sha256": "3c187fc9bdad3572e6c849b077ffee2f612661083602d79261c0c50169da268c",
+  "colors": {
+    "black": {
+      "aborted": 0,
+      "decision": "inconclusive",
+      "draws": 102,
+      "elo": -2.7143957373168446,
+      "games": 256,
+      "llr": -0.270805,
+      "losses": 78,
+      "pgn": "artifacts/matches/qsearch-tt-followup-20260929/sprt-batch8/qsearch-tt-current-source-20k-batch8-20260929-170415/black/koi-uci-match-20260929-111829-356.pgn",
+      "pgn_sha256": "ef47712301b9506d00f67e4890c06e114d1ad73cff8432df302189e5598c0f5c",
+      "report": "artifacts/matches/qsearch-tt-followup-20260929/sprt-batch8/qsearch-tt-current-source-20k-batch8-20260929-170415/black/koi-uci-match-20260929-111829-356.json",
+      "report_sha256": "9e135a5fe6d886fc18ec404afd70216f21d4801627a0d87cbaff0ed411a8457f",
+      "unique_roots_played": 128,
+      "validation": "official validate_release_candidate_games.py passed",
+      "wins": 76
+    },
+    "white": {
+      "aborted": 0,
+      "decision": "inconclusive",
+      "draws": 102,
+      "elo": 2.714395737316835,
+      "games": 256,
+      "llr": -0.080202,
+      "losses": 76,
+      "pgn": "artifacts/matches/qsearch-tt-followup-20260929/sprt-batch8/qsearch-tt-current-source-20k-batch8-20260929-170415/white/koi-uci-match-20260929-111833-664.pgn",
+      "pgn_sha256": "ef47712301b9506d00f67e4890c06e114d1ad73cff8432df302189e5598c0f5c",
+      "report": "artifacts/matches/qsearch-tt-followup-20260929/sprt-batch8/qsearch-tt-current-source-20k-batch8-20260929-170415/white/koi-uci-match-20260929-111833-664.json",
+      "report_sha256": "fc56c16fe671e3e237cbd3d06df4ce15df99966b8cef2bb2221d30f8596ad15e",
+      "unique_roots_played": 128,
+      "validation": "official validate_release_candidate_games.py passed",
+      "wins": 78
+    }
+  },
+  "combined": {
+    "decision": "inconclusive",
+    "draws": 204,
+    "games": 512,
+    "llr": -0.351007,
+    "losses": 154,
+    "lower_threshold": -2.9444389791664403,
+    "score": 0.5,
+    "upper_threshold": 2.9444389791664403,
+    "wins": 154
+  },
+  "cumulative": {
+    "decision": "inconclusive",
+    "draws": 1560,
+    "games": 3805,
+    "llr": -2.631576000000001,
+    "losses": 1123,
+    "lower_threshold": -2.9444389791664403,
+    "score": 0.49986859395532196,
+    "upper_threshold": 2.9444389791664403,
+    "wins": 1122
+  },
+  "derived_utc": "2026-09-29T11:39:07.454669+00:00",
+  "engine_source_commit": "18c2f9ae9e9aec480112af32b63b893ae030e32e",
+  "experiment": {
+    "path": "artifacts/verification/qsearch-tt-followup-20260929/experiment-batch8.json",
+    "sha256": "71a5e8f778e6d24941853c5f9397eafbfbbc4d996960e44f7025d3f1c0533b74"
+  },
+  "harness_binding": {
+    "harness_git_blob": "de0de5bce59c2d650a7f1c872d730b9d82e76952",
+    "harness_path": "tools/stability/uci_match.ps1",
+    "harness_sha256": "9df4f67a4632a05e070eb44fde202814a9692befd3a63c880688b946feedfb3e",
+    "source": "experiment.match_harness and runner-state.json",
+    "workspace_commit": "b40feb1c8447e4e8c56589409f9a5ccb47e3edfd"
+  },
+  "method": "sum of independent color SPRT LLRs; alpha=beta=0.05 thresholds are plus/minus ln(19)",
+  "opening_file_sha256": "2e28795306ba1c9f2b07bff9ad7096317a808e1ab0e111c311545a8e93a681a9",
+  "opening_set": {
+    "count": 128,
+    "generator_path": "artifacts/verification/qsearch-tt-followup-20260929/generate_openings_batch8.py",
+    "generator_sha256": "7171b266a575524a2730d3e4fa339ad1dcfe3637388ee56f48df251084d11ac4",
+    "manifest_path": "artifacts/manifests/qsearch-tt-followup-20260929-batch8.json",
+    "manifest_sha256": "dfebcc8028e3a2a4143bb5a5932af546ea79463422b92f3f4b613ded11d1d248",
+    "opening_state_overlap_count": 0,
+    "unique_opening_count": 128
+  },
+  "options": {
+    "algorithm": "AlphaBeta",
+    "evaluator": "classical",
+    "games_per_opening": 2,
+    "hash_mb": 512,
+    "max_plies": 512,
+    "nodes": 20000,
+    "own_book": false,
+    "protocol_timeout_ms": 5000,
+    "random_seed": 0,
+    "speed": 100,
+    "threads": 1,
+    "time_control": "nodes 20000"
+  },
+  "prior_cumulative": {
+    "decision": "inconclusive",
+    "derived_path": "artifacts/matches/qsearch-tt-followup-20260929/sprt-batch7/qsearch-tt-current-source-20k-batch7-20260929-155026/combined-decision-derived.json",
+    "derived_sha256": "4473e3908798cfc187ddf765cf821e1c857b8cdae9dccd0386d54346d4b94275",
+    "draws": 1356,
+    "games": 3293,
+    "llr": -2.2805690000000007,
+    "losses": 969,
+    "lower_threshold": -2.9444389791664403,
+    "score": 0.4998481627695111,
+    "upper_threshold": 2.9444389791664403,
+    "wins": 968
+  },
+  "replay_sha256": "3bfc8758939531e8c5b2a07adabe9d23fd11e9a64e0b39b95265d2b4dcc14003",
+  "runner_state": {
+    "exit_codes": {
+      "black": 0,
+      "white": 0
+    },
+    "path": "artifacts/matches/qsearch-tt-followup-20260929/sprt-batch8/qsearch-tt-current-source-20k-batch8-20260929-170415/runner-state.json",
+    "runner_pid": 12588,
+    "sha256": "0609b64e85e285080e8c29c05683a6463772d154995cdf417a55d2697b3983b9",
+    "workers": {
+      "black": 10552,
+      "white": 22320
+    }
+  },
+  "schema": "koi-sprt-combined-derived-v1",
+  "sprt_hypotheses": {
+    "alpha": 0.05,
+    "beta": 0.05,
+    "elo0": 0,
+    "elo1": 10,
+    "max_games_per_color": 256,
+    "min_games_per_color": 40
+  }
+}

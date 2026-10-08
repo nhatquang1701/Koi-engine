@@ -1,0 +1,115 @@
+{
+  "baseline_sha256": "cbc05d459445eacd9f0ef8749aec18434ce251b105e6d1900f5dd4b5299ce0aa",
+  "candidate_change_commit": "b49dee4",
+  "candidate_sha256": "3c187fc9bdad3572e6c849b077ffee2f612661083602d79261c0c50169da268c",
+  "colors": {
+    "black": {
+      "aborted": 0,
+      "decision": "inconclusive",
+      "draws": 104,
+      "elo": -10.86089841744591,
+      "games": 256,
+      "llr": -0.564906,
+      "losses": 80,
+      "pgn": "artifacts/matches/qsearch-tt-followup-20260929/sprt-batch4/qsearch-tt-current-source-20k-batch4-20260929-115759/black/koi-uci-match-20260929-060238-916.pgn",
+      "pgn_sha256": "2750847d58442e54329f6c841e6382eb9bffe63706e5cc42e1691a6c6f0efe76",
+      "report": "artifacts/matches/qsearch-tt-followup-20260929/sprt-batch4/qsearch-tt-current-source-20k-batch4-20260929-115759/black/koi-uci-match-20260929-060238-916.json",
+      "report_sha256": "e887462e71ce0cd5eb2ca6d787dae9197a0dcf0d33c667a5c741ece501f2e636",
+      "unique_roots_played": 128,
+      "validation": "official validate_release_candidate_games.py passed",
+      "wins": 72
+    },
+    "white": {
+      "aborted": 0,
+      "decision": "inconclusive",
+      "draws": 104,
+      "elo": 10.86089841744591,
+      "games": 256,
+      "llr": 0.208731,
+      "losses": 72,
+      "pgn": "artifacts/matches/qsearch-tt-followup-20260929/sprt-batch4/qsearch-tt-current-source-20k-batch4-20260929-115759/white/koi-uci-match-20260929-060242-052.pgn",
+      "pgn_sha256": "2750847d58442e54329f6c841e6382eb9bffe63706e5cc42e1691a6c6f0efe76",
+      "report": "artifacts/matches/qsearch-tt-followup-20260929/sprt-batch4/qsearch-tt-current-source-20k-batch4-20260929-115759/white/koi-uci-match-20260929-060242-052.json",
+      "report_sha256": "3d03b1ba17f55847770937ac6bc569ef14eb01ee4b607f2fe53e1c6b4ea49bd0",
+      "unique_roots_played": 128,
+      "validation": "official validate_release_candidate_games.py passed",
+      "wins": 80
+    }
+  },
+  "combined": {
+    "decision": "inconclusive",
+    "draws": 208,
+    "games": 512,
+    "llr": -0.356175,
+    "losses": 152,
+    "lower_threshold": -2.9444389791664403,
+    "score": 0.5,
+    "upper_threshold": 2.9444389791664403,
+    "wins": 152
+  },
+  "cumulative": {
+    "decision": "inconclusive",
+    "draws": 728,
+    "games": 1757,
+    "llr": -1.2007890000000003,
+    "losses": 515,
+    "lower_threshold": -2.9444389791664403,
+    "score": 0.49971542401821284,
+    "upper_threshold": 2.9444389791664403,
+    "wins": 514
+  },
+  "derived_utc": "2026-09-29T06:10:48.454789+00:00",
+  "engine_source_commit": "18c2f9ae9e9aec480112af32b63b893ae030e32e",
+  "experiment": {
+    "path": "artifacts/verification/qsearch-tt-followup-20260929/experiment-batch4.json",
+    "sha256": "0054c82a4d84578478b19e83cfefb6a3b014f721c41768b412d9a4c5c7da5279"
+  },
+  "method": "sum of independent color SPRT LLRs; alpha=beta=0.05 thresholds are plus/minus ln(19)",
+  "opening_file_sha256": "0e49be81ac6f8521ffef63c17e3cf3bd17c5dc3c7fce4d334842d0b8054d14f6",
+  "opening_set": {
+    "count": 128,
+    "generator_path": "artifacts/verification/qsearch-tt-followup-20260929/generate_openings_batch4.py",
+    "generator_sha256": "81faba20795072247177704d6dfa1e4cfd4cbbb0ce7565c74bd5c9e2cd06d5d8",
+    "manifest_path": "artifacts/manifests/qsearch-tt-followup-20260929-batch4.json",
+    "manifest_sha256": "d13bf623ae46b1c50b874bd81da1de24381fff29f6abfab7f8bd1856afd964ef",
+    "opening_state_overlap_count": 0,
+    "unique_opening_count": 128
+  },
+  "options": {
+    "algorithm": "AlphaBeta",
+    "evaluator": "classical",
+    "games_per_opening": 2,
+    "hash_mb": 512,
+    "max_plies": 512,
+    "nodes": 20000,
+    "own_book": false,
+    "protocol_timeout_ms": 5000,
+    "random_seed": 0,
+    "speed": 100,
+    "threads": 1,
+    "time_control": "nodes 20000"
+  },
+  "prior_cumulative": {
+    "decision": "inconclusive",
+    "derived_path": "artifacts/matches/qsearch-tt-followup-20260929/sprt-batch3/qsearch-tt-current-source-20k-batch3-20260929-065150/combined-decision-derived.json",
+    "derived_sha256": "bddeb5ae4821ed49455ad40fa60c34aea64cfb87e2dc7c2f796ed683b2f9e09a",
+    "draws": 520,
+    "games": 1245,
+    "llr": -0.8446140000000002,
+    "losses": 363,
+    "lower_threshold": -2.9444389791664403,
+    "score": 0.4995983935742972,
+    "upper_threshold": 2.9444389791664403,
+    "wins": 362
+  },
+  "replay_sha256": "3bfc8758939531e8c5b2a07adabe9d23fd11e9a64e0b39b95265d2b4dcc14003",
+  "schema": "koi-sprt-combined-derived-v1",
+  "sprt_hypotheses": {
+    "alpha": 0.05,
+    "beta": 0.05,
+    "elo0": 0,
+    "elo1": 10,
+    "max_games_per_color": 256,
+    "min_games_per_color": 40
+  }
+}

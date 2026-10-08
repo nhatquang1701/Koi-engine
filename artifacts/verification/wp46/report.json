@@ -1,0 +1,40 @@
+{
+  "rows": 16,
+  "target": "cp",
+  "ridge": 1e-06,
+  "scales": {
+    "material": 1.0314656307549814,
+    "piece_square": 2.671384465856969,
+    "mobility": -0.05520726763781149,
+    "pawn_structure": 5.386072022851636,
+    "activity": 3.2517109056132742,
+    "development": 5.267893144293543,
+    "center_control": 2.0982316545647066,
+    "initiative": 0.9277578117874986,
+    "king_safety": 1.3918211361251929,
+    "king_activity": -26.185705210583883,
+    "passed_pawn": -4.988057784091039,
+    "tempo": 5.586923535109481
+  },
+  "offset": -28.735656405141413,
+  "current": {
+    "mae": 17.1875,
+    "r2": 0.9988914732007751
+  },
+  "fitted": {
+    "mae": 3.340291643302191,
+    "r2": 0.999936291546799
+  },
+  "schema": "koi-classical-tuning-report-v1",
+  "created": "2026-09-21T13:25:33.379697+00:00",
+  "corpus_sha256": "f696153a8de5575a21fd359ca3a6b7478452d54bf0b9ebacd32adc72f2419a4c",
+  "input": "artifacts\\verification\\wp46\\features-cp.csv",
+  "adopted": false,
+  "piece_square": {
+    "rows": 16,
+    "limit_cp": 24,
+    "buckets": 37,
+    "nonzero": 21,
+    "header": "src\\koi\\evaluation_piece_squares_tuned.hpp"
+  }
+}

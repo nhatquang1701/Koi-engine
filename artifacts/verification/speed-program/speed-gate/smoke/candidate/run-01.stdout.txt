@@ -1,0 +1,4 @@
+Koi benchmark
+config threads 1 speed 100 timed 1 hash cold depth 4 fen-file C:\Users\ntATh\AppData\Local\Temp\opencode\speed-baseline\smoke-fens.txt
+position fen-001 depth 4 nodes 1870 qnodes 4394 tt_hits 331 score 0 move b1c3 elapsed_ms 63 nps 99428
+position fen-002 depth 4 nodes 6569 qnodes 143454 tt_hits 12752 score 44 move b1c3 elapsed_ms 1177 nps 127462

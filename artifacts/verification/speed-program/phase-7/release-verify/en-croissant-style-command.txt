@@ -1,0 +1,2 @@
+json C:\Users\ntATh\AI test\Koi engine\artifacts\verification\speed-program\phase-7\release-verify\en-croissant-style-24ply\koi-uci-match-20260926-032405-418.json
+pgn C:\Users\ntATh\AI test\Koi engine\artifacts\verification\speed-program\phase-7\release-verify\en-croissant-style-24ply\koi-uci-match-20260926-032405-418.pgn

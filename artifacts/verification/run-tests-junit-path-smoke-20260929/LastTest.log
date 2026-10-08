@@ -1,0 +1,27 @@
+Start testing: Sep 29 07:02 SE Asia Standard Time
+----------------------------------------------------------
+33/81 Testing: perft_tests
+33/81 Test: perft_tests
+Command: "C:/Users/ntATh/AI test/Koi engine/build/roadmap-visit-win-release/perft_tests.exe"
+Directory: C:/Users/ntATh/AI test/Koi engine/build/roadmap-visit-win-release
+"perft_tests" start time: Sep 29 07:02 SE Asia Standard Time
+Output:
+----------------------------------------------------------
+PASS start-position perft
+PASS Kiwipete perft
+PASS endgame pin perft
+PASS interruptible perft count and restore
+PASS interruptible perft stop
+koi-test-summary run=5 pass=5 fail=0 xfail=0 xpass=0 skip=0 unseen=0 intermittent=0
+<end of output>
+Test time =   0.33 sec
+----------------------------------------------------------
+Test Passed.
+"perft_tests" end time: Sep 29 07:02 SE Asia Standard Time
+"perft_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Sep 29 07:02 SE Asia Standard Time
+
+unit =   0.33 sec*proc
+

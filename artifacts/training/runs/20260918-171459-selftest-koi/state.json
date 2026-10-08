@@ -1,0 +1,18 @@
+{
+  "kind": "selftest",
+  "backend": "koi",
+  "created": "2026-09-18T10:14:59Z",
+  "status": "completed",
+  "run": "C:\\Users\\ntATh\\AI test\\Koi engine\\artifacts\\training\\runs\\20260918-171459-selftest-koi",
+  "schema": "koi-nnue-studio-run-v1",
+  "progress": {
+    "epoch": 1,
+    "epochs": 1,
+    "val_mae_cp": 10.6,
+    "history": [
+      10.6
+    ]
+  },
+  "exit_code": 0,
+  "finished": "2026-09-18T10:15:03Z"
+}
