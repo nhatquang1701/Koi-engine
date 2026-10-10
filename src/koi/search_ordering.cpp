@@ -648,7 +648,7 @@ std::optional<MoveMetadata> SearchMovePicker::emit_tt() {
     }
     tt_emitted_ = true;
     for (std::size_t index = 0; index < moves_.size(); ++index) {
-        if (!is_excluded(index) && moves_[index].move == *tt_move_) {
+        if (moves_[index].move == *tt_move_ && !is_excluded(index)) {
             emitted_.set(index);
             MoveMetadata metadata = mode_ == Mode::evasion ? moves_[index] :
                 materialize(index);

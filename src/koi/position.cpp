@@ -166,13 +166,15 @@ struct Snapshot {
     std::uint16_t halfmove = 0;
     std::uint16_t fullmove = 1;
     std::uint64_t key = 0;
+    // Sits next to `key` on purpose: repetition_count() walks the history
+    // backwards and reads exactly these two fields from every visited
+    // snapshot, so one cache line now covers the whole probe.
+    bool null_move = false;
     std::array<std::array<std::uint64_t, 7>, 2> piece_bitboards{};
     std::array<std::uint64_t, 2> occupancy{};
     std::uint64_t occupied = 0;
     std::array<std::uint64_t, 2> checkers{};
     std::array<std::uint64_t, 2> pinned{};
-    std::array<std::uint64_t, 2> blockers_for_king{};
-    bool null_move = false;
     std::uint64_t repetition_history_fingerprint = 0;
     bool repetition_history_suppressed = false;
 };
@@ -192,7 +194,6 @@ struct NativeState {
     std::uint64_t occupied = 0;
     std::array<std::uint64_t, 2> checkers{};
     std::array<std::uint64_t, 2> pinned{};
-    std::array<std::uint64_t, 2> blockers_for_king{};
     std::array<Snapshot, kMaximumHistory> history{};
     std::size_t history_size = 0;
 };
@@ -237,7 +238,6 @@ void snapshot_into(NativeState& state, bool null_move = false) noexcept {
     slot->occupied = state.occupied;
     slot->checkers = state.checkers;
     slot->pinned = state.pinned;
-    slot->blockers_for_king = state.blockers_for_king;
     slot->null_move = null_move;
     slot->repetition_history_fingerprint = state.repetition_history_fingerprint;
     slot->repetition_history_suppressed = state.repetition_history_suppressed;
@@ -280,7 +280,11 @@ void rebuild_derived(NativeState& state) noexcept {
     refresh_king_masks(state);
 }
 
-void remove_derived_piece(NativeState& state, Piece piece, int square) noexcept {
+// The Zobrist key table is fetched once by apply_unchecked() and threaded
+// through the incremental helpers, so a single make does not pay the
+// function-local-static initialization guard per helper call.
+void remove_derived_piece(
+    NativeState& state, const ZobristKeys& keys, Piece piece, int square) noexcept {
     if (piece.empty() || !valid_square(square)) {
         return;
     }
@@ -289,10 +293,11 @@ void remove_derived_piece(NativeState& state, Piece piece, int square) noexcept 
     const std::size_t type = static_cast<std::size_t>(piece.type);
     state.piece_bitboards[color][type] &= ~square_bit;
     state.occupancy[color] &= ~square_bit;
-    state.key ^= zobrist().pieces[color][type][static_cast<std::size_t>(square)];
+    state.key ^= keys.pieces[color][type][static_cast<std::size_t>(square)];
 }
 
-void add_derived_piece(NativeState& state, Piece piece, int square) noexcept {
+void add_derived_piece(
+    NativeState& state, const ZobristKeys& keys, Piece piece, int square) noexcept {
     if (piece.empty() || !valid_square(square)) {
         return;
     }
@@ -301,11 +306,10 @@ void add_derived_piece(NativeState& state, Piece piece, int square) noexcept {
     const std::size_t type = static_cast<std::size_t>(piece.type);
     state.piece_bitboards[color][type] |= square_bit;
     state.occupancy[color] |= square_bit;
-    state.key ^= zobrist().pieces[color][type][static_cast<std::size_t>(square)];
+    state.key ^= keys.pieces[color][type][static_cast<std::size_t>(square)];
 }
 
-void remove_rule_keys(NativeState& state) noexcept {
-    const ZobristKeys& keys = zobrist();
+void remove_rule_keys(NativeState& state, const ZobristKeys& keys) noexcept {
     state.key ^= keys.castling[state.castling & kAllCastling];
     if (has_legal_en_passant_capture_mutable(state)) {
         state.key ^= keys.en_passant[state.en_passant.index() & 7];
@@ -315,8 +319,7 @@ void remove_rule_keys(NativeState& state) noexcept {
     }
 }
 
-void add_rule_keys(NativeState& state) noexcept {
-    const ZobristKeys& keys = zobrist();
+void add_rule_keys(NativeState& state, const ZobristKeys& keys) noexcept {
     state.key ^= keys.castling[state.castling & kAllCastling];
     if (has_legal_en_passant_capture_mutable(state)) {
         state.key ^= keys.en_passant[state.en_passant.index() & 7];
@@ -440,7 +443,6 @@ void refresh_king_masks(NativeState& state) noexcept {
     const std::size_t color_index = state.side == Color::white ? 0U : 1U;
     state.checkers[color_index] = 0;
     state.pinned[color_index] = 0;
-    state.blockers_for_king[color_index] = 0;
     const Color color = state.side;
     const int king = king_square(state, color);
     if (king < 0) return;
@@ -467,13 +469,13 @@ void refresh_king_masks(NativeState& state) noexcept {
         (detail::rook_attacks(king, state.occupied) & enemy_rooks);
     state.checkers[color_index] = checkers;
 
-    // The former "squares strictly between each slider checker and the
-    // king" mask was written but never read: git grep finds only the
-    // reset above, the snapshot/restore copies, and the declaration of
-    // state.blockers_for_king, so its computation is gone.  The field
-    // itself stays because it is part of the snapshot/restore surface,
-    // and the reset above keeps it at zero.
-    //
+    // An enemy without a bishop/queen or rook/queen can never pin through
+    // a blocker, so the scan below is skipped while `pinned` still holds
+    // the zero written above.
+    if (enemy_bishops == 0 && enemy_rooks == 0) {
+        return;
+    }
+
     // Pin scan.  Removing a piece can only expose a slider attack that
     // runs through the piece's square; a piece between the king and the
     // removed piece would still block, and a piece off the ray does not
@@ -1465,7 +1467,6 @@ private:
     state.occupied = saved.occupied;
     state.checkers = saved.checkers;
     state.pinned = saved.pinned;
-    state.blockers_for_king = saved.blockers_for_king;
 }
 
     template <typename MoveContainer>
@@ -1624,6 +1625,10 @@ private:
         const int to = move.to().index();
         const std::uint64_t previous_position_key = state.key;
         const std::uint8_t previous_castling = state.castling;
+        // One guarded fetch for the whole make: every incremental helper
+        // below would otherwise pay the function-local static guard on its
+        // own zobrist() call, and the table never changes mid-make.
+        const ZobristKeys& keys = zobrist();
         const Piece moving = state.board[static_cast<std::size_t>(from)];
         const Piece captured = state.board[static_cast<std::size_t>(to)];
         const bool pawn_move = moving.type == PieceType::pawn;
@@ -1634,16 +1639,16 @@ private:
         // Remove the old rule-state keys and every piece that is about to
         // leave the board before mutating the board array. The remaining
         // derived state is rebuilt only from the pieces that actually moved.
-        remove_rule_keys(state);
-        remove_derived_piece(state, moving, from);
+        remove_rule_keys(state, keys);
+        remove_derived_piece(state, keys, moving, from);
         if (!captured.empty()) {
-            remove_derived_piece(state, captured, to);
+            remove_derived_piece(state, keys, captured, to);
         }
         const int en_passant_captured_square =
             en_passant ? to + (moving.color == Color::white ? -8 : 8) : -1;
         if (en_passant) {
             remove_derived_piece(
-                state, state.board[static_cast<std::size_t>(en_passant_captured_square)],
+                state, keys, state.board[static_cast<std::size_t>(en_passant_captured_square)],
                 en_passant_captured_square);
         }
 
@@ -1660,15 +1665,15 @@ private:
             if (move.promotion() == Promotion::knight) promoted = PieceType::knight;
             state.board[static_cast<std::size_t>(to)].type = promoted;
         }
-        add_derived_piece(state, state.board[static_cast<std::size_t>(to)], to);
+        add_derived_piece(state, keys, state.board[static_cast<std::size_t>(to)], to);
         if (castling) {
             const int rook_from = to > from ? from + 3 : from - 4;
             const int rook_to = to > from ? from + 1 : from - 1;
             const Piece rook = state.board[static_cast<std::size_t>(rook_from)];
-            remove_derived_piece(state, rook, rook_from);
+            remove_derived_piece(state, keys, rook, rook_from);
             state.board[static_cast<std::size_t>(rook_to)] = rook;
             state.board[static_cast<std::size_t>(rook_from)] = {};
-            add_derived_piece(state, rook, rook_to);
+            add_derived_piece(state, keys, rook, rook_to);
         }
 
         if (moving.type == PieceType::king) {
@@ -1698,7 +1703,7 @@ private:
             state.en_passant = {};
         }
         state.occupied = state.occupancy[0] | state.occupancy[1];
-        add_rule_keys(state);
+        add_rule_keys(state, keys);
         const bool irreversible = pawn_move || capture || state.castling != previous_castling;
         if (!state.repetition_history_suppressed) {
             state.repetition_history_fingerprint = irreversible ? 0 :

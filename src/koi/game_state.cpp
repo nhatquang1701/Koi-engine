@@ -1106,10 +1106,11 @@ bool native_check_probe_matches(const Position& position,
         probe.friendly_bishop_queen) {
         return false;
     }
-    const std::uint64_t king_slider_rays = enemy_king == 0 ? 0 :
-        detail::rook_attacks(static_cast<int>(std::countr_zero(enemy_king)), 0) |
-        detail::bishop_attacks(static_cast<int>(std::countr_zero(enemy_king)), 0);
-    return king_slider_rays == probe.king_slider_rays;
+    // king_slider_rays is derived solely from enemy_king (countr_zero plus
+    // open-board rook/bishop attacks; see native_check_probe), and enemy_king
+    // equality was already required above, so a fresh ray computation would
+    // necessarily equal the stored field.  No separate comparison is needed.
+    return true;
 }
 
 // `facts` must have been resolved from the same position as `probe`;

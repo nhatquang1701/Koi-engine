@@ -292,8 +292,19 @@ int SearchContext::quiescence(GameState& state, int alpha, int beta, int ply,
             }
         }
 
-        const SearchHistoryContext history = history_context(ply, previous_move,
-                                                               state.pawn_key());
+        // Pawn history is read only when a quiet move is ranked.  The tactical
+        // generator stops adding quiet checks at the check-depth horizon, so
+        // an ordinary deeper node has no quiet candidate whose ranking could
+        // observe the pawn key; the narrow deep quiet-check probe above is the
+        // only late re-entry.  Checked nodes generate the full list and both
+        // quiet-check windows keep real keys, so passing zero elsewhere skips
+        // the incremental pawn-key computation without changing a priority.
+        const bool quiet_history_reachable = checked ||
+            qdepth < quiescence_check_depth_limit ||
+            (qdepth >= kNarrowQuietCheckProbeStartDepth &&
+             qdepth < kMaximumQuiescenceNarrowQuietCheckDepth);
+        const SearchHistoryContext history = history_context(
+            ply, previous_move, quiet_history_reachable ? state.pawn_key() : 0);
         std::optional<Move> tt_move;
         if (tt_entry.has_value() && !tt_entry->best_move.is_no_move()) {
             tt_move = tt_entry->best_move;
@@ -682,16 +693,21 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
         // the current TT move.  Stockfish 19 keeps the parent node's
         // static-evaluation and TT-PV snapshot for that probe; preserve it
         // before the ordinary node initialization below so the reduced
-        // alternative search does not change its own reference point.
-        const SearchFrame inherited_frame = frame;
+        // alternative search does not change its own reference point.  The
+        // snapshot is read only by excluded probes, so ordinary nodes skip
+        // the copy.
+        std::optional<SearchFrame> inherited_frame;
+        if (excluded_search) {
+            inherited_frame = frame;
+        }
         frame.previous_move = previous_move.value_or(Move::no_move());
         frame.in_check = checked;
         frame.move_count = 0;
         frame.reduction = 0;
         frame.cutoff_count = 0;
-        frame.static_eval = excluded_search ? inherited_frame.static_eval : 0;
-        frame.static_eval_valid = excluded_search ? inherited_frame.static_eval_valid : false;
-        frame.tt_pv = excluded_search ? inherited_frame.tt_pv : false;
+        frame.static_eval = excluded_search ? inherited_frame->static_eval : 0;
+        frame.static_eval_valid = excluded_search ? inherited_frame->static_eval_valid : false;
+        frame.tt_pv = excluded_search ? inherited_frame->tt_pv : false;
         frame.had_tt_move = false;
         if (ply + 1 < static_cast<int>(SearchStack::kCapacity)) {
             // The current node reads the cutoff count owned by its immediate
@@ -901,8 +917,8 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
                 static_eval_valid = true;
             }
         } else if (excluded_search) {
-            static_eval = inherited_frame.static_eval;
-            static_eval_valid = inherited_frame.static_eval_valid;
+            static_eval = inherited_frame->static_eval;
+            static_eval_valid = inherited_frame->static_eval_valid;
         } else {
             // The raw evaluator score is cached; the bounded correction is
             // applied on top of it so the cache stays perspective-raw.  A
@@ -1393,13 +1409,20 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
         const int full_child_depth = depth - 1;
         const bool shallow_checked_root = ply == 1 && depth <= 3 &&
             stack.frame(0).in_check;
+        // game_phase() is a pure function of the maintained piece bitboards.
+        // Quiet candidates cannot change piece counts within this node (no
+        // captures, no promotions; castling and king moves preserve counts;
+        // en passant is a capture and never quiet), and the position is
+        // restored between candidates (make/unmake), so every candidate
+        // observes the same phase.  Compute it once for the depth-three
+        // reduction gate instead of once per quiet candidate.
+        const bool phase_rich_depth_three = depth == 3 && state.game_phase() >= 8;
         while (const auto candidate = picker.next()) {
             const MoveMetadata& metadata = *candidate;
             if (interrupted()) {
                 return 0;
             }
             const Move move = metadata.move;
-            frame.current_move = move;
             const bool is_killer_move = ordering.is_killer(move, ply);
             const int capture_history = ordering.capture_history_score(metadata);
             // Once a cut node has already examined enough candidates, keep
@@ -1464,8 +1487,8 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
             // existing Koi phase boundary to keep the shallow LMR available
             // where the low-phase regression needs it while requiring a full
             // first pass in phase-rich positions.
-            const bool phase_rich_shallow_node = lmr_gate.candidate && depth == 3 &&
-                !metadata.is_capture() && state.game_phase() >= 8;
+            const bool phase_rich_shallow_node = lmr_gate.candidate &&
+                !metadata.is_capture() && phase_rich_depth_three;
             // A checked root receives a one-ply root extension.  At the
             // resulting shallow horizon, serial search can carry history from
             // one evasion into the next while root workers cannot; avoid a
