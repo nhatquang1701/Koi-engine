@@ -823,33 +823,54 @@ void compute_activation_diff(std::span<const std::int16_t> own,
     }
 }
 
-// v6 quantization correspondence: with s = l1_shift and a unit weight
-// magnitude w,
-//   l1_weights_q      = round(w * 2^s / 127)
-//   l1_diff_weights_q = round(w * 2^s)          (no /127)
-//   l1_bias_q         = round(bias * 127 * 2^s)
-// A full pair product (127 * 127) contributes w * 127 * 2^s and a full
-// difference (127) contributes w * 127 * 2^s, so both channels land at the
-// same 127 * 2^s scale before the >> s.
+// v6 L1 stage.  The head consumes cross-perspective pair products and the
+// activation difference through two int8 matrices; two container layouts share
+// the same feature path:
+//   * Legacy (l1_diff_shift == 0: v5 containers and pre-split v6 fixtures):
+//     `(pair_sum + diff_sum + bias) >> l1_shift`, with the stored int32 bias
+//     pre-shifted at the 127 * 2^l1_shift scale.
+//   * Split (l1_diff_shift != 0, written by the separate-shift trainer):
+//     `(pair_sum >> l1_shift) + (diff_sum >> l1_diff_shift) + bias`, with the
+//     stored int32 bias at the plain 127 scale.
+// Quantization correspondence for the split layout, with sp = l1_shift and
+// sd = l1_diff_shift:
+//   l1_weights_q      = round(w * 2^sp / 127)
+//   l1_diff_weights_q = round(w * 2^sd)
+//   l1_bias_q         = round(bias * 127)
+// Both accumulators are int64 (`127 * 127` per pair term) and the arithmetic
+// right shifts floor, matching the trainer's numpy int64 `>>`.
 void l1_activations_scalar(const NnueNetwork& network,
                            std::span<const std::int16_t> pairs,
                            std::span<const std::int16_t> diff,
                            std::span<std::int32_t> activations) noexcept {
     const std::size_t pair_count = pairs.size();
     const bool use_diff = !diff.empty();
+    const bool split = use_diff && network.l1_diff_shift > 0;
     for (std::size_t unit = 0; unit < activations.size(); ++unit) {
         const std::int8_t* weights = network.l1_weights.data() + unit * pair_count;
         const std::int8_t* diff_weights = use_diff ?
             network.l1_diff_weights.data() + unit * pair_count : nullptr;
-        std::int64_t sum = network.l1_bias[unit];
+        std::int64_t pair_sum = 0;
+        std::int64_t diff_sum = 0;
         for (std::size_t pair = 0; pair < pair_count; ++pair) {
-            sum += static_cast<std::int64_t>(weights[pair]) * pairs[pair];
+            pair_sum += static_cast<std::int64_t>(weights[pair]) * pairs[pair];
             if (use_diff) {
-                sum += static_cast<std::int64_t>(diff_weights[pair]) * diff[pair];
+                diff_sum += static_cast<std::int64_t>(diff_weights[pair]) * diff[pair];
             }
         }
-        if (network.l1_shift > 0) {
-            sum >>= network.l1_shift;
+        std::int64_t sum;
+        if (split) {
+            sum = (pair_sum >> network.l1_shift) +
+                (diff_sum >> network.l1_diff_shift) + network.l1_bias[unit];
+        } else {
+            sum = pair_sum;
+            if (use_diff) {
+                sum += diff_sum;
+            }
+            sum += network.l1_bias[unit];
+            if (network.l1_shift > 0) {
+                sum >>= network.l1_shift;
+            }
         }
         activations[unit] = static_cast<std::int32_t>(std::clamp<std::int64_t>(
             sum, 0, kKoiNnueClippedReluMaximum));
@@ -915,12 +936,16 @@ void l1_activations_avx2(const NnueNetwork& network,
                          std::span<std::int32_t> activations) noexcept {
     const std::size_t pair_count = pairs.size();
     const bool use_diff = !diff.empty();
-    // Each int32 lane accumulates at most (pair_count / 16 + 1) * 2 products
-    // per channel, each bounded by 127 * (127 * 127).  A v6 lane therefore
-    // doubles the v5 bound; fall back to the int64 scalar path when the
-    // worst case cannot fit, so the vector path is always equivalent.
+    const bool split = use_diff && network.l1_diff_shift > 0;
+    // The pair and diff channels keep separate int32 lane vectors so each lane
+    // stays within the v5 worst case: (pair_count / 16 + 1) blocks of two
+    // products bounded by 127 * (127 * 127).  The split head cannot merge the
+    // channels before the per-channel shifts, and the legacy head merges them
+    // only after the lanes are widened to int64 (exact addition).  Fall back to
+    // the int64 scalar path when a channel's worst case cannot fit, so the
+    // vector path is always equivalent to the scalar reference.
     const std::int64_t lane_worst_case =
-        static_cast<std::int64_t>(pair_count / 16U + 1U) * (use_diff ? 4 : 2) * 127 * (127 * 127);
+        static_cast<std::int64_t>(pair_count / 16U + 1U) * 2 * 127 * (127 * 127);
     if (lane_worst_case > std::numeric_limits<std::int32_t>::max()) {
         l1_activations_scalar(network, pairs, diff, activations);
         return;
@@ -930,7 +955,8 @@ void l1_activations_avx2(const NnueNetwork& network,
         const std::int8_t* weights = network.l1_weights.data() + unit * pair_count;
         const std::int8_t* diff_weights = use_diff ?
             network.l1_diff_weights.data() + unit * pair_count : nullptr;
-        __m256i accumulator = _mm256_setzero_si256();
+        __m256i pair_accumulator = _mm256_setzero_si256();
+        __m256i diff_accumulator = _mm256_setzero_si256();
         std::size_t pair = 0;
         for (; pair + 16U <= pair_count; pair += 16U) {
             const __m256i pair_values = _mm256_loadu_si256(
@@ -938,31 +964,49 @@ void l1_activations_avx2(const NnueNetwork& network,
             const __m128i weight_bytes = _mm_loadu_si128(
                 reinterpret_cast<const __m128i*>(weights + pair));
             const __m256i weight_values = _mm256_cvtepi8_epi16(weight_bytes);
-            accumulator = _mm256_add_epi32(
-                accumulator, _mm256_madd_epi16(pair_values, weight_values));
+            pair_accumulator = _mm256_add_epi32(
+                pair_accumulator, _mm256_madd_epi16(pair_values, weight_values));
             if (use_diff) {
                 const __m256i diff_values = _mm256_loadu_si256(
                     reinterpret_cast<const __m256i*>(diff.data() + pair));
                 const __m128i diff_weight_bytes = _mm_loadu_si128(
                     reinterpret_cast<const __m128i*>(diff_weights + pair));
                 const __m256i diff_weight_values = _mm256_cvtepi8_epi16(diff_weight_bytes);
-                accumulator = _mm256_add_epi32(
-                    accumulator, _mm256_madd_epi16(diff_values, diff_weight_values));
+                diff_accumulator = _mm256_add_epi32(
+                    diff_accumulator, _mm256_madd_epi16(diff_values, diff_weight_values));
             }
         }
-        _mm256_store_si256(reinterpret_cast<__m256i*>(lanes.data()), accumulator);
-        std::int64_t sum = network.l1_bias[unit];
+        _mm256_store_si256(reinterpret_cast<__m256i*>(lanes.data()), pair_accumulator);
+        std::int64_t pair_sum = 0;
         for (const std::int32_t lane : lanes) {
-            sum += lane;
+            pair_sum += lane;
+        }
+        std::int64_t diff_sum = 0;
+        if (use_diff) {
+            _mm256_store_si256(reinterpret_cast<__m256i*>(lanes.data()), diff_accumulator);
+            for (const std::int32_t lane : lanes) {
+                diff_sum += lane;
+            }
         }
         for (; pair < pair_count; ++pair) {
-            sum += static_cast<std::int64_t>(weights[pair]) * pairs[pair];
+            pair_sum += static_cast<std::int64_t>(weights[pair]) * pairs[pair];
             if (use_diff) {
-                sum += static_cast<std::int64_t>(diff_weights[pair]) * diff[pair];
+                diff_sum += static_cast<std::int64_t>(diff_weights[pair]) * diff[pair];
             }
         }
-        if (network.l1_shift > 0) {
-            sum >>= network.l1_shift;
+        std::int64_t sum;
+        if (split) {
+            sum = (pair_sum >> network.l1_shift) +
+                (diff_sum >> network.l1_diff_shift) + network.l1_bias[unit];
+        } else {
+            sum = pair_sum;
+            if (use_diff) {
+                sum += diff_sum;
+            }
+            sum += network.l1_bias[unit];
+            if (network.l1_shift > 0) {
+                sum >>= network.l1_shift;
+            }
         }
         activations[unit] = static_cast<std::int32_t>(std::clamp<std::int64_t>(
             sum, 0, kKoiNnueClippedReluMaximum));
@@ -1239,9 +1283,16 @@ std::expected<std::vector<std::uint8_t>, NnueError> NnueLoader::serialize(
         if (network.hidden_shift > kKoiNnueMaximumShift ||
             network.output_shift > kKoiNnueMaximumShift ||
             network.l1_shift > kKoiNnueMaximumShift ||
+            network.l1_diff_shift > kKoiNnueMaximumShift ||
             network.bottleneck_shift != 0) {
             return std::unexpected(make_error(NnueErrorCode::malformed_manifest,
                                               "NNUE v5/v6 shift is out of range"));
+        }
+        // The v6 split shift packs into the byte v5 reserved, so a v5 network
+        // must leave it at zero.
+        if (!is_halfka_threat_v6(network.manifest) && network.l1_diff_shift != 0) {
+            return std::unexpected(make_error(NnueErrorCode::malformed_manifest,
+                                              "NNUE v5 containers cannot carry a diff shift"));
         }
     } else if (is_halfka_king_bucket_v1(network.manifest)) {
         if (network.hidden_shift > kKoiNnueMaximumShift ||
@@ -1317,7 +1368,9 @@ std::expected<std::vector<std::uint8_t>, NnueError> NnueLoader::serialize(
         container.push_back(network.hidden_shift);
         container.push_back(network.output_shift);
         container.push_back(network.l1_shift);
-        container.push_back(0);
+        // The byte v5 reserved carries the v6 split pair/diff shift (zero
+        // keeps the legacy combined head); validation pins it to zero for v5.
+        container.push_back(network.l1_diff_shift);
     } else if (is_halfka_king_bucket_v1(network.manifest)) {
         container.push_back(network.hidden_shift);
         container.push_back(network.output_shift);
@@ -1364,6 +1417,7 @@ std::expected<NnueNetwork, NnueError> NnueLoader::load(
     std::uint8_t bottleneck_shift = 0;
     std::uint8_t output_shift = 0;
     std::uint8_t l1_shift = 0;
+    std::uint8_t l1_diff_shift = 0;
     if (uses_halfka_threat_features(manifest)) {
         if (container.size() - offset < 4) {
             return std::unexpected(make_error(NnueErrorCode::malformed_manifest,
@@ -1372,13 +1426,17 @@ std::expected<NnueNetwork, NnueError> NnueLoader::load(
         hidden_shift = container[offset++];
         output_shift = container[offset++];
         l1_shift = container[offset++];
-        const std::uint8_t reserved = container[offset++];
-        if (reserved != 0) {
+        const std::uint8_t diff_or_reserved = container[offset++];
+        if (is_halfka_threat_v6(manifest)) {
+            // v6 packs the split pair/diff shift into the byte v5 reserved;
+            // zero keeps the legacy combined interpretation.
+            l1_diff_shift = diff_or_reserved;
+        } else if (diff_or_reserved != 0) {
             return std::unexpected(make_error(NnueErrorCode::malformed_manifest,
-                                               "NNUE v5/v6 reserved header byte must be zero"));
+                                               "NNUE v5 reserved header byte must be zero"));
         }
         if (hidden_shift > kKoiNnueMaximumShift || output_shift > kKoiNnueMaximumShift ||
-            l1_shift > kKoiNnueMaximumShift) {
+            l1_shift > kKoiNnueMaximumShift || l1_diff_shift > kKoiNnueMaximumShift) {
             return std::unexpected(make_error(NnueErrorCode::malformed_manifest,
                                                "NNUE v5/v6 shift is out of range"));
         }
@@ -1457,6 +1515,7 @@ std::expected<NnueNetwork, NnueError> NnueLoader::load(
     network.bottleneck_shift = bottleneck_shift;
     network.output_shift = output_shift;
     network.l1_shift = l1_shift;
+    network.l1_diff_shift = l1_diff_shift;
     const std::size_t input_units = network.manifest.layer_sizes[0];
     const std::size_t hidden_units = network.manifest.layer_sizes[1];
     const std::size_t output_units = network.manifest.layer_sizes[2];

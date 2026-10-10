@@ -214,7 +214,13 @@ def parse_v5_container(path: pathlib.Path) -> dict:
 
 
 def parse_v6_container(path: pathlib.Path) -> dict:
-    """Parse the version 6 container (v5 header plus the diff weight block)."""
+    """Parse the version 6 container (v5 header plus the diff weight block).
+
+    The header byte v5 keeps reserved carries ``l1_diff_shift`` for v6: a
+    nonzero value selects the split head
+    ``(pair_sum >> l1_shift) + (diff_sum >> l1_diff_shift)`` and 0 keeps the
+    legacy combined ``(pair_sum + diff_sum) >> l1_shift`` interpretation.
+    """
     data = path.read_bytes()
     (
         magic,
@@ -231,6 +237,7 @@ def parse_v6_container(path: pathlib.Path) -> dict:
         feature_length,
         payload_length,
     ) = HEADER_V5.unpack_from(data, 0)
+    l1_diff_shift = reserved
     payload_hash = data[44:76].hex()
     quantization = data[76 : 76 + quantization_length]
     feature_set = data[
@@ -279,6 +286,7 @@ def parse_v6_container(path: pathlib.Path) -> dict:
         "output_buckets": output_buckets,
         "l1_units": l1_units,
         "reserved": reserved,
+        "l1_diff_shift": l1_diff_shift,
         "hidden_shift": hidden_shift,
         "output_shift": output_shift,
         "l1_shift": l1_shift,
@@ -304,6 +312,7 @@ def parse_v6_container(path: pathlib.Path) -> dict:
             "output_bias": output_bias,
             "hidden_shift": hidden_shift,
             "l1_shift": l1_shift,
+            "l1_diff_shift": l1_diff_shift,
             "output_shift": output_shift,
         },
     }
@@ -742,8 +751,9 @@ class V6HeadTests(unittest.TestCase):
                     parameter.uniform_(-0.1, 0.1)
                 else:
                     parameter.copy_(torch.randn_like(parameter) * 0.3)
-        hidden_shift, l1_shift, output_shift = 7, 8, 6
-        params = train_nnue_koi.quantize_v6(model, hidden_shift, l1_shift)
+        hidden_shift, l1_shift, l1_diff_shift, output_shift = 7, 9, 8, 6
+        params = train_nnue_koi.quantize_v6(model, hidden_shift, l1_shift,
+                                            l1_diff_shift)
         params["output_weights"] = np.clip(
             np.rint(model.output_weight.detach().numpy().astype(np.float64)
                     * train_nnue_koi.TARGET_SCALE * 2.0**output_shift / 127.0),
@@ -757,13 +767,14 @@ class V6HeadTests(unittest.TestCase):
         opp = rng.integers(0, 128, size=(24, 64)).astype(np.int64)
         buckets = rng.integers(0, 8, size=24)
         scores = train_nnue_koi.integer_scores_v6(params, own, opp, buckets)
-        # Dequantized reference in the same integer L1 units; the arithmetic
-        # shifts floor, so a sub-unit difference is expected.
+        # Dequantized reference in the same integer L1 units; the two channels
+        # shift on their own scales and floor, so a sub-unit difference is
+        # expected.
         pairs = own * opp
         diff = own - opp
         l1 = (pairs @ params["l1_weights"].T.astype(np.float64) / 2.0**l1_shift
-              + diff @ params["l1_diff_weights"].T.astype(np.float64) / 2.0**l1_shift
-              + params["l1_bias"].astype(np.float64) / 2.0**l1_shift)
+              + diff @ params["l1_diff_weights"].T.astype(np.float64) / 2.0**l1_diff_shift
+              + params["l1_bias"].astype(np.float64))
         l1 = np.clip(l1, 0.0, 127.0)
         reference = (
             params["output_bias"][buckets].astype(np.float64) / 2.0**output_shift
@@ -777,7 +788,7 @@ class V6HeadTests(unittest.TestCase):
         self.assertIsNotNone(train_nnue_koi)
         torch.manual_seed(13)
         model = train_nnue_koi.KoiNetV6(64, 8)
-        params = train_nnue_koi.quantize_v6(model, 7, 8)
+        params = train_nnue_koi.quantize_v6(model, 7, 8, 9)
         params["output_weights"] = np.clip(
             np.rint(model.output_weight.detach().numpy().astype(np.float64)
                     * train_nnue_koi.TARGET_SCALE * 2.0**6 / 127.0),
@@ -788,7 +799,7 @@ class V6HeadTests(unittest.TestCase):
         params["output_shift"] = 6
         payload = train_nnue_koi.nnue_payload_v6(params, 64, 8)
         container, payload_hash = train_nnue_koi.nnue_container_v6(
-            payload, 64, 8, 7, 6, 8)
+            payload, 64, 8, 7, 6, 8, 9)
         header = struct.unpack_from("<8sIIIIIBBBBHHQ", container, 0)
         self.assertEqual(header[0], b"KOI-NNUE")
         self.assertEqual(header[1], 6)
@@ -796,7 +807,9 @@ class V6HeadTests(unittest.TestCase):
         self.assertEqual(header[3], 64)
         self.assertEqual(header[4], OUTPUT_BUCKETS)
         self.assertEqual(header[5], 8)
-        self.assertEqual(header[6:10], (7, 6, 8, 0))
+        # The 4th scale byte was reserved in v5 and now carries the split
+        # pair/diff head's diff shift.
+        self.assertEqual(header[6:10], (7, 6, 8, 9))
         self.assertEqual(header[10], len(QUANTIZATION))
         self.assertEqual(header[11], len(FEATURE_SET + b"+threat-pairs-v1"))
         self.assertEqual(header[12], len(payload))
@@ -832,6 +845,119 @@ class V6HeadTests(unittest.TestCase):
         white = v6_raw_cp(self.model, V6_QUEEN_PAIR[0])
         black = v6_raw_cp(self.model, V6_QUEEN_PAIR[1])
         self.assertLess(abs(white + black), 5.0)
+
+
+class V6ContainerByteTests(unittest.TestCase):
+    """v6 header byte semantics: nonzero selects the split pair/diff head."""
+
+    @staticmethod
+    def _params(l1_shift: int, l1_diff_shift: int) -> dict:
+        rng = np.random.default_rng(20261008)
+        hidden_units = HIDDEN_UNITS
+        l1_units = 8
+        return {
+            "feature_weights": rng.integers(
+                -1000, 1000, size=(train_nnue_koi.V5_INPUT_UNITS, hidden_units),
+                dtype=np.int64),
+            "hidden_bias": rng.integers(
+                -100, 100, size=hidden_units, dtype=np.int64),
+            "l1_weights": rng.integers(
+                -127, 128, size=(l1_units, hidden_units), dtype=np.int64),
+            "l1_diff_weights": rng.integers(
+                -127, 128, size=(l1_units, hidden_units), dtype=np.int64),
+            "l1_bias": rng.integers(-500, 500, size=l1_units, dtype=np.int64),
+            "output_weights": rng.integers(
+                -127, 128, size=(OUTPUT_BUCKETS, l1_units), dtype=np.int64),
+            "output_bias": rng.integers(
+                -500, 500, size=OUTPUT_BUCKETS, dtype=np.int64),
+            "hidden_shift": 7,
+            "l1_shift": l1_shift,
+            "l1_diff_shift": l1_diff_shift,
+            "output_shift": 6,
+        }
+
+    @staticmethod
+    def _expected_scores(params: dict, own, opp, buckets, split: bool):
+        """Reference integer scores for one of the two head interpretations."""
+        pairs = own * opp
+        diff = own - opp
+        pair_sum = pairs @ params["l1_weights"].T
+        diff_sum = diff @ params["l1_diff_weights"].T
+        if split:
+            pre = ((pair_sum >> params["l1_shift"])
+                   + (diff_sum >> params["l1_diff_shift"])
+                   + params["l1_bias"])
+        else:
+            pre = (pair_sum + diff_sum + params["l1_bias"]) >> params["l1_shift"]
+        l1 = np.clip(pre, 0, 127)
+        output = (params["output_bias"][buckets]
+                  + (l1 * params["output_weights"][buckets]).sum(axis=1))
+        return output >> params["output_shift"]
+
+    @staticmethod
+    def _positions():
+        own = np.random.default_rng(21).integers(
+            0, 128, size=(6, HIDDEN_UNITS)).astype(np.int64)
+        opp = np.random.default_rng(22).integers(
+            0, 128, size=(6, HIDDEN_UNITS)).astype(np.int64)
+        buckets = np.arange(6, dtype=np.int64) % OUTPUT_BUCKETS
+        return own, opp, buckets
+
+    def test_v6_container_diff_shift_round_trip(self):
+        self.assertIsNotNone(train_nnue_koi)
+        params = self._params(l1_shift=8, l1_diff_shift=9)
+        payload = train_nnue_koi.nnue_payload_v6(params, HIDDEN_UNITS, 8)
+        container, payload_hash = train_nnue_koi.nnue_container_v6(
+            payload, HIDDEN_UNITS, 8, 7, 6, 8, 9)
+        # The formerly reserved header byte at offset 31 now carries the diff
+        # shift; a nonzero value selects the split pair/diff head.
+        self.assertEqual(container[31], 9)
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / "split-v6.nnue"
+            path.write_bytes(container)
+            parsed = parse_v6_container(path)
+            self.assertEqual(parsed["version"], 6)
+            self.assertEqual(parsed["hidden_shift"], 7)
+            self.assertEqual(parsed["l1_shift"], 8)
+            self.assertEqual(parsed["l1_diff_shift"], 9)
+            self.assertEqual(parsed["reserved"], 9)
+            self.assertEqual(parsed["payload_hash"], payload_hash)
+            self.assertTrue(np.array_equal(
+                parsed["l1_diff_weights"],
+                params["l1_diff_weights"].astype("<i1")))
+            own, opp, buckets = self._positions()
+            scores = train_nnue_koi.integer_scores_v6(
+                parsed["params"], own, opp, buckets)
+            self.assertTrue(np.array_equal(
+                scores,
+                self._expected_scores(
+                    parsed["params"], own, opp, buckets, split=True)))
+
+    def test_v6_reserved_zero_keeps_legacy_combined_shift(self):
+        self.assertIsNotNone(train_nnue_koi)
+        params = self._params(l1_shift=8, l1_diff_shift=0)
+        payload = train_nnue_koi.nnue_payload_v6(params, HIDDEN_UNITS, 8)
+        container, _ = train_nnue_koi.nnue_container_v6(
+            payload, HIDDEN_UNITS, 8, 7, 6, 8, 0)
+        self.assertEqual(container[31], 0)
+        own, opp, buckets = self._positions()
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / "legacy-v6.nnue"
+            path.write_bytes(container)
+            parsed = parse_v6_container(path)
+            self.assertEqual(parsed["l1_diff_shift"], 0)
+            self.assertEqual(parsed["reserved"], 0)
+            legacy = train_nnue_koi.integer_scores_v6(
+                parsed["params"], own, opp, buckets)
+            self.assertTrue(np.array_equal(
+                legacy,
+                self._expected_scores(
+                    parsed["params"], own, opp, buckets, split=False)))
+            # The same weights with a nonzero byte must take the split head, so
+            # the two interpretations are observably different.
+            split_params = dict(parsed["params"], l1_diff_shift=9)
+            split = train_nnue_koi.integer_scores_v6(split_params, own, opp, buckets)
+            self.assertFalse(np.array_equal(legacy, split))
 
 
 @unittest.skipUnless(TORCH_AVAILABLE, "PyTorch is not installed")
@@ -1067,8 +1193,6 @@ class TrainerPipelineTests(unittest.TestCase):
             "v6",
             "--l1-units",
             "8",
-            "--l1-shifts",
-            "6",
             "--net-out",
             str(first_net),
             "--meta-out",
@@ -1081,7 +1205,17 @@ class TrainerPipelineTests(unittest.TestCase):
         self.assertEqual(metadata["arch"], "v6")
         self.assertEqual(metadata["activation"], "crelu-pair-diff-l1")
         self.assertEqual(metadata["feature_set"], "halfka-king-bucket-v1+threat-pairs-v1")
-        self.assertEqual(metadata["l1_shift"], 6)
+        # The export searches the pair (8..14) and diff (8..10) shifts
+        # independently and keeps the historical 4..8 output range.
+        self.assertGreaterEqual(metadata["l1_shift"], 8)
+        self.assertLessEqual(metadata["l1_shift"], 14)
+        self.assertGreaterEqual(metadata["l1_diff_shift"], 8)
+        self.assertLessEqual(metadata["l1_diff_shift"], 10)
+        self.assertGreaterEqual(metadata["output_shift"], 4)
+        self.assertLessEqual(metadata["output_shift"], 8)
+        self.assertEqual(metadata["best_epoch"], 1)
+        self.assertEqual(metadata["epochs_run"], 1)
+        self.assertIn("l1_pair_zero_fraction", metadata)
         self.assertIn("l1_saturation", metadata)
         self.assertIn("l1_diff_saturation", metadata)
         container = parse_v6_container(first_net)
@@ -1089,6 +1223,9 @@ class TrainerPipelineTests(unittest.TestCase):
         self.assertEqual(container["version"], 6)
         self.assertEqual(container["input_units"], 36864)
         self.assertEqual(container["l1_units"], 8)
+        self.assertEqual(container["l1_shift"], metadata["l1_shift"])
+        self.assertEqual(container["l1_diff_shift"], metadata["l1_diff_shift"])
+        self.assertEqual(container["output_shift"], metadata["output_shift"])
         expected_payload = (
             36864 * HIDDEN_UNITS * 2
             + HIDDEN_UNITS * 4
@@ -1110,8 +1247,6 @@ class TrainerPipelineTests(unittest.TestCase):
             "v6",
             "--l1-units",
             "8",
-            "--l1-shifts",
-            "6",
             "--net-out",
             str(second_net),
             "--meta-out",

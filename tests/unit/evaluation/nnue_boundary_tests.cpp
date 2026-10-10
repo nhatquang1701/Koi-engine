@@ -640,18 +640,34 @@ int reference_threat_score(const koi::NnueNetwork& network,
     const std::vector<int> opp = activations_for(koi::opposite(mover));
     std::vector<int> l1(l1_units, 0);
     for (std::size_t unit = 0; unit < l1_units; ++unit) {
-        std::int64_t sum = network.l1_bias[unit];
+        std::int64_t pair_sum = 0;
+        std::int64_t diff_sum = 0;
         for (std::size_t pair = 0; pair < pair_count; ++pair) {
-            sum += static_cast<std::int64_t>(network.l1_weights[unit * pair_count + pair]) *
+            pair_sum += static_cast<std::int64_t>(network.l1_weights[unit * pair_count + pair]) *
                 own[pair] * opp[pair];
             if (use_diff) {
-                sum += static_cast<std::int64_t>(
-                           network.l1_diff_weights[unit * pair_count + pair]) *
+                diff_sum += static_cast<std::int64_t>(
+                                network.l1_diff_weights[unit * pair_count + pair]) *
                     (own[pair] - opp[pair]);
             }
         }
-        if (network.l1_shift > 0) {
-            sum >>= network.l1_shift;
+        std::int64_t sum;
+        if (use_diff && network.l1_diff_shift > 0) {
+            // Split head: each channel shifts on its own scale, then the L1
+            // bias (stored at the 127 scale) is added; both shifts floor.
+            sum = (pair_sum >> network.l1_shift) +
+                (diff_sum >> network.l1_diff_shift) + network.l1_bias[unit];
+        } else {
+            // Legacy combined head: the stored L1 bias is pre-shifted at the
+            // 127 * 2^l1_shift scale.
+            sum = pair_sum;
+            if (use_diff) {
+                sum += diff_sum;
+            }
+            sum += network.l1_bias[unit];
+            if (network.l1_shift > 0) {
+                sum >>= network.l1_shift;
+            }
         }
         l1[unit] = std::clamp<int>(static_cast<int>(sum), 0, koi::kKoiNnueClippedReluMaximum);
     }
@@ -1515,6 +1531,12 @@ void test_v6_container_round_trip_and_validation() {
                     static_cast<std::uint8_t>(network.l1_bias[0] & 0xFF),
             "v6 payload must place l1_diff_weights between l1_weights and l1_bias");
 
+    // The synthetic fixture stays on the legacy combined head: the formerly
+    // reserved byte is zero so the Python cross-language fixture keeps testing
+    // the legacy formula.
+    require((*encoded)[31] == 0,
+            "the legacy v6 fixture must keep the formerly reserved byte zero");
+
     const auto decoded = koi::NnueLoader::load(*encoded);
     require(decoded.has_value(), "serialized v6 NNUE network must load");
     require(decoded->manifest.version == koi::kKoiNnueHalfkaThreatV6FormatVersion &&
@@ -1522,6 +1544,7 @@ void test_v6_container_round_trip_and_validation() {
                 decoded->manifest.feature_set == "halfka-king-bucket-v1+threat-pairs-v1" &&
                 decoded->manifest.quantization == "int16/int8" &&
                 decoded->hidden_shift == 7 && decoded->l1_shift == 6 &&
+                decoded->l1_diff_shift == 0 &&
                 decoded->output_shift == 12 && decoded->bottleneck_shift == 0 &&
                 decoded->feature_weights.size() == kInputUnits * kHiddenUnits &&
                 decoded->l1_weights.size() == kL1Units * kHiddenUnits &&
@@ -1597,12 +1620,21 @@ void test_v6_container_rejects_corruption() {
     const auto encoded = koi::NnueLoader::serialize(koi::NnueNetwork::synthetic_v6());
     require(encoded.has_value(), "v6 corruption fixture must serialize");
 
-    std::vector<std::uint8_t> reserved_byte = *encoded;
-    reserved_byte[31] = 1;
-    const auto reserved_byte_result = koi::NnueLoader::load(reserved_byte);
-    require(!reserved_byte_result.has_value() &&
-                reserved_byte_result.error().code == koi::NnueErrorCode::malformed_manifest,
-            "a nonzero v6 reserved byte must be rejected");
+    // The formerly reserved byte carries the split diff shift for v6: any
+    // value in range selects the split head, values above the shift limit are
+    // rejected before inference.
+    std::vector<std::uint8_t> split_shift = *encoded;
+    split_shift[31] = 1;
+    const auto split_shift_result = koi::NnueLoader::load(split_shift);
+    require(split_shift_result.has_value() && split_shift_result->l1_diff_shift == 1,
+            "a nonzero v6 header byte must select the split pair/diff head");
+
+    std::vector<std::uint8_t> corrupt_diff_shift = *encoded;
+    corrupt_diff_shift[31] = 21;
+    const auto corrupt_diff_shift_result = koi::NnueLoader::load(corrupt_diff_shift);
+    require(!corrupt_diff_shift_result.has_value() &&
+                corrupt_diff_shift_result.error().code == koi::NnueErrorCode::malformed_manifest,
+            "v6 diff shifts above the named limit must be rejected");
 
     std::vector<std::uint8_t> corrupt_l1_shift = *encoded;
     corrupt_l1_shift[30] = 21;
@@ -1737,6 +1769,97 @@ void test_v6_golden_score() {
     require(scalar == kExpectedV6GoldenScore && avx2 == kExpectedV6GoldenScore,
             "v6 golden startpos score must stay pinned: score=" + std::to_string(scalar) +
                 " avx2=" + std::to_string(avx2));
+}
+
+void test_v6_split_diff_shift_matches_independent_reference() {
+    // A v6 container with a nonzero l1_diff_shift takes the split head
+    // `(pair_sum >> l1_shift) + (diff_sum >> l1_diff_shift) + bias` while the
+    // legacy combined head keeps `(pair_sum + diff_sum + bias) >> l1_shift`.
+    koi::NnueNetwork network = koi::NnueNetwork::synthetic_v6();
+    // Controlled weights: the pair and diff channels are zeroed and a single
+    // L1 unit is observed, so the two head formulas land in different
+    // (non-saturated) L1 ranges: the split head adds the bias at the raw 127
+    // scale while the legacy head shifts the combined sum.  Unit 4 reads
+    // bias + 2 vs 0.  (The previous extreme alternating weights saturated
+    // every unit to the same 0/127 value in both heads, so the heads could
+    // not be distinguished.)
+    std::fill(network.l1_weights.begin(), network.l1_weights.end(), 0);
+    std::fill(network.l1_diff_weights.begin(), network.l1_diff_weights.end(), 0);
+    std::fill(network.bottleneck_weights.begin(), network.bottleneck_weights.end(), 0);
+    std::fill(network.bottleneck_bias.begin(), network.bottleneck_bias.end(), 0);
+    for (std::size_t index = 0; index < network.l1_bias.size(); ++index) {
+        network.l1_bias[index] =
+            static_cast<std::int32_t>(static_cast<int>(index * 13U) - 50);
+    }
+    constexpr std::size_t kObservedUnit = 4;
+    for (std::size_t bucket = 0; bucket < network.bottleneck_weights.size() / network.l1_bias.size();
+         ++bucket) {
+        network.bottleneck_weights[bucket * network.l1_bias.size() + kObservedUnit] = 1;
+    }
+    network.l1_shift = 6;
+    network.l1_diff_shift = 9;
+    network.output_shift = 0;
+
+    constexpr std::size_t kInputUnits = 36864;
+    constexpr std::size_t kHiddenUnits = 32;
+    constexpr std::size_t kOutputBuckets = 8;
+    constexpr std::size_t kL1Units = 8;
+    constexpr std::size_t kPayloadSize = kInputUnits * kHiddenUnits * 2 +
+        kHiddenUnits * 4 + kL1Units * kHiddenUnits + kL1Units * kHiddenUnits + kL1Units * 4 +
+        kOutputBuckets * kL1Units + kOutputBuckets * 4;
+    const std::size_t strings = koi::kKoiNnueQuantization.size() +
+        koi::kKoiNnueHalfkaThreatV5FeatureSet.size();
+    const auto encoded = koi::NnueLoader::serialize(network);
+    require(encoded.has_value(), "split v6 NNUE network must serialize");
+    require(encoded->size() == 76 + strings + kPayloadSize,
+            "the split v6 container must keep the v5/v6 header and payload size");
+    require((*encoded)[31] == network.l1_diff_shift,
+            "the split v6 diff shift must occupy the formerly reserved header byte");
+
+    const auto decoded = koi::NnueLoader::load(*encoded);
+    require(decoded.has_value() && decoded->l1_diff_shift == network.l1_diff_shift &&
+                decoded->l1_diff_weights == network.l1_diff_weights &&
+                decoded->l1_bias == network.l1_bias,
+            "the split v6 diff shift, weights and biases must survive a round trip");
+
+    const auto weights = std::make_shared<const koi::NnueNetwork>(std::move(network));
+    koi::NnueNetwork legacy_network = *weights;
+    legacy_network.l1_diff_shift = 0;
+    koi::NnueWorker scalar_worker(weights);
+    koi::NnueWorker avx2_worker(weights);
+    const std::vector<koi::GameState> states{
+        koi::GameState::startpos(),
+        require_state("r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 4 4"),
+        require_state("r1bqk2r/pppp1ppp/2n2n2/2b1p3/2B1P3/2NP1N2/PPP2PPP/R1BQK2R w KQkq - 0 1"),
+        require_state("4k3/8/8/8/8/8/P7/4K3 w - - 0 1"),
+    };
+    bool differs_from_legacy = false;
+    for (const koi::GameState& state : states) {
+        const koi::EvaluationFeatures features =
+            koi::EvaluationFeatureExtractor::extract(state);
+        const koi::Color mover = features.position.side_to_move;
+        const int expected = reference_v6_score(*weights, features, mover);
+        const int scalar = scalar_worker.evaluate(features, mover,
+                                                  koi::NnueInferencePath::scalar);
+        const int avx2 = avx2_worker.evaluate(features, mover,
+                                              koi::NnueInferencePath::avx2_compatible);
+        require(scalar == expected && avx2 == expected &&
+                    avx2_worker.accumulator().values == scalar_worker.accumulator().values &&
+                    avx2_worker.accumulator().bottleneck_values ==
+                        scalar_worker.accumulator().bottleneck_values,
+                "split v6 scalar and AVX2 paths must match the independent reference: " +
+                    std::to_string(scalar) + "/" + std::to_string(avx2) + " != " +
+                    std::to_string(expected));
+        differs_from_legacy |= reference_v6_score(legacy_network, features, mover) != expected;
+    }
+    require(differs_from_legacy,
+            "the split and combined v6 heads must differ for these weights");
+
+    // The L1 stage is recomputed from the cached hidden sums, so the split head
+    // must agree between the incremental and full-recompute workers.
+    walk_incremental_game("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", 20,
+                          0x5EED1234ULL, weights);
+    walk_incremental_game("r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1", 12, 0x0BADF00DULL, weights);
 }
 
 void test_v6_diff_channel_is_applied() {
@@ -2067,6 +2190,10 @@ void emit_v6_fixture(const std::filesystem::path& output_path) {
     const std::size_t l1_units = network.manifest.layer_sizes[3];
     network.hidden_shift = 7;
     network.l1_shift = 6;
+    // Pin the legacy combined head: the Python cross-language test parses the
+    // formerly reserved byte as l1_diff_shift, and zero keeps it on the legacy
+    // formula shared with pre-split containers.
+    network.l1_diff_shift = 0;
     network.output_shift = 12;
     network.feature_weights.resize(input_units * hidden_units);
     for (std::size_t index = 0; index < network.feature_weights.size(); ++index) {
@@ -2220,6 +2347,7 @@ int main(int argc, char** argv) {
         {"NNUE v6 path parity", test_v6_inference_paths_agree_on_random_weights},
         {"NNUE v6 golden score", test_v6_golden_score},
         {"NNUE v6 diff channel", test_v6_diff_channel_is_applied},
+        {"NNUE v6 split head", test_v6_split_diff_shift_matches_independent_reference},
         {"NNUE v2 shifts rejected", test_v1_v2_serialization_rejects_nonzero_shifts},
         {"NNUE invalid fallback", test_invalid_in_memory_network_uses_the_classical_fallback},
         {"NNUE one-shot stateless", test_one_shot_evaluation_matches_stateless_inference},

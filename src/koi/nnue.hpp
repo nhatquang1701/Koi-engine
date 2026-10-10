@@ -39,7 +39,9 @@ inline constexpr std::uint32_t kKoiNnueHalfkaThreatV5FormatVersion = 5;
 // but makes the L1 stage antisymmetric: alongside the cross-perspective pair
 // products p[i] = own[i] * opp[i] it consumes the difference d[i] = own[i] -
 // opp[i] through a second int8 matrix.  The payload therefore grows by
-// l1_units * hidden_units bytes, placed directly after `l1_weights`.
+// l1_units * hidden_units bytes, placed directly after `l1_weights`.  The byte
+// v5 reserved carries the separate diff-channel shift `l1_diff_shift` (0 keeps
+// the legacy combined head) so the two channels can quantize independently.
 inline constexpr std::uint32_t kKoiNnueHalfkaThreatV6FormatVersion = 6;
 inline constexpr std::uint32_t kKoiNnueHalfkaKingBucketV1FeatureCount =
     static_cast<std::uint32_t>(kNnueHalfkaKingBucketV1FeatureCount);
@@ -132,6 +134,13 @@ struct NnueNetwork {
     std::uint8_t bottleneck_shift = 0;
     std::uint8_t output_shift = 0;
     std::uint8_t l1_shift = 0;
+    // Version 6 split-head shift for the antisymmetric difference channel.
+    // Zero selects the legacy combined
+    // `(pair_sum + diff_sum + bias) >> l1_shift` head used by pre-split
+    // containers; a nonzero value selects
+    // `(pair_sum >> l1_shift) + (diff_sum >> l1_diff_shift) + bias`, whose L1
+    // bias is stored at the plain 127 scale.  Versions 2-5 leave it at zero.
+    std::uint8_t l1_diff_shift = 0;
 
     [[nodiscard]] static NnueNetwork synthetic();
     [[nodiscard]] static NnueNetwork synthetic_v2();
@@ -143,7 +152,10 @@ struct NnueNetwork {
     // buckets, and 8 L1 units, with shifts 7/12 and a 6-bit L1 shift.
     [[nodiscard]] static NnueNetwork synthetic_v5();
     // Minimal-width v6 network mirroring synthetic_v5, plus the antisymmetric
-    // L1 difference weights (a small alternating +/-1 pattern).
+    // L1 difference weights (a small alternating +/-1 pattern).  It keeps the
+    // legacy combined head (l1_diff_shift = 0) so pre-split containers and the
+    // cross-language fixture remain bit-comparable; tests set the split shift
+    // explicitly.
     [[nodiscard]] static NnueNetwork synthetic_v6();
 };
 

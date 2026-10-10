@@ -31,26 +31,34 @@ v6 (``--arch v6``):
                             -2^31, 2^31 - 1), 0, 127)
     pairs[j]   = own[j] * opp[j]
     diff[j]    = own[j] - opp[j]                       # antisymmetric channel
-    l1[k]      = clamp((sum_j l1_weights[k, j] * pairs[j]
-                        + sum_j l1_diff_weights[k, j] * diff[j]
-                        + l1_bias[k]) >> s_l1, 0, 127)
+    l1[k]      = clamp((sum_j l1_weights[k, j] * pairs[j]) >> sp
+                       + (sum_j l1_diff_weights[k, j] * diff[j]) >> sd
+                       + l1_bias[k], 0, 127)
     score      = (output_bias[b] + sum_k output_weights[b, k] * l1[k]) >> k3
 
 The ``diff`` channel makes the head antisymmetric under swapping the own and
-opponent perspectives, which the v5 pair-only head cannot represent.  Its
-quantization scale is chosen so both terms land on the same 127*2^s*l1_pre
-integer scale before the arithmetic shift:
+opponent perspectives, which the v5 pair-only head cannot represent.  The pair
+and diff channels quantize on independent integer scales and use separate
+shifts ``sp = l1_shift`` and ``sd = l1_diff_shift``; each channel lands on the
+``127 * l1_pre`` integer scale after its own arithmetic shift:
 
     pairs_f in [0, 1]   -> pairs_int = 127^2 * pairs_f
     diff_f  in [-1, 1]  -> diff_int  = 127 * diff_f
-    l1_weights_q      = round(l1_weights_f * 2^s / 127)
-    l1_diff_weights_q = round(l1_diff_weights_f * 2^s)
+    l1_weights_q      = round(l1_weights_f * 2^sp / 127)
+    l1_diff_weights_q = round(l1_diff_weights_f * 2^sd)
+    l1_bias_q         = round(l1_bias_f * 127)
+
+A shared shift quantizes the pair weights with a 127/2^sp step (30.26% of the
+pair weights round to zero at sp = 8) while being 127x too coarse for the diff
+weights, so the trainer searches ``sp`` and ``sd`` separately.
 
 with ``b = min(7, (32 - pieces) / 4)``.  The exported v4 container is version 4
 (``hidden_shift``/``output_shift`` bytes, metadata ``koi-nnue-training-metadata-v2``);
 the v5 and v6 containers are version 5/6 (``hidden_shift``/``output_shift``/
 ``l1_shift`` bytes, metadata ``koi-nnue-training-metadata-v3``); the v6 payload
-inserts the int8 diff weights directly after the int8 pair weights.
+inserts the int8 diff weights directly after the int8 pair weights, and the v6
+header writes ``l1_diff_shift`` into the byte v5 reserves (0 selects the legacy
+combined ``(pairs + diff) >> l1_shift`` head, nonzero the split head).
 
 The trainer prints the studio progress contract lines:
 
@@ -627,19 +635,28 @@ def quantize_v5(model, hidden_shift: int, l1_shift: int) -> dict:
             "hidden_shift": hidden_shift, "l1_shift": l1_shift}
 
 
-def quantize_v6(model, hidden_shift: int, l1_shift: int) -> dict:
+def quantize_v6(model, hidden_shift: int, l1_shift: int, l1_diff_shift: int) -> dict:
     """v5 quantization plus the antisymmetric diff head (container version 6).
 
-    In training units ``pairs_f`` is in [0, 1] and ``diff_f`` in [-1, 1], so the
-    integer activations are ``pairs_int = 127^2 * pairs_f`` and
-    ``diff_int = 127 * diff_f``.  With ``l1_weights_q = l1_weights_f * 2^s / 127``
-    and ``l1_diff_weights_q = l1_diff_weights_f * 2^s`` both matrix products land
-    on the same ``127 * 2^s * l1_pre`` scale before the arithmetic shift; the
-    diff weights therefore skip the /127 the pair weights use and stay inside
-    the int8 range as long as their float values are within about 127/2^s.
+    The pair channel (shift ``sp = l1_shift``) and the diff channel (shift
+    ``sd = l1_diff_shift``) quantize on independent integer scales.  In
+    training units ``pairs_f`` is in [0, 1] and ``diff_f`` in [-1, 1], so:
+
+        l1_weights_q      = clip(rint(l1_weights_f * 2^sp / 127), +-127)
+        l1_diff_weights_q = clip(rint(l1_diff_weights_f * 2^sd), +-127)
+        l1_bias_q         = rint(l1_bias_f * 127)
+
+    ``(pairs_int @ l1_weights_q.T) >> sp`` and
+    ``(diff_int @ l1_diff_weights_q.T) >> sd`` both land on the ``127 * l1_pre``
+    integer scale, where ``l1_bias_q`` is added; the diff weights skip the /127
+    the pair weights use because a full pair product is 127x a full difference.
+    A shared shift would round the pair weights with a 127/2^sp step (30.26%
+    of pair weights hit zero at sp = 8) while being 127x too coarse for the
+    diff weights, so the two shifts are separate.
     """
     scale = float(2**hidden_shift)
-    l1_scale = float(2**l1_shift)
+    pair_scale = float(2**l1_shift)
+    diff_scale = float(2**l1_diff_shift)
     feature = model.feature.weight.detach().numpy().astype(np.float64)
     hidden_bias = model.hidden_bias.detach().numpy().astype(np.float64)
     l1_weight = model.l1_weight.detach().numpy().astype(np.float64)
@@ -647,14 +664,15 @@ def quantize_v6(model, hidden_shift: int, l1_shift: int) -> dict:
     l1_bias = model.l1_bias.detach().numpy().astype(np.float64)
     feature_q = np.clip(np.rint(feature * scale), -W1_LIMIT, W1_LIMIT).astype(np.int64)
     hidden_bias_q = np.rint(hidden_bias * scale).astype(np.int64)
-    l1_weight_q = np.clip(np.rint(l1_weight * l1_scale / 127.0), -L1_LIMIT,
+    l1_weight_q = np.clip(np.rint(l1_weight * pair_scale / 127.0), -L1_LIMIT,
                           L1_LIMIT).astype(np.int64)
-    l1_diff_weight_q = np.clip(np.rint(l1_diff_weight * l1_scale), -L1_LIMIT,
+    l1_diff_weight_q = np.clip(np.rint(l1_diff_weight * diff_scale), -L1_LIMIT,
                                L1_LIMIT).astype(np.int64)
-    l1_bias_q = np.rint(l1_bias * 127.0 * l1_scale).astype(np.int64)
+    l1_bias_q = np.rint(l1_bias * 127.0).astype(np.int64)
     return {"feature_weights": feature_q, "hidden_bias": hidden_bias_q,
             "l1_weights": l1_weight_q, "l1_diff_weights": l1_diff_weight_q,
-            "l1_bias": l1_bias_q, "hidden_shift": hidden_shift, "l1_shift": l1_shift}
+            "l1_bias": l1_bias_q, "hidden_shift": hidden_shift,
+            "l1_shift": l1_shift, "l1_diff_shift": l1_diff_shift}
 
 
 def hidden_activations_dual(params, own_indices, own_offsets, opp_indices, opp_offsets,
@@ -684,25 +702,48 @@ def integer_scores_v5(params, own, opp, buckets):
 
 
 def integer_scores_v6(params, own, opp, buckets):
-    """Integer v6 forward: pair channel plus the antisymmetric diff channel."""
+    """Integer v6 forward: pair plus diff channel and the bucket head.
+
+    ``params["l1_diff_shift"]`` mirrors the v6 container byte semantics: a
+    nonzero value is the split head
+    ``(pairs @ pair_w.T >> sp) + (diff @ diff_w.T >> sd) + bias`` and
+    0/absent keeps the legacy combined ``(pair_sum + diff_sum + bias) >> sp``
+    used by the pre-split containers.  Every product accumulates in int64 and
+    Python ``>>`` floors negative values, matching the C++ int64 arithmetic
+    shift bit for bit.
+    """
     pairs = own * opp
     diff = own - opp
-    l1 = (pairs @ params["l1_weights"].T + diff @ params["l1_diff_weights"].T
-          + params["l1_bias"])
-    l1 >>= params["l1_shift"]
-    l1 = np.clip(l1, 0, 127)
+    pair_sum = pairs @ params["l1_weights"].T
+    diff_sum = diff @ params["l1_diff_weights"].T
+    diff_shift = params.get("l1_diff_shift") or 0
+    if diff_shift:
+        pair_term = pair_sum >> params["l1_shift"]
+        diff_term = diff_sum >> diff_shift
+        pre = pair_term + diff_term + params["l1_bias"]
+    else:
+        pre = (pair_sum + diff_sum + params["l1_bias"]) >> params["l1_shift"]
+    l1 = np.clip(pre, 0, 127)
     output = params["output_bias"][buckets] + (l1 * params["output_weights"][buckets]).sum(axis=1)
     return output >> params["output_shift"]
 
 
 def l1_saturation_v6(params, own, opp) -> float:
-    """Fraction of quantized v6 L1 units clipped to 0 or 127 on the sample."""
+    """Fraction of quantized v6 L1 units clipped to 0 or 127 on the sample.
+
+    Uses the same split/legacy branch as :func:`integer_scores_v6`.
+    """
     pairs = own * opp
     diff = own - opp
-    l1 = (pairs @ params["l1_weights"].T + diff @ params["l1_diff_weights"].T
-          + params["l1_bias"])
-    l1 >>= params["l1_shift"]
-    l1 = np.clip(l1, 0, 127)
+    pair_sum = pairs @ params["l1_weights"].T
+    diff_sum = diff @ params["l1_diff_weights"].T
+    diff_shift = params.get("l1_diff_shift") or 0
+    if diff_shift:
+        pre = ((pair_sum >> params["l1_shift"])
+               + (diff_sum >> diff_shift) + params["l1_bias"])
+    else:
+        pre = (pair_sum + diff_sum + params["l1_bias"]) >> params["l1_shift"]
+    l1 = np.clip(pre, 0, 127)
     return float(np.mean((l1 == 0) | (l1 == 127)))
 
 
@@ -716,9 +757,10 @@ def saturation_fractions_v5(params) -> tuple[float, float, float]:
 def saturation_fractions_v6(params) -> tuple[float, float, float, float, float]:
     """Clipping saturation of every v6 layer plus the pair-weight zero fraction.
 
-    The shared ``l1_shift`` rounds the pair weights through an extra /127 the
-    diff weights skip, so a large ``pair_zero`` fraction means the shift is
-    crushing the pair channel even when nothing clips at 127.
+    The pair weights round through an extra /127 the diff weights skip, so a
+    large ``pair_zero`` fraction means the pair shift is still crushing the
+    pair channel even when nothing clips at 127; the separate ``l1_diff_shift``
+    protects the diff channel from the same step.
     """
     w1 = float(np.mean(np.abs(params["feature_weights"]) >= W1_LIMIT))
     l1_pairs = float(np.mean(np.abs(params["l1_weights"]) >= L1_LIMIT))
@@ -836,12 +878,18 @@ def nnue_payload_v6(params, hidden_units: int, l1_units: int) -> bytes:
 
 
 def nnue_container_v6(payload, hidden_units: int, l1_units: int, hidden_shift: int,
-                      output_shift: int, l1_shift: int):
-    """Version 6 uses the unchanged v5 header with version = 6."""
+                      output_shift: int, l1_shift: int, l1_diff_shift: int):
+    """Version 6 uses the v5 header with version = 6.
+
+    The byte v5 reserves (header offset 31, after ``l1_shift``) carries
+    ``l1_diff_shift``: the engine takes the legacy combined path when it is 0
+    and the split pair/diff path when it is nonzero, so the trainer always
+    writes ``sd >= 8`` there.
+    """
     payload_hash = hashlib.sha256(payload).hexdigest()
     header = struct.pack("<8sIIIIIBBBBHHQ", MAGIC, V6_VERSION, V5_INPUT_UNITS,
                          hidden_units, OUTPUT_BUCKETS, l1_units, hidden_shift,
-                         output_shift, l1_shift, 0, len(QUANTIZATION),
+                         output_shift, l1_shift, l1_diff_shift, len(QUANTIZATION),
                          len(V5_FEATURE_SET), len(payload))
     container = header + bytes.fromhex(payload_hash) + QUANTIZATION + V5_FEATURE_SET + payload
     return container, payload_hash
@@ -1167,6 +1215,7 @@ def main_v6(args, rng) -> int:
     best_epoch = 0
     best_val_mae = float("inf")
     epochs_without_improvement = 0
+    epochs_run = 0
     for epoch in range(1, epochs + 1):
         model.train()
         epoch_started = time.perf_counter()
@@ -1190,6 +1239,7 @@ def main_v6(args, rng) -> int:
             loss_total += float(loss.detach())
             seen += int(own_flat.shape[0])
         scheduler.step()
+        epochs_run = epoch
         train_loss = loss_total / max(1, seen)
         val_prediction = validate_v5(model, own_indices, own_offsets, opp_indices,
                                      opp_offsets, buckets, targets, val_order,
@@ -1237,51 +1287,65 @@ def main_v6(args, rng) -> int:
     # ~2x and shift 8 clips the hidden CReLU at 127.
     if list(args.hidden_shifts) != [7]:
         log("hidden shift pinned to 7 for v6 (only self-consistent value)")
+    # The pair and diff channels have independent integer scales, so the export
+    # searches their shifts separately: the pair weights need sp >= 8 to stop
+    # rounding to zero in bulk, while the diff weights are already 127x finer
+    # and need only sd = 8..10.  k3 keeps the historical 4..8 range.
     for hidden_shift in [7]:
-        for l1_shift in args.l1_shifts:
-            params = quantize_v6(model, hidden_shift, l1_shift)
-            own_hidden, opp_hidden = hidden_activations_dual(
-                params, own_indices, own_offsets, opp_indices, opp_offsets, tune_order,
-                hidden_units)
-            l1_sat = l1_saturation_v6(params, own_hidden, opp_hidden)
-            for output_shift in args.output_shifts:
-                params["output_weights"] = np.clip(
-                    np.rint(output_weight * TARGET_SCALE * float(2**output_shift) / 127.0),
-                    -L1_LIMIT, L1_LIMIT).astype(np.int64)
-                params["output_bias"] = np.rint(
-                    output_bias * TARGET_SCALE * float(2**output_shift)).astype(np.int64)
-                params["output_shift"] = output_shift
-                candidate = integer_scores_v6(params, own_hidden, opp_hidden,
-                                              buckets[tune_order])
-                mae = float(np.mean(np.abs(candidate - scores[tune_order])))
-                # An output layer that clips silently destroys the evaluator, so
-                # any candidate without output saturation beats one with it.
-                # The diff head saturates independently of the pair head, so both
-                # hidden fractions count; small amounts (<= 5%) are tolerated.
-                w1_sat, l1_pair_sat, l1_diff_sat, w2_sat, pair_zero_sat = (
-                    saturation_fractions_v6(params))
-                output_saturated = w2_sat > 0.0
-                hidden_saturated = max(w1_sat, l1_pair_sat, l1_diff_sat) > 0.05
-                # A shared l1_shift that rounds most pair weights to zero is as
-                # harmful as clipping, so treat pair_zero > 10% as unhealthy.
-                pair_zero_high = pair_zero_sat > 0.10
-                log(f"quantization v6 s1={hidden_shift} s_l1={l1_shift} k3={output_shift} "
-                    f"val_mae_cp {mae:.2f} saturation "
-                    f"{w1_sat:.4f},{l1_pair_sat:.4f},{l1_diff_sat:.4f},{w2_sat:.4f} "
-                    f"pair_zero {pair_zero_sat:.4f} l1_sat {l1_sat:.4f}")
-                if best is None or (
-                        (output_saturated, hidden_saturated, pair_zero_high, mae)
-                        < (best_output_saturated, best_hidden_saturated,
-                           best_pair_zero_high, best[0])):
-                    best = (mae, hidden_shift, l1_shift, output_shift, dict(params))
-                    best_output_saturated = output_saturated
-                    best_hidden_saturated = hidden_saturated
-                    best_pair_zero_high = pair_zero_high
+        # Hidden activations depend only on the hidden shift, so quantize the
+        # shared feature layer once instead of per (sp, sd) candidate.
+        feature_params = quantize_v6(model, hidden_shift, 8, 8)
+        own_hidden, opp_hidden = hidden_activations_dual(
+            feature_params, own_indices, own_offsets, opp_indices, opp_offsets,
+            tune_order, hidden_units)
+        for l1_shift in range(8, 15):
+            for l1_diff_shift in range(8, 11):
+                params = quantize_v6(model, hidden_shift, l1_shift, l1_diff_shift)
+                l1_sat = l1_saturation_v6(params, own_hidden, opp_hidden)
+                for output_shift in range(4, 9):
+                    params["output_weights"] = np.clip(
+                        np.rint(output_weight * TARGET_SCALE * float(2**output_shift) / 127.0),
+                        -L1_LIMIT, L1_LIMIT).astype(np.int64)
+                    params["output_bias"] = np.rint(
+                        output_bias * TARGET_SCALE * float(2**output_shift)).astype(np.int64)
+                    params["output_shift"] = output_shift
+                    candidate = integer_scores_v6(params, own_hidden, opp_hidden,
+                                                  buckets[tune_order])
+                    mae = float(np.mean(np.abs(candidate - scores[tune_order])))
+                    # An output layer that clips silently destroys the
+                    # evaluator, so any candidate without output saturation
+                    # beats one with it.  The pair and diff heads saturate
+                    # independently, so all three hidden fractions count; small
+                    # amounts (<= 5%) are tolerated instead of discarding a
+                    # good candidate.
+                    w1_sat, l1_pair_sat, l1_diff_sat, w2_sat, pair_zero_sat = (
+                        saturation_fractions_v6(params))
+                    output_saturated = w2_sat > 0.0
+                    hidden_saturated = max(w1_sat, l1_pair_sat, l1_diff_sat) > 0.05
+                    # A pair shift that still rounds most pair weights to zero
+                    # is as harmful as clipping, so treat pair_zero > 10% as
+                    # unhealthy.
+                    pair_zero_high = pair_zero_sat > 0.10
+                    log(f"quantization v6 s1={hidden_shift} sp={l1_shift} "
+                        f"sd={l1_diff_shift} k3={output_shift} val_mae_cp {mae:.2f} "
+                        f"saturation {w1_sat:.4f},{l1_pair_sat:.4f},"
+                        f"{l1_diff_sat:.4f},{w2_sat:.4f} pair_zero "
+                        f"{pair_zero_sat:.4f} l1_sat {l1_sat:.4f}")
+                    if best is None or (
+                            (output_saturated, hidden_saturated, pair_zero_high, mae)
+                            < (best_output_saturated, best_hidden_saturated,
+                               best_pair_zero_high, best[0])):
+                        best = (mae, hidden_shift, l1_shift, l1_diff_shift,
+                                output_shift, dict(params))
+                        best_output_saturated = output_saturated
+                        best_hidden_saturated = hidden_saturated
+                        best_pair_zero_high = pair_zero_high
     if best is None:
         raise TrainerError("no quantization candidate was evaluated")
-    best_mae, best_hidden_shift, best_l1_shift, best_output_shift, best_params = best
-    log(f"selected v6 s1={best_hidden_shift} s_l1={best_l1_shift} k3={best_output_shift} "
-        f"val_mae_cp {best_mae:.2f}")
+    (best_mae, best_hidden_shift, best_l1_shift, best_l1_diff_shift,
+     best_output_shift, best_params) = best
+    log(f"selected v6 s1={best_hidden_shift} sp={best_l1_shift} "
+        f"sd={best_l1_diff_shift} k3={best_output_shift} val_mae_cp {best_mae:.2f}")
 
     float_prediction = validate_v5(model, own_indices, own_offsets, opp_indices, opp_offsets,
                                    buckets, targets, val_order, args.batch_size, pad_length)
@@ -1291,7 +1355,7 @@ def main_v6(args, rng) -> int:
     payload = nnue_payload_v6(best_params, hidden_units, l1_units)
     container, payload_hash = nnue_container_v6(payload, hidden_units, l1_units,
                                                 best_hidden_shift, best_output_shift,
-                                                best_l1_shift)
+                                                best_l1_shift, best_l1_diff_shift)
     net_out = args.net_out
     meta_out = args.meta_out
     if pathlib.Path(net_out).name in ("koi-v4.nnue", "koi-v5.nnue"):
@@ -1320,8 +1384,11 @@ def main_v6(args, rng) -> int:
         "activation": "crelu-pair-diff-l1",
         "hidden_shift": best_hidden_shift,
         "l1_shift": best_l1_shift,
+        "l1_diff_shift": best_l1_diff_shift,
         "output_shift": best_output_shift,
         "epochs": max(1, args.epochs),
+        "best_epoch": best_epoch,
+        "epochs_run": epochs_run,
         "batch_size": args.batch_size,
         "learning_rate": args.learning_rate,
         "seed": args.seed,
