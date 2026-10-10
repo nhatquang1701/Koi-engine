@@ -519,40 +519,80 @@ bool has_pawn_on_file(const PositionFeatures& features, int color, int file) noe
 // the pawn, support checks include the pawn's own rank.
 constexpr std::uint64_t kFileMaskBits = 0x0101010101010101ULL;
 
-std::uint64_t file_mask(int file) noexcept {
-    return kFileMaskBits << file;
-}
+// The mask tables are built once at compile time from the same shift/OR/span
+// expressions the old per-call helpers used, so every pawn term stays
+// bit-identical while the masks stop being rebuilt for each pawn of each
+// evaluate call.
+constexpr std::array<std::uint64_t, 8> kFileMasks = [] {
+    std::array<std::uint64_t, 8> masks{};
+    for (int file = 0; file < 8; ++file) {
+        masks[static_cast<std::size_t>(file)] = kFileMaskBits << file;
+    }
+    return masks;
+}();
 
-std::uint64_t adjacent_files_mask(int file) noexcept {
-    std::uint64_t mask = 0;
-    if (file > 0) {
-        mask |= file_mask(file - 1);
+constexpr std::array<std::uint64_t, 8> kAdjacentFileMasks = [] {
+    std::array<std::uint64_t, 8> masks{};
+    for (int file = 0; file < 8; ++file) {
+        std::uint64_t mask = 0;
+        if (file > 0) {
+            mask |= kFileMasks[static_cast<std::size_t>(file - 1)];
+        }
+        if (file < 7) {
+            mask |= kFileMasks[static_cast<std::size_t>(file + 1)];
+        }
+        masks[static_cast<std::size_t>(file)] = mask;
     }
-    if (file < 7) {
-        mask |= file_mask(file + 1);
-    }
-    return mask;
-}
+    return masks;
+}();
 
-std::uint64_t ranks_mask(int first, int last) noexcept {
-    if (first > last) {
-        return 0;
+// Bounded rank spans for the three shapes the pawn terms use:
+// kRanksFrom[f] is ranks_mask(f, 7) (kRanksFrom[8] is the old first > last
+// empty case), kRanksUpTo[j] is ranks_mask(0, j - 1) (kRanksUpTo[0] is the old
+// empty case), and kRanksAround[r] is ranks_mask(max(0, r - 1), min(7, r + 1)).
+constexpr std::array<std::uint64_t, 9> kRanksFrom = [] {
+    std::array<std::uint64_t, 9> masks{};
+    for (int first = 0; first < 8; ++first) {
+        const std::uint64_t low = first == 0 ? 0 : ((std::uint64_t{1} << (first * 8)) - 1);
+        masks[static_cast<std::size_t>(first)] = ~std::uint64_t{0} ^ low;
     }
-    const std::uint64_t low = first == 0 ? 0 : ((std::uint64_t{1} << (first * 8)) - 1);
-    const std::uint64_t high = last == 7
-        ? ~std::uint64_t{0}
-        : ((std::uint64_t{1} << ((last + 1) * 8)) - 1);
-    return high ^ low;
-}
+    masks[8] = 0;
+    return masks;
+}();
+
+constexpr std::array<std::uint64_t, 8> kRanksUpTo = [] {
+    std::array<std::uint64_t, 8> masks{};
+    for (int last = 0; last < 7; ++last) {
+        masks[static_cast<std::size_t>(last + 1)] = (std::uint64_t{1} << ((last + 1) * 8)) - 1;
+    }
+    return masks;
+}();
+
+constexpr std::array<std::uint64_t, 8> kRanksAround = [] {
+    std::array<std::uint64_t, 8> masks{};
+    for (int rank = 0; rank < 8; ++rank) {
+        const int first = std::max(0, rank - 1);
+        const int last = std::min(7, rank + 1);
+        const std::uint64_t low = first == 0 ? 0 : ((std::uint64_t{1} << (first * 8)) - 1);
+        const std::uint64_t high = last == 7
+            ? ~std::uint64_t{0}
+            : ((std::uint64_t{1} << ((last + 1) * 8)) - 1);
+        masks[static_cast<std::size_t>(rank)] = high ^ low;
+    }
+    return masks;
+}();
 
 // No enemy pawn on the three files around `file` at a rank strictly ahead of
 // `rank` in `direction`.
 bool pawn_is_passed_bitboard(const PositionFeatures& features, int enemy, int file, int rank,
                              int direction) noexcept {
-    const int first_ahead = direction > 0 ? rank + 1 : 0;
-    const int last_ahead = direction > 0 ? 7 : rank - 1;
-    return (features.pawns[static_cast<std::size_t>(enemy)] & adjacent_files_mask(file) &
-            ranks_mask(first_ahead, last_ahead)) == 0;
+    // Same first/last span the old ranks_mask call built from `rank` and
+    // `direction`; the tables keep the empty rank-0/rank-7 cases.
+    const std::uint64_t ahead = direction > 0
+        ? kRanksFrom[static_cast<std::size_t>(rank + 1)]
+        : kRanksUpTo[static_cast<std::size_t>(rank)];
+    return (features.pawns[static_cast<std::size_t>(enemy)] &
+            kAdjacentFileMasks[static_cast<std::size_t>(file)] & ahead) == 0;
 }
 
 template <typename Fn>
@@ -584,7 +624,7 @@ int pawn_structure_for(const PositionFeatures& features, Color color) noexcept {
     if (features.occupied != 0) {
         for (int file = 0; file < 8; ++file) {
             own_file_counts[static_cast<std::size_t>(file)] =
-                std::popcount(features.pawns[own] & file_mask(file));
+                std::popcount(features.pawns[own] & kFileMasks[static_cast<std::size_t>(file)]);
         }
     } else {
         for (std::uint8_t square = 0; square < 64; ++square) {
@@ -653,8 +693,11 @@ int pawn_structure_for(const PositionFeatures& features, Color color) noexcept {
 
         bool connected = false;
         if (features.occupied != 0) {
-            connected = (features.pawns[own] & adjacent_files_mask(file) &
-                         ranks_mask(std::max(0, rank - 1), std::min(7, rank + 1))) != 0;
+            // Same masks as before: own pawns on a neighboring file within one
+            // rank of this pawn.
+            connected = (features.pawns[own] &
+                         kAdjacentFileMasks[static_cast<std::size_t>(file)] &
+                         kRanksAround[static_cast<std::size_t>(rank)]) != 0;
         } else {
             for (int adjacent_file : {file - 1, file + 1}) {
                 if (adjacent_file < 0 || adjacent_file >= 8) {
@@ -681,10 +724,13 @@ int pawn_structure_for(const PositionFeatures& features, Color color) noexcept {
 
             bool has_advanced_support = false;
             if (features.occupied != 0) {
+                // Same spans the old ranks_mask calls built; kRanksUpTo takes
+                // the exclusive end rank, hence forward_rank + 1.
                 const std::uint64_t support_ranks = direction > 0
-                    ? ranks_mask(forward_rank, 7)
-                    : ranks_mask(0, forward_rank);
-                has_advanced_support = (features.pawns[own] & adjacent_files_mask(file) &
+                    ? kRanksFrom[static_cast<std::size_t>(forward_rank)]
+                    : kRanksUpTo[static_cast<std::size_t>(forward_rank + 1)];
+                has_advanced_support = (features.pawns[own] &
+                                        kAdjacentFileMasks[static_cast<std::size_t>(file)] &
                                         support_ranks) != 0;
             } else {
                 for (const int adjacent_file : {file - 1, file + 1}) {

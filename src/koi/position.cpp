@@ -319,9 +319,12 @@ void remove_rule_keys(NativeState& state, const ZobristKeys& keys) noexcept {
     }
 }
 
-void add_rule_keys(NativeState& state, const ZobristKeys& keys) noexcept {
+// `en_passant_capture_legal` carries apply_unchecked()'s probe result for
+// this same rule state; re-probing here returned the identical value.
+void add_rule_keys(
+    NativeState& state, const ZobristKeys& keys, bool en_passant_capture_legal) noexcept {
     state.key ^= keys.castling[state.castling & kAllCastling];
-    if (has_legal_en_passant_capture_mutable(state)) {
+    if (en_passant_capture_legal) {
         state.key ^= keys.en_passant[state.en_passant.index() & 7];
     }
     if (state.side == Color::black) {
@@ -1472,7 +1475,16 @@ private:
     template <typename MoveContainer>
     void push(MoveContainer& moves, int from, int to) const {
         if (!valid_square(to)) return;
-        const Piece target = state.board[static_cast<std::size_t>(to)];
+        push(moves, from, to, state.board[static_cast<std::size_t>(to)]);
+    }
+
+    // Bit-identity: `target` is the value the three-argument overload reloads
+    // from `state.board[to]`; a caller that already loaded that same square
+    // passes it here, so the checks, the promotion decision, and the emission
+    // order below are unchanged.
+    template <typename MoveContainer>
+    void push(MoveContainer& moves, int from, int to, Piece target) const {
+        if (!valid_square(to)) return;
         if (!target.empty() && target.color == state.side) return;
         if (target.type == PieceType::king) return;
         const Square source = Square::from_index(static_cast<std::uint8_t>(from));
@@ -1504,19 +1516,27 @@ private:
             if (piece.type == PieceType::pawn) {
                 const int direction = side == Color::white ? 1 : -1;
                 const int one = from + direction * 8;
-                if (valid_square(one) && state.board[static_cast<std::size_t>(one)].empty()) {
-                    if constexpr (!TacticalOnly) {
-                        push(moves, from, one);
-                        const int two = from + direction * 16;
-                        const int start_rank = side == Color::white ? 1 : 6;
-                        if (rank == start_rank && state.board[static_cast<std::size_t>(two)].empty()) {
-                            moves.emplace_back(Square::from_index(static_cast<std::uint8_t>(from)),
-                                               Square::from_index(static_cast<std::uint8_t>(two)));
-                        }
-                    } else {
-                        const int promotion_rank = side == Color::white ? 7 : 0;
-                        if (rank_of(one) == promotion_rank) {
-                            push(moves, from, one);
+                if (valid_square(one)) {
+                    // Bit-identity: the quiet target is loaded once here and
+                    // the same Piece value is threaded into push(); the board
+                    // cannot change between this load and either emission.
+                    const Piece one_target = state.board[static_cast<std::size_t>(one)];
+                    if (one_target.empty()) {
+                        if constexpr (!TacticalOnly) {
+                            push(moves, from, one, one_target);
+                            const int two = from + direction * 16;
+                            const int start_rank = side == Color::white ? 1 : 6;
+                            if (rank == start_rank &&
+                                state.board[static_cast<std::size_t>(two)].empty()) {
+                                moves.emplace_back(
+                                    Square::from_index(static_cast<std::uint8_t>(from)),
+                                    Square::from_index(static_cast<std::uint8_t>(two)));
+                            }
+                        } else {
+                            const int promotion_rank = side == Color::white ? 7 : 0;
+                            if (rank_of(one) == promotion_rank) {
+                                push(moves, from, one, one_target);
+                            }
                         }
                     }
                 }
@@ -1526,9 +1546,12 @@ private:
                     if (target_file < 0 || target_file >= 8 || target_rank < 0 || target_rank >= 8) continue;
                     const int to = target_rank * 8 + target_file;
                     const Piece target = state.board[static_cast<std::size_t>(to)];
+                    // Bit-identity: `target` is the Piece the three-argument
+                    // push() reloaded; the board is not mutated before the
+                    // call, including the empty en-passant target square.
                     if ((!target.empty() && target.color != side && target.type != PieceType::king) ||
                         (state.en_passant.index() == to && target.empty())) {
-                        push(moves, from, to);
+                        push(moves, from, to, target);
                     }
                 }
                 continue;
@@ -1546,14 +1569,17 @@ private:
                     const int target_rank = rank + step[1];
                     if (target_file >= 0 && target_file < 8 && target_rank >= 0 && target_rank < 8) {
                         const int to = target_rank * 8 + target_file;
+                        // Bit-identity: the target square is loaded once and
+                        // the same Piece value is threaded into push() in both
+                        // generator modes; the checks and order are unchanged.
+                        const Piece target = state.board[static_cast<std::size_t>(to)];
                         if constexpr (TacticalOnly) {
-                            const Piece target = state.board[static_cast<std::size_t>(to)];
                             if (target.empty() || target.color == side ||
                                 target.type == PieceType::king) {
                                 continue;
                             }
                         }
-                        push(moves, from, to);
+                        push(moves, from, to, target);
                     }
                 }
                 if constexpr (!TacticalOnly) {
@@ -1698,12 +1724,19 @@ private:
             state.fullmove = static_cast<std::uint16_t>(std::min<unsigned>(32768, state.fullmove + 1));
         }
         state.side = opposite(state.side);
-        if (state.en_passant.index() < Square::kInvalid &&
-            !has_legal_en_passant_capture_mutable(state)) {
+        // Bit-identity: add_rule_keys() used to re-run this probe on the same
+        // rule state; the only field rewritten in between is `occupied`,
+        // which the probe rebuilds from the occupancy bitboards before its
+        // first read.  On a failed probe the cleared en-passant square makes
+        // the former re-probe return false too, so the result matches it.
+        const bool en_passant_capture_legal =
+            state.en_passant.index() < Square::kInvalid &&
+            has_legal_en_passant_capture_mutable(state);
+        if (!en_passant_capture_legal) {
             state.en_passant = {};
         }
         state.occupied = state.occupancy[0] | state.occupancy[1];
-        add_rule_keys(state, keys);
+        add_rule_keys(state, keys, en_passant_capture_legal);
         const bool irreversible = pawn_move || capture || state.castling != previous_castling;
         if (!state.repetition_history_suppressed) {
             state.repetition_history_fingerprint = irreversible ? 0 :

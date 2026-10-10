@@ -282,7 +282,11 @@ inline int static_exchange_gain_from_features(const ExchangeContext& context,
     }
 
     constexpr std::size_t kMaximumExchangeDepth = 32;
-    std::array<int, kMaximumExchangeDepth> gains{};
+    // Deliberately not zero-initialized: every read below touches only entries
+    // 0..depth, and each entry is written before its first read (gains[0]
+    // just below, gains[depth] right after ++depth), so clearing 32 slots per
+    // capture was dead work.
+    std::array<int, kMaximumExchangeDepth> gains;
     const Piece captured_piece = board[static_cast<std::size_t>(captured_square)];
     gains[0] = exchange_piece_value(captured_piece.type) + promotion_exchange_gain(move.promotion());
 

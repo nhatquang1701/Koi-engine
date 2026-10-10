@@ -957,9 +957,16 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
                 --depth;
             }
         }
+        // game_phase() is a pure function of the maintained piece bitboards.
+        // Nothing between this point and the move loop can change piece
+        // counts: the null probe restores the position, and the move loop
+        // restores it between candidates (make/unmake), with captures and
+        // promotions never observed by the quiet-only gates below.  Compute
+        // it once for all three consumers instead of once per use.
+        const int node_game_phase = state.game_phase();
         const bool phase_rich_quiet_position = !claimable_draw && !checked && depth == 1 &&
             !tactical_position &&
-            state.game_phase() >= 8;
+            node_game_phase >= 8;
         const PositionFeatures* quiet_forcing_parent_features = nullptr;
         const PositionFeatures* root_direct_forcing_features = nullptr;
         if (!checked && depth == 1 && ply == 1) {
@@ -1032,7 +1039,7 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
             depth, alpha, beta, static_eval, checked,
             null_move_allowed,
             improving, pawn_endgame);
-        if (null_move_decision.eligible && null_move_is_safe(state, state.game_phase())) {
+        if (null_move_decision.eligible && null_move_is_safe(state, node_game_phase)) {
             if (make_null_observed(state, ply)) {
                 PrincipalVariation null_pv;
                 const int null_depth = std::max(
@@ -1402,28 +1409,38 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
             std::abs(tt_entry->score) < kMateThreshold;
         std::optional<PositionFeatures> lmr_parent_features;
         const Color moving_side = history_side(side_to_move, false);
-        const int quiet_skip_threshold =
-            (3 + depth * depth) / (2 - static_cast<int>(improving));
+        // The denominator is 1 when `improving` and 2 otherwise, and the
+        // numerator 3 + depth^2 is always positive, so the integer division is
+        // replaced by the equivalent branch/shift: x / 1 == x and x / 2 ==
+        // x >> 1 for non-negative x.
+        const int quiet_skip_numerator = 3 + depth * depth;
+        const int quiet_skip_threshold = improving ? quiet_skip_numerator :
+            (quiet_skip_numerator >> 1);
         const Move previous_history_move = history.count > 0 ?
             history.continuation_moves[0] : Move::no_move();
         const int full_child_depth = depth - 1;
         const bool shallow_checked_root = ply == 1 && depth <= 3 &&
             stack.frame(0).in_check;
-        // game_phase() is a pure function of the maintained piece bitboards.
-        // Quiet candidates cannot change piece counts within this node (no
+        // The depth-three reduction gate reads the node's hoisted game phase;
+        // quiet candidates cannot change piece counts within this node (no
         // captures, no promotions; castling and king moves preserve counts;
         // en passant is a capture and never quiet), and the position is
-        // restored between candidates (make/unmake), so every candidate
-        // observes the same phase.  Compute it once for the depth-three
-        // reduction gate instead of once per quiet candidate.
-        const bool phase_rich_depth_three = depth == 3 && state.game_phase() >= 8;
+        // restored between candidates (make/unmake), so every quiet candidate
+        // observes the same phase.
+        const bool phase_rich_depth_three = depth == 3 && node_game_phase >= 8;
         while (const auto candidate = picker.next()) {
             const MoveMetadata& metadata = *candidate;
             if (interrupted()) {
                 return 0;
             }
             const Move move = metadata.move;
-            const bool is_killer_move = ordering.is_killer(move, ply);
+            // The killer probe is consumed only by gates that cannot observe
+            // it below depth 3: negative_continuation_history requires
+            // depth >= 4, and late_move_gate (reached through lmr_gate and
+            // dynamic_late_move) requires depth >= 3 for its candidate to
+            // exist.  Table reads are pure, so skipping the probe below depth
+            // 3 changes no decision.
+            const bool is_killer_move = depth >= 3 && ordering.is_killer(move, ply);
             const int capture_history = ordering.capture_history_score(metadata);
             // Once a cut node has already examined enough candidates, keep
             // Stockfish's staged-picker behavior: tactical moves and the
@@ -1448,7 +1465,14 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
             const int continuation_score = depth < 3 ? 0 :
                 ordering.continuation_history_score(metadata, history);
             const bool is_tt_move = tt_move.has_value() && move == *tt_move;
-            const bool is_proven_counter_move = !previous_history_move.is_no_move() &&
+            // The proven-counter-move probe has a single consumer,
+            // negative_continuation_history, whose own
+            // depth >= kNegativeContinuationHistoryMinimumDepth guard makes
+            // the flag unobservable below that horizon.  Table reads are pure,
+            // so skipping the probe there changes no decision.
+            const bool is_proven_counter_move =
+                depth >= kNegativeContinuationHistoryMinimumDepth &&
+                !previous_history_move.is_no_move() &&
                 ordering.is_proven_counter_move(
                     moving_side, previous_history_move, move);
             const bool root_pawn_move = ply == 0 && metadata.moving_piece == PieceType::pawn;
@@ -1615,13 +1639,31 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
                     // supplies the safety signal used by LMR.
                     reducible_quiet = !child_in_check;
                 } else if (lmr_parent_features.has_value()) {
+                    // The diagnostic count is charged exactly as the
+                    // full-snapshot path charged it, keeping the
+                    // position_feature_extractions < nodes contract and the
+                    // counter's previous shape; the snapshot itself is no
+                    // longer built here.
                     ++stats.position_feature_extractions;
-                    const PositionFeatures after_quiet_features = state.position_features();
-                    const std::size_t enemy = lmr_parent_features->side_to_move == Color::white ? 1U : 0U;
-                    king_zone_pressure = after_quiet_features.king_zone_attacks[enemy] >
+                    // Compact after-move view: only the fields the forcing
+                    // probe and the king-zone comparison read are rebuilt,
+                    // directly from the native bitboards.  It is bit-identical
+                    // to a full snapshot of `state` (same attack tables, same
+                    // post-move occupancy refreshed by apply_unchecked at
+                    // position.cpp:1705; enemy_king_zone_attacks equals
+                    // popcount(attacks_after[own] & king_zone_mask(enemy
+                    // king))).  The parent snapshot stays the source of the
+                    // before/after comparison.
+                    QuietForcingAfterView after_forced_view;
+                    build_quiet_forcing_after_view(
+                        state, lmr_parent_features->side_to_move, after_forced_view);
+                    const std::size_t enemy =
+                        lmr_parent_features->side_to_move == Color::white ? 1U : 0U;
+                    king_zone_pressure = after_forced_view.enemy_king_zone_attacks >
                         lmr_parent_features->king_zone_attacks[enemy];
                     reducible_quiet = !child_in_check &&
-                        !quiet_move_is_forcing(*lmr_parent_features, after_quiet_features, metadata);
+                        !quiet_move_is_forcing(
+                            *lmr_parent_features, state, after_forced_view, metadata);
                 }
             }
             if (king_zone_pressure) {

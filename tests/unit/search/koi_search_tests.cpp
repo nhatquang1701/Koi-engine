@@ -3219,6 +3219,76 @@ void test_lmr_excludes_quiet_moves_that_increase_enemy_king_zone_pressure() {
                 target->uci() + ", depth=" + std::to_string(result.completed_depth) + ")");
 }
 
+void test_compact_forcing_probe_matches_full_feature_decision() {
+    // Every quiet legal move of every fixture is probed twice: once through
+    // the compact native after-move view and once through a full
+    // PositionFeatures snapshot of the same child.  The decisions must agree
+    // exactly, and the compact view must reproduce every snapshot field the
+    // probe consumes.  The set covers opening, king-ring, piece-attack,
+    // passed-pawn, central-break, castling, and both sides to move.
+    constexpr std::array<std::string_view, 8> fixtures{
+        "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+        "k7/2R1Q3/8/8/8/2n5/8/6K1 w - - 0 1",
+        "4k3/8/7b/8/8/8/8/R5K1 w - - 0 1",
+        "4k3/8/8/3p4/8/8/8/R5K1 w - - 0 1",
+        "3qk2r/8/8/8/8/1P6/B7/3QK2R w - - 0 1",
+        "8/5p2/4p3/3P4/2P5/1P6/8/K1k5 w - - 0 1",
+        "r3k2r/pppppppp/8/8/3N4/8/PPPPPPPP/R3K2R w KQkq - 0 1",
+        "r3k2r/pppppppp/8/8/3n4/8/PPPPPPPP/R3K2R b KQkq - 0 1",
+    };
+
+    std::size_t quiet_moves_checked = 0;
+    std::size_t forcing_moves_seen = 0;
+    for (const std::string_view fen : fixtures) {
+        const koi::GameState parent = require_state(fen);
+        const koi::PositionFeatures before = parent.position_features();
+        const std::vector<koi::MoveMetadata> moves = parent.legal_moves_with_metadata();
+        require(!moves.empty(), "the compact forcing probe fixture must have legal moves");
+        for (const koi::MoveMetadata& metadata : moves) {
+            if (metadata.is_capture() || metadata.gives_check ||
+                metadata.move.promotion() != koi::Promotion::none) {
+                continue;
+            }
+            koi::GameState child = parent;
+            require(child.make_move(metadata.move),
+                    "the compact forcing probe fixture move must be applicable");
+            const koi::PositionFeatures after = child.position_features();
+            koi::detail::QuietForcingAfterView view;
+            koi::detail::build_quiet_forcing_after_view(
+                child, parent.side_to_move(), view);
+            const std::size_t own =
+                parent.side_to_move() == koi::Color::white ? 0U : 1U;
+            const std::size_t enemy = 1U - own;
+            const std::string move_name = metadata.move.uci();
+            require(view.occupied != 0 && view.occupied == after.occupied,
+                    "the compact view must reproduce child occupancy for " + move_name);
+            require(view.enemy_pieces == after.colors[enemy],
+                    "the compact view must reproduce enemy occupancy for " + move_name);
+            require(view.enemy_pawns == after.pawns[enemy],
+                    "the compact view must reproduce the enemy pawns for " + move_name);
+            require(view.own_attacked_squares == after.attacked_squares[own],
+                    "the compact view must reproduce the mover attack union for " + move_name);
+            require(view.enemy_king_zone_attacks == after.king_zone_attacks[enemy],
+                    "the compact view must reproduce the enemy king-zone count for " + move_name);
+            const bool compact =
+                koi::detail::quiet_move_is_forcing(before, child, view, metadata);
+            const bool full =
+                koi::detail::quiet_move_is_forcing(before, after, metadata);
+            require(compact == full,
+                    "the compact forcing probe must match the full-features decision for " +
+                        move_name);
+            ++quiet_moves_checked;
+            if (full) {
+                ++forcing_moves_seen;
+            }
+        }
+    }
+    require(quiet_moves_checked > 0,
+            "the compact forcing probe parity test must exercise quiet moves");
+    require(forcing_moves_seen > 0,
+            "the compact forcing probe parity test must exercise at least one forcing decision");
+}
+
 void test_lmr_excludes_high_history_quiet_moves() {
     const koi::GameState state = koi::GameState::startpos();
     const auto move = koi::Move::parse_uci("b1c3");
@@ -4683,6 +4753,7 @@ int main(int argc, char** argv) {
         {"sparse phase-rich null safety", test_sparse_phase_rich_position_skips_null_pruning},
         {"repetition-sensitive null safety", test_repetition_sensitive_history_disables_null_move_pruning},
         {"king-zone LMR exclusion", test_lmr_excludes_quiet_moves_that_increase_enemy_king_zone_pressure},
+        {"compact forcing probe parity", test_compact_forcing_probe_matches_full_feature_decision},
         {"high-history LMR exclusion", test_lmr_excludes_high_history_quiet_moves},
         {"opening central break", test_opening_central_break_survives_root_search_reduction},
         {"shallow null verification off", test_shallow_null_fail_highs_skip_verification},

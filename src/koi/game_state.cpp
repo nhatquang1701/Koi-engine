@@ -1849,11 +1849,14 @@ bool GameState::make_move(const Move& move) noexcept {
 bool GameState::apply_generated_move(const MoveMetadata& metadata,
                                      const bool verify_shadow_legality,
                                      const bool verify_mirror) noexcept {
-    if (metadata.position_key != position_key()) {
+    // Bit-identical: nothing mutates the position between the old position
+    // check and the token check, so a single key read serves both.
+    const std::uint64_t key = position_key();
+    if (metadata.position_key != key) {
         return false;
     }
     if (metadata.validation_token == 0 ||
-        metadata.validation_token != metadata_validation_token(position_key(), metadata)) {
+        metadata.validation_token != metadata_validation_token(key, metadata)) {
         return false;
     }
     if (!impl_->native_position.make_generated_move(metadata.move)) {
@@ -1895,17 +1898,20 @@ bool GameState::make_search_move(const MoveMetadata& metadata) noexcept {
     // one search-local annotation after proving that the supplied token
     // matches the original unannotated move. No other metadata mutation is
     // accepted here.
-    MoveMetadata search_metadata = metadata;
     if ((metadata.is_capture() || metadata.move.promotion() != Promotion::none) &&
         metadata.gives_check) {
+        // Bit-identical: only this branch can rewrite the record, so it keeps
+        // the copy while the unannotated path forwards `metadata` unchanged.
+        MoveMetadata search_metadata = metadata;
         MoveMetadata unannotated = metadata;
         unannotated.gives_check = false;
         const std::uint64_t key = position_key();
         if (metadata.validation_token == metadata_validation_token(key, unannotated)) {
             search_metadata.validation_token = metadata_validation_token(key, search_metadata);
         }
+        return apply_generated_move(search_metadata, false, false);
     }
-    return apply_generated_move(search_metadata, false, false);
+    return apply_generated_move(metadata, false, false);
 }
 
 void GameState::detach_mirror() noexcept {
