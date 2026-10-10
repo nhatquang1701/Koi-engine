@@ -943,7 +943,7 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
         }
         const bool phase_rich_quiet_position = !claimable_draw && !checked && depth == 1 &&
             !tactical_position &&
-            ensure_features().game_phase >= 8;
+            state.game_phase() >= 8;
         const PositionFeatures* quiet_forcing_parent_features = nullptr;
         const PositionFeatures* root_direct_forcing_features = nullptr;
         if (!checked && depth == 1 && ply == 1) {
@@ -1016,7 +1016,7 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
             depth, alpha, beta, static_eval, checked,
             null_move_allowed,
             improving, pawn_endgame);
-        if (null_move_decision.eligible && null_move_is_safe(state, ensure_features())) {
+        if (null_move_decision.eligible && null_move_is_safe(state, state.game_phase())) {
             if (make_null_observed(state, ply)) {
                 PrincipalVariation null_pv;
                 const int null_depth = std::max(
@@ -1416,9 +1416,14 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
                 picker.skip_quiet_moves();
                 selective_pruning = true;
             }
-            const int history_score = metadata.is_capture() ? 0 :
+            // Both history reads feed only gates that require depth >= 3
+            // (late_move_gate's candidate, dynamic_late_move, and
+            // negative_continuation_history at depth >= 4), so below that
+            // horizon the zero placeholders are never observed.
+            const int history_score = (depth < 3 || metadata.is_capture()) ? 0 :
                 ordering.quiet_history_score(moving_side, metadata, history);
-            const int continuation_score = ordering.continuation_history_score(metadata, history);
+            const int continuation_score = depth < 3 ? 0 :
+                ordering.continuation_history_score(metadata, history);
             const bool is_tt_move = tt_move.has_value() && move == *tt_move;
             const bool is_proven_counter_move = !previous_history_move.is_no_move() &&
                 ordering.is_proven_counter_move(
@@ -1460,7 +1465,7 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
             // where the low-phase regression needs it while requiring a full
             // first pass in phase-rich positions.
             const bool phase_rich_shallow_node = lmr_gate.candidate && depth == 3 &&
-                !metadata.is_capture() && ensure_features().game_phase >= 8;
+                !metadata.is_capture() && state.game_phase() >= 8;
             // A checked root receives a one-ply root extension.  At the
             // resulting shallow horizon, serial search can carry history from
             // one evasion into the next while root workers cannot; avoid a

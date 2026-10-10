@@ -1252,8 +1252,15 @@ std::vector<Move> legal_moves() {
         if (state.halfmove < 4) {
             return 1;
         }
+        // A repeated key can only occur within the last `halfmove` plies:
+        // an intervening pawn move, capture, or castling-right change would
+        // have altered the key irreversibly, and the first two reset the
+        // clock.  Clamped clocks (>= 255) keep the unbounded scan.
         std::size_t count = 1;
-        for (std::size_t index = state.history_size; index > 0; --index) {
+        const std::size_t scan = state.halfmove < 255
+            ? std::min<std::size_t>(state.history_size, state.halfmove)
+            : state.history_size;
+        for (std::size_t index = state.history_size; index > state.history_size - scan; --index) {
             const Snapshot& previous = state.history[index - 1];
             if (previous.null_move) {
                 break;
@@ -1268,7 +1275,9 @@ std::vector<Move> legal_moves() {
     [[nodiscard]] bool is_checkmate() const noexcept {
         try {
             auto* mutable_this = const_cast<NativePosition*>(this);
-            return mutable_this->legal_moves().empty() && in_check();
+            // has_legal_move() runs the same pseudo-generation and legality
+            // filter as legal_moves(), with an early exit and no allocation.
+            return in_check() && !mutable_this->has_legal_move();
         } catch (...) {
             return false;
         }

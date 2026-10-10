@@ -1,6 +1,7 @@
 #include "koi/detail/search_context_support.hpp"
 
 #include <algorithm>
+#include <array>
 #include <bit>
 #include <cmath>
 
@@ -329,13 +330,13 @@ bool quiet_move_has_pawn_break_target(const MoveMetadata& metadata) noexcept {
     return (file == 3 || file == 4) && (rank == 3 || rank == 4);
 }
 
-bool null_move_is_safe(const GameState& state, const PositionFeatures& features) noexcept {
+bool null_move_is_safe(const GameState& state, const int phase) noexcept {
     // No repetition re-check: the only caller reaches this function only when
     // SearchPolicy::dynamic_null_move() reported eligible, which requires
     // `null_move_allowed`; that flag already contains
     // `!repetition_sensitive` (search_context.cpp), so the direct
     // state.is_repetition_sensitive() scan could only return false here.
-    if (features.game_phase < 8 ||
+    if (phase < 8 ||
         !state.has_non_pawn_material(state.side_to_move()) ||
         !state.has_non_pawn_material(opposite(state.side_to_move())) ||
         state.halfmove_clock() >= kNullMoveRuleSafetyHalfmoves) {
@@ -368,7 +369,8 @@ bool narrow_deep_quiet_check_candidate(GameState& state, const MoveMetadata& met
     if (!state.make_search_move(metadata)) {
         return false;
     }
-    const bool narrow_evasion_set = state.legal_moves().size() <= 3;
+    std::array<Move, 4> narrow_replies{};
+    const bool narrow_evasion_set = state.legal_moves_into(narrow_replies) <= 3;
     (void)state.unmake_move();
     return narrow_evasion_set;
 }

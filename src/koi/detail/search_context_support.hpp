@@ -25,8 +25,9 @@ namespace koi::detail {
 [[nodiscard]] bool quiet_move_has_pawn_break_target(
     const MoveMetadata& metadata) noexcept;
 
-[[nodiscard]] bool null_move_is_safe(const GameState& state,
-                                     const PositionFeatures& features) noexcept;
+// `phase` is GameState::game_phase(); passing the scalar keeps this gate from
+// forcing a full feature snapshot.
+[[nodiscard]] bool null_move_is_safe(const GameState& state, int phase) noexcept;
 
 [[nodiscard]] bool deep_quiet_check_candidate(const MoveMetadata& metadata) noexcept;
 

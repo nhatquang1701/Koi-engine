@@ -1519,6 +1519,10 @@ std::vector<Move> GameState::legal_moves() const {
     return impl_->native_position.legal_moves();
 }
 
+std::size_t GameState::legal_moves_into(std::span<Move> output) const noexcept {
+    return impl_->native_position.legal_moves_into(output);
+}
+
 PositionConsistencySnapshot GameState::consistency_snapshot() const {
     PositionConsistencySnapshot snapshot;
     snapshot.native_fen = impl_->native_position.fen();
@@ -2014,6 +2018,17 @@ std::uint64_t GameState::piece_bitboard(const PieceType type, const Color color)
 
 std::size_t GameState::piece_count() const noexcept {
     return impl_->native_position.piece_count();
+}
+
+int GameState::game_phase() const noexcept {
+    int phase = 0;
+    for (const Color color : {Color::white, Color::black}) {
+        phase += static_cast<int>(std::popcount(piece_bitboard(PieceType::knight, color)));
+        phase += static_cast<int>(std::popcount(piece_bitboard(PieceType::bishop, color)));
+        phase += 2 * static_cast<int>(std::popcount(piece_bitboard(PieceType::rook, color)));
+        phase += 4 * static_cast<int>(std::popcount(piece_bitboard(PieceType::queen, color)));
+    }
+    return std::min(phase, 24);
 }
 
 std::uint64_t GameState::polyglot_key() const noexcept {

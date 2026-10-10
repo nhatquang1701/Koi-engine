@@ -179,8 +179,8 @@ private:
     std::array<std::uint16_t, kStageRankCount> stage_end_{};
     std::bitset<kStageRankCount> stage_sorted_{};
     // The good-capture pass is already ordered by the same history/MVV score
-    // used by the bad-capture pass. Keep only source indices for deferred
-    // captures instead of copying the complete Candidate record a second time.
+    // used by the bad-capture pass. Keep only the staged slot of each deferred
+    // capture instead of copying the complete Candidate record a second time.
     std::array<std::uint16_t, kMaximumLegalMoves> deferred_bad_capture_indices_;
     std::size_t candidate_count_ = 0;
     std::size_t candidate_index_ = 0;

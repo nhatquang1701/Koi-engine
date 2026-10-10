@@ -257,6 +257,11 @@ public:
     // Forwards Position::copy_board_to; see that declaration.
     void copy_board_to(std::span<Piece, 64> output) const noexcept;
     [[nodiscard]] std::vector<Move> legal_moves() const;
+    // Allocation-free legal generation for hot callers. The output preserves
+    // the same deterministic ordering as legal_moves(); the returned value is
+    // the total legal move count, and a span smaller than that count receives
+    // only its first entries. Forwards Position::legal_moves_into.
+    [[nodiscard]] std::size_t legal_moves_into(std::span<Move> output) const noexcept;
     [[nodiscard]] PositionConsistencySnapshot consistency_snapshot() const;
     // Cheap search-boundary mirror check. The exhaustive consistency snapshot
     // remains available for tests and incident reports.
@@ -341,6 +346,10 @@ public:
     // Total piece count of both colors, kings included.  Forwards to the
     // native position's maintained bitboards.
     [[nodiscard]] std::size_t piece_count() const noexcept;
+    // Standard chess phase from the native piece bitboards: N/B = 1, R = 2,
+    // Q = 4 per color, clamped at 24. Matches PositionFeatures::game_phase
+    // without building a feature snapshot.
+    [[nodiscard]] int game_phase() const noexcept;
     [[nodiscard]] std::uint64_t polyglot_key() const noexcept;
     [[nodiscard]] std::uint8_t castling_rights() const noexcept;
     [[nodiscard]] Square en_passant_square() const noexcept;

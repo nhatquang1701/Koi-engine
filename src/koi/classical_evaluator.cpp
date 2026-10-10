@@ -236,36 +236,6 @@ int knight_mobility(const PositionFeatures& features, std::uint8_t square) noexc
     return std::popcount(detail::knight_attacks(square) & ~masks.colors[color_index(moving.color)]);
 }
 
-bool piece_attacks_square(const PositionFeatures& features, std::uint8_t source,
-                          std::uint8_t target, std::uint64_t occupied) noexcept {
-    if (source >= 64 || target >= 64 || source == target) {
-        return false;
-    }
-    const Piece piece = features.board[source];
-    if (piece.empty()) {
-        return false;
-    }
-
-    const std::uint64_t target_bit = std::uint64_t{1} << target;
-    switch (piece.type) {
-    case PieceType::pawn:
-        return (detail::pawn_attacks(source, piece.color == Color::white) & target_bit) != 0;
-    case PieceType::knight:
-        return (detail::knight_attacks(source) & target_bit) != 0;
-    case PieceType::king:
-        return (detail::king_attacks(source) & target_bit) != 0;
-    case PieceType::bishop:
-        return (detail::bishop_attacks(source, occupied) & target_bit) != 0;
-    case PieceType::rook:
-        return (detail::rook_attacks(source, occupied) & target_bit) != 0;
-    case PieceType::queen:
-        return (detail::queen_attacks(source, occupied) & target_bit) != 0;
-    case PieceType::none:
-        return false;
-    }
-    return false;
-}
-
 int king_ring_attack_units(const PositionFeatures& features, Color color) noexcept {
     // In sparse endgames the king is an active piece and static ring pressure
     // is too noisy; the tapered king-activity and passed-pawn terms are the
@@ -321,16 +291,18 @@ int king_ring_attack_units(const PositionFeatures& features, Color color) noexce
         return 0;
     }
 
-    const int king_file = king % 8;
-    const int king_rank = king / 8;
     const Color attacker = opposite(color);
+    // The ring is exactly `king_attacks(king)`: the table already excludes
+    // off-board squares and the king square, and every attack mask excludes
+    // its own source square, so the removed per-target loop tested the same
+    // set of bits.
+    const std::uint64_t ring = detail::king_attacks(king);
 
     // `attacked_squares[attacker]` is the union of the attacker's masks built
-    // from the same tables this loop queries, and the ring is exactly
-    // `king_attacks(king)` (the loop skips the king square and off-board
-    // squares), so an empty intersection proves no attacker touches the ring.
+    // from the same tables the per-attacker mask below uses, so an empty
+    // intersection proves no attacker touches the ring.
     if (features.occupied != 0 &&
-        (features.attacked_squares[color_index(attacker)] & detail::king_attacks(king)) == 0) {
+        (features.attacked_squares[color_index(attacker)] & ring) == 0) {
         return 0;
     }
 
@@ -340,21 +312,34 @@ int king_ring_attack_units(const PositionFeatures& features, Color color) noexce
     const auto count_attacker = [&](const int source) noexcept {
         const Piece piece = features.board[static_cast<std::size_t>(source)];
 
-        bool attacks_ring = false;
-        for (int file = king_file - 1; file <= king_file + 1 && !attacks_ring; ++file) {
-            for (int rank = king_rank - 1; rank <= king_rank + 1; ++rank) {
-                if (!inside(file, rank) || (file == king_file && rank == king_rank)) {
-                    continue;
-                }
-                if (piece_attacks_square(features, static_cast<std::uint8_t>(source),
-                                         static_cast<std::uint8_t>(rank * 8 + file),
-                                         masks.occupied)) {
-                    attacks_ring = true;
-                    break;
-                }
-            }
+        // Build the attacker's mask once. `piece_attacks_square(source, target,
+        // occupied)` was exactly `(attack_mask(source, occupied) & bit(target))
+        // != 0`, and the old loop tested every on-board king neighbour, so the
+        // intersection with `ring` is the same predicate over the same set.
+        std::uint64_t attacks = 0;
+        switch (piece.type) {
+        case PieceType::pawn:
+            attacks = detail::pawn_attacks(source, piece.color == Color::white);
+            break;
+        case PieceType::knight:
+            attacks = detail::knight_attacks(source);
+            break;
+        case PieceType::king:
+            attacks = detail::king_attacks(source);
+            break;
+        case PieceType::bishop:
+            attacks = detail::bishop_attacks(source, masks.occupied);
+            break;
+        case PieceType::rook:
+            attacks = detail::rook_attacks(source, masks.occupied);
+            break;
+        case PieceType::queen:
+            attacks = detail::queen_attacks(source, masks.occupied);
+            break;
+        case PieceType::none:
+            break;
         }
-        if (!attacks_ring) {
+        if ((attacks & ring) == 0) {
             return;
         }
 
