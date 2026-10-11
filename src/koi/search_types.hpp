@@ -97,6 +97,9 @@ struct SearchStats {
     std::uint64_t lmr_parent_feature_reuses = 0;
     // Number of evaluator calls served by the search-local static-evaluation cache.
     std::uint64_t evaluation_cache_hits = 0;
+    // Number of evaluator calls that missed the search-local static-evaluation
+    // cache and invoked the evaluator directly. Diagnostic-only.
+    std::uint64_t evaluation_cache_misses = 0;
     std::uint64_t tt_hits = 0;
     std::uint64_t pvs_searches = 0;
     std::uint64_t pvs_researches = 0;

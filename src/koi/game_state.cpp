@@ -1336,7 +1336,8 @@ bool fill_move_metadata_from_facts(const NativeMetadataContext& context, const M
     return true;
 }
 
-PositionFeatures native_position_features(const Position& position) noexcept {
+void native_position_features(const Position& position,
+                              PositionFeatures& features) noexcept {
     NativeFeatureBitboards pieces{};
     for (const Color color : {Color::white, Color::black}) {
         const std::size_t color_index = color == Color::white ? 0U : 1U;
@@ -1347,7 +1348,6 @@ PositionFeatures native_position_features(const Position& position) noexcept {
         }
     }
 
-    PositionFeatures features;
     features.side_to_move = position.side_to_move();
     features.fullmove_number = position.fullmove_number();
     const std::uint64_t occupied =
@@ -1426,7 +1426,6 @@ PositionFeatures native_position_features(const Position& position) noexcept {
             attacks[1 - color] & king_zone_mask(features.king_squares[color].index())));
     }
     features.castling_rights = position.castling_rights();
-    return features;
 }
 
 } // namespace

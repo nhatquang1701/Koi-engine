@@ -445,13 +445,29 @@ int pawn_break_for(const PositionFeatures& features, Color color) noexcept {
 // additions in the same square order as the walk it replaces, and the
 // returned difference is the same integer expression `breakdown` formerly
 // computed from the two return values.
-int initiative_for(const PositionFeatures& features) noexcept {
+//
+// The material and tapered piece-square accumulation joined the same pass:
+// every visited square feeds `score.material` and `score.piece_square` with
+// the exact expressions `breakdown` formerly applied in a separate
+// `accumulate_piece` walk, kings included, and only then is the piece tested
+// for the initiative terms (kings and empty squares leave there, as they
+// always did).  Both accumulators keep their original ascending square order,
+// so every value stays bit-identical.
+int accumulate_and_initiative(const PositionFeatures& features, EvaluationBreakdown& score) noexcept {
+    const int phase = features.game_phase;
     const int phase_taper = static_cast<int>(features.game_phase) +
         kEvaluation.center_control_phase_offset;
     int white_score = 0;
     int black_score = 0;
     const auto inspect_square = [&](const int square) noexcept {
         const Piece piece = features.board[static_cast<std::size_t>(square)];
+        const int signed_value = piece_value(piece.type) * (piece.color == Color::white ? 1 : -1);
+        score.material += signed_value;
+        const std::uint8_t table_square = piece.color == Color::white
+            ? static_cast<std::uint8_t>(square)
+            : mirrored_square(static_cast<std::uint8_t>(square));
+        const int value = tapered_piece_square(piece.type, table_square, phase);
+        score.piece_square += piece.color == Color::white ? value : -value;
         if (piece.empty() || piece.type == PieceType::king) {
             return;
         }
@@ -494,6 +510,9 @@ int initiative_for(const PositionFeatures& features) noexcept {
         for_each_feature_square(features.occupied, inspect_square);
     } else {
         for (std::uint8_t square = 0; square < 64; ++square) {
+            if (features.board[square].empty()) {
+                continue;
+            }
             inspect_square(square);
         }
     }
@@ -990,27 +1009,6 @@ EvaluationBreakdown ClassicalEvaluator::breakdown(const GameState& state, Color 
 
     const int phase = features.game_phase;
 
-    const auto accumulate_piece = [&](const int square) noexcept {
-        const Piece piece = features.board[static_cast<std::size_t>(square)];
-        const int signed_value = piece_value(piece.type) * (piece.color == Color::white ? 1 : -1);
-        score.material += signed_value;
-        const std::uint8_t table_square = piece.color == Color::white
-            ? static_cast<std::uint8_t>(square)
-            : mirrored_square(static_cast<std::uint8_t>(square));
-        const int value = tapered_piece_square(piece.type, table_square, phase);
-        score.piece_square += piece.color == Color::white ? value : -value;
-    };
-    if (features.occupied != 0) {
-        for_each_feature_square(features.occupied, accumulate_piece);
-    } else {
-        for (std::uint8_t square = 0; square < 64; ++square) {
-            if (features.board[square].empty()) {
-                continue;
-            }
-            accumulate_piece(square);
-        }
-    }
-
     score.mobility = (static_cast<int>(features.mobility[0]) -
                       static_cast<int>(features.mobility[1])) * kEvaluation.mobility_weight;
     const PawnScores white_pawns = pawn_scores_for(features, Color::white);
@@ -1023,7 +1021,7 @@ EvaluationBreakdown ClassicalEvaluator::breakdown(const GameState& state, Color 
                            center_control_for(features, Color::black) +
                            pawn_break_for(features, Color::white) -
                            pawn_break_for(features, Color::black);
-    score.initiative = initiative_for(features);
+    score.initiative = accumulate_and_initiative(features, score);
     score.king_safety = king_safety_for(features, Color::white) -
                         king_safety_for(features, Color::black);
     score.king_safety = score.king_safety * (phase + kEvaluation.king_safety_phase_offset) /

@@ -442,6 +442,7 @@ struct SearchContext {
             return entry.score;
         }
 
+        ++stats.evaluation_cache_misses;
         const int score = evaluation.evaluate(state, perspective);
         entry = EvaluationCacheEntry{key, score, true};
         return score;

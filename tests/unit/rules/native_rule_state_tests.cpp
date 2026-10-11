@@ -101,11 +101,10 @@ void test_compatibility_mirror_owns_only_shadow_state_and_history() {
             "a rejected mirror move must preserve the prior shadow state and history");
 }
 
-koi::PositionFeatures ownership_feature_builder(const koi::Position& position) noexcept {
-    koi::PositionFeatures features{};
+void ownership_feature_builder(const koi::Position& position,
+                               koi::PositionFeatures& features) noexcept {
     features.side_to_move = position.side_to_move();
     features.fullmove_number = position.fullmove_number();
-    return features;
 }
 
 void test_feature_state_owns_cache_publication_and_invalidation() {

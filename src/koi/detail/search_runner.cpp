@@ -134,6 +134,7 @@ void accumulate_stats(SearchStats& total, const SearchStats& partial) noexcept {
     total.position_feature_extractions += partial.position_feature_extractions;
     total.lmr_parent_feature_reuses += partial.lmr_parent_feature_reuses;
     total.evaluation_cache_hits += partial.evaluation_cache_hits;
+    total.evaluation_cache_misses += partial.evaluation_cache_misses;
     total.correction_history_updates += partial.correction_history_updates;
     total.tt_hits += partial.tt_hits;
     total.pvs_searches += partial.pvs_searches;

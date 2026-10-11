@@ -90,10 +90,13 @@ void FeatureState::get_or_compute_into(const std::size_t cache_index,
     }
 
     cache_misses_.fetch_add(1, std::memory_order_relaxed);
-    // Fill the caller's snapshot first, then mirror it into the slot: the miss
-    // path pays the same single copy as the by-value API, and a caller keeps
-    // the builder result even when allocating or storing the entry throws.
-    out = builder(position);
+    // Fill the caller's snapshot in place, then mirror it into the slot: the
+    // miss path pays only the slot copy, and a caller keeps the builder result
+    // even when allocating or storing the entry throws.  Value-initialize
+    // first because the former builder return carried PositionFeatures
+    // defaults for every field the builder itself did not write.
+    out = {};
+    builder(position, out);
     if (cache_index < kMaximumGameStateHistory) {
         try {
             if (slots_[cache_index] == nullptr) {

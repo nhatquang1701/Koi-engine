@@ -15,7 +15,7 @@ namespace koi::detail {
 
 inline constexpr std::size_t kMaximumGameStateHistory = 256;
 
-using FeatureBuilder = PositionFeatures (*)(const Position&) noexcept;
+using FeatureBuilder = void (*)(const Position&, PositionFeatures&) noexcept;
 
 class FeatureState final {
 public:
@@ -27,9 +27,10 @@ public:
         std::size_t cache_index, std::uint64_t position_key,
         const Position& position, FeatureBuilder builder) const noexcept;
     // Output-parameter form for hot callers that already own a destination.
-    // Cache behavior and contents are identical to get_or_compute(); a cache
-    // hit copies the slot snapshot straight into `out` instead of building a
-    // return temporary that the caller then assigns from.
+    // Cache behavior and contents are identical to get_or_compute(); on a miss
+    // the builder fills `out` in place after this function value-initializes
+    // it, so fields the builder leaves untouched keep the same PositionFeatures
+    // defaults the former by-value return carried.
     void get_or_compute_into(
         std::size_t cache_index, std::uint64_t position_key,
         const Position& position, FeatureBuilder builder,
