@@ -161,6 +161,12 @@ int SearchContext::quiescence(GameState& state, int alpha, int beta, int ply,
                 return entry.score;
             }
         }
+        // The transposition key is stable for the whole node lifetime.  Hoist
+        // it above the terminal checks so this cluster prefetch can overlap
+        // them; the probe below reuses the same key without recomputing it.
+        const std::uint64_t qsearch_transposition_key = search_transposition_key(state);
+        table_access.prefetch(qsearch_transposition_key);
+
         // A checked qsearch node has no stand-pat value.  At the native
         // recursion safety boundary, use the heap-backed public move list only
         // to distinguish mate from a position with legal evasions, then stop
@@ -191,7 +197,6 @@ int SearchContext::quiescence(GameState& state, int alpha, int beta, int ply,
             return terminal_score(state, legal_moves.size(), ply);
         }
 
-        const std::uint64_t qsearch_transposition_key = search_transposition_key(state);
         // Consume the probe result in place so the normalized entry is not
         // copied a second time after probe() already built it.
         std::optional<TranspositionEntry> tt_entry =
@@ -231,6 +236,60 @@ int SearchContext::quiescence(GameState& state, int alpha, int beta, int ply,
                 path_selective_bound = true;
                 path_lower_bound = true;
                 return entry.score;
+            }
+        }
+
+        int best = claimable_draw ? 0 : -kInfinity;
+        const int original_alpha = alpha;
+        bool best_lower_bound = false;
+        bool unknown_selective_child = false;
+        int selective_upper_bound = -kInfinity;
+        Move best_move = Move::no_move();
+        int qsearch_eval = kNoEvaluation;
+        // The raw evaluation and the stand-pat test are independent of the
+        // tactical frontier, so a non-checked fail-high can return before
+        // paying for move generation.  A position without a legal move is
+        // stalemate, not a stand-pat cutoff, so the fail-high return first
+        // verifies move existence with the same predicate the generation-based
+        // terminal check below uses.
+        if (!checked) {
+            // Reuse the unadjusted evaluation from a transposition hit when
+            // one is available; the stored eval is perspective-raw exactly
+            // like the evaluator's own return value.
+            const int raw_eval = (tt_entry.has_value() && tt_entry->eval != kNoEvaluation) ?
+                tt_entry->eval : evaluate(state, state.side_to_move());
+            qsearch_eval = raw_eval;
+            best = claimable_draw ? std::max(0, raw_eval) : raw_eval;
+            // Stand-pat is a legal null continuation in qsearch terms, so it
+            // provides a safe lower bound for the tactical frontier.  This
+            // direction remains useful to a parent even when later pruning
+            // makes the qsearch result selective.
+            best_lower_bound = true;
+            if (best >= beta) {
+                if (!state.has_legal_move()) {
+                    // Stand-pat is not a legal continuation without a legal
+                    // move: this is the terminal position the generation-first
+                    // order detected before the cutoff, cached the same way.
+                    const int score = terminal_score(state, 0, ply);
+                    if (use_qsearch_cache) {
+                        store_qsearch_cache(qsearch_key, score, false);
+                    }
+                    return score;
+                }
+                ++stats.qsearch_stand_pat_cutoffs;
+                path_selective_bound = true;
+                path_lower_bound = true;
+                if (use_qsearch_cache) {
+                    store_qsearch_cache(qsearch_key, best, true);
+                }
+                if (!path_repetition_sensitive) {
+                    // Stand-pat is a legal continuation, so it is a proven
+                    // lower bound for the tactical frontier.
+                    table_access.store(qsearch_transposition_key, qsearch_table_depth(qdepth), best,
+                                       TranspositionBound::lower, Move::no_move(), ply, false,
+                                       qsearch_eval);
+                }
+                return best;
             }
         }
 
@@ -310,41 +369,7 @@ int SearchContext::quiescence(GameState& state, int alpha, int beta, int ply,
             tt_move = tt_entry->best_move;
         }
 
-        int best = claimable_draw ? 0 : -kInfinity;
-        const int original_alpha = alpha;
-        bool best_lower_bound = false;
-        bool unknown_selective_child = false;
-        int selective_upper_bound = -kInfinity;
-        Move best_move = Move::no_move();
-        int qsearch_eval = kNoEvaluation;
         if (!checked) {
-            // Reuse the unadjusted evaluation from a transposition hit when
-            // one is available; the stored eval is perspective-raw exactly
-            // like the evaluator's own return value.
-            const int raw_eval = (tt_entry.has_value() && tt_entry->eval != kNoEvaluation) ?
-                tt_entry->eval : evaluate(state, state.side_to_move());
-            qsearch_eval = raw_eval;
-            best = claimable_draw ? std::max(0, raw_eval) : raw_eval;
-            // Stand-pat is a legal null continuation in qsearch terms, so it
-            // provides a safe lower bound for the tactical frontier.  This
-            // direction remains useful to a parent even when later pruning
-            // makes the qsearch result selective.
-            best_lower_bound = true;
-            if (best >= beta) {
-                path_selective_bound = true;
-                path_lower_bound = true;
-                if (use_qsearch_cache) {
-                    store_qsearch_cache(qsearch_key, best, true);
-                }
-                if (!path_repetition_sensitive) {
-                    // Stand-pat is a legal continuation, so it is a proven
-                    // lower bound for the tactical frontier.
-                    table_access.store(qsearch_transposition_key, qsearch_table_depth(qdepth), best,
-                                       TranspositionBound::lower, Move::no_move(), ply, false,
-                                       qsearch_eval);
-                }
-                return best;
-            }
             alpha = std::max(alpha, best);
             if (qdepth >= kMaximumQuiescenceDepth) {
                 if (!moves.empty()) {
@@ -795,15 +820,14 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
         std::optional<PositionFeatures> features;
         const auto ensure_features = [&]() -> const PositionFeatures& {
             if (!features.has_value()) {
-                const std::uint64_t misses_before = state.position_feature_cache_misses();
                 // emplace() value-initializes the snapshot, but the fill below
                 // overwrites every member with the same cached slot the
                 // by-value call would return, so the final contents are
                 // identical while the return temporary and its copy-assignment
-                // disappear.
+                // disappear. The return value reports the single cache miss
+                // this call may have caused.
                 features.emplace();
-                state.position_features_into(*features);
-                if (state.position_feature_cache_misses() > misses_before) {
+                if (state.position_features_into(*features)) {
                     ++stats.position_feature_extractions;
                 }
             }
@@ -1537,13 +1561,12 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
                 !phase_rich_shallow_node;
             if (lmr_candidate && !metadata.is_capture()) {
                 if (!lmr_parent_features.has_value()) {
-                    const std::uint64_t misses_before = state.position_feature_cache_misses();
                     // Same in-place fill as ensure_features(): the parent
                     // snapshot is a value, not a reference into the cache, so
-                    // child fetches cannot rewrite it.
+                    // child fetches cannot rewrite it. The return value is the
+                    // FeatureState miss report for this call.
                     lmr_parent_features.emplace();
-                    state.position_features_into(*lmr_parent_features);
-                    if (state.position_feature_cache_misses() > misses_before) {
+                    if (state.position_features_into(*lmr_parent_features)) {
                         ++stats.position_feature_extractions;
                     }
                 } else {
@@ -1702,9 +1725,12 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
                     (quiet_move_has_king_ring_target(forcing_parent_features, metadata) ||
                      quiet_move_has_pawn_break_target(metadata));
                 if (direct_forcing_target || near_root_forcing_target) {
-                    const std::uint64_t misses_before = state.position_feature_cache_misses();
-                    const PositionFeatures after_quiet_features = state.position_features();
-                    if (state.position_feature_cache_misses() > misses_before) {
+                    // The in-place fetch keeps the same cache slot and
+                    // contents as position_features(); its return value
+                    // reports the miss without the before/after
+                    // cache_misses() reads.
+                    PositionFeatures after_quiet_features;
+                    if (state.position_features_into(after_quiet_features)) {
                         ++stats.position_feature_extractions;
                     }
                     quiet_forcing_extension = quiet_move_is_forcing(

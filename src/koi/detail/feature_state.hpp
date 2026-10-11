@@ -30,8 +30,11 @@ public:
     // Cache behavior and contents are identical to get_or_compute(); on a miss
     // the builder fills `out` in place after this function value-initializes
     // it, so fields the builder leaves untouched keep the same PositionFeatures
-    // defaults the former by-value return carried.
-    void get_or_compute_into(
+    // defaults the former by-value return carried. Returns true when the
+    // snapshot was rebuilt (a cache miss) and false when it came from the
+    // cache, so callers can account misses without reading cache_misses()
+    // before and after.
+    bool get_or_compute_into(
         std::size_t cache_index, std::uint64_t position_key,
         const Position& position, FeatureBuilder builder,
         PositionFeatures& out) const noexcept;

@@ -262,6 +262,10 @@ public:
     // the total legal move count, and a span smaller than that count receives
     // only its first entries. Forwards Position::legal_moves_into.
     [[nodiscard]] std::size_t legal_moves_into(std::span<Move> output) const noexcept;
+    // True as soon as one legal move is found, without generating the rest.
+    // Forwards Position::has_legal_move; quiescence uses it to keep terminal
+    // precedence when a stand-pat cutoff returns before tactical generation.
+    [[nodiscard]] bool has_legal_move() const noexcept;
     [[nodiscard]] PositionConsistencySnapshot consistency_snapshot() const;
     // Cheap search-boundary mirror check. The exhaustive consistency snapshot
     // remains available for tests and incident reports.
@@ -284,8 +288,11 @@ public:
     // Output-parameter form of position_features(): fills an existing snapshot
     // in place so hot evaluator/search fetches do not materialize a return
     // temporary first. Cache behavior, contents, and thread safety are
-    // identical; see detail::FeatureState::get_or_compute_into.
-    void position_features_into(PositionFeatures& out) const noexcept;
+    // identical; see detail::FeatureState::get_or_compute_into. Returns true
+    // when the call missed the cache and rebuilt the snapshot, so callers can
+    // account extractions without reading position_feature_cache_misses()
+    // before and after.
+    bool position_features_into(PositionFeatures& out) const noexcept;
     // Diagnostic-only count of cache rebuilds. Search uses this to verify that
     // make/unmake restores parent feature snapshots instead of rebuilding them.
     [[nodiscard]] std::uint64_t position_feature_cache_misses() const noexcept;

@@ -1533,6 +1533,17 @@ std::size_t GameState::legal_moves_into(std::span<Move> output) const noexcept {
     return impl_->native_position.legal_moves_into(output);
 }
 
+bool GameState::has_legal_move() const noexcept {
+    // Same terminal verdict contract as Position::has_legal_move(): a
+    // generation failure reports "no legal move" rather than propagating, so
+    // quiescence keeps the generation-based terminal precedence.
+    try {
+        return impl_->native_position.has_legal_move();
+    } catch (...) {
+        return false;
+    }
+}
+
 PositionConsistencySnapshot GameState::consistency_snapshot() const {
     PositionConsistencySnapshot snapshot;
     snapshot.native_fen = impl_->native_position.fen();
@@ -1791,10 +1802,11 @@ PositionFeatures GameState::position_features() const noexcept {
         native_position_features);
 }
 
-void GameState::position_features_into(PositionFeatures& out) const noexcept {
+bool GameState::position_features_into(PositionFeatures& out) const noexcept {
     // Same authority, cache slot, and miss accounting as position_features();
     // only the return path differs, so the extracted snapshot is identical.
-    impl_->feature_state.get_or_compute_into(
+    // The returned flag reports whether this call rebuilt the snapshot.
+    return impl_->feature_state.get_or_compute_into(
         impl_->native_position.history_size(),
         impl_->native_position.position_key(),
         impl_->native_position,

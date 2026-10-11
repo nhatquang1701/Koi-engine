@@ -167,10 +167,10 @@ struct SearchContext {
     // rate low across iterative deepening; the entries are exact-key checked,
     // so the size only trades memory for hit rate.
     static constexpr std::size_t kQSearchCacheSize = 16 * 1024;
-    // Upper bound on how many `interrupted()` calls may skip the wall-clock
-    // read. Every call still inspects the atomic stop flags, so an external
-    // stop is immediate; only a timer deadline can be observed a few hundred
-    // microseconds late.
+    // Upper bound on how many `interrupted()`/`count_node()` clock polls may
+    // skip the wall-clock read. Every call still inspects the atomic stop
+    // flags, so an external stop is immediate; only a timer deadline can be
+    // observed a few hundred microseconds late.
     static constexpr int kClockPollInterval = 256;
 
     static constexpr std::size_t stack_capacity() noexcept {
@@ -381,12 +381,22 @@ struct SearchContext {
         return budget.visited(stats.nodes + stats.qnodes);
     }
 
-    [[nodiscard]] bool interrupted() noexcept {
+    // Samples the external stop flags once and records the abort. count_node()
+    // and interrupted() share it so a node pays one flag load pair; the clock
+    // poll below keeps its own cadence.
+    [[nodiscard]] bool stop_signal_pending() noexcept {
         if (stop_requested.load(std::memory_order_relaxed) ||
             (iteration_aborted != nullptr && iteration_aborted->load(std::memory_order_relaxed))) {
             aborted = true;
             return true;
         }
+        return false;
+    }
+
+    // Wall-clock polling separated from the flag check so count_node() can
+    // sample the stop flags once per node instead of twice. The countdown
+    // decrement and the kClockPollInterval reset are unchanged.
+    [[nodiscard]] bool poll_clock() noexcept {
         if (clock_poll_countdown > 0) {
             --clock_poll_countdown;
             return false;
@@ -399,10 +409,12 @@ struct SearchContext {
         return false;
     }
 
+    [[nodiscard]] bool interrupted() noexcept {
+        return stop_signal_pending() || poll_clock();
+    }
+
     [[nodiscard]] bool count_node(bool quiescence) noexcept {
-        if (stop_requested.load(std::memory_order_relaxed) ||
-            (iteration_aborted != nullptr && iteration_aborted->load(std::memory_order_relaxed))) {
-            aborted = true;
+        if (stop_signal_pending()) {
             return false;
         }
         if (!budget.reserve(stats.nodes + stats.qnodes)) {
@@ -414,7 +426,7 @@ struct SearchContext {
         } else {
             ++stats.nodes;
         }
-        return !interrupted();
+        return !poll_clock();
     }
 
     [[nodiscard]] int terminal_score(const GameState& state, std::size_t move_count,

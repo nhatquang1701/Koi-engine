@@ -88,6 +88,10 @@ struct SearchStats {
     // tactical generator calls they can avoid.
     std::uint64_t qsearch_tt_cutoffs = 0;
     std::uint64_t qsearch_move_generations = 0;
+    // Number of non-checked qsearch nodes that returned on a stand-pat
+    // fail-high before tactical move generation. Diagnostic-only; records how
+    // often the reordered cutoff avoids the generation it replaced.
+    std::uint64_t qsearch_stand_pat_cutoffs = 0;
     // Number of full PositionFeatures snapshots requested by the search
     // context. This is diagnostic-only and helps keep expensive feature
     // extraction out of nodes that do not need it.
