@@ -2714,6 +2714,14 @@ void SearchRunner::run() {
                 nullptr, evaluator_mutex_ptr, &legal_moves, true,
                 options.quiet_history_side_hook, tablebase_binding);
             SearchContext& context = *context_storage;
+            if (lazy_pool == nullptr) {
+                // Exclusive TT access contract: one live search per
+                // TranspositionTable; the runner thread is the only TT
+                // toucher while an exclusive session is active (UCI
+                // stop+join, koi-bench sequential).  The LazySMP main thread
+                // shares the table with its helpers, so it stays locked.
+                context.table_access.set_exclusive(true);
+            }
             context.allow_root_forcing_extension = limits.depth.has_value() &&
                 *limits.depth == 1;
             const bool ultra_short_nonchecked_extension = limits.movetime.has_value() &&

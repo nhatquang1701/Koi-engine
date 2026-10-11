@@ -4,6 +4,7 @@
 #include <array>
 #include <atomic>
 #include <bit>
+#include <cassert>
 #include <limits>
 #include <mutex>
 #include <new>
@@ -49,6 +50,26 @@ constexpr std::size_t kClusterSize = 4;
 // UCI value is permill, so 1000 slots is the natural resolution and keeps the
 // sampling cost independent of the configured Hash size.
 constexpr std::size_t kHashfullSampleSlots = 1000;
+
+// Exclusive access mode skips the stripe lock: the caller guarantees one live
+// search per table, so no other thread can touch the cluster concurrently.
+// This stand-in keeps the stripe-lock declaration inside probe_impl and
+// store_impl identical across access modes while constructing nothing.
+struct UnlockedStripe {
+    explicit UnlockedStripe(std::shared_mutex&) noexcept {}
+};
+
+// Selects the stripe-lock type for one access mode: locked uses the real
+// mutex lock, exclusive uses the no-op stand-in.
+template <bool Locked, class Lock>
+struct StripeLockSelect {
+    using type = Lock;
+};
+
+template <class Lock>
+struct StripeLockSelect<false, Lock> {
+    using type = UnlockedStripe;
+};
 
 int score_for_storage(int score, int ply) noexcept {
     if (score >= kMateThreshold) {
@@ -275,6 +296,29 @@ TranspositionTable::TranspositionTable(std::size_t megabytes, HashMemoryPolicy p
     (void)resize_locked(megabytes);
 }
 
+#ifndef NDEBUG
+void TranspositionTable::claim_exclusive_session() noexcept {
+    // At most one exclusive session may exist per table: the compare-exchange
+    // fails, and the assert fires, when another thread already holds the
+    // claim.  Relaxed ordering is enough for this once-per-search debug check.
+    std::thread::id expected{};
+    const bool claimed = exclusive_session_owner_.compare_exchange_strong(
+        expected, std::this_thread::get_id(), std::memory_order_relaxed);
+    assert(claimed && "at most one exclusive TT session may exist at a time");
+    (void)claimed;
+}
+
+void TranspositionTable::release_exclusive_session() noexcept {
+    exclusive_session_owner_.store(std::thread::id{}, std::memory_order_relaxed);
+}
+
+void TranspositionTable::assert_exclusive_session_owner() const noexcept {
+    assert(exclusive_session_owner_.load(std::memory_order_relaxed) ==
+               std::this_thread::get_id() &&
+           "exclusive TT access must run on the session's claiming thread");
+}
+#endif
+
 void TranspositionTable::Lease::adopt_snapshot(const TranspositionTable& table) noexcept {
     std::lock_guard<std::mutex> lock(table.maintenance_mutex_);
     fallback_ = table.storage_;
@@ -499,8 +543,10 @@ void TranspositionTable::new_generation() noexcept {
     }
 }
 
-void TranspositionTable::store(std::uint64_t key, int depth, int score, TranspositionBound bound,
-                               Move best_move, int ply, bool pv, int eval) noexcept {
+template <bool Locked>
+void TranspositionTable::store_impl(std::uint64_t key, int depth, int score,
+                                    TranspositionBound bound, Move best_move, int ply, bool pv,
+                                    int eval) noexcept {
     const Lease lease(*this);
     Storage* const storage = lease.storage();
     if (storage == nullptr || storage->cluster_count == 0) {
@@ -513,7 +559,8 @@ void TranspositionTable::store(std::uint64_t key, int depth, int score, Transpos
     // same segment.
     TranspositionEntry* const cluster_entries = storage->cluster_base(cluster);
     static_assert(std::has_single_bit(kStripeCount));
-    std::unique_lock stripe_lock(storage->stripes[cluster & (kStripeCount - 1)]);
+    using StripeLock = StripeLockSelect<Locked, std::unique_lock<std::shared_mutex>>::type;
+    StripeLock stripe_lock(storage->stripes[cluster & (kStripeCount - 1)]);
 
     std::size_t empty_slot = storage->total_slot_count;
     std::size_t replacement_slot = first_slot;
@@ -592,7 +639,24 @@ void TranspositionTable::store(std::uint64_t key, int depth, int score, Transpos
                                      .pv = pv};
 }
 
-std::optional<TranspositionEntry> TranspositionTable::probe(std::uint64_t key, int ply) const noexcept {
+void TranspositionTable::store(std::uint64_t key, int depth, int score, TranspositionBound bound,
+                               Move best_move, int ply, bool pv, int eval,
+                               TranspositionAccessMode mode) noexcept {
+#ifndef NDEBUG
+    if (mode == TranspositionAccessMode::exclusive) {
+        assert_exclusive_session_owner();
+    }
+#endif
+    if (mode == TranspositionAccessMode::exclusive) {
+        store_impl<false>(key, depth, score, bound, best_move, ply, pv, eval);
+        return;
+    }
+    store_impl<true>(key, depth, score, bound, best_move, ply, pv, eval);
+}
+
+template <bool Locked>
+std::optional<TranspositionEntry> TranspositionTable::probe_impl(
+    std::uint64_t key, int ply) const noexcept {
     const Lease lease(*this);
     Storage* const storage = lease.storage();
     if (storage == nullptr || storage->cluster_count == 0) {
@@ -606,7 +670,8 @@ std::optional<TranspositionEntry> TranspositionTable::probe(std::uint64_t key, i
     // Pull the cluster in while the stripe lock is acquired; callers that
     // prefetched the key earlier already have the fetch in flight.
     KOI_TT_PREFETCH(cluster_entries);
-    std::shared_lock stripe_lock(storage->stripes[cluster & (kStripeCount - 1)]);
+    using StripeLock = StripeLockSelect<Locked, std::shared_lock<std::shared_mutex>>::type;
+    StripeLock stripe_lock(storage->stripes[cluster & (kStripeCount - 1)]);
     for (std::size_t offset = 0; offset < kClusterSize; ++offset) {
         const TranspositionEntry& entry = cluster_entries[offset];
         if (!entry.occupied || entry.generation_age != storage->clear_epoch ||
@@ -619,6 +684,19 @@ std::optional<TranspositionEntry> TranspositionTable::probe(std::uint64_t key, i
         return result;
     }
     return std::nullopt;
+}
+
+std::optional<TranspositionEntry> TranspositionTable::probe(
+    std::uint64_t key, int ply, TranspositionAccessMode mode) const noexcept {
+#ifndef NDEBUG
+    if (mode == TranspositionAccessMode::exclusive) {
+        assert_exclusive_session_owner();
+    }
+#endif
+    if (mode == TranspositionAccessMode::exclusive) {
+        return probe_impl<false>(key, ply);
+    }
+    return probe_impl<true>(key, ply);
 }
 
 void TranspositionTable::prefetch(std::uint64_t key) const noexcept {

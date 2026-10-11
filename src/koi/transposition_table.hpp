@@ -9,6 +9,7 @@
 #include <mutex>
 #include <optional>
 #include <shared_mutex>
+#include <thread>
 #include <vector>
 
 #include "koi/move.hpp"
@@ -16,6 +17,16 @@
 namespace koi {
 
 enum class TranspositionBound : std::uint8_t { exact, lower, upper };
+
+// Access-mode selector for TranspositionTable::probe()/store().  `locked`
+// takes the stripe lock and is required whenever another thread may touch the
+// same table.  `exclusive` skips only the stripe lock: the caller guarantees
+// one live search per table and that every access runs on that session's
+// thread (UCI stop+join, koi-bench sequential).  The hazard lease, cluster
+// scan, and replacement logic stay identical in both modes, so a concurrent
+// resize remains memory-safe.  Maintenance entry points (new_generation,
+// hashfull, clear, set_size_mb, prefetch) always stay locked.
+enum class TranspositionAccessMode : std::uint8_t { locked, exclusive };
 
 // Sentinel for "this entry carries no static evaluation".  Real evaluations are
 // bounded far away from this value, so it is unambiguous.
@@ -101,6 +112,13 @@ struct HashMemoryPolicy {
     HashAllocationFailureProvider allocation_failure;
 };
 
+// The search seam owns the exclusive access mode on behalf of one search; it
+// also drives the debug-only exclusive-session claim below, which stays
+// private to the table.
+namespace detail {
+class SearchTableAccess;
+} // namespace detail
+
 class TranspositionTable {
 public:
     explicit TranspositionTable(std::size_t megabytes = 512, HashMemoryPolicy policy = {});
@@ -121,9 +139,13 @@ public:
     // `eval` is the unadjusted static evaluation for the position, or
     // kNoEvaluation when the caller has none (checked nodes, bound-only
     // stores).  It is stored so a later probe can skip evaluate().
+    // `mode` selects the stripe-lock policy, see TranspositionAccessMode.
     void store(std::uint64_t key, int depth, int score, TranspositionBound bound, Move best_move,
-               int ply = 0, bool pv = false, int eval = kNoEvaluation) noexcept;
-    [[nodiscard]] std::optional<TranspositionEntry> probe(std::uint64_t key, int ply = 0) const noexcept;
+               int ply = 0, bool pv = false, int eval = kNoEvaluation,
+               TranspositionAccessMode mode = TranspositionAccessMode::locked) noexcept;
+    [[nodiscard]] std::optional<TranspositionEntry> probe(
+        std::uint64_t key, int ply = 0,
+        TranspositionAccessMode mode = TranspositionAccessMode::locked) const noexcept;
     // Software prefetch of the probe cluster.  Search calls this a few
     // instructions before the matching probe so the cache line fetch overlaps
     // the work in between; a disabled or empty table is a no-op.  Resolves the
@@ -134,6 +156,18 @@ public:
 
 private:
     struct Storage;
+
+    // Access-mode implementations for probe()/store(): Locked == true takes
+    // the stripe lock, Locked == false skips only that lock.  Both modes keep
+    // the Lease, the cluster scan, replacement math, entry values, and
+    // generation/clear_epoch handling character-identical, so one executing
+    // thread observes identical entries; only lock instructions differ.
+    template <bool Locked>
+    [[nodiscard]] std::optional<TranspositionEntry> probe_impl(std::uint64_t key,
+                                                               int ply) const noexcept;
+    template <bool Locked>
+    void store_impl(std::uint64_t key, int depth, int score, TranspositionBound bound,
+                    Move best_move, int ply, bool pv, int eval) noexcept;
 
     // Hazard-pointer lease for the store/probe hot paths.  A reader
     // publishes the storage pointer it is about to use in one hazard slot and
@@ -216,6 +250,21 @@ private:
     // at thread exit.  A constant-initialized thread_local above keeps the hot
     // path free of dynamic-init guards.
     [[nodiscard]] static std::size_t register_thread_hazard_slot() noexcept;
+
+#ifndef NDEBUG
+    // Debug-only exclusive-session enforcement, driven by
+    // detail::SearchTableAccess::set_exclusive.  It asserts (a) at most one
+    // exclusive session exists per table at any time and (b) exclusive
+    // probe()/store() calls run on the thread that claimed the session.
+    // Release builds compile this out and rely on the documented contract
+    // "one live search per table".
+    void claim_exclusive_session() noexcept;
+    void release_exclusive_session() noexcept;
+    void assert_exclusive_session_owner() const noexcept;
+    std::atomic<std::thread::id> exclusive_session_owner_{};
+#endif
+
+    friend class detail::SearchTableAccess;
 
     static constexpr std::size_t kStripeCount = 64;
 

@@ -49,12 +49,42 @@ public:
     explicit SearchTableAccess(TranspositionTable& table, const bool enabled = true) noexcept
         : table_(&table), enabled_(enabled) {}
 
+    // A debug-only exclusive-session claim must be returned even when the
+    // caller never invokes set_exclusive(false); release builds carry no
+    // claim and the destructor body is empty.
+    ~SearchTableAccess() noexcept {
+#ifndef NDEBUG
+        release_exclusive_session();
+#endif
+    }
+
     void set_enabled(const bool enabled) noexcept {
         enabled_ = enabled;
     }
 
     [[nodiscard]] bool enabled() const noexcept {
         return enabled_;
+    }
+
+    // Enables or disables exclusive access mode for this view.  Exclusive
+    // mode skips only the stripe lock, so it is valid only under the table's
+    // single-live-search contract: the runner thread is the only TT toucher
+    // while the session is active (UCI stop+join, koi-bench sequential).
+    // Debug builds claim the table's single exclusive session here; release
+    // builds keep only the mode flag.
+    void set_exclusive(const bool value) noexcept {
+        if (value == exclusive_) {
+            return;
+        }
+        exclusive_ = value;
+#ifndef NDEBUG
+        if (value) {
+            table_->claim_exclusive_session();
+            exclusive_session_claimed_ = true;
+        } else {
+            release_exclusive_session();
+        }
+#endif
     }
 
     // Physical table presence, independent of this view's probe/store gate.
@@ -76,7 +106,7 @@ public:
         if (!enabled_) {
             return std::nullopt;
         }
-        return table_->probe(key, ply);
+        return table_->probe(key, ply, access_mode());
     }
 
     // Advisory prefetch of the cluster a later probe will read; a disabled
@@ -92,13 +122,33 @@ public:
                const int ply = 0, const bool pv = false,
                const int eval = kNoEvaluation) noexcept {
         if (enabled_) {
-            table_->store(key, depth, score, bound, best_move, ply, pv, eval);
+            table_->store(key, depth, score, bound, best_move, ply, pv, eval, access_mode());
         }
     }
 
 private:
+    [[nodiscard]] TranspositionAccessMode access_mode() const noexcept {
+        return exclusive_ ? TranspositionAccessMode::exclusive :
+            TranspositionAccessMode::locked;
+    }
+
+#ifndef NDEBUG
+    void release_exclusive_session() noexcept {
+        if (exclusive_session_claimed_) {
+            table_->release_exclusive_session();
+            exclusive_session_claimed_ = false;
+        }
+    }
+#endif
+
     TranspositionTable* table_;
     bool enabled_;
+    // Exclusive access mode is off by default; see set_exclusive().
+    bool exclusive_ = false;
+#ifndef NDEBUG
+    // Debug-only: this view currently holds the table's exclusive claim.
+    bool exclusive_session_claimed_ = false;
+#endif
 };
 
 } // namespace koi::detail
