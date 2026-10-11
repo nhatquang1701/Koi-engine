@@ -499,9 +499,13 @@ void SearchMovePicker::prepare_candidates() {
         if (is_excluded(index)) {
             continue;
         }
-        // Rank from the stored metadata directly; only the materialize path
-        // needs a mutable copy.
-        MoveMetadata materialized{};
+        // Rank from the stored metadata directly; only the quiescence
+        // materialize path needs a mutable copy.  The copy is deliberately
+        // default-initialized and must outlive the branch that fills it:
+        // materialize() assigns it before `metadata` can point at it, so a
+        // value-initialization would only zero-fill a dead record on the
+        // common non-quiescence path.
+        MoveMetadata materialized;
         const MoveMetadata* metadata = &moves_[index];
 
         Stage candidate_stage = Stage::done;

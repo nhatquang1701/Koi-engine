@@ -1291,11 +1291,21 @@ bool fill_move_metadata_from_facts(const NativeMetadataContext& context, const M
         return false;
     }
     const Piece moving = facts.from;
-    metadata = MoveMetadata{};
+    // Field-wise reset instead of `metadata = MoveMetadata{}`.  The move
+    // description below is written on every accepted path, but the check/SEE
+    // guards keep their reset value: `gives_check` is read whenever check
+    // analysis is skipped, `see_computed` gates every lazy SEE reader, and
+    // `see_score` is passed to pruning for non-captures too.  The remaining
+    // fields (`ordering_score`, `position_key`, `validation_token`) are always
+    // written by ordering/the picker or a generator stamping pass before any
+    // reader observes them.
     metadata.move = move;
     metadata.moving_piece = moving.type;
     metadata.captured_piece = facts.occupied_to ? facts.to.type : PieceType::none;
     metadata.kind = MoveKind::quiet;
+    metadata.gives_check = false;
+    metadata.see_computed = false;
+    metadata.see_score = 0;
     if (move.promotion() != Promotion::none) {
         metadata.kind = MoveKind::promotion;
     } else if (moving.type == PieceType::king &&
