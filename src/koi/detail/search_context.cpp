@@ -356,14 +356,19 @@ int SearchContext::quiescence(GameState& state, int alpha, int beta, int ply,
         // an ordinary deeper node has no quiet candidate whose ranking could
         // observe the pawn key; the narrow deep quiet-check probe above is the
         // only late re-entry.  Checked nodes generate the full list and both
-        // quiet-check windows keep real keys, so passing zero elsewhere skips
-        // the incremental pawn-key computation without changing a priority.
+        // quiet-check windows keep real keys, so an unreachable context is
+        // skipped there without changing a priority.
         const bool quiet_history_reachable = checked ||
             qdepth < quiescence_check_depth_limit ||
             (qdepth >= kNarrowQuietCheckProbeStartDepth &&
              qdepth < kMaximumQuiescenceNarrowQuietCheckDepth);
-        const SearchHistoryContext history = history_context(
-            ply, previous_move, quiet_history_reachable ? state.pawn_key() : 0);
+        // With no quiet candidate every entry in `moves` is a capture or
+        // promotion whose priority() branches return before any history read,
+        // and the lazy re-priority path that could re-read it is main-mode only.
+        SearchHistoryContext history{};
+        if (quiet_history_reachable) {
+            history = history_context(ply, previous_move, state.pawn_key());
+        }
         std::optional<Move> tt_move;
         if (tt_entry.has_value() && !tt_entry->best_move.is_no_move()) {
             tt_move = tt_entry->best_move;

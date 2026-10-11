@@ -455,7 +455,11 @@ struct SearchContext {
         }
 
         ++stats.evaluation_cache_misses;
+        const std::uint64_t feature_misses_before =
+            state.position_feature_cache_misses();
         const int score = evaluation.evaluate(state, perspective);
+        stats.evaluation_feature_cache_misses +=
+            state.position_feature_cache_misses() - feature_misses_before;
         entry = EvaluationCacheEntry{key, score, true};
         return score;
     }
@@ -507,7 +511,11 @@ struct SearchContext {
     // here can only cost a refresh, never a wrong score.
     [[nodiscard]] bool make_observed(GameState& state, const MoveMetadata& metadata,
                                      const int ply) {
-        const std::uint64_t parent_key = state.position_key();
+        // The parent key is observed only by the notification below, which is
+        // a no-op without a private worker; a serial classical search never
+        // has one, so skip the key computation there.
+        const std::uint64_t parent_key =
+            evaluation.has_private_worker() ? state.position_key() : 0;
         if (!state.make_search_move(metadata)) {
             return false;
         }

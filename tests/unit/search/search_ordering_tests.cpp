@@ -1,6 +1,8 @@
 #include <algorithm>
+#include <cstdint>
 #include <iostream>
 #include <optional>
+#include <random>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -389,6 +391,178 @@ void test_picker_emitted_scores_match_recomputed_priority() {
     }
 }
 
+// Independent reference for the quiescence picker's documented emission
+// rule: candidates are grouped into the capture/promotion stage and the
+// quiet-check stage, each stage is ordered by its packed ascending key
+// (priority descending, move tie-break ascending), and non-checking quiet
+// moves never enter a stage.  The picker must reproduce that sequence while
+// emitting lazily.
+struct QuiescenceReferenceEntry {
+    koi::MoveMetadata metadata{};
+    int priority = 0;
+    std::uint32_t tie_break = 0;
+    std::uint64_t sort_key = 0;
+};
+
+void verify_quiescence_picker_against_reference(
+    const koi::GameState& state, const koi::detail::SearchMoveOrdering& ordering,
+    const koi::detail::SearchHistoryContext& context,
+    const koi::MoveMetadataList& candidates, int& reference_captures,
+    int& reference_promotions, int& reference_checks, int& dropped_quiets) {
+    std::vector<QuiescenceReferenceEntry> stages[2];
+    for (std::size_t index = 0; index < candidates.size(); ++index) {
+        const koi::MoveMetadata& source = candidates[index];
+        const bool tactical = source.is_capture() ||
+            source.move.promotion() != koi::Promotion::none;
+        if (!tactical && !source.gives_check) {
+            ++dropped_quiets;
+            continue;
+        }
+        // The public single-candidate ordering path resolves deferred SEE
+        // exactly like the picker's prepare pass ranks a tactical candidate
+        // and publishes the priority in ordering_score, so it is the
+        // priority oracle here.
+        koi::MoveMetadataList single;
+        require(single.push_back(source), "reference list must accept the candidate record");
+        ordering.order(state, single, std::nullopt, context);
+        const int priority = single[0].ordering_score;
+        const std::uint32_t tie_break = koi::detail::move_tie_break_key(source.move);
+        stages[tactical ? 0 : 1].push_back(QuiescenceReferenceEntry{
+            single[0], priority, tie_break,
+            (static_cast<std::uint64_t>(
+                 ~(static_cast<std::uint32_t>(priority) ^ 0x80000000U)) << 32U) | tie_break});
+        if (source.move.promotion() != koi::Promotion::none) {
+            ++reference_promotions;
+        }
+    }
+    for (std::vector<QuiescenceReferenceEntry>& stage : stages) {
+        std::sort(stage.begin(), stage.end(),
+                  [](const QuiescenceReferenceEntry& lhs,
+                     const QuiescenceReferenceEntry& rhs) {
+                      return lhs.sort_key < rhs.sort_key;
+                  });
+        for (std::size_t index = 1; index < stage.size(); ++index) {
+            require(stage[index - 1].priority > stage[index].priority ||
+                        (stage[index - 1].priority == stage[index].priority &&
+                         stage[index - 1].tie_break < stage[index].tie_break),
+                    "reference stage order must be priority-descending with an ascending tie-break");
+        }
+    }
+    reference_captures += static_cast<int>(stages[0].size());
+    reference_checks += static_cast<int>(stages[1].size());
+
+    koi::detail::SearchMovePicker picker(
+        ordering, state, candidates, std::nullopt, context, 0,
+        koi::detail::SearchMovePicker::Mode::quiescence);
+    const auto verify_emitted = [&picker](const QuiescenceReferenceEntry& expected) {
+        const std::optional<koi::MoveMetadata> emitted = picker.next();
+        require(emitted.has_value(),
+                "quiescence picker must emit a record for every reference-stage candidate");
+        require(emitted->move == expected.metadata.move,
+                "quiescence picker emission order must match the reference stage order");
+        require(emitted->moving_piece == expected.metadata.moving_piece &&
+                    emitted->captured_piece == expected.metadata.captured_piece &&
+                    emitted->kind == expected.metadata.kind &&
+                    emitted->position_key == expected.metadata.position_key &&
+                    emitted->validation_token == expected.metadata.validation_token,
+                "quiescence picker must emit the staged source record unchanged");
+        require(emitted->gives_check == expected.metadata.gives_check,
+                "quiescence picker must preserve the staged check flag");
+        require(emitted->see_computed == expected.metadata.see_computed &&
+                    emitted->see_score == expected.metadata.see_score,
+                "quiescence picker must preserve the resolved SEE side effects");
+        require(emitted->ordering_score == expected.metadata.ordering_score,
+                "quiescence picker must emit the staged ordering score");
+    };
+    for (const QuiescenceReferenceEntry& entry : stages[0]) {
+        verify_emitted(entry);
+    }
+    for (const QuiescenceReferenceEntry& entry : stages[1]) {
+        verify_emitted(entry);
+    }
+    require(!picker.next().has_value(),
+            "quiescence picker must not emit candidates outside the two reachable stages");
+}
+
+void test_quiescence_picker_matches_documented_reference() {
+    constexpr std::string_view fens[] = {
+        "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1",
+        "4k3/P7/8/8/8/8/8/4K3 w - - 0 1",
+        "1n2k3/P7/8/8/8/8/8/4K3 w - - 0 1",
+        "k7/8/8/8/8/8/1q2Q3/4K3 w - - 0 1",
+        "4k3/4p3/8/8/8/8/8/4R1K1 w - - 0 1",
+        "8/2b1k3/7p/p1p1p2P/PpP1P3/1P1BK3/8/8 w - - 0 1",
+        "4k3/8/8/3pP3/8/8/8/4K3 w - d6 0 2",
+    };
+    int reference_captures = 0;
+    int reference_promotions = 0;
+    int reference_checks = 0;
+    int dropped_quiets = 0;
+    std::mt19937 random(0x4B4F4951U);
+    for (const std::string_view fen : fens) {
+        const koi::GameState state = require_state(fen);
+        for (const bool include_see : {false, true}) {
+            for (const bool tactical_only : {false, true}) {
+                koi::MoveMetadataList generated;
+                if (tactical_only) {
+                    static_cast<void>(state.legal_tactical_moves_with_metadata(
+                        generated, true, include_see));
+                } else {
+                    state.legal_moves_with_metadata(generated, true, include_see);
+                }
+
+                // Deterministic adaptive-history shape so the differential
+                // exercises separated capture and quiet-check priorities:
+                // every third tactical record gets capture feedback and every
+                // third quiet record quiet feedback at the picker's ply.
+                koi::detail::SearchMoveOrdering ordering;
+                koi::detail::SearchHistoryContext context{};
+                context.ply = 3;
+                for (std::size_t index = 0; index < generated.size(); ++index) {
+                    const koi::MoveMetadata& metadata = generated[index];
+                    const bool tactical = metadata.is_capture() ||
+                        metadata.move.promotion() != koi::Promotion::none;
+                    if (index % 3 != 0) {
+                        continue;
+                    }
+                    if (tactical) {
+                        ordering.record_capture_best(metadata, 4, context);
+                    } else {
+                        ordering.record_quiet_cutoff(state.side_to_move(), metadata, 4, context);
+                    }
+                }
+
+                // The generator's own order and a shuffled copy must emit
+                // identically: the staged key order, not the input order,
+                // fixes the sequence.
+                koi::MoveMetadataList shuffled = generated;
+                std::shuffle(shuffled.begin(), shuffled.end(), random);
+                verify_quiescence_picker_against_reference(
+                    state, ordering, context, generated, reference_captures,
+                    reference_promotions, reference_checks, dropped_quiets);
+                verify_quiescence_picker_against_reference(
+                    state, ordering, context, shuffled, reference_captures,
+                    reference_promotions, reference_checks, dropped_quiets);
+
+                // A pruned candidate window releases only part of the list.
+                koi::MoveMetadataList window = shuffled;
+                window.resize(std::min<std::size_t>(3, window.size()));
+                verify_quiescence_picker_against_reference(
+                    state, ordering, context, window, reference_captures,
+                    reference_promotions, reference_checks, dropped_quiets);
+            }
+        }
+    }
+    require(reference_captures > 0,
+            "the differential fixtures must emit capture candidates");
+    require(reference_promotions > 0,
+            "the differential fixtures must emit promotion candidates");
+    require(reference_checks > 0,
+            "the differential fixtures must emit quiet-check candidates");
+    require(dropped_quiets > 0,
+            "the differential fixtures must drop non-checking quiet candidates");
+}
+
 void test_search_move_generation_can_defer_see() {
     const koi::GameState state = require_state(
         "4k3/8/8/3q4/4Q3/8/8/4K3 w - - 0 1");
@@ -495,6 +669,7 @@ int main(int argc, char** argv) {
         {"parent move feedback", test_parent_move_feedback_rewards_fail_low_and_penalizes_refutation},
         {"cached move scores", test_metadata_ordering_score_is_cached_with_see},
         {"picker emitted scores", test_picker_emitted_scores_match_recomputed_priority},
+        {"quiescence picker differential", test_quiescence_picker_matches_documented_reference},
         {"deferred SEE generation", test_search_move_generation_can_defer_see},
         {"quiet-only check metadata", test_search_move_generation_can_skip_capture_check_analysis},
         {"deferred SEE ordering", test_ordering_resolves_deferred_see_for_search_moves},

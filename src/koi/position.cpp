@@ -172,7 +172,6 @@ struct Snapshot {
     bool null_move = false;
     std::array<std::array<std::uint64_t, 7>, 2> piece_bitboards{};
     std::array<std::uint64_t, 2> occupancy{};
-    std::uint64_t occupied = 0;
     std::array<std::uint64_t, 2> checkers{};
     std::array<std::uint64_t, 2> pinned{};
     std::uint64_t repetition_history_fingerprint = 0;
@@ -235,7 +234,6 @@ void snapshot_into(NativeState& state, bool null_move = false) noexcept {
     slot->key = state.key;
     slot->piece_bitboards = state.piece_bitboards;
     slot->occupancy = state.occupancy;
-    slot->occupied = state.occupied;
     slot->checkers = state.checkers;
     slot->pinned = state.pinned;
     slot->null_move = null_move;
@@ -1482,9 +1480,12 @@ private:
         state.repetition_history_suppressed = saved.repetition_history_suppressed;
         state.piece_bitboards = saved.piece_bitboards;
         state.occupancy = saved.occupancy;
-    state.occupied = saved.occupied;
-    state.checkers = saved.checkers;
-    state.pinned = saved.pinned;
+        // `occupied == occupancy[0] | occupancy[1]` holds at every snapshot
+        // point (rebuild_derived, apply_unchecked both re-derive the union),
+        // so unmake recomputes it instead of carrying a snapshot copy.
+        state.occupied = state.occupancy[0] | state.occupancy[1];
+        state.checkers = saved.checkers;
+        state.pinned = saved.pinned;
 }
 
     template <typename MoveContainer>

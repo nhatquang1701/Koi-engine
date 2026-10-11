@@ -495,31 +495,101 @@ void SearchMovePicker::prepare_candidates() {
     deferred_bad_capture_index_ = 0;
     candidates_prepared_ = true;
 
+    if (mode_ == Mode::quiescence) {
+        // Quiescence reaches exactly two candidate stages: the complete
+        // capture/promotion stage and the quiet-check stage the generator
+        // enables inside the check horizon.  The complete capture list is
+        // staged, as in Stockfish's qsearch: qsearch's own SEE/delta pruning
+        // decides what is safe, and every tactical candidate is materialized
+        // before ranking so a poisoned capture cannot outrank a sound
+        // defensive recapture.  Place both stages in one pass with a front
+        // cursor for tactical candidates and a back cursor for quiet checks,
+        // then sort each region with its packed key before emission.  The
+        // generic eight-stage counting partition would stage the same records
+        // with the same materialize-then-rank sequence and the same per-stage
+        // key order, so the two placements are emission-order equivalent;
+        // this path additionally skips the in-place permutation and the
+        // main-only deferral/re-priority machinery next() can never reach in
+        // quiescence mode.
+        std::size_t capture_count = 0;
+        std::size_t check_count = 0;
+        for (std::size_t index = 0; index < moves_.size(); ++index) {
+            if (is_excluded(index)) {
+                continue;
+            }
+            const MoveMetadata& source = moves_[index];
+            const bool tactical = source.is_capture() ||
+                source.move.promotion() != Promotion::none;
+            if (!tactical && !source.gives_check) {
+                continue;
+            }
+            // Same SEE resolution as materialize(), minus its main-mode
+            // capture-check probe: a quiescence picker never sets that bit,
+            // so every tactical candidate is ranked with its resolved
+            // exchange score exactly like the generic path ranks it.
+            MoveMetadata materialized;
+            const MoveMetadata* metadata = &source;
+            if (tactical) {
+                materialized = source;
+                if (materialized.is_capture()) {
+                    if (!see_computed_.test(index)) {
+                        if (materialized.see_computed) {
+                            see_scores_[index] = materialized.see_score;
+                        } else {
+                            if (!see_context_.has_value()) {
+                                see_context_ = exchange_context_from(state_);
+                            }
+                            see_scores_[index] = static_cast<std::int16_t>(std::clamp(
+                                static_exchange_gain(*see_context_, materialized),
+                                static_cast<int>(std::numeric_limits<std::int16_t>::min()),
+                                static_cast<int>(std::numeric_limits<std::int16_t>::max())));
+                        }
+                        see_computed_.set(index);
+                    }
+                    materialized.see_score = see_scores_[index];
+                    materialized.see_computed = true;
+                }
+                metadata = &materialized;
+            }
+            const int priority = ordering_.priority(
+                state_, *metadata, std::nullopt, history_context_);
+            const Candidate candidate{
+                static_cast<std::uint16_t>(index),
+                static_cast<std::uint8_t>(tactical ? Stage::good_captures : Stage::quiet_checks),
+                priority, picker_stage_sort_key(priority, move_tie_break_key(metadata->move))};
+            if (tactical) {
+                staged_[capture_count++] = candidate;
+            } else {
+                staged_[kMaximumLegalMoves - 1 - check_count] = candidate;
+                ++check_count;
+            }
+        }
+        // The two regions cannot overlap: their sizes sum to the number of
+        // staged records, which never exceeds moves_.size().
+        stage_begin_[static_cast<std::size_t>(Stage::good_captures)] = 0;
+        stage_end_[static_cast<std::size_t>(Stage::good_captures)] =
+            static_cast<std::uint16_t>(capture_count);
+        stage_begin_[static_cast<std::size_t>(Stage::quiet_checks)] =
+            static_cast<std::uint16_t>(kMaximumLegalMoves - check_count);
+        stage_end_[static_cast<std::size_t>(Stage::quiet_checks)] =
+            static_cast<std::uint16_t>(kMaximumLegalMoves);
+        candidate_count_ = capture_count + check_count;
+        stage_sorted_.reset();
+        return;
+    }
+
     for (std::size_t index = 0; index < moves_.size(); ++index) {
         if (is_excluded(index)) {
             continue;
         }
-        // Rank from the stored metadata directly; only the quiescence
-        // materialize path needs a mutable copy.  The copy is deliberately
-        // default-initialized and must outlive the branch that fills it:
-        // materialize() assigns it before `metadata` can point at it, so a
-        // value-initialization would only zero-fill a dead record on the
-        // common non-quiescence path.
-        MoveMetadata materialized;
+        // Quiescence is staged completely above, so this loop only ranks
+        // main and evasion candidates, and each one is ranked from its stored
+        // metadata record directly.
         const MoveMetadata* metadata = &moves_[index];
 
         Stage candidate_stage = Stage::done;
         if (mode_ == Mode::evasion) {
             candidate_stage = Stage::evasions;
-        } else if (mode_ == Mode::quiescence) {
-            // Stockfish's qsearch capture stage emits the complete capture
-            // list and lets qsearch SEE/delta pruning decide what is safe;
-            // do not discard a mildly losing recapture in the picker.
-            if (metadata->is_capture() || metadata->move.promotion() != Promotion::none) {
-                candidate_stage = Stage::good_captures;
-            } else if (metadata->gives_check) {
-                candidate_stage = Stage::quiet_checks;
-            }
         } else if (metadata->move.promotion() != Promotion::none || metadata->is_capture()) {
             candidate_stage = Stage::good_captures;
         } else {
@@ -529,21 +599,6 @@ void SearchMovePicker::prepare_candidates() {
             // separates the proven good quiet prefix from the tail that can
             // safely be searched after deferred captures.
             candidate_stage = Stage::good_quiets;
-        }
-        if (candidate_stage == Stage::done) {
-            continue;
-        }
-        // Qsearch deliberately asks the generator for captures without SEE
-        // so the picker can own the work.  Materialize tactical candidates
-        // before ranking them, however: qsearch may discard candidates after
-        // only its first two ordered moves, and a victim/attacker score alone
-        // can put a sound defensive recapture behind a poisoned capture.
-        // This remains fixed-storage and computes SEE only for candidates
-        // entering a tactical stage.
-        if (mode_ == Mode::quiescence &&
-            (metadata->is_capture() || metadata->move.promotion() != Promotion::none)) {
-            materialized = materialize(index);
-            metadata = &materialized;
         }
         const int priority = ordering_.priority(
             state_, *metadata, std::nullopt, history_context_);
@@ -676,6 +731,37 @@ std::optional<MoveMetadata> SearchMovePicker::next() {
                 advance_stage();
                 return tt;
             }
+            advance_stage();
+            continue;
+        }
+        if (mode_ == Mode::quiescence) {
+            // Quiescence only reaches the capture and quiet-check stages, so
+            // emit them straight from the regions prepare_candidates()
+            // placed them in.  The main-mode deferral and staged-priority
+            // reuse below are unreachable here; captures were materialized in
+            // prepare, so emission only restores the recorded SEE value
+            // instead of paying a second materialize() pass.
+            if (!candidates_prepared_) {
+                prepare_candidates();
+            }
+            ensure_stage_sorted();
+            const std::size_t rank = static_cast<std::size_t>(stage_);
+            const std::size_t stage_count =
+                static_cast<std::size_t>(stage_end_[rank]) - stage_begin_[rank];
+            if (candidate_index_ < stage_count) {
+                const Candidate& candidate =
+                    staged_[stage_begin_[rank] + candidate_index_++];
+                const std::size_t source_index = candidate.source_index;
+                emitted_.set(source_index);
+                MoveMetadata metadata = moves_[source_index];
+                if (metadata.is_capture()) {
+                    metadata.see_score = see_scores_[source_index];
+                    metadata.see_computed = true;
+                }
+                metadata.ordering_score = candidate.priority;
+                return metadata;
+            }
+            candidate_index_ = 0;
             advance_stage();
             continue;
         }

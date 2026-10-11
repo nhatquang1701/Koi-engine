@@ -551,6 +551,8 @@ void write_run_metrics(std::ostream& output, const BenchmarkRun& run, bool timed
            << result.stats.evaluation_cache_hits
            << ", \"evaluation_cache_misses\": "
            << result.stats.evaluation_cache_misses
+           << ", \"evaluation_feature_cache_misses\": "
+           << result.stats.evaluation_feature_cache_misses
            << "}, \"nps\": " << nps;
     if (timed) {
         output << ", \"elapsed_ms\": " << run.wall_time.count();
