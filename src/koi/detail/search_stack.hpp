@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <vector>
 
+#include "koi/detail/no_init_array.hpp"
 #include "koi/move.hpp"
 
 namespace koi::detail {
@@ -32,9 +33,29 @@ struct SearchFrame {
     bool had_tt_move = false;
 };
 
+// A principal variation is a plain length-prefixed move sequence.  Only the
+// first `length` entries are ever read (to_vector, prepend, the root coverage
+// check, and every direct moves[0] read test the length first), so the tail
+// stays unconstructed through NoInitArray; copies and moves carry just the
+// live prefix, mirroring MoveMetadataList.  A wholesale implicit copy would
+// carry the untouched tail instead.
 struct PrincipalVariation {
-    std::array<Move, kPrincipalVariationCapacity> moves{};
-    std::uint8_t length = 0;
+    PrincipalVariation() noexcept = default;
+    PrincipalVariation(const PrincipalVariation& other) noexcept { copy_from(other); }
+    PrincipalVariation& operator=(const PrincipalVariation& other) noexcept {
+        if (this != &other) {
+            copy_from(other);
+        }
+        return *this;
+    }
+    PrincipalVariation(PrincipalVariation&& other) noexcept { copy_from(other); }
+    PrincipalVariation& operator=(PrincipalVariation&& other) noexcept {
+        if (this != &other) {
+            copy_from(other);
+        }
+        return *this;
+    }
+    ~PrincipalVariation() = default;
 
     void clear() noexcept {
         length = 0;
@@ -49,7 +70,18 @@ struct PrincipalVariation {
     }
 
     [[nodiscard]] std::vector<Move> to_vector() const {
-        return {moves.begin(), moves.begin() + length};
+        return {moves.data(), moves.data() + length};
+    }
+
+    NoInitArray<Move, kPrincipalVariationCapacity> moves;
+    std::uint8_t length = 0;
+
+private:
+    void copy_from(const PrincipalVariation& other) noexcept {
+        length = other.length;
+        for (std::size_t index = 0; index < length; ++index) {
+            moves[index] = other.moves[index];
+        }
     }
 };
 

@@ -2,6 +2,7 @@
 
 #include "koi/game_state.hpp"
 #include "koi/detail/attack_tables.hpp"
+#include "koi/detail/no_init_array.hpp"
 
 #include <algorithm>
 #include <array>
@@ -48,8 +49,9 @@ public:
 private:
     // Uninitialized on purpose: every read is bounded by size_ and every write
     // goes through emplace_back, which stores the element before counting it.
-    // Value-initializing would zero 256 Moves (1 KiB) on every generation call.
-    std::array<Move, kMaximumLegalMoves> storage_;
+    // NoInitArray defers each entry's construction to that store, so a
+    // generation call never writes 256 no-move sentinels (1 KiB).
+    detail::NoInitArray<Move, kMaximumLegalMoves> storage_;
     std::size_t size_ = 0;
 };
 

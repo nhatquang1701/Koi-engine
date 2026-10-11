@@ -8,6 +8,7 @@
 #include <optional>
 #include <vector>
 
+#include "koi/detail/no_init_array.hpp"
 #include "koi/syzygy_tablebase.hpp"
 
 namespace koi::detail {
@@ -1409,8 +1410,9 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
         bool singular_probe_done = false;
         // Only the first `failed_move_count` entries are ever read, so the
         // array is intentionally left uninitialized to avoid clearing ~3 KB
-        // at every negamax node.
-        std::array<DeferredHistoryMove, kMaximumLegalMoves> failed_moves;
+        // at every negamax node.  NoInitArray starts an entry's lifetime on
+        // the store that claims it; nothing is written up front.
+        NoInitArray<DeferredHistoryMove, kMaximumLegalMoves> failed_moves;
         std::size_t failed_move_count = 0;
         MoveMetadata best_metadata{};
         Color best_history_side = side_to_move;

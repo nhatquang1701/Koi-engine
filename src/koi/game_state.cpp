@@ -17,6 +17,7 @@
 #include "koi/detail/attack_tables.hpp"
 #include "koi/detail/compatibility_mirror.hpp"
 #include "koi/detail/feature_state.hpp"
+#include "koi/detail/no_init_array.hpp"
 #include "koi/detail/static_exchange.hpp"
 #include "koi/position.hpp"
 
@@ -1608,9 +1609,10 @@ void GameState::legal_moves_with_metadata(MoveMetadataList& moves,
     const std::uint64_t key = position_key();
     try {
         // Only the first `legal_count` entries are read; the generator writes
-        // them all before use, so the zero-fill pass is skipped.
-        std::array<Move, kMaximumLegalMoves> legal;
-        const std::size_t legal_count = impl_->native_position.legal_moves_into(legal);
+        // them all before use, so no initialization pass runs at all.
+        detail::NoInitArray<Move, kMaximumLegalMoves> legal;
+        const std::size_t legal_count = impl_->native_position.legal_moves_into(
+            std::span<Move>(legal.data(), legal.size()));
         const NativeMetadataContext context{
             &impl_->native_position,
             impl_->mirror_tracking ? &impl_->compatibility_mirror : nullptr};
@@ -1660,8 +1662,8 @@ bool GameState::legal_tactical_moves_with_metadata(MoveMetadataList& moves,
     bool has_legal_moves = false;
     try {
         // Only the first `legal_count` entries are read; the generator writes
-        // them all before use, so the zero-fill pass is skipped.
-        std::array<Move, kMaximumLegalMoves> legal;
+        // them all before use, so no initialization pass runs at all.
+        detail::NoInitArray<Move, kMaximumLegalMoves> legal;
         const bool checked = impl_->native_position.in_check();
         // Quiescence without quiet checks only needs the tactical frontier.
         // A position whose only legal moves are quiet still has to count as
@@ -1669,8 +1671,10 @@ bool GameState::legal_tactical_moves_with_metadata(MoveMetadataList& moves,
         // early-exit legality probe.
         const bool tactical_only = !checked && !include_quiet_checks;
         const std::size_t legal_count = tactical_only ?
-            impl_->native_position.legal_tactical_moves_into(legal) :
-            impl_->native_position.legal_moves_into(legal);
+            impl_->native_position.legal_tactical_moves_into(
+                std::span<Move>(legal.data(), legal.size())) :
+            impl_->native_position.legal_moves_into(
+                std::span<Move>(legal.data(), legal.size()));
         has_legal_moves = legal_count != 0 ||
             (tactical_only && impl_->native_position.has_legal_move());
         const NativeMetadataContext context{

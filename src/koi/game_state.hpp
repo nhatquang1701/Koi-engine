@@ -10,6 +10,7 @@
 #include <string_view>
 #include <vector>
 
+#include "koi/detail/no_init_array.hpp"
 #include "koi/move.hpp"
 
 namespace koi {
@@ -76,14 +77,16 @@ inline constexpr std::size_t kMaximumLegalMoves = 256;
 
 class MoveMetadataList {
 public:
-    using iterator = std::array<MoveMetadata, kMaximumLegalMoves>::iterator;
-    using const_iterator = std::array<MoveMetadata, kMaximumLegalMoves>::const_iterator;
+    using iterator = MoveMetadata*;
+    using const_iterator = const MoveMetadata*;
 
     // The storage is intentionally left uninitialized: only the first
     // `size()` entries are ever read, and the search hot path allocates one of
-    // these per node.  Copying is restricted to the live prefix for the same
-    // reason (an implicit array copy would read the uninitialized tail).
-    constexpr MoveMetadataList() noexcept = default;
+    // these per node.  NoInitArray starts each entry's lifetime on first write
+    // instead of storing Move's no-move sentinel into all 256 entries, and
+    // copying stays restricted to the live prefix for the same reason (a
+    // wholesale copy would carry the untouched tail).
+    MoveMetadataList() noexcept = default;
     MoveMetadataList(const MoveMetadataList& other) noexcept { copy_from(other); }
     MoveMetadataList& operator=(const MoveMetadataList& other) noexcept {
         if (this != &other) {
@@ -102,24 +105,24 @@ public:
 
     [[nodiscard]] constexpr std::size_t size() const noexcept { return size_; }
     [[nodiscard]] constexpr bool empty() const noexcept { return size_ == 0; }
-    [[nodiscard]] constexpr MoveMetadata& front() noexcept { return storage_[0]; }
-    [[nodiscard]] constexpr const MoveMetadata& front() const noexcept { return storage_[0]; }
-    [[nodiscard]] constexpr MoveMetadata& back() noexcept { return storage_[size_ - 1]; }
-    [[nodiscard]] constexpr const MoveMetadata& back() const noexcept { return storage_[size_ - 1]; }
-    [[nodiscard]] constexpr MoveMetadata& operator[](std::size_t index) noexcept { return storage_[index]; }
-    [[nodiscard]] constexpr const MoveMetadata& operator[](std::size_t index) const noexcept {
+    [[nodiscard]] MoveMetadata& front() noexcept { return storage_[0]; }
+    [[nodiscard]] const MoveMetadata& front() const noexcept { return storage_[0]; }
+    [[nodiscard]] MoveMetadata& back() noexcept { return storage_[size_ - 1]; }
+    [[nodiscard]] const MoveMetadata& back() const noexcept { return storage_[size_ - 1]; }
+    [[nodiscard]] MoveMetadata& operator[](std::size_t index) noexcept { return storage_[index]; }
+    [[nodiscard]] const MoveMetadata& operator[](std::size_t index) const noexcept {
         return storage_[index];
     }
-    [[nodiscard]] constexpr iterator begin() noexcept { return storage_.begin(); }
-    [[nodiscard]] constexpr const_iterator begin() const noexcept { return storage_.begin(); }
-    [[nodiscard]] constexpr const_iterator cbegin() const noexcept { return storage_.cbegin(); }
-    [[nodiscard]] constexpr iterator end() noexcept { return storage_.begin() + size_; }
-    [[nodiscard]] constexpr const_iterator end() const noexcept { return storage_.begin() + size_; }
-    [[nodiscard]] constexpr const_iterator cend() const noexcept { return storage_.cbegin() + size_; }
+    [[nodiscard]] iterator begin() noexcept { return storage_.data(); }
+    [[nodiscard]] const_iterator begin() const noexcept { return storage_.data(); }
+    [[nodiscard]] const_iterator cbegin() const noexcept { return storage_.data(); }
+    [[nodiscard]] iterator end() noexcept { return storage_.data() + size_; }
+    [[nodiscard]] const_iterator end() const noexcept { return storage_.data() + size_; }
+    [[nodiscard]] const_iterator cend() const noexcept { return storage_.data() + size_; }
 
     constexpr void clear() noexcept { size_ = 0; }
 
-    [[nodiscard]] constexpr bool push_back(const MoveMetadata& metadata) noexcept {
+    [[nodiscard]] bool push_back(const MoveMetadata& metadata) noexcept {
         if (size_ >= kMaximumLegalMoves) {
             return false;
         }
@@ -139,7 +142,7 @@ private:
         }
     }
 
-    std::array<MoveMetadata, kMaximumLegalMoves> storage_;
+    detail::NoInitArray<MoveMetadata, kMaximumLegalMoves> storage_;
     std::size_t size_ = 0;
 };
 
