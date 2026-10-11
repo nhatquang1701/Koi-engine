@@ -1147,6 +1147,18 @@ std::vector<Move> legal_moves() {
 
     bool make_null_move() noexcept {
         snapshot_into(state, /*null_move=*/true);
+        // A null pass touches no piece, so the board, the piece bitboards and
+        // the occupancy words are already current: only the rule-state key
+        // terms change.  This mirrors calculate_key(): the en-passant term is
+        // present iff the predicate below held when the key was last built,
+        // so probe it while the square is still set and the side to move is
+        // still the side that could capture; the side-to-move term toggles
+        // exactly once for the flip below.
+        const ZobristKeys& keys = zobrist();
+        if (has_legal_en_passant_capture_mutable(state)) {
+            state.key ^= keys.en_passant[state.en_passant.index() & 7];
+        }
+        state.key ^= keys.black_to_move;
         state.en_passant = {};
         state.halfmove = static_cast<std::uint16_t>(
             std::min<unsigned>(std::numeric_limits<std::uint16_t>::max(), state.halfmove + 1));
@@ -1159,7 +1171,10 @@ std::vector<Move> legal_moves() {
         // history fingerprint intact, but suppress all positions derived from
         // the pass while that speculative branch remains active.
         state.repetition_history_suppressed = true;
-        rebuild_derived(state);
+        // Same post-null-move arm as rebuild_derived(): the new side to move
+        // needs fresh checkers/pinned masks, and nothing else it rebuilt
+        // (board-derived bitboards) can have changed.
+        refresh_king_masks(state);
         return true;
     }
 

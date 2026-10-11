@@ -435,38 +435,59 @@ int pawn_break_for(const PositionFeatures& features, Color color) noexcept {
         (kEvaluation.maximum_phase + kEvaluation.center_control_phase_offset);
 }
 
-int initiative_for(const PositionFeatures& features, Color color) noexcept {
-    const int own = color_index(color);
-    const int enemy = 1 - own;
+// The former per-colour walks are fused into one ascending pass over
+// `occupied`.  For a piece of either colour both walks evaluated the same
+// loose-piece predicate (attacked by the opponent and not defended by its own
+// side), so the merged walk tests it once: the pressure bonus still credits
+// the attacker's accumulator and the hanging penalty still debits the owner's.
+// The knight mobility query likewise serves only the owner, so it runs once
+// per piece instead of once per colour.  Each accumulator receives the same
+// additions in the same square order as the walk it replaces, and the
+// returned difference is the same integer expression `breakdown` formerly
+// computed from the two return values.
+int initiative_for(const PositionFeatures& features) noexcept {
     const int phase_taper = static_cast<int>(features.game_phase) +
         kEvaluation.center_control_phase_offset;
-    int score = 0;
+    int white_score = 0;
+    int black_score = 0;
     const auto inspect_square = [&](const int square) noexcept {
         const Piece piece = features.board[static_cast<std::size_t>(square)];
         if (piece.empty() || piece.type == PieceType::king) {
             return;
         }
+        const int own = color_index(piece.color);
+        const int enemy = 1 - own;
         const std::uint64_t square_bit = std::uint64_t{1} << square;
-        if (color_index(piece.color) == enemy) {
-            // An attack on a defended piece is not, by itself, a useful threat:
-            // rewarding it inflated quiet positions where the opponent can
-            // simply recapture the attacker.  Keep this term conservative and
-            // reserve it for genuinely loose valuable pieces.
-            if ((features.attacked_squares[own] & square_bit) != 0 &&
-                (features.attacked_squares[enemy] & square_bit) == 0) {
-                score += piece_value(piece.type) * kEvaluation.attacked_piece_pressure_weight / 100;
+        // An attack on a defended piece is not, by itself, a useful threat:
+        // rewarding it inflated quiet positions where the opponent can
+        // simply recapture the attacker.  Keep this term conservative and
+        // reserve it for genuinely loose valuable pieces.
+        const bool loose = (features.attacked_squares[enemy] & square_bit) != 0 &&
+            (features.attacked_squares[own] & square_bit) == 0;
+        if (loose) {
+            if (piece.color == Color::white) {
+                black_score += piece_value(piece.type) * kEvaluation.attacked_piece_pressure_weight / 100;
+                white_score -= piece_value(piece.type) * kEvaluation.hanging_piece_penalty / 100;
+            } else {
+                white_score += piece_value(piece.type) * kEvaluation.attacked_piece_pressure_weight / 100;
+                black_score -= piece_value(piece.type) * kEvaluation.hanging_piece_penalty / 100;
             }
-            return;
         }
-
-        if ((features.attacked_squares[enemy] & square_bit) != 0 &&
-            (features.attacked_squares[own] & square_bit) == 0) {
-            score -= piece_value(piece.type) * kEvaluation.hanging_piece_penalty / 100;
-        }
-        if (piece.type == PieceType::knight &&
-            piece_mobility(features, static_cast<std::uint8_t>(square)) == 0) {
-            score -= kEvaluation.trapped_piece_penalty * phase_taper /
-                (kEvaluation.maximum_phase + kEvaluation.center_control_phase_offset);
+        if (piece.type == PieceType::knight) {
+            // Extracted features store the knight's mobility directly;
+            // synthetic fixtures keep the board-scanning accessor.
+            const bool trapped = features.occupied != 0
+                ? features.piece_mobility[square] == 0
+                : piece_mobility(features, static_cast<std::uint8_t>(square)) == 0;
+            if (trapped) {
+                if (piece.color == Color::white) {
+                    white_score -= kEvaluation.trapped_piece_penalty * phase_taper /
+                        (kEvaluation.maximum_phase + kEvaluation.center_control_phase_offset);
+                } else {
+                    black_score -= kEvaluation.trapped_piece_penalty * phase_taper /
+                        (kEvaluation.maximum_phase + kEvaluation.center_control_phase_offset);
+                }
+            }
         }
     };
     if (features.occupied != 0) {
@@ -476,7 +497,7 @@ int initiative_for(const PositionFeatures& features, Color color) noexcept {
             inspect_square(square);
         }
     }
-    return score;
+    return white_score - black_score;
 }
 
 int king_activity_for(const PositionFeatures& features, Color color) noexcept {
@@ -617,9 +638,29 @@ void for_each_feature_pawn(const PositionFeatures& features, int color, Fn&& vis
     }
 }
 
-int pawn_structure_for(const PositionFeatures& features, Color color) noexcept {
+// Both pawn terms of one colour come from a single ascending own-pawn walk.
+// The former `pawn_structure_for` and `passed_pawn_for` walks ran the passed
+// test with identical arguments for the same pawn, so the fused walk calls
+// `pawn_is_passed_bitboard` once per pawn and lets both accumulators share the
+// result.  Each accumulator keeps the same terms in the same pawn order as
+// the walk it replaces, and the fixture (`occupied == 0`) fallbacks are
+// unchanged.
+struct PawnScores {
+    int structure = 0;
+    int passed = 0;
+};
+
+PawnScores pawn_scores_for(const PositionFeatures& features, Color color) noexcept {
     const int own = color_index(color);
     const int enemy = 1 - own;
+    const int direction = color == Color::white ? 1 : -1;
+    const std::uint8_t king = features.king_squares[own].index();
+    const std::uint8_t enemy_king = features.king_squares[1 - own].index();
+    const int king_file = king < 64 ? king % 8 : 0;
+    const int king_rank = king < 64 ? king / 8 : 0;
+    const int enemy_king_file = enemy_king < 64 ? enemy_king % 8 : 0;
+    const int enemy_king_rank = enemy_king < 64 ? enemy_king / 8 : 0;
+    const int endgame_phase = kEvaluation.maximum_phase - features.game_phase;
     std::array<int, 8> own_file_counts{};
     if (features.occupied != 0) {
         for (int file = 0; file < 8; ++file) {
@@ -636,7 +677,7 @@ int pawn_structure_for(const PositionFeatures& features, Color color) noexcept {
         }
     }
 
-    int score = 0;
+    int structure = 0;
     int islands = 0;
     bool previous_file = false;
     for (int file = 0; file < 8; ++file) {
@@ -645,19 +686,19 @@ int pawn_structure_for(const PositionFeatures& features, Color color) noexcept {
             ++islands;
         }
         previous_file = occupied;
-        score -= std::max(0, own_file_counts[file] - 1) * kEvaluation.doubled_pawn_penalty;
+        structure -= std::max(0, own_file_counts[file] - 1) * kEvaluation.doubled_pawn_penalty;
         const bool left_file = file > 0 && own_file_counts[file - 1] > 0;
         const bool right_file = file < 7 && own_file_counts[file + 1] > 0;
         if (occupied && !left_file && !right_file) {
-            score -= own_file_counts[file] * kEvaluation.isolated_pawn_penalty;
+            structure -= own_file_counts[file] * kEvaluation.isolated_pawn_penalty;
         }
     }
-    score -= std::max(0, islands - 1) * kEvaluation.pawn_island_penalty;
+    structure -= std::max(0, islands - 1) * kEvaluation.pawn_island_penalty;
 
+    int passed_score = 0;
     for_each_feature_pawn(features, own, [&](const int square) {
         const int file = square % 8;
         const int rank = square / 8;
-        const int direction = color == Color::white ? 1 : -1;
         const int forward_rank = rank + direction;
         bool passed = true;
         if (features.occupied != 0) {
@@ -678,17 +719,37 @@ int pawn_structure_for(const PositionFeatures& features, Color color) noexcept {
             const int advancement = color == Color::white ? rank : 7 - rank;
             const int passed_bonus = kEvaluation.passed_pawn_base +
                 advancement * kEvaluation.passed_pawn_advance_weight;
-            score += passed_bonus * (kEvaluation.passed_pawn_phase_base - features.game_phase) /
+            structure += passed_bonus * (kEvaluation.passed_pawn_phase_base - features.game_phase) /
                 kEvaluation.maximum_phase;
             if ((features.attacked_squares[own] & (std::uint64_t{1} << square)) != 0) {
-                score += kEvaluation.passed_pawn_protection_bonus;
+                structure += kEvaluation.passed_pawn_protection_bonus;
             }
             if (forward_rank >= 0 && forward_rank < 8) {
                 const Piece blocker = features.board[static_cast<std::size_t>(forward_rank * 8 + file)];
                 if (!blocker.empty() && color_index(blocker.color) == enemy) {
-                    score -= kEvaluation.direct_passed_pawn_blockade_penalty;
+                    structure -= kEvaluation.direct_passed_pawn_blockade_penalty;
                 }
             }
+
+            const int king_distance = std::max(std::abs(file - king_file), std::abs(rank - king_rank));
+            const int enemy_king_distance = std::max(
+                std::abs(file - enemy_king_file), std::abs(rank - enemy_king_rank));
+            // King proximity is only meaningful once the board clears, so taper the
+            // whole support package by the endgame phase: a middlegame passer must
+            // not earn credit for a king that is still sheltering.  The enemy-king
+            // term is a penalty rather than a bonus, so it is allowed to go
+            // negative for passers the hostile king controls.
+            int king_term = std::max(0, 4 - king_distance) *
+                kEvaluation.passed_pawn_king_proximity_weight;
+            if (king_distance <= 2) {
+                king_term += kEvaluation.passed_pawn_king_support_bonus;
+            }
+            king_term -= std::max(0, 4 - enemy_king_distance) *
+                kEvaluation.passed_pawn_enemy_king_penalty_weight;
+            passed_score += king_term * endgame_phase / kEvaluation.maximum_phase;
+
+            passed_score += advancement * kEvaluation.passed_pawn_promotion_weight * endgame_phase /
+                kEvaluation.maximum_phase;
         }
 
         bool connected = false;
@@ -713,13 +774,16 @@ int pawn_structure_for(const PositionFeatures& features, Color color) noexcept {
             }
         }
         if (connected) {
-            score += kEvaluation.connected_pawn_bonus;
+            structure += kEvaluation.connected_pawn_bonus;
         }
 
         if (forward_rank >= 0 && forward_rank < 8) {
             const std::uint64_t forward_bit = std::uint64_t{1} << (forward_rank * 8 + file);
-            if ((features.attacked_squares[enemy] & forward_bit) != 0) {
-                score -= kEvaluation.attacked_pawn_penalty;
+            // The attacked-pawn and backward-pawn penalties were gated on the
+            // same bit test, so the shared value is computed once.
+            const bool forward_attacked = (features.attacked_squares[enemy] & forward_bit) != 0;
+            if (forward_attacked) {
+                structure -= kEvaluation.attacked_pawn_penalty;
             }
 
             bool has_advanced_support = false;
@@ -752,72 +816,12 @@ int pawn_structure_for(const PositionFeatures& features, Color color) noexcept {
                     }
                 }
             }
-            if (!has_advanced_support && (features.attacked_squares[enemy] & forward_bit) != 0) {
-                score -= kEvaluation.backward_pawn_penalty;
+            if (!has_advanced_support && forward_attacked) {
+                structure -= kEvaluation.backward_pawn_penalty;
             }
         }
     });
-    return score;
-}
-
-int passed_pawn_for(const PositionFeatures& features, Color color) noexcept {
-    const int own = color_index(color);
-    const int direction = color == Color::white ? 1 : -1;
-    const std::uint8_t king = features.king_squares[own].index();
-    const std::uint8_t enemy_king = features.king_squares[1 - own].index();
-    const int king_file = king < 64 ? king % 8 : 0;
-    const int king_rank = king < 64 ? king / 8 : 0;
-    const int enemy_king_file = enemy_king < 64 ? enemy_king % 8 : 0;
-    const int enemy_king_rank = enemy_king < 64 ? enemy_king / 8 : 0;
-    const int endgame_phase = kEvaluation.maximum_phase - features.game_phase;
-    int score = 0;
-
-    for_each_feature_pawn(features, own, [&](const int square) {
-        const int file = square % 8;
-        const int rank = square / 8;
-        bool passed = true;
-        if (features.occupied != 0) {
-            passed = pawn_is_passed_bitboard(features, 1 - own, file, rank, direction);
-        } else {
-            for (int candidate_file = std::max(0, file - 1);
-                 candidate_file <= std::min(7, file + 1); ++candidate_file) {
-                for (int candidate_rank = rank + direction;
-                     candidate_rank >= 0 && candidate_rank < 8;
-                     candidate_rank += direction) {
-                    const Piece candidate = features.board[
-                        static_cast<std::size_t>(candidate_rank * 8 + candidate_file)];
-                    if (candidate.type == PieceType::pawn && color_index(candidate.color) != own) {
-                        passed = false;
-                    }
-                }
-            }
-        }
-        if (!passed) {
-            return;
-        }
-
-        const int king_distance = std::max(std::abs(file - king_file), std::abs(rank - king_rank));
-        const int enemy_king_distance = std::max(
-            std::abs(file - enemy_king_file), std::abs(rank - enemy_king_rank));
-        // King proximity is only meaningful once the board clears, so taper the
-        // whole support package by the endgame phase: a middlegame passer must
-        // not earn credit for a king that is still sheltering.  The enemy-king
-        // term is a penalty rather than a bonus, so it is allowed to go
-        // negative for passers the hostile king controls.
-        int king_term = std::max(0, 4 - king_distance) *
-            kEvaluation.passed_pawn_king_proximity_weight;
-        if (king_distance <= 2) {
-            king_term += kEvaluation.passed_pawn_king_support_bonus;
-        }
-        king_term -= std::max(0, 4 - enemy_king_distance) *
-            kEvaluation.passed_pawn_enemy_king_penalty_weight;
-        score += king_term * endgame_phase / kEvaluation.maximum_phase;
-
-        const int advancement = color == Color::white ? rank : 7 - rank;
-        score += advancement * kEvaluation.passed_pawn_promotion_weight * endgame_phase /
-            kEvaluation.maximum_phase;
-    });
-    return score;
+    return PawnScores{structure, passed_score};
 }
 
 int activity_for(const PositionFeatures& features, Color color) noexcept {
@@ -1009,8 +1013,9 @@ EvaluationBreakdown ClassicalEvaluator::breakdown(const GameState& state, Color 
 
     score.mobility = (static_cast<int>(features.mobility[0]) -
                       static_cast<int>(features.mobility[1])) * kEvaluation.mobility_weight;
-    score.pawn_structure = pawn_structure_for(features, Color::white) -
-                           pawn_structure_for(features, Color::black);
+    const PawnScores white_pawns = pawn_scores_for(features, Color::white);
+    const PawnScores black_pawns = pawn_scores_for(features, Color::black);
+    score.pawn_structure = white_pawns.structure - black_pawns.structure;
     score.activity = activity_for(features, Color::white) - activity_for(features, Color::black);
     score.development = development_for(extracted, Color::white) -
                         development_for(extracted, Color::black);
@@ -1018,16 +1023,14 @@ EvaluationBreakdown ClassicalEvaluator::breakdown(const GameState& state, Color 
                            center_control_for(features, Color::black) +
                            pawn_break_for(features, Color::white) -
                            pawn_break_for(features, Color::black);
-    score.initiative = initiative_for(features, Color::white) -
-                       initiative_for(features, Color::black);
+    score.initiative = initiative_for(features);
     score.king_safety = king_safety_for(features, Color::white) -
                         king_safety_for(features, Color::black);
     score.king_safety = score.king_safety * (phase + kEvaluation.king_safety_phase_offset) /
         kEvaluation.king_safety_phase_divisor;
     score.king_activity = king_activity_for(features, Color::white) -
                           king_activity_for(features, Color::black);
-    score.passed_pawn = passed_pawn_for(features, Color::white) -
-                        passed_pawn_for(features, Color::black);
+    score.passed_pawn = white_pawns.passed - black_pawns.passed;
     score.tempo = phase <= 2 ?
         (features.side_to_move == Color::white ? kEvaluation.tempo_bonus :
          -kEvaluation.tempo_bonus) : 0;

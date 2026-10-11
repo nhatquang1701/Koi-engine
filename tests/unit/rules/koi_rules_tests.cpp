@@ -327,6 +327,40 @@ void test_null_move_round_trips_side_fen_and_key() {
     require(!state.unmake_null_move(), "an empty null-move history must be rejected");
 }
 
+void test_null_move_incremental_key_matches_a_fresh_parse() {
+    struct Fixture {
+        std::string_view fen;
+        std::string_view expected_after;
+        koi::Color side_after;
+    };
+    constexpr Fixture fixtures[] = {
+        {"r3k2r/ppp2ppp/2n1bn2/3qp3/3P4/2NB1N2/PPP2PPP/R2Q1RK1 w kq - 10 9",
+         "r3k2r/ppp2ppp/2n1bn2/3qp3/3P4/2NB1N2/PPP2PPP/R2Q1RK1 b kq - 11 9", koi::Color::black},
+        {"4k3/8/8/3pP3/8/8/8/4K3 w - d6 0 2",
+         "4k3/8/8/3pP3/8/8/8/4K3 b - - 1 2", koi::Color::black},
+        {"4r1k1/8/8/3pP3/8/8/8/4K3 w - d6 0 2",
+         "4r1k1/8/8/3pP3/8/8/8/4K3 b - - 1 2", koi::Color::black},
+        {"4k3/8/3p4/8/4Pp2/8/8/4K3 b - e3 0 9",
+         "4k3/8/3p4/8/4Pp2/8/8/4K3 w - - 1 10", koi::Color::white},
+    };
+
+    for (const Fixture& fixture : fixtures) {
+        const auto parsed = GameState::from_fen(fixture.fen);
+        require(parsed.has_value(), "null-move key fixture FEN must parse");
+        GameState state = *parsed;
+        require(state.make_null_move(), "a fixture must accept a null move");
+
+        const auto after = GameState::from_fen(fixture.expected_after);
+        require(after.has_value(), "null-move expected FEN must parse");
+        require(state.fen() == fixture.expected_after,
+                "a null move must emit the expected FEN");
+        require(state.side_to_move() == fixture.side_after,
+                "a null move must flip the side to move");
+        require(state.position_key() == after->position_key(),
+                "the null-move key must match a fresh parse of the resulting FEN");
+    }
+}
+
 void test_rejected_king_move_leaves_state_unchanged() {
     const auto parsed = GameState::from_fen("4r2k/8/8/8/8/8/8/4K3 w - - 0 1");
     require(parsed.has_value(), "rejected-move fixture must construct");
@@ -368,6 +402,7 @@ int main(int argc, char** argv) {
         {"position features", test_position_features_expose_symmetric_board_attacks_and_mobility},
         {"make/unmake restoration", test_make_and_unmake_restore_fen_and_key},
         {"null move restoration", test_null_move_round_trips_side_fen_and_key},
+        {"null move incremental key", test_null_move_incremental_key_matches_a_fresh_parse},
         {"transactional rejected move", test_rejected_king_move_leaves_state_unchanged},
         {"start-position move count", test_start_position_has_twenty_legal_moves},
     };
