@@ -296,6 +296,12 @@ public:
     // account extractions without reading position_feature_cache_misses()
     // before and after.
     bool position_features_into(PositionFeatures& out) const noexcept;
+    // Cache-free fetch for the evaluator path, which evaluates each position at
+    // most once per evaluation-cache window: the FeatureState slot (keyed by
+    // ply/history_size) has ~0 hit rate there and only adds lock, counter, and
+    // copy overhead. Value-initializes `out` and runs the same native builder,
+    // so the result stays value-identical to a FeatureState rebuild.
+    void position_features_uncached(PositionFeatures& out) const noexcept;
     // Diagnostic-only count of cache rebuilds. Search uses this to verify that
     // make/unmake restores parent feature snapshots instead of rebuilding them.
     [[nodiscard]] std::uint64_t position_feature_cache_misses() const noexcept;

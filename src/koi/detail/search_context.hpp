@@ -455,11 +455,7 @@ struct SearchContext {
         }
 
         ++stats.evaluation_cache_misses;
-        const std::uint64_t feature_misses_before =
-            state.position_feature_cache_misses();
         const int score = evaluation.evaluate(state, perspective);
-        stats.evaluation_feature_cache_misses +=
-            state.position_feature_cache_misses() - feature_misses_before;
         entry = EvaluationCacheEntry{key, score, true};
         return score;
     }

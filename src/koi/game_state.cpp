@@ -1818,6 +1818,14 @@ bool GameState::position_features_into(PositionFeatures& out) const noexcept {
         out);
 }
 
+void GameState::position_features_uncached(PositionFeatures& out) const noexcept {
+    // Exactly the FeatureState miss-path body minus the cache: value-initialize
+    // then run the same native builder, so every field carries the same bytes
+    // a FeatureState rebuild would produce for this position.
+    out = {};
+    native_position_features(impl_->native_position, out);
+}
+
 std::uint64_t GameState::position_feature_cache_misses() const noexcept {
     return impl_->feature_state.cache_misses();
 }

@@ -423,9 +423,11 @@ int SearchContext::quiescence(GameState& state, int alpha, int beta, int ply,
         int move_count = 0;
         while (const MoveMetadata* candidate = picker.next()) {
             const MoveMetadata& metadata = *candidate;
-            if (interrupted()) {
-                return 0;
-            }
+            // The stop flags are already sampled once per node entry
+            // (count_node above), so no per-candidate interrupt check is
+            // needed here: an external stop only widens abort latency by the
+            // remainder of this node's candidate-prune tail, and no candidate
+            // can recurse without passing a child node-entry sample.
             if (!checked &&
                 qdepth >= quiescence_check_depth_limit - 1 &&
                 metadata.gives_check &&
@@ -1486,9 +1488,11 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
         const bool phase_rich_depth_three = depth == 3 && node_game_phase >= 8;
         while (const MoveMetadata* candidate = picker.next()) {
             const MoveMetadata& metadata = *candidate;
-            if (interrupted()) {
-                return 0;
-            }
+            // The stop flags are already sampled once per node entry
+            // (count_node above), so no per-candidate interrupt check is
+            // needed here: an external stop only widens abort latency by the
+            // remainder of this node's candidate-prune tail, and no candidate
+            // can recurse without passing a child node-entry sample.
             const Move move = metadata.move;
             // The killer probe is consumed only by gates that cannot observe
             // it below depth 3: negative_continuation_history requires

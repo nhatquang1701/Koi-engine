@@ -320,11 +320,12 @@ constexpr std::size_t kThreatSliderStride = 384;
 
 EvaluationFeatures EvaluationFeatureExtractor::extract(const GameState& state) noexcept {
     EvaluationFeatures features;
-    // Fill the member in place: the cached snapshot is copied once, where the
-    // by-value call would also build and then copy-assign a return temporary.
-    // Every member of `features.position` is overwritten, so the result is
-    // identical to `features.position = state.position_features()`.
-    state.position_features_into(features.position);
+    // Fill the member in place from the cache-free evaluator path: same
+    // value-initialize-then-build sequence as a FeatureState miss, without the
+    // cache's lock/counter/copy overhead. Every member receives the same bytes
+    // the cached snapshot would carry, so the result is identical to
+    // `features.position = state.position_features()`.
+    state.position_features_uncached(features.position);
     features.castling_rights = features.position.castling_rights;
     return features;
 }

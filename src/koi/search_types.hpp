@@ -104,9 +104,9 @@ struct SearchStats {
     // Number of evaluator calls that missed the search-local static-evaluation
     // cache and invoked the evaluator directly. Diagnostic-only.
     std::uint64_t evaluation_cache_misses = 0;
-    // Number of evaluator-path position-feature cache rebuilds observed around
-    // those static-evaluation misses. Diagnostic-only; makes the evaluator's
-    // FeatureState hit/miss ratio observable.
+    // Retained for JSON schema stability; now structurally zero. The evaluator
+    // path builds features directly (it no longer consults FeatureState), so
+    // there are no evaluator-path FeatureState rebuilds left to observe.
     std::uint64_t evaluation_feature_cache_misses = 0;
     std::uint64_t tt_hits = 0;
     std::uint64_t pvs_searches = 0;
