@@ -27,8 +27,16 @@ inline constexpr std::size_t kSearchContinuationPlies = 6;
 // The recursive search supplies the short move suffix that is available at a
 // node.  Keeping this as a value object makes all ordering tables worker-local
 // and avoids exposing SearchStack internals to the ordering implementation.
+//
+// Deliberately without default member initializers: this is a
+// write-before-read contract type.  SearchContext::history_context() writes
+// every field any reader can observe, and quiescence starts the storage
+// without stores (NoInitArray), so a context that can never be read costs no
+// initialization.  The unscaled continuation tail still holds Move's own
+// sentinel because Move's non-trivial default constructor runs on the
+// default-initialized array.
 struct SearchHistoryContext {
-    std::array<Move, kSearchContinuationPlies> continuation_moves{};
+    std::array<Move, kSearchContinuationPlies> continuation_moves;
     // `table_move_index(continuation_moves[d]) * 131U`, hoisted once per node
     // by SearchContext::history_context() so scoring stops recomputing it per
     // candidate.  table_move_index() is pure and total (no-move and
@@ -38,13 +46,13 @@ struct SearchHistoryContext {
     // unsealed context (a real move never has index 0); those recompute the
     // component, which preserves the exact previous behavior for hand-built
     // contexts.
-    std::array<std::uint32_t, kSearchContinuationPlies> continuation_previous_scaled{};
-    std::size_t count = 0;
-    int ply = 0;
+    std::array<std::uint32_t, kSearchContinuationPlies> continuation_previous_scaled;
+    std::size_t count;
+    int ply;
     // The search supplies a pawn-only structural key so equal pawn
     // structures share experience across otherwise different piece layouts;
     // the move dimensions remain explicit in the table index.
-    std::uint64_t pawn_key = 0;
+    std::uint64_t pawn_key;
 };
 
 // SearchOrderingTables owns the adaptive state for one worker's move ordering.

@@ -3,10 +3,13 @@
 // resizing.  These behaviours are otherwise only reachable through a full
 // search, where failures are hard to localise.
 
+#include <atomic>
+#include <chrono>
 #include <cstdint>
 #include <thread>
 #include <vector>
 
+#include "koi/detail/search_table_access.hpp"
 #include "koi/move.hpp"
 #include "koi/transposition_table.hpp"
 #include "koi_test_support.hpp"
@@ -16,6 +19,7 @@ namespace {
 using koi::Move;
 using koi::TranspositionBound;
 using koi::TranspositionTable;
+using koi::detail::SearchTableAccess;
 using koi::test::require;
 
 [[nodiscard]] Move parse_move(std::string_view text) {
@@ -190,6 +194,83 @@ void test_concurrent_store_and_probe_is_safe() {
     }
 }
 
+void test_exclusive_access_round_trips_through_the_session_pin() {
+    TranspositionTable table(1);
+    SearchTableAccess access(table);
+    const Move move = parse_move("e2e4");
+
+    // Exclusive mode must behave like locked mode for entry values while it
+    // serves accesses from its session pin instead of a per-access lease.
+    access.set_exclusive(true);
+    access.store(0xE4E4ULL, 6, 55, TranspositionBound::lower, move, 1, true, 321);
+    const auto entry = koi::test::require_value(access.probe(0xE4E4ULL, 1),
+                                                "an exclusive session must probe its stores");
+    require(entry.key == 0xE4E4ULL, "the pinned probe must return the stored key");
+    require(entry.depth == 6 && entry.score == 55,
+            "the pinned probe must return the stored depth and score");
+    require(entry.bound == TranspositionBound::lower, "the pinned probe must return the bound");
+    require(entry.best_move.uci() == "e2e4", "the pinned probe must return the stored move");
+    require(entry.eval == 321, "the pinned probe must return the stored evaluation");
+    require(entry.pv, "the pinned probe must return the stored PV flag");
+    require(entry.generation_age == 0, "an entry stored in the current epoch must have age zero");
+
+    // Releasing the session must leave the entries behind for locked readers.
+    access.set_exclusive(false);
+    require(koi::test::require_value(table.probe(0xE4E4ULL, 1),
+                                     "a released session must leave its entries behind")
+                .depth == 6,
+            "entries stored through the pin must remain visible through the locked path");
+}
+
+void test_exclusive_session_pin_blocks_resize_until_release() {
+    TranspositionTable table(1);
+    SearchTableAccess access(table);
+    const Move move = parse_move("e2e4");
+
+    access.set_exclusive(true);
+    access.store(0x51ULL, 4, 12, TranspositionBound::exact, move, 0, false, 7);
+
+    // A resize publishes the replacement storage and then waits for the
+    // retired storage to leave every hazard slot; the session pin holds its
+    // slot, so the resize cannot complete while the session is pinned.
+    std::atomic<bool> resize_started = false;
+    std::atomic<bool> resize_finished = false;
+    std::thread resizer([&table, &resize_started, &resize_finished]() {
+        resize_started.store(true, std::memory_order_release);
+        (void)table.set_size_mb(2);
+        resize_finished.store(true, std::memory_order_release);
+    });
+    while (!resize_started.load(std::memory_order_acquire)) {
+        std::this_thread::yield();
+    }
+    const auto blocked_deadline = std::chrono::steady_clock::now() +
+        std::chrono::milliseconds(100);
+    while (!resize_finished.load(std::memory_order_acquire) &&
+           std::chrono::steady_clock::now() < blocked_deadline) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    const bool blocked_while_pinned = !resize_finished.load(std::memory_order_acquire);
+
+    // Releasing the pin clears the hazard slot, so the waiting resize can
+    // complete; the wait bound below is generous, not a timing assertion.
+    access.set_exclusive(false);
+    const auto completion_deadline = std::chrono::steady_clock::now() +
+        std::chrono::seconds(2);
+    while (!resize_finished.load(std::memory_order_acquire) &&
+           std::chrono::steady_clock::now() < completion_deadline) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    resizer.join();
+
+    require(blocked_while_pinned,
+            "a resize must not complete while an exclusive session pin is held");
+    require(resize_finished.load(std::memory_order_acquire),
+            "the resize must complete once the exclusive session pin is released");
+    require(table.size_mb() == 2, "the completed resize must report the new size");
+    require(!table.probe(0x51ULL).has_value(),
+            "the resized table must remain usable after the session");
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -203,6 +284,8 @@ int main(int argc, char** argv) {
         {"transposition power of two rounding", test_power_of_two_rounding_and_prefetch},
         {"transposition cluster masking", test_cluster_masking_covers_every_slot},
         {"transposition concurrent access", test_concurrent_store_and_probe_is_safe},
+        {"transposition exclusive round trip", test_exclusive_access_round_trips_through_the_session_pin},
+        {"transposition exclusive pin blocks resize", test_exclusive_session_pin_blocks_resize_until_release},
     };
     return koi::test::run_tests(tests, argc, argv);
 }

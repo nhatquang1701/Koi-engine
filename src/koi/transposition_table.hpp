@@ -22,10 +22,14 @@ enum class TranspositionBound : std::uint8_t { exact, lower, upper };
 // takes the stripe lock and is required whenever another thread may touch the
 // same table.  `exclusive` skips only the stripe lock: the caller guarantees
 // one live search per table and that every access runs on that session's
-// thread (UCI stop+join, koi-bench sequential).  The hazard lease, cluster
-// scan, and replacement logic stay identical in both modes, so a concurrent
-// resize remains memory-safe.  Maintenance entry points (new_generation,
-// hashfull, clear, set_size_mb, prefetch) always stay locked.
+// thread (UCI stop+join, koi-bench sequential).  The cluster scan and
+// replacement logic stay identical in both modes, so a concurrent resize
+// remains memory-safe.  detail::SearchTableAccess drives exclusive mode
+// through a session-scoped hazard pin (SessionLease) and the
+// probe_exclusive/store_exclusive entry points, which read the pinned storage
+// pointer directly and so run no atomic instructions on the steady-state
+// path.  Maintenance entry points (new_generation, hashfull, clear,
+// set_size_mb, prefetch) always stay locked.
 enum class TranspositionAccessMode : std::uint8_t { locked, exclusive };
 
 // Sentinel for "this entry carries no static evaluation".  Real evaluations are
@@ -157,17 +161,35 @@ public:
 private:
     struct Storage;
 
-    // Access-mode implementations for probe()/store(): Locked == true takes
-    // the stripe lock, Locked == false skips only that lock.  Both modes keep
-    // the Lease, the cluster scan, replacement math, entry values, and
-    // generation/clear_epoch handling character-identical, so one executing
-    // thread observes identical entries; only lock instructions differ.
+    // Access-mode implementations for the public probe()/store() entry
+    // points: Locked == true takes the stripe lock, Locked == false skips
+    // only that lock.  Both modes keep the Lease, the cluster scan,
+    // replacement math, entry values, and generation/clear_epoch handling
+    // character-identical, so one executing thread observes identical
+    // entries; only lock instructions differ.  The exclusive steady state
+    // driven by detail::SearchTableAccess does not use these templates: it
+    // pins one SessionLease (see below) and calls probe_exclusive/
+    // store_exclusive, whose bodies mirror the Locked == false instantiations
+    // with the hazard lease replaced by that pinned pointer.
     template <bool Locked>
     [[nodiscard]] std::optional<TranspositionEntry> probe_impl(std::uint64_t key,
                                                                int ply) const noexcept;
     template <bool Locked>
     void store_impl(std::uint64_t key, int depth, int score, TranspositionBound bound,
                     Move best_move, int ply, bool pv, int eval) noexcept;
+
+    // Exclusive-session entry points for detail::SearchTableAccess.  `storage`
+    // is the pointer pinned once for the whole session by SessionLease (see
+    // below); while the pin is held a resize cannot complete, so these read
+    // the same objects a per-access lease would resolve and need neither the
+    // hazard lease nor, in exclusive mode, the stripe lock.  The bodies mirror
+    // probe_impl<false>/store_impl<false>; keep them character-identical
+    // modulo the lease so both modes observe the same entries.
+    [[nodiscard]] std::optional<TranspositionEntry> probe_exclusive(
+        Storage* storage, std::uint64_t key, int ply) const noexcept;
+    void store_exclusive(Storage* storage, std::uint64_t key, int depth, int score,
+                         TranspositionBound bound, Move best_move, int ply, bool pv,
+                         int eval) noexcept;
 
     // Hazard-pointer lease for the store/probe hot paths.  A reader
     // publishes the storage pointer it is about to use in one hazard slot and
@@ -242,6 +264,63 @@ private:
         Storage* storage_ = nullptr;
         std::size_t hazard_slot_ = kTranspositionHazardSlots;
         std::shared_ptr<Storage> fallback_;
+    };
+
+    // Session-scoped hazard pin for exclusive access, held by
+    // detail::SearchTableAccess.  Acquisition and release are exactly the
+    // Lease constructor's publication/revalidation (one hazard-slot acquire)
+    // and destructor's slot clear, but the pin is taken once per exclusive
+    // session and held until set_exclusive(false) or the seam's destruction.
+    // The pinned Storage* is the pointer any per-access lease would resolve
+    // while no resize completes: resize_locked() publishes the replacement
+    // first and only then waits for the retired storage to leave every hazard
+    // slot, and this pin holds its slot, so generation, clear_epoch, stripes,
+    // and entries cannot change owners while the pin is held.
+    //
+    // Memory safety and deadlock: under the documented contract (one live
+    // search per table) a resize only runs between sessions, after the pin is
+    // released.  A contract-violating resize cannot complete while pinned --
+    // it waits on this slot and the retired storage stays alive, which is
+    // strictly safer than the previous per-access lease (no use-after-free,
+    // the violation turns into a wait).  No deadlock is possible on the
+    // legitimate flow (UCI stop+join before Hash changes; koi-bench
+    // sequential): the pinned session never waits on resize completion
+    // itself, it only stops accessing the pin when the session ends, which
+    // clears the slot and lets a waiting resize proceed.  A thread that
+    // cannot obtain a hazard slot falls back to the maintenance-locked
+    // reference-counted snapshot, exactly like Lease::adopt_snapshot; the pin
+    // then keeps the storage alive by reference count and a concurrent resize
+    // may complete, which is also safe.
+    //
+    // Invariant: while the pin is held, every TT access on the pinning thread
+    // goes through probe_exclusive/store_exclusive; those take no lease, and a
+    // per-access Lease on that thread would clear this slot early and give up
+    // the resize wait.  Search satisfies it -- the exclusive seam serves all
+    // of its accesses, and the runner's locked accesses happen before the
+    // session or in the parallel branch where no pin exists.
+    class SessionLease {
+    public:
+        explicit SessionLease(const TranspositionTable& table) noexcept : lease_(table) {
+#ifndef NDEBUG
+            // The pin must be acquired for the exclusive session claimed by
+            // set_exclusive() and used on that owning thread; reuse the
+            // exclusive-owner assertion so a misuse trips in debug builds.
+            table.assert_exclusive_session_owner();
+#endif
+        }
+
+        SessionLease(const SessionLease&) = delete;
+        SessionLease& operator=(const SessionLease&) = delete;
+
+        // Plain pointer to the pinned storage; reading it performs no atomic
+        // operations.  It stays valid until this pin is released.
+        [[nodiscard]] Storage* storage() const noexcept { return lease_.storage(); }
+
+    private:
+        // The hazard publication (constructor) and slot clear (destructor)
+        // live in Lease; the session pin simply holds that lease open for as
+        // long as the session lives.
+        Lease lease_;
     };
 
     [[nodiscard]] static std::size_t normalized_size_mb(std::size_t megabytes) noexcept;

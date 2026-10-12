@@ -99,10 +99,16 @@ public:
 
     SearchMovePicker(const SearchMoveOrdering& ordering, const GameState& state,
                      const MoveMetadataList& moves, std::optional<Move> tt_move,
-                     const SearchHistoryContext& history_context, int ply, Mode mode,
+                     const SearchHistoryContext* history_context, int ply, Mode mode,
                      Move excluded_move = Move::no_move()) noexcept;
 
-    [[nodiscard]] std::optional<MoveMetadata> next();
+    // Emits the next candidate, or nullptr when no stage remains.  The
+    // returned record lives in the picker's emission scratch and is valid
+    // only until the following next() call overwrites it: callers bind it per
+    // iteration and finish with it before advancing the picker.  A picker
+    // instance is driven from one place at a time, and recursive nodes use
+    // their own picker objects, so live records never share scratch.
+    [[nodiscard]] const MoveMetadata* next();
 
     // Called by a cut node after enough forcing moves have been searched. The
     // current candidate is preserved, while later quiet stages are skipped in
@@ -143,12 +149,15 @@ private:
     void prepare_candidates();
     void ensure_stage_sorted() noexcept;
     void advance_stage() noexcept;
-    [[nodiscard]] std::optional<MoveMetadata> emit_tt();
+    [[nodiscard]] const MoveMetadata* emit_tt();
 
     const SearchMoveOrdering& ordering_;
     const GameState& state_;
     const MoveMetadataList& moves_;
-    SearchHistoryContext history_context_;
+    // Borrowed, not owned: the constructor pointer must refer to a context the
+    // caller keeps alive through the picker loop, so the picker never carries
+    // a copy of the 96-byte record.
+    const SearchHistoryContext* history_context_;
     std::optional<Move> tt_move_;
     Move excluded_move_;
     int ply_ = 0;
@@ -182,6 +191,11 @@ private:
     // used by the bad-capture pass. Keep only the staged slot of each deferred
     // capture instead of copying the complete Candidate record a second time.
     std::array<std::uint16_t, kMaximumLegalMoves> deferred_bad_capture_indices_;
+    // Emission scratch for next(): every return path writes it before the
+    // pointer is handed out, and the following emitted record overwrites it.
+    // Deliberately uninitialized: MoveMetadata has no meaningful empty value
+    // here and the record is always assigned before it can be read.
+    MoveMetadata emitted_metadata_;
     std::size_t candidate_count_ = 0;
     std::size_t candidate_index_ = 0;
     std::size_t deferred_bad_capture_count_ = 0;

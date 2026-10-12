@@ -616,6 +616,7 @@ struct SearchContext {
         const int ply, const std::optional<Move> previous_move,
         const std::uint64_t pawn_key) const noexcept {
         SearchHistoryContext context;
+        context.count = 0;
         context.ply = ply;
         context.pawn_key = pawn_key;
 

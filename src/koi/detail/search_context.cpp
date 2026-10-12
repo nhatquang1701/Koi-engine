@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <optional>
 #include <vector>
 
@@ -366,10 +367,21 @@ int SearchContext::quiescence(GameState& state, int alpha, int beta, int ply,
         // With no quiet candidate every entry in `moves` is a capture or
         // promotion whose priority() branches return before any history read,
         // and the lazy re-priority path that could re-read it is main-mode only.
-        SearchHistoryContext history{};
+        // The storage is started without stores, so an unreachable context
+        // costs nothing; the reachable branch assigns a fully written context
+        // over it, and the picker below borrows whichever value is current.
+        NoInitArray<SearchHistoryContext, 1> history_storage;
         if (quiet_history_reachable) {
-            history = history_context(ply, previous_move, state.pawn_key());
+            history_storage[0] = history_context(ply, previous_move, state.pawn_key());
         }
+#ifndef NDEBUG
+        else {
+            // Poison the unreachable context in debug builds so a future
+            // reader that invalidates the reachability proof fails a test
+            // loudly instead of ranking moves from indeterminate bytes.
+            std::memset(history_storage.data(), 0xAA, sizeof(SearchHistoryContext));
+        }
+#endif
         std::optional<Move> tt_move;
         if (tt_entry.has_value() && !tt_entry->best_move.is_no_move()) {
             tt_move = tt_entry->best_move;
@@ -402,14 +414,14 @@ int SearchContext::quiescence(GameState& state, int alpha, int beta, int ply,
         }
 
         SearchMovePicker picker(
-            ordering, state, moves, tt_move, history, ply,
+            ordering, state, moves, tt_move, &history_storage[0], ply,
             checked ? SearchMovePicker::Mode::evasion : SearchMovePicker::Mode::quiescence);
         const Square previous_destination = previous_move.has_value() ?
             previous_move->to() : Square::from_index(Square::kInvalid);
         const int futility_base = !checked && best > -kMateThreshold ?
             best + kQuiescenceFutilityMargin : -kInfinity;
         int move_count = 0;
-        while (const auto candidate = picker.next()) {
+        while (const MoveMetadata* candidate = picker.next()) {
             const MoveMetadata& metadata = *candidate;
             if (interrupted()) {
                 return 0;
@@ -1396,7 +1408,7 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
         }
 
         SearchMovePicker picker(
-            ordering, state, moves, tt_move, history, ply,
+            ordering, state, moves, tt_move, &history, ply,
             checked ? SearchMovePicker::Mode::evasion : SearchMovePicker::Mode::main,
             excluded_move);
         // A claimable draw is an implicit zero-valued option for the side to
@@ -1472,7 +1484,7 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
         // restored between candidates (make/unmake), so every quiet candidate
         // observes the same phase.
         const bool phase_rich_depth_three = depth == 3 && node_game_phase >= 8;
-        while (const auto candidate = picker.next()) {
+        while (const MoveMetadata* candidate = picker.next()) {
             const MoveMetadata& metadata = *candidate;
             if (interrupted()) {
                 return 0;

@@ -25,6 +25,19 @@ koi::Move require_move(std::string_view uci) {
     return koi::test::require_value(koi::Move::parse_uci(uci), "test move must parse");
 }
 
+// SearchHistoryContext is a write-before-read type with no default member
+// initializers; this reproduces the value-initialized context the tests used
+// to construct with `{}`.
+koi::detail::SearchHistoryContext zeroed_history_context() {
+    koi::detail::SearchHistoryContext context;
+    context.continuation_moves.fill(koi::Move::no_move());
+    context.continuation_previous_scaled.fill(0);
+    context.count = 0;
+    context.ply = 0;
+    context.pawn_key = 0;
+    return context;
+}
+
 std::vector<koi::Move> quiet_moves(const koi::GameState& state, std::vector<koi::Move> moves) {
     moves.erase(std::remove_if(moves.begin(), moves.end(), [&state](const koi::Move& move) {
         return state.is_capture(move) || move.promotion() != koi::Promotion::none;
@@ -295,7 +308,7 @@ void test_parent_move_feedback_rewards_fail_low_and_penalizes_refutation() {
     const koi::Move grandparent = require_move("b1c3");
     const koi::Move great_grandparent = require_move("d2d4");
 
-    koi::detail::SearchHistoryContext child_context;
+    koi::detail::SearchHistoryContext child_context = zeroed_history_context();
     child_context.ply = 3;
     child_context.count = 3;
     child_context.continuation_moves[0] = parent;
@@ -304,7 +317,7 @@ void test_parent_move_feedback_rewards_fail_low_and_penalizes_refutation() {
 
     // The same tables that order the parent move at its own node must observe
     // the reward: distance-zero continuation pair plus the multi-ply slot.
-    koi::detail::SearchHistoryContext parent_context;
+    koi::detail::SearchHistoryContext parent_context = zeroed_history_context();
     parent_context.ply = 2;
     parent_context.count = 2;
     parent_context.continuation_moves[0] = grandparent;
@@ -368,7 +381,7 @@ void test_picker_emitted_scores_match_recomputed_priority() {
     for (const std::string_view fen : fens) {
         const koi::GameState state = require_state(fen);
         koi::detail::SearchMoveOrdering ordering;
-        const koi::detail::SearchHistoryContext context{};
+        const koi::detail::SearchHistoryContext context = zeroed_history_context();
         for (const auto mode : {koi::detail::SearchMovePicker::Mode::main,
                                 koi::detail::SearchMovePicker::Mode::quiescence}) {
             koi::MoveMetadataList moves;
@@ -379,8 +392,8 @@ void test_picker_emitted_scores_match_recomputed_priority() {
                 state.legal_moves_with_metadata(moves, true, false);
             }
             koi::detail::SearchMovePicker picker(ordering, state, moves, std::nullopt,
-                                                 context, 0, mode);
-            while (const std::optional<koi::MoveMetadata> emitted = picker.next()) {
+                                                 &context, 0, mode);
+            while (const koi::MoveMetadata* emitted = picker.next()) {
                 koi::MoveMetadataList single;
                 static_cast<void>(single.push_back(*emitted));
                 ordering.order(state, single, std::nullopt, context);
@@ -452,11 +465,11 @@ void verify_quiescence_picker_against_reference(
     reference_checks += static_cast<int>(stages[1].size());
 
     koi::detail::SearchMovePicker picker(
-        ordering, state, candidates, std::nullopt, context, 0,
+        ordering, state, candidates, std::nullopt, &context, 0,
         koi::detail::SearchMovePicker::Mode::quiescence);
     const auto verify_emitted = [&picker](const QuiescenceReferenceEntry& expected) {
-        const std::optional<koi::MoveMetadata> emitted = picker.next();
-        require(emitted.has_value(),
+        const koi::MoveMetadata* emitted = picker.next();
+        require(emitted != nullptr,
                 "quiescence picker must emit a record for every reference-stage candidate");
         require(emitted->move == expected.metadata.move,
                 "quiescence picker emission order must match the reference stage order");
@@ -480,7 +493,7 @@ void verify_quiescence_picker_against_reference(
     for (const QuiescenceReferenceEntry& entry : stages[1]) {
         verify_emitted(entry);
     }
-    require(!picker.next().has_value(),
+    require(picker.next() == nullptr,
             "quiescence picker must not emit candidates outside the two reachable stages");
 }
 
@@ -516,7 +529,7 @@ void test_quiescence_picker_matches_documented_reference() {
                 // every third tactical record gets capture feedback and every
                 // third quiet record quiet feedback at the picker's ply.
                 koi::detail::SearchMoveOrdering ordering;
-                koi::detail::SearchHistoryContext context{};
+                koi::detail::SearchHistoryContext context = zeroed_history_context();
                 context.ply = 3;
                 for (std::size_t index = 0; index < generated.size(); ++index) {
                     const koi::MoveMetadata& metadata = generated[index];

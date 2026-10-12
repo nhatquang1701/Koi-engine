@@ -421,7 +421,7 @@ void SearchMoveOrdering::record_parent_refuted(
 SearchMovePicker::SearchMovePicker(
     const SearchMoveOrdering& ordering, const GameState& state,
     const MoveMetadataList& moves, std::optional<Move> tt_move,
-    const SearchHistoryContext& history_context, const int ply, const Mode mode,
+    const SearchHistoryContext* history_context, const int ply, const Mode mode,
     const Move excluded_move) noexcept
     : ordering_(ordering), state_(state), moves_(moves),
       history_context_(history_context), tt_move_(tt_move),
@@ -552,7 +552,7 @@ void SearchMovePicker::prepare_candidates() {
                 metadata = &materialized;
             }
             const int priority = ordering_.priority(
-                state_, *metadata, std::nullopt, history_context_);
+                state_, *metadata, std::nullopt, *history_context_);
             const Candidate candidate{
                 static_cast<std::uint16_t>(index),
                 static_cast<std::uint8_t>(tactical ? Stage::good_captures : Stage::quiet_checks),
@@ -601,7 +601,7 @@ void SearchMovePicker::prepare_candidates() {
             candidate_stage = Stage::good_quiets;
         }
         const int priority = ordering_.priority(
-            state_, *metadata, std::nullopt, history_context_);
+            state_, *metadata, std::nullopt, *history_context_);
         if (mode_ == Mode::main && candidate_stage == Stage::good_quiets &&
             priority <= kGoodQuietPriorityThreshold) {
             candidate_stage = Stage::bad_quiets;
@@ -701,33 +701,33 @@ void SearchMovePicker::advance_stage() noexcept {
     }
 }
 
-std::optional<MoveMetadata> SearchMovePicker::emit_tt() {
+const MoveMetadata* SearchMovePicker::emit_tt() {
     if (tt_emitted_ || !tt_move_.has_value()) {
-        return std::nullopt;
+        return nullptr;
     }
     tt_emitted_ = true;
     for (std::size_t index = 0; index < moves_.size(); ++index) {
         if (moves_[index].move == *tt_move_ && !is_excluded(index)) {
             emitted_.set(index);
-            MoveMetadata metadata = mode_ == Mode::evasion ? moves_[index] :
+            emitted_metadata_ = mode_ == Mode::evasion ? moves_[index] :
                 materialize(index);
             // The emitted move equals tt_move_, which priority() answers with
             // the TT constant before any other branch; materialize never
             // changes the move.
-            metadata.ordering_score = kTtMovePriority;
-            return metadata;
+            emitted_metadata_.ordering_score = kTtMovePriority;
+            return &emitted_metadata_;
         }
     }
-    return std::nullopt;
+    return nullptr;
 }
 
-std::optional<MoveMetadata> SearchMovePicker::next() {
+const MoveMetadata* SearchMovePicker::next() {
     for (;;) {
         if (stage_ == Stage::done) {
-            return std::nullopt;
+            return nullptr;
         }
         if (stage_ == Stage::tt) {
-            if (const auto tt = emit_tt(); tt.has_value()) {
+            if (const MoveMetadata* tt = emit_tt(); tt != nullptr) {
                 advance_stage();
                 return tt;
             }
@@ -753,13 +753,13 @@ std::optional<MoveMetadata> SearchMovePicker::next() {
                     staged_[stage_begin_[rank] + candidate_index_++];
                 const std::size_t source_index = candidate.source_index;
                 emitted_.set(source_index);
-                MoveMetadata metadata = moves_[source_index];
-                if (metadata.is_capture()) {
-                    metadata.see_score = see_scores_[source_index];
-                    metadata.see_computed = true;
+                emitted_metadata_ = moves_[source_index];
+                if (emitted_metadata_.is_capture()) {
+                    emitted_metadata_.see_score = see_scores_[source_index];
+                    emitted_metadata_.see_computed = true;
                 }
-                metadata.ordering_score = candidate.priority;
-                return metadata;
+                emitted_metadata_.ordering_score = candidate.priority;
+                return &emitted_metadata_;
             }
             candidate_index_ = 0;
             advance_stage();
@@ -787,10 +787,10 @@ std::optional<MoveMetadata> SearchMovePicker::next() {
             const std::size_t candidate_slot = candidate_index_++;
             const Candidate candidate = staged_[candidate_slot];
             emitted_.set(candidate.source_index);
-            MoveMetadata metadata = mode_ == Mode::evasion ? moves_[candidate.source_index] :
+            emitted_metadata_ = mode_ == Mode::evasion ? moves_[candidate.source_index] :
                 materialize(candidate.source_index);
             if (mode_ == Mode::main && stage_ == Stage::good_captures &&
-                metadata.is_capture() && !is_good_capture(metadata)) {
+                emitted_metadata_.is_capture() && !is_good_capture(emitted_metadata_)) {
                 if (deferred_bad_capture_count_ < deferred_bad_capture_indices_.size()) {
                     // Keep the staged slot rather than the source index so the
                     // candidate's staged priority is still reachable when the
@@ -812,7 +812,7 @@ std::optional<MoveMetadata> SearchMovePicker::next() {
             // and quiet-stage candidates were fully materialized before
             // ranking.
             const bool materialization_can_alter_priority =
-                mode_ == Mode::main && metadata.is_capture();
+                mode_ == Mode::main && emitted_metadata_.is_capture();
             if (materialization_can_alter_priority &&
                 !moves_[candidate.source_index].see_computed) {
                 // Search lists defer SEE, so the staged priority ranked this
@@ -820,18 +820,18 @@ std::optional<MoveMetadata> SearchMovePicker::next() {
                 // materialized priority is exactly the staged priority plus
                 // those two resolved terms.
                 const int see = std::clamp(
-                    static_cast<int>(metadata.see_score),
+                    static_cast<int>(emitted_metadata_.see_score),
                     -piece_value(PieceType::queen), piece_value(PieceType::queen));
                 const int bad_capture_penalty =
-                    see < 0 && !metadata.gives_check ? kBadCapturePenalty : 0;
-                metadata.ordering_score =
+                    see < 0 && !emitted_metadata_.gives_check ? kBadCapturePenalty : 0;
+                emitted_metadata_.ordering_score =
                     candidate.priority + see * kSeeOrderingWeight - bad_capture_penalty;
             } else {
-                metadata.ordering_score = materialization_can_alter_priority
-                    ? ordering_.priority(state_, metadata, std::nullopt, history_context_)
+                emitted_metadata_.ordering_score = materialization_can_alter_priority
+                    ? ordering_.priority(state_, emitted_metadata_, std::nullopt, *history_context_)
                     : candidate.priority;
             }
-            return metadata;
+            return &emitted_metadata_;
         }
         if (stage_ == Stage::bad_captures) {
             if (deferred_bad_capture_index_ < deferred_bad_capture_count_) {
@@ -839,23 +839,23 @@ std::optional<MoveMetadata> SearchMovePicker::next() {
                     deferred_bad_capture_indices_[deferred_bad_capture_index_++];
                 const Candidate& candidate = staged_[candidate_slot];
                 const std::size_t source_index = candidate.source_index;
-                MoveMetadata metadata = materialize(source_index);
+                emitted_metadata_ = materialize(source_index);
                 if (!moves_[source_index].see_computed) {
                     // Same SEE delta as the good-capture stage: the staged
                     // priority ranked this capture with see == 0 and no
                     // bad-capture penalty.
                     const int see = std::clamp(
-                        static_cast<int>(metadata.see_score),
+                        static_cast<int>(emitted_metadata_.see_score),
                         -piece_value(PieceType::queen), piece_value(PieceType::queen));
                     const int bad_capture_penalty =
-                        see < 0 && !metadata.gives_check ? kBadCapturePenalty : 0;
-                    metadata.ordering_score =
+                        see < 0 && !emitted_metadata_.gives_check ? kBadCapturePenalty : 0;
+                    emitted_metadata_.ordering_score =
                         candidate.priority + see * kSeeOrderingWeight - bad_capture_penalty;
                 } else {
-                    metadata.ordering_score = ordering_.priority(
-                        state_, metadata, std::nullopt, history_context_);
+                    emitted_metadata_.ordering_score = ordering_.priority(
+                        state_, emitted_metadata_, std::nullopt, *history_context_);
                 }
-                return metadata;
+                return &emitted_metadata_;
             }
         }
         advance_stage();
