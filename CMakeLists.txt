@@ -105,6 +105,11 @@ if(KOI_SANITIZE AND NOT MSVC)
     message(FATAL_ERROR "KOI_SANITIZE is currently wired for MSVC builds only")
 endif()
 
+# --- ThreadSanitizer (Linux/GCC) -----------------------------------------------
+# KOI_TSAN only disables Release IPO for the TSan CI leg; the sanitizer flags
+# themselves are passed by that workflow via CMAKE_CXX_FLAGS.
+option(KOI_TSAN "Disable Release IPO for a ThreadSanitizer build" OFF)
+
 # --- Profile-guided optimization (Windows/MSVC) --------------------------------
 # KOI_PGO=generate builds Release with /GENPROFILE and links with /LTCG:PGI to
 # emit a .pgd next to each binary; KOI_PGO=use rebuilds Release with /USEPROFILE
@@ -191,7 +196,7 @@ endif()
 
 include(CheckIPOSupported)
 check_ipo_supported(RESULT KOI_IPO_SUPPORTED OUTPUT KOI_IPO_ERROR LANGUAGES CXX)
-if(KOI_IPO_SUPPORTED AND NOT KOI_SANITIZE AND NOT KOI_PGO)
+if(KOI_IPO_SUPPORTED AND NOT KOI_SANITIZE AND NOT KOI_PGO AND NOT KOI_TSAN)
     set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
 elseif(KOI_PGO)
     message(STATUS "Koi Engine PGO manages the Release IPO/LTO flags")

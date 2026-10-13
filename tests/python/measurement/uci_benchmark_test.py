@@ -177,11 +177,16 @@ class UciBenchmarkReportTest(unittest.TestCase):
             self.assertEqual(events.count("stop"), 2)
             self.assertTrue(all(position["stop_sent"] for run in report["runs"]
                                 for position in run["positions"]))
-            self.assertTrue(all(40 <= position["search_elapsed_ms"] < 200
+            # No upper bound on search_elapsed_ms: a starved shared runner can
+            # delay the stop-wait wake by over 150 ms with no engine misbehavior.
+            # Budget adherence is the >= 40 lower bound (stop_sent_at can only be
+            # stamped at or after the 50 ms deadline); stop discipline is the
+            # stop_latency_ms bound below.
+            self.assertTrue(all(40 <= position["search_elapsed_ms"]
                                 for run in report["runs"] for position in run["positions"]))
             self.assertTrue(all(position["time_to_bestmove_ms"] < 500
                                 for run in report["runs"] for position in run["positions"]))
-            self.assertTrue(all(position["stop_latency_ms"] < 500
+            self.assertTrue(all(position["stop_latency_ms"] < 200
                                 for run in report["runs"] for position in run["positions"]))
             self.assertNotIn("go depth 12", events)
             self.assertTrue(all(run["positions"][0]["bestmove"] == "e2e4" for run in report["runs"]))

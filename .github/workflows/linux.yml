@@ -536,3 +536,61 @@ jobs:
             artifacts/packages/koi-engine-v1.0.0-linux-x86_64.tar.gz.sha256
           if-no-files-found: ignore
           retention-days: 7
+
+  linux-tsan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    # Advisory for the first cycle: the job lands non-blocking so a first-run
+    # TSan quirk cannot paint main red; it can become blocking once it has a
+    # green history.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: tools/measurement/requirements.txt
+      - name: Install the GCC 14 toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends g++-14 ninja-build
+          python -m pip install --disable-pip-version-check --quiet --upgrade cmake -r tools/measurement/requirements.txt
+      # TSan needs a shadow-memory mapping that Ubuntu 24.04's default ASLR
+      # entropy can break ("unexpected memory mapping"), so lower it.
+      - name: Relax ASLR entropy for TSan
+        run: sudo sysctl -w vm.mmap_rnd_bits=28 || true
+      - name: Configure and build with GCC 14 + ThreadSanitizer
+        run: |
+          cmake -S . -B build/ci-tsan -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER=gcc-14 -DCMAKE_CXX_COMPILER=g++-14 \
+            -DCMAKE_CXX_FLAGS="-fsanitize=thread -fno-omit-frame-pointer -g" \
+            -DCMAKE_EXE_LINKER_FLAGS=-fsanitize=thread \
+            -DKOI_TSAN=ON -DKOI_STATIC_RUNTIME=OFF -DKOI_BUILD_MODULES=OFF \
+            -DKOI_TEST_TIMEOUT_SECONDS=600 \
+            -DPython3_EXECUTABLE="$(command -v python)"
+          cmake --build build/ci-tsan --config Release -j 4
+      # Targeted concurrency set first: the shared-TT/lock-elision and
+      # search-worker lifetime surfaces are the ones ASan cannot see. The
+      # broader `-L unit -LE heavy` sweep can be added once this is green.
+      - name: Run the concurrency suites under TSan
+        env:
+          KOI_TEST_RETRIES: "1"
+          TSAN_OPTIONS: "halt_on_error=1 second_deadlock_stack=1"
+        run: |
+          ctest --test-dir build/ci-tsan -C Release -j 2 \
+            -R "^(transposition_table_tests|search_service_tests|uci_controller_tests|time_manager_tests|koi_search_tests_[1-4]of4)$" \
+            --output-on-failure --output-junit build/ci-tsan/ctest-tsan-junit.xml
+      - name: Show the test log tail
+        if: always()
+        run: tail -n 150 build/ci-tsan/Testing/Temporary/LastTest.log || true
+      - name: Upload TSan diagnostics
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: linux-tsan-test-diagnostics
+          path: |
+            build/ci-tsan/ctest-tsan-junit.xml
+            build/ci-tsan/Testing/Temporary/LastTest.log
+          if-no-files-found: ignore
+          retention-days: 7
