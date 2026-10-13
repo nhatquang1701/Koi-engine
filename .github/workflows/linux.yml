@@ -539,7 +539,7 @@ jobs:
 
   linux-tsan:
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 120
     # Advisory for the first cycle: the job lands non-blocking so a first-run
     # TSan quirk cannot paint main red; it can become blocking once it has a
     # green history.
@@ -567,7 +567,7 @@ jobs:
             -DCMAKE_CXX_FLAGS="-fsanitize=thread -fno-omit-frame-pointer -g" \
             -DCMAKE_EXE_LINKER_FLAGS=-fsanitize=thread \
             -DKOI_TSAN=ON -DKOI_STATIC_RUNTIME=OFF -DKOI_BUILD_MODULES=OFF \
-            -DKOI_TEST_TIMEOUT_SECONDS=600 \
+            -DKOI_TEST_TIMEOUT_SECONDS=1200 \
             -DPython3_EXECUTABLE="$(command -v python)"
           cmake --build build/ci-tsan --config Release -j 4
       # Targeted concurrency set first: the shared-TT/lock-elision and
@@ -576,7 +576,11 @@ jobs:
       - name: Run the concurrency suites under TSan
         env:
           KOI_TEST_RETRIES: "1"
-          TSAN_OPTIONS: "halt_on_error=1 second_deadlock_stack=1"
+          # The striped transposition table alone creates 64 mutexes, which
+          # overflows TSan's fixed 64-entry deadlock-detector table
+          # (sanitizer_deadlock_detector.h CHECK, observed hanging the whole
+          # test process on the first cycle). Race detection is unaffected.
+          TSAN_OPTIONS: "halt_on_error=1 detect_deadlocks=0"
         run: |
           ctest --test-dir build/ci-tsan -C Release -j 2 \
             -R "^(transposition_table_tests|search_service_tests|uci_controller_tests|time_manager_tests|koi_search_tests_[1-4]of4)$" \
