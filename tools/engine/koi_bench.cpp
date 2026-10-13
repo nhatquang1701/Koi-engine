@@ -436,12 +436,16 @@ BenchmarkRun run_position(const BenchPosition& benchmark, const BenchmarkConfig&
              sample.nps = compute_nps(sample.nodes + sample.qnodes, sample.elapsed_ms);
              sample.score_cp = info.score_cp;
              sample.best_move = info.pv.front().uci();
+             // Keep the FIRST line for each depth: the completed-iteration
+             // line.  A long search re-publishes its last completed depth
+             // with live, growing counters (interim progress lines), so a
+             // later line for the same depth carries the next iteration's
+             // wall time and node totals, not this depth's.  Picking the
+             // first line keeps every sweep sample a completed iteration.
              const auto existing = std::find_if(samples.begin(), samples.end(),
                  [&sample](const DepthSample& candidate) { return candidate.depth == sample.depth; });
              if (existing == samples.end()) {
                  samples.push_back(std::move(sample));
-             } else {
-                 *existing = std::move(sample);
              }
          },
          .on_complete = [&result](const koi::SearchResult& completed) {
