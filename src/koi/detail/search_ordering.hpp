@@ -151,6 +151,33 @@ private:
     void advance_stage() noexcept;
     [[nodiscard]] const MoveMetadata* emit_tt();
 
+    // Compact bitset whose words are deliberately not zeroed by construction.
+    // std::bitset's default constructor always clears its storage, which
+    // would charge every quiescence/evasion picker construction for bits only
+    // a main-mode picker can read (see materialize); the picker constructor
+    // calls reset() for main mode instead.  No accessor below is reached
+    // before that reset has run.
+    class LazyBitset {
+    public:
+        void reset() noexcept { words_.fill(0); }
+
+        [[nodiscard]] bool test(const std::size_t index) const noexcept {
+            return ((words_[index / kWordBits] >> (index % kWordBits)) & 1U) != 0U;
+        }
+
+        void set(const std::size_t index) noexcept {
+            words_[index / kWordBits] |= std::uint64_t{1} << (index % kWordBits);
+        }
+
+    private:
+        static constexpr std::size_t kWordBits = 64U;
+        static constexpr std::size_t kWordCount =
+            (kMaximumLegalMoves + kWordBits - 1U) / kWordBits;
+        // Deliberately uninitialized: the main-mode constructor reset() starts
+        // these words before any test()/set() touches them.
+        std::array<std::uint64_t, kWordCount> words_;
+    };
+
     const SearchMoveOrdering& ordering_;
     const GameState& state_;
     const MoveMetadataList& moves_;
@@ -169,8 +196,12 @@ private:
     // uninitialized to avoid clearing several kilobytes at every node.
     std::bitset<kMaximumLegalMoves> emitted_{};
     std::bitset<kMaximumLegalMoves> see_computed_{};
-    std::bitset<kMaximumLegalMoves> capture_check_computed_{};
-    std::bitset<kMaximumLegalMoves> capture_checks_{};
+    // The capture-check guard is read only by main-mode pickers (materialize's
+    // capture-check probe), so only a main-mode picker zeroes it: quiescence
+    // and evasion constructions leave these words unconstructed instead of
+    // clearing two bitsets they can never observe.
+    LazyBitset capture_check_computed_;
+    LazyBitset capture_checks_;
     std::array<std::int16_t, kMaximumLegalMoves> see_scores_;
     // Exchange baseline for this picker, built lazily on the first capture
     // whose SEE is not already available and reused for every later capture.

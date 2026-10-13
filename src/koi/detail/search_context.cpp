@@ -268,6 +268,7 @@ int SearchContext::quiescence(GameState& state, int alpha, int beta, int ply,
             // makes the qsearch result selective.
             best_lower_bound = true;
             if (best >= beta) {
+                ++stats.has_legal_move_calls;
                 if (!state.has_legal_move()) {
                     // Stand-pat is not a legal continuation without a legal
                     // move: this is the terminal position the generation-first

@@ -543,6 +543,8 @@ void write_run_metrics(std::ostream& output, const BenchmarkRun& run, bool timed
            << result.stats.qsearch_move_generations
            << ", \"qsearch_stand_pat_cutoffs\": "
            << result.stats.qsearch_stand_pat_cutoffs
+           << ", \"has_legal_move_calls\": "
+           << result.stats.has_legal_move_calls
            << ", \"position_feature_extractions\": "
            << result.stats.position_feature_extractions
            << ", \"lmr_parent_feature_reuses\": "

@@ -92,6 +92,10 @@ struct SearchStats {
     // fail-high before tactical move generation. Diagnostic-only; records how
     // often the reordered cutoff avoids the generation it replaced.
     std::uint64_t qsearch_stand_pat_cutoffs = 0;
+    // Number of stand-pat beta-cut guards that asked the position whether any
+    // legal move exists. Diagnostic-only; records the call volume served by
+    // the early-exit legal-move existence probe.
+    std::uint64_t has_legal_move_calls = 0;
     // Number of full PositionFeatures snapshots requested by the search
     // context. This is diagnostic-only and helps keep expensive feature
     // extraction out of nodes that do not need it.

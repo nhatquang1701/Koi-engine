@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <iostream>
+#include <random>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -382,6 +383,51 @@ void test_start_position_has_twenty_legal_moves() {
     require(state.legal_moves().size() == 20, "startpos must expose exactly twenty legal moves");
 }
 
+void test_legal_move_existence_matches_the_legal_move_list() {
+    // Checkmate, stalemate, pins, en passant, checks, promotion, and
+    // castling: positions where the pseudo-legal list and the legal list
+    // differ, so the existence probe must agree with the full legal list.
+    constexpr std::string_view fixtures[] = {
+        "4R1k1/6pp/8/8/8/8/8/6K1 b - - 0 1",                            // checkmate
+        "k7/8/1Q6/8/8/8/8/K7 b - - 0 1",                                // stalemate
+        "4k3/8/8/8/8/4r3/4N3/4K3 w - - 0 1",                            // pinned knight
+        "rnbqkbnr/pppp1ppp/8/3Pp3/8/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 2",  // en passant
+        "4r1k1/8/8/3pP3/8/8/8/4K3 w - d6 0 2",                          // pinned en passant
+        "4k3/8/8/8/8/8/4r3/4K3 w - - 0 1",                              // in check
+        "4k3/8/8/8/1b6/8/8/R3K3 w Q - 0 1",                             // check to be blocked
+        "4k3/P7/8/8/8/8/8/4K3 w - - 0 1",                               // promotion
+        "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1",                         // castling
+        "r3k2r/ppp2ppp/2n1bn2/3qp3/3P4/2NB1N2/PPP2PPP/R2Q1RK1 w kq - 10 9",  // middlegame
+    };
+    for (const std::string_view fen : fixtures) {
+        const auto parsed = GameState::from_fen(fen);
+        require(parsed.has_value(), "legal-move existence fixture FEN must be valid");
+        const std::vector<Move> legal = parsed->legal_moves();
+        require(parsed->has_legal_move() == !legal.empty(),
+                "has_legal_move must agree with the full legal list on fixture FENs");
+    }
+
+    // Deterministic seeded playouts: the equality must hold at every visited
+    // position, including quiet positions whose first legal candidate sits
+    // late in the pseudo-legal list.
+    std::mt19937 random(0x5eed1e5u);
+    for (int game = 0; game < 4; ++game) {
+        GameState state = GameState::startpos();
+        for (int ply = 0; ply < 256; ++ply) {
+            const std::vector<Move> legal = state.legal_moves();
+            require(state.has_legal_move() == !legal.empty(),
+                    "has_legal_move must agree with the full legal list at every playout position");
+            if (legal.empty() || state.is_draw_by_rule()) {
+                break;
+            }
+            // Plain modulo keeps the playout identical across standard
+            // libraries; the distribution bias is irrelevant for coverage.
+            require(state.make_move(legal[random() % legal.size()]),
+                    "a move from the legal list must be applicable");
+        }
+    }
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -405,6 +451,7 @@ int main(int argc, char** argv) {
         {"null move incremental key", test_null_move_incremental_key_matches_a_fresh_parse},
         {"transactional rejected move", test_rejected_king_move_leaves_state_unchanged},
         {"start-position move count", test_start_position_has_twenty_legal_moves},
+        {"legal-move existence differential", test_legal_move_existence_matches_the_legal_move_list},
     };
 
     return koi::test::run_tests(tests, argc, argv);

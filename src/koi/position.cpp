@@ -55,6 +55,23 @@ private:
     std::size_t size_ = 0;
 };
 
+// Sink adapter for the materializing callers: every append accepts the move
+// and reports "continue" (a constant, so the generator's early-out checks fold
+// away and those paths keep today's full-list code).
+class AddAllMoves {
+public:
+    explicit AddAllMoves(MoveBuffer& moves) noexcept : moves_(moves) {}
+
+    template <typename... Arguments>
+    [[nodiscard]] bool emplace_back(Arguments&&... arguments) noexcept {
+        moves_.emplace_back(std::forward<Arguments>(arguments)...);
+        return true;
+    }
+
+private:
+    MoveBuffer& moves_;
+};
+
 struct ZobristKeys {
     std::array<std::array<std::array<std::uint64_t, 64>, 7>, 2> pieces{};
     std::array<std::uint64_t, 16> castling{};
@@ -434,13 +451,13 @@ bool is_checked(const NativeState& state, Color color) noexcept {
 // slider.  apply_unchecked flips the side before callers ask about the mover,
 // and every reader indexes the masks with the current side: the hoisted
 // values in legal_moves, legal_moves_into_impl, and has_legal_move
-// (position.cpp:962-964, 986-988, 1023-1025), the re-read in
-// resolve_move_legality (position.cpp:878), whose callers pass state.side as
-// the mover, and the side-to-move in_check() probe (position.cpp:1219).
+// (position.cpp:1031, 1051, 1084), the re-read in
+// resolve_move_legality (position.cpp:894), whose callers pass state.side as
+// the mover, and the side-to-move in_check() probe (position.cpp:1277).
 // NativeState is private to this translation unit, so no other
 // reader exists.  The other colour's masks are intentionally left stale: no
 // reader touches them, and snapshot_into()/restore() copy both arrays
-// (position.cpp:238, 1457), so unmake restores whatever was
+// (position.cpp:256-257, 1532-1533), so unmake restores whatever was
 // current when the snapshot was taken.
 void refresh_king_masks(NativeState& state) noexcept {
     const std::size_t color_index = state.side == Color::white ? 0U : 1U;
@@ -630,12 +647,14 @@ bool safe_king_step(NativeState& state, int from, int to, Color side) noexcept {
     return safe;
 }
 
-template <typename MoveContainer>
-void add_promotion_moves(MoveContainer& moves, Square from, Square to) {
-    moves.emplace_back(from, to, Promotion::queen);
-    moves.emplace_back(from, to, Promotion::rook);
-    moves.emplace_back(from, to, Promotion::bishop);
-    moves.emplace_back(from, to, Promotion::knight);
+// Emits the queen, rook, bishop, and knight promotion of one push in that
+// frozen order and reports whether the sink wants the walk to continue.
+template <typename MoveSink>
+[[nodiscard]] bool add_promotion_moves(MoveSink& moves, Square from, Square to) {
+    if (!moves.emplace_back(from, to, Promotion::queen)) return false;
+    if (!moves.emplace_back(from, to, Promotion::rook)) return false;
+    if (!moves.emplace_back(from, to, Promotion::bishop)) return false;
+    return moves.emplace_back(from, to, Promotion::knight);
 }
 
 class NativePosition {
@@ -961,6 +980,54 @@ public:
         return legal;
     }
 
+    // The one per-candidate legality verdict shared by every consumer of the
+    // pseudo generator: the cheap prologue probe accepts the common case, and
+    // only the moves it flags run the full in-place resolution.  Both halves
+    // leave every predicate-visible field as they found it, so the hoisted
+    // mask arguments stay valid across the whole walk.
+    [[nodiscard]] bool candidate_is_legal(
+        const Move& move, Color mover, std::uint64_t checkers, std::uint64_t pinned,
+        int en_passant) {
+        if (!move_requires_legality_probe(move, state.board, checkers, pinned, en_passant)) {
+            return true;
+        }
+        return resolve_move_legality(move, mover);
+    }
+
+    // Sink for the existence probe: every emitted candidate runs the shared
+    // verdict and the first legal one stops the generation walk (emplace_back
+    // returns false = "stop", true = "continue").  The walk stops only after
+    // an acceptance that today's materialize-then-filter order would have
+    // returned true on at the same candidate, so has_legal_move()'s boolean
+    // answer cannot change.
+    class FirstLegalMoveSink {
+    public:
+        FirstLegalMoveSink(NativePosition& position, Color mover, std::uint64_t checkers,
+                           std::uint64_t pinned, int en_passant) noexcept
+            : position_(position), mover_(mover), checkers_(checkers), pinned_(pinned),
+              en_passant_(en_passant) {}
+
+        template <typename... Arguments>
+        [[nodiscard]] bool emplace_back(Arguments&&... arguments) noexcept {
+            const Move move(std::forward<Arguments>(arguments)...);
+            if (position_.candidate_is_legal(move, mover_, checkers_, pinned_, en_passant_)) {
+                found_ = true;
+                return false;
+            }
+            return true;
+        }
+
+        [[nodiscard]] bool found() const noexcept { return found_; }
+
+    private:
+        NativePosition& position_;
+        Color mover_;
+        std::uint64_t checkers_;
+        std::uint64_t pinned_;
+        int en_passant_;
+        bool found_ = false;
+    };
+
 std::vector<Move> legal_moves() {
     const Color mover = state.side;
     const std::size_t side_index = mover == Color::white ? 0U : 1U;
@@ -968,16 +1035,12 @@ std::vector<Move> legal_moves() {
     const std::uint64_t pinned = state.pinned[side_index];
     const int en_passant = state.en_passant.index();
     MoveBuffer pseudo;
-    generate_pseudo(pseudo);
+    AddAllMoves sink(pseudo);
+    generate_pseudo(sink);
     std::vector<Move> result;
     result.reserve(pseudo.size());
     for (const Move& move : pseudo) {
-        bool legal = !move_requires_legality_probe(
-            move, state.board, checkers, pinned, en_passant);
-        if (!legal) {
-            legal = resolve_move_legality(move, mover);
-        }
-        if (legal) {
+        if (candidate_is_legal(move, mover, checkers, pinned, en_passant)) {
             result.push_back(move);
         }
     }
@@ -992,15 +1055,11 @@ std::vector<Move> legal_moves() {
         const std::uint64_t pinned = state.pinned[side_index];
         const int en_passant = state.en_passant.index();
         MoveBuffer pseudo;
-        generate_pseudo<TacticalOnly>(pseudo);
+        AddAllMoves sink(pseudo);
+        generate_pseudo<TacticalOnly>(sink);
         std::size_t count = 0;
     for (const Move& move : pseudo) {
-        bool legal = !move_requires_legality_probe(
-            move, state.board, checkers, pinned, en_passant);
-        if (!legal) {
-            legal = resolve_move_legality(move, mover);
-        }
-        if (legal) {
+        if (candidate_is_legal(move, mover, checkers, pinned, en_passant)) {
             // Count every legal move; a too-small span only drops moves.
             if (count < output.size()) {
                 output[count] = move;
@@ -1028,19 +1087,9 @@ std::vector<Move> legal_moves() {
         const std::uint64_t checkers = state.checkers[side_index];
         const std::uint64_t pinned = state.pinned[side_index];
         const int en_passant = state.en_passant.index();
-        MoveBuffer pseudo;
-        generate_pseudo(pseudo);
-        for (const Move& move : pseudo) {
-            bool legal = !move_requires_legality_probe(
-                move, state.board, checkers, pinned, en_passant);
-            if (!legal) {
-                legal = resolve_move_legality(move, mover);
-            }
-            if (legal) {
-                return true;
-            }
-        }
-        return false;
+        FirstLegalMoveSink sink(*this, mover, checkers, pinned, en_passant);
+        generate_pseudo(sink);
+        return sink.found();
     }
 
     [[nodiscard]] bool is_legal(const Move& move) const noexcept {
@@ -1490,37 +1539,41 @@ private:
         state.pinned = saved.pinned;
 }
 
-    template <typename MoveContainer>
-    void push(MoveContainer& moves, int from, int to) const {
-        if (!valid_square(to)) return;
-        push(moves, from, to, state.board[static_cast<std::size_t>(to)]);
+    template <typename MoveSink>
+    [[nodiscard]] bool push(MoveSink& moves, int from, int to) const {
+        if (!valid_square(to)) return true;
+        return push(moves, from, to, state.board[static_cast<std::size_t>(to)]);
     }
 
     // Bit-identity: `target` is the value the three-argument overload reloads
     // from `state.board[to]`; a caller that already loaded that same square
     // passes it here, so the checks, the promotion decision, and the emission
-    // order below are unchanged.
-    template <typename MoveContainer>
-    void push(MoveContainer& moves, int from, int to, Piece target) const {
-        if (!valid_square(to)) return;
-        if (!target.empty() && target.color == state.side) return;
-        if (target.type == PieceType::king) return;
+    // order below are unchanged.  The return value reports whether the sink
+    // wants the walk to continue (the container sinks always do).
+    template <typename MoveSink>
+    [[nodiscard]] bool push(MoveSink& moves, int from, int to, Piece target) const {
+        if (!valid_square(to)) return true;
+        if (!target.empty() && target.color == state.side) return true;
+        if (target.type == PieceType::king) return true;
         const Square source = Square::from_index(static_cast<std::uint8_t>(from));
         const Square destination = Square::from_index(static_cast<std::uint8_t>(to));
         const Piece moving = state.board[static_cast<std::size_t>(from)];
         const int promotion_rank = moving.color == Color::white ? 7 : 0;
         if (moving.type == PieceType::pawn && rank_of(to) == promotion_rank) {
-            add_promotion_moves(moves, source, destination);
-        } else {
-            moves.emplace_back(source, destination);
+            return add_promotion_moves(moves, source, destination);
         }
+        return moves.emplace_back(source, destination);
     }
 
     // `TacticalOnly` emits captures, en-passant, and promotions without the
     // quiet moves that quiescence would discard anyway.  The full generator
     // stays the default so perft and the public move list are unchanged.
-    template <bool TacticalOnly = false, typename MoveContainer>
-    void generate_pseudo(MoveContainer& moves) {
+    // `moves.emplace_back` / `push` report whether the sink wants the walk to
+    // continue; the container sinks always answer true, so their emission
+    // list and order are exactly today's, while FirstLegalMoveSink stops the
+    // walk at the first legal candidate.
+    template <bool TacticalOnly = false, typename MoveSink>
+    void generate_pseudo(MoveSink& moves) {
         const Color side = state.side;
         const std::size_t side_index = side == Color::white ? 0U : 1U;
         std::uint64_t origins = state.occupancy[side_index];
@@ -1541,19 +1594,21 @@ private:
                     const Piece one_target = state.board[static_cast<std::size_t>(one)];
                     if (one_target.empty()) {
                         if constexpr (!TacticalOnly) {
-                            push(moves, from, one, one_target);
+                            if (!push(moves, from, one, one_target)) return;
                             const int two = from + direction * 16;
                             const int start_rank = side == Color::white ? 1 : 6;
                             if (rank == start_rank &&
                                 state.board[static_cast<std::size_t>(two)].empty()) {
-                                moves.emplace_back(
-                                    Square::from_index(static_cast<std::uint8_t>(from)),
-                                    Square::from_index(static_cast<std::uint8_t>(two)));
+                                if (!moves.emplace_back(
+                                        Square::from_index(static_cast<std::uint8_t>(from)),
+                                        Square::from_index(static_cast<std::uint8_t>(two)))) {
+                                    return;
+                                }
                             }
                         } else {
                             const int promotion_rank = side == Color::white ? 7 : 0;
                             if (rank_of(one) == promotion_rank) {
-                                push(moves, from, one, one_target);
+                                if (!push(moves, from, one, one_target)) return;
                             }
                         }
                     }
@@ -1569,7 +1624,7 @@ private:
                     // call, including the empty en-passant target square.
                     if ((!target.empty() && target.color != side && target.type != PieceType::king) ||
                         (state.en_passant.index() == to && target.empty())) {
-                        push(moves, from, to, target);
+                        if (!push(moves, from, to, target)) return;
                     }
                 }
                 continue;
@@ -1597,7 +1652,7 @@ private:
                                 continue;
                             }
                         }
-                        push(moves, from, to, target);
+                        if (!push(moves, from, to, target)) return;
                     }
                 }
                 if constexpr (!TacticalOnly) {
@@ -1611,8 +1666,10 @@ private:
                             state.board[static_cast<std::size_t>(rank_base * 8 + 6)].empty() &&
                             safe_king_step(state, from, rank_base * 8 + 5, side) &&
                             safe_king_step(state, from, rank_base * 8 + 6, side)) {
-                            moves.emplace_back(Square::from_index(static_cast<std::uint8_t>(from)),
-                                               Square::from_index(static_cast<std::uint8_t>(rank_base * 8 + 6)));
+                            if (!moves.emplace_back(Square::from_index(static_cast<std::uint8_t>(from)),
+                                                    Square::from_index(static_cast<std::uint8_t>(rank_base * 8 + 6)))) {
+                                return;
+                            }
                         }
                         if ((state.castling & queen_right) != 0 &&
                             state.board[static_cast<std::size_t>(rank_base * 8 + 1)].empty() &&
@@ -1620,8 +1677,10 @@ private:
                             state.board[static_cast<std::size_t>(rank_base * 8 + 3)].empty() &&
                             safe_king_step(state, from, rank_base * 8 + 3, side) &&
                             safe_king_step(state, from, rank_base * 8 + 2, side)) {
-                            moves.emplace_back(Square::from_index(static_cast<std::uint8_t>(from)),
-                                               Square::from_index(static_cast<std::uint8_t>(rank_base * 8 + 2)));
+                            if (!moves.emplace_back(Square::from_index(static_cast<std::uint8_t>(from)),
+                                                    Square::from_index(static_cast<std::uint8_t>(rank_base * 8 + 2)))) {
+                                return;
+                            }
                         }
                     }
                     }
@@ -1644,13 +1703,17 @@ private:
                         const Piece target = state.board[static_cast<std::size_t>(to)];
                         if (target.empty()) {
                             if constexpr (!TacticalOnly) {
-                                moves.emplace_back(Square::from_index(static_cast<std::uint8_t>(from)),
-                                                   Square::from_index(static_cast<std::uint8_t>(to)));
+                                if (!moves.emplace_back(Square::from_index(static_cast<std::uint8_t>(from)),
+                                                        Square::from_index(static_cast<std::uint8_t>(to)))) {
+                                    return false;
+                                }
                             }
                         } else {
                             if (target.color != state.side && target.type != PieceType::king) {
-                                moves.emplace_back(Square::from_index(static_cast<std::uint8_t>(from)),
-                                                   Square::from_index(static_cast<std::uint8_t>(to)));
+                                if (!moves.emplace_back(Square::from_index(static_cast<std::uint8_t>(from)),
+                                                        Square::from_index(static_cast<std::uint8_t>(to)))) {
+                                    return false;
+                                }
                             }
                             break;
                         }
@@ -1658,9 +1721,10 @@ private:
                         target_rank += step[1];
                     }
                 }
+                return true;
             };
-            if (diagonal) add_rays(diagonal_steps);
-            if (orthogonal) add_rays(orthogonal_steps);
+            if (diagonal && !add_rays(diagonal_steps)) return;
+            if (orthogonal && !add_rays(orthogonal_steps)) return;
         }
     }
 

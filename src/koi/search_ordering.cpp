@@ -425,7 +425,15 @@ SearchMovePicker::SearchMovePicker(
     const Move excluded_move) noexcept
     : ordering_(ordering), state_(state), moves_(moves),
       history_context_(history_context), tt_move_(tt_move),
-      excluded_move_(excluded_move), ply_(ply), mode_(mode), stage_(first_stage()) {}
+      excluded_move_(excluded_move), ply_(ply), mode_(mode), stage_(first_stage()) {
+    // Only a main-mode picker reads the capture-check guard (materialize's
+    // capture-check probe); quiescence and evasion pickers never reach that
+    // probe, so only main mode pays for its zeroed start.
+    if (mode_ == Mode::main) {
+        capture_check_computed_.reset();
+        capture_checks_.reset();
+    }
+}
 
 bool SearchMovePicker::is_excluded(const std::size_t index) const noexcept {
     return index >= moves_.size() || emitted_.test(index) ||
@@ -479,10 +487,16 @@ MoveMetadata SearchMovePicker::materialize(const std::size_t index) {
     const bool promotion = metadata.move.promotion() != Promotion::none;
     if (mode_ == Mode::main && (metadata.is_capture() || promotion) &&
         !metadata.gives_check && !capture_check_computed_.test(index)) {
-        capture_checks_[index] = state_.move_gives_check(metadata.move);
+        // First probe for this index, so the stored check bit starts clear
+        // and a set() is equivalent to assigning the probed value.
+        if (state_.move_gives_check(metadata.move)) {
+            capture_checks_.set(index);
+        }
         capture_check_computed_.set(index);
     }
-    if (capture_check_computed_.test(index)) {
+    // Only main mode ever sets the guard above, so only main mode reads it:
+    // quiescence and evasion construction skip its zeroing.
+    if (mode_ == Mode::main && capture_check_computed_.test(index)) {
         metadata.gives_check = metadata.gives_check || capture_checks_.test(index);
     }
     return metadata;
@@ -752,7 +766,6 @@ const MoveMetadata* SearchMovePicker::next() {
                 const Candidate& candidate =
                     staged_[stage_begin_[rank] + candidate_index_++];
                 const std::size_t source_index = candidate.source_index;
-                emitted_.set(source_index);
                 emitted_metadata_ = moves_[source_index];
                 if (emitted_metadata_.is_capture()) {
                     emitted_metadata_.see_score = see_scores_[source_index];
@@ -786,7 +799,6 @@ const MoveMetadata* SearchMovePicker::next() {
             staged_[candidate_index_].stage_rank == static_cast<std::uint8_t>(stage_)) {
             const std::size_t candidate_slot = candidate_index_++;
             const Candidate candidate = staged_[candidate_slot];
-            emitted_.set(candidate.source_index);
             emitted_metadata_ = mode_ == Mode::evasion ? moves_[candidate.source_index] :
                 materialize(candidate.source_index);
             if (mode_ == Mode::main && stage_ == Stage::good_captures &&
