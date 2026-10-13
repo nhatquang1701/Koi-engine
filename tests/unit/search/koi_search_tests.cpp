@@ -1009,7 +1009,15 @@ void test_ultra_short_timed_search_completes_a_root_iteration() {
 
     koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>());
     koi::SearchLimits limits;
+#if defined(__SANITIZE_THREAD__)
+    // ThreadSanitizer slows the instrumented binary by roughly an order of
+    // magnitude, so a 50 ms budget expires during thread startup and the
+    // search legitimately returns its startup fallback. Keep the contract
+    // check with a budget the instrumented build can meet.
+    limits.movetime = 1000ms;
+#else
     limits.movetime = 50ms;
+#endif
     koi::SearchOptions options;
     options.hash_mb = 16;
     options.threads = 4;
