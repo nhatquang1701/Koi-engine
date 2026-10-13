@@ -540,10 +540,11 @@ jobs:
   linux-tsan:
     runs-on: ubuntu-24.04
     timeout-minutes: 120
-    # Advisory for the first cycle: the job lands non-blocking so a first-run
-    # TSan quirk cannot paint main red; it can become blocking once it has a
-    # green history.
-    continue-on-error: true
+    # Promoted to a required check on 2026-10-13: the first two cycles exposed
+    # the deadlock-detector mutex-table overflow (fixed by disabling the
+    # lock-order detector) and one sanitizer-unaware timing budget (fixed in
+    # the ultra-short timed search test); cycle 3 passed all eight suites with
+    # no race reports.
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
