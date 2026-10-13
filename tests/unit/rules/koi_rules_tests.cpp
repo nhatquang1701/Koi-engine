@@ -881,14 +881,14 @@ void require_emission_order_matches_the_oracle(const GameState& state) {
     require_same_move_sequence(tactical, oracle_tactical, "legal_tactical_moves_with_metadata", state);
 }
 
-void test_move_emission_order_matches_the_reference_oracle() {
-    // Suite fixtures (startpos, checkmate, stalemate, pins, en passant,
-    // promotion, castling, in-check replies, an asymmetric castling gate),
-    // kiwipete for dense ray coverage, all 16 FENs of
-    // koi-run/sparse-qsearch-fens.txt (embedded; the test never reads the file
-    // at runtime), and the slider-dense corpus position mirrored to the other
-    // side to move.
-    constexpr std::string_view fixtures[] = {
+// Shared differential corpus: suite fixtures (startpos, checkmate, stalemate,
+// pins, en passant, promotion, castling, in-check replies, an asymmetric
+// castling gate), kiwipete for dense ray coverage, all 16 FENs of
+// koi-run/sparse-qsearch-fens.txt (embedded; tests never read the file at
+// runtime), and the slider-dense corpus position mirrored to the other side
+// to move.  The move-emission order oracle and the make/unmake restore
+// differential both walk this list.
+constexpr std::string_view kDifferentialCorpusFens[] = {
         "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
         "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1",
         "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R b KQkq - 0 1",
@@ -921,9 +921,10 @@ void test_move_emission_order_matches_the_reference_oracle() {
         "4k1r1/8/8/3Q4/2q3N1/8/4B1B1/4R1K1 b - - 0 1",
         "4k3/8/8/8/2rQ4/8/8/3R2K1 b - - 0 1",
         "4k1r1/8/8/3Q4/2q3N1/8/4B1B1/4R1K1 w - - 0 1",
-    };
+};
 
-    for (const std::string_view fen : fixtures) {
+void test_move_emission_order_matches_the_reference_oracle() {
+    for (const std::string_view fen : kDifferentialCorpusFens) {
         const auto parsed = GameState::from_fen(fen);
         require(parsed.has_value(), "emission-order fixture FEN must be valid");
         require_emission_order_matches_the_oracle(*parsed);
@@ -961,6 +962,168 @@ void test_move_emission_order_matches_the_reference_oracle() {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Make/unmake restore differential: search applies moves through
+// GameState::make_search_move (declared game_state.hpp:322, defined at
+// game_state.cpp:1927) and restores them through GameState::unmake_move
+// (declared game_state.hpp:329, defined at game_state.cpp:1954) - the exact
+// pair behind detail::SearchContext::make_observed / unmake_observed
+// (search_context.hpp:531 and :540).  Every observable of the parent position
+// must be bit-identical after make -> unmake, and the incremental key right
+// after each make must equal the key of a fresh parse of the resulting FEN.
+// This is the standing arbiter for any future inverse-unmake or snapshot
+// change.
+// ---------------------------------------------------------------------------
+
+struct RestoreObservables {
+    std::string fen;
+    std::uint64_t position_key = 0;
+    std::vector<Move> legal_moves;
+    std::array<koi::Piece, 64> board{};
+    koi::Color side_to_move = koi::Color::white;
+    std::uint8_t castling_rights = 0;
+    Square en_passant{};
+    std::uint16_t halfmove_clock = 0;
+    std::uint16_t fullmove_number = 0;
+};
+
+RestoreObservables capture_restore_observables(const GameState& state) {
+    RestoreObservables captured;
+    captured.fen = state.fen();
+    captured.position_key = state.position_key();
+    captured.legal_moves = state.legal_moves();
+    state.copy_board_to(captured.board);
+    captured.side_to_move = state.side_to_move();
+    captured.castling_rights = state.castling_rights();
+    captured.en_passant = state.en_passant_square();
+    captured.halfmove_clock = state.halfmove_clock();
+    captured.fullmove_number = state.fullmove_number();
+    return captured;
+}
+
+// The incremental key immediately after a make must agree with a fresh parse
+// of the resulting FEN; catches incremental-key drift that FEN comparison
+// alone cannot see (the same pattern as the null-move key test above).
+void require_key_matches_fresh_parse(const GameState& state, const std::string& context) {
+    const std::string fen = state.fen();
+    const auto fresh = GameState::from_fen(fen);
+    if (!fresh.has_value()) {
+        throw std::runtime_error("post-make FEN must re-parse" + context + ": " + fen);
+    }
+    if (fresh->position_key() != state.position_key()) {
+        throw std::runtime_error(
+            "incremental position key must match a fresh parse" + context +
+            ": incremental=" + std::to_string(state.position_key()) +
+            " fresh=" + std::to_string(fresh->position_key()) + " fen=" + fen);
+    }
+}
+
+void require_restore_observables(const RestoreObservables& expected, const GameState& state,
+                                 const std::string& context) {
+    require(state.fen() == expected.fen, "unmake must restore the FEN" + context);
+    require(state.position_key() == expected.position_key,
+            "unmake must restore the position key" + context);
+    const std::vector<Move> legal = state.legal_moves();
+    require_same_move_sequence(legal, expected.legal_moves, "unmake legal move list", state);
+    std::array<koi::Piece, 64> board{};
+    state.copy_board_to(board);
+    for (std::size_t index = 0; index < board.size(); ++index) {
+        if (board[index].type != expected.board[index].type ||
+            board[index].color != expected.board[index].color) {
+            throw std::runtime_error("unmake must restore the mailbox" + context +
+                                     " square " + std::to_string(index));
+        }
+    }
+    require(state.side_to_move() == expected.side_to_move,
+            "unmake must restore the side to move" + context);
+    require(state.castling_rights() == expected.castling_rights,
+            "unmake must restore the castling rights" + context);
+    require(state.en_passant_square() == expected.en_passant,
+            "unmake must restore the en passant square" + context);
+    require(state.halfmove_clock() == expected.halfmove_clock,
+            "unmake must restore the halfmove clock" + context);
+    require(state.fullmove_number() == expected.fullmove_number,
+            "unmake must restore the fullmove number" + context);
+}
+
+// One full make/unmake/assert cycle for a generated move of the current
+// position; the caller guarantees `metadata` was generated for this state.
+void require_restore_cycle(GameState& state, const koi::MoveMetadata& metadata,
+                           const std::string& context, std::size_t& move_cycles) {
+    const RestoreObservables baseline = capture_restore_observables(state);
+    require(state.make_search_move(metadata), "make_search_move must apply" + context);
+    require_key_matches_fresh_parse(state, context + " after make");
+    require(state.unmake_move(), "a made search move must be undoable" + context);
+    require_restore_observables(baseline, state, context);
+    ++move_cycles;
+}
+
+// Every legal move of one position must round-trip.  The metadata list covers
+// the complete legal list, so iterating it is exactly "for every legal move".
+void require_every_move_restores(GameState& state, const std::string& context,
+                                 std::size_t& move_cycles) {
+    koi::MoveMetadataList metadata;
+    state.legal_moves_with_metadata(metadata);
+    require(metadata.size() == state.legal_moves().size(),
+            "the metadata batch must cover every legal move" + context);
+    for (const koi::MoveMetadata& candidate : metadata) {
+        require_restore_cycle(state, candidate,
+                              context + " move " + candidate.move.uci(), move_cycles);
+    }
+}
+
+void test_make_unmake_restore_differential() {
+    std::size_t move_cycles = 0;
+
+    // (a) Every legal move of every corpus fixture, on both a mirror-attached
+    // public state and a mirror-detached state (the search configuration:
+    // search_runner.cpp detaches its root mirror before searching).
+    for (const std::string_view fen : kDifferentialCorpusFens) {
+        const auto parsed = GameState::from_fen(fen);
+        require(parsed.has_value(), "restore-differential fixture FEN must be valid");
+        const std::string context = " at " + std::string(fen);
+
+        GameState attached = *parsed;
+        require_every_move_restores(attached, context, move_cycles);
+
+        GameState detached = *parsed;
+        detached.detach_mirror();
+        require_every_move_restores(detached, context + " (detached mirror)", move_cycles);
+    }
+
+    // (b) Deterministic seeded playouts: at every node the key must match a
+    // fresh parse, the make/unmake cycle must restore every observable, and
+    // the restored position must accept the chosen move again to advance.
+    std::mt19937 random(0x5eed2e5u);
+    for (int game = 0; game < 4; ++game) {
+        GameState state = GameState::startpos();
+        state.detach_mirror();
+        for (int ply = 0; ply < 128; ++ply) {
+            const std::string context = " in playout " + std::to_string(game) +
+                " ply " + std::to_string(ply);
+            require_key_matches_fresh_parse(state, context);
+            koi::MoveMetadataList metadata;
+            state.legal_moves_with_metadata(metadata);
+            if (metadata.empty() || state.is_draw_by_rule()) {
+                break;
+            }
+            // Plain modulo keeps the playout identical across standard
+            // libraries; the distribution bias is irrelevant for coverage.
+            const koi::MoveMetadata& chosen = metadata[random() % metadata.size()];
+            require_restore_cycle(state, chosen, context + " move " + chosen.move.uci(),
+                                  move_cycles);
+            require(state.make_search_move(chosen),
+                    "the restored position must accept the chosen move again" + context);
+        }
+    }
+
+    // Non-vacuity guard: the corpus and playouts together must produce far
+    // more than a token number of cycles, so a silent coverage regression
+    // fails loudly instead of passing on an empty walk.
+    require(move_cycles > 500,
+            "the restore differential must exercise more than 500 move cycles");
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -986,6 +1149,7 @@ int main(int argc, char** argv) {
         {"start-position move count", test_start_position_has_twenty_legal_moves},
         {"legal-move existence differential", test_legal_move_existence_matches_the_legal_move_list},
         {"move emission order differential", test_move_emission_order_matches_the_reference_oracle},
+        {"make unmake restore differential", test_make_unmake_restore_differential},
     };
 
     return koi::test::run_tests(tests, argc, argv);
