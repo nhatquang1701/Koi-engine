@@ -60,6 +60,12 @@ for line in sys.stdin:
             print("info string invalid position", flush=True)
         elif mode == "chatter-search":
             start_chatter()
+        elif mode == "interim-rows":
+            print("info depth 1 time 2 nodes 10 nps 5000", flush=True)
+            print("info depth 2 nodes 30", flush=True)
+            print("info depth 2 time 5 nodes 30 nps 6000", flush=True)
+            print("info depth 2 time 9 nodes 99 nps 11000", flush=True)
+            print("bestmove e2e4", flush=True)
         else:
             print("info depth 1 time 2 nodes 10 nps 5000", flush=True)
             print("info depth 2 time 5 nodes 30 nps 6000", flush=True)
@@ -192,6 +198,29 @@ class UciBenchmarkReportTest(unittest.TestCase):
             self.assertTrue(all(run["positions"][0]["bestmove"] == "e2e4" for run in report["runs"]))
             self.assertTrue(all(run["positions"][0]["go_command"] == "go infinite"
                                 for run in report["runs"]))
+
+    def test_first_complete_depth_row_wins_over_a_later_interim_row(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = Path(temp_dir)
+            engine_path = temp / "fake_uci_engine.py"
+            engine_path.write_text(FAKE_ENGINE, encoding="utf-8")
+            corpus_path = temp / "one.fen"
+            corpus_path.write_text("8/8/8/8/8/8/8/K6k w - - 0 1\n", encoding="utf-8")
+
+            with mock.patch.dict(os.environ, {"FAKE_UCI_MODE": "interim-rows"}):
+                report = uci_benchmark.run_benchmark(
+                    engines=[("koi", [sys.executable, str(engine_path)])],
+                    corpus_path=corpus_path,
+                    source_revision="abc1234",
+                )
+
+            # Depth 2 first arrives incomplete (no time), is upgraded by the
+            # first complete row, and the later interim-style duplicate row
+            # must not overwrite it.
+            self.assertEqual(report["runs"][0]["positions"][0]["depth_rows"], [
+                {"depth": 1, "nodes": 10, "nps": 5000, "time_ms": 2},
+                {"depth": 2, "nodes": 30, "nps": 6000, "time_ms": 5},
+            ])
 
     def test_named_fen_corpus_is_normalized_before_engine_launch(self):
         with tempfile.TemporaryDirectory() as temp_dir:

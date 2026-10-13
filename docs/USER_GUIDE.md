@@ -783,6 +783,10 @@ from the starting position (for example, `bestmove e2e4`).
   approximate transposition-table occupancy in permill (0..1000). An iteration
   published without full-window root authority carries a `lowerbound` flag
   after the score, so GUIs can tell a bounded estimate from a completed pass.
+- During a long search iteration the engine may repeat the current depth with
+  refreshed `nodes`, `nps`, and `time` values (interim progress lines), so a
+  GUI readout does not freeze on the last completed depth; the repeated score,
+  PV, and bound continue to describe that completed iteration.
 - `stop` cancels and joins the active worker and emits exactly one final legal
   `bestmove` for that search. The final `bestmove` includes a
   ` ponder <reply>` suffix whenever the completed principal variation contains

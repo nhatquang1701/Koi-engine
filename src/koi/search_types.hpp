@@ -300,6 +300,13 @@ struct SearchOptions {
     StrengthProfileHook strength_profile_hook;
     QuietHistorySideHook quiet_history_side_hook;
     TablebaseProbeHook tablebase_probe_hook;
+    // Test/diagnostic seam for interim UCI progress lines. During a long
+    // iteration the runner thread republishes the most recent completed
+    // iteration with refreshed nodes/nps/time at this cadence (same depth,
+    // score, and PV), so a GUI never freezes on the last completed depth.
+    // A non-positive value disables interim publication. This is not exposed
+    // as a UCI option; the default is the product cadence.
+    std::chrono::milliseconds interim_report_interval{250};
 };
 
 [[nodiscard]] inline std::size_t maximum_search_threads() noexcept {

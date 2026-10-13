@@ -2767,6 +2767,128 @@ void test_search_info_nodes_reports_all_visited_nodes() {
             "search info node count must include all work used for nps");
 }
 
+void test_interim_publication_repeats_depth_with_refreshed_nodes() {
+    auto evaluator = std::make_shared<koi::ClassicalEvaluator>();
+    koi::SearchService service(evaluator, {}, 16);
+    koi::SearchLimits limits;
+    limits.infinite = true;
+    koi::SearchOptions options;
+    options.threads = 1;
+    options.multi_pv = 2;
+    options.interim_report_interval = 1ms;
+
+    std::mutex info_mutex;
+    std::vector<koi::SearchInfo> infos;
+    // Sink-side repeat detector: the first line per (depth, rank) is the
+    // completed iteration; a later line of the same pair with more nodes is an
+    // interim refresh.
+    std::array<std::optional<koi::SearchInfo>, 2> last_by_rank;
+    std::atomic_bool saw_refresh{false};
+    CompletedSearch completed;
+    koi::SearchHandle handle = service.start(
+        koi::GameState::startpos(), limits,
+        {.on_info = [&info_mutex, &infos, &last_by_rank, &saw_refresh](
+                        const koi::SearchInfo& info) {
+             std::lock_guard lock(info_mutex);
+             infos.push_back(info);
+             if (info.multipv >= 1 && info.multipv <= 2) {
+                 const std::optional<koi::SearchInfo>& previous =
+                     last_by_rank[static_cast<std::size_t>(info.multipv - 1)];
+                 if (previous.has_value() && previous->depth == info.depth &&
+                     info.nodes > previous->nodes) {
+                     saw_refresh.store(true, std::memory_order_relaxed);
+                 }
+                 last_by_rank[static_cast<std::size_t>(info.multipv - 1)] = info;
+             }
+         },
+         .on_complete = completed.sink().on_complete},
+        options);
+
+    const auto deadline = std::chrono::steady_clock::now() + 20s;
+    while (!saw_refresh.load(std::memory_order_relaxed) &&
+           std::chrono::steady_clock::now() < deadline) {
+        std::this_thread::sleep_for(1ms);
+    }
+    handle.stop();
+    handle.wait();
+    require(saw_refresh.load(std::memory_order_relaxed),
+            "interim publication must repeat the current depth with a rising node count");
+
+    const koi::SearchResult result = completed.take_result();
+    require(result.best_move.has_value() && koi::GameState::startpos().is_legal(*result.best_move),
+            "a stopped infinite interim search must still return a legal best move");
+
+    std::lock_guard lock(info_mutex);
+    require(!infos.empty(), "interim publication must emit info lines");
+    int current_depth = 0;
+    bool rank_present[2] = {false, false};
+    std::array<std::optional<koi::SearchInfo>, 2> previous_by_rank;
+    for (const koi::SearchInfo& info : infos) {
+        require(info.depth >= 1, "interim lines must keep a positive completed depth");
+        require(info.multipv >= 1 && info.multipv <= 2,
+                "interim lines must stay within the requested MultiPV ranks");
+        require(!info.pv.empty(), "interim lines must keep the completed principal variation");
+        require(info.depth >= current_depth, "published depth must never decrease");
+        if (info.depth != current_depth) {
+            require(current_depth == 0 || (rank_present[0] && rank_present[1]),
+                    "every published depth must carry both requested MultiPV ranks");
+            current_depth = info.depth;
+            rank_present[0] = false;
+            rank_present[1] = false;
+            previous_by_rank[0].reset();
+            previous_by_rank[1].reset();
+        }
+        rank_present[static_cast<std::size_t>(info.multipv - 1)] = true;
+        std::optional<koi::SearchInfo>& previous =
+            previous_by_rank[static_cast<std::size_t>(info.multipv - 1)];
+        if (previous.has_value() && previous->depth == info.depth) {
+            require(previous->score_cp == info.score_cp && previous->mate == info.mate &&
+                        previous->pv == info.pv && previous->bound == info.bound &&
+                        info.nodes >= previous->nodes,
+                    "a repeated depth must keep the completed score/PV and move nodes forward");
+        }
+        previous = info;
+    }
+    require(rank_present[0] && rank_present[1],
+            "the last published depth must carry both requested MultiPV ranks");
+}
+
+void test_interim_publication_preserves_serial_search_results() {
+    const auto run = [](std::chrono::milliseconds interval) {
+        koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>(), {}, 16);
+        koi::SearchLimits limits;
+        limits.depth = 5;
+        koi::SearchOptions options;
+        options.threads = 1;
+        options.interim_report_interval = interval;
+        std::atomic<int> info_count{0};
+        CompletedSearch completed;
+        koi::SearchHandle handle = service.start(
+            koi::GameState::startpos(), limits,
+            {.on_info = [&info_count](const koi::SearchInfo&) {
+                 info_count.fetch_add(1, std::memory_order_relaxed);
+             },
+             .on_complete = completed.sink().on_complete},
+            options);
+        handle.wait();
+        return std::pair{completed.take_result(), info_count.load(std::memory_order_relaxed)};
+    };
+
+    const auto disabled = run(std::chrono::milliseconds{0});
+    const auto enabled = run(std::chrono::milliseconds{1});
+    require(disabled.second > 0 && enabled.second > disabled.second,
+            "the enabled cadence must add interim lines on top of the completed iterations");
+    require(disabled.first.best_move == enabled.first.best_move &&
+                disabled.first.score_cp == enabled.first.score_cp &&
+                disabled.first.mate == enabled.first.mate &&
+                disabled.first.pv == enabled.first.pv &&
+                disabled.first.completed_depth == enabled.first.completed_depth,
+            "interim publication must not change the best move, score, or PV");
+    require(disabled.first.stats.nodes == enabled.first.stats.nodes &&
+                disabled.first.stats.qnodes == enabled.first.stats.qnodes,
+            "interim publication must not change the counted search work");
+}
+
 void test_threaded_infinite_search_cancels_and_completes_once() {
     auto evaluator = std::make_shared<CountingEvaluator>();
     koi::SearchService service(evaluator);
@@ -4740,6 +4862,8 @@ int main(int argc, char** argv) {
         {"threaded node parity", test_threaded_and_reference_node_limits_have_matching_accounting},
         {"depth-zero node accounting", test_depth_zero_leaves_are_counted_as_quiescence_only},
         {"search info accounting", test_search_info_nodes_reports_all_visited_nodes},
+        {"interim progress lines", test_interim_publication_repeats_depth_with_refreshed_nodes},
+        {"interim progress determinism", test_interim_publication_preserves_serial_search_results},
         {"lazy search features", test_search_feature_extraction_is_not_needed_at_every_normal_node},
         {"feature cache restoration", test_position_features_restore_parent_cache_after_unmake},
         {"threaded cancellation", test_threaded_infinite_search_cancels_and_completes_once},
@@ -4833,6 +4957,8 @@ int main(int argc, char** argv) {
         "timed poisoned capture",
         "timed PV and bestmove coherence",
         "threaded timed cancellation",
+        "interim progress lines",
+        "interim progress determinism",
         "clock short forcing root research",
         "short tactical root fallback",
         "short oracle b2b1 rook retreat",

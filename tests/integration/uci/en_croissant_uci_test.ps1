@@ -60,6 +60,27 @@ try {
     if ((Read-UciUntil -Session $session -Description 'readyok during infinite analysis' -ValidateUciOutput -Predicate { param($line) $line -ceq 'readyok' }) -cne 'readyok') {
         throw 'Infinite analysis did not remain ready.'
     }
+
+    # A long iteration must refresh its published progress instead of leaving a
+    # GUI frozen on the last completed depth: read lines until a repeated depth
+    # reports strictly more nodes than its previous line for that depth.
+    $interimNodesByDepth = @{}
+    $interimRefreshSeen = $false
+    while (-not $interimRefreshSeen) {
+        $line = Read-UciLine $session 'interim progress during infinite analysis'
+        if (-not (Test-SearchInfo $line)) {
+            throw "Invalid interim-progress output: $line"
+        }
+        if ($line -match '^info depth ([1-9][0-9]*) .* nodes ([0-9]+) ') {
+            $depth = [int]$Matches[1]
+            $nodes = [System.UInt64]$Matches[2]
+            if ($interimNodesByDepth.ContainsKey($depth) -and
+                $nodes -gt $interimNodesByDepth[$depth]) {
+                $interimRefreshSeen = $true
+            }
+            $interimNodesByDepth[$depth] = $nodes
+        }
+    }
     Send-UciCommand $session 'stop'
     $thirdBestmove = Read-UciUntil -Session $session -Description 'bestmove after infinite analysis' -ValidateUciOutput -Predicate { param($line) $line -match '^bestmove [a-h][1-8][a-h][1-8][nbrq]?( ponder [a-h][1-8][a-h][1-8][nbrq]?)?$' }
     if ($thirdBestmove -notmatch '^bestmove [a-h][1-8][a-h][1-8][nbrq]?( ponder [a-h][1-8][a-h][1-8][nbrq]?)?$') {

@@ -8,6 +8,7 @@
 #include <condition_variable>
 #include <cstdint>
 #include <exception>
+#include <functional>
 #include <limits>
 #include <memory>
 #include <mutex>
@@ -2099,7 +2100,8 @@ public:
           time_manager_(time_manager), stop_requested_(stop_requested), global_nodes_(global_nodes),
           evaluator_mutex_(evaluator_mutex), use_transposition_table_(use_transposition_table),
           quiet_history_side_hook_(std::move(quiet_history_side_hook)),
-          tablebase_binding_(std::move(tablebase_binding)), worker_stats_(worker_count_) {
+          tablebase_binding_(std::move(tablebase_binding)), worker_stats_(worker_count_),
+          live_visited_(worker_count_) {
         workers_.reserve(worker_count_);
         try {
             for (std::size_t index = 0; index < worker_count_; ++index) {
@@ -2153,7 +2155,33 @@ public:
 
         {
             std::unique_lock lock(mutex_);
-            work_finished_.wait(lock, [this] { return finished_workers_ == worker_count_; });
+            while (finished_workers_ != worker_count_) {
+                if (!progress_tick) {
+                    // No interim tick configured: the original predicate wait.
+                    work_finished_.wait(lock, [this] {
+                        return finished_workers_ == worker_count_;
+                    });
+                    continue;
+                }
+                const std::chrono::milliseconds interval =
+                    std::max(std::chrono::milliseconds{1}, progress_tick_interval);
+                work_finished_.wait_for(lock, interval, [this] {
+                    return finished_workers_ == worker_count_;
+                });
+                if (finished_workers_ == worker_count_) {
+                    break;
+                }
+                // A tick publishes interim progress from the runner thread
+                // only. It runs outside the job mutex and its failure cannot
+                // affect the search or the completion accounting.
+                const std::function<void()> tick = progress_tick;
+                lock.unlock();
+                try {
+                    tick();
+                } catch (...) {
+                }
+                lock.lock();
+            }
         }
 
         stats = {};
@@ -2174,6 +2202,23 @@ public:
             // Only an exact root line may prevent a fail-low retry.
             window_failed_low = !has_exact_score_above_alpha;
         }
+    }
+
+    // Runner-thread interim-progress hook. While the pool runs, `run` wakes
+    // every `progress_tick_interval` and calls the tick outside the job mutex
+    // so the runner can publish refreshed info lines. An empty tick keeps the
+    // plain predicate wait. Both members are set by the runner before run().
+    std::function<void()> progress_tick;
+    std::chrono::milliseconds progress_tick_interval{250};
+
+    // Sum of the per-worker visited-node high-water marks. Monotonic for the
+    // pool lifetime and read by the runner thread only.
+    [[nodiscard]] std::uint64_t live_visited() const noexcept {
+        std::uint64_t total = 0;
+        for (const std::atomic<std::uint64_t>& slot : live_visited_) {
+            total += slot.load(std::memory_order_relaxed);
+        }
+        return total;
     }
 
 private:
@@ -2221,6 +2266,10 @@ private:
             }
 
             seen_sequence = job->sequence;
+            // Total visited nodes before this job. The per-job stats reset
+            // below, so combining the base with the running job counters
+            // yields a monotonic high-water mark for interim progress lines.
+            const std::uint64_t job_base = context.stats.nodes + context.stats.qnodes;
             context.begin_iteration(&job->aborted);
             // The serial root search initializes ply zero before descending
             // into its children. Root-parallel workers start directly at ply
@@ -2388,6 +2437,12 @@ private:
                     break;
                 }
                 search_root(move_index);
+                // Refresh this worker's high-water mark so the runner's
+                // interim tick can sum live traffic without touching the
+                // worker-local context.
+                live_visited_[worker_index].store(
+                    job_base + context.stats.nodes + context.stats.qnodes,
+                    std::memory_order_relaxed);
             }
 
             (*job->worker_stats)[worker_index] = context.stats;
@@ -2424,6 +2479,10 @@ private:
     TablebaseSearchBinding tablebase_binding_;
     std::vector<WorkerThread> workers_;
     std::vector<SearchStats> worker_stats_;
+    // Per-worker visited-node high-water marks, cumulative across jobs. Each
+    // worker is the only writer of its own slot; the runner thread sums them
+    // for interim `info` lines while the job is still running.
+    std::vector<std::atomic<std::uint64_t>> live_visited_;
     std::mutex mutex_;
     std::condition_variable work_available_;
     std::condition_variable work_finished_;
@@ -2441,6 +2500,55 @@ void safely_report_info(const SearchEventSink& sink, const SearchInfo& info) {
         sink.on_info(info);
     } catch (...) {
     }
+}
+
+// Snapshot of the most recently published completed iteration. Interim
+// progress lines clone this state so a repeated depth keeps the completed
+// score, PV, and bound while only the live counters are refreshed. The state
+// is touched by the runner thread only; every sink call stays there.
+struct InterimReportState {
+    std::vector<SearchInfo> lines;
+    // Elapsed-time origin for refreshed `time`/`nps` values.
+    std::chrono::steady_clock::time_point started{};
+    std::chrono::steady_clock::time_point last_publish{};
+};
+
+// Publishes a completed iteration (one line for single-PV, one per MultiPV
+// rank) through the sink and remembers it for interim refresh.
+void publish_iteration_lines(const SearchEventSink& sink, InterimReportState& state,
+                             std::vector<SearchInfo> lines) {
+    for (const SearchInfo& info : lines) {
+        safely_report_info(sink, info);
+    }
+    state.lines = std::move(lines);
+    state.last_publish = std::chrono::steady_clock::now();
+}
+
+// Republishes the stored iteration snapshot with refreshed node counters when
+// a long iteration has run past the configured cadence. Score, PV, bound,
+// depth, seldepth, and tbhits stay those of the completed iteration; `nodes`
+// is clamped against the live total so the GUI readout never goes backwards.
+void maybe_publish_interim(const SearchEventSink& sink, InterimReportState& state,
+                           const std::uint64_t live_nodes,
+                           const std::chrono::milliseconds interval) {
+    if (interval.count() <= 0 || state.lines.empty() || state.lines.front().depth < 1) {
+        return;
+    }
+    const auto now = std::chrono::steady_clock::now();
+    if (now - state.last_publish < interval) {
+        return;
+    }
+    const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+        now - state.started);
+    for (const SearchInfo& stored : state.lines) {
+        SearchInfo info = stored;
+        info.nodes = std::max(stored.nodes, live_nodes);
+        info.nps = elapsed.count() > 0 ? info.nodes * 1000 /
+            static_cast<std::uint64_t>(elapsed.count()) : info.nodes;
+        info.elapsed = elapsed;
+        safely_report_info(sink, info);
+    }
+    state.last_publish = now;
 }
 
 // Keeps the process-wide "GPU batching is worth it" counter true for exactly
@@ -2489,6 +2597,12 @@ void SearchRunner::run() {
     const auto& sink = sink_;
 
     const auto started = std::chrono::steady_clock::now();
+    // Interim progress publication state, owned by the runner thread. Normal
+    // publications deposit the completed iteration here; long iterations
+    // refresh it through the context probe (serial/LazySMP) or the root-pool
+    // tick (root-parallel). Results never read this state.
+    InterimReportState interim_state;
+    interim_state.started = started;
     GameState root = session->root();
     // Search never reads the vendored compatibility board. Detaching it keeps
     // interior make/unmake from copying a second board on every node; native
@@ -2716,6 +2830,19 @@ void SearchRunner::run() {
                 nullptr, evaluator_mutex_ptr, &legal_moves, true,
                 options.quiet_history_side_hook, tablebase_binding);
             SearchContext& context = *context_storage;
+            if (options.interim_report_interval.count() > 0) {
+                // Interim progress publisher for long iterations. Only this
+                // runner-thread context gets the probe; LazySMP helpers and
+                // root-parallel workers never publish protocol output.
+                context.progress_probe = [&context, &sink, &interim_state, &lazy_pool,
+                                          interval = options.interim_report_interval] {
+                    std::uint64_t live = context.stats.nodes + context.stats.qnodes;
+                    if (lazy_pool != nullptr) {
+                        live += lazy_pool->live_nodes() + lazy_pool->live_qnodes();
+                    }
+                    maybe_publish_interim(sink, interim_state, live, interval);
+                };
+            }
             if (lazy_pool == nullptr) {
                 // Exclusive TT access contract: one live search per
                 // TranspositionTable; the runner thread is the only TT
@@ -3938,7 +4065,7 @@ void SearchRunner::run() {
                     // but its unresolved children give no proven direction.
                     info.bound = SearchInfo::Bound::estimate;
                 }
-                safely_report_info(sink, info);
+                publish_iteration_lines(sink, interim_state, std::vector<SearchInfo>{info});
                 const int iteration_observation_score = bounded_fallback_result ?
                     searched_iteration_score : score;
                 time_manager.observe_iteration(SearchIterationObservation{
@@ -3987,6 +4114,19 @@ void SearchRunner::run() {
                 global_nodes_ptr, evaluator_mutex_ptr, nullptr, true,
                 options.quiet_history_side_hook, tablebase_binding);
             SearchContext& root_context = *root_context_storage;
+            if (options.interim_report_interval.count() > 0) {
+                // The pool's run() wait loop wakes on this cadence and calls
+                // the tick on the runner thread; live worker traffic comes
+                // from the per-worker high-water marks plus the runner's own
+                // root work.
+                pool.progress_tick_interval = options.interim_report_interval;
+                pool.progress_tick = [&root_context, &pool, &sink, &interim_state,
+                                      interval = options.interim_report_interval] {
+                    const std::uint64_t live = root_context.stats.nodes +
+                        root_context.stats.qnodes + pool.live_visited();
+                    maybe_publish_interim(sink, interim_state, live, interval);
+                };
+            }
 
             MoveMetadataList parallel_moves = legal_moves;
             detail::SearchMoveOrdering root_ordering;
@@ -4790,6 +4930,8 @@ void SearchRunner::run() {
                     static_cast<std::uint64_t>(elapsed.count()) : visited;
                 const std::size_t line_count = multi_pv ?
                     std::min(options.multi_pv, ranked_indices.size()) : std::size_t{1};
+                std::vector<SearchInfo> iteration_lines;
+                iteration_lines.reserve(line_count);
                 for (std::size_t rank = 0; rank < line_count; ++rank) {
                     const RootLine& line = lines[ranked_indices[rank]];
                     SearchInfo info{depth, line.score, mate_from_score(line.score), visited,
@@ -4808,8 +4950,9 @@ void SearchRunner::run() {
                         // has no proven score direction.
                         info.bound = SearchInfo::Bound::estimate;
                     }
-                    safely_report_info(sink, info);
+                    iteration_lines.push_back(info);
                 }
+                publish_iteration_lines(sink, interim_state, std::move(iteration_lines));
                 const auto iteration_elapsed = elapsed - previous_report_elapsed;
                 const int iteration_observation_score = bounded_fallback_result ?
                     searched_iteration_score : result.score_cp;

@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cmath>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -211,6 +212,13 @@ struct SearchContext {
     // sets this only between completed iterations; the first iteration keeps
     // the normal generated-move ordering.
     std::optional<Move> root_move_hint;
+    // Optional progress hook for interim UCI publication, invoked on the
+    // runner thread from the clock-poll slow path. Only the runner's main
+    // search context ever sets it; helper and parallel-worker contexts leave
+    // it empty so every protocol line stays runner-thread-only. The hook is
+    // observation-only: it may never change search control flow, and any
+    // exception it throws is swallowed.
+    std::function<void()> progress_probe;
 
     SearchContext(const Evaluator& evaluator, TranspositionTable& table, TimeManager& time_manager,
                   std::atomic_bool& stop_requested,
@@ -395,7 +403,9 @@ struct SearchContext {
 
     // Wall-clock polling separated from the flag check so count_node() can
     // sample the stop flags once per node instead of twice. The countdown
-    // decrement and the kClockPollInterval reset are unchanged.
+    // decrement and the kClockPollInterval reset are unchanged. The progress
+    // probe runs after the stop handling so it can never delay a deadline,
+    // and a failing probe must not alter the search result.
     [[nodiscard]] bool poll_clock() noexcept {
         if (clock_poll_countdown > 0) {
             --clock_poll_countdown;
@@ -405,6 +415,12 @@ struct SearchContext {
         if (time_manager.should_stop(visited_nodes())) {
             request_abort();
             return true;
+        }
+        if (progress_probe) {
+            try {
+                progress_probe();
+            } catch (...) {
+            }
         }
         return false;
     }

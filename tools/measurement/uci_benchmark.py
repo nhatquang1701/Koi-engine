@@ -302,7 +302,10 @@ def _search_position(process: subprocess.Popen[str], lines: queue.Queue[Any], fe
             row_complete = all(row[field] is not None for field in ("nodes", "nps", "time_ms"))
             previous_complete = previous is not None and all(
                 previous[field] is not None for field in ("nodes", "nps", "time_ms"))
-            if previous is None or row_complete:
+            # A later complete row for a depth is an interim progress refresh of
+            # the same completed iteration, so the first complete row wins;
+            # incomplete rows are still merged or upgraded.
+            if previous is None or (row_complete and not previous_complete):
                 depth_rows[row_depth] = row
             elif not previous_complete:
                 depth_rows[row_depth] = {
