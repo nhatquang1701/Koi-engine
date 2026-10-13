@@ -1,6 +1,11 @@
 #include <algorithm>
+#include <array>
+#include <bit>
+#include <cstddef>
+#include <cstdint>
 #include <iostream>
 #include <random>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -428,6 +433,534 @@ void test_legal_move_existence_matches_the_legal_move_list() {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Move-emission order oracle: an independent mailbox generator rebuilt only
+// through GameState's public accessors.  It mirrors Position::generate_pseudo's
+// emission conditions (piece walk order, ray directions, promotion order,
+// castling gates, tactical-only filtering) and re-derives legality by playing
+// each candidate on a private board copy.  It shares no code with the native
+// generator, so the upcoming bitboard ray-table rewrite must leave
+// legal_moves_into and legal_tactical_moves_into element-for-element identical.
+// ---------------------------------------------------------------------------
+
+namespace reference {
+
+using koi::Color;
+using koi::Move;
+using koi::opposite;
+using koi::Piece;
+using koi::PieceType;
+using koi::Promotion;
+using koi::Square;
+
+constexpr int kInvalidSquare = 64;
+
+struct Snapshot {
+    std::array<Piece, 64> board{};
+    Color side = Color::white;
+    std::uint8_t castling = 0;
+    int en_passant = kInvalidSquare;
+    std::array<int, 2> king_square{kInvalidSquare, kInvalidSquare};
+};
+
+constexpr Square square_from(int index) noexcept {
+    return Square::from_index(static_cast<std::uint8_t>(index));
+}
+
+Snapshot capture(const koi::GameState& state) noexcept {
+    Snapshot snapshot;
+    state.copy_board_to(snapshot.board);
+    snapshot.side = state.side_to_move();
+    snapshot.castling = state.castling_rights();
+    const Square en_passant = state.en_passant_square();
+    if (en_passant.index() < Square::kInvalid) {
+        snapshot.en_passant = static_cast<int>(en_passant.index());
+    }
+    for (const Color color : {Color::white, Color::black}) {
+        const std::uint64_t king = state.piece_bitboard(PieceType::king, color);
+        if (king != 0) {
+            snapshot.king_square[color == Color::white ? 0 : 1] =
+                static_cast<int>(std::countr_zero(king));
+        }
+    }
+    return snapshot;
+}
+
+// Mailbox attack scan rebuilt from the snapshot (the same deliberately
+// independent pattern as the SEE test's `reference` namespace).
+bool square_attacked(const Snapshot& snapshot, int target, Color attacker) noexcept {
+    if (target < 0 || target >= 64) {
+        return false;
+    }
+    const std::array<Piece, 64>& board = snapshot.board;
+    const int target_file = target & 7;
+    const int target_rank = target >> 3;
+    const auto has_piece = [&board, attacker](int square, PieceType type) noexcept {
+        if (square < 0 || square >= 64) {
+            return false;
+        }
+        const Piece piece = board[static_cast<std::size_t>(square)];
+        return piece.color == attacker && piece.type == type;
+    };
+
+    const int pawn_rank = target_rank - (attacker == Color::white ? 1 : -1);
+    if (pawn_rank >= 0 && pawn_rank < 8) {
+        if ((target_file > 0 && has_piece((pawn_rank << 3) + target_file - 1, PieceType::pawn)) ||
+            (target_file < 7 && has_piece((pawn_rank << 3) + target_file + 1, PieceType::pawn))) {
+            return true;
+        }
+    }
+
+    constexpr int knight_directions[8][2] = {
+        {1, 2}, {2, 1}, {2, -1}, {1, -2},
+        {-1, -2}, {-2, -1}, {-2, 1}, {-1, 2},
+    };
+    for (const auto& direction : knight_directions) {
+        const int file = target_file + direction[0];
+        const int rank = target_rank + direction[1];
+        if (file >= 0 && file < 8 && rank >= 0 && rank < 8 &&
+            has_piece((rank << 3) + file, PieceType::knight)) {
+            return true;
+        }
+    }
+
+    for (int file = target_file - 1; file <= target_file + 1; ++file) {
+        for (int rank = target_rank - 1; rank <= target_rank + 1; ++rank) {
+            if ((file == target_file && rank == target_rank) ||
+                file < 0 || file >= 8 || rank < 0 || rank >= 8) {
+                continue;
+            }
+            if (has_piece((rank << 3) + file, PieceType::king)) {
+                return true;
+            }
+        }
+    }
+
+    constexpr int directions[8][2] = {
+        {1, 0}, {-1, 0}, {0, 1}, {0, -1},
+        {1, 1}, {1, -1}, {-1, 1}, {-1, -1},
+    };
+    for (int direction = 0; direction < 8; ++direction) {
+        const bool diagonal = direction >= 4;
+        int file = target_file + directions[direction][0];
+        int rank = target_rank + directions[direction][1];
+        while (file >= 0 && file < 8 && rank >= 0 && rank < 8) {
+            const Piece piece = board[static_cast<std::size_t>((rank << 3) + file)];
+            if (!piece.empty()) {
+                if (piece.color == attacker &&
+                    ((diagonal && (piece.type == PieceType::bishop || piece.type == PieceType::queen)) ||
+                     (!diagonal && (piece.type == PieceType::rook || piece.type == PieceType::queen)))) {
+                    return true;
+                }
+                break;
+            }
+            file += directions[direction][0];
+            rank += directions[direction][1];
+        }
+    }
+    return false;
+}
+
+// Position::safe_king_step: move the king onto the transit square with the
+// rook still home, then ask whether the transit square is attacked.
+bool king_step_is_safe(const Snapshot& snapshot, int from, int to, Color side) noexcept {
+    Snapshot trial = snapshot;
+    trial.board[static_cast<std::size_t>(to)] = trial.board[static_cast<std::size_t>(from)];
+    trial.board[static_cast<std::size_t>(from)] = {};
+    return !square_attacked(trial, to, opposite(side));
+}
+
+constexpr PieceType promotion_piece(Promotion promotion) noexcept {
+    switch (promotion) {
+    case Promotion::knight:
+        return PieceType::knight;
+    case Promotion::bishop:
+        return PieceType::bishop;
+    case Promotion::rook:
+        return PieceType::rook;
+    case Promotion::queen:
+        return PieceType::queen;
+    case Promotion::none:
+        return PieceType::none;
+    }
+    return PieceType::none;
+}
+
+// Position::push with the same guards: skip the board edge, own pieces, and
+// king captures; expand a pawn reaching the promotion rank in queen, rook,
+// bishop, knight order.
+void emit_push(std::vector<Move>& moves, const Snapshot& snapshot, int from, int to) {
+    if (to < 0 || to >= 64) {
+        return;
+    }
+    const Piece target = snapshot.board[static_cast<std::size_t>(to)];
+    if (!target.empty() && target.color == snapshot.side) {
+        return;
+    }
+    if (target.type == PieceType::king) {
+        return;
+    }
+    const Piece moving = snapshot.board[static_cast<std::size_t>(from)];
+    const int promotion_rank = moving.color == Color::white ? 7 : 0;
+    if (moving.type == PieceType::pawn && (to >> 3) == promotion_rank) {
+        moves.emplace_back(square_from(from), square_from(to), Promotion::queen);
+        moves.emplace_back(square_from(from), square_from(to), Promotion::rook);
+        moves.emplace_back(square_from(from), square_from(to), Promotion::bishop);
+        moves.emplace_back(square_from(from), square_from(to), Promotion::knight);
+        return;
+    }
+    moves.emplace_back(square_from(from), square_from(to));
+}
+
+// Position::generate_pseudo over the snapshot: pieces in ascending square
+// order, the production step/ray direction tables verbatim, and castling only
+// in the full mode with the king-side gate before the queen-side gate.
+void emit_pseudo(const Snapshot& snapshot, bool tactical_only, std::vector<Move>& moves) {
+    const Color side = snapshot.side;
+    for (int from = 0; from < 64; ++from) {
+        const Piece piece = snapshot.board[static_cast<std::size_t>(from)];
+        if (piece.empty() || piece.color != side) {
+            continue;
+        }
+        const int file = from & 7;
+        const int rank = from >> 3;
+        if (piece.type == PieceType::pawn) {
+            const int direction = side == Color::white ? 1 : -1;
+            const int one = from + direction * 8;
+            if (one >= 0 && one < 64) {
+                const Piece one_target = snapshot.board[static_cast<std::size_t>(one)];
+                if (one_target.empty()) {
+                    if (!tactical_only) {
+                        emit_push(moves, snapshot, from, one);
+                        const int two = from + direction * 16;
+                        const int start_rank = side == Color::white ? 1 : 6;
+                        if (rank == start_rank &&
+                            snapshot.board[static_cast<std::size_t>(two)].empty()) {
+                            moves.emplace_back(square_from(from), square_from(two));
+                        }
+                    } else {
+                        const int promotion_rank = side == Color::white ? 7 : 0;
+                        if ((one >> 3) == promotion_rank) {
+                            emit_push(moves, snapshot, from, one);
+                        }
+                    }
+                }
+            }
+            for (const int file_delta : {-1, 1}) {
+                const int target_file = file + file_delta;
+                const int target_rank = rank + direction;
+                if (target_file < 0 || target_file >= 8 ||
+                    target_rank < 0 || target_rank >= 8) {
+                    continue;
+                }
+                const int to = target_rank * 8 + target_file;
+                const Piece target = snapshot.board[static_cast<std::size_t>(to)];
+                if ((!target.empty() && target.color != side &&
+                     target.type != PieceType::king) ||
+                    (snapshot.en_passant == to && target.empty())) {
+                    emit_push(moves, snapshot, from, to);
+                }
+            }
+            continue;
+        }
+        if (piece.type == PieceType::knight || piece.type == PieceType::king) {
+            static constexpr std::array<std::array<int, 2>, 8> knight_steps{{
+                {{1, 2}}, {{2, 1}}, {{2, -1}}, {{1, -2}},
+                {{-1, -2}}, {{-2, -1}}, {{-2, 1}}, {{-1, 2}}}};
+            static constexpr std::array<std::array<int, 2>, 8> king_steps{{
+                {{1, 1}}, {{1, 0}}, {{1, -1}}, {{0, -1}},
+                {{-1, -1}}, {{-1, 0}}, {{-1, 1}}, {{0, 1}}}};
+            const auto& steps = piece.type == PieceType::knight ? knight_steps : king_steps;
+            for (const auto& step : steps) {
+                const int target_file = file + step[0];
+                const int target_rank = rank + step[1];
+                if (target_file < 0 || target_file >= 8 ||
+                    target_rank < 0 || target_rank >= 8) {
+                    continue;
+                }
+                const int to = target_rank * 8 + target_file;
+                const Piece target = snapshot.board[static_cast<std::size_t>(to)];
+                if (tactical_only) {
+                    if (target.empty() || target.color == side ||
+                        target.type == PieceType::king) {
+                        continue;
+                    }
+                }
+                emit_push(moves, snapshot, from, to);
+            }
+            if (!tactical_only && piece.type == PieceType::king &&
+                !square_attacked(snapshot, from, opposite(side))) {
+                const int rank_base = side == Color::white ? 0 : 7;
+                if (from == rank_base * 8 + 4) {
+                    const std::uint8_t king_right = side == Color::white ?
+                        koi::kWhiteKingSideCastling : koi::kBlackKingSideCastling;
+                    const std::uint8_t queen_right = side == Color::white ?
+                        koi::kWhiteQueenSideCastling : koi::kBlackQueenSideCastling;
+                    if ((snapshot.castling & king_right) != 0 &&
+                        snapshot.board[static_cast<std::size_t>(rank_base * 8 + 5)].empty() &&
+                        snapshot.board[static_cast<std::size_t>(rank_base * 8 + 6)].empty() &&
+                        king_step_is_safe(snapshot, from, rank_base * 8 + 5, side) &&
+                        king_step_is_safe(snapshot, from, rank_base * 8 + 6, side)) {
+                        moves.emplace_back(square_from(from), square_from(rank_base * 8 + 6));
+                    }
+                    if ((snapshot.castling & queen_right) != 0 &&
+                        snapshot.board[static_cast<std::size_t>(rank_base * 8 + 1)].empty() &&
+                        snapshot.board[static_cast<std::size_t>(rank_base * 8 + 2)].empty() &&
+                        snapshot.board[static_cast<std::size_t>(rank_base * 8 + 3)].empty() &&
+                        king_step_is_safe(snapshot, from, rank_base * 8 + 3, side) &&
+                        king_step_is_safe(snapshot, from, rank_base * 8 + 2, side)) {
+                        moves.emplace_back(square_from(from), square_from(rank_base * 8 + 2));
+                    }
+                }
+            }
+            continue;
+        }
+
+        const bool diagonal = piece.type == PieceType::bishop || piece.type == PieceType::queen;
+        const bool orthogonal = piece.type == PieceType::rook || piece.type == PieceType::queen;
+        static constexpr std::array<std::array<int, 2>, 4> diagonal_steps{{
+            {{1, 1}}, {{1, -1}}, {{-1, -1}}, {{-1, 1}}}};
+        static constexpr std::array<std::array<int, 2>, 4> orthogonal_steps{{
+            {{1, 0}}, {{0, 1}}, {{-1, 0}}, {{0, -1}}}};
+        const auto add_rays = [&moves, &snapshot, from, file, rank, tactical_only, side](
+                                  const auto& steps) {
+            for (const auto& step : steps) {
+                int target_file = file + step[0];
+                int target_rank = rank + step[1];
+                while (target_file >= 0 && target_file < 8 &&
+                       target_rank >= 0 && target_rank < 8) {
+                    const int to = target_rank * 8 + target_file;
+                    const Piece target = snapshot.board[static_cast<std::size_t>(to)];
+                    if (target.empty()) {
+                        if (!tactical_only) {
+                            moves.emplace_back(square_from(from), square_from(to));
+                        }
+                    } else {
+                        if (target.color != side && target.type != PieceType::king) {
+                            moves.emplace_back(square_from(from), square_from(to));
+                        }
+                        break;
+                    }
+                    target_file += step[0];
+                    target_rank += step[1];
+                }
+            }
+        };
+        if (diagonal) {
+            add_rays(diagonal_steps);
+        }
+        if (orthogonal) {
+            add_rays(orthogonal_steps);
+        }
+    }
+}
+
+// Legality by construction: play the candidate on a board copy and ask
+// whether the mover's king is attacked.  Castling candidates are already
+// fully validated at emission time, exactly like Position::king_move_is_legal.
+bool move_is_legal(const Snapshot& snapshot, const Move& move) noexcept {
+    const int from = move.from().index();
+    const int to = move.to().index();
+    if (from >= 64 || to >= 64) {
+        return false;
+    }
+    const Piece moving = snapshot.board[static_cast<std::size_t>(from)];
+    if (moving.empty() || moving.color != snapshot.side) {
+        return false;
+    }
+    const int file_delta = (to & 7) - (from & 7);
+    if (moving.type == PieceType::king && (file_delta == 2 || file_delta == -2)) {
+        return true;
+    }
+    Snapshot trial = snapshot;
+    if (moving.type == PieceType::pawn && to == snapshot.en_passant &&
+        trial.board[static_cast<std::size_t>(to)].empty()) {
+        trial.board[static_cast<std::size_t>(to + (moving.color == Color::white ? -8 : 8))] = {};
+    }
+    trial.board[static_cast<std::size_t>(from)] = {};
+    Piece placed = moving;
+    if (move.promotion() != Promotion::none) {
+        placed.type = promotion_piece(move.promotion());
+    }
+    trial.board[static_cast<std::size_t>(to)] = placed;
+    const int king_square = moving.type == PieceType::king ?
+        to : snapshot.king_square[moving.color == Color::white ? 0 : 1];
+    if (king_square < 0 || king_square >= 64) {
+        return false;
+    }
+    return !square_attacked(trial, king_square, opposite(snapshot.side));
+}
+
+std::vector<Move> legal_sequence(const koi::GameState& state, bool tactical_only) {
+    const Snapshot snapshot = capture(state);
+    // GameState::legal_tactical_moves_with_metadata completes the tactical
+    // list to the full legal list while in check (its tactical_only is
+    // !checked && !include_quiet_checks), so the oracle mirrors that here.
+    const int king_index = snapshot.side == Color::white ? 0 : 1;
+    const bool checked =
+        snapshot.king_square[king_index] < 64 &&
+        square_attacked(snapshot, snapshot.king_square[king_index], opposite(snapshot.side));
+    std::vector<Move> pseudo;
+    emit_pseudo(snapshot, tactical_only && !checked, pseudo);
+    std::vector<Move> legal;
+    legal.reserve(pseudo.size());
+    for (const Move& move : pseudo) {
+        if (move_is_legal(snapshot, move)) {
+            legal.push_back(move);
+        }
+    }
+    return legal;
+}
+
+// Final legal moves made by a bishop, rook, or queen: the non-vacuity guard
+// that a fixture actually exercises long ray walks.
+std::size_t count_slider_moves(const koi::GameState& state) {
+    const Snapshot snapshot = capture(state);
+    std::size_t count = 0;
+    for (const Move& move : legal_sequence(state, false)) {
+        const Piece piece = snapshot.board[move.from().index()];
+        if (piece.type == PieceType::bishop || piece.type == PieceType::rook ||
+            piece.type == PieceType::queen) {
+            ++count;
+        }
+    }
+    return count;
+}
+
+} // namespace reference
+
+void require_same_move_sequence(std::span<const Move> production,
+                                const std::vector<Move>& oracle,
+                                std::string_view what,
+                                const GameState& state) {
+    if (production.size() != oracle.size()) {
+        throw std::runtime_error(
+            std::string(what) + " count mismatch at " + state.fen() +
+            ": production=" + std::to_string(production.size()) +
+            " oracle=" + std::to_string(oracle.size()));
+    }
+    for (std::size_t index = 0; index < production.size(); ++index) {
+        if (!(production[index] == oracle[index])) {
+            throw std::runtime_error(
+                std::string(what) + " order mismatch at " + state.fen() +
+                " index " + std::to_string(index) +
+                ": production=" + production[index].uci() +
+                " oracle=" + oracle[index].uci());
+        }
+    }
+}
+
+// Triple differential for one position: the allocation-free full list, the
+// vector full list, and the tactical-only list must all match the independent
+// oracle exactly, element for element, in sequence order.
+void require_emission_order_matches_the_oracle(const GameState& state) {
+    const std::vector<Move> oracle_full = reference::legal_sequence(state, false);
+    const std::vector<Move> oracle_tactical = reference::legal_sequence(state, true);
+
+    std::array<Move, koi::kMaximumLegalMoves> span_full{};
+    const std::size_t span_full_count = state.legal_moves_into(span_full);
+    const std::vector<Move> full = state.legal_moves();
+    require(span_full_count == full.size(),
+            "legal_moves_into and legal_moves must agree on the legal move count");
+    require(std::equal(span_full.begin(), span_full.begin() + span_full_count,
+                       full.begin(), full.end()),
+            "legal_moves_into and legal_moves must expose the same legal move sequence");
+    require_same_move_sequence(full, oracle_full, "legal_moves", state);
+
+    // The facade has no span-based tactical entry point; the metadata list
+    // with quiet checks and SEE disabled is the capture/promotion contract
+    // the oracle mirrors (GameState::legal_tactical_moves_with_metadata).
+    koi::MoveMetadataList tactical_metadata;
+    (void)state.legal_tactical_moves_with_metadata(
+        tactical_metadata, /*include_quiet_checks=*/false, /*include_see=*/false);
+    std::vector<Move> tactical;
+    tactical.reserve(tactical_metadata.size());
+    for (std::size_t index = 0; index < tactical_metadata.size(); ++index) {
+        tactical.push_back(tactical_metadata[index].move);
+    }
+    require_same_move_sequence(tactical, oracle_tactical, "legal_tactical_moves_with_metadata", state);
+}
+
+void test_move_emission_order_matches_the_reference_oracle() {
+    // Suite fixtures (startpos, checkmate, stalemate, pins, en passant,
+    // promotion, castling, in-check replies, an asymmetric castling gate),
+    // kiwipete for dense ray coverage, all 16 FENs of
+    // koi-run/sparse-qsearch-fens.txt (embedded; the test never reads the file
+    // at runtime), and the slider-dense corpus position mirrored to the other
+    // side to move.
+    constexpr std::string_view fixtures[] = {
+        "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+        "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1",
+        "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R b KQkq - 0 1",
+        "4R1k1/6pp/8/8/8/8/8/6K1 b - - 0 1",
+        "k7/8/1Q6/8/8/8/8/K7 b - - 0 1",
+        "4k3/8/8/8/8/4r3/4N3/4K3 w - - 0 1",
+        "rnbqkbnr/pppp1ppp/8/3Pp3/8/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 2",
+        "4r1k1/8/8/3pP3/8/8/8/4K3 w - d6 0 2",
+        "4k3/8/8/8/8/8/4r3/4K3 w - - 0 1",
+        "4k3/8/8/8/1b6/8/8/R3K3 w Q - 0 1",
+        "4k3/P7/8/8/8/8/8/4K3 w - - 0 1",
+        "4k3/p7/8/8/8/8/8/4K3 b - - 0 1",
+        "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1",
+        "4k3/8/8/8/8/5r2/8/R3K2R w KQ - 0 1",
+        "r3k2r/ppp2ppp/2n1bn2/3qp3/3P4/2NB1N2/PPP2PPP/R2Q1RK1 w kq - 10 9",
+        "k7/4r3/5q2/3p4/4P3/2N5/8/7K w - - 0 1",
+        "2r1k3/5q1b/8/8/4N3/8/8/K7 w - - 0 1",
+        "r3k3/P7/8/8/8/8/7p/1N2K3 b - - 0 1",
+        "4k2r/P7/8/8/8/8/7p/4K3 w - - 0 1",
+        "kn2q3/8/8/8/8/8/P7/4K3 w - - 0 1",
+        "8/8/4r1q1/7k/8/7N/P7/K7 w - - 0 1",
+        "k7/4P3/8/8/8/8/p7/4R1K1 w - - 0 1",
+        "4k3/1P6/8/8/8/8/6p1/4K1N1 w - - 0 1",
+        "b7/8/3q3k/8/7r/6N1/8/K7 w - - 0 1",
+        "8/3q1r2/2k5/8/8/5N2/8/K1B5 w - - 0 1",
+        "4k3/8/3q4/4r3/8/8/1B6/4K3 w - - 0 1",
+        "4k3/1P6/8/8/8/8/6p1/2B1K3 b - - 0 1",
+        "4k3/3q4/8/8/8/8/3Q4/3R2K1 w - - 0 1",
+        "2b1k3/7P/8/8/8/8/3p4/5K1R b - - 0 1",
+        "4k1r1/8/8/3Q4/2q3N1/8/4B1B1/4R1K1 b - - 0 1",
+        "4k3/8/8/8/2rQ4/8/8/3R2K1 b - - 0 1",
+        "4k1r1/8/8/3Q4/2q3N1/8/4B1B1/4R1K1 w - - 0 1",
+    };
+
+    for (const std::string_view fen : fixtures) {
+        const auto parsed = GameState::from_fen(fen);
+        require(parsed.has_value(), "emission-order fixture FEN must be valid");
+        require_emission_order_matches_the_oracle(*parsed);
+    }
+
+    // Non-vacuity guard: the slider-dense corpus position must genuinely walk
+    // long rays, otherwise the sequence comparison would be trivial.
+    const auto slider_dense =
+        GameState::from_fen("4k1r1/8/8/3Q4/2q3N1/8/4B1B1/4R1K1 b - - 0 1");
+    require(slider_dense.has_value(), "slider-dense fixture must be valid");
+    require(reference::count_slider_moves(*slider_dense) >= 15,
+            "the slider-dense position must emit a long slider ray sequence");
+    require(slider_dense->legal_moves().size() >= 20,
+            "the slider-dense position must emit a long legal move list");
+    const auto kiwipete = GameState::from_fen(
+        "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1");
+    require(kiwipete.has_value() && kiwipete->legal_moves().size() >= 40,
+            "kiwipete must emit a long legal move list");
+
+    // Deterministic seeded playouts: the element-for-element identity must
+    // hold at every visited position, including promotions, en passant,
+    // castling, and discovered checks.
+    std::mt19937 random(0x5eed1e5u);
+    for (int game = 0; game < 4; ++game) {
+        GameState state = GameState::startpos();
+        for (int ply = 0; ply < 128; ++ply) {
+            require_emission_order_matches_the_oracle(state);
+            const std::vector<Move> legal = state.legal_moves();
+            if (legal.empty() || state.is_draw_by_rule()) {
+                break;
+            }
+            require(state.make_move(legal[random() % legal.size()]),
+                    "a move from the legal list must be applicable");
+        }
+    }
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -452,6 +985,7 @@ int main(int argc, char** argv) {
         {"transactional rejected move", test_rejected_king_move_leaves_state_unchanged},
         {"start-position move count", test_start_position_has_twenty_legal_moves},
         {"legal-move existence differential", test_legal_move_existence_matches_the_legal_move_list},
+        {"move emission order differential", test_move_emission_order_matches_the_reference_oracle},
     };
 
     return koi::test::run_tests(tests, argc, argv);
