@@ -177,25 +177,48 @@ bool split_fields(std::string_view fen, std::array<std::string_view, 6>& fields)
     return count == fields.size();
 }
 
-struct Snapshot {
-    Board board{};
-    Color side = Color::white;
-    std::uint8_t castling = 0;
-    Square en_passant{};
-    std::uint16_t halfmove = 0;
-    std::uint16_t fullmove = 1;
-    std::uint64_t key = 0;
-    // Sits next to `key` on purpose: repetition_count() walks the history
-    // backwards and reads exactly these two fields from every visited
-    // snapshot, so one cache line now covers the whole probe.
-    bool null_move = false;
-    std::array<std::array<std::uint64_t, 7>, 2> piece_bitboards{};
-    std::array<std::uint64_t, 2> occupancy{};
-    std::array<std::uint64_t, 2> checkers{};
-    std::array<std::uint64_t, 2> pinned{};
-    std::uint64_t repetition_history_fingerprint = 0;
-    bool repetition_history_suppressed = false;
+// Inverse-make undo record: one 64-byte cache line per make. The make paths
+// push one record before mutating the state, and unapply() reconstructs the
+// pre-move state from it, so the 328-byte field-by-field Snapshot copy and
+// the restore it fed are gone. The record holds only what a make cannot be
+// inverted from the child state alone: the prior key, rule state, clocks,
+// repetition state, and both king-mask slots (verbatim), plus the move and
+// the captured piece so unapply() can mirror the piece moves through the
+// same incremental add/remove helpers apply_unchecked() uses. Board,
+// bitboards, occupancy, `occupied`, and `side` are reconstructed instead.
+//
+// The layout below is exact (alignof 8, no padding):
+//   key 0, null_move 8, prior_suppressed 9, prior_halfmove 10,
+//   prior_fullmove 12, prior_castling 14, prior_en_passant 15,
+//   fingerprint 16, checkers 24, pinned 40, move 56, captured 60,
+//   ep_victim 62, flags 63.
+// `key` and `null_move` sit first on purpose: repetition_count() walks the
+// ring backwards and reads exactly those two fields from every visited
+// record, so one cache line still covers the whole probe.
+struct UndoRecord {
+    std::uint64_t key = 0;                     // prior position key, verbatim
+    bool null_move = false;                    // repetition-scan kind
+    bool prior_suppressed = false;             // prior repetition_history_suppressed
+    std::uint16_t prior_halfmove = 0;          // uint16: a null move can store 256
+    std::uint16_t prior_fullmove = 1;          // uint16: a black null move can store 32769
+    std::uint8_t prior_castling = 0;
+    std::uint8_t prior_en_passant = Square::kInvalid; // 64 = none, verbatim
+    std::uint64_t fingerprint = 0;             // prior repetition_history_fingerprint
+    std::array<std::uint64_t, 2> checkers{};   // prior checkers (both slots)
+    std::array<std::uint64_t, 2> pinned{};     // prior pinned (both slots)
+    Move move{};                               // from/to/promotion (4 B packed)
+    Piece captured{};                          // piece removed (EP victim for EP)
+    std::uint8_t ep_victim = Square::kInvalid; // EP victim square (else invalid)
+    std::uint8_t flags = 0;                    // bit0 ep, bit1 castling, bit2 double_push, bit3 capture
 };
+static_assert(sizeof(UndoRecord) == 64);
+
+// UndoRecord::flags bits, derived exactly as apply_unchecked() derives the
+// booleans from the same pre-move state.
+constexpr std::uint8_t kEpFlag = 0x1;
+constexpr std::uint8_t kCastlingFlag = 0x2;
+constexpr std::uint8_t kDoublePushFlag = 0x4;
+constexpr std::uint8_t kCaptureFlag = 0x8;
 
 struct NativeState {
     Board board{};
@@ -212,7 +235,7 @@ struct NativeState {
     std::uint64_t occupied = 0;
     std::array<std::uint64_t, 2> checkers{};
     std::array<std::uint64_t, 2> pinned{};
-    std::array<Snapshot, kMaximumHistory> history{};
+    std::array<UndoRecord, kMaximumHistory> history{};
     std::size_t history_size = 0;
 };
 
@@ -220,44 +243,82 @@ bool has_legal_en_passant_capture(const NativeState& state) noexcept;
 bool has_legal_en_passant_capture_mutable(NativeState& state) noexcept;
 void refresh_king_masks(NativeState& state) noexcept;
 
-// Records a snapshot of the pre-move state in the next history slot. The
-// array has a fixed capacity so the search can make and unmake moves without
-// allocating, but a game may legitimately run past it: a long replay then
-// drops the oldest snapshot and keeps the recent window that repetition
-// detection and search need. Without this, a command listing more than
-// `kMaximumHistory` moves would be rejected and the engine would keep
-// answering the stale position.
-//
-// The slot is filled field by field straight from `state`, so make/unmake
-// pays no intermediate Snapshot temporary. That is bit-identical to the
-// former `record_snapshot(state, snapshot())`: the full-history memmove only
-// shifts history[0..kMaximumHistory-2], which shares no storage with the
-// copied state fields, so shifting before or after the copy writes the same
-// values. Only struct padding is left as the slot had it, and nothing reads
-// padding.
-void snapshot_into(NativeState& state, bool null_move = false) noexcept {
-    Snapshot* slot = nullptr;
+// Pushes the next undo slot. The array has a fixed capacity so the search
+// can make and unmake moves without allocating, but a game may legitimately
+// run past it: a long replay then drops the oldest record and keeps the
+// recent window that repetition detection and search need. Without this, a
+// command listing more than `kMaximumHistory` moves would be rejected and
+// the engine would keep answering the stale position. The overflow shift
+// keeps the former ring semantics verbatim, with sizeof(UndoRecord)
+// substituted: 255 x 64 = 16,320 B instead of 83,640 B.
+UndoRecord* push_undo_record(NativeState& state) noexcept {
     if (state.history_size >= kMaximumHistory) {
         std::memmove(state.history.data(), state.history.data() + 1,
-                     (kMaximumHistory - 1) * sizeof(Snapshot));
-        slot = &state.history[kMaximumHistory - 1];
-    } else {
-        slot = &state.history[state.history_size++];
+                     (kMaximumHistory - 1) * sizeof(UndoRecord));
+        return &state.history[kMaximumHistory - 1];
     }
-    slot->board = state.board;
-    slot->side = state.side;
-    slot->castling = state.castling;
-    slot->en_passant = state.en_passant;
-    slot->halfmove = state.halfmove;
-    slot->fullmove = state.fullmove;
+    return &state.history[state.history_size++];
+}
+
+// Fills the next undo slot from the pre-move state, before apply_unchecked()
+// runs. The move facts are derived exactly as apply_unchecked() derives them
+// from this same state (moving piece, captured piece, pawn/castling/EP/
+// double-push predicates), so the record and the make agree on every flag.
+void record_undo(NativeState& state, const Move& move) noexcept {
+    UndoRecord* slot = push_undo_record(state);
+    const int from = move.from().index();
+    const int to = move.to().index();
+    const Piece moving = state.board[static_cast<std::size_t>(from)];
+    const Piece captured = state.board[static_cast<std::size_t>(to)];
+    const bool pawn_move = moving.type == PieceType::pawn;
+    const bool en_passant = pawn_move && to == state.en_passant.index() && captured.empty();
+    const int ep_victim = en_passant ? to + (moving.color == Color::white ? -8 : 8) : -1;
+    std::uint8_t flags = 0;
+    if (en_passant) flags |= kEpFlag;
+    if (moving.type == PieceType::king && std::abs(file_of(to) - file_of(from)) == 2) {
+        flags |= kCastlingFlag;
+    }
+    if (pawn_move && std::abs(to - from) == 16) flags |= kDoublePushFlag;
+    if (!captured.empty() || en_passant) flags |= kCaptureFlag;
+
     slot->key = state.key;
-    slot->piece_bitboards = state.piece_bitboards;
-    slot->occupancy = state.occupancy;
+    slot->null_move = false;
+    slot->prior_suppressed = state.repetition_history_suppressed;
+    slot->prior_halfmove = state.halfmove;
+    slot->prior_fullmove = state.fullmove;
+    slot->prior_castling = state.castling;
+    slot->prior_en_passant = state.en_passant.index();
+    slot->fingerprint = state.repetition_history_fingerprint;
     slot->checkers = state.checkers;
     slot->pinned = state.pinned;
-    slot->null_move = null_move;
-    slot->repetition_history_fingerprint = state.repetition_history_fingerprint;
-    slot->repetition_history_suppressed = state.repetition_history_suppressed;
+    slot->move = move;
+    // An en-passant capture removes the pawn behind `to`, not a piece on
+    // `to`, so the record carries that victim in `captured` plus its square;
+    // every other capture re-adds `captured` on `to` directly.
+    slot->captured = en_passant ? state.board[static_cast<std::size_t>(ep_victim)] : captured;
+    slot->ep_victim = en_passant ? static_cast<std::uint8_t>(ep_victim) : Square::kInvalid;
+    slot->flags = flags;
+}
+
+// Null pass: no piece moves, so only the assignment tail of the inverse
+// reads these fields. The board, bitboards, and occupancy are untouched by
+// both the make and the unmake.
+void record_undo_null(NativeState& state) noexcept {
+    UndoRecord* slot = push_undo_record(state);
+    slot->key = state.key;
+    slot->null_move = true;
+    slot->prior_suppressed = state.repetition_history_suppressed;
+    slot->prior_halfmove = state.halfmove;
+    slot->prior_fullmove = state.fullmove;
+    slot->prior_castling = state.castling;
+    slot->prior_en_passant = state.en_passant.index();
+    slot->fingerprint = state.repetition_history_fingerprint;
+    slot->checkers = state.checkers;
+    slot->pinned = state.pinned;
+    slot->move = Move::no_move();
+    slot->captured = Piece{};
+    slot->ep_victim = Square::kInvalid;
+    slot->flags = 0;
 }
 
 std::uint64_t bit(int square) noexcept {
@@ -451,14 +512,14 @@ bool is_checked(const NativeState& state, Color color) noexcept {
 // slider.  apply_unchecked flips the side before callers ask about the mover,
 // and every reader indexes the masks with the current side: the hoisted
 // values in legal_moves, legal_moves_into_impl, and has_legal_move
-// (position.cpp:1031, 1051, 1084), the re-read in
-// resolve_move_legality (position.cpp:894), whose callers pass state.side as
-// the mover, and the side-to-move in_check() probe (position.cpp:1277).
+// (position.cpp:1092, 1112, 1145), the re-read in
+// resolve_move_legality (position.cpp:955), whose callers pass state.side as
+// the mover, and the side-to-move in_check() probe (position.cpp:1389).
 // NativeState is private to this translation unit, so no other
 // reader exists.  The other colour's masks are intentionally left stale: no
-// reader touches them, and snapshot_into()/restore() copy both arrays
-// (position.cpp:256-257, 1532-1533), so unmake restores whatever was
-// current when the snapshot was taken.
+// reader touches them, and record_undo()/unapply() carry both arrays through
+// the undo record, so unmake restores whatever was current when the make
+// recorded it.
 void refresh_king_masks(NativeState& state) noexcept {
     const std::size_t color_index = state.side == Color::white ? 0U : 1U;
     state.checkers[color_index] = 0;
@@ -551,8 +612,8 @@ namespace {
 // In-place variant used by the make/unmake hot path.  Applying the candidate
 // capture directly to the board and the two pawn bitboards -- and restoring
 // the exact same fields afterwards -- avoids the full NativeState copy
-// (board + 256-entry history, roughly 75 KiB) that the read-only wrapper must
-// still pay for its rare const callers.
+// (board + 256-entry undo ring, roughly 16 KiB) that the read-only wrapper
+// must still pay for its rare const callers.
 bool has_legal_en_passant_capture_in_place(NativeState& state) noexcept {
     if (state.en_passant.index() >= Square::kInvalid) {
         return false;
@@ -836,7 +897,7 @@ public:
 // (king_move_is_legal) temporarily clears only `occupied` and restores it,
 // and the non-king trial mutates only the captured/victim bitboard words and
 // `occupied`, restoring them before returning.  resolve_move_legality never
-// records history (snapshot_into belongs to the public make path), so the
+// records history (record_undo belongs to the make path), so the
 // hoisted values stay loop-invariant.
 [[nodiscard]] static bool move_requires_legality_probe(
     const Move& move, const Board& board,
@@ -1150,7 +1211,7 @@ std::vector<Move> legal_moves() {
     bool apply_legal(const Move& move) {
         const auto legal = legal_moves();
         if (std::find(legal.begin(), legal.end(), move) == legal.end()) return false;
-        snapshot_into(state);
+        record_undo(state, move);
         apply_unchecked(move);
         refresh_king_masks(state);
         return true;
@@ -1172,7 +1233,7 @@ std::vector<Move> legal_moves() {
         if (moving.empty() || moving.color != state.side) {
             return false;
         }
-        snapshot_into(state);
+        record_undo(state, move);
         apply_unchecked(move);
         refresh_king_masks(state);
         return true;
@@ -1180,10 +1241,61 @@ std::vector<Move> legal_moves() {
 
     bool unapply() noexcept {
         if (state.history_size == 0) return false;
-        // Restore straight from the history slot: restore() only reads it,
-        // and the slot is not written again until the next snapshot_into, so
-        // the local copy was pure overhead.
-        restore(state.history[--state.history_size]);
+        // Consume the top record and invert the make in place.  The piece
+        // moves mirror apply_unchecked()'s sequence through the same
+        // add/remove helpers, so the bitboards and occupancy words land on
+        // exactly the pre-move membership; the rule state, clocks, key,
+        // repetition state, and both mask slots are assigned verbatim from
+        // the record because the make cannot reconstruct them from the child
+        // (cleared castling rights, cleared or replaced en-passant square,
+        // reset clocks, one-way fingerprint combiner).  A null record skips
+        // the piece block: the make touched no board state.  The key XORs
+        // inside the helpers are deliberately kept: the shared helpers leave
+        // the bitboard/occupancy updates bit-for-bit identical to the
+        // forward path, and the assignment below overwrites the key anyway.
+        const UndoRecord& record = state.history[--state.history_size];
+        const ZobristKeys& keys = zobrist();
+        if (!record.null_move) {
+            const Color mover = opposite(state.side);
+            const int from = record.move.from().index();
+            const int to = record.move.to().index();
+            const Piece moved_now = state.board[static_cast<std::size_t>(to)];
+            const Piece mover_piece = record.move.promotion() != Promotion::none
+                ? Piece{PieceType::pawn, mover} : moved_now;
+            remove_derived_piece(state, keys, moved_now, to);
+            state.board[static_cast<std::size_t>(to)] = {};
+            if (!record.captured.empty()) {
+                const int victim = (record.flags & kEpFlag) != 0
+                    ? static_cast<int>(record.ep_victim) : to;
+                state.board[static_cast<std::size_t>(victim)] = record.captured;
+                add_derived_piece(state, keys, record.captured, victim);
+            }
+            state.board[static_cast<std::size_t>(from)] = mover_piece;
+            add_derived_piece(state, keys, mover_piece, from);
+            if ((record.flags & kCastlingFlag) != 0) {
+                const int rook_from = to > from ? from + 3 : from - 4;
+                const int rook_to = to > from ? from + 1 : from - 1;
+                const Piece rook = state.board[static_cast<std::size_t>(rook_to)];
+                remove_derived_piece(state, keys, rook, rook_to);
+                state.board[static_cast<std::size_t>(rook_from)] = rook;
+                state.board[static_cast<std::size_t>(rook_to)] = {};
+                add_derived_piece(state, keys, rook, rook_from);
+            }
+        }
+        state.side = opposite(state.side);
+        state.castling = record.prior_castling;
+        state.en_passant = Square::from_index(record.prior_en_passant);
+        state.halfmove = record.prior_halfmove;
+        state.fullmove = record.prior_fullmove;
+        state.key = record.key;
+        state.repetition_history_fingerprint = record.fingerprint;
+        state.repetition_history_suppressed = record.prior_suppressed;
+        state.checkers = record.checkers;
+        state.pinned = record.pinned;
+        // `occupied == occupancy[0] | occupancy[1]` holds at every record
+        // point (rebuild_derived and apply_unchecked both re-derive the
+        // union), so unmake recomputes it instead of recording a copy.
+        state.occupied = state.occupancy[0] | state.occupancy[1];
         return true;
     }
 
@@ -1195,7 +1307,7 @@ std::vector<Move> legal_moves() {
     }
 
     bool make_null_move() noexcept {
-        snapshot_into(state, /*null_move=*/true);
+        record_undo_null(state);
         // A null pass touches no piece, so the board, the piece bitboards and
         // the occupancy words are already current: only the rule-state key
         // terms change.  This mirrors calculate_key(): the en-passant term is
@@ -1279,7 +1391,7 @@ std::vector<Move> legal_moves() {
         // fills checkers[side] from exactly square_attacked()'s five terms, and
         // every public mutation refreshes the side-to-move mask (rebuild_derived
         // on set_fen and null transitions, apply_legal/make_generated_move after
-        // the side flip, restore on unmake).  Board-mutating trial helpers
+        // the side flip, unapply from the undo record).  Board-mutating trial helpers
         // (has_legal_en_passant_capture_in_place, resolve_move_legality,
         // safe_king_step) call is_checked()/square_attacked() directly and never
         // read this mask.  is_checked() reports true for an absent king, so keep
@@ -1311,7 +1423,7 @@ std::vector<Move> legal_moves() {
     [[nodiscard]] std::size_t repetition_count() const noexcept {
         // A null move is a search-only pass, not a legal game-history entry.
         // Its descendants may still make ordinary moves before the probe is
-        // undone, so checking only for the most recent null snapshot would
+        // undone, so checking only for the most recent null record would
         // let those artificial positions participate in repetition draws.
         if (state.repetition_history_suppressed) {
             return 1;
@@ -1330,7 +1442,7 @@ std::vector<Move> legal_moves() {
             ? std::min<std::size_t>(state.history_size, state.halfmove)
             : state.history_size;
         for (std::size_t index = state.history_size; index > state.history_size - scan; --index) {
-            const Snapshot& previous = state.history[index - 1];
+            const UndoRecord& previous = state.history[index - 1];
             if (previous.null_move) {
                 break;
             }
@@ -1519,26 +1631,6 @@ std::vector<Move> legal_moves() {
     [[nodiscard]] std::uint16_t fullmove_number() const noexcept { return state.fullmove; }
 
 private:
-    void restore(const Snapshot& saved) noexcept {
-        state.board = saved.board;
-        state.side = saved.side;
-        state.castling = saved.castling;
-        state.en_passant = saved.en_passant;
-        state.halfmove = saved.halfmove;
-        state.fullmove = saved.fullmove;
-        state.key = saved.key;
-        state.repetition_history_fingerprint = saved.repetition_history_fingerprint;
-        state.repetition_history_suppressed = saved.repetition_history_suppressed;
-        state.piece_bitboards = saved.piece_bitboards;
-        state.occupancy = saved.occupancy;
-        // `occupied == occupancy[0] | occupancy[1]` holds at every snapshot
-        // point (rebuild_derived, apply_unchecked both re-derive the union),
-        // so unmake recomputes it instead of carrying a snapshot copy.
-        state.occupied = state.occupancy[0] | state.occupancy[1];
-        state.checkers = saved.checkers;
-        state.pinned = saved.pinned;
-}
-
     template <typename MoveSink>
     [[nodiscard]] bool push(MoveSink& moves, int from, int to) const {
         if (!valid_square(to)) return true;
