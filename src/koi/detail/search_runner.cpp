@@ -3105,9 +3105,15 @@ void SearchRunner::run() {
                     previous_pv != result.pv;
                 bool bounded_fallback_result = false;
 
+                // The correction must also cover depth-two blind iterations in
+                // the timed band: a cheaper fallback scan can flip
+                // should_start_next_iteration's estimated-next-iteration guard
+                // and let a blind depth two publish the poisoned capture
+                // (batch 30: base 106+106 = 212 >= 209 stops, cheaper
+                // 82+82 = 164 < 209 continues to depth two).
                 if ((short_tactical_fallback || defer_nonchecking_short_fallback) &&
                     !defer_expensive_short_fallback &&
-                    result.completed_depth == 1 &&
+                    result.completed_depth <= 2 &&
                     (short_capture_needs_fallback(legal_moves, result.best_move) ||
                      short_quiet_needs_fallback(root, legal_moves, result.best_move) ||
                      short_quiet_exposes_immediate_check(
@@ -4800,10 +4806,16 @@ void SearchRunner::run() {
                     previous_pv != result.pv;
                 bool bounded_fallback_result = false;
 
+                // The correction must also cover depth-two blind iterations in
+                // the timed band: a cheaper fallback scan can flip
+                // should_start_next_iteration's estimated-next-iteration guard
+                // and let a blind depth two publish the poisoned capture
+                // (batch 30: base 106+106 = 212 >= 209 stops, cheaper
+                // 82+82 = 164 < 209 continues to depth two).
                 if (authoritative_root_iteration && !multi_pv &&
                     (short_tactical_fallback || defer_nonchecking_short_fallback) &&
                     !defer_expensive_short_fallback &&
-                    result.completed_depth == 1 &&
+                    result.completed_depth <= 2 &&
                     (short_capture_needs_fallback(parallel_moves, result.best_move) ||
                      short_quiet_needs_fallback(root, parallel_moves, result.best_move) ||
                      short_quiet_exposes_immediate_check(

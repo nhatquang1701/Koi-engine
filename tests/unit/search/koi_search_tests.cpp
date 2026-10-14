@@ -1240,6 +1240,67 @@ void test_short_search_rejects_the_qxa3_poisoned_pawn_capture() {
                 ", qnodes=" + std::to_string(result.stats.qnodes) + ")");
 }
 
+void test_short_search_rejects_the_qxa3_poison_at_depth_two() {
+    const koi::GameState root = require_state(
+        "2b1kbr1/p6p/2p1pQp1/3P1p2/8/q1N5/1rP2PPP/2KR1B1R w - - 0 20");
+    const auto poisoned_capture = koi::Move::parse_uci("d5e6");
+    require(poisoned_capture.has_value() && root.is_legal(*poisoned_capture),
+            "the depth-two qxa3 fixture must contain the reviewed poisoned pawn capture");
+
+    koi::SearchLimits limits;
+    // The 250 ms movetime activates the short-tactical fallback band, which is
+    // the timed code path under test.  The search itself is unbounded so the
+    // depth-two iteration always completes: on current hardware a finite 250 ms
+    // budget expires inside the depth-one safety band, the search then stops at
+    // depth one, and the depth-two correction would never run.  The unbounded
+    // search proceeds to depth three, so the test stops it as soon as the first
+    // completed depth-two line arrives; no wall-clock deadline is involved in
+    // the outcome.  No explicit depth limit is set: the depth-two confirmation
+    // band only runs for an explicit `depth 2` request and is not part of the
+    // timed-band path being pinned here.
+    limits.movetime = 250ms;
+    limits.infinite = true;
+    koi::SearchOptions options;
+    options.hash_mb = 16;
+    options.threads = 1;
+    koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>());
+
+    std::atomic_bool saw_depth_two{false};
+    CompletedSearch completed;
+    koi::SearchHandle handle = service.start(
+        root, limits,
+        {.on_info = [&saw_depth_two](const koi::SearchInfo& info) {
+             if (info.depth >= 2) {
+                 saw_depth_two.store(true, std::memory_order_relaxed);
+             }
+         },
+         .on_complete = completed.sink().on_complete},
+        options);
+
+    const auto deadline = std::chrono::steady_clock::now() + 20s;
+    while (!saw_depth_two.load(std::memory_order_relaxed) &&
+           std::chrono::steady_clock::now() < deadline) {
+        std::this_thread::sleep_for(1ms);
+    }
+    handle.stop();
+    handle.wait();
+    const koi::SearchResult result = completed.take_result();
+
+    require(result.completed_depth >= 2,
+            "the depth-two poisoned-capture regression must complete a depth-two iteration");
+    require(result.best_move.has_value() && root.is_legal(*result.best_move),
+            "the depth-two qxa3 fixture must retain a legal move");
+    require(result.best_move != poisoned_capture,
+            std::string("a depth-two short search must reject the poisoned pawn capture (depth=") +
+                std::to_string(result.completed_depth) + ", best=" +
+                (result.best_move.has_value() ? result.best_move->uci() : "none") +
+                ", nodes=" + std::to_string(result.stats.nodes) +
+                ", qnodes=" + std::to_string(result.stats.qnodes) +
+                ", fallback_calls=" + std::to_string(result.stats.short_fallback_invocations) +
+                ", fallback_candidates=" + std::to_string(result.stats.short_fallback_candidates) +
+                ", elapsed_ms=" + std::to_string(result.stats.elapsed.count()) + ")");
+}
+
 void test_short_search_preserves_the_defensive_rook_lift() {
     const koi::GameState root = require_state(
         "2b1kbr1/p6p/2p1pQp1/3P1p2/8/q1N5/1rP2PPP/2KR1B1R w - - 0 20");
@@ -4819,6 +4880,7 @@ int main(int argc, char** argv) {
         {"interrupted root completed candidate", test_interrupted_root_uses_best_completed_candidate},
         {"short tactical root fallback", test_short_tactical_root_does_not_publish_ordering_fallback},
         {"short poisoned pawn capture", test_short_search_rejects_the_qxa3_poisoned_pawn_capture},
+        {"short poisoned pawn capture depth two", test_short_search_rejects_the_qxa3_poison_at_depth_two},
         {"short defensive rook lift", test_short_search_preserves_the_defensive_rook_lift},
         {"short queen check trap", test_short_search_rejects_the_queen_check_trap},
         {"short oracle fallback safety", test_short_oracle_positions_reject_catastrophic_fallbacks},
