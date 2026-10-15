@@ -1467,6 +1467,10 @@ def main(argv: list[str] | None = None) -> int:
     )
     loss_fn = nn.SmoothL1Loss()
     epochs = args.epochs if args.float_in is None else 0
+    best_state = None
+    best_epoch = 0
+    best_val_mae = float("inf")
+    epochs_without_improvement = 0
     for epoch in range(epochs):
         model.train()
         epoch_started = time.time()
@@ -1494,7 +1498,23 @@ def main(argv: list[str] | None = None) -> int:
             f"time {time.time() - epoch_started:.1f}s"
         )
         scheduler.step()
+        if val_mae < best_val_mae:
+            best_val_mae = val_mae
+            best_epoch = epoch + 1
+            best_state = {name: value.detach().cpu().clone()
+                          for name, value in model.state_dict().items()}
+            epochs_without_improvement = 0
+            log(f"best val epoch {epoch + 1} mae {val_mae:.2f}")
+        else:
+            epochs_without_improvement += 1
+            if (args.early_stop_patience > 0
+                    and epochs_without_improvement >= args.early_stop_patience):
+                log(f"early stop at epoch {epoch + 1} (best epoch {best_epoch})")
+                break
 
+    if best_state is not None:
+        model.load_state_dict(best_state)
+        log(f"exporting best-val checkpoint (epoch {best_epoch}, mae {best_val_mae:.2f})")
     if args.float_out is not None:
         args.float_out.parent.mkdir(parents=True, exist_ok=True)
         torch.save(model.state_dict(), args.float_out)
