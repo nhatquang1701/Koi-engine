@@ -458,8 +458,14 @@ lines and `#` comments are ignored). The replay executable is expected beside
 
 For color-balanced paired Elo measurements, supply the checked-in eight-opening
 suite (or another file in the same `name | uci move uci move` format) and a chess
-clock. `-Games` is the number of games run for each selected opening, so use 20 as
-Koi White and 20 as Koi Black for 40 games per opening and condition. Run both
+clock. `-Games` is the number of games run for each selected opening. Koi's
+`RandomSeed` only seeds opening-book choice, so deterministic repeated games on
+one opening replay identical moves: the JSON configuration counts distinct move
+sequences as `effective_games` and sets `duplicate_games_detected` with
+`report_valid: false` when a match repeats a game. Prefer one game per opening
+per color (separate Koi White and Koi Black runs) or add `-PairedColors` to
+alternate Koi's color between paired games in one run (the second game of each
+pair plays the opposite color). Run both
 book-disabled and licensed-book conditions at both clocks:
 
 ```powershell
@@ -493,8 +499,10 @@ ignore those UCI options safely.
 acceptance testing: it launches the white and black SPRT runs concurrently, reads both
 reports, and prints per-color and combined results. The combined decision accepts when
 the sum of the two color LLRs crosses the alpha = beta = 0.05 acceptance bound,
-and rejects when it crosses the rejection bound. Both Koi binaries use seed 0
-with their opening books disabled. The script exits 0 on
+and rejects when it crosses the rejection bound. Both Koi binaries start from seed 0
+with their opening books disabled, and every repeated game derives its own seed.
+The tool defaults to one game per opening and color; repeated move sequences are
+counted once as `effective_games` and raise a loud duplicate-game warning. The script exits 0 on
 accept, 1 on reject, and 2 when more games are needed.
 The v1.0.0 release comparison uses the fixed, color-reversed opening sample and
 exact bound described in the release evidence report; this SPRT utility is exploratory.
@@ -574,6 +582,15 @@ python .\tools\measurement\elo_estimate.py `
   --prior-elo 1600 --mode book --book C:\LicensedBooks\book.bin `
   --output .\artifacts\matches\rough-elo-book.json
 ```
+
+To measure a Koi NNUE network, pass `--koi-eval-file` with the network path. The
+tool reads the container header, selects the matching `nnue-v4`/`nnue-v5`
+attestation, and requires the match harness to confirm that the engine enabled
+that exact file; the report records the absolute path, SHA-256, byte size,
+container version, and attestation under `configuration.koi_evaluator`. Missing,
+malformed, or rejected networks fail with a nonzero exit. `--koi-options-json`
+forwards additional non-pinned Koi options (for example `GpuNnue`) to the harness
+and records the file hash; it must not set `EvalFile`.
 
 CTest registers the standard-library-only estimator, match-option, and opening
 corpus tests when Python 3 is available; the corpus test receives the built

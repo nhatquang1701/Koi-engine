@@ -1,3 +1,6 @@
+import contextlib
+import hashlib
+import io
 import json
 import subprocess
 import tempfile
@@ -28,6 +31,12 @@ def make_paths(directory):
     return paths
 
 
+def make_eval_file(directory, version=4, name="net.nnue"):
+    path = directory / name
+    path.write_bytes(b"KOI-NNUE" + version.to_bytes(4, "little") + b"\x00" * 8)
+    return path
+
+
 def write_anchor_manifest(directory, paths, *, elos=(1400, 1600, 1800), lower=()):
     manifest_path = directory / "anchors.json"
     manifest_path.write_text(json.dumps({
@@ -53,7 +62,7 @@ def option_line(name, value):
     return f"setoption name {name} value {str(value).lower() if isinstance(value, bool) else value}"
 
 
-def make_match_report(paths, anchor, color, *, result="1-0", own_book=False):
+def make_match_report(paths, anchor, color, *, result="1-0", own_book=False, eval_file=None):
     openings = opening_map()
     koi_options = [
         option_line("Hash", 512), option_line("Threads", 4), option_line("Speed", 100),
@@ -64,16 +73,31 @@ def make_match_report(paths, anchor, color, *, result="1-0", own_book=False):
     opponent_options = [option_line("Hash", 512), option_line("Threads", 4), option_line("Speed", 100)]
     if anchor.stockfish_elo is not None:
         opponent_options += [option_line("UCI_LimitStrength", True), option_line("UCI_Elo", anchor.rating)]
+    configuration = {"time_control": "1+0", "movetime_ms": 0, "threads": 4, "speed": 100,
+                     "hash_mb": 512, "games_per_position": 1, "koi_color": color,
+                     "koi_random_seed": 1,
+                     "koi_own_book": own_book,
+                     "koi_book_file": str(paths["book.bin"] if own_book else "book.bin"),
+                     "koi_book_depth": 16, "koi_book_random": False,
+                     "opponent_limit_strength": anchor.stockfish_elo is not None,
+                     "opponent_elo": anchor.rating if anchor.stockfish_elo is not None else None}
+    if eval_file is not None:
+        data = eval_file.read_bytes()
+        configuration.update({
+            "koi_evaluator_mode": {4: "nnue-v4", 5: "nnue-v5"}[int.from_bytes(data[8:12], "little")],
+            "koi_evalfile_path": str(eval_file),
+            "koi_evalfile_sha256": hashlib.sha256(data).hexdigest(),
+            "koi_evaluator_attestation": {
+                "nnue_enabled_confirmation": f"info string NNUE enabled from {eval_file}",
+                "evalfile_rejections": [],
+                "gpu_enabled_marker": None,
+                "gpu_unavailable_fallbacks": [],
+            },
+        })
+        koi_options.append(option_line("EvalFile", str(eval_file)))
     return {
         "schema": "koi-uci-match-v2",
-        "configuration": {"time_control": "1+0", "movetime_ms": 0, "threads": 4, "speed": 100,
-                          "hash_mb": 512, "games_per_position": 1, "koi_color": color,
-                          "koi_random_seed": 1,
-                          "koi_own_book": own_book,
-                          "koi_book_file": str(paths["book.bin"] if own_book else "book.bin"),
-                          "koi_book_depth": 16, "koi_book_random": False,
-                          "opponent_limit_strength": anchor.stockfish_elo is not None,
-                          "opponent_elo": anchor.rating if anchor.stockfish_elo is not None else None},
+        "configuration": configuration,
         "engines": [
             {"label": "Koi", "path": str(paths["koi.exe"]), "name": "Koi 1.2.3",
              "identity": ["id name Koi 1.2.3"], "options": koi_options,
@@ -369,6 +393,191 @@ class EloEstimateTests(unittest.TestCase):
             self.assertEqual(report["results"]["games"], 128)
             self.assertEqual(len(report["artifacts"]), 8)
             self.assertIn("reproducibility_hash", report)
+
+    def test_koi_eval_file_is_plumbed_to_the_match_command_and_option_allowlist(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            directory = Path(temporary_directory)
+            paths = make_paths(directory)
+            eval_file = make_eval_file(directory).resolve()
+            evaluator = elo_estimate.load_koi_evaluator(eval_file)
+            self.assertEqual((evaluator.mode, evaluator.container_version), ("nnue-v4", 4))
+            self.assertEqual(evaluator.size_bytes, eval_file.stat().st_size)
+            self.assertEqual(evaluator.sha256, hashlib.sha256(eval_file.read_bytes()).hexdigest())
+            anchor = elo_estimate.Anchor("stockfish-1600", paths["stockfish.exe"], 1600, "test", 1600)
+            classical_options = elo_estimate.koi_option_set("no-book", None)
+            command = elo_estimate._harness_command(
+                "powershell-test", paths["koi.exe"], paths["replay.exe"], anchor, paths["openings"],
+                directory / "out", "white", "1+0", None, classical_options, evaluator=evaluator,
+            )
+            self.assertEqual(command[command.index("-KoiEvalFile") + 1], str(eval_file))
+            self.assertEqual(command[command.index("-KoiEvaluatorMode") + 1], "nnue-v4")
+            classical = elo_estimate._harness_command(
+                "powershell-test", paths["koi.exe"], paths["replay.exe"], anchor, paths["openings"],
+                directory / "out", "white", "1+0", None, classical_options,
+            )
+            self.assertNotIn("-KoiEvalFile", classical)
+            self.assertNotIn("-KoiEvaluatorMode", classical)
+            parsed = elo_estimate._parse_relevant_options({"options": [option_line("EvalFile", str(eval_file))]}, "Koi")
+            self.assertEqual(list(parsed), ["EvalFile"])
+            self.assertTrue(elo_estimate._same_path(Path(parsed["EvalFile"]), eval_file))
+
+    def test_koi_eval_file_provenance_and_attestation_are_recorded(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            directory = Path(temporary_directory)
+            paths = make_paths(directory)
+            eval_file = make_eval_file(directory).resolve()
+            output_path = directory / "external-report.json"
+            calls = []
+            def fake_run(command, **_kwargs):
+                calls.append(command)
+                output_directory = Path(command[command.index("-OutputDirectory") + 1])
+                color = command[command.index("-KoiColor") + 1]
+                rating = int(command[command.index("-OpponentElo") + 1])
+                anchor = elo_estimate.Anchor(f"stockfish-{rating}", paths["stockfish.exe"], rating, "test", rating)
+                output_directory.mkdir(parents=True, exist_ok=True)
+                report_path, pgn_path = output_directory / f"{rating}-{color}.json", output_directory / f"{rating}-{color}.pgn"
+                result = "1-0" if color == "white" else "0-1"
+                attested = Path(command[command.index("-KoiEvalFile") + 1])
+                report_path.write_text(json.dumps(make_match_report(paths, anchor, color, result=result, eval_file=attested)), encoding="utf-8")
+                pgn_path.write_text("[Result \"1-0\"]\n", encoding="utf-8")
+                return subprocess.CompletedProcess(command, 0, f"json {report_path}\npgn {pgn_path}\n", "")
+            arguments = requested_args(paths, write_anchor_manifest(directory, paths), output_path, "--koi-eval-file", str(eval_file))
+            with mock.patch.object(elo_estimate, "_powershell_executable", return_value="powershell-test"), mock.patch.object(elo_estimate.subprocess, "run", side_effect=fake_run):
+                self.assertEqual(elo_estimate.main(arguments), 0)
+            self.assertEqual(len(calls), 4)
+            self.assertTrue(all(command[command.index("-KoiEvalFile") + 1] == str(eval_file) for command in calls))
+            self.assertTrue(all(command[command.index("-KoiEvaluatorMode") + 1] == "nnue-v4" for command in calls))
+            report = json.loads(output_path.read_text(encoding="utf-8"))
+            self.assertEqual(report["results"]["games"], 128)
+            evaluator = report["configuration"]["koi_evaluator"]
+            self.assertTrue(elo_estimate._same_path(Path(evaluator["eval_file"]["path"]), eval_file))
+            self.assertEqual(evaluator["eval_file"]["sha256"], hashlib.sha256(eval_file.read_bytes()).hexdigest())
+            self.assertEqual(evaluator["eval_file"]["size_bytes"], eval_file.stat().st_size)
+            self.assertEqual(evaluator["eval_file"]["container_version"], 4)
+            self.assertEqual(evaluator["eval_file"]["evaluator_mode"], "nnue-v4")
+            self.assertEqual(report["configuration"]["active_koi_options"]["EvalFile"], str(eval_file))
+            self.assertEqual(evaluator["attestation"]["nnue_enabled_confirmation"], f"info string NNUE enabled from {eval_file}")
+            self.assertEqual(evaluator["attestation"]["evalfile_rejections"], [])
+            self.assertNotIn("koi_options_json", report["configuration"])
+
+    def test_koi_eval_file_dry_run_records_provenance_without_attestation(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            directory = Path(temporary_directory)
+            paths = make_paths(directory)
+            eval_file = make_eval_file(directory).resolve()
+            output_path = directory / "external-report.json"
+            arguments = requested_args(paths, write_anchor_manifest(directory, paths), output_path, "--koi-eval-file", str(eval_file), "--dry-run")
+            with mock.patch.object(elo_estimate.subprocess, "run") as run:
+                self.assertEqual(elo_estimate.main(arguments), 0)
+            run.assert_not_called()
+            report = json.loads(output_path.read_text(encoding="utf-8"))
+            evaluator = report["configuration"]["koi_evaluator"]
+            self.assertTrue(elo_estimate._same_path(Path(evaluator["eval_file"]["path"]), eval_file))
+            self.assertEqual(evaluator["eval_file"]["sha256"], hashlib.sha256(eval_file.read_bytes()).hexdigest())
+            self.assertEqual(evaluator["eval_file"]["size_bytes"], eval_file.stat().st_size)
+            self.assertIsNone(evaluator["attestation"])
+
+    def test_missing_or_invalid_koi_eval_file_fails_loudly(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            directory = Path(temporary_directory)
+            paths = make_paths(directory)
+            missing = directory / "absent.nnue"
+            with self.assertRaisesRegex(elo_estimate.EloEstimateError, "missing"):
+                elo_estimate.load_koi_evaluator(missing)
+            invalid = directory / "invalid.nnue"
+            invalid.write_bytes(b"not a koi nnue container")
+            with self.assertRaisesRegex(elo_estimate.EloEstimateError, "container"):
+                elo_estimate.load_koi_evaluator(invalid)
+            unsupported = make_eval_file(directory, version=6, name="v6.nnue")
+            with self.assertRaisesRegex(elo_estimate.EloEstimateError, "version 6"):
+                elo_estimate.load_koi_evaluator(unsupported)
+            arguments = requested_args(paths, write_anchor_manifest(directory, paths), directory / "external-report.json", "--koi-eval-file", str(missing))
+            stderr = io.StringIO()
+            with contextlib.redirect_stderr(stderr):
+                self.assertEqual(elo_estimate.main(arguments), 2)
+            self.assertIn("Koi EvalFile is missing", stderr.getvalue())
+
+    def test_report_validation_requires_a_matching_eval_file_attestation(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            directory = Path(temporary_directory)
+            paths = make_paths(directory)
+            eval_file = make_eval_file(directory).resolve()
+            evaluator = elo_estimate.load_koi_evaluator(eval_file)
+            manifest = elo_estimate.load_anchor_manifest(write_anchor_manifest(directory, paths), paths["stockfish.exe"], 1500)
+            anchor = manifest.anchors[1]
+            options = elo_estimate.koi_option_set("no-book", None)
+            options["EvalFile"] = str(eval_file)
+            report = make_match_report(paths, anchor, "white", eval_file=eval_file)
+            games = elo_estimate.validate_match_manifest(report, opening_map(), "white", anchor, options, "1+0", None, paths["koi.exe"], evaluator)
+            self.assertEqual(len(games), 32)
+            for mutation, expected in (
+                (lambda value: value["configuration"].update({"koi_evaluator_mode": "classical"}), "mode"),
+                (lambda value: value["configuration"].update({"koi_evalfile_path": str(directory / "other.nnue")}), "path"),
+                (lambda value: value["configuration"].update({"koi_evalfile_sha256": "0" * 64}), "SHA-256"),
+                (lambda value: value["configuration"].pop("koi_evaluator_attestation"), "attestation"),
+                (lambda value: value["configuration"]["koi_evaluator_attestation"].update({"evalfile_rejections": ["info string EvalFile rejected"]}), "rejected"),
+                (lambda value: value["configuration"]["koi_evaluator_attestation"].update({"nnue_enabled_confirmation": None}), "confirmation"),
+                (lambda value: value["engines"][0]["options"].pop(), "option"),
+            ):
+                broken = json.loads(json.dumps(report))
+                mutation(broken)
+                with self.subTest(expected=expected), self.assertRaisesRegex(elo_estimate.EloEstimateError, expected):
+                    elo_estimate.validate_match_manifest(broken, opening_map(), "white", anchor, options, "1+0", None, paths["koi.exe"], evaluator)
+
+    def test_koi_options_json_is_forwarded_with_provenance_and_rejects_pinned_options(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            directory = Path(temporary_directory)
+            paths = make_paths(directory)
+            options_path = directory / "koi-options.json"
+            options_path.write_text(json.dumps({"GpuNnue": "off"}), encoding="utf-8")
+            loaded = elo_estimate.load_koi_options_json(options_path)
+            self.assertTrue(elo_estimate._same_path(loaded.path, options_path))
+            self.assertEqual(loaded.sha256, hashlib.sha256(options_path.read_bytes()).hexdigest())
+            output_path = directory / "external-report.json"
+            calls = []
+            def fake_run(command, **_kwargs):
+                calls.append(command)
+                output_directory = Path(command[command.index("-OutputDirectory") + 1])
+                color = command[command.index("-KoiColor") + 1]
+                rating = int(command[command.index("-OpponentElo") + 1])
+                anchor = elo_estimate.Anchor(f"stockfish-{rating}", paths["stockfish.exe"], rating, "test", rating)
+                output_directory.mkdir(parents=True, exist_ok=True)
+                report_path, pgn_path = output_directory / f"{rating}-{color}.json", output_directory / f"{rating}-{color}.pgn"
+                result = "1-0" if color == "white" else "0-1"
+                report_path.write_text(json.dumps(make_match_report(paths, anchor, color, result=result)), encoding="utf-8")
+                pgn_path.write_text("[Result \"1-0\"]\n", encoding="utf-8")
+                return subprocess.CompletedProcess(command, 0, f"json {report_path}\npgn {pgn_path}\n", "")
+            arguments = requested_args(paths, write_anchor_manifest(directory, paths), output_path, "--koi-options-json", str(options_path))
+            with mock.patch.object(elo_estimate, "_powershell_executable", return_value="powershell-test"), mock.patch.object(elo_estimate.subprocess, "run", side_effect=fake_run):
+                self.assertEqual(elo_estimate.main(arguments), 0)
+            self.assertTrue(all(command[command.index("-KoiOptionsJsonPath") + 1] == str(loaded.path) for command in calls))
+            self.assertTrue(all("-KoiEvalFile" not in command for command in calls))
+            report = json.loads(output_path.read_text(encoding="utf-8"))
+            self.assertEqual(report["configuration"]["koi_options_json"], {"path": str(loaded.path), "sha256": loaded.sha256})
+            self.assertNotIn("koi_evaluator", report["configuration"])
+            for payload, expected in (
+                ({"Threads": 8}, "Threads"),
+                ({"EvalFile": "net.nnue"}, "EvalFile"),
+                ([1, 2], "object"),
+            ):
+                broken_path = directory / f"broken-{expected}.json"
+                broken_path.write_text(json.dumps(payload), encoding="utf-8")
+                with self.subTest(expected=expected), self.assertRaisesRegex(elo_estimate.EloEstimateError, expected):
+                    elo_estimate.load_koi_options_json(broken_path)
+
+    def test_classical_runs_do_not_gain_evaluator_or_options_json_provenance(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            directory = Path(temporary_directory)
+            paths = make_paths(directory)
+            output_path = directory / "external-report.json"
+            arguments = requested_args(paths, write_anchor_manifest(directory, paths), output_path, "--dry-run")
+            with mock.patch.object(elo_estimate.subprocess, "run") as run:
+                self.assertEqual(elo_estimate.main(arguments), 0)
+            run.assert_not_called()
+            report = json.loads(output_path.read_text(encoding="utf-8"))
+            self.assertNotIn("koi_evaluator", report["configuration"])
+            self.assertNotIn("koi_options_json", report["configuration"])
+            self.assertEqual(report["configuration"]["active_koi_options"], {"Hash": 512, "Threads": 4, "Speed": 100, "OwnBook": False})
 
     def test_low_confidence_non_dry_run_adds_an_adaptive_64_game_batch_up_to_maximum(self):
         with tempfile.TemporaryDirectory() as temporary_directory:

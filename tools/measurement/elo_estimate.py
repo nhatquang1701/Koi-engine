@@ -22,6 +22,8 @@ from typing import Any, Mapping, Optional, Sequence
 SCHEMA = "koi-rough-elo-estimate-v1"
 ANCHOR_SCHEMA = "koi-elo-anchor-manifest-v1"
 MATCH_SCHEMA = "koi-uci-match-v2"
+KOI_NNUE_MAGIC = b"KOI-NNUE"
+KOI_EVALUATOR_MODES = {4: "nnue-v4", 5: "nnue-v5"}
 SCHEDULE_SCHEMA = "koi-elo-schedule-v1"
 ALL_ANCHOR_SCHEDULE_SCHEMA = "koi-elo-schedule-v2"
 BATCH_GAMES = 64
@@ -39,7 +41,10 @@ UCI_MOVE_RE = re.compile(r"^[a-h][1-8][a-h][1-8][nbrq]?$")
 SETOPTION_RE = re.compile(r"^setoption\s+name\s+(?P<name>.+?)\s+value\s*(?P<value>.*)$", re.IGNORECASE)
 RELEVANT_OPTION_NAMES = {
     name.casefold(): name
-    for name in ("Hash", "Threads", "Speed", "RandomSeed", "OwnBook", "BookFile", "BookDepth", "BookRandom", "UCI_LimitStrength", "UCI_Elo")
+    for name in (
+        "Hash", "Threads", "Speed", "RandomSeed", "OwnBook", "BookFile", "BookDepth",
+        "BookRandom", "EvalFile", "UCI_LimitStrength", "UCI_Elo",
+    )
 }
 BOOLEAN_OPTION_NAMES = frozenset({"OwnBook", "BookRandom", "UCI_LimitStrength"})
 INTEGER_OPTION_NAMES = frozenset({"Hash", "Threads", "Speed", "RandomSeed", "BookDepth", "UCI_Elo"})
@@ -54,6 +59,7 @@ CONFIGURATION_OPTION_FIELDS = {
     "BookFile": "koi_book_file",
     "BookDepth": "koi_book_depth",
     "BookRandom": "koi_book_random",
+    "EvalFile": "koi_evalfile_path",
     "UCI_LimitStrength": "opponent_limit_strength",
     "UCI_Elo": "opponent_elo",
 }
@@ -84,6 +90,25 @@ class AnchorManifest:
     sha256: str
     stockfish_path: Path
     anchors: tuple[Anchor, ...]
+
+
+@dataclass(frozen=True)
+class KoiEvaluator:
+    """An attested Koi NNUE network and its recorded provenance."""
+
+    path: Path
+    sha256: str
+    size_bytes: int
+    container_version: int
+    mode: str
+
+
+@dataclass(frozen=True)
+class KoiOptionsJson:
+    """Extra Koi options forwarded verbatim to the match harness."""
+
+    path: Path
+    sha256: str
 
 
 @dataclass(frozen=True)
@@ -165,6 +190,39 @@ def load_openings(path: Path) -> tuple[Opening, ...]:
         return parse_opening_corpus(resolved.read_text(encoding="utf-8"))
     except UnicodeDecodeError as error:
         raise EloEstimateError(f"opening corpus is not UTF-8: {resolved}") from error
+
+
+def load_koi_evaluator(path: Path) -> KoiEvaluator:
+    """Load a Koi NNUE network and derive its attestation mode from the header."""
+
+    resolved = _require_file(path, "Koi EvalFile")
+    data = _read_bytes(resolved, "Koi EvalFile")
+    if len(data) < 12 or data[:8] != KOI_NNUE_MAGIC:
+        raise EloEstimateError(f"Koi EvalFile is not a Koi NNUE container: {resolved}")
+    version = int.from_bytes(data[8:12], "little")
+    mode = KOI_EVALUATOR_MODES.get(version)
+    if mode is None:
+        raise EloEstimateError(f"Koi EvalFile container version {version} has no evaluator attestation mode: {resolved}")
+    return KoiEvaluator(resolved, hashlib.sha256(data).hexdigest(), len(data), version, mode)
+
+
+def load_koi_options_json(path: Path) -> KoiOptionsJson:
+    """Validate extra Koi options that the match harness applies and records."""
+
+    resolved = _require_file(path, "Koi options JSON")
+    try:
+        value = json.loads(resolved.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise EloEstimateError(f"invalid Koi options JSON: {resolved}") from error
+    if not isinstance(value, Mapping):
+        raise EloEstimateError(f"Koi options JSON must contain an object: {resolved}")
+    for key in value:
+        canonical = RELEVANT_OPTION_NAMES.get(str(key).strip().casefold())
+        if canonical == "EvalFile":
+            raise EloEstimateError(f"Koi options JSON must not set EvalFile; use --koi-eval-file: {resolved}")
+        if canonical in CONFIGURATION_OPTION_FIELDS:
+            raise EloEstimateError(f"Koi options JSON must not override {canonical}: {resolved}")
+    return KoiOptionsJson(resolved, sha256_file(resolved, "Koi options JSON"))
 
 
 def _require_text(value: Any, label: str) -> str:
@@ -682,6 +740,12 @@ def _canonical_option_value(name: str, value: Any) -> Any:
         if not isinstance(value, str) or not value.strip():
             raise EloEstimateError("malformed BookFile option value")
         return os.path.normcase(os.path.normpath(value.strip()))
+    if name == "EvalFile":
+        if isinstance(value, Path):
+            value = str(value)
+        if not isinstance(value, str) or not value.strip():
+            raise EloEstimateError("malformed EvalFile option value")
+        return os.path.normcase(str(_canonical(Path(value.strip()))))
     raise EloEstimateError(f"unsupported option provenance field: {name}")
 
 
@@ -736,7 +800,30 @@ def _opening_sequences(expected_openings: Mapping[str, Sequence[str]]) -> dict[s
     return normalized
 
 
-def validate_match_manifest(report: Mapping[str, Any], expected_openings: Mapping[str, Sequence[str]], koi_color: str, anchor: Anchor, koi_options: Mapping[str, Any], time_control: Optional[str], movetime_ms: Optional[int], koi_path: Path) -> tuple[MatchGame, ...]:
+def _require_evaluator_attestation(configuration: Mapping[str, Any], evaluator: KoiEvaluator) -> Mapping[str, Any]:
+    """Prove a match report attests the requested Koi EvalFile and mode."""
+
+    if configuration.get("koi_evaluator_mode") != evaluator.mode:
+        raise EloEstimateError(f"match evaluator mode does not match {evaluator.mode}")
+    reported_path = configuration.get("koi_evalfile_path")
+    if not isinstance(reported_path, str) or not _same_path(Path(reported_path), evaluator.path):
+        raise EloEstimateError("match EvalFile attestation path does not match the requested network")
+    reported_sha256 = configuration.get("koi_evalfile_sha256")
+    if not isinstance(reported_sha256, str) or reported_sha256.casefold() != evaluator.sha256:
+        raise EloEstimateError("match EvalFile attestation SHA-256 does not match the requested network")
+    attestation = configuration.get("koi_evaluator_attestation")
+    if not isinstance(attestation, Mapping):
+        raise EloEstimateError("match EvalFile attestation is missing")
+    rejections = attestation.get("evalfile_rejections")
+    if not isinstance(rejections, list) or rejections:
+        raise EloEstimateError(f"match EvalFile attestation rejected the requested network: {rejections}")
+    confirmation = attestation.get("nnue_enabled_confirmation")
+    if not isinstance(confirmation, str) or not confirmation.startswith("info string NNUE enabled from "):
+        raise EloEstimateError("match EvalFile attestation is missing the NNUE-enabled confirmation")
+    return attestation
+
+
+def validate_match_manifest(report: Mapping[str, Any], expected_openings: Mapping[str, Sequence[str]], koi_color: str, anchor: Anchor, koi_options: Mapping[str, Any], time_control: Optional[str], movetime_ms: Optional[int], koi_path: Path, evaluator: Optional[KoiEvaluator] = None) -> tuple[MatchGame, ...]:
     """Validate a real v2 report before its games affect an Elo estimate."""
 
     if not isinstance(report, Mapping) or report.get("schema") != MATCH_SCHEMA:
@@ -777,6 +864,8 @@ def validate_match_manifest(report: Mapping[str, Any], expected_openings: Mappin
     koi_actual = _parse_relevant_options(koi_engine, "Koi")
     if STRENGTH_OPTION_NAMES & koi_actual.keys():
         raise EloEstimateError("Koi option provenance must not contain opponent strength settings")
+    if evaluator is not None:
+        _require_evaluator_attestation(configuration, evaluator)
     koi_expected = dict(koi_options)
     koi_expected.update({"RandomSeed": 1, "BookRandom": False})
     _require_option_values(koi_actual, koi_expected, "Koi")
@@ -868,6 +957,8 @@ def _harness_command(
     koi_options: Mapping[str, Any],
     batch: Optional[BatchPlan] = None,
     run_label: str = "measurement",
+    evaluator: Optional[KoiEvaluator] = None,
+    options_json: Optional[KoiOptionsJson] = None,
 ) -> list[str]:
     script = Path(__file__).resolve().parents[1] / "stability" / "uci_match.ps1"
     if not script.is_file():
@@ -880,6 +971,10 @@ def _harness_command(
         command.extend(["-MovetimeMs", str(movetime_ms)])
     if koi_options["OwnBook"]:
         command.extend(["-KoiBookFile", str(koi_options["BookFile"]), "-KoiBookDepth", str(koi_options["BookDepth"])])
+    if evaluator is not None:
+        command.extend(["-KoiEvalFile", str(evaluator.path), "-KoiEvaluatorMode", evaluator.mode])
+    if options_json is not None:
+        command.extend(["-KoiOptionsJsonPath", str(options_json.path)])
     if anchor.stockfish_elo is not None:
         command.extend(["-OpponentElo", str(anchor.rating)])
     return command
@@ -899,6 +994,8 @@ def _run_color_batch(
     koi_options: Mapping[str, Any],
     batch: Optional[BatchPlan] = None,
     run_label: str = "measurement",
+    evaluator: Optional[KoiEvaluator] = None,
+    options_json: Optional[KoiOptionsJson] = None,
 ) -> tuple[tuple[MatchGame, ...], list[dict[str, str]], Mapping[str, Any]]:
     command = _harness_command(
         powershell,
@@ -913,6 +1010,8 @@ def _run_color_batch(
         koi_options,
         batch,
         run_label,
+        evaluator,
+        options_json,
     )
     try:
         completed = subprocess.run(command, capture_output=True, text=True, check=False)
@@ -925,7 +1024,7 @@ def _run_color_batch(
         report = json.loads(json_path.read_text(encoding="utf-8-sig"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
         raise EloEstimateError(f"invalid match JSON artifact: {json_path}") from error
-    games = validate_match_manifest(report, expected_openings, color, anchor, koi_options, time_control, movetime_ms, koi)
+    games = validate_match_manifest(report, expected_openings, color, anchor, koi_options, time_control, movetime_ms, koi, evaluator)
     artifacts = [{"kind": "json", "path": str(json_path), "sha256": sha256_file(json_path, "match JSON artifact")}, {"kind": "pgn", "path": str(pgn_path), "sha256": sha256_file(pgn_path, "match PGN artifact")}]
     return games, artifacts, report
 
@@ -1001,6 +1100,16 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--prior-elo", required=True, type=int)
     parser.add_argument("--mode", choices=("no-book", "book"), default="no-book")
     parser.add_argument("--book", type=Path)
+    parser.add_argument(
+        "--koi-eval-file",
+        type=Path,
+        help="Koi NNUE network for the Koi side; the match harness attests it and its SHA-256 is recorded",
+    )
+    parser.add_argument(
+        "--koi-options-json",
+        type=Path,
+        help="extra Koi options JSON forwarded to the match harness; EvalFile is not allowed here",
+    )
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--schedule-export", type=Path, help="write the paired schedule artifact")
     parser.add_argument("--schedule-import", type=Path, help="reuse a previously exported paired schedule")
@@ -1014,7 +1123,11 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _validate_arguments(args: argparse.Namespace) -> tuple[Path, Path, Path, Path, tuple[Opening, ...], AnchorManifest, Optional[str], Optional[int], dict[str, Any], Path, dict[str, Any]]:
+def _validate_arguments(args: argparse.Namespace) -> tuple[
+    Path, Path, Path, Path, tuple[Opening, ...], AnchorManifest, Optional[str],
+    Optional[int], dict[str, Any], Path, dict[str, Any],
+    Optional[KoiEvaluator], Optional[KoiOptionsJson],
+]:
     if args.threads != 4 or args.hash_mb != 512 or args.speed != 100:
         raise EloEstimateError("this estimator requires --threads 4 --hash 512 --speed 100")
     if args.min_games not in {128, 192, 256, 320} or args.max_games not in {128, 192, 256, 320} or args.min_games > args.max_games:
@@ -1028,15 +1141,19 @@ def _validate_arguments(args: argparse.Namespace) -> tuple[Path, Path, Path, Pat
     openings_path, openings = _require_file(args.openings, "opening corpus"), load_openings(args.openings)
     manifest = load_anchor_manifest(args.anchors, stockfish, args.prior_elo)
     book = _require_file(args.book, "book file") if args.book is not None else None
+    evaluator = load_koi_evaluator(args.koi_eval_file) if args.koi_eval_file is not None else None
+    options_json = load_koi_options_json(args.koi_options_json) if args.koi_options_json is not None else None
     options = koi_option_set(args.mode, book)
+    if evaluator is not None:
+        options["EvalFile"] = str(evaluator.path)
     output = _output_is_external(args.output)
-    return koi, replay, stockfish, openings_path, openings, manifest, time_control, args.movetime_ms, options, output, _hashes(manifest, koi, replay, stockfish, openings_path, book)
+    return koi, replay, stockfish, openings_path, openings, manifest, time_control, args.movetime_ms, options, output, _hashes(manifest, koi, replay, stockfish, openings_path, book), evaluator, options_json
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
     args = _build_parser().parse_args(argv)
     try:
-        koi, replay, stockfish, openings_path, openings, manifest, time_control, movetime_ms, options, output, hashes = _validate_arguments(args)
+        koi, replay, stockfish, openings_path, openings, manifest, time_control, movetime_ms, options, output, hashes, evaluator, options_json = _validate_arguments(args)
         opening_names = tuple(opening.name for opening in openings)
         all_anchor_schedule = args.all_anchors
         if args.schedule_import is not None:
@@ -1087,6 +1204,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         pairs: dict[int, list[tuple[float, float]]] = {}
         reports: list[dict[str, Any]] = []
         executed: list[BatchPlan] = []
+        evaluator_attestation: Optional[Mapping[str, Any]] = None
         if not args.dry_run:
             powershell = _powershell_executable()
             artifact_root = output.parent / f"{output.stem}-artifacts"
@@ -1094,8 +1212,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             while schedule:
                 batch = schedule.pop(0)
                 batch_directory = artifact_root / f"batch-{batch.ordinal:02d}-{batch.anchor.id}"
-                white, white_artifacts, white_report = _run_color_batch(powershell, koi, replay, batch.anchor, openings_path, opening_sequences, batch_directory / "white", "white", time_control, movetime_ms, options, batch, args.run_label)
-                black, black_artifacts, black_report = _run_color_batch(powershell, koi, replay, batch.anchor, openings_path, opening_sequences, batch_directory / "black", "black", time_control, movetime_ms, options, batch, args.run_label)
+                white, white_artifacts, white_report = _run_color_batch(powershell, koi, replay, batch.anchor, openings_path, opening_sequences, batch_directory / "white", "white", time_control, movetime_ms, options, batch, args.run_label, evaluator, options_json)
+                black, black_artifacts, black_report = _run_color_batch(powershell, koi, replay, batch.anchor, openings_path, opening_sequences, batch_directory / "black", "black", time_control, movetime_ms, options, batch, args.run_label, evaluator, options_json)
+                if evaluator is not None and evaluator_attestation is None:
+                    evaluator_attestation = white_report["configuration"]["koi_evaluator_attestation"]
                 pairs.setdefault(batch.anchor.rating, []).extend(_pairs_for_batch(white, black, list(opening_names)))
                 all_games.extend(white)
                 all_games.extend(black)
@@ -1115,6 +1235,46 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             if exported_schedule_path is not None:
                 artifacts.append({"kind": "schedule", "path": str(exported_schedule_path), "sha256": sha256_file(exported_schedule_path, "schedule artifact")})
         summary = _estimate_summary(all_games, pairs, manifest.anchors[0].rating, manifest.anchors[-1].rating)
+        configuration: dict[str, Any] = {
+            "measurement": {
+                "label": LOCAL_ELO_MEASUREMENT_LABEL,
+                "perspective": "Koi",
+                "prior_elo": args.prior_elo,
+                "min_games": args.min_games,
+                "max_games": args.max_games,
+                "all_anchors": all_anchor_schedule,
+            },
+            "mode": args.mode,
+            "time_control": time_control,
+            "movetime_ms": movetime_ms,
+            "no_book_options": koi_option_set("no-book", None),
+            "book_options": koi_option_set("book", args.book) if args.book is not None else None,
+            "active_koi_options": options,
+            "engine_requirements": {
+                "koi": {"path": str(koi), "options": options},
+                "stockfish": {"path": str(stockfish), "options": {"UCI_LimitStrength": True}},
+            },
+            "hashes": hashes,
+            "bootstrap": {
+                "samples": BOOTSTRAP_SAMPLES,
+                "seed": BOOTSTRAP_SEED,
+                "unit": "paired opening (Koi White plus Koi Black)",
+            },
+            "run_label": args.run_label,
+        }
+        if evaluator is not None:
+            configuration["koi_evaluator"] = {
+                "eval_file": {
+                    "path": str(evaluator.path),
+                    "sha256": evaluator.sha256,
+                    "size_bytes": evaluator.size_bytes,
+                    "container_version": evaluator.container_version,
+                    "evaluator_mode": evaluator.mode,
+                },
+                "attestation": dict(evaluator_attestation) if evaluator_attestation is not None else None,
+            }
+        if options_json is not None:
+            configuration["koi_options_json"] = {"path": str(options_json.path), "sha256": options_json.sha256}
         report: dict[str, Any] = {
             "schema": SCHEMA,
             "schema_version": 1,
@@ -1129,33 +1289,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 "source": "imported" if imported_schedule else "planned",
                 "path": str(args.schedule_import) if args.schedule_import is not None else (str(exported_schedule_path) if exported_schedule_path is not None else None),
             },
-            "configuration": {
-                "measurement": {
-                    "label": LOCAL_ELO_MEASUREMENT_LABEL,
-                    "perspective": "Koi",
-                    "prior_elo": args.prior_elo,
-                    "min_games": args.min_games,
-                    "max_games": args.max_games,
-                    "all_anchors": all_anchor_schedule,
-                },
-                "mode": args.mode,
-                "time_control": time_control,
-                "movetime_ms": movetime_ms,
-                "no_book_options": koi_option_set("no-book", None),
-                "book_options": koi_option_set("book", args.book) if args.book is not None else None,
-                "active_koi_options": options,
-                "engine_requirements": {
-                    "koi": {"path": str(koi), "options": options},
-                    "stockfish": {"path": str(stockfish), "options": {"UCI_LimitStrength": True}},
-                },
-                "hashes": hashes,
-                "bootstrap": {
-                    "samples": BOOTSTRAP_SAMPLES,
-                    "seed": BOOTSTRAP_SEED,
-                    "unit": "paired opening (Koi White plus Koi Black)",
-                },
-                "run_label": args.run_label,
-            },
+            "configuration": configuration,
             "artifacts": artifacts,
             "engine_provenance": reports,
         }

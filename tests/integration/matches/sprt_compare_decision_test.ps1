@@ -79,4 +79,63 @@ if (($arguments -join ' ') -notmatch '(?:^| )-KoiRandomSeed 0(?: |$)' -or
     throw 'Baseline comparison must use equal deterministic seed and disabled-book settings.'
 }
 
+# Default Games=1: repeated games per opening and color are exactly what the
+# duplicate-game defect produced, so the default must not request them.
+$gamesParameters = @($ast.ParamBlock.Parameters | Where-Object { $_.Name.VariablePath.UserPath -eq 'Games' })
+if ($gamesParameters.Count -ne 1 -or $gamesParameters[0].DefaultValue.Extent.Text.Trim() -ne '1') {
+    throw 'sprt_compare.ps1 must default to one game per opening and color.'
+}
+
+$hashFunction = $ast.Find({
+        param($node)
+        $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+        $node.Name -eq 'Get-MoveSequenceHash'
+    }, $true)
+if ($null -eq $hashFunction) {
+    throw 'sprt_compare.ps1 must expose Get-MoveSequenceHash for duplicate-game detection.'
+}
+. ([scriptblock]::Create($hashFunction.Extent.Text))
+$whiteHash = Get-MoveSequenceHash -KoiColor 'white' -Moves @('e2e4', 'e7e5')
+$whiteHashAgain = Get-MoveSequenceHash -KoiColor 'white' -Moves @('e2e4', 'e7e5')
+$blackHash = Get-MoveSequenceHash -KoiColor 'black' -Moves @('e2e4', 'e7e5')
+$emptyHash = Get-MoveSequenceHash -KoiColor 'white' -Moves @()
+if ($null -eq $whiteHash -or $whiteHash -ne $whiteHashAgain -or
+    $whiteHash -eq $blackHash -or $null -ne $emptyHash) {
+    throw 'The move-sequence hash must be deterministic, color-aware, and empty for move-less games.'
+}
+
+$analysisFunction = $ast.Find({
+        param($node)
+        $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+        $node.Name -eq 'Get-DuplicateGameAnalysis'
+    }, $true)
+if ($null -eq $analysisFunction) {
+    throw 'sprt_compare.ps1 must expose Get-DuplicateGameAnalysis for duplicate-game detection.'
+}
+. ([scriptblock]::Create($analysisFunction.Extent.Text))
+$duplicateRecords = @(
+    [pscustomobject]@{ move_hash = 'aa' },
+    [pscustomobject]@{ move_hash = 'aa' },
+    [pscustomobject]@{ move_hash = 'bb' },
+    [pscustomobject]@{ move_hash = $null }
+)
+$duplicateResult = Get-DuplicateGameAnalysis -Games $duplicateRecords
+if ($duplicateResult.effective_games -ne 3 -or
+    $duplicateResult.duplicate_games_detected -ne $true -or
+    $duplicateResult.duplicate_games -ne 1 -or
+    @($duplicateResult.duplicate_groups).Count -ne 1) {
+    throw 'Duplicate games must collapse into effective_games while the repeated pair is reported.'
+}
+$distinctRecords = @(
+    [pscustomobject]@{ move_hash = 'aa' },
+    [pscustomobject]@{ move_hash = 'bb' }
+)
+$distinctResult = Get-DuplicateGameAnalysis -Games $distinctRecords
+if ($distinctResult.effective_games -ne 2 -or
+    $distinctResult.duplicate_games_detected -ne $false -or
+    $distinctResult.duplicate_games -ne 0) {
+    throw 'Distinct games must keep the full effective_games count without a duplicate warning.'
+}
+
 Write-Output 'PASS combined SPRT decision uses aggregate evidence only'
+Write-Output 'PASS duplicate-game detection and effective-games reporting are covered'

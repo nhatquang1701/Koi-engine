@@ -7,7 +7,7 @@ param(
     [string]$OpeningFile = (Join-Path $PSScriptRoot '../../tests/data/openings/openings-curated-32.txt'),
     [int]$Nodes = 20000,
     [string]$TimeControl = '',
-    [int]$Games = 2,
+    [int]$Games = 1,
     [int]$MinGames = 40,
     [int]$MaxGames = 64,
     [double]$Elo0 = 0,
@@ -45,6 +45,49 @@ function Get-CombinedSprtResult([double]$WhiteLlr, [double]$BlackLlr,
         'inconclusive'
     }
     return [pscustomobject]@{ llr = $llr; decision = $decision }
+}
+
+function Get-MoveSequenceHash {
+    param(
+        [string]$KoiColor,
+        [string[]]$Moves
+    )
+
+    if ($Moves.Count -eq 0) {
+        return $null
+    }
+    $payload = "$KoiColor|" + ($Moves -join ' ')
+    $sha256 = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $digest = $sha256.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($payload))
+        return (($digest | ForEach-Object { $_.ToString('x2') }) -join '')
+    } finally {
+        $sha256.Dispose()
+    }
+}
+
+function Get-DuplicateGameAnalysis {
+    param([object[]]$Games)
+
+    $moveHashes = [System.Collections.Generic.List[string]]::new()
+    $emptyMoveGames = 0
+    foreach ($game in $Games) {
+        if ($null -eq $game.move_hash) {
+            ++$emptyMoveGames
+        } else {
+            $moveHashes.Add([string]$game.move_hash)
+        }
+    }
+    $duplicateGroups = @($moveHashes | Group-Object | Where-Object { $_.Count -gt 1 })
+    $distinctGames = @($moveHashes | Sort-Object -Unique).Count + $emptyMoveGames
+    return [pscustomobject]@{
+        effective_games = $distinctGames
+        duplicate_games_detected = ($duplicateGroups.Count -gt 0)
+        duplicate_games = ($Games.Count - $distinctGames)
+        duplicate_groups = @($duplicateGroups | ForEach-Object {
+            [ordered]@{ move_hash = $_.Name; games = $_.Count }
+        })
+    }
 }
 
 function Assert-FileExists([string]$Path, [string]$Description) {
@@ -143,7 +186,10 @@ function Read-ColorResult([string]$Color) {
     if ($null -eq $parsed.sprt) {
         throw "SPRT result JSON for $Color has no sprt block: $($json.FullName)"
     }
-    return $parsed.sprt
+    return [pscustomobject]@{
+        sprt = $parsed.sprt
+        games = @($parsed.games)
+    }
 }
 
 Write-Output "sprt-compare: candidate $CandidatePath vs baseline $BaselinePath"
@@ -164,23 +210,53 @@ if ($whiteProcess.ExitCode -ne 0 -or $blackProcess.ExitCode -ne 0) {
 
 $white = Read-ColorResult 'white'
 $black = Read-ColorResult 'black'
-$games = [int]$white.games + [int]$black.games
-$wins = [int]$white.wins + [int]$black.wins
-$draws = [int]$white.draws + [int]$black.draws
-$losses = [int]$white.losses + [int]$black.losses
-$combined = Get-CombinedSprtResult -WhiteLlr ([double]$white.llr) -BlackLlr ([double]$black.llr) `
+# PowerShell variable names are case-insensitive, so the combined $games total
+# below would overwrite the requested $Games parameter. Snapshot it first.
+$requestedGamesPerOpening = $Games
+$games = [int]$white.sprt.games + [int]$black.sprt.games
+$wins = [int]$white.sprt.wins + [int]$black.sprt.wins
+$draws = [int]$white.sprt.draws + [int]$black.sprt.draws
+$losses = [int]$white.sprt.losses + [int]$black.sprt.losses
+$combined = Get-CombinedSprtResult -WhiteLlr ([double]$white.sprt.llr) -BlackLlr ([double]$black.sprt.llr) `
     -AcceptThreshold $acceptThreshold -RejectThreshold $rejectThreshold
 $combinedLlr = [double]$combined.llr
 
+# Duplicate-game assertion: a game is identified by the candidate color plus
+# the full recorded move sequence, so a color-reversed replay stays a distinct
+# game while a repeated (position, color, seed) match collapses to one game.
+$gameRecords = [System.Collections.Generic.List[object]]::new()
+foreach ($colorResult in @(
+    [pscustomobject]@{ color = 'white'; games = $white.games },
+    [pscustomobject]@{ color = 'black'; games = $black.games }
+)) {
+    foreach ($game in @($colorResult.games)) {
+        $moves = @($game.moves | ForEach-Object { [string]$_.move })
+        $gameRecords.Add([pscustomobject]@{
+            koi_color = $colorResult.color
+            move_hash = Get-MoveSequenceHash -KoiColor $colorResult.color -Moves $moves
+        })
+    }
+}
+$duplicateAnalysis = Get-DuplicateGameAnalysis -Games @($gameRecords)
+$playedGames = $gameRecords.Count
+
 Write-Output ("white: {0} games {1}W/{2}D/{3}L elo {4} llr {5} decision {6}" -f `
-    $white.games, $white.wins, $white.draws, $white.losses, $white.elo, $white.llr, $white.decision)
+    $white.sprt.games, $white.sprt.wins, $white.sprt.draws, $white.sprt.losses, $white.sprt.elo, $white.sprt.llr, $white.sprt.decision)
 Write-Output ("black: {0} games {1}W/{2}D/{3}L elo {4} llr {5} decision {6}" -f `
-    $black.games, $black.wins, $black.draws, $black.losses, $black.elo, $black.llr, $black.decision)
+    $black.sprt.games, $black.sprt.wins, $black.sprt.draws, $black.sprt.losses, $black.sprt.elo, $black.sprt.llr, $black.sprt.decision)
+Write-Output ("sprt-compare: effective_games {0} distinct of {1} played; requested {2} game(s) per opening and color" -f `
+    $duplicateAnalysis.effective_games, $playedGames, $requestedGamesPerOpening)
+if ($duplicateAnalysis.duplicate_games_detected) {
+    Write-Output (("WARNING: duplicate games detected: {0} of {1} games repeat an earlier color+move sequence; " +
+        "the combined SPRT evidence is inflated.") -f $duplicateAnalysis.duplicate_games, $playedGames)
+    Write-Warning (("sprt-compare: duplicate games detected: {0} of {1} games repeat an earlier color+move sequence; " +
+        "effective_games {2}.") -f $duplicateAnalysis.duplicate_games, $playedGames, $duplicateAnalysis.effective_games)
+}
 
 $decision = [string]$combined.decision
 
 $score = if ($games -gt 0) { ([double]$wins + 0.5 * [double]$draws) / [double]$games } else { 0.0 }
-$combinedElo = ([double]$white.elo + [double]$black.elo) / 2.0
+$combinedElo = ([double]$white.sprt.elo + [double]$black.sprt.elo) / 2.0
 Write-Output ("combined: {0} games {1}W/{2}D/{3}L score {4} elo {5} llr {6} decision {7}" -f `
     $games, $wins, $draws, $losses,
     [Math]::Round($score, 4), [Math]::Round($combinedElo, 1), [Math]::Round($combinedLlr, 3), $decision)

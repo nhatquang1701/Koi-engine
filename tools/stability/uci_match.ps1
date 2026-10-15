@@ -31,6 +31,8 @@ param(
     [ValidateRange(1, 64)]
     [int]$Depth = 4,
 
+    # Games per position. Each game derives its own RandomSeed from the base
+    # seed (-KoiRandomSeed, or a KoiOptions RandomSeed) plus the game index.
     [ValidateRange(1, 100000)]
     [int]$Games = 1,
 
@@ -95,6 +97,11 @@ param(
 
     [ValidateSet('white', 'black')]
     [string]$KoiColor = 'white',
+
+    # Alternate Koi's color between paired games: the second game of each pair
+    # plays the opposite color. Every game still derives its own RandomSeed, so
+    # repeated games on one position are never byte-identical.
+    [switch]$PairedColors,
 
     [ValidatePattern('^[^\s]+$')]
     [string]$BatchId = 'batch-00',
@@ -244,6 +251,16 @@ if ($KoiEvaluatorMode -ne 'classical') {
     $koiEvalFileSha256 = (Get-FileHash -LiteralPath $resolvedKoiEvalFile -Algorithm SHA256).Hash.ToLowerInvariant()
 }
 
+$koiRandomSeedOption = @($KoiOptions.Keys | Where-Object { ([string]$_) -ieq 'RandomSeed' })
+$koiRandomSeedBase = $KoiRandomSeed
+if ($koiRandomSeedOption.Count -gt 0) {
+    $parsedRandomSeed = [uint64]0
+    if (-not [uint64]::TryParse([string]$KoiOptions[$koiRandomSeedOption[0]], [ref]$parsedRandomSeed)) {
+        throw "Koi RandomSeed option must be a non-negative integer: $($KoiOptions[$koiRandomSeedOption[0]])"
+    }
+    $koiRandomSeedBase = $parsedRandomSeed
+}
+
 # Pure sequential-testing state for the logistic SPRT (draw-aware trinomial
 # model, sample variance estimated from the game scores). Kept side-effect free
 # so the process tests can reason about it directly.
@@ -313,6 +330,57 @@ function Get-SprtState {
         losses = $Losses
         score = $score
         elo = $elo
+    }
+}
+
+function Get-GameRandomSeed([uint64]$BaseSeed, [int]$GameIndex) {
+    # Koi's RandomSeed spin option is capped at 2147483647. Adding the game
+    # index makes repeated games on one position distinct while wrapping long
+    # matches back into the engine's accepted range. Kept side-effect free so
+    # the process tests can reason about it directly.
+    return ($BaseSeed + [uint64]($GameIndex - 1)) % ([uint64]2147483648)
+}
+
+function Get-MoveSequenceHash {
+    param(
+        [string]$KoiColor,
+        [string[]]$Moves
+    )
+
+    if ($Moves.Count -eq 0) {
+        return $null
+    }
+    $payload = "$KoiColor|" + ($Moves -join ' ')
+    $sha256 = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $digest = $sha256.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($payload))
+        return (($digest | ForEach-Object { $_.ToString('x2') }) -join '')
+    } finally {
+        $sha256.Dispose()
+    }
+}
+
+function Get-DuplicateGameAnalysis {
+    param([object[]]$Games)
+
+    $moveHashes = [System.Collections.Generic.List[string]]::new()
+    $emptyMoveGames = 0
+    foreach ($game in $Games) {
+        if ($null -eq $game.move_hash) {
+            ++$emptyMoveGames
+        } else {
+            $moveHashes.Add([string]$game.move_hash)
+        }
+    }
+    $duplicateGroups = @($moveHashes | Group-Object | Where-Object { $_.Count -gt 1 })
+    $distinctGames = @($moveHashes | Sort-Object -Unique).Count + $emptyMoveGames
+    return [pscustomobject]@{
+        effective_games = $distinctGames
+        duplicate_games_detected = ($duplicateGroups.Count -gt 0)
+        duplicate_games = ($Games.Count - $distinctGames)
+        duplicate_groups = @($duplicateGroups | ForEach-Object {
+            [ordered]@{ move_hash = $_.Name; games = $_.Count }
+        })
     }
 }
 
@@ -1102,6 +1170,9 @@ try {
     Assert-KoiEvalFileAccepted $koiEngine
     Initialize-UciEngine $opponentEngine
     $stopMatches = $false
+    # Initialize-UciEngine already sent the base RandomSeed; only a game whose
+    # derived seed differs from the last sent value needs a new setoption line.
+    $lastSentKoiRandomSeed = $koiRandomSeedBase
 
     foreach ($position in $positions) {
         if ($stopMatches) {
@@ -1110,6 +1181,18 @@ try {
         for ($gameIndex = 1; $gameIndex -le $Games; ++$gameIndex) {
             if ($stopMatches) {
                 break
+            }
+            $gameKoiColor = if ($PairedColors -and ($gameIndex % 2) -eq 0) {
+                if ($KoiColor -ceq 'white') { 'black' } else { 'white' }
+            } else {
+                $KoiColor
+            }
+            $gameKoiRandomSeed = Get-GameRandomSeed -BaseSeed $koiRandomSeedBase -GameIndex $gameIndex
+            if ($gameKoiRandomSeed -ne $lastSentKoiRandomSeed) {
+                $randomSeedOption = "setoption name RandomSeed value $gameKoiRandomSeed"
+                Send-UciLine $koiEngine $randomSeedOption
+                $koiEngine.SentOptions.Add($randomSeedOption)
+                $lastSentKoiRandomSeed = $gameKoiRandomSeed
             }
             Send-UciLine $koiEngine 'ucinewgame'
             Send-UciLine $opponentEngine 'ucinewgame'
@@ -1164,8 +1247,8 @@ try {
                     break
                 }
                 $side = Get-SideFromFen $rootFen
-                $koiTurn = ($side -ceq 'w' -and $KoiColor -ceq 'white') -or
-                    ($side -ceq 'b' -and $KoiColor -ceq 'black')
+                $koiTurn = ($side -ceq 'w' -and $gameKoiColor -ceq 'white') -or
+                    ($side -ceq 'b' -and $gameKoiColor -ceq 'black')
                 $engine = if ($koiTurn) { $koiEngine } else { $opponentEngine }
                 $positionCommand = Format-PositionCommand $position $moves
                 try {
@@ -1237,13 +1320,14 @@ try {
                 $result = '*'
             }
 
-            $whiteName = if ($KoiColor -ceq 'white') { $koiEngine.Name } else { $opponentEngine.Name }
-            $blackName = if ($KoiColor -ceq 'black') { $koiEngine.Name } else { $opponentEngine.Name }
+            $whiteName = if ($gameKoiColor -ceq 'white') { $koiEngine.Name } else { $opponentEngine.Name }
+            $blackName = if ($gameKoiColor -ceq 'black') { $koiEngine.Name } else { $opponentEngine.Name }
             $game = [ordered]@{
                 position = $position.Name
                 initial_fen = $position.Fen
                 round = $gameIndex
-                koi_color = $KoiColor
+                koi_color = $gameKoiColor
+                koi_random_seed = $gameKoiRandomSeed
                 result = $result
                 winner = Get-Winner $result
                 termination = $termination
@@ -1263,8 +1347,8 @@ try {
                     ($result -ceq '*' -and ($termination -ceq 'max plies' -or $termination -ceq 'rule draw'))) {
                     ++$sprtDraws
                 } elseif ($result -ceq '1-0' -or $result -ceq '0-1') {
-                    $koiWon = ($result -ceq '1-0' -and $KoiColor -ceq 'white') -or
-                        ($result -ceq '0-1' -and $KoiColor -ceq 'black')
+                    $koiWon = ($result -ceq '1-0' -and $gameKoiColor -ceq 'white') -or
+                        ($result -ceq '0-1' -and $gameKoiColor -ceq 'black')
                     if ($koiWon) {
                         ++$sprtWins
                     } else {
@@ -1308,6 +1392,21 @@ finally {
         }
     }
 }
+
+# Distinct games actually played. Koi's RandomSeed only seeds opening-book
+# choice, so seeds cannot make two deterministic games distinct; the identity
+# is the recorded move sequence (with the Koi color), exactly as net_match.ps1
+# and sprt_compare.ps1 compute it. Identical sequences flag the report invalid.
+$gameMoveHashes = [System.Collections.Generic.List[object]]::new()
+foreach ($game in $gameRecords) {
+    $gameMoves = @($game.moves | ForEach-Object { [string]$_.move })
+    $gameMoveHashes.Add([pscustomobject]@{
+        move_hash = Get-MoveSequenceHash -KoiColor $game.koi_color -Moves $gameMoves
+    })
+}
+$duplicateAnalysis = Get-DuplicateGameAnalysis -Games @($gameMoveHashes)
+$effectiveGames = $duplicateAnalysis.effective_games
+$duplicateGamesDetected = $duplicateAnalysis.duplicate_games_detected
 
 $koiEvaluatorAttestation = Get-KoiEvaluatorAttestation $koiEngine $koiStop
 
@@ -1432,9 +1531,15 @@ $report = [ordered]@{
         timeout_ms = $TimeoutMilliseconds
         protocol_timeout_ms = $TimeoutMilliseconds
         games_per_position = $Games
+        effective_games = $effectiveGames
+        duplicate_games_detected = $duplicateGamesDetected
+        report_valid = -not $duplicateGamesDetected
+        duplicate_game_groups = @($duplicateAnalysis.duplicate_groups)
+        paired_colors = [bool]$PairedColors
         koi_color = $KoiColor
         time_control = $pgnTimeControl
         koi_random_seed = $KoiRandomSeed
+        koi_random_seed_base = $koiRandomSeedBase
         koi_own_book = $KoiOwnBookEnabled
         koi_book_file = $KoiBookFile
         koi_book_depth = $KoiBookDepth

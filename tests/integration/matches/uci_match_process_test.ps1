@@ -44,7 +44,7 @@ function Invoke-ScriptedMatch([string]$KoiPath, [string]$OpponentPath, [string]$
                                 [switch]$Sprt, [int]$SprtMinGames = 20, [int]$SprtMaxGames = 2000,
                                 [double]$SprtElo1 = 5.0,
                                 [string]$KoiOptionsJsonPath = '', [string]$OpponentOptionsJsonPath = '',
-                                [switch]$CompactSearchInfo) {
+                                [switch]$CompactSearchInfo, [switch]$PairedColors) {
     $optionalArguments = @()
     if (-not [string]::IsNullOrWhiteSpace($OpeningFile)) {
         $optionalArguments += @('-OpeningFile', $OpeningFile)
@@ -55,6 +55,9 @@ function Invoke-ScriptedMatch([string]$KoiPath, [string]$OpponentPath, [string]$
     if ($Sprt) {
         $optionalArguments += @('-Sprt', '-SprtMinGames', $SprtMinGames, '-SprtMaxGames', $SprtMaxGames,
             '-SprtElo1', $SprtElo1)
+    }
+    if ($PairedColors) {
+        $optionalArguments += '-PairedColors'
     }
     if (-not [string]::IsNullOrWhiteSpace($OpponentOwnBook)) {
         $optionalArguments += @('-OpponentOwnBook', $OpponentOwnBook)
@@ -704,6 +707,229 @@ try {
         [Math]::Abs([double]$sprtBalancedReport.sprt.llr) -gt 0.5 -or
         $sprtBalancedReport.games.Count -ne 30) {
         throw 'A balanced candidate must run to the SPRT game cap and report inconclusive.'
+    }
+
+    # The old harness replayed -Games copies of one position with a single
+    # fixed color and RandomSeed, so repeated games were byte-identical.
+    # Paired games must now alternate Koi's color and every game must carry
+    # its own derived RandomSeed.
+    $pairedDirectory = Join-Path $outputDirectory 'paired-colors'
+    New-Item -ItemType Directory -Path $pairedDirectory -Force | Out-Null
+    $pairedKoi = New-ScriptedUciEngine -FixturePath $fixturePath -Directory $pairedDirectory 'mate-white'
+    $pairedOpponent = New-ScriptedUciEngine -FixturePath $fixturePath -Directory $pairedDirectory 'passive-black'
+    $pairedMatch = Invoke-ScriptedMatch $pairedKoi.path $pairedOpponent.path $pairedDirectory `
+        2 16 5000 '' '' 'white' 1 $false 'book.bin' 16 -PairedColors
+    $pairedReport = $pairedMatch.report
+    $pairedGames = @($pairedReport.games)
+    if ($pairedGames.Count -ne 2 -or
+        $pairedGames[0].koi_color -ne 'white' -or $pairedGames[1].koi_color -ne 'black' -or
+        $pairedGames[0].koi_random_seed -ne 1 -or $pairedGames[1].koi_random_seed -ne 2 -or
+        $pairedReport.configuration.paired_colors -ne $true -or
+        $pairedReport.configuration.koi_random_seed_base -ne 1 -or
+        $pairedReport.configuration.effective_games -ne 2 -or
+        $pairedReport.configuration.duplicate_games_detected -ne $false -or
+        $pairedReport.configuration.report_valid -ne $true) {
+        throw 'Paired games must alternate Koi colors and derive a distinct RandomSeed per game.'
+    }
+    $pairedKoiOptions = @($pairedReport.engines | Where-Object { $_.label -eq 'Koi' })[0].options
+    if ($pairedKoiOptions -notcontains 'setoption name RandomSeed value 1' -or
+        $pairedKoiOptions -notcontains 'setoption name RandomSeed value 2') {
+        throw 'The second game of a pair must send its own derived RandomSeed to Koi.'
+    }
+
+    # Distinct seeds do not make deterministic games distinct: Koi's
+    # RandomSeed only seeds opening-book choice, so two identical replays must
+    # collapse into one effective game and flag the report invalid.
+    $duplicateSeedDirectory = Join-Path $outputDirectory 'duplicate-play'
+    New-Item -ItemType Directory -Path $duplicateSeedDirectory -Force | Out-Null
+    $duplicateSeedKoi = New-ScriptedUciEngine -FixturePath $fixturePath -Directory $duplicateSeedDirectory 'mate-white'
+    $duplicateSeedOpponent = New-ScriptedUciEngine -FixturePath $fixturePath -Directory $duplicateSeedDirectory 'passive-black'
+    $duplicateSeedMatch = Invoke-ScriptedMatch $duplicateSeedKoi.path $duplicateSeedOpponent.path $duplicateSeedDirectory 2 16
+    $duplicateSeedGames = @($duplicateSeedMatch.report.games)
+    $duplicateSeedConfiguration = $duplicateSeedMatch.report.configuration
+    if ($duplicateSeedGames.Count -ne 2 -or
+        $duplicateSeedGames[0].koi_color -ne 'white' -or $duplicateSeedGames[1].koi_color -ne 'white' -or
+        $duplicateSeedGames[0].koi_random_seed -eq $duplicateSeedGames[1].koi_random_seed -or
+        $duplicateSeedConfiguration.paired_colors -ne $false -or
+        $duplicateSeedConfiguration.effective_games -ne 1 -or
+        $duplicateSeedConfiguration.duplicate_games_detected -ne $true -or
+        $duplicateSeedConfiguration.report_valid -ne $false -or
+        @($duplicateSeedConfiguration.duplicate_game_groups).Count -ne 1) {
+        throw 'Identical deterministic play with distinct seeds must be flagged as a duplicate game, not counted twice.'
+    }
+
+    $netMatchScript = Join-Path $repositoryRoot 'tools/nnue/net_match.ps1'
+    if (-not (Test-Path -LiteralPath $netMatchScript -PathType Leaf)) {
+        throw "net match script is missing: $netMatchScript"
+    }
+    $netMatchDirectory = Join-Path $outputDirectory 'net-match'
+    New-Item -ItemType Directory -Path $netMatchDirectory -Force | Out-Null
+    # net_match.ps1 now attests the candidate container through
+    # uci_match.ps1 -KoiEvalFile/-KoiEvaluatorMode, so the scenario needs a
+    # real v4 NNUE fixture instead of a dummy file.
+    $netNetPath = Join-Path $netMatchDirectory 'fixture-v4.nnue'
+    & $nnueFixturePath --arch v4 --output $netNetPath
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Could not generate the v4 NNUE net-match fixture.'
+    }
+    $netNetSha256 = (Get-FileHash -LiteralPath $netNetPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    $terminalOpeningFile = Join-Path $netMatchDirectory 'terminal-openings.txt'
+    [System.IO.File]::WriteAllText($terminalOpeningFile,
+        "fool-mate | f2f3 e7e5 g2g4 d8h4`nscholar-mate | e2e4 e7e5 f1c4 b8c6 d1h5 g8f6 h5f7`n",
+        [System.Text.UTF8Encoding]::new($false))
+    $duplicateOpeningFile = Join-Path $netMatchDirectory 'duplicate-openings.txt'
+    [System.IO.File]::WriteAllText($duplicateOpeningFile,
+        "fool-mate-a | f2f3 e7e5 g2g4 d8h4`nfool-mate-b | f2f3 e7e5 g2g4 d8h4`n",
+        [System.Text.UTF8Encoding]::new($false))
+
+    $cleanNetMatchOutput = @(& $PowerShellExecutable -NoProfile -ExecutionPolicy Bypass -File $netMatchScript `
+        -NnueNet $netNetPath -OpponentNet $netNetPath -EnginePath $EnginePath `
+        -Games 4 -Nodes 1 -OpeningFile $terminalOpeningFile `
+        -OutputDirectory (Join-Path $netMatchDirectory 'clean') 2>&1)
+    if ($LASTEXITCODE -ne 0) {
+        throw "net_match.ps1 clean run exited with ${LASTEXITCODE}: $($cleanNetMatchOutput -join ' | ')"
+    }
+    $cleanNetReport = Get-Content -LiteralPath (Join-Path (Join-Path $netMatchDirectory 'clean') 'net-match.json') `
+        -Raw | ConvertFrom-Json
+    if ($cleanNetReport.effective_games -ne 4 -or $cleanNetReport.requested_games -ne 4 -or
+        $cleanNetReport.duplicate_games_detected -ne $false -or $cleanNetReport.report_valid -ne $true -or
+        $cleanNetReport.opening_file -ne (Resolve-Path -LiteralPath $terminalOpeningFile).Path -or
+        $cleanNetReport.verdict -ne 'inconclusive' -or
+        $cleanNetReport.koi_evaluator_mode -ne 'nnue-v4' -or
+        $cleanNetReport.nnue_container_version -ne 4 -or
+        $cleanNetReport.nnue_sha256 -ne $netNetSha256 -or
+        $cleanNetReport.opponent_sha256 -ne $netNetSha256 -or
+        $cleanNetReport.sprt.enabled -ne $true -or $cleanNetReport.sprt.elo0 -ne 0 -or
+        $cleanNetReport.sprt.elo1 -ne 10 -or $cleanNetReport.sprt.alpha -ne 0.05 -or
+        $cleanNetReport.sprt.beta -ne 0.05 -or $cleanNetReport.sprt.target_effective_games -ne 200 -or
+        $cleanNetReport.sprt.target_met -ne $false -or $cleanNetReport.sprt.decision -ne 'inconclusive' -or
+        @($cleanNetReport.game_results | Where-Object { $null -eq $_.move_hash }).Count -ne 0) {
+        throw 'A distinct-opening net match must report four effective games, attested v4 containers, and an inconclusive SPRT verdict.'
+    }
+    if (($cleanNetMatchOutput -join ' ') -notmatch ('openings 2 ' + [regex]::Escape($terminalOpeningFile))) {
+        throw 'net_match.ps1 must print the opening file it used.'
+    }
+
+    $duplicateNetMatchOutput = @(& $PowerShellExecutable -NoProfile -ExecutionPolicy Bypass -File $netMatchScript `
+        -NnueNet $netNetPath -OpponentNet $netNetPath -EnginePath $EnginePath `
+        -Games 4 -Nodes 1 -OpeningFile $duplicateOpeningFile `
+        -OutputDirectory (Join-Path $netMatchDirectory 'duplicate') 2>&1)
+    if ($LASTEXITCODE -ne 0) {
+        throw "net_match.ps1 duplicate run exited with ${LASTEXITCODE}: $($duplicateNetMatchOutput -join ' | ')"
+    }
+    $duplicateNetReport = Get-Content -LiteralPath (Join-Path (Join-Path $netMatchDirectory 'duplicate') 'net-match.json') `
+        -Raw | ConvertFrom-Json
+    if ($duplicateNetReport.duplicate_games_detected -ne $true -or
+        $duplicateNetReport.report_valid -ne $false -or
+        $duplicateNetReport.verdict -ne 'invalid' -or
+        $duplicateNetReport.effective_games -ne 2 -or
+        $duplicateNetReport.requested_games -ne 4 -or
+        $duplicateNetReport.games -ne 4 -or
+        @($duplicateNetReport.duplicate_game_groups).Count -ne 2 -or
+        @($duplicateNetReport.game_results | Where-Object { $_.move_hash } |
+            ForEach-Object { $_.move_hash } | Sort-Object -Unique).Count -ne 2) {
+        throw 'A net match that repeats an opening must mark the report invalid and count distinct effective games.'
+    }
+    if (($duplicateNetMatchOutput -join ' ') -notmatch 'duplicate games detected: 2 of 4 games' -or
+        ($duplicateNetMatchOutput -join ' ') -match '\{[0-9]\}') {
+        throw 'A net match with repeated move sequences must warn loudly about duplicate games with real counts.'
+    }
+
+    $netMatchTokens = $null
+    $netMatchParseErrors = $null
+    $netMatchAst = [System.Management.Automation.Language.Parser]::ParseFile(
+        $netMatchScript, [ref]$netMatchTokens, [ref]$netMatchParseErrors)
+    if ($netMatchParseErrors.Count -ne 0) {
+        throw "Could not parse net_match.ps1: $($netMatchParseErrors -join '; ')"
+    }
+    $resolveOpeningFunction = $netMatchAst.Find({
+            param($node)
+            $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+            $node.Name -eq 'Resolve-OpeningFile'
+        }, $true)
+    if ($null -eq $resolveOpeningFunction) {
+        throw 'net_match.ps1 must expose Resolve-OpeningFile.'
+    }
+    . ([scriptblock]::Create($resolveOpeningFunction.Extent.Text))
+    $resolverRoot = Join-Path $netMatchDirectory 'resolver'
+    $releaseResolverRoot = Join-Path $resolverRoot 'release'
+    $fallbackResolverRoot = Join-Path $resolverRoot 'fallback'
+    $emptyResolverRoot = Join-Path $resolverRoot 'empty'
+    $releaseOpeningDirectory = Join-Path $releaseResolverRoot 'tests/data/openings'
+    $fallbackOpeningDirectory = Join-Path $fallbackResolverRoot 'tests/data/openings'
+    New-Item -ItemType Directory -Path $releaseOpeningDirectory -Force | Out-Null
+    New-Item -ItemType Directory -Path $fallbackOpeningDirectory -Force | Out-Null
+    New-Item -ItemType Directory -Path $emptyResolverRoot -Force | Out-Null
+    [System.IO.File]::WriteAllText((Join-Path $releaseOpeningDirectory 'openings-release-strength-160.txt'), "a | e2e4`n")
+    [System.IO.File]::WriteAllText((Join-Path $releaseOpeningDirectory 'openings-curated-32.txt'), "b | d2d4`n")
+    [System.IO.File]::WriteAllText((Join-Path $fallbackOpeningDirectory 'openings-curated-32.txt'), "b | d2d4`n")
+    $preferredOpening = Resolve-OpeningFile -RequestedPath '' -Root $releaseResolverRoot
+    $fallbackOpening = Resolve-OpeningFile -RequestedPath '' -Root $fallbackResolverRoot
+    if ([System.IO.Path]::GetFileName($preferredOpening) -ne 'openings-release-strength-160.txt' -or
+        [System.IO.Path]::GetFileName($fallbackOpening) -ne 'openings-curated-32.txt') {
+        throw 'net_match.ps1 must prefer the 160-opening corpus and fall back to the curated book only when it is absent.'
+    }
+    $missingOpeningFailed = $false
+    try {
+        [void](Resolve-OpeningFile -RequestedPath '' -Root $emptyResolverRoot)
+    } catch {
+        $missingOpeningFailed = $true
+    }
+    if (-not $missingOpeningFailed) {
+        throw 'net_match.ps1 must fail when no opening corpus is available.'
+    }
+
+    # I1: an SPRT accept below the 200-effective-game target is evidence, not a
+    # promotion, so it must not report candidate-stronger.
+    $verdictFunction = $netMatchAst.Find({
+            param($node)
+            $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+            $node.Name -eq 'Get-NetMatchVerdict'
+        }, $true)
+    if ($null -eq $verdictFunction) {
+        throw 'net_match.ps1 must expose Get-NetMatchVerdict.'
+    }
+    . ([scriptblock]::Create($verdictFunction.Extent.Text))
+    $belowTargetVerdict = Get-NetMatchVerdict -Aborted 0 -Decided 120 -RequestedGames 120 `
+        -DuplicateGamesDetected $false -SprtDecision 'accept' -TargetMet $false
+    $promotionVerdict = Get-NetMatchVerdict -Aborted 0 -Decided 200 -RequestedGames 200 `
+        -DuplicateGamesDetected $false -SprtDecision 'accept' -TargetMet $true
+    $rejectVerdict = Get-NetMatchVerdict -Aborted 0 -Decided 200 -RequestedGames 200 `
+        -DuplicateGamesDetected $false -SprtDecision 'reject' -TargetMet $true
+    $runningVerdict = Get-NetMatchVerdict -Aborted 0 -Decided 40 -RequestedGames 40 `
+        -DuplicateGamesDetected $false -SprtDecision 'inconclusive' -TargetMet $false
+    $duplicateVerdict = Get-NetMatchVerdict -Aborted 0 -Decided 4 -RequestedGames 4 `
+        -DuplicateGamesDetected $true -SprtDecision 'accept' -TargetMet $false
+    $incompleteVerdict = Get-NetMatchVerdict -Aborted 1 -Decided 3 -RequestedGames 4 `
+        -DuplicateGamesDetected $false -SprtDecision 'accept' -TargetMet $false
+    if ($belowTargetVerdict -ne 'accepted-below-target' -or
+        $promotionVerdict -ne 'candidate-stronger' -or
+        $rejectVerdict -ne 'candidate-weaker' -or
+        $runningVerdict -ne 'inconclusive' -or
+        $duplicateVerdict -ne 'invalid' -or
+        $incompleteVerdict -ne 'incomplete') {
+        throw 'An SPRT accept below the effective-games target must not report candidate-stronger.'
+    }
+
+    $sprtDuplicateDirectory = Join-Path $outputDirectory 'sprt-duplicate'
+    New-Item -ItemType Directory -Path $sprtDuplicateDirectory -Force | Out-Null
+    $duplicateCandidate = New-ScriptedUciEngine -FixturePath $fixturePath -Directory $sprtDuplicateDirectory 'mate-white'
+    $duplicateBaseline = New-ScriptedUciEngine -FixturePath $fixturePath -Directory $sprtDuplicateDirectory 'passive-black'
+    $sprtDuplicateOpeningPath = Join-Path $sprtDuplicateDirectory 'openings.txt'
+    [System.IO.File]::WriteAllText($sprtDuplicateOpeningPath, "duplicate | e2e4`n", [System.Text.UTF8Encoding]::new($false))
+    $sprtDuplicateOutput = @(& $PowerShellExecutable -NoProfile -ExecutionPolicy Bypass -File $sprtCompareScript `
+        -CandidatePath $duplicateCandidate.path -BaselinePath $duplicateBaseline.path -ReplayPath $replayPath `
+        -OpeningFile $sprtDuplicateOpeningPath -Nodes 1 -Games 2 -MinGames 4 -MaxGames 4 `
+        -MaxPlies 8 -Elo0 0 -Elo1 10 -Threads 1 -Hash 16 `
+        -OutputDirectory $sprtDuplicateDirectory -Label 'duplicate-smoke' 2>&1)
+    if ($LASTEXITCODE -ne 2) {
+        throw "A duplicated-game SPRT comparison must stay inconclusive (exit 2), got ${LASTEXITCODE}: $($sprtDuplicateOutput -join ' | ')"
+    }
+    if (($sprtDuplicateOutput -join ' ') -notmatch 'effective_games 2' -or
+        ($sprtDuplicateOutput -join ' ') -notmatch 'requested 2 game\(s\) per opening and color' -or
+        ($sprtDuplicateOutput -join ' ') -notmatch 'duplicate games detected: 2 of 4 games' -or
+        ($sprtDuplicateOutput -join ' ') -match '\{[0-9]\}') {
+        throw 'A color-paired SPRT run with repeated deterministic games must report distinct effective games, the requested per-opening count, and a duplicate warning with real counts.'
     }
 }
 finally {

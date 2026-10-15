@@ -498,6 +498,15 @@ reported value must be labeled “local Stockfish-equivalent Elo at recorded
 hardware/options/time control” and must not be presented as a universal Elo
 claim.
 
+NNUE runs pass the network with `--koi-eval-file`: the container header selects
+the `nnue-v4`/`nnue-v5` attestation mode, the match harness proves the engine
+enabled that exact file, and the report records the absolute path, SHA-256, byte
+size, container version, and harness attestation under
+`configuration.koi_evaluator`. A missing, malformed, or rejected network exits
+nonzero. `--koi-options-json` forwards extra non-pinned Koi options (for example
+`GpuNnue` or `SyzygyPath`) to the harness and records the file hash; it must not
+set `EvalFile` or the pinned measurement options.
+
 ## NNUE training
 
 Training is driven by the Python trainer and the bullet pipeline; the Koi NNUE
@@ -535,10 +544,16 @@ colour-split A/B match (`tools/nnue/ab_match.ps1` versus the classical evaluator
 schema `koi-nnue-ab-match-v1`; `tools/nnue/net_match.ps1` for network versus
 network). Those results are local
 reports: the classical evaluator remains the engine default and no reported
-number is an Elo claim. Both tools default to the 32 curated openings in
-`tests/data/openings/openings-curated-32.txt` and spread the requested games
-across them, so the sides meet varied positions instead of repeating one
-deterministic start position; pass `-OpeningFile` to override.
+number is an Elo claim. `ab_match.ps1` defaults to the 32 curated openings in
+`tests/data/openings/openings-curated-32.txt` but still repeats openings across
+its per-position games, so its screens are half-duplicated; use `net_match.ps1`
+(or another deduplicated protocol) for evidence runs. `net_match.ps1` prefers the
+160-opening `tests/data/openings/openings-release-strength-160.txt` corpus
+(falling back to the curated book), plays exactly one game per opening per
+colour, refuses a request that would repeat a game, and marks its report
+invalid if two games share a move sequence; pass `-OpeningFile` to override.
+Its promotion verdict is an SPRT (H0=0, H1=+10 Elo, alpha=beta=0.05) over the
+combined colour legs with a 200-effective-game target.
 
 GPU NNUE inference is optional at runtime. When `nvcc` is available
 (CMake option `KOI_ENABLE_GPU_NNUE`, on by default), the build compiles
