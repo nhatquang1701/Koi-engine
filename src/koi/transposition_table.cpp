@@ -838,13 +838,24 @@ std::optional<TranspositionEntry> TranspositionTable::probe(
 }
 
 void TranspositionTable::prefetch(std::uint64_t key) const noexcept {
-    // Address-only: read the published storage once and resolve the same
-    // cluster base the probe will use, without pinning a hazard slot.  The
-    // result is a cache hint with no semantic effect, and the controller
-    // joins the active search before a Hash resize can replace storage, so a
-    // per-call lease (publish, two acquire loads, and a release store on a
-    // per-node path) buys nothing here.
-    const Storage* const storage = hot_storage_.load(std::memory_order_acquire);
+    // Resolve the address under the same hazard lease as the probe: the
+    // public service seam supports resizing the table during a live search
+    // (the soak suite's resize regression test drives that contract), so a
+    // lease-free read could touch retired storage.  The lease is the same
+    // ~3-atomic pattern the probe already pays per call; correctness outranks
+    // the hint's cost.
+    const Lease lease(*this);
+    const Storage* const storage = lease.storage();
+    if (storage == nullptr || storage->cluster_count == 0) {
+        return;
+    }
+    const std::size_t cluster = static_cast<std::size_t>(key) & storage->cluster_mask;
+    KOI_TT_PREFETCH(storage->cluster_base(cluster));
+}
+
+void TranspositionTable::prefetch_exclusive(Storage* storage, std::uint64_t key) const noexcept {
+    // Exclusive-mode prefetch: the session pin keeps the storage alive, so the
+    // body is the exact non-lease remainder of the locked prefetch.
     if (storage == nullptr || storage->cluster_count == 0) {
         return;
     }

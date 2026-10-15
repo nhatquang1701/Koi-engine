@@ -141,13 +141,21 @@ public:
     }
 
     // Advisory prefetch of the cluster a later probe will read; a disabled
-    // view stays a complete no-op on the shared table.  The hint stays
-    // address-only rather than using the pin: it has no semantic effect, so a
-    // stale address after a contract-violating resize is harmless.
+    // view stays a complete no-op on the shared table.  Resolving the address
+    // dereferences the live storage, and a resize may run during an active
+    // search (the soak suite's resize regression test drives that contract),
+    // so each mode uses its own lifetime guard: exclusive mode reads the
+    // session-pinned storage, and the locked path takes the same hazard lease
+    // as the probe.
     void prefetch(const std::uint64_t key) const noexcept {
-        if (enabled_) {
-            table_->prefetch(key);
+        if (!enabled_) {
+            return;
         }
+        if (exclusive_) {
+            table_->prefetch_exclusive(pin_->storage(), key);
+            return;
+        }
+        table_->prefetch(key);
     }
 
     void store(const std::uint64_t key, const int depth, const int score,

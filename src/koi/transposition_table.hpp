@@ -29,7 +29,8 @@ enum class TranspositionBound : std::uint8_t { exact, lower, upper };
 // probe_exclusive/store_exclusive entry points, which read the pinned storage
 // pointer directly and so run no atomic instructions on the steady-state
 // path.  Maintenance entry points (new_generation, hashfull, clear,
-// set_size_mb, prefetch) always stay locked.
+// set_size_mb) always stay locked; the prefetch hint routes by mode like
+// probe (prefetch_exclusive rides the same pin).
 enum class TranspositionAccessMode : std::uint8_t { locked, exclusive };
 
 // Sentinel for "this entry carries no static evaluation".  Real evaluations are
@@ -152,10 +153,13 @@ public:
         TranspositionAccessMode mode = TranspositionAccessMode::locked) const noexcept;
     // Software prefetch of the probe cluster.  Search calls this a few
     // instructions before the matching probe so the cache line fetch overlaps
-    // the work in between; a disabled or empty table is a no-op.  Resolves the
-    // address from the published hot storage without a hazard lease: the hint
-    // has no semantic effect and the controller joins the active search before
-    // a Hash resize can replace storage.
+    // the work in between; a disabled or empty table is a no-op.  The address
+    // is resolved under the same hazard lease as probe(): the public service
+    // seam supports resizing the table during a live search (the soak suite's
+    // resize regression test drives that contract), so reading the retired
+    // storage without a lease would be a use-after-free.  The "controller
+    // joins the active search before a Hash resize" premise holds only for the
+    // UCI path.
     void prefetch(std::uint64_t key) const noexcept;
 
 private:
@@ -190,6 +194,7 @@ private:
     void store_exclusive(Storage* storage, std::uint64_t key, int depth, int score,
                          TranspositionBound bound, Move best_move, int ply, bool pv,
                          int eval) noexcept;
+    void prefetch_exclusive(Storage* storage, std::uint64_t key) const noexcept;
 
     // Hazard-pointer lease for the store/probe hot paths.  A reader
     // publishes the storage pointer it is about to use in one hazard slot and
