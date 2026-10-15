@@ -573,7 +573,8 @@ jobs:
           cmake --build build/ci-tsan --config Release -j 4
       # Targeted concurrency set first: the shared-TT/lock-elision and
       # search-worker lifetime surfaces are the ones ASan cannot see. The
-      # broader `-L unit -LE heavy` sweep can be added once this is green.
+      # broader `-L unit -LE heavy` sweep runs in the next step (added
+      # 2026-10-15 after this targeted set stayed green as a required check).
       - name: Run the concurrency suites under TSan
         env:
           KOI_TEST_RETRIES: "1"
@@ -586,6 +587,17 @@ jobs:
           ctest --test-dir build/ci-tsan -C Release -j 2 \
             -R "^(transposition_table_tests|search_service_tests|uci_controller_tests|time_manager_tests|koi_search_tests_[1-4]of4)$" \
             --output-on-failure --output-junit build/ci-tsan/ctest-tsan-junit.xml
+      # Broad unit sweep: everything labeled `unit` except `heavy` (the heavy
+      # search shards already ran above). This is the same selection the
+      # release jobs use for their unit suite, now exercised under TSan.
+      - name: Run the broad unit suite under TSan
+        env:
+          KOI_TEST_RETRIES: "1"
+          TSAN_OPTIONS: "halt_on_error=1 detect_deadlocks=0"
+        run: |
+          ctest --test-dir build/ci-tsan -C Release -j 2 \
+            -L unit -LE heavy \
+            --output-on-failure --output-junit build/ci-tsan/ctest-tsan-sweep-junit.xml
       - name: Show the test log tail
         if: always()
         run: tail -n 150 build/ci-tsan/Testing/Temporary/LastTest.log || true
@@ -596,6 +608,7 @@ jobs:
           name: linux-tsan-test-diagnostics
           path: |
             build/ci-tsan/ctest-tsan-junit.xml
+            build/ci-tsan/ctest-tsan-sweep-junit.xml
             build/ci-tsan/Testing/Temporary/LastTest.log
           if-no-files-found: ignore
           retention-days: 7
