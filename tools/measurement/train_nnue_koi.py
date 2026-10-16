@@ -922,7 +922,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--threads", type=int, default=4)
     parser.add_argument("--hidden-units", type=int, default=1024)
     parser.add_argument("--hidden-shifts", type=int, nargs="+", default=[6, 7, 8])
-    parser.add_argument("--output-shifts", type=int, nargs="+", default=[4, 5, 6, 7, 8])
+    parser.add_argument("--output-shifts", type=int, nargs="+", default=[4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14])
     parser.add_argument("--tune-samples", type=int, default=4000)
     parser.add_argument("--float-out", type=pathlib.Path, default=None,
                         help="optional path for a float checkpoint after training")
