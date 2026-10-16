@@ -1394,6 +1394,7 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
             const SearchFrame saved_frame = frame;
             SearchFrame& child_frame = stack.frame(static_cast<std::size_t>(ply + 1));
             const int saved_child_cutoff_count = child_frame.cutoff_count;
+            const std::size_t saved_root_move_score_count = root_move_score_count;
             (void)negamax(state, probe_depth, alpha, alpha + 1, ply, probe_pv, previous_move,
                           false, check_extensions_remaining, Move::no_move(), nullptr, nullptr);
             if (aborted) {
@@ -1402,6 +1403,7 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
             frame = saved_frame;
             child_frame.cutoff_count = saved_child_cutoff_count;
             path_selective_bound = saved_selective_bound;
+            root_move_score_count = saved_root_move_score_count;
             ++stats.internal_iterative_deepening;
             const std::optional<TranspositionEntry> probe_entry =
                 table_access.probe(transposition_key, ply);
@@ -1782,8 +1784,8 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
             const bool reduced = lmr_decision.reduced;
             const int reduction = lmr_decision.reduction;
             const int extension_depth = singular_extension + (quiet_forcing_extension ? 1 : 0);
-            const int authoritative_child_depth = std::max(
-                0, full_child_depth + extension_depth);
+            const int authoritative_child_depth =
+                std::clamp(full_child_depth + extension_depth, 0, depth);
             const int child_depth = reduced ?
                 std::max(0, authoritative_child_depth - reduction) : authoritative_child_depth;
             const bool child_depth_reduced_by_extension = extension_depth < 0;

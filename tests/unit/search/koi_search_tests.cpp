@@ -4836,6 +4836,38 @@ void test_transposition_table_survives_mixed_concurrent_maintenance() {
 
 } // namespace
 
+void test_start_position_completes_depth_seven_within_the_extension_budget() {
+    koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>());
+    koi::SearchLimits limits;
+    limits.depth = 7;
+    koi::SearchOptions options;
+    options.hash_mb = 512;
+    options.threads = 1;
+    CompletedSearch completed;
+    koi::SearchHandle handle = service.start(
+        require_state("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"),
+        limits, completed.sink(), options);
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(90);
+    while (completed.completion_count() == 0 && std::chrono::steady_clock::now() < deadline) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    }
+    if (completed.completion_count() == 0) {
+        handle.stop();
+    }
+    handle.wait();
+    const koi::SearchResult result = completed.take_result();
+    require(result.completed_depth == 7,
+            "the start position must complete a depth-seven search (completed_depth=" +
+                std::to_string(result.completed_depth) +
+                ", nodes=" + std::to_string(result.stats.nodes) +
+                ", qnodes=" + std::to_string(result.stats.qnodes) + ")");
+    const std::uint64_t visited = result.stats.nodes + result.stats.qnodes;
+    require(visited <= 20'000'000,
+            "the depth-seven start-position search must stay within the extension budget (nodes=" +
+                std::to_string(result.stats.nodes) +
+                ", qnodes=" + std::to_string(result.stats.qnodes) + ")");
+}
+
 int main(int argc, char** argv) {
     const std::vector<koi::test::TestCase> tests{
         {"classical evaluator", test_evaluator_returns_material_and_pst_from_requested_perspective},
@@ -4855,6 +4887,8 @@ int main(int argc, char** argv) {
         {"evaluator complete breakdown", test_evaluator_breakdown_accounts_for_every_component},
         {"evaluator bishop pair", test_evaluator_rewards_a_bishop_pair},
         {"time manager", test_time_manager_applies_move_time_and_clock_limits},
+        {"start position depth seven completes",
+         test_start_position_completes_depth_seven_within_the_extension_budget},
         {"adaptive time manager", test_adaptive_time_manager_uses_tt_stability_and_hardness},
         {"low-clock emergency pacing", test_low_clock_hard_budget_preserves_emergency_pacing},
         {"low-clock hard window", test_low_clock_hard_position_can_use_its_hard_window},
