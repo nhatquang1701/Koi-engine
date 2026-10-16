@@ -1086,6 +1086,50 @@ class TrainerPipelineTests(unittest.TestCase):
         self.assertEqual(completed.returncode, 0, completed.stderr)
         self.assertEqual(first_net.read_bytes(), second_net.read_bytes())
 
+    def test_default_shift_grid_reaches_extended_output_shifts(self):
+        net = self.directory / "default-grid.nnue"
+        meta = self.directory / "default-grid.metadata.json"
+        completed = subprocess.run(
+            [
+                sys.executable,
+                str(TRAINER),
+                "--corpus",
+                str(self.corpus),
+                "--rows",
+                "64",
+                "--epochs",
+                "1",
+                "--hidden-units",
+                str(HIDDEN_UNITS),
+                "--batch-size",
+                "16",
+                "--threads",
+                "1",
+                "--arch",
+                "v4",
+                "--net-out",
+                str(net),
+                "--meta-out",
+                str(meta),
+            ],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=600,
+            check=False,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        metadata = json.loads(meta.read_text(encoding="utf-8"))
+        # The default output-shift grid must extend beyond the historical
+        # [4..8] range: the usable quantization region begins at
+        # output_shift 9 at hidden 32 (and far higher at larger hidden
+        # sizes), so a narrow default grid silently selects a decimated
+        # integer head.
+        self.assertGreaterEqual(metadata["output_shift"], 9)
+        self.assertLessEqual(
+            metadata["val_round_trip_mae_cp"], metadata["val_mae_cp"] + 1.0
+        )
+
     def test_float_in_reuses_the_checkpoint(self):
         first_net = self.directory / "trained.nnue"
         first_meta = self.directory / "trained.metadata.json"
