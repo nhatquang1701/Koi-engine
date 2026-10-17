@@ -4849,6 +4849,19 @@ void test_start_position_completes_depth_seven_within_the_extension_budget() {
     koi::SearchOptions options;
     options.hash_mb = 512;
     options.threads = 1;
+    // Measure the depth-six baseline on a fresh service so the depth-seven
+    // growth can be bounded: the pre-fix search exploded across this step.
+    koi::SearchService shallow_service(std::make_shared<koi::ClassicalEvaluator>());
+    koi::SearchLimits shallow_limits;
+    shallow_limits.depth = 6;
+    const koi::SearchResult shallow = search(
+        shallow_service,
+        require_state("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"),
+        shallow_limits, options);
+    require(shallow.completed_depth == 6,
+            "the depth-six baseline search must complete (completed_depth=" +
+                std::to_string(shallow.completed_depth) + ")");
+    const std::uint64_t visited_six = shallow.stats.nodes + shallow.stats.qnodes;
     CompletedSearch completed;
     koi::SearchHandle handle = service.start(
         require_state("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"),
@@ -4868,6 +4881,9 @@ void test_start_position_completes_depth_seven_within_the_extension_budget() {
                 ", nodes=" + std::to_string(result.stats.nodes) +
                 ", qnodes=" + std::to_string(result.stats.qnodes) + ")");
     const std::uint64_t visited = result.stats.nodes + result.stats.qnodes;
+    require(visited <= 40 * visited_six,
+            "the depth-six to depth-seven step must stay within a bounded effective branching factor (depth six visited=" +
+                std::to_string(visited_six) + ", depth seven visited=" + std::to_string(visited) + ")");
     require(visited <= 20'000'000,
             "the depth-seven start-position search must stay within the extension budget (nodes=" +
                 std::to_string(result.stats.nodes) +
