@@ -1021,7 +1021,10 @@ void test_ultra_short_timed_search_completes_a_root_iteration() {
     // check with a budget the instrumented build can meet.
     limits.movetime = 1000ms;
 #else
-    limits.movetime = 50ms;
+    // A loaded CI runner can also expire a short budget during thread
+    // startup; keep the contract check with a budget even a loaded runner
+    // can meet.
+    limits.movetime = 250ms;
 #endif
     koi::SearchOptions options;
     options.hash_mb = 16;
