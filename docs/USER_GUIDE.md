@@ -803,10 +803,10 @@ from the starting position (for example, `bestmove e2e4`).
   never receive an unproven score; before any proven iteration exists the line
   omits the score entirely.
 - During a long search iteration the engine may publish the in-flight depth
-  with refreshed `nodes`, `nps`, and `time` values (interim progress lines), so
-  a GUI readout does not freeze on the last completed depth; the published
-  score, PV, and bound continue to describe the most recent completed
-  iteration.
+  and principal variation with refreshed `nodes`, `nps`, and `time` values
+  (interim progress lines), so a GUI readout does not freeze on the last
+  completed depth; the published score and bound continue to describe the
+  most recent completed iteration.
 - `stop` cancels and joins the active worker and emits exactly one final legal
   `bestmove` for that search. The final `bestmove` includes a
   ` ponder <reply>` suffix whenever the completed principal variation contains

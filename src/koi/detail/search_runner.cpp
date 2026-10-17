@@ -2525,12 +2525,13 @@ void publish_iteration_lines(const SearchEventSink& sink, InterimReportState& st
 }
 
 // Republishes the stored iteration snapshot with refreshed node counters when
-// a long iteration has run past the configured cadence. Score, PV, bound, and
-// tbhits stay those of the completed iteration while the reported depth
-// tracks the in-flight iteration; `nodes` is clamped against the live total
-// so the GUI readout never goes backwards.
+// a long iteration has run past the configured cadence. The score, bound, and
+// tbhits stay those of the completed iteration while the reported depth and
+// the principal variation track the in-flight iteration; `nodes` is clamped
+// against the live total so the GUI readout never goes backwards.
 void maybe_publish_interim(const SearchEventSink& sink, InterimReportState& state,
                            const std::uint64_t live_nodes, const int live_depth,
+                           const PrincipalVariation* live_pv,
                            const std::chrono::milliseconds interval) {
     if (interval.count() <= 0 || state.lines.empty() || state.lines.front().depth < 1) {
         return;
@@ -2545,6 +2546,9 @@ void maybe_publish_interim(const SearchEventSink& sink, InterimReportState& stat
         SearchInfo info = stored;
         info.depth = std::max(stored.depth, live_depth);
         info.seldepth = std::max(stored.seldepth, info.depth);
+        if (live_pv != nullptr && live_pv->length > 0) {
+            info.pv = live_pv->to_vector();
+        }
         info.nodes = std::max(stored.nodes, live_nodes);
         info.nps = elapsed.count() > 0 ? info.nodes * 1000 /
             static_cast<std::uint64_t>(elapsed.count()) : info.nodes;
@@ -2833,21 +2837,23 @@ void SearchRunner::run() {
                 nullptr, evaluator_mutex_ptr, &legal_moves, true,
                 options.quiet_history_side_hook, tablebase_binding);
             SearchContext& context = *context_storage;
-            // The loop below records the depth being searched so interim
-            // publications can report the in-flight iteration.
+            // The loop below records the depth and principal variation being
+            // searched so interim publications can report the in-flight
+            // iteration instead of only the last completed one.
             int in_flight_depth = 0;
+            PrincipalVariation pv;
             if (options.interim_report_interval.count() > 0) {
                 // Interim progress publisher for long iterations. Only this
                 // runner-thread context gets the probe; LazySMP helpers and
                 // root-parallel workers never publish protocol output.
                 context.progress_probe = [&context, &sink, &interim_state, &lazy_pool,
-                                          &in_flight_depth,
+                                          &in_flight_depth, &pv,
                                           interval = options.interim_report_interval] {
                     std::uint64_t live = context.stats.nodes + context.stats.qnodes;
                     if (lazy_pool != nullptr) {
                         live += lazy_pool->live_nodes() + lazy_pool->live_qnodes();
                     }
-                    maybe_publish_interim(sink, interim_state, live, in_flight_depth, interval);
+                    maybe_publish_interim(sink, interim_state, live, in_flight_depth, &pv, interval);
                 };
             }
             if (lazy_pool == nullptr) {
@@ -2915,6 +2921,7 @@ void SearchRunner::run() {
             std::chrono::milliseconds previous_report_elapsed{0};
             for (int depth = 1;; depth = depth < maximum_depth ? depth + 1 : maximum_depth) {
                 in_flight_depth = depth;
+                pv.clear();
                 if (auto conversion = session->take_ponderhit_limits(); conversion.has_value()) {
                     limits = std::move(*conversion);
                     time_manager.reconfigure(limits, root.side_to_move(), options.speed_percent,
@@ -2941,7 +2948,6 @@ void SearchRunner::run() {
                 const std::vector<Move> previous_pv = result.pv;
                 const bool had_completed_iteration = result.completed_depth > 0;
                 context.root_move_hint = had_completed_iteration ? result.best_move : std::nullopt;
-                PrincipalVariation pv;
                 int alpha = -kInfinity;
                 int beta = kInfinity;
                 bool aspiration_researched = false;
@@ -4153,7 +4159,7 @@ void SearchRunner::run() {
                                       interval = options.interim_report_interval] {
                     const std::uint64_t live = root_context.stats.nodes +
                         root_context.stats.qnodes + pool.live_visited();
-                    maybe_publish_interim(sink, interim_state, live, in_flight_depth, interval);
+                    maybe_publish_interim(sink, interim_state, live, in_flight_depth, nullptr, interval);
                 };
             }
 

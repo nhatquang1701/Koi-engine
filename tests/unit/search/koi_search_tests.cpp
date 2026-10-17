@@ -2992,6 +2992,78 @@ void test_selective_iteration_republishes_the_last_proven_score() {
             "a selective iteration must keep its own principal variation");
 }
 
+void test_interim_publication_reports_the_in_flight_principal_variation() {
+    auto evaluator = std::make_shared<koi::ClassicalEvaluator>();
+    koi::SearchService service(evaluator, {}, 16);
+    koi::SearchLimits limits;
+    limits.infinite = true;
+    koi::SearchOptions options;
+    options.threads = 1;
+    options.multi_pv = 1;
+    options.hash_mb = 16;
+    options.interim_report_interval = std::chrono::milliseconds{1};
+
+    std::mutex info_mutex;
+    std::vector<koi::SearchInfo> infos;
+    std::array<int, 80> depth_counts{};
+    std::atomic_bool saw_repeat{false};
+    CompletedSearch completed;
+    koi::SearchHandle handle = service.start(
+        koi::GameState::startpos(), limits,
+        {.on_info =
+             [&info_mutex, &infos, &depth_counts, &saw_repeat](const koi::SearchInfo& info) {
+                 std::lock_guard lock(info_mutex);
+                 if (info.depth >= 2 && info.depth < 80 && depth_counts[info.depth - 1] >= 3) {
+                     saw_repeat.store(true, std::memory_order_relaxed);
+                 }
+                 if (info.depth >= 0 && info.depth < 80) {
+                     ++depth_counts[info.depth];
+                 }
+                 infos.push_back(info);
+             },
+         .on_complete = completed.sink().on_complete},
+        options);
+
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(20);
+    while (std::chrono::steady_clock::now() < deadline && !saw_repeat.load()) {
+        std::this_thread::sleep_for(std::chrono::milliseconds{1});
+    }
+    handle.stop();
+    handle.wait();
+    (void)completed.take_result();
+
+    std::lock_guard lock(info_mutex);
+    require(saw_repeat.load(),
+            "the interim in-flight test needs an interim repeat before the in-flight line can be "
+            "checked");
+    std::map<int, std::vector<const koi::SearchInfo*>> by_depth;
+    for (const koi::SearchInfo& info : infos) {
+        by_depth[info.depth].push_back(&info);
+    }
+    bool saw_in_flight = false;
+    const std::vector<const koi::SearchInfo*>* previous = nullptr;
+    for (const auto& entry : by_depth) {
+        const std::vector<const koi::SearchInfo*>& lines = entry.second;
+        if (previous != nullptr) {
+            const koi::SearchInfo& completed_prior = *previous->back();
+            for (std::size_t index = 0; index + 1 < lines.size(); ++index) {
+                const koi::SearchInfo& interim = *lines[index];
+                require(interim.score_cp == completed_prior.score_cp &&
+                            interim.mate == completed_prior.mate &&
+                            interim.bound == completed_prior.bound,
+                        "an interim line must republish the last completed score and bound");
+                if (interim.pv != completed_prior.pv) {
+                    saw_in_flight = true;
+                }
+            }
+        }
+        previous = &lines;
+    }
+    require(saw_in_flight,
+            "an interim line must report the in-flight principal variation instead of the last "
+            "completed one");
+}
+
 void test_interim_publication_preserves_serial_search_results() {
     const auto run = [](std::chrono::milliseconds interval) {
         koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>(), {}, 16);
@@ -5062,6 +5134,7 @@ int main(int argc, char** argv) {
         {"interim progress lines", test_interim_publication_reports_in_flight_depth},
         {"selective score republish", test_selective_iteration_republishes_the_last_proven_score},
         {"interim progress determinism", test_interim_publication_preserves_serial_search_results},
+        {"interim in-flight principal variation", test_interim_publication_reports_the_in_flight_principal_variation},
         {"lazy search features", test_search_feature_extraction_is_not_needed_at_every_normal_node},
         {"feature cache restoration", test_position_features_restore_parent_cache_after_unmake},
         {"threaded cancellation", test_threaded_infinite_search_cancels_and_completes_once},
@@ -5157,6 +5230,7 @@ int main(int argc, char** argv) {
         "threaded timed cancellation",
         "interim progress lines",
         "interim progress determinism",
+        "interim in-flight principal variation",
         "clock short forcing root research",
         "short tactical root fallback",
         "short oracle b2b1 rook retreat",

@@ -302,9 +302,9 @@ struct SearchOptions {
     TablebaseProbeHook tablebase_probe_hook;
     // Test/diagnostic seam for interim UCI progress lines. During a long
     // iteration the runner thread republishes the most recent completed
-    // iteration's score, PV, and bound at the in-flight iteration depth with
-    // refreshed nodes/nps/time at this cadence, so a GUI never freezes on the
-    // last completed depth.
+    // iteration's score and bound with the in-flight iteration's principal
+    // variation at the in-flight depth and refreshed nodes/nps/time at this
+    // cadence, so a GUI never freezes on the last completed depth.
     // A non-positive value disables interim publication. This is not exposed
     // as a UCI option; the default is the product cadence.
     std::chrono::milliseconds interim_report_interval{250};
