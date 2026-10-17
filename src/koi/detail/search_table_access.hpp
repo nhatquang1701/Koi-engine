@@ -21,8 +21,10 @@ namespace koi::detail {
     std::uint64_t key = state.position_key() ^
         (static_cast<std::uint64_t>(state.halfmove_clock()) +
          0x9E3779B97F4A7C15ULL);
-    key ^= (state.repetition_history_fingerprint() +
-            0xD6E8FEB86659FD93ULL) * 0xA24BAED4963EE407ULL;
+    // The reversible-history fingerprint deliberately stays out of the key:
+    // it is order-sensitive and would defeat transposition reuse across move
+    // orders, while the negamax and quiescence cut sites already refuse cuts
+    // for checked, claimable-draw, and repetition-sensitive positions.
     if (state.repetition_history_suppressed()) {
         // A null branch deliberately suppresses legal repetition and clock
         // draws. Keep its artificial history domain separate even when the
