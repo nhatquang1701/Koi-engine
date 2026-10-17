@@ -15,7 +15,7 @@ inline constexpr int kMaximumQuiescenceDepth = 16;
 // metadata buffer.  Keep the safety horizon materially below the regular
 // search-stack capacity so a perpetual checking sequence cannot exhaust the
 // process stack before the boundary is observed.
-inline constexpr int kMaximumQuiescenceSafetyDepth = 24;
+inline constexpr int kMaximumQuiescenceSafetyDepth = 16;
 inline constexpr int kMaximumCheckExtensionsPerPath = 2;
 inline constexpr int kMaximumSingularExtensionsPerPath = 2;
 inline constexpr int kMaximumQuiescenceCheckDepth = 3;
