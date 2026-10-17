@@ -672,7 +672,8 @@ struct SearchContext {
                 bool* repetition_sensitive_path = nullptr,
                 bool* selective_bound_path = nullptr,
                 bool* root_authoritative_path = nullptr,
-                bool* lower_bound_path = nullptr);
+                bool* lower_bound_path = nullptr,
+                int singular_extensions_remaining = kMaximumSingularExtensionsPerPath);
 };
 
 } // namespace koi::detail

@@ -650,7 +650,8 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
                            bool* repetition_sensitive_path,
                            bool* selective_bound_path,
                            bool* root_authoritative_path,
-                           bool* lower_bound_path) {
+                           bool* lower_bound_path,
+                           int singular_extensions_remaining) {
         // One history scan feeds both the repetition-sensitivity flag here and
         // the draw status after move generation; no mutation happens between
         // the two reads on the path that reaches that status.
@@ -814,6 +815,7 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
             time_manager.time_budget().has_value() &&
             *time_manager.time_budget() < kShortTimedFallbackMinimum;
         int child_check_extensions_remaining = check_extensions_remaining;
+        int child_singular_extensions_remaining = singular_extensions_remaining;
         const bool check_extension_applied = SearchPolicy::check_extension(
             checked, depth, short_timed_root, check_extensions_remaining);
             if (check_extension_applied) {
@@ -1640,7 +1642,7 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
                 }
                 path_repetition_sensitive = path_repetition_sensitive ||
                     excluded_repetition_sensitive;
-                if (!excluded_selective_bound && excluded_score < singular_beta) {
+                if (!excluded_selective_bound && excluded_score < singular_beta && singular_extensions_remaining > 0) {
                     // Use two calibrated margins, following Stockfish 19's
                     // one/two/three-ply singular-extension ladder. A PV
                     // node and a quiet TT move receive slightly more room;
@@ -1655,6 +1657,7 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
                         (excluded_score < singular_beta - double_margin ? 1 : 0) +
                         (excluded_score < singular_beta - triple_margin ? 1 : 0);
                     ++stats.singular_extensions;
+                    --child_singular_extensions_remaining;
                 } else if (!excluded_selective_bound && !pv_node && depth >= 8 &&
                            excluded_score >= beta &&
                            excluded_score < kMateThreshold) {
@@ -1887,7 +1890,7 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
                     state, child_depth, -beta, -alpha, ply + 1, child_pv,
                     move, allow_null_pruning, child_extension_budget,
                     Move::no_move(), &child_repetition_sensitive,
-                    &child_selective_bound, nullptr, &child_lower_bound);
+                    &child_selective_bound, nullptr, &child_lower_bound, child_singular_extensions_remaining);
                 exact_root_score = (ply != 0 || (score > alpha && score < beta)) &&
                     !child_selective_bound;
             } else if (root_forcing_move) {
@@ -1895,7 +1898,7 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
                     state, child_depth, -kInfinity, kInfinity, ply + 1, child_pv,
                     move, allow_null_pruning, child_extension_budget,
                     Move::no_move(), &child_repetition_sensitive,
-                    &child_selective_bound, nullptr, &child_lower_bound);
+                    &child_selective_bound, nullptr, &child_lower_bound, child_singular_extensions_remaining);
                 exact_root_score = !child_selective_bound;
             } else {
                 ++stats.pvs_searches;
@@ -1904,7 +1907,7 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
                     state, child_depth, -alpha - 1, -alpha, ply + 1, child_pv,
                     move, allow_null_pruning, child_extension_budget,
                     Move::no_move(), &child_repetition_sensitive,
-                    &scout_selective_bound, nullptr, &child_lower_bound);
+                    &scout_selective_bound, nullptr, &child_lower_bound, child_singular_extensions_remaining);
                 path_repetition_sensitive = path_repetition_sensitive ||
                     child_repetition_sensitive;
                 child_selective_bound = scout_selective_bound;
@@ -1917,7 +1920,7 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
                         state, authoritative_child_depth, -beta, -alpha, ply + 1, child_pv,
                         move, allow_null_pruning, child_extension_budget,
                         Move::no_move(), &verification_repetition_sensitive,
-                        &verification_selective_bound, nullptr, &child_lower_bound);
+                        &verification_selective_bound, nullptr, &child_lower_bound, child_singular_extensions_remaining);
                     path_repetition_sensitive = path_repetition_sensitive ||
                         verification_repetition_sensitive;
                     child_selective_bound = verification_selective_bound;
@@ -1933,7 +1936,7 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
                         state, authoritative_child_depth, -beta, -alpha, ply + 1, child_pv,
                         move, allow_null_pruning, child_extension_budget,
                         Move::no_move(), &verification_repetition_sensitive,
-                        &verification_selective_bound, nullptr, &child_lower_bound);
+                        &verification_selective_bound, nullptr, &child_lower_bound, child_singular_extensions_remaining);
                     path_repetition_sensitive = path_repetition_sensitive ||
                         verification_repetition_sensitive;
                     child_selective_bound = verification_selective_bound;
