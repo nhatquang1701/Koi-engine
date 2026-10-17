@@ -1268,6 +1268,10 @@ void test_short_search_rejects_the_qxa3_poison_at_depth_two() {
     koi::SearchOptions options;
     options.hash_mb = 16;
     options.threads = 1;
+    // On a slow host an interim line may publish the in-flight depth while
+    // the depth-two iteration runs, but this fixture stops the search on the
+    // first completed depth-two line; disable the cadence to keep it exact.
+    options.interim_report_interval = std::chrono::milliseconds{0};
     koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>());
 
     std::atomic_bool saw_depth_two{false};
