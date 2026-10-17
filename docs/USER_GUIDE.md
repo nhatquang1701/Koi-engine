@@ -798,12 +798,15 @@ from the starting position (for example, `bestmove e2e4`).
 - Search reports completed iterations as UCI `info depth ... score ... nodes
   ... nps ... hashfull ... time ... pv ...` lines, where `hashfull` is the
   approximate transposition-table occupancy in permill (0..1000). An iteration
-  published without full-window root authority carries a `lowerbound` flag
-  after the score, so GUIs can tell a bounded estimate from a completed pass.
-- During a long search iteration the engine may repeat the current depth with
-  refreshed `nodes`, `nps`, and `time` values (interim progress lines), so a
-  GUI readout does not freeze on the last completed depth; the repeated score,
-  PV, and bound continue to describe that completed iteration.
+  whose root verification stayed selective republishes the most recent proven
+  score at the current depth while keeping its own principal variation, so GUIs
+  never receive an unproven score; before any proven iteration exists the line
+  omits the score entirely.
+- During a long search iteration the engine may publish the in-flight depth
+  with refreshed `nodes`, `nps`, and `time` values (interim progress lines), so
+  a GUI readout does not freeze on the last completed depth; the published
+  score, PV, and bound continue to describe the most recent completed
+  iteration.
 - `stop` cancels and joins the active worker and emits exactly one final legal
   `bestmove` for that search. The final `bestmove` includes a
   ` ponder <reply>` suffix whenever the completed principal variation contains

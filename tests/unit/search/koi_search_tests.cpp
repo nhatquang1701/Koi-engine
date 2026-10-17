@@ -8,6 +8,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -767,14 +768,18 @@ void test_deterministic_multipv_reports_sorted_distinct_legal_lines() {
         handle.wait();
 
         require(result.has_value(), "MultiPV search must report a completion result");
-        std::vector<koi::SearchInfo> final_depth;
+        std::array<std::optional<koi::SearchInfo>, 3> final_by_rank;
         for (const koi::SearchInfo& info : infos) {
-            if (info.depth == 2) {
-                final_depth.push_back(info);
+            if (info.depth == 2 && info.multipv >= 1 && info.multipv <= 3) {
+                final_by_rank[static_cast<std::size_t>(info.multipv - 1)] = info;
             }
         }
-        require(final_depth.size() == 3,
-                "MultiPV must report three final-depth lines when three legal roots exist");
+        std::vector<koi::SearchInfo> final_depth;
+        for (const std::optional<koi::SearchInfo>& line : final_by_rank) {
+            require(line.has_value(),
+                    "MultiPV must report three final-depth lines when three legal roots exist");
+            final_depth.push_back(*line);
+        }
         const koi::GameState root = koi::GameState::startpos();
         std::vector<koi::Move> first_moves;
         for (std::size_t index = 0; index < final_depth.size(); ++index) {
@@ -2620,14 +2625,18 @@ void test_threaded_multipv_publishes_ranked_legal_root_lines() {
         options);
     handle.wait();
 
-    std::vector<koi::SearchInfo> final_depth;
+    std::array<std::optional<koi::SearchInfo>, 3> final_by_rank;
     for (const koi::SearchInfo& info : infos) {
-        if (info.depth == limits.depth) {
-            final_depth.push_back(info);
+        if (info.depth == limits.depth && info.multipv >= 1 && info.multipv <= 3) {
+            final_by_rank[static_cast<std::size_t>(info.multipv - 1)] = info;
         }
     }
-    require(final_depth.size() == 3,
-            "threaded MultiPV must report three final-depth lines for three legal roots");
+    std::vector<koi::SearchInfo> final_depth;
+    for (const std::optional<koi::SearchInfo>& line : final_by_rank) {
+        require(line.has_value(),
+                "threaded MultiPV must report three final-depth lines for three legal roots");
+        final_depth.push_back(*line);
+    }
     std::vector<koi::Move> first_moves;
     for (std::size_t index = 0; index < final_depth.size(); ++index) {
         const koi::SearchInfo& info = final_depth[index];
@@ -2663,21 +2672,26 @@ void test_threaded_multipv_matches_single_thread_at_final_depth() {
         koi::SearchOptions options;
         options.threads = threads;
         options.multi_pv = 3;
-        std::vector<koi::SearchInfo> final_depth;
+        std::array<std::optional<koi::SearchInfo>, 3> final_by_rank;
         std::optional<koi::SearchResult> result;
         koi::SearchService service(std::make_shared<ConcurrencyEvaluator>());
         koi::SearchHandle handle = service.start(
             root, limits,
-            {.on_info = [&final_depth, &limits](const koi::SearchInfo& info) {
-                 if (info.depth == limits.depth) {
-                     final_depth.push_back(info);
+            {.on_info = [&final_by_rank, &limits](const koi::SearchInfo& info) {
+                 if (info.depth == limits.depth && info.multipv >= 1 && info.multipv <= 3) {
+                     final_by_rank[static_cast<std::size_t>(info.multipv - 1)] = info;
                  }
              },
              .on_complete = [&result](const koi::SearchResult& completed) { result = completed; }},
             options);
         handle.wait();
-        require(result.has_value() && final_depth.size() == 3,
-                "each final-depth MultiPV search must report three ranked lines");
+        require(result.has_value(), "each final-depth MultiPV search must report three ranked lines");
+        std::vector<koi::SearchInfo> final_depth;
+        for (const std::optional<koi::SearchInfo>& line : final_by_rank) {
+            require(line.has_value(),
+                    "each final-depth MultiPV search must report three ranked lines");
+            final_depth.push_back(*line);
+        }
         return std::pair{std::move(final_depth), *result};
     };
 
@@ -2709,20 +2723,25 @@ void test_threaded_multipv_is_stable_after_warming_the_shared_hash() {
     koi::SearchService service(std::make_shared<ConcurrencyEvaluator>());
 
     const auto run = [&] {
-        std::vector<koi::SearchInfo> final_depth;
+        std::array<std::optional<koi::SearchInfo>, 3> final_by_rank;
         std::optional<koi::SearchResult> result;
         koi::SearchHandle handle = service.start(
             root, limits,
-            {.on_info = [&final_depth](const koi::SearchInfo& info) {
-                 if (info.depth == 2) {
-                     final_depth.push_back(info);
+            {.on_info = [&final_by_rank](const koi::SearchInfo& info) {
+                 if (info.depth == 2 && info.multipv >= 1 && info.multipv <= 3) {
+                     final_by_rank[static_cast<std::size_t>(info.multipv - 1)] = info;
                  }
              },
              .on_complete = [&result](const koi::SearchResult& completed) { result = completed; }},
             options);
         handle.wait();
-        require(result.has_value() && final_depth.size() == 3,
-                "repeated threaded MultiPV searches must finish three final-depth lines");
+        require(result.has_value(), "repeated threaded MultiPV searches must finish three final-depth lines");
+        std::vector<koi::SearchInfo> final_depth;
+        for (const std::optional<koi::SearchInfo>& line : final_by_rank) {
+            require(line.has_value(),
+                    "repeated threaded MultiPV searches must finish three final-depth lines");
+            final_depth.push_back(*line);
+        }
         std::vector<koi::Move> first_moves;
         for (std::size_t index = 0; index < final_depth.size(); ++index) {
             const koi::SearchInfo& info = final_depth[index];
@@ -2828,7 +2847,7 @@ void test_search_info_nodes_reports_all_visited_nodes() {
             "search info node count must include all work used for nps");
 }
 
-void test_interim_publication_repeats_depth_with_refreshed_nodes() {
+void test_interim_publication_reports_in_flight_depth() {
     auto evaluator = std::make_shared<koi::ClassicalEvaluator>();
     koi::SearchService service(evaluator, {}, 16);
     koi::SearchLimits limits;
@@ -2836,82 +2855,137 @@ void test_interim_publication_repeats_depth_with_refreshed_nodes() {
     koi::SearchOptions options;
     options.threads = 1;
     options.multi_pv = 2;
-    options.interim_report_interval = 1ms;
+    options.interim_report_interval = std::chrono::milliseconds(1);
 
     std::mutex info_mutex;
     std::vector<koi::SearchInfo> infos;
-    // Sink-side repeat detector: the first line per (depth, rank) is the
-    // completed iteration; a later line of the same pair with more nodes is an
-    // interim refresh.
-    std::array<std::optional<koi::SearchInfo>, 2> last_by_rank;
+    // Sink-side interim detector: completed depths are unique per rank, so a
+    // repeated (depth, rank) pair proves that an in-flight refresh was emitted.
+    std::array<std::vector<int>, 2> depths_by_rank;
     std::atomic_bool saw_refresh{false};
     CompletedSearch completed;
     koi::SearchHandle handle = service.start(
         koi::GameState::startpos(), limits,
-        {.on_info = [&info_mutex, &infos, &last_by_rank, &saw_refresh](
-                        const koi::SearchInfo& info) {
-             std::lock_guard lock(info_mutex);
-             infos.push_back(info);
-             if (info.multipv >= 1 && info.multipv <= 2) {
-                 const std::optional<koi::SearchInfo>& previous =
-                     last_by_rank[static_cast<std::size_t>(info.multipv - 1)];
-                 if (previous.has_value() && previous->depth == info.depth &&
-                     info.nodes > previous->nodes) {
-                     saw_refresh.store(true, std::memory_order_relaxed);
+        {.on_info =
+             [&info_mutex, &infos, &depths_by_rank, &saw_refresh](const koi::SearchInfo& info) {
+                 std::lock_guard lock(info_mutex);
+                 infos.push_back(info);
+                 if (info.multipv >= 1 && info.multipv <= 2) {
+                     std::vector<int>& seen =
+                         depths_by_rank[static_cast<std::size_t>(info.multipv - 1)];
+                     if (info.depth >= 2 &&
+                         std::find(seen.begin(), seen.end(), info.depth) != seen.end()) {
+                         saw_refresh.store(true, std::memory_order_relaxed);
+                     }
+                     seen.push_back(info.depth);
                  }
-                 last_by_rank[static_cast<std::size_t>(info.multipv - 1)] = info;
-             }
-         },
+             },
          .on_complete = completed.sink().on_complete},
         options);
 
-    const auto deadline = std::chrono::steady_clock::now() + 20s;
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(20);
     while (!saw_refresh.load(std::memory_order_relaxed) &&
            std::chrono::steady_clock::now() < deadline) {
-        std::this_thread::sleep_for(1ms);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
     handle.stop();
     handle.wait();
     require(saw_refresh.load(std::memory_order_relaxed),
-            "interim publication must repeat the current depth with a rising node count");
+            "interim publication must refresh a depth whose in-flight iteration is running");
 
     const koi::SearchResult result = completed.take_result();
-    require(result.best_move.has_value() && koi::GameState::startpos().is_legal(*result.best_move),
+    require(result.best_move.has_value() &&
+                koi::GameState::startpos().is_legal(*result.best_move),
             "a stopped infinite interim search must still return a legal best move");
 
     std::lock_guard lock(info_mutex);
     require(!infos.empty(), "interim publication must emit info lines");
+
+    // Group the lines by (depth, rank) in arrival order: the last line of a
+    // group is the completed iteration; earlier lines are interim refreshes
+    // that carry the previous completed iteration's values at the in-flight
+    // depth.
+    std::map<std::pair<int, int>, std::vector<const koi::SearchInfo*>> groups;
     int current_depth = 0;
-    bool rank_present[2] = {false, false};
-    std::array<std::optional<koi::SearchInfo>, 2> previous_by_rank;
+    int max_depth = 0;
     for (const koi::SearchInfo& info : infos) {
-        require(info.depth >= 1, "interim lines must keep a positive completed depth");
+        require(info.depth >= 1, "interim lines must keep a positive depth");
         require(info.multipv >= 1 && info.multipv <= 2,
                 "interim lines must stay within the requested MultiPV ranks");
         require(!info.pv.empty(), "interim lines must keep the completed principal variation");
         require(info.depth >= current_depth, "published depth must never decrease");
-        if (info.depth != current_depth) {
-            require(current_depth == 0 || (rank_present[0] && rank_present[1]),
-                    "every published depth must carry both requested MultiPV ranks");
-            current_depth = info.depth;
-            rank_present[0] = false;
-            rank_present[1] = false;
-            previous_by_rank[0].reset();
-            previous_by_rank[1].reset();
-        }
-        rank_present[static_cast<std::size_t>(info.multipv - 1)] = true;
-        std::optional<koi::SearchInfo>& previous =
-            previous_by_rank[static_cast<std::size_t>(info.multipv - 1)];
-        if (previous.has_value() && previous->depth == info.depth) {
-            require(previous->score_cp == info.score_cp && previous->mate == info.mate &&
-                        previous->pv == info.pv && previous->bound == info.bound &&
-                        info.nodes >= previous->nodes,
-                    "a repeated depth must keep the completed score/PV and move nodes forward");
-        }
-        previous = info;
+        current_depth = info.depth;
+        groups[{info.depth, info.multipv}].push_back(&info);
+        max_depth = std::max(max_depth, info.depth);
     }
-    require(rank_present[0] && rank_present[1],
-            "the last published depth must carry both requested MultiPV ranks");
+    for (int depth = 1; depth <= max_depth; ++depth) {
+        require(groups.contains({depth, 1}) && groups.contains({depth, 2}),
+                "every published depth must carry both requested MultiPV ranks");
+    }
+    for (const auto& [key, lines] : groups) {
+        const int depth = key.first;
+        const int rank = key.second;
+        for (std::size_t index = 1; index < lines.size(); ++index) {
+            require(lines[index]->nodes >= lines[index - 1]->nodes,
+                    "interim refresh lines must move nodes forward");
+        }
+        const auto previous = groups.find({depth - 1, rank});
+        if (previous == groups.end()) {
+            continue;
+        }
+        const koi::SearchInfo& completed_prior = *previous->second.back();
+        for (std::size_t index = 0; index + 1 < lines.size(); ++index) {
+            require(lines[index]->depth > completed_prior.depth &&
+                        lines[index]->score_cp == completed_prior.score_cp &&
+                        lines[index]->mate == completed_prior.mate &&
+                        lines[index]->pv == completed_prior.pv &&
+                        lines[index]->bound == completed_prior.bound,
+                    "an interim line must report the in-flight depth while republishing the "
+                    "previous completed line");
+        }
+    }
+}
+
+void test_selective_iteration_republishes_the_last_proven_score() {
+    auto evaluator = std::make_shared<koi::ClassicalEvaluator>();
+    koi::SearchService service(evaluator, {}, 16);
+    koi::SearchLimits limits;
+    limits.depth = 3;
+    koi::SearchOptions options;
+    options.threads = 1;
+
+    std::mutex info_mutex;
+    std::optional<koi::SearchInfo> depth_two_info;
+    std::optional<koi::SearchInfo> depth_three_info;
+    CompletedSearch completed;
+    koi::SearchHandle handle = service.start(
+        koi::GameState::startpos(), limits,
+        {.on_info =
+             [&info_mutex, &depth_two_info, &depth_three_info](const koi::SearchInfo& info) {
+                 std::lock_guard lock(info_mutex);
+                 if (info.depth == 2) {
+                     depth_two_info = info;
+                 }
+                 if (info.depth == 3) {
+                     depth_three_info = info;
+                 }
+             },
+         .on_complete = completed.sink().on_complete},
+        options);
+    handle.wait();
+    (void)completed.take_result();
+
+    std::lock_guard lock(info_mutex);
+    require(depth_two_info.has_value() &&
+                depth_two_info->bound != koi::SearchInfo::Bound::estimate,
+            "the startpos depth-two iteration must publish a proven score");
+    require(depth_three_info.has_value() &&
+                depth_three_info->bound != koi::SearchInfo::Bound::estimate &&
+                depth_three_info->score_cp == depth_two_info->score_cp &&
+                depth_three_info->mate == depth_two_info->mate,
+            "a selective iteration must republish the last proven score instead of dropping it");
+    require(depth_three_info->pv.size() > depth_two_info->pv.size(),
+            "a selective iteration must keep its own principal variation");
 }
 
 void test_interim_publication_preserves_serial_search_results() {
@@ -4981,7 +5055,8 @@ int main(int argc, char** argv) {
         {"threaded node parity", test_threaded_and_reference_node_limits_have_matching_accounting},
         {"depth-zero node accounting", test_depth_zero_leaves_are_counted_as_quiescence_only},
         {"search info accounting", test_search_info_nodes_reports_all_visited_nodes},
-        {"interim progress lines", test_interim_publication_repeats_depth_with_refreshed_nodes},
+        {"interim progress lines", test_interim_publication_reports_in_flight_depth},
+        {"selective score republish", test_selective_iteration_republishes_the_last_proven_score},
         {"interim progress determinism", test_interim_publication_preserves_serial_search_results},
         {"lazy search features", test_search_feature_extraction_is_not_needed_at_every_normal_node},
         {"feature cache restoration", test_position_features_restore_parent_cache_after_unmake},

@@ -170,7 +170,7 @@ struct SearchInfo {
     //              proven alpha-beta bound direction;
     //   lower - the search proved that the value is at least the score;
     //   upper - the search proved that the value is at most the score.
-    // UCI has no estimate marker, so an estimated info line omits the score.
+    // UCI has no estimate marker, so an estimated info line omits the score unless the runner republishes the most recent proven score at the current depth.
     // Estimates must never be treated as exact inside the search.
     enum class Bound : std::uint8_t { exact = 0, lower = 1, upper = 2, estimate = 3 };
 
@@ -302,8 +302,9 @@ struct SearchOptions {
     TablebaseProbeHook tablebase_probe_hook;
     // Test/diagnostic seam for interim UCI progress lines. During a long
     // iteration the runner thread republishes the most recent completed
-    // iteration with refreshed nodes/nps/time at this cadence (same depth,
-    // score, and PV), so a GUI never freezes on the last completed depth.
+    // iteration's score, PV, and bound at the in-flight iteration depth with
+    // refreshed nodes/nps/time at this cadence, so a GUI never freezes on the
+    // last completed depth.
     // A non-positive value disables interim publication. This is not exposed
     // as a UCI option; the default is the product cadence.
     std::chrono::milliseconds interim_report_interval{250};
