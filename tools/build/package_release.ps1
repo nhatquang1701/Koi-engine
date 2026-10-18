@@ -13,7 +13,7 @@ $isMacOSHost = -not $isWindowsHost -and
     [System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([System.Runtime.InteropServices.OSPlatform]::OSX)
 $binarySuffix = if ($isWindowsHost) { '.exe' } else { '' }
 $platformTag = if ($isWindowsHost) { '' } elseif ($isMacOSHost) { '-macos-arm64' } else { '-linux-x86_64' }
-$packageName = "koi-engine-v1.1.0$platformTag"
+$packageName = "koi-engine-v1.1.1$platformTag"
 $packageDirectory = Join-Path $outputRoot $packageName
 $archivePath = if ($isWindowsHost) {
     Join-Path $outputRoot "$packageName.zip"
@@ -128,7 +128,7 @@ KOI_GPU_NNUE=1.
 "@
 }
 @"
-Koi Engine v1.1.0 installation
+Koi Engine v1.1.1 installation
 
 Run $engineName as a UCI engine from En Croissant or another UCI GUI.
 $launcherParagraph
@@ -180,7 +180,7 @@ $packageFiles = @(Get-ChildItem -LiteralPath $packageDirectory -File -Recurse |
     })
 $manifest = [ordered]@{
     schema = 'koi-engine-package-v1'
-    version = '1.1.0'
+    version = '1.1.1'
     platform = if ($isWindowsHost) { 'windows-x86_64' } elseif ($isMacOSHost) { 'macos-arm64' } else { 'linux-x86_64' }
     build_configuration = 'Release'
     files = $packageFiles

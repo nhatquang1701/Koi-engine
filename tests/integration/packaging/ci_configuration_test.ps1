@@ -164,7 +164,7 @@ Require-CMakePattern '(?i)KOI_GPU_PTX_ARCHS' 'the embedded GPU PTX architecture 
 Require-CMakePattern '(?i)CONFIG:Release.*:/O2' 'the Release compiler optimization level'
 Require-CMakePattern '(?i)CONFIG:Release.*:/DNDEBUG' 'the Release assertion configuration'
 Require-CMakePattern '(?i)CONFIG:Release' 'a Release-only AVX2 configuration guard'
-Require-CMakePattern '(?i)project\s*\(\s*koi_engine\s+VERSION\s+1\.1\.0' 'the v1.1.0 project identity'
+Require-CMakePattern '(?i)project\s*\(\s*koi_engine\s+VERSION\s+1\.1\.0' 'the v1.1.1 project identity'
 Require-CMakePattern '(?i)CMAKE_MSVC_RUNTIME_LIBRARY' 'the static MSVC runtime policy'
 Require-CMakePattern '(?i)FILE_SET\s+CXX_MODULES' 'the C++26 named-module source set'
 Require-CMakePattern '(?i)KOI_BUILD_SHADOW_DIFF' 'the opt-in differential test switch'

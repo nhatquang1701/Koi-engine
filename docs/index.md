@@ -48,7 +48,7 @@ workflow. The guide complements these repository references:
 
 ## Reference
 
-[Release notes](releases/v1.1.0.md) document the current package. The
+[Release notes](releases/v1.1.1.md) document the current package. The
 [documentation map](README.md) links the maintained repository documentation.
 
 For the GitHub repository entry point, see the concise

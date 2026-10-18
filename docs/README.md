@@ -12,7 +12,7 @@ asset, and tooling reference.
 - [lichess-bot.md](lichess-bot.md) covers running Koi as a Lichess bot.
 - [mac-worker.md](mac-worker.md) documents the Apple Silicon build, test, and
   measurement worker setup.
-- [releases/](releases/v1.1.0.md) contains published release notes.
+- [releases/](releases/v1.1.1.md) contains published release notes.
 - [history/](history/removed-nnue-studio.md) records tools that were removed and
   why.
 - `../tests/README.md` explains test categories and fixture locations.

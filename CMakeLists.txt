@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.31)
 
-project(koi_engine VERSION 1.1.0 LANGUAGES CXX)
+project(koi_engine VERSION 1.1.1 LANGUAGES CXX)
 
 # Koi Engine supports Windows x64 with MSVC (the primary development platform),
 # x86-64 Linux with GCC 14+ or Clang 18+, and macOS on Apple Silicon or Intel
