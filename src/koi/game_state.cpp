@@ -1695,6 +1695,19 @@ bool GameState::legal_tactical_moves_with_metadata(MoveMetadataList& moves,
                 // part of the tactical list, so do not build metadata for it.
                 continue;
             }
+            // A quiet move of a check-generating list is retained only when it
+            // gives check, and the discarded entries are never read.  Resolve
+            // that here so the metadata build below runs only for kept moves
+            // (the fill recomputes the same flag for the retained quiet checks).
+            if (include_quiet_checks && !checked && !capture_or_promotion &&
+                facts.valid && facts.own_piece_on_from) {
+                const bool castling_shape = facts.from.type == PieceType::king &&
+                    std::abs(static_cast<int>(move.to().index()) -
+                             static_cast<int>(move.from().index())) == 2;
+                if (!native_move_gives_check(move, facts, probe, castling_shape)) {
+                    continue;
+                }
+            }
             const CheckFlagMode probe_mode = checked || capture_or_promotion ?
                 CheckFlagMode::all_moves : CheckFlagMode::quiet_moves_only;
             MoveMetadata metadata;
