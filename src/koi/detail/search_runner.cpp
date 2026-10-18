@@ -2221,6 +2221,13 @@ public:
         return total;
     }
 
+    // The freshest published root-line PV for the rank-one interim in-flight
+    // line. Read under `mutex_`; persists across per-attempt line resets.
+    [[nodiscard]] PrincipalVariation leader_pv_copy() {
+        std::lock_guard lock(mutex_);
+        return has_leader_pv_ ? leader_pv_ : PrincipalVariation{};
+    }
+
 private:
     struct Job {
         const GameState* root = nullptr;
@@ -2407,6 +2414,10 @@ private:
                     line.score = score;
                     line.stable_index = (*job->stable_root_indices)[move_index];
                     line.pv.prepend(root_move.move, child_pv);
+                    if (line.pv.length > 0) {
+                        leader_pv_ = line.pv;
+                        has_leader_pv_ = true;
+                    }
                     // A scout fail-low is an upper bound for this root move,
                     // not a completed comparable score. A full-window
                     // selective result, however, is still useful when a
@@ -2484,6 +2495,12 @@ private:
     // for interim `info` lines while the job is still running.
     std::vector<std::atomic<std::uint64_t>> live_visited_;
     std::mutex mutex_;
+    // The freshest published root-line PV, guarded by `mutex_`. Interim
+    // reports use it for the rank-one in-flight line; it persists across
+    // the per-attempt line resets so even a slow instrumented build has a
+    // live PV to report.
+    PrincipalVariation leader_pv_{};
+    bool has_leader_pv_ = false;
     std::condition_variable work_available_;
     std::condition_variable work_finished_;
     std::shared_ptr<Job> job_;
@@ -4159,12 +4176,12 @@ void SearchRunner::run() {
                 // root work.
                 pool.progress_tick_interval = options.interim_report_interval;
                 pool.progress_tick = [&root_context, &pool, &sink, &interim_state,
-                                      &in_flight_depth, &lines,
+                                      &in_flight_depth,
                                       interval = options.interim_report_interval] {
                     const std::uint64_t live = root_context.stats.nodes +
                         root_context.stats.qnodes + pool.live_visited();
-                    const auto leader = RootCoordinator::best_completed(lines);
-                    const PrincipalVariation* live_pv = leader.has_value() && lines[*leader].pv.length > 0 ? &lines[*leader].pv : nullptr;
+                    const PrincipalVariation leader = pool.leader_pv_copy();
+                    const PrincipalVariation* live_pv = leader.length > 0 ? &leader : nullptr;
                     maybe_publish_interim(sink, interim_state, live, in_flight_depth, live_pv, interval);
                 };
             }
