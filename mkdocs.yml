@@ -51,9 +51,11 @@ nav:
       - Repository README: repository.md
   - Using Koi:
       - User guide: docs/USER_GUIDE.md
+      - Lichess bot: docs/lichess-bot.md
   - Developing Koi:
       - Agent guide: AGENTS.md
       - Contributing: CONTRIBUTING.md
+      - Apple Silicon worker: docs/mac-worker.md
       - Tests: tests/README.md
       - Developer tools: tools/README.md
   - Reference:
