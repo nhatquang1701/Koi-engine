@@ -19,7 +19,10 @@ inline constexpr int kMaximumQuiescenceSafetyDepth = 16;
 inline constexpr int kMaximumCheckExtensionsPerPath = 2;
 inline constexpr int kMaximumSingularExtensionsPerPath = 2;
 inline constexpr int kMaximumQuiescenceCheckDepth = 3;
-inline constexpr int kQuiescenceFutilityMargin = 306;
+// Tightened by measurement (C44): 306 -> 200 cut ~20% of visited nodes on the
+// qsearch-heavy middlegame probe while self-play scored +3.5% (68W/76D/54L
+// over 198 games), so the conservative original sat off the optimum.
+inline constexpr int kQuiescenceFutilityMargin = 200;
 inline constexpr int kQuiescenceFutilityMoveLimit = 2;
 // Only captures whose static exchange value is worse than this floor are
 // removed from the tactical frontier.  A floor of zero discards the sound
