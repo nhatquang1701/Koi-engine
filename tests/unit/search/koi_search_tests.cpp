@@ -2929,6 +2929,7 @@ void test_interim_publication_reports_in_flight_depth() {
         require(groups.contains({depth, 1}) && groups.contains({depth, 2}),
                 "every published depth must carry both requested MultiPV ranks");
     }
+    bool saw_live_pv = false;
     for (const auto& [key, lines] : groups) {
         const int depth = key.first;
         const int rank = key.second;
@@ -2942,15 +2943,18 @@ void test_interim_publication_reports_in_flight_depth() {
         }
         const koi::SearchInfo& completed_prior = *previous->second.back();
         for (std::size_t index = 0; index + 1 < lines.size(); ++index) {
+            const bool first_rank = rank == 1;
+            saw_live_pv = saw_live_pv || (first_rank && lines[index]->pv != completed_prior.pv);
             require(lines[index]->depth > completed_prior.depth &&
                         lines[index]->score_cp == completed_prior.score_cp &&
                         lines[index]->mate == completed_prior.mate &&
-                        lines[index]->pv == completed_prior.pv &&
+                        (first_rank || lines[index]->pv == completed_prior.pv) &&
                         lines[index]->bound == completed_prior.bound,
-                    "an interim line must report the in-flight depth while republishing the "
+                    "an interim line must report the in-flight depth while rank two and beyond republish the "
                     "previous completed line");
         }
     }
+    require(saw_live_pv, "the rank-one interim line must report the live in-flight leader's principal variation");
 }
 
 void test_selective_iteration_republishes_the_last_proven_score() {

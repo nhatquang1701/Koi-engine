@@ -2287,7 +2287,7 @@ private:
             root_frame.cutoff_count = 0;
             root_frame.tt_pv = true;
 
-            const auto search_root = [&context, &job](std::size_t move_index) {
+            const auto search_root = [&context, &job, this](std::size_t move_index) {
                 const MoveMetadata& root_move = (*job->root_moves)[move_index];
                 try {
                     GameState child = *job->root;
@@ -2402,7 +2402,7 @@ private:
                                std::memory_order_relaxed)) {
                     }
 
-                    RootLine& line = (*job->lines)[move_index];
+                    { std::lock_guard line_lock(mutex_); RootLine& line = (*job->lines)[move_index];
                     line.searched = true;
                     line.score = score;
                     line.stable_index = (*job->stable_root_indices)[move_index];
@@ -2423,7 +2423,7 @@ private:
                     // selective paths must block root authority.
                     line.safe_upper_bound = !exact_score && score <= score_alpha &&
                         (!child_selective_bound || child_lower_bound);
-                    line.selective_upper_bound = child_selective_bound && child_lower_bound;
+                    line.selective_upper_bound = child_selective_bound && child_lower_bound; }
                 } catch (...) {
                     context.request_abort();
                     job->aborted.store(true, std::memory_order_relaxed);
@@ -2542,11 +2542,14 @@ void maybe_publish_interim(const SearchEventSink& sink, InterimReportState& stat
     }
     const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
         now - state.started);
+    bool first_line = true;
     for (const SearchInfo& stored : state.lines) {
         SearchInfo info = stored;
         info.depth = std::max(stored.depth, live_depth);
         info.seldepth = std::max(stored.seldepth, info.depth);
-        if (live_pv != nullptr && live_pv->length > 0) {
+        const bool use_live_pv = first_line && live_pv != nullptr && live_pv->length > 0;
+        first_line = false;
+        if (use_live_pv) {
             info.pv = live_pv->to_vector();
         }
         info.nodes = std::max(stored.nodes, live_nodes);
@@ -4148,6 +4151,7 @@ void SearchRunner::run() {
             // The loop below records the depth being searched so interim
             // publications can report the in-flight iteration.
             int in_flight_depth = 0;
+            std::vector<RootLine> lines;
             if (options.interim_report_interval.count() > 0) {
                 // The pool's run() wait loop wakes on this cadence and calls
                 // the tick on the runner thread; live worker traffic comes
@@ -4155,11 +4159,13 @@ void SearchRunner::run() {
                 // root work.
                 pool.progress_tick_interval = options.interim_report_interval;
                 pool.progress_tick = [&root_context, &pool, &sink, &interim_state,
-                                      &in_flight_depth,
+                                      &in_flight_depth, &lines,
                                       interval = options.interim_report_interval] {
                     const std::uint64_t live = root_context.stats.nodes +
                         root_context.stats.qnodes + pool.live_visited();
-                    maybe_publish_interim(sink, interim_state, live, in_flight_depth, nullptr, interval);
+                    const auto leader = RootCoordinator::best_completed(lines);
+                    const PrincipalVariation* live_pv = leader.has_value() && lines[*leader].pv.length > 0 ? &lines[*leader].pv : nullptr;
+                    maybe_publish_interim(sink, interim_state, live, in_flight_depth, live_pv, interval);
                 };
             }
 
@@ -4342,7 +4348,7 @@ void SearchRunner::run() {
                         record != nullptr ? record->stable_index : index);
                 }
 
-                std::vector<RootLine> lines(parallel_moves.size());
+                lines.assign(parallel_moves.size(), RootLine{});
 
                 SearchStats iteration_stats;
                 bool aborted = false;
