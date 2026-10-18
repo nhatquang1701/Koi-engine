@@ -59,4 +59,5 @@ nav:
   - Reference:
       - Documentation map: docs/overview.md
       - Removed NNUE Studio: docs/history/removed-nnue-studio.md
-      - Release notes: docs/releases/v1.0.0.md
+      - Release notes (1.1.0): docs/releases/v1.1.0.md
+      - Release notes (1.0.0): docs/releases/v1.0.0.md

@@ -215,3 +215,46 @@ jobs:
           if errorlevel 1 exit /b 1
           ctest --test-dir build/ci-release -C Release -R koi_shadow_diff_tests --output-on-failure
           if errorlevel 1 exit /b 1
+
+  # The release zip is built and verified with the shared release tooling so the
+  # Windows package follows the same manifest, checksum, and smoke contract as
+  # the Linux and macOS packages.
+  windows-package:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - name: Configure x64 MSVC environment, build, and package Release
+        shell: cmd
+        run: |
+          if not exist "%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" exit /b 1
+          for /f "usebackq delims=" %%I in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do set "VSINSTALL=%%I"
+          if not defined VSINSTALL exit /b 1
+          set "VSDEVCMD=%VSINSTALL%\Common7\Tools\VsDevCmd.bat"
+          if not exist "%VSDEVCMD%" exit /b 1
+          call "%VSDEVCMD%" -arch=x64 -host_arch=x64
+          if errorlevel 1 exit /b 1
+          where cl
+          cl 2>&1 | findstr /C:"x64" >nul
+          if errorlevel 1 exit /b 1
+          cmake -S . -B build/ci-package -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=cl
+          if errorlevel 1 exit /b 1
+          cmake --build build/ci-package --config Release
+          if errorlevel 1 exit /b 1
+          pwsh -NoProfile -File tools/build/package_release.ps1 -BuildDirectory build/ci-package -OutputDirectory artifacts/packages
+          if errorlevel 1 exit /b 1
+          pwsh -NoProfile -File tests/integration/packaging/package_release_test.ps1 -BuildDirectory build/ci-package -PackageScript tools/build/package_release.ps1
+          if errorlevel 1 exit /b 1
+          certutil -hashfile artifacts\packages\koi-engine-v1.1.0.zip SHA256
+          if errorlevel 1 exit /b 1
+          dir artifacts\packages
+      - name: Upload the Windows package
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: koi-engine-windows-package
+          path: |
+            artifacts/packages/koi-engine-v1.1.0.zip
+            artifacts/packages/koi-engine-v1.1.0.zip.sha256
+          if-no-files-found: ignore
+          retention-days: 7

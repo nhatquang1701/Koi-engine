@@ -284,7 +284,7 @@ timeout, configurable through `KOI_UCI_TIMEOUT_MS`.
 
 ## Continuous integration
 
-`.github/workflows/windows.yml` has four independent jobs (no `fail-fast`
+`.github/workflows/windows.yml` has five independent jobs (no `fail-fast`
 cancellation):
 
 - `release-full` installs the measurement requirements (`numpy`), builds Release, runs the parallel
@@ -297,6 +297,9 @@ cancellation):
   memory errors and use-after-free regressions fail CI.
 - `shadow-diff` builds with `-DKOI_BUILD_SHADOW_DIFF=ON` and runs
   `koi_shadow_diff_tests`.
+- `windows-package` builds Release, packages the `koi-engine-v1.1.0.zip` with
+  `tools/build/package_release.ps1`, runs the package manifest and smoke test,
+  and uploads the archive with its `.sha256` sidecar.
 
 `.github/workflows/linux.yml` runs the same suite on Linux:
 
@@ -308,18 +311,22 @@ cancellation):
   and time-manager suites three times with `KOI_TEST_RETRIES=1` and no
   `--repeat`, so a first-attempt flake cannot hide behind a retry.
 - `linux-tarball` builds inside an Ubuntu 22.04 container, packages the
-  portable `koi-engine-v1.0.0-linux-x86_64.tar.gz` with
+  portable `koi-engine-v1.1.0-linux-x86_64.tar.gz` with
   `tools/build/package_release.ps1`, verifies and extracts the archive, then
   runs bounded UCI smokes with the automatic and `KOI_CPU_VARIANT=generic`
   variants.
 
-`.github/workflows/macos.yml` runs one Apple Silicon leg:
+`.github/workflows/macos.yml` runs two Apple Silicon legs:
 
 - `macos-arm64` installs Homebrew LLVM clang and builds Release with
   `-DKOI_BUILD_MODULES=OFF -DKOI_ENABLE_GPU_NNUE=OFF -DKOI_STATIC_RUNTIME=OFF`,
   then runs the same unit, heavy-search, process, and Python label groups as
   the Linux legs. The x86-only AVX-512 binary smoke and the three-binary
   variant process test are omitted, and diagnostics upload on failure.
+- `macos-package` builds Release, packages the
+  `koi-engine-v1.1.0-macos-arm64.tar.gz` with
+  `tools/build/package_release.ps1`, verifies and extracts the archive, runs
+  the bounded UCI smokes, and uploads the tarball with its `.sha256` sidecar.
 
 ## Local macOS arm64 heavy-test worker
 

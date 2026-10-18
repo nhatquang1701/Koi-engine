@@ -152,3 +152,80 @@ jobs:
             build/ci-release/Testing/Temporary/LastTest.log
           if-no-files-found: ignore
           retention-days: 7
+
+  # The release tarball is built and verified with the shared release tooling
+  # so the macOS arm64 package follows the same manifest, checksum, and smoke
+  # contract as the Windows and Linux packages.
+  macos-package:
+    runs-on: macos-14
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install the Homebrew LLVM toolchain
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: "1"
+        run: |
+          brew install ninja llvm
+          echo "LLVM_PREFIX=$(brew --prefix llvm)" >> "$GITHUB_ENV"
+      - name: Build the release binaries
+        run: |
+          cmake -S . -B build/ci-package -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER="$LLVM_PREFIX/bin/clang" \
+            -DCMAKE_CXX_COMPILER="$LLVM_PREFIX/bin/clang++" \
+            -DKOI_BUILD_MODULES=OFF -DKOI_ENABLE_GPU_NNUE=OFF -DKOI_STATIC_RUNTIME=OFF
+          cmake --build build/ci-package --config Release -j 4
+      - name: Package and verify the release tarball
+        run: |
+          pwsh -NoProfile -File tools/build/package_release.ps1 -BuildDirectory build/ci-package -OutputDirectory artifacts/packages
+          ls -l artifacts/packages
+          pwsh -NoProfile -File tests/integration/packaging/package_release_test.ps1 -BuildDirectory build/ci-package -PackageScript tools/build/package_release.ps1
+          archive=artifacts/packages/koi-engine-v1.1.0-macos-arm64.tar.gz
+          (cd artifacts/packages && shasum -a 256 -c koi-engine-v1.1.0-macos-arm64.tar.gz.sha256)
+          extracted=/tmp/koi-v1.1.0-package
+          mkdir -p "$extracted"
+          tar -xzf "$archive" -C "$extracted"
+          python3 - <<"PY"
+          import hashlib
+          import json
+          import os
+          import pathlib
+          import re
+          root = pathlib.Path("/tmp/koi-v1.1.0-package")
+          manifest = json.loads((root / "package.json").read_text(encoding="utf-8-sig"))
+          assert manifest["version"] == "1.1.0", manifest["version"]
+          assert manifest["platform"] == "macos-arm64", manifest["platform"]
+          assert re.fullmatch(r"[0-9a-f]{40,64}", manifest["provenance"]["source_commit"]), manifest["provenance"]
+          assert manifest["provenance"]["source_commit"] == os.environ["GITHUB_SHA"], manifest["provenance"]
+          assert manifest["provenance"]["source_dirty"] is False, manifest["provenance"]
+          for item in manifest["files"]:
+              path = (root / item["path"]).resolve()
+              assert root.resolve() in path.parents, item["path"]
+              data = path.read_bytes()
+              assert len(data) == item["size_bytes"], item["path"]
+              assert hashlib.sha256(data).hexdigest() == item["sha256"], item["path"]
+          PY
+          for executable in koi-engine koi-bench koi-replay koi-perft; do
+            test -x "$extracted/$executable"
+          done
+          printf "uci\nisready\nposition startpos\ngo depth 2\nstop\nquit\n" | "$extracted/koi-engine" > /tmp/koi-macos-auto.txt 2> /tmp/koi-macos-auto.err
+          test ! -s /tmp/koi-macos-auto.err
+          grep -q "uciok" /tmp/koi-macos-auto.txt
+          grep -q "readyok" /tmp/koi-macos-auto.txt
+          test "$(grep -Ec "^bestmove " /tmp/koi-macos-auto.txt)" -eq 1
+          grep -Eq "^bestmove [a-h][1-8][a-h][1-8][nbrq]?$" /tmp/koi-macos-auto.txt
+          printf "uci\nisready\nposition startpos\ngo depth 2\nstop\nquit\n" | KOI_CPU_VARIANT=generic "$extracted/koi-engine" > /tmp/koi-macos-generic.txt 2> /tmp/koi-macos-generic.err
+          test ! -s /tmp/koi-macos-generic.err
+          grep -q "uciok" /tmp/koi-macos-generic.txt
+          grep -q "readyok" /tmp/koi-macos-generic.txt
+          test "$(grep -Ec "^bestmove " /tmp/koi-macos-generic.txt)" -eq 1
+          tar -tzf "$archive"
+      - name: Upload the macOS tarball
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: koi-engine-macos-tarball
+          path: |
+            artifacts/packages/koi-engine-v1.1.0-macos-arm64.tar.gz
+            artifacts/packages/koi-engine-v1.1.0-macos-arm64.tar.gz.sha256
+          if-no-files-found: ignore
+          retention-days: 7

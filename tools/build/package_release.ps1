@@ -9,8 +9,10 @@ $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'
 $buildRoot = [System.IO.Path]::GetFullPath($BuildDirectory)
 $outputRoot = [System.IO.Path]::GetFullPath($OutputDirectory)
 $isWindowsHost = $env:OS -eq 'Windows_NT'
+$isMacOSHost = -not $isWindowsHost -and
+    [System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([System.Runtime.InteropServices.OSPlatform]::OSX)
 $binarySuffix = if ($isWindowsHost) { '.exe' } else { '' }
-$platformTag = if ($isWindowsHost) { '' } else { '-linux-x86_64' }
+$platformTag = if ($isWindowsHost) { '' } elseif ($isMacOSHost) { '-macos-arm64' } else { '-linux-x86_64' }
 $packageName = "koi-engine-v1.1.0$platformTag"
 $packageDirectory = Join-Path $outputRoot $packageName
 $archivePath = if ($isWindowsHost) {
@@ -39,9 +41,15 @@ if (-not (Test-Path -LiteralPath $buildRoot -PathType Container)) {
 }
 New-Item -ItemType Directory -Path $outputRoot -Force | Out-Null
 
-$requiredExecutables = @("koi-engine$binarySuffix", "koi-engine-avx2$binarySuffix",
-                         "koi-engine-avx512$binarySuffix", "koi-bench$binarySuffix",
+# The x86-64 AVX2/AVX-512 sibling builds are only produced on Windows and
+# Linux; the macOS arm64 package ships the single native build.
+$requiredExecutables = @("koi-engine$binarySuffix", "koi-bench$binarySuffix",
                          "koi-replay$binarySuffix", "koi-perft$binarySuffix")
+if (-not $isMacOSHost) {
+    $requiredExecutables = @("koi-engine$binarySuffix", "koi-engine-avx2$binarySuffix",
+                             "koi-engine-avx512$binarySuffix", "koi-bench$binarySuffix",
+                             "koi-replay$binarySuffix", "koi-perft$binarySuffix")
+}
 function Test-RequiredExecutables {
     param(
         [Parameter(Mandatory = $true)]
@@ -98,14 +106,32 @@ Copy-Item -LiteralPath (Join-Path $repositoryRoot 'third_party/fathom/LICENSE') 
 $engineName = "koi-engine$binarySuffix"
 $avx2Name = "koi-engine-avx2$binarySuffix"
 $avx512Name = "koi-engine-avx512$binarySuffix"
+$launcherParagraph = if ($isMacOSHost) {
+    "This package contains the native Apple Silicon (arm64) build; run $engineName directly."
+} else {
 @"
-Koi Engine v1.0.0 installation
-
-Run $engineName as a UCI engine from En Croissant or another UCI GUI.
 $engineName starts the fastest build this CPU supports: it launches the
 $avx512Name or $avx2Name sibling when it is present and the CPU supports those
 instructions, and otherwise runs its own baseline build in place. Set
 KOI_CPU_VARIANT=generic, avx2, or avx512 to force one build.
+"@
+}
+$hardwareParagraph = if ($isMacOSHost) {
+    'The optional GPU NNUE inference is CUDA-only and is not available on macOS.'
+} else {
+@"
+Every build requires an x86-64 CPU. The AVX2 build requires AVX2 and the
+AVX-512 build requires AVX-512; the baseline build has no instruction-set
+requirement. The optional GPU NNUE inference needs an NVIDIA GPU (Pascal
+sm_61 or newer) with a CUDA 12.x-capable driver and is opt-in with
+KOI_GPU_NNUE=1.
+"@
+}
+@"
+Koi Engine v1.1.0 installation
+
+Run $engineName as a UCI engine from En Croissant or another UCI GUI.
+$launcherParagraph
 
 The optional user-supplied book.bin belongs beside $engineName and is not
 included in this package. Syzygy tablebase files are also user-supplied;
@@ -120,11 +146,7 @@ Recommended starting options:
   BookDepth=16
   BookRandom=false
 
-Every build requires an x86-64 CPU. The AVX2 build requires AVX2 and the
-AVX-512 build requires AVX-512; the baseline build has no instruction-set
-requirement. The optional GPU NNUE inference needs an NVIDIA GPU (Pascal
-sm_61 or newer) with a CUDA 12.x-capable driver and is opt-in with
-KOI_GPU_NNUE=1.
+$hardwareParagraph
 "@ | Set-Content -LiteralPath (Join-Path $packageDirectory 'INSTALL.txt') -Encoding UTF8
 
 $sourceCommit = $env:GITHUB_SHA
@@ -159,7 +181,7 @@ $packageFiles = @(Get-ChildItem -LiteralPath $packageDirectory -File -Recurse |
 $manifest = [ordered]@{
     schema = 'koi-engine-package-v1'
     version = '1.1.0'
-    platform = if ($isWindowsHost) { 'windows-x86_64' } else { 'linux-x86_64' }
+    platform = if ($isWindowsHost) { 'windows-x86_64' } elseif ($isMacOSHost) { 'macos-arm64' } else { 'linux-x86_64' }
     build_configuration = 'Release'
     files = $packageFiles
     book_included = $false

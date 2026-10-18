@@ -27,10 +27,10 @@ The tooling runs on Windows, Linux, and macOS arm64 (Apple Silicon). Python
 tools use the in-tree `koi_chess` package, PowerShell tools run under `pwsh`,
 and binary names pick up the platform suffix automatically (`.exe` on Windows,
 no suffix on Linux and macOS).
-`tools/build/package_release.ps1` writes the Windows `.zip` or, on Linux, the
-portable `koi-engine-v1.0.0-linux-x86_64.tar.gz`
-built in an Ubuntu 22.04 container by CI; macOS arm64 is a source-build target
-with no published archive. Each package includes a file
+`tools/build/package_release.ps1` writes the Windows `.zip` or, on Linux and
+macOS arm64, the portable `koi-engine-v1.1.0-linux-x86_64.tar.gz` or
+`koi-engine-v1.1.0-macos-arm64.tar.gz` tarball; CI builds and verifies each
+archive on its own platform. Each package includes a file
 manifest with SHA-256 hashes and source provenance; the archive has a matching
 `.sha256` sidecar.
 

@@ -35,22 +35,24 @@ NNUE network can be enabled when available.
 
 ## Download
 
-Get the Windows and Linux x86-64 packages and their checksum sidecars from
+Get the Windows, Linux x86-64, and macOS arm64 packages and their checksum
+sidecars from
 [GitHub Releases](https://github.com/nhatquang1701/Koi-engine/releases).
 
-- Windows: `koi-engine-v1.0.0.zip`
-- Linux x86-64: `koi-engine-v1.0.0-linux-x86_64.tar.gz`
+- Windows: `koi-engine-v1.1.0.zip`
+- Linux x86-64: `koi-engine-v1.1.0-linux-x86_64.tar.gz`
+- macOS arm64: `koi-engine-v1.1.0-macos-arm64.tar.gz`
 
-macOS arm64 (Apple Silicon) builds from source: install Homebrew LLVM (clang
-19+; AppleClang 18+ also works), CMake, and Ninja, then configure with
+macOS arm64 (Apple Silicon) can also build from source: install Homebrew LLVM
+(clang 19+; AppleClang 18+ also works), CMake, and Ninja, then configure with
 `-DKOI_BUILD_MODULES=OFF -DKOI_STATIC_RUNTIME=OFF`. GPU NNUE is CUDA-only and
 unavailable on macOS; the CPU NNUE and classical evaluator paths work normally.
 See the [user guide](docs/USER_GUIDE.md#build-prerequisites) for the commands.
 
 ## Get started
 
-1. Download and extract the archive for your system (or build from source on
-   macOS).
+1. Download and extract the archive for your system (or build from source when
+   no package matches your platform).
 2. Add `koi-engine.exe` (Windows) or `koi-engine` (Linux and macOS) as a UCI
    engine in En Croissant or another compatible chess GUI.
 3. Start with `Hash=512`, `Threads=1`, and `Speed=100`.

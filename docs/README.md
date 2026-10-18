@@ -9,7 +9,7 @@ asset, and tooling reference.
 - [AGENTS.md](../AGENTS.md) gives contributors and coding agents the stable
   architecture contracts, source map, test workflow, artifact policy, and
   release guidance.
-- [releases/](releases/v1.0.0.md) contains published release notes.
+- [releases/](releases/v1.1.0.md) contains published release notes.
 - [history/](history/removed-nnue-studio.md) records tools that were removed and
   why.
 - `../tests/README.md` explains test categories and fixture locations.

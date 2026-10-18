@@ -146,6 +146,14 @@ Require-WorkflowPattern '(?m)^\s*ctest\s+--test-dir\s+build/ci-release\s+-C\s+Re
 Require-WorkflowPattern '(?m)^\s*cmake\s+-S\s+\.\s+-B\s+build/ci-asan\s+-G\s+Ninja\s+-DCMAKE_BUILD_TYPE=Debug\s+-DCMAKE_CXX_COMPILER=cl\s+-DKOI_SANITIZE=ON\s*$' 'the AddressSanitizer CMake configure command'
 Require-WorkflowPattern '(?m)^\s*ctest\s+--test-dir\s+build/ci-asan\s+-C\s+Debug\s+-j\s+2\s+-L\s+unit\s+-LE\s+heavy\s+--output-on-failure\s+--output-junit\s+build/ci-asan/ctest-junit\.xml\s*$' 'the AddressSanitizer CTest command'
 Require-WorkflowPattern '(?i)-DKOI_BUILD_SHADOW_DIFF=ON' 'the opt-in differential configure switch'
+
+# The Windows packaging job builds the release zip with the shared release
+# tooling and verifies the manifest, checksums, and extracted-engine smoke.
+Require-WorkflowPattern '(?m)^\s{2}windows-package:\s*$' 'the Windows packaging job'
+Require-WorkflowPattern '(?i)tools/build/package_release\.ps1' 'the shared packaging script'
+Require-WorkflowPattern '(?i)tests/integration/packaging/package_release_test\.ps1' 'the packaging manifest and archive smoke test'
+Require-WorkflowPattern '(?i)koi-engine-v1\.1\.0\.zip' 'the Windows package archive name'
+Require-WorkflowPattern '(?i)koi-engine-v1\.1\.0\.zip\.sha256' 'the Windows package checksum sidecar'
 Require-CMakePattern '(?i)check_ipo_supported' 'an IPO/LTO capability check'
 Require-CMakePattern '(?i)CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE\s+ON' 'portable Release IPO/LTO'
 Require-CMakePattern '(?i)/arch:AVX2' 'the AVX2 Release optimization flag'
@@ -156,7 +164,7 @@ Require-CMakePattern '(?i)KOI_GPU_PTX_ARCHS' 'the embedded GPU PTX architecture 
 Require-CMakePattern '(?i)CONFIG:Release.*:/O2' 'the Release compiler optimization level'
 Require-CMakePattern '(?i)CONFIG:Release.*:/DNDEBUG' 'the Release assertion configuration'
 Require-CMakePattern '(?i)CONFIG:Release' 'a Release-only AVX2 configuration guard'
-Require-CMakePattern '(?i)project\s*\(\s*koi_engine\s+VERSION\s+1\.0\.0' 'the v1.0.0 project identity'
+Require-CMakePattern '(?i)project\s*\(\s*koi_engine\s+VERSION\s+1\.1\.0' 'the v1.1.0 project identity'
 Require-CMakePattern '(?i)CMAKE_MSVC_RUNTIME_LIBRARY' 'the static MSVC runtime policy'
 Require-CMakePattern '(?i)FILE_SET\s+CXX_MODULES' 'the C++26 named-module source set'
 Require-CMakePattern '(?i)KOI_BUILD_SHADOW_DIFF' 'the opt-in differential test switch'
@@ -188,7 +196,7 @@ Require-LinuxWorkflowPattern '(?i)ctest\s+--test-dir\s+build/ci-release\s+-C\s+R
 Require-LinuxWorkflowPattern '(?i)ubuntu:22\.04' 'the Ubuntu 22.04 tarball container'
 Require-LinuxWorkflowPattern '(?i)tools/build/package_release\.ps1' 'the shared packaging script'
 Require-LinuxWorkflowPattern '(?i)tests/integration/packaging/package_release_test\.ps1' 'the packaging manifest and archive smoke test'
-Require-LinuxWorkflowPattern '(?i)koi-engine-v1\.0\.0-linux-x86_64\.tar\.gz' 'the Linux tarball name'
+Require-LinuxWorkflowPattern '(?i)koi-engine-v1\.1\.0-linux-x86_64\.tar\.gz' 'the Linux tarball name'
 Require-LinuxWorkflowPattern '(?i)sha256sum\s+-c' 'archive checksum verification'
 Require-LinuxWorkflowPattern '(?i)tar\s+-xzf\s+"\$archive"' 'extraction of the release archive'
 Require-LinuxWorkflowPattern '(?i)test\s+-x\s+"\$extracted/\$executable"' 'preservation of executable permissions in the archive'
@@ -220,6 +228,15 @@ Require-MacOSWorkflowPattern '(?i)--output-on-failure' 'CTest failure output'
 Require-MacOSWorkflowPattern '(?i)KOI_TEST_RETRIES:\s*"3"' 'the shared-runner retry setting'
 Require-MacOSWorkflowPattern '(?i)actions/upload-artifact@v5' 'test diagnostic artifact upload'
 Require-MacOSWorkflowPattern '(?i)LastTest\.log' 'the LastTest.log diagnostic upload'
+
+# The macOS packaging job builds the arm64 tarball with the shared release
+# tooling and verifies the manifest, checksums, and extracted-engine smoke.
+Require-MacOSWorkflowPattern '(?m)^\s{2}macos-package:\s*$' 'the macOS packaging job'
+Require-MacOSWorkflowPattern '(?i)tools/build/package_release\.ps1' 'the shared packaging script'
+Require-MacOSWorkflowPattern '(?i)tests/integration/packaging/package_release_test\.ps1' 'the packaging manifest and archive smoke test'
+Require-MacOSWorkflowPattern '(?i)koi-engine-v1\.1\.0-macos-arm64\.tar\.gz' 'the macOS tarball name'
+Require-MacOSWorkflowPattern '(?i)shasum\s+-a\s+256\s+-c' 'archive checksum verification'
+Require-MacOSWorkflowPattern '(?i)KOI_CPU_VARIANT=generic' 'the forced generic UCI smoke'
 Deny-MacOSWorkflowPattern '(?i)koi-engine-avx512' 'the x86-only AVX-512 smoke'
 Deny-MacOSWorkflowPattern '(?i)koi_engine_variant_process' 'the x86-only three-binary variant process test'
 
