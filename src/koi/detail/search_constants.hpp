@@ -63,7 +63,10 @@ inline constexpr int kReverseFutilityWorseningSurcharge = 24;
 inline constexpr int kNegativeContinuationHistoryBase = 4'136;
 inline constexpr int kNegativeContinuationHistoryMinimumDepth = 4;
 inline constexpr int kNegativeContinuationHistoryMinimumMove = 3;
-inline constexpr int kNarrowQuietCheckProbeStartDepth = 6;
+// Disabled by measurement (C44): the narrow deep quiet-check probe cut ~8.5%
+// of visited nodes with neutral strength in self-play, so the start depth sits
+// above any reachable quiescence depth and the probe never activates.
+inline constexpr int kNarrowQuietCheckProbeStartDepth = 99;
 inline constexpr int kMaximumQuiescenceNarrowQuietCheckDepth = 7;
 inline constexpr int kMaximumQuiescenceNarrowQuietChecks = 2;
 inline constexpr int kIncompleteRootForcingMargin = 50;
