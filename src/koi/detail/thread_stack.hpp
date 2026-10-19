@@ -21,6 +21,18 @@
 #include <type_traits>
 
 #include <pthread.h>
+#include <pthread/qos.h>
+#endif
+
+#if defined(_WIN32)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
+
+#if defined(__linux__)
+#include <sys/resource.h>
 #endif
 
 namespace koi::detail {
@@ -29,6 +41,24 @@ namespace koi::detail {
 // worker budget so deep lines keep a safety margin, and far above the 512 KiB
 // pthread default it replaces.
 inline constexpr std::size_t kWorkerStackBytes = std::size_t{64} * 1024 * 1024;
+
+// Best-effort CPU-class hint so search workers prefer performance cores where
+// the platform exposes a knob (macOS QoS classes, Windows priority classes,
+// Linux nice). The hint is advisory: failures are ignored and never affect
+// correctness or the search result. On Apple silicon this is the E-core
+// mitigation: USER_INITIATED pulls work off the efficiency cores, and the
+// engine's timed behavior is verified on the Mac gate.
+inline void apply_worker_thread_hint() noexcept {
+#if defined(__APPLE__)
+    (void)pthread_set_qos_class_self_np(QOS_CLASS_USER_INITIATED, 0);
+#elif defined(_WIN32)
+    (void)::SetThreadPriority(::GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
+#elif defined(__linux__)
+    // Unprivileged processes may only lower their nice value; the call then
+    // fails with EPERM and the hint degrades to a no-op.
+    (void)::setpriority(PRIO_PROCESS, 0, -5);
+#endif
+}
 
 #if defined(__APPLE__)
 
@@ -131,6 +161,7 @@ void* trampoline(void* raw) {
     // outlive the WorkerThread handle safely.
     std::unique_ptr<State> state(static_cast<State*>(raw));
     try {
+        apply_worker_thread_hint();
         (*state)();
     } catch (...) {
         // A C++ exception cannot cross the pthread entry point. std::thread
@@ -181,7 +212,10 @@ using WorkerThread = std::thread;
 template <typename Callable>
 [[nodiscard]] WorkerThread spawn_worker_thread(
     Callable&& callable, const std::size_t /*stack_bytes*/ = kWorkerStackBytes) {
-    return WorkerThread(std::forward<Callable>(callable));
+    return WorkerThread([worker = std::forward<Callable>(callable)]() mutable {
+        apply_worker_thread_hint();
+        worker();
+    });
 }
 
 #endif
