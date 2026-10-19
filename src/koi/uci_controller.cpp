@@ -1656,7 +1656,8 @@ void UciController::write_perft_results(GameState root, const int depth,
 
 void UciController::write_search_info(std::uint64_t generation, const SearchInfo& info) {
     std::lock_guard lock(output_mutex_);
-    if (generation != generation_ || info.depth <= 0) {
+    if (generation != generation_ || info.depth <= 0 ||
+        state_ == ControllerState::ShuttingDown) {
         return;
     }
 
@@ -1713,7 +1714,7 @@ void UciController::rebuild_syzygy() {
 void UciController::write_search_completion(std::uint64_t generation,
                                             const SearchResult& result) {
     std::lock_guard lock(output_mutex_);
-    if (generation != generation_) {
+    if (generation != generation_ || state_ == ControllerState::ShuttingDown) {
         return;
     }
 
