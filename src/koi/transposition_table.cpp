@@ -603,10 +603,10 @@ void TranspositionTable::store_impl(std::uint64_t key, int depth, int score,
                 return;
             }
             candidate = TranspositionEntry{.key = key,
-                                           .depth = pack_depth(depth),
                                            .score = score_for_storage(score, ply),
-                                           .eval = pack_eval(eval),
                                            .best_move = best_move,
+                                           .eval = pack_eval(eval),
+                                           .depth = pack_depth(depth),
                                            .generation = storage->generation,
                                            .generation_age = storage->clear_epoch,
                                            .bound = bound,
@@ -649,10 +649,10 @@ void TranspositionTable::store_impl(std::uint64_t key, int depth, int score,
         }
     }
     destination = TranspositionEntry{.key = key,
-                                     .depth = pack_depth(depth),
                                      .score = score_for_storage(score, ply),
-                                     .eval = pack_eval(eval),
                                      .best_move = best_move,
+                                     .eval = pack_eval(eval),
+                                     .depth = pack_depth(depth),
                                      .generation = storage->generation,
                                      .generation_age = storage->clear_epoch,
                                      .bound = bound,
@@ -703,10 +703,10 @@ void TranspositionTable::store_exclusive(Storage* storage, std::uint64_t key, in
                 return;
             }
             candidate = TranspositionEntry{.key = key,
-                                           .depth = pack_depth(depth),
                                            .score = score_for_storage(score, ply),
-                                           .eval = pack_eval(eval),
                                            .best_move = best_move,
+                                           .eval = pack_eval(eval),
+                                           .depth = pack_depth(depth),
                                            .generation = storage->generation,
                                            .generation_age = storage->clear_epoch,
                                            .bound = bound,
@@ -749,10 +749,10 @@ void TranspositionTable::store_exclusive(Storage* storage, std::uint64_t key, in
         }
     }
     destination = TranspositionEntry{.key = key,
-                                     .depth = pack_depth(depth),
                                      .score = score_for_storage(score, ply),
-                                     .eval = pack_eval(eval),
                                      .best_move = best_move,
+                                     .eval = pack_eval(eval),
+                                     .depth = pack_depth(depth),
                                      .generation = storage->generation,
                                      .generation_age = storage->clear_epoch,
                                      .bound = bound,
