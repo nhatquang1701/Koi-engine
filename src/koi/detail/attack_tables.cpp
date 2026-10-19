@@ -2,6 +2,12 @@
 
 #include <array>
 #include <bit>
+#include <cstddef>
+#include <memory>
+
+#if defined(KOI_PEXT_ATTACKS) && KOI_PEXT_ATTACKS
+#include <immintrin.h>
+#endif
 
 namespace koi::detail {
 namespace {
@@ -135,6 +141,89 @@ struct Tables {
     return attacks;
 }
 
+#if defined(KOI_PEXT_ATTACKS) && KOI_PEXT_ATTACKS
+
+// PEXT bitboards for the slider queries.  The relevant-occupancy mask keeps
+// only the squares a blocker can actually influence (a blocker on the board
+// edge never changes the attack set), so the rook table holds 102,400 entries
+// and the bishop table 5,248.  The tables are built once, lazily, from the ray
+// computation above, so the PEXT path and the ray path agree by construction.
+[[nodiscard]] U64 relevant_mask(const Tables& t, int square,
+                                std::initializer_list<int> directions) noexcept {
+    U64 mask = 0;
+    for (const int direction : directions) {
+        const std::size_t index = static_cast<std::size_t>(direction);
+        const U64 ray = t.rays[index][static_cast<std::size_t>(square)];
+        if (ray == 0) continue;
+        // The final square of the ray is the board edge; a blocker there does
+        // not hide anything, so it stays out of the mask.
+        const U64 edge = kSteps[index] > 0
+            ? (U64{1} << (63 - std::countl_zero(ray)))
+            : (U64{1} << std::countr_zero(ray));
+        mask |= ray & ~edge;
+    }
+    return mask;
+}
+
+void build_square(int square, U64 mask, std::uint32_t offset, U64* table,
+                  std::initializer_list<int> directions) noexcept {
+    // Carry-rippler enumeration of every subset of the relevant mask.
+    U64 subset = 0;
+    do {
+        table[offset + static_cast<std::uint32_t>(_pext_u64(subset, mask))] =
+            sliding_attacks(square, subset, directions);
+        subset = (subset - mask) & mask;
+    } while (subset != 0);
+}
+
+struct PextTables {
+    std::array<U64, 64> rook_mask{};
+    std::array<U64, 64> bishop_mask{};
+    std::array<std::uint32_t, 64> rook_offset{};
+    std::array<std::uint32_t, 64> bishop_offset{};
+    std::unique_ptr<U64[]> rook_table;
+    std::unique_ptr<U64[]> bishop_table;
+
+    PextTables() noexcept {
+        const Tables& t = tables();
+        std::size_t rook_total = 0;
+        std::size_t bishop_total = 0;
+        for (int square = 0; square < 64; ++square) {
+            const std::size_t index = static_cast<std::size_t>(square);
+            rook_mask[index] = relevant_mask(t, square, {0, 2, 4, 6});
+            bishop_mask[index] = relevant_mask(t, square, {1, 3, 5, 7});
+            rook_offset[index] = static_cast<std::uint32_t>(rook_total);
+            bishop_offset[index] = static_cast<std::uint32_t>(bishop_total);
+            rook_total += std::size_t{1} << std::popcount(rook_mask[index]);
+            bishop_total += std::size_t{1} << std::popcount(bishop_mask[index]);
+        }
+        rook_table = std::make_unique<U64[]>(rook_total);
+        bishop_table = std::make_unique<U64[]>(bishop_total);
+        for (int square = 0; square < 64; ++square) {
+            const std::size_t index = static_cast<std::size_t>(square);
+            build_square(square, rook_mask[index], rook_offset[index], rook_table.get(),
+                         {0, 2, 4, 6});
+            build_square(square, bishop_mask[index], bishop_offset[index], bishop_table.get(),
+                         {1, 3, 5, 7});
+        }
+    }
+};
+
+[[nodiscard]] const PextTables& pext_tables() noexcept {
+    static const PextTables instance{};
+    return instance;
+}
+
+[[nodiscard]] std::uint64_t pext_attacks(int square, std::uint64_t occupied,
+                                         const std::array<U64, 64>& masks,
+                                         const std::array<std::uint32_t, 64>& offsets,
+                                         const U64* table) noexcept {
+    const std::size_t index = static_cast<std::size_t>(square);
+    return table[offsets[index] + static_cast<std::uint32_t>(_pext_u64(occupied, masks[index]))];
+}
+
+#endif // KOI_PEXT_ATTACKS
+
 } // namespace
 
 std::uint64_t knight_attacks(int square) noexcept {
@@ -158,15 +247,34 @@ std::uint64_t pawn_attackers_of(int target, bool white_pawns) noexcept {
 }
 
 std::uint64_t bishop_attacks(int square, std::uint64_t occupied) noexcept {
+#if defined(KOI_PEXT_ATTACKS) && KOI_PEXT_ATTACKS
+    if (square < 0 || square >= 64) return 0;
+    const PextTables& t = pext_tables();
+    return pext_attacks(square, occupied, t.bishop_mask, t.bishop_offset, t.bishop_table.get());
+#else
     return sliding_attacks(square, occupied, {1, 3, 5, 7});
+#endif
 }
 
 std::uint64_t rook_attacks(int square, std::uint64_t occupied) noexcept {
+#if defined(KOI_PEXT_ATTACKS) && KOI_PEXT_ATTACKS
+    if (square < 0 || square >= 64) return 0;
+    const PextTables& t = pext_tables();
+    return pext_attacks(square, occupied, t.rook_mask, t.rook_offset, t.rook_table.get());
+#else
     return sliding_attacks(square, occupied, {0, 2, 4, 6});
+#endif
 }
 
 std::uint64_t queen_attacks(int square, std::uint64_t occupied) noexcept {
+#if defined(KOI_PEXT_ATTACKS) && KOI_PEXT_ATTACKS
+    if (square < 0 || square >= 64) return 0;
+    const PextTables& t = pext_tables();
+    return pext_attacks(square, occupied, t.bishop_mask, t.bishop_offset, t.bishop_table.get()) |
+        pext_attacks(square, occupied, t.rook_mask, t.rook_offset, t.rook_table.get());
+#else
     return sliding_attacks(square, occupied, {0, 1, 2, 3, 4, 5, 6, 7});
+#endif
 }
 
 std::uint64_t ray_attacks(int square, int direction) noexcept {

@@ -31,6 +31,23 @@ jobs:
             -DKOI_TEST_TIMEOUT_SECONDS=300 \
             -DPython3_EXECUTABLE="$(command -v python)"
           cmake --build build/ci-release --config Release -j 4
+      # The PEXT slider tables are an x86-64 Release optimization; build and
+      # test the ray-only fallback configuration so the flag keeps working.
+      - name: Configure and build the ray-slider fallback
+        run: |
+          cmake -S . -B build/ci-ray -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER=gcc-14 -DCMAKE_CXX_COMPILER=g++-14 \
+            -DKOI_TEST_TIMEOUT_SECONDS=300 \
+            -DPython3_EXECUTABLE="$(command -v python)" \
+            -DKOI_PEXT_ATTACKS=OFF
+          cmake --build build/ci-ray --config Release -j 4
+      - name: Run the unit suite on the ray-slider fallback
+        env:
+          KOI_TEST_RETRIES: "3"
+        run: |
+          ctest --test-dir build/ci-ray -C Release -j 4 -L unit -LE heavy \
+            --repeat until-pass:2 \
+            --output-on-failure --output-junit build/ci-ray/ctest-unit-junit.xml
       # The CPU-flavor tests depend on what the host actually supports, and the
       # runner image changes over time, so record the flags and the AVX-512
       # binary's own verdict before the suite runs.

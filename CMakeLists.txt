@@ -110,6 +110,13 @@ endif()
 # themselves are passed by that workflow via CMAKE_CXX_FLAGS.
 option(KOI_TSAN "Disable Release IPO for a ThreadSanitizer build" OFF)
 
+# --- PEXT slider attacks (x86-64) ----------------------------------------------
+# The AVX2/AVX-512 variant cores answer slider queries from PEXT bitboard
+# tables when this is ON; the baseline core always keeps the ray path, and
+# non-x86 targets (macOS arm64) are unaffected. Turning it OFF builds every
+# variant with the ray path so the CI can test the fallback configuration.
+option(KOI_PEXT_ATTACKS "Use PEXT bitboards for slider attacks in x86-64 variants" ON)
+
 # --- Profile-guided optimization (Windows/MSVC) --------------------------------
 # KOI_PGO=generate builds Release with /GENPROFILE and links with /LTCG:PGI to
 # emit a .pgd next to each binary; KOI_PGO=use rebuilds Release with /USEPROFILE
@@ -416,6 +423,15 @@ function(koi_add_core_target target arch_option)
         koi_arch_compile_option("${arch_option}" KOI_ARCH_COMPILE_OPTION)
         target_compile_options(${target} PRIVATE
             "$<$<CONFIG:Release>:${KOI_ARCH_COMPILE_OPTION}>")
+        if(KOI_PEXT_ATTACKS)
+            target_compile_definitions(${target} PRIVATE
+                "$<$<CONFIG:Release>:KOI_PEXT_ATTACKS=1>")
+            if(NOT MSVC)
+                # -mavx2 does not imply BMI2 on GCC/Clang.
+                target_compile_options(${target} PRIVATE
+                    "$<$<CONFIG:Release>:-mbmi2>")
+            endif()
+        endif()
     endif()
     if(KOI_GPU_PTX_AVAILABLE)
         target_include_directories(${target} PRIVATE "${CMAKE_BINARY_DIR}/generated")
@@ -605,6 +621,11 @@ if(KOI_BUILD_MODULES)
         target_compile_options(koi_module_tests PRIVATE
             "$<$<CONFIG:Release>:${KOI_MODULE_TEST_ARCH_OPTION}>"
         )
+        if(KOI_PEXT_ATTACKS AND NOT MSVC)
+            # Match the PEXT-enabled koi_core ISA in the same way.
+            target_compile_options(koi_module_tests PRIVATE
+                "$<$<CONFIG:Release>:-mbmi2>")
+        endif()
     endif()
 
     add_test(NAME koi_module_tests COMMAND koi_module_tests)

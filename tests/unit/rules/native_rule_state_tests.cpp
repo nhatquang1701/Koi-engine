@@ -1,3 +1,4 @@
+#include <array>
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -5,6 +6,7 @@
 #include <vector>
 
 #include "koi/game_state.hpp"
+#include "koi/detail/attack_tables.hpp"
 #include "koi/detail/compatibility_mirror.hpp"
 #include "koi/detail/feature_state.hpp"
 #include "koi/position.hpp"
@@ -484,6 +486,66 @@ void test_occupied_squares_track_make_unmake_transactions() {
     }
 }
 
+void test_slider_attack_tables_match_the_ray_reference() {
+    // The production slider queries must agree with a ray computation built
+    // from the public ray tables and the nearest-blocker query.  On x86-64
+    // Release this compares the PEXT bitboard tables against the reference;
+    // elsewhere both sides are the ray path, which keeps the check honest.
+    const auto ray_slider = [](int square, std::uint64_t occupied,
+                               const std::array<int, 4>& directions) {
+        std::uint64_t attacks = 0;
+        for (const int direction : directions) {
+            const std::uint64_t ray = koi::detail::ray_attacks(square, direction);
+            if (ray == 0) continue;
+            const int first = koi::detail::nearest_blocker(square, direction, occupied);
+            attacks |= first < 0 ? ray : ray ^ koi::detail::ray_attacks(first, direction);
+        }
+        return attacks;
+    };
+    const std::array<int, 4> bishop_directions = {1, 3, 5, 7};
+    const std::array<int, 4> rook_directions = {0, 2, 4, 6};
+
+    std::uint64_t rng = 0x9E3779B97F4A7C15ULL;
+    const auto next_random = [&rng]() {
+        rng ^= rng << 13;
+        rng ^= rng >> 7;
+        rng ^= rng << 17;
+        return rng;
+    };
+
+    std::vector<std::uint64_t> occupancies;
+    occupancies.push_back(0);
+    occupancies.push_back(~std::uint64_t{0});
+    for (int square = 0; square < 64; ++square) {
+        const std::uint64_t single = std::uint64_t{1} << square;
+        occupancies.push_back(single);
+        occupancies.push_back(single | (std::uint64_t{1} << (63 - square)));
+    }
+    for (int sample = 0; sample < 128; ++sample) {
+        std::uint64_t occupancy = 0;
+        for (int draw = 0; draw < 3; ++draw) {
+            occupancy |= next_random();
+        }
+        occupancies.push_back(occupancy);
+    }
+
+    for (const std::uint64_t occupied : occupancies) {
+        for (int square = 0; square < 64; ++square) {
+            const std::uint64_t bishop_expected = ray_slider(square, occupied, bishop_directions);
+            const std::uint64_t rook_expected = ray_slider(square, occupied, rook_directions);
+            require(koi::detail::bishop_attacks(square, occupied) == bishop_expected,
+                    "bishop attacks must match the ray reference");
+            require(koi::detail::rook_attacks(square, occupied) == rook_expected,
+                    "rook attacks must match the ray reference");
+            require(koi::detail::queen_attacks(square, occupied) ==
+                        (bishop_expected | rook_expected),
+                    "queen attacks must equal the bishop/rook union");
+        }
+    }
+    require(koi::detail::bishop_attacks(-1, 0) == 0 && koi::detail::rook_attacks(64, 0) == 0,
+            "out-of-range slider queries must answer zero");
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -506,6 +568,7 @@ int main(int argc, char** argv) {
         {"sparse black piece move ordering", test_sparse_black_piece_set_preserves_ascending_source_square_order},
         {"occupied squares transactions", test_occupied_squares_track_make_unmake_transactions},
         {"locked wall survives make/unmake", test_locked_wall_dead_position_survives_make_unmake},
+        {"slider attacks match the ray reference", test_slider_attack_tables_match_the_ray_reference},
     };
     return koi::test::run_tests(tests, argc, argv);
 }
