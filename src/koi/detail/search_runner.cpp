@@ -2126,7 +2126,9 @@ public:
              bool root_check_extension, const std::vector<std::size_t>& stable_root_indices,
              std::vector<RootLine>& lines, bool use_root_pvs, int root_static_eval,
              int window_alpha, int window_beta, SearchStats& stats, bool& aborted,
-             bool& window_failed_low, bool& window_failed_high) {
+             bool& window_failed_low, bool& window_failed_high,
+             const std::vector<int>& move_previous_scores,
+             const std::vector<bool>& move_has_previous, bool multi_pv) {
         auto job = std::make_shared<Job>();
         job->root = &root;
         job->root_moves = &root_moves;
@@ -2139,6 +2141,9 @@ public:
         job->root_static_eval = root_static_eval;
         job->window_alpha = window_alpha;
         job->window_beta = window_beta;
+        job->move_previous_scores = move_previous_scores;
+        job->move_has_previous = move_has_previous;
+        job->multi_pv = multi_pv;
         job->root_alpha.store(window_alpha, std::memory_order_relaxed);
         if (depth == 1) {
             job->root_features = root.position_features();
@@ -2247,6 +2252,12 @@ private:
         std::atomic_bool aborted = false;
         bool use_root_pvs = false;
         std::uint64_t sequence = 0;
+        // Per-move aspiration hints for the MultiPV path: the previous
+        // completed score of each parallel root move, used to narrow the
+        // search window around it.  Empty when no per-move hints exist.
+        std::vector<int> move_previous_scores;
+        std::vector<bool> move_has_previous;
+        bool multi_pv = false;
     };
 
     void worker_loop(std::size_t worker_index) {
@@ -2324,13 +2335,29 @@ private:
                         ++child_depth;
                     }
                     const int shared_alpha = job->root_alpha.load(std::memory_order_relaxed);
+                    // MultiPV per-move aspiration: narrow the window around
+                    // this move's previous completed score when one exists.
+                    // The full job window remains the outer bound, so a failed
+                    // aspiration re-searches exactly as the runner would.
+                    int move_alpha = job->window_alpha;
+                    int move_beta = job->window_beta;
+                    if (job->multi_pv &&
+                        move_index < job->move_has_previous.size() &&
+                        job->move_has_previous[move_index]) {
+                        const int aspiration_span =
+                            kAspirationWindow + std::min(32, job->depth * 2);
+                        move_alpha = std::max(job->window_alpha,
+                                              job->move_previous_scores[move_index] - aspiration_span);
+                        move_beta = std::min(job->window_beta,
+                                             job->move_previous_scores[move_index] + aspiration_span);
+                    }
                     const bool scout = job->use_root_pvs && move_index != 0 &&
                         shared_alpha > job->window_alpha;
                     bool exact_score = false;
                     bool completed_score = false;
                     bool child_selective_bound = false;
                     bool child_lower_bound = false;
-                    int score_alpha = job->window_alpha;
+                    int score_alpha = move_alpha;
                     int score = 0;
                     if (scout) {
                         ++context.stats.root_pvs_searches;
@@ -2357,7 +2384,7 @@ private:
                             score_alpha = research_alpha;
                             bool research_selective_bound = false;
                             score = -context.negamax(child, child_depth,
-                                                     -job->window_beta, -research_alpha, 1,
+                                                     -move_beta, -research_alpha, 1,
                                                      child_pv,
                                                      root_move.move, true,
                                                      child_check_extensions_remaining,
@@ -2366,22 +2393,45 @@ private:
                                                      &child_lower_bound);
                             child_selective_bound = research_selective_bound;
                             completed_score = !context.aborted &&
-                                score > job->window_alpha && score < job->window_beta;
+                                score > move_alpha && score < move_beta;
                             exact_score = score > research_alpha &&
-                                score < job->window_beta && !child_selective_bound;
+                                score < move_beta && !child_selective_bound;
                         }
                     } else {
                         score = -context.negamax(child, child_depth,
-                                                 -job->window_beta, -job->window_alpha, 1, child_pv,
+                                                 -move_beta, -move_alpha, 1, child_pv,
                                                  root_move.move, true,
                                                  child_check_extensions_remaining,
                                                  Move::no_move(), nullptr,
                                                  &child_selective_bound, nullptr,
                                                  &child_lower_bound);
+                        // A narrowed per-move window that fails must widen in
+                        // the worker: the runner's aspiration retry does not
+                        // rerun MultiPV iterations, so a bound-limited score
+                        // would otherwise never become authoritative.
+                        if (!context.aborted && !child_selective_bound &&
+                            (move_alpha > job->window_alpha || move_beta < job->window_beta) &&
+                            (score <= move_alpha || score >= move_beta)) {
+                            ++context.stats.root_pvs_researches;
+                            child_pv = {};
+                            bool widen_selective_bound = false;
+                            score = -context.negamax(child, child_depth,
+                                                     -job->window_beta, -job->window_alpha, 1,
+                                                     child_pv,
+                                                     root_move.move, true,
+                                                     child_check_extensions_remaining,
+                                                     Move::no_move(), nullptr,
+                                                     &widen_selective_bound, nullptr,
+                                                     &child_lower_bound);
+                            child_selective_bound = widen_selective_bound;
+                            score_alpha = job->window_alpha;
+                            move_alpha = job->window_alpha;
+                            move_beta = job->window_beta;
+                        }
                         completed_score = !context.aborted &&
-                            score > job->window_alpha && score < job->window_beta;
-                        exact_score = score > job->window_alpha &&
-                            score < job->window_beta && !child_selective_bound;
+                            score > move_alpha && score < move_beta;
+                        exact_score = score > move_alpha &&
+                            score < move_beta && !child_selective_bound;
                     }
                     // A selective child can return a useful score at the
                     // aspiration ceiling without proving that the root move
@@ -2390,6 +2440,11 @@ private:
                     // estimate can repeatedly drive the root away from the
                     // previous completed score.
                     if (score >= job->window_beta && !child_selective_bound) {
+                        job->window_failed_high.store(true, std::memory_order_relaxed);
+                    } else if (move_beta < job->window_beta && !child_selective_bound &&
+                               score >= move_beta) {
+                        // A per-move aspiration fail-high must widen too: the
+                        // runner's window retry re-searches the whole root.
                         job->window_failed_high.store(true, std::memory_order_relaxed);
                     }
                     if (context.aborted) {
@@ -4408,10 +4463,22 @@ void SearchRunner::run() {
                     // prior failed window would make stale bounds look
                     // like current root results.
                     std::fill(lines.begin(), lines.end(), RootLine{});
+                    std::vector<int> move_previous_scores(parallel_moves.size(), 0);
+                    std::vector<bool> move_has_previous(parallel_moves.size(), false);
+                    for (std::size_t index = 0; index < parallel_moves.size(); ++index) {
+                        const RootScheduleRecord* record =
+                            schedule_record_for(parallel_moves[index].move);
+                        if (record != nullptr && record->has_previous_score) {
+                            move_previous_scores[index] = record->previous_score;
+                            move_has_previous[index] = true;
+                        }
+                    }
                     pool.run(root, parallel_moves, depth, root_check_extension,
                              stable_root_indices, lines, use_root_pvs, root_static_eval,
                              window_alpha, window_beta, attempt_stats, attempt_aborted,
-                             window_failed_low, window_failed_high);
+                             window_failed_low, window_failed_high,
+                             move_previous_scores, move_has_previous,
+                             options.multi_pv > 1);
                     accumulate_stats(iteration_stats, attempt_stats);
                     if (attempt_aborted) {
                         aborted = true;
