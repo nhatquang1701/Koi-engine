@@ -128,17 +128,18 @@ void test_resize_changes_the_reported_size() {
     require(table.size_mb() == 1, "requests below the minimum must clamp to one megabyte");
 }
 
-void test_power_of_two_rounding_and_prefetch() {
-    // Cluster indexing masks the key, so the allocation rounds down to the
-    // nearest power of two clusters and the reported size follows it.
+void test_size_tracks_the_request() {
+    // The allocation tracks the requested size; the reported size rounds to
+    // the nearest megabyte so it matches the request even though 24-byte
+    // entries never divide 1 MiB exactly.
     TranspositionTable table(3);
-    require(table.size_mb() == 2, "a three megabyte request must round down to two");
+    require(table.size_mb() == 3, "a three megabyte request must be applied");
 
     (void)table.set_size_mb(5);
-    require(table.size_mb() == 4, "a five megabyte request must round down to four");
+    require(table.size_mb() == 5, "a five megabyte request must be applied");
 
     (void)table.set_size_mb(7);
-    require(table.size_mb() == 4, "a seven megabyte request must round down to four");
+    require(table.size_mb() == 7, "a seven megabyte request must be applied");
 
     // A prefetch is advisory: it must be safe before a probe and must not
     // change what the probe finds.
@@ -281,7 +282,7 @@ int main(int argc, char** argv) {
         {"transposition generation ageing", test_new_generation_ages_entries},
         {"transposition clear and hashfull", test_clear_invalidates_entries_and_resets_hashfull},
         {"transposition resize bounds", test_resize_changes_the_reported_size},
-        {"transposition power of two rounding", test_power_of_two_rounding_and_prefetch},
+        {"transposition size tracking", test_size_tracks_the_request},
         {"transposition cluster masking", test_cluster_masking_covers_every_slot},
         {"transposition concurrent access", test_concurrent_store_and_probe_is_safe},
         {"transposition exclusive round trip", test_exclusive_access_round_trips_through_the_session_pin},

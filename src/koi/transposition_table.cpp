@@ -91,6 +91,20 @@ int score_for_probe(int score, int ply) noexcept {
     return score;
 }
 
+// Entry fields are narrower than the search-domain values that feed them.
+// Clamp on the way in so the packed widths stay lossless for every realistic
+// depth and evaluation while a stray extreme value cannot wrap around.
+std::int8_t pack_depth(int depth) noexcept {
+    return static_cast<std::int8_t>(std::clamp(depth, -128, 127));
+}
+
+std::int16_t pack_eval(int eval) noexcept {
+    if (eval == kNoEvaluation) {
+        return kNoEvaluation;
+    }
+    return static_cast<std::int16_t>(std::clamp(eval, -32'767, 32'767));
+}
+
 HashMemorySnapshot default_memory_snapshot() noexcept {
 #if defined(_WIN32)
     MEMORYSTATUSEX status{};
@@ -124,19 +138,15 @@ std::size_t megabytes_to_bytes(std::size_t megabytes) noexcept {
     return megabytes * kBytesPerMegabyte;
 }
 
-std::size_t bytes_to_megabytes(std::size_t bytes) noexcept {
-    return bytes / kBytesPerMegabyte;
-}
-
 std::size_t u64_to_size(std::uint64_t value) noexcept {
     const std::uint64_t maximum = std::numeric_limits<std::size_t>::max();
     return static_cast<std::size_t>(std::min(value, maximum));
 }
 
-// Indexing uses a power-of-two cluster count so the probe/store hot path can
-// mask instead of divide.  The table therefore rounds its allocation down to
-// the nearest power of two clusters; the reported size follows the rounded
-// allocation.
+// The cluster index uses multiply-shift hashing (cluster_index below), so the
+// cluster count does not have to be a power of two and the allocation can
+// track the requested size almost exactly instead of rounding down to the
+// next power-of-two cluster count.
 [[nodiscard]] std::size_t round_down_power_of_two(const std::size_t value) noexcept {
     if (value <= 1) {
         return 1;
@@ -144,13 +154,29 @@ std::size_t u64_to_size(std::uint64_t value) noexcept {
     return std::bit_floor(value);
 }
 
+[[nodiscard]] std::size_t cluster_index(std::uint64_t key, std::size_t cluster_count) noexcept {
+    std::uint32_t folded = static_cast<std::uint32_t>(key) ^
+        static_cast<std::uint32_t>(key >> 32U);
+    folded *= 0x9E3779B9U;
+    const std::uint64_t product = static_cast<std::uint64_t>(folded) *
+        static_cast<std::uint64_t>(cluster_count);
+    return static_cast<std::size_t>(product >> 32U);
+}
+
+// Reported size rounds to the nearest megabyte so a request that lands just
+// under the boundary (24-byte entries never divide 1 MiB exactly) still
+// reports the requested value.
+[[nodiscard]] std::size_t bytes_to_reported_megabytes(const std::size_t bytes) noexcept {
+    return (bytes + kBytesPerMegabyte / 2) / kBytesPerMegabyte;
+}
+
 [[nodiscard]] std::size_t rounded_size_mb(const std::size_t megabytes) noexcept {
     const std::size_t requested_entries = std::max<std::size_t>(
         kClusterSize, megabytes_to_bytes(megabytes) / sizeof(TranspositionEntry));
-    const std::size_t clusters = round_down_power_of_two(
-        std::max<std::size_t>(1, requested_entries / kClusterSize));
+    const std::size_t clusters = std::max<std::size_t>(1, requested_entries / kClusterSize);
     const std::size_t total_entries = clusters * kClusterSize;
-    return std::max<std::size_t>(1, bytes_to_megabytes(total_entries * sizeof(TranspositionEntry)));
+    return std::max<std::size_t>(
+        1, bytes_to_reported_megabytes(total_entries * sizeof(TranspositionEntry)));
 }
 
 // Process-wide pool of hazard slots.  A slot index is owned by a thread for
@@ -233,10 +259,7 @@ struct TranspositionTable::Storage {
         const std::size_t requested_bytes = megabytes_to_bytes(megabytes);
         const std::size_t requested_entries = std::max<std::size_t>(
             kClusterSize, requested_bytes / sizeof(TranspositionEntry));
-        // Power-of-two cluster count so store/probe can mask the search key.
-        cluster_count = round_down_power_of_two(
-            std::max<std::size_t>(1, requested_entries / kClusterSize));
-        cluster_mask = cluster_count - 1;
+        cluster_count = std::max<std::size_t>(1, requested_entries / kClusterSize);
         const std::size_t total_entries = cluster_count * kClusterSize;
         const std::size_t segment_count =
             (total_entries + entries_per_segment - 1) / entries_per_segment;
@@ -249,7 +272,7 @@ struct TranspositionTable::Storage {
         }
         total_slot_count = total_entries;
         allocated_bytes = total_entries * sizeof(TranspositionEntry);
-        size_mb = std::max<std::size_t>(1, bytes_to_megabytes(allocated_bytes));
+        size_mb = std::max<std::size_t>(1, bytes_to_reported_megabytes(allocated_bytes));
     }
 
     [[nodiscard]] TranspositionEntry& at(std::size_t slot) noexcept {
@@ -280,14 +303,13 @@ struct TranspositionTable::Storage {
     std::size_t allocated_bytes = 0;
     std::size_t total_slot_count = 0;
     std::size_t cluster_count = 0;
-    std::size_t cluster_mask = 0;
     std::size_t size_mb = 0;
-    std::uint16_t generation = 1;
+    std::uint8_t generation = 1;
     // `generation_age` is also the storage epoch for logical Clear Hash
     // invalidation.  A clear normally advances this fence without touching
     // the segments, which keeps repeated cold benchmark runs bounded by the
     // search work instead of the table size.
-    std::uint16_t clear_epoch = 0;
+    std::uint8_t clear_epoch = 0;
 };
 
 TranspositionTable::TranspositionTable(std::size_t megabytes, HashMemoryPolicy policy)
@@ -385,10 +407,10 @@ HashResizeResult TranspositionTable::resize_locked(std::size_t megabytes) noexce
         return result;
     }
 
-    // Round the allocation down to the nearest power-of-two cluster count so
-    // mask indexing stays exact; the reported size matches the storage.
+    // The allocation tracks the requested size (multiply-shift cluster
+    // indexing); the reported size matches the storage.
     const std::size_t candidate_mb = rounded_size_mb(
-        std::max<std::size_t>(1, bytes_to_megabytes(allowed_bytes)));
+        std::max<std::size_t>(1, bytes_to_reported_megabytes(allowed_bytes)));
     if (current != nullptr && current->size_mb == candidate_mb) {
         result.effective_mb = current->size_mb;
         result.allocated_bytes = current->allocated_bytes;
@@ -510,7 +532,7 @@ void TranspositionTable::clear() noexcept {
     for (std::size_t index = 0; index < kStripeCount; ++index) {
         stripe_locks[index] = std::unique_lock<std::shared_mutex>(storage->stripes[index]);
     }
-    if (storage->clear_epoch == std::numeric_limits<std::uint16_t>::max()) {
+    if (storage->clear_epoch == std::numeric_limits<std::uint8_t>::max()) {
         storage->clear_epoch = 0;
         for (const auto& segment : storage->segments) {
             std::fill(segment->entries.begin(), segment->entries.end(), TranspositionEntry{});
@@ -553,7 +575,7 @@ void TranspositionTable::store_impl(std::uint64_t key, int depth, int score,
         return;
     }
 
-    const std::size_t cluster = static_cast<std::size_t>(key) & storage->cluster_mask;
+    const std::size_t cluster = cluster_index(key, storage->cluster_count);
     const std::size_t first_slot = cluster * kClusterSize;
     // Resolve the cluster base once; every entry in the cluster lives in the
     // same segment.
@@ -581,9 +603,9 @@ void TranspositionTable::store_impl(std::uint64_t key, int depth, int score,
                 return;
             }
             candidate = TranspositionEntry{.key = key,
-                                           .depth = depth,
+                                           .depth = pack_depth(depth),
                                            .score = score_for_storage(score, ply),
-                                           .eval = eval,
+                                           .eval = pack_eval(eval),
                                            .best_move = best_move,
                                            .generation = storage->generation,
                                            .generation_age = storage->clear_epoch,
@@ -600,12 +622,11 @@ void TranspositionTable::store_impl(std::uint64_t key, int depth, int score,
         // Prefer stale generations, then shallow entries.  The final key
         // component makes replacement deterministic when all other signals
         // tie, which is useful for fixed-depth reproducibility.
-        const std::uint16_t age = static_cast<std::uint16_t>(
+        const std::uint8_t age = static_cast<std::uint8_t>(
             storage->generation - candidate.generation);
         const std::uint32_t age_rank = age == 0 ? 1U : 0U;
         const std::uint32_t depth_rank = static_cast<std::uint32_t>(
-            std::clamp(candidate.depth, 0,
-                       static_cast<int>(std::numeric_limits<std::uint16_t>::max())));
+            std::max(0, static_cast<int>(candidate.depth)));
         const std::uint32_t key_rank = static_cast<std::uint32_t>(candidate.key);
         const std::uint32_t priority = (age_rank << 24U) |
             (std::min<std::uint32_t>(depth_rank, 0xFFFFU) << 8U) |
@@ -628,9 +649,9 @@ void TranspositionTable::store_impl(std::uint64_t key, int depth, int score,
         }
     }
     destination = TranspositionEntry{.key = key,
-                                     .depth = depth,
+                                     .depth = pack_depth(depth),
                                      .score = score_for_storage(score, ply),
-                                     .eval = eval,
+                                     .eval = pack_eval(eval),
                                      .best_move = best_move,
                                      .generation = storage->generation,
                                      .generation_age = storage->clear_epoch,
@@ -654,7 +675,7 @@ void TranspositionTable::store_exclusive(Storage* storage, std::uint64_t key, in
         return;
     }
 
-    const std::size_t cluster = static_cast<std::size_t>(key) & storage->cluster_mask;
+    const std::size_t cluster = cluster_index(key, storage->cluster_count);
     const std::size_t first_slot = cluster * kClusterSize;
     // Resolve the cluster base once; every entry in the cluster lives in the
     // same segment.
@@ -682,9 +703,9 @@ void TranspositionTable::store_exclusive(Storage* storage, std::uint64_t key, in
                 return;
             }
             candidate = TranspositionEntry{.key = key,
-                                           .depth = depth,
+                                           .depth = pack_depth(depth),
                                            .score = score_for_storage(score, ply),
-                                           .eval = eval,
+                                           .eval = pack_eval(eval),
                                            .best_move = best_move,
                                            .generation = storage->generation,
                                            .generation_age = storage->clear_epoch,
@@ -701,12 +722,11 @@ void TranspositionTable::store_exclusive(Storage* storage, std::uint64_t key, in
         // Prefer stale generations, then shallow entries.  The final key
         // component makes replacement deterministic when all other signals
         // tie, which is useful for fixed-depth reproducibility.
-        const std::uint16_t age = static_cast<std::uint16_t>(
+        const std::uint8_t age = static_cast<std::uint8_t>(
             storage->generation - candidate.generation);
         const std::uint32_t age_rank = age == 0 ? 1U : 0U;
         const std::uint32_t depth_rank = static_cast<std::uint32_t>(
-            std::clamp(candidate.depth, 0,
-                       static_cast<int>(std::numeric_limits<std::uint16_t>::max())));
+            std::max(0, static_cast<int>(candidate.depth)));
         const std::uint32_t key_rank = static_cast<std::uint32_t>(candidate.key);
         const std::uint32_t priority = (age_rank << 24U) |
             (std::min<std::uint32_t>(depth_rank, 0xFFFFU) << 8U) |
@@ -729,9 +749,9 @@ void TranspositionTable::store_exclusive(Storage* storage, std::uint64_t key, in
         }
     }
     destination = TranspositionEntry{.key = key,
-                                     .depth = depth,
+                                     .depth = pack_depth(depth),
                                      .score = score_for_storage(score, ply),
-                                     .eval = eval,
+                                     .eval = pack_eval(eval),
                                      .best_move = best_move,
                                      .generation = storage->generation,
                                      .generation_age = storage->clear_epoch,
@@ -764,7 +784,7 @@ std::optional<TranspositionEntry> TranspositionTable::probe_impl(
         return std::nullopt;
     }
 
-    const std::size_t cluster = static_cast<std::size_t>(key) & storage->cluster_mask;
+    const std::size_t cluster = cluster_index(key, storage->cluster_count);
     // Resolve the cluster base once; every entry in the cluster lives in the
     // same segment.
     const TranspositionEntry* const cluster_entries = storage->cluster_base(cluster);
@@ -801,7 +821,7 @@ std::optional<TranspositionEntry> TranspositionTable::probe_exclusive(
         return std::nullopt;
     }
 
-    const std::size_t cluster = static_cast<std::size_t>(key) & storage->cluster_mask;
+    const std::size_t cluster = cluster_index(key, storage->cluster_count);
     // Resolve the cluster base once; every entry in the cluster lives in the
     // same segment.
     const TranspositionEntry* const cluster_entries = storage->cluster_base(cluster);
@@ -849,7 +869,7 @@ void TranspositionTable::prefetch(std::uint64_t key) const noexcept {
     if (storage == nullptr || storage->cluster_count == 0) {
         return;
     }
-    const std::size_t cluster = static_cast<std::size_t>(key) & storage->cluster_mask;
+    const std::size_t cluster = cluster_index(key, storage->cluster_count);
     KOI_TT_PREFETCH(storage->cluster_base(cluster));
 }
 
@@ -859,7 +879,7 @@ void TranspositionTable::prefetch_exclusive(Storage* storage, std::uint64_t key)
     if (storage == nullptr || storage->cluster_count == 0) {
         return;
     }
-    const std::size_t cluster = static_cast<std::size_t>(key) & storage->cluster_mask;
+    const std::size_t cluster = cluster_index(key, storage->cluster_count);
     KOI_TT_PREFETCH(storage->cluster_base(cluster));
 }
 

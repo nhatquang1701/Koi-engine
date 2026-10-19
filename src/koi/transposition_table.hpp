@@ -34,8 +34,9 @@ enum class TranspositionBound : std::uint8_t { exact, lower, upper };
 enum class TranspositionAccessMode : std::uint8_t { locked, exclusive };
 
 // Sentinel for "this entry carries no static evaluation".  Real evaluations are
-// bounded far away from this value, so it is unambiguous.
-inline constexpr int kNoEvaluation = -1'000'000'000;
+// bounded far away from this value, so it is unambiguous.  The value is the
+// std::int16_t minimum because the packed entry stores evaluations as int16.
+inline constexpr std::int16_t kNoEvaluation = -32'768;
 
 // Number of hazard-pointer slots one table can hand out to concurrent readers.
 // Each store/probe publishes the storage it is about to use in one
@@ -47,23 +48,23 @@ inline constexpr std::size_t kTranspositionHazardSlots = 1024;
 
 struct TranspositionEntry {
     std::uint64_t key = 0;
-    int depth = 0;
     int score = 0;
+    Move best_move = Move::no_move();
     // Unadjusted static evaluation from the side to move's perspective, or
     // kNoEvaluation when the entry was stored without one.  Search reuses it
-    // to skip evaluate() on a transposition hit.  Field order below keeps the
-    // entry at 32 bytes so a cluster still spans two cache lines.
-    int eval = kNoEvaluation;
-    Move best_move = Move::no_move();
+    // to skip evaluate() on a transposition hit.  Field order and widths keep
+    // the entry at 24 bytes, so a four-entry cluster spans 96 bytes.
+    std::int16_t eval = kNoEvaluation;
+    std::int8_t depth = 0;
     // Replacement epoch and probe-time age.  These have nothing to do with
     // UciController's protocol generation or SearchRequestIdentity: the epoch
     // is advanced once per search by TranspositionTable::new_generation() so
     // replacement prefers entries from previous searches.
-    std::uint16_t generation = 0;
+    std::uint8_t generation = 0;
     // Distance from the current epoch, also reset by logical Clear Hash.  Kept
     // separate from `generation` so clear() can invalidate entries without
     // sweeping storage.
-    std::uint16_t generation_age = 0;
+    std::uint8_t generation_age = 0;
     TranspositionBound bound = TranspositionBound::exact;
     bool occupied = false;
     // PV provenance survives transposition.  Search uses it to keep the
@@ -72,8 +73,8 @@ struct TranspositionEntry {
     bool pv = false;
 };
 
-static_assert(sizeof(TranspositionEntry) == 32,
-              "TranspositionEntry must stay cache-line friendly");
+static_assert(sizeof(TranspositionEntry) == 24,
+              "TranspositionEntry must stay cache-friendly");
 
 enum class HashResizeStatus : std::uint8_t {
     applied,
