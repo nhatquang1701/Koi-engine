@@ -180,6 +180,29 @@ try {
         Assert-True (@($replay.StandardOutput -split "`r?`n") -contains 'legal 1') "$label bestmove is not legal from startpos: $bestmove"
     }
 
+    $netSourceDirectory = Join-Path $outputDirectory 'net-source'
+    New-Item -ItemType Directory -Path $netSourceDirectory -Force | Out-Null
+    $netSource = Join-Path $netSourceDirectory 'candidate.nnue'
+    [System.IO.File]::WriteAllBytes($netSource, [byte[]](1..64))
+    $metadataSource = Join-Path $netSourceDirectory 'candidate.metadata.json'
+    Set-Content -LiteralPath $metadataSource -Value '{"schema":"test"}' -Encoding UTF8
+    $netOutputDirectory = Join-Path $outputDirectory 'with-net'
+    & $powerShellExecutable -NoProfile -ExecutionPolicy Bypass -File $PackageScript `
+        -BuildDirectory $BuildDirectory -OutputDirectory $netOutputDirectory `
+        -NnuePath $netSource -NnueMetadataPath $metadataSource | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "package script with a network exited with $LASTEXITCODE" }
+    $netPackage = Join-Path $netOutputDirectory $packageName
+    $netTarget = Join-Path $netPackage 'nnue/koi.nnue'
+    Assert-True (Test-Path -LiteralPath $netTarget -PathType Leaf) 'package is missing nnue/koi.nnue'
+    Assert-True ((Get-TestSha256 -Path $netTarget) -ceq (Get-TestSha256 -Path $netSource)) 'bundled network differs from the source network'
+    $netSidecar = (Get-Content -LiteralPath (Join-Path $netPackage 'nnue/koi.nnue.sha256') -Raw).Trim()
+    Assert-True ($netSidecar -ceq (Get-TestSha256 -Path $netTarget)) 'network sidecar does not match the bundled network'
+    Assert-True (Test-Path -LiteralPath (Join-Path $netPackage 'nnue/koi.nnue.metadata.json') -PathType Leaf) 'package is missing the network metadata'
+    $netManifest = Get-Content -LiteralPath (Join-Path $netPackage 'package.json') -Raw | ConvertFrom-Json
+    Assert-True ($netManifest.nnue_included -eq $true) 'manifest must state that the network is included'
+    $netPaths = @($netManifest.files | ForEach-Object { [string]$_.path })
+    Assert-True ($netPaths -contains 'nnue/koi.nnue') 'manifest file list is missing the network'
+
     Write-Output 'PASS v1.1.2 release package manifest, checksums, provenance, and extracted archive smoke'
 } finally {
     if (Test-Path -LiteralPath $outputDirectory) {

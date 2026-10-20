@@ -1,7 +1,11 @@
 [CmdletBinding()]
 param(
     [string]$BuildDirectory = (Join-Path $PSScriptRoot '../../build/release'),
-    [string]$OutputDirectory = (Join-Path $PSScriptRoot '../../artifacts/packages')
+    [string]$OutputDirectory = (Join-Path $PSScriptRoot '../../artifacts/packages'),
+    # Optional gated NNUE payload: a network with at least classical-equal
+    # strength at equal time. Omit it for packages without a bundled network.
+    [string]$NnuePath = '',
+    [string]$NnueMetadataPath = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -96,6 +100,29 @@ Copy-Item -LiteralPath $readmePath -Destination (Join-Path $packageDirectory 'RE
 Copy-Item -LiteralPath (Join-Path $repositoryRoot 'LICENSE') `
     -Destination (Join-Path $packageDirectory 'LICENSE')
 
+$nnueIncluded = $false
+if (-not [string]::IsNullOrWhiteSpace($NnuePath)) {
+    $resolvedNnue = [System.IO.Path]::GetFullPath($NnuePath)
+    if (-not (Test-Path -LiteralPath $resolvedNnue -PathType Leaf)) {
+        throw "NNUE network is missing: $resolvedNnue"
+    }
+    $nnueDirectory = Join-Path $packageDirectory 'nnue'
+    New-Item -ItemType Directory -Path $nnueDirectory -Force | Out-Null
+    $nnueTarget = Join-Path $nnueDirectory 'koi.nnue'
+    Copy-Item -LiteralPath $resolvedNnue -Destination $nnueTarget
+    $nnueSha = Get-Sha256Hex $nnueTarget
+    Set-Content -LiteralPath (Join-Path $nnueDirectory 'koi.nnue.sha256') -Value $nnueSha -Encoding ASCII
+    if (-not [string]::IsNullOrWhiteSpace($NnueMetadataPath)) {
+        $resolvedMetadata = [System.IO.Path]::GetFullPath($NnueMetadataPath)
+        if (-not (Test-Path -LiteralPath $resolvedMetadata -PathType Leaf)) {
+            throw "NNUE metadata is missing: $resolvedMetadata"
+        }
+        Copy-Item -LiteralPath $resolvedMetadata `
+            -Destination (Join-Path $nnueDirectory 'koi.nnue.metadata.json')
+    }
+    $nnueIncluded = $true
+}
+
 $licenseDirectory = Join-Path $packageDirectory 'licenses'
 New-Item -ItemType Directory -Path $licenseDirectory -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $repositoryRoot 'third_party/chess-library/LICENSE') `
@@ -106,6 +133,11 @@ Copy-Item -LiteralPath (Join-Path $repositoryRoot 'third_party/fathom/LICENSE') 
 $engineName = "koi-engine$binarySuffix"
 $avx2Name = "koi-engine-avx2$binarySuffix"
 $avx512Name = "koi-engine-avx512$binarySuffix"
+$nnueParagraph = if ($nnueIncluded) {
+    "This package includes Koi's gated NNUE network at nnue/koi.nnue (its SHA-256 is in nnue/koi.nnue.sha256). Set EvalFile to that path to use it; the classical evaluator remains the fallback."
+} else {
+    ''
+}
 $launcherParagraph = if ($isMacOSHost) {
     "This package contains the native Apple Silicon (arm64) build; run $engineName directly."
 } else {
@@ -136,6 +168,7 @@ $launcherParagraph
 The optional user-supplied book.bin belongs beside $engineName and is not
 included in this package. Syzygy tablebase files are also user-supplied;
 configure SyzygyPath in the GUI when they are available.
+$nnueParagraph
 
 Recommended starting options:
   Hash=512
@@ -186,6 +219,7 @@ $manifest = [ordered]@{
     files = $packageFiles
     book_included = $false
     tablebases_included = $false
+    nnue_included = [bool]$nnueIncluded
     provenance = [ordered]@{
         source_commit = $sourceCommit
         source_dirty = [bool]$sourceDirty
