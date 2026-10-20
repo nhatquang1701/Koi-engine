@@ -556,6 +556,35 @@ void accumulate_hidden_sparse_avx2(const NnueNetwork& network,
     }
 
     std::int64_t output = network.output_bias;
+#if KOI_NNUE_COMPILED_AVX2
+    if (bottleneck_units == 8U && avx2_available()) {
+        __m256i sums = _mm256_setzero_si256();
+        for (std::size_t hidden = 0; hidden < hidden_units; ++hidden) {
+            const std::int32_t value = accumulator.values[hidden];
+            const __m128i weights8 = _mm_loadl_epi64(reinterpret_cast<const __m128i*>(
+                network.bottleneck_weights.data() + hidden * bottleneck_units));
+            const __m256i weights = _mm256_cvtepi8_epi32(weights8);
+            sums = _mm256_add_epi32(
+                sums, _mm256_mullo_epi32(_mm256_set1_epi32(value), weights));
+        }
+        std::int32_t lanes[8];
+        _mm256_storeu_si256(reinterpret_cast<__m256i*>(lanes), sums);
+        for (std::size_t bottleneck = 0; bottleneck < bottleneck_units; ++bottleneck) {
+            std::int64_t activation = lanes[bottleneck];
+            if (network.bottleneck_shift > 0) {
+                activation >>= network.bottleneck_shift;
+            }
+            activation += network.bottleneck_bias[bottleneck];
+            activation = std::clamp<std::int64_t>(activation, 0, kKoiNnueClippedReluMaximum);
+            accumulator.bottleneck_values[bottleneck] = static_cast<std::int16_t>(activation);
+            output += activation * network.output_weights[bottleneck];
+        }
+        if (network.output_shift > 0) {
+            output >>= network.output_shift;
+        }
+        return clamp_score(output);
+    }
+#endif
     for (std::size_t bottleneck = 0; bottleneck < bottleneck_units; ++bottleneck) {
         std::int64_t activation = 0;
         for (std::size_t hidden = 0; hidden < hidden_units; ++hidden) {
