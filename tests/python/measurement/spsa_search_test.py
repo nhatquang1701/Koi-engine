@@ -99,6 +99,10 @@ class DryRunTest(unittest.TestCase):
             self.assertTrue((staging / "iter000-plus").is_dir())
             self.assertTrue((staging / "iter000-minus").is_dir())
             self.assertTrue(report.is_file())
+            self.assertNotIn("best", result)
+            final = result["final"]
+            self.assertEqual(set(final), {p.name for p in spsa_search.DEFAULT_PARAMETERS})
+            self.assertEqual(json.loads(report.read_text(encoding="utf-8"))["final"], final)
 
 
 if __name__ == "__main__":

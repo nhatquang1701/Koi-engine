@@ -271,8 +271,6 @@ def run(
     rng = random.Random(seed)
     values = {parameter.name: parameter.value for parameter in parameters}
     history: list[dict[str, object]] = []
-    best = dict(values)
-    best_score = float("-inf")
 
     for iteration in range(iterations):
         delta = {parameter.name: rng.choice((-1, 1)) for parameter in parameters}
@@ -304,7 +302,9 @@ def run(
         for tag in ("plus", "minus"):
             output = pathlib.Path(staged[tag]["__dir"])
             params_json = output / "parameters.json"
-            params_json.write_text(json.dumps(staged[tag], indent=2), encoding="utf-8")
+            params_json.write_text(
+                json.dumps({name: value for name, value in staged[tag].items()
+                            if name != "__dir"}, indent=2), encoding="utf-8")
             command = (runner
                        .replace("{dir}", str(output))
                        .replace("{tag}", tag)
@@ -324,10 +324,6 @@ def run(
 
         values = spsa_step(values, parameters, delta, scores["plus"], scores["minus"],
                            coefficient, rng)
-        if scores["plus"] > best_score:
-            best_score = scores["plus"]
-            best = dict(staged["plus"])
-            best.pop("__dir", None)
         history.append({
             "iteration": iteration,
             "delta": delta,
@@ -342,8 +338,7 @@ def run(
             "schema": REPORT_SCHEMA,
             "parameters": [asdict(parameter) for parameter in parameters],
             "iterations": history,
-            "best": best,
-            "best_score": best_score,
+            "final": dict(values),
         }
         report_path.parent.mkdir(parents=True, exist_ok=True)
         report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
@@ -352,8 +347,6 @@ def run(
         "schema": REPORT_SCHEMA,
         "parameters": [asdict(parameter) for parameter in parameters],
         "iterations": history,
-        "best": best,
-        "best_score": best_score,
         "final": values,
     }
     report_path.parent.mkdir(parents=True, exist_ok=True)
@@ -415,7 +408,7 @@ def main(argv: list[str] | None = None) -> int:
     except TuningError as error:
         print(f"spsa search failed: {error}", file=sys.stderr)
         return 1
-    print(json.dumps(result.get("final", result.get("best")), indent=2))
+    print(json.dumps(result.get("final"), indent=2))
     return 0
 
 
