@@ -1206,6 +1206,16 @@ if(Python3_Interpreter_FOUND)
             ENVIRONMENT "PYTHONDONTWRITEBYTECODE=1;KOI_REPLAY_PATH=$<TARGET_FILE:koi_replay>"
     )
     add_test(
+        NAME spsa_search_python
+        COMMAND "${Python3_EXECUTABLE}" -m unittest tests/python/measurement/spsa_search_test.py -v
+    )
+    set_tests_properties(
+        spsa_search_python
+        PROPERTIES
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+            ENVIRONMENT "PYTHONDONTWRITEBYTECODE=1"
+    )
+    add_test(
         NAME tune_eval_python
         COMMAND "${Python3_EXECUTABLE}" -m unittest tests/python/evaluation/tune_eval_test.py -v
     )

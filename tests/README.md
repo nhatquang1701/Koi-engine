@@ -149,7 +149,7 @@ Python tooling tests (`tests/python/**/*.py`), run as `python -m unittest` with
 the repository root as the working directory:
 
 - Measurement: `elo_oracle_python`, `elo_estimate_python`, `stockfish_match_python`,
-  `elo_openings_python`, `measurement_phase_python`, `measurement_forensics_python`.
+  `elo_openings_python`, `spsa_search_python`, `measurement_phase_python`, `measurement_forensics_python`.
 - Release evidence: `release_candidate_games_python` validates recorded game
   artifacts, `release_strength_openings_python` checks the fixed opening sample,
   and `strength_bound_python` checks the paired strength decision and provenance.
