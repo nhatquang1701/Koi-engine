@@ -354,6 +354,16 @@ def run(
     return final
 
 
+def stage_final(root: pathlib.Path, parameters: list[Parameter],
+                report: dict[str, object], out_dir: pathlib.Path) -> pathlib.Path:
+    """Stage the report's final theta as a buildable candidate tree."""
+    values = report.get("final")
+    if not isinstance(values, dict):
+        raise TuningError("report has no final theta to stage")
+    stage_variant(root, parameters, values, out_dir)
+    return out_dir
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--manifest", type=pathlib.Path,
@@ -376,7 +386,22 @@ def main(argv: list[str] | None = None) -> int:
                         default=pathlib.Path("artifacts/training/spsa-report.json"))
     parser.add_argument("--dry-run", action="store_true",
                         help="stage one iteration of variants and stop")
+    parser.add_argument("--stage-final", nargs=2, metavar=("REPORT", "DIR"),
+                        help="stage the final theta from a report and exit")
     arguments = parser.parse_args(argv)
+
+    if arguments.stage_final:
+        report_path, out_dir = (pathlib.Path(item) for item in arguments.stage_final)
+        try:
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+            raw_parameters = report["parameters"]
+            parameters = [Parameter(**item) for item in raw_parameters]
+            stage_final(arguments.root, parameters, report, out_dir)
+        except (OSError, json.JSONDecodeError, KeyError, TypeError, TuningError) as error:
+            print(f"spsa stage-final failed: {error}", file=sys.stderr)
+            return 1
+        print(f"staged {out_dir}")
+        return 0
 
     if arguments.emit_default_manifest:
         arguments.emit_default_manifest.parent.mkdir(parents=True, exist_ok=True)

@@ -104,6 +104,30 @@ class DryRunTest(unittest.TestCase):
             self.assertEqual(set(final), {p.name for p in spsa_search.DEFAULT_PARAMETERS})
             self.assertEqual(json.loads(report.read_text(encoding="utf-8"))["final"], final)
 
+    def test_stage_final_stages_the_report_theta(self):
+        with tempfile.TemporaryDirectory() as directory:
+            staging = Path(directory) / "staging"
+            report = Path(directory) / "report.json"
+            result = spsa_search.run(
+                root=ROOT,
+                parameters=list(spsa_search.DEFAULT_PARAMETERS),
+                staging_root=staging,
+                runner="",
+                iterations=1,
+                games=10,
+                seed=1,
+                a0=2.0,
+                alpha=0.602,
+                a_bar=10.0,
+                report_path=report,
+                dry_run=True,
+            )
+            out = Path(directory) / "final"
+            spsa_search.stage_final(ROOT, list(spsa_search.DEFAULT_PARAMETERS),
+                                    result, out)
+            header = (out / "src/koi/detail/search_constants.hpp").read_text(encoding="utf-8")
+            self.assertIn("kRazorMarginPerDepthSquared = 120", header)
+
 
 if __name__ == "__main__":
     unittest.main()
