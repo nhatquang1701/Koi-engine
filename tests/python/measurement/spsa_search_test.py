@@ -64,8 +64,8 @@ class UpdateTest(unittest.TestCase):
         updated = spsa_search.spsa_step(
             {"first": 10, "second": 10}, parameters,
             {"first": 1, "second": -1}, 0.60, 0.40, coefficient=50.0)
-        self.assertEqual(updated["first"], 15)
-        self.assertEqual(updated["second"], 5)
+        self.assertEqual(updated["first"], 20)
+        self.assertEqual(updated["second"], 0)
 
     def test_update_clamps_to_the_declared_range(self):
         parameters = [

@@ -241,7 +241,7 @@ def spsa_step(
     gradient = (score_plus - score_minus) / 2.0
     updated: dict[str, int] = {}
     for parameter in parameters:
-        change = coefficient * gradient * delta[parameter.name]
+        change = coefficient * gradient * delta[parameter.name] * parameter.step
         magnitude = abs(change)
         steps = int(magnitude)
         if rng.random() < (magnitude - steps):
