@@ -12,6 +12,10 @@ asset, and tooling reference.
 - [lichess-bot.md](lichess-bot.md) covers running Koi as a Lichess bot.
 - [mac-worker.md](mac-worker.md) documents the Apple Silicon build, test, and
   measurement worker setup.
+- [ARCHITECTURE.md](ARCHITECTURE.md) maps the runtime modules to the files under
+  `src/koi`.
+- [NNUE_PIPELINE.md](NNUE_PIPELINE.md) shows the training and promotion loop for
+  the optional network.
 - [releases/](releases/v1.1.2.md) contains published release notes.
 - [history/](history/removed-nnue-studio.md) records tools that were removed and
   why.

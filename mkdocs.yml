@@ -42,7 +42,11 @@ markdown_extensions:
       pygments_lang_class: true
   - pymdownx.inlinehilite
   - pymdownx.snippets
-  - pymdownx.superfences
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - tables
 
 nav:
@@ -55,6 +59,8 @@ nav:
   - Developing Koi:
       - Agent guide: AGENTS.md
       - Contributing: CONTRIBUTING.md
+      - Architecture: docs/ARCHITECTURE.md
+      - NNUE pipeline: docs/NNUE_PIPELINE.md
       - Apple Silicon worker: docs/mac-worker.md
       - Tests: tests/README.md
       - Developer tools: tools/README.md
