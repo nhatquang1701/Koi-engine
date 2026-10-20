@@ -234,6 +234,33 @@ class KoiDatasetTest(unittest.TestCase):
                 self.assertEqual(blocks, list(koi_dataset.encode_record(board)))
                 self.assertEqual(score, cp)
 
+    def test_encode_version_one_writes_the_halfka_only_layout(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            corpus = directory / "labels.txt"
+            write_corpus(corpus, ROWS)
+            output = directory / "dataset-v1.bin"
+            result = run_tool(
+                "encode", "--input", str(corpus), "--output", str(output), "--version", "1")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            data = output.read_bytes()
+            header = koi_dataset.DatasetEncoder.read_header_bytes(data)
+            self.assertEqual(header["magic"], "KOI-DATA")
+            self.assertEqual(header["version"], 1)
+            self.assertEqual(header["feature_set"], "halfka-king-bucket-v1")
+            self.assertEqual(header["records"], len(ROWS))
+            position = koi_dataset.header_bytes_v1()
+            for fen, expected_cp in ROWS:
+                count = struct.unpack_from("<H", data, position)[0]
+                position += 2
+                indices = list(struct.unpack_from(f"<{count}H", data, position))
+                position += count * 2
+                score = struct.unpack_from("<i", data, position)[0]
+                position += 4
+                self.assertEqual(indices, koi_dataset.halfka_king_bucket_indices(chess.Board(fen)))
+                self.assertEqual(score, expected_cp)
+            self.assertEqual(position, len(data))
+
     def test_encode_skips_malformed_and_out_of_range_rows(self):
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)

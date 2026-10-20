@@ -55,7 +55,9 @@ GROUP_FEATURE_SETS = (FEATURE_SET, THREAT_FEATURE_SET)
 COMBINED_FEATURE_SET = "halfka-king-bucket-v1+threat-pairs-v1"
 MAGIC = b"KOI-DATA"
 VERSION = 2
+V1_VERSION = 1
 STATE_SCHEMA = "koi-dataset-v2-state"
+V1_STATE_SCHEMA = "koi-dataset-v1-state"
 INPUT_UNITS = 12 * 12 * 64
 THREAT_BUCKET_UNITS = 2304
 THREAT_INPUT_UNITS = 12 * THREAT_BUCKET_UNITS
@@ -74,6 +76,11 @@ def header_bytes() -> int:
     for name in (FEATURE_SET_BYTES, THREAT_FEATURE_SET_BYTES):
         payload += 2 + len(name)
     return payload
+
+
+def header_bytes_v1() -> int:
+    """Header size for the single-group ``koi-dataset-v1`` layout."""
+    return 8 + 4 + 2 + len(FEATURE_SET_BYTES) + 8
 
 
 HEADER_BYTES = header_bytes()
@@ -241,12 +248,17 @@ def parse_row(raw: bytes) -> tuple[chess.Board, int] | None:
 class DatasetEncoder:
     """Streaming, resumable writer for ``koi-dataset-v2``."""
 
-    def __init__(self, output: Path, input_path: Path) -> None:
+    def __init__(self, output: Path, input_path: Path, version: int = VERSION) -> None:
+        if version not in (V1_VERSION, VERSION):
+            raise DatasetError(f"unsupported dataset version {version}")
+        self.version = version
         self.output = output
         self.input_path = input_path
         self.state_path = output.parent / (output.name + ".state.json")
-        self.count_offset = HEADER_BYTES - 8
-        self.data_start = HEADER_BYTES
+        self.count_offset = (
+            HEADER_BYTES if version == VERSION else header_bytes_v1()) - 8
+        self.data_start = HEADER_BYTES if version == VERSION else header_bytes_v1()
+        self.state_schema = STATE_SCHEMA if version == VERSION else V1_STATE_SCHEMA
         self.offset = 0
         self.records = 0
         self.data_bytes = 0
@@ -264,11 +276,13 @@ class DatasetEncoder:
                 return True
         if self.output.exists() and self.state_path.exists():
             state = json.loads(self.state_path.read_text(encoding="utf-8"))
-            if state.get("schema") != STATE_SCHEMA:
+            if state.get("schema") != self.state_schema:
                 raise DatasetError(f"{self.state_path} has an unknown schema")
+            expected_groups = (
+                list(GROUP_FEATURE_SETS) if self.version == VERSION else [FEATURE_SET])
             if (
                 state.get("input") != str(self.input_path)
-                or list(state.get("groups", ())) != list(GROUP_FEATURE_SETS)
+                or list(state.get("groups", ())) != expected_groups
             ):
                 raise DatasetError(
                     f"{self.state_path} belongs to a different input; delete it to start over"
@@ -292,11 +306,15 @@ class DatasetEncoder:
                 self.state_path.unlink()
             self.output.parent.mkdir(parents=True, exist_ok=True)
             self.handle = open(self.output, "w+b")
-            self.handle.write(struct.pack("<8sIH", MAGIC, VERSION, len(GROUP_FEATURE_SETS)))
-            for name in GROUP_FEATURE_SETS:
-                encoded = name.encode("utf-8")
-                self.handle.write(struct.pack("<H", len(encoded)))
-                self.handle.write(encoded)
+            if self.version == VERSION:
+                self.handle.write(struct.pack("<8sIH", MAGIC, VERSION, len(GROUP_FEATURE_SETS)))
+                for name in GROUP_FEATURE_SETS:
+                    encoded = name.encode("utf-8")
+                    self.handle.write(struct.pack("<H", len(encoded)))
+                    self.handle.write(encoded)
+            else:
+                self.handle.write(struct.pack("<8sIH", MAGIC, V1_VERSION, len(FEATURE_SET_BYTES)))
+                self.handle.write(FEATURE_SET_BYTES)
             self.handle.write(struct.pack("<Q", 0))
             self.handle.flush()
             log(f"created {self.output}")
@@ -312,6 +330,22 @@ class DatasetEncoder:
 
     # -- writing -----------------------------------------------------------
     def add(self, groups: tuple[list[int], list[int], list[int], list[int]], cp: int) -> None:
+        if self.version == V1_VERSION:
+            block = groups[0]
+            if len(block) > SPARSE_CAPACITY:
+                raise DatasetError(
+                    f"group A record has {len(block)} active features; "
+                    f"capacity is {SPARSE_CAPACITY}"
+                )
+            record = struct.pack("<H", len(block))
+            record += struct.pack(f"<{len(block)}H", *block)
+            record += struct.pack("<i", cp)
+            self._pending.append(record)
+            self.records += 1
+            self.data_bytes += len(record)
+            if len(self._pending) >= FLUSH_RECORDS:
+                self._flush()
+            return
         counts = [len(block) for block in groups]
         if counts[0] > SPARSE_CAPACITY or counts[2] > SPARSE_CAPACITY:
             raise DatasetError(
@@ -373,9 +407,10 @@ class DatasetEncoder:
 
     def _save_state(self) -> None:
         state = {
-            "schema": STATE_SCHEMA,
+            "schema": self.state_schema,
             "input": str(self.input_path),
-            "groups": list(GROUP_FEATURE_SETS),
+            "groups": (list(GROUP_FEATURE_SETS) if self.version == VERSION
+                       else [FEATURE_SET]),
             "offset": self.offset,
             "records": self.records,
             "data_bytes": self.data_bytes,
@@ -431,7 +466,7 @@ class DatasetEncoder:
 
 
 def encode_command(args: argparse.Namespace) -> int:
-    encoder = DatasetEncoder(args.output, args.input)
+    encoder = DatasetEncoder(args.output, args.input, args.version)
     try:
         if encoder.start(args.resume):
             return 0
@@ -478,6 +513,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="stop after N new records and keep the checkpoint (0 encodes everything)",
     )
     encode.add_argument("--progress-every", type=int, default=100000)
+    encode.add_argument(
+        "--version",
+        type=int,
+        choices=(1, 2),
+        default=2,
+        help="dataset schema to write (2 = halfka + threat groups for the v5/v6 "
+             "trainers; 1 = halfka only for the v4 trainer)",
+    )
     info = subparsers.add_parser("info", help="print the header of an encoded dataset")
     info.add_argument("--input", type=Path, required=True)
     return parser
