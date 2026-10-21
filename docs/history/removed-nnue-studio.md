@@ -45,8 +45,6 @@ era used the schema name `koi-nnue-studio-ab-match-v1`.
 - It carried a disproportionate maintenance surface: a tkinter UI, three
   backend adapters, run-directory telemetry, and two dedicated Python test
   modules.
-- The maintainer requested complete removal on 2026-10-06, including its
-  documentation.
 
 ## What replaced it
 
