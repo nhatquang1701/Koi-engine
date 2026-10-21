@@ -16,7 +16,7 @@ asset, and tooling reference.
   `src/koi`.
 - [NNUE_PIPELINE.md](NNUE_PIPELINE.md) shows the training and promotion loop for
   the optional network.
-- [releases/](releases/v1.1.2.md) contains published release notes.
+- [releases/](releases/v1.1.3.md) contains published release notes.
 - [history/](history/removed-nnue-studio.md) records tools that were removed and
   why.
 - `../tests/README.md` explains test categories and fixture locations.

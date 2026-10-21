@@ -179,9 +179,9 @@ jobs:
           pwsh -NoProfile -File tools/build/package_release.ps1 -BuildDirectory build/ci-package -OutputDirectory artifacts/packages
           ls -l artifacts/packages
           pwsh -NoProfile -File tests/integration/packaging/package_release_test.ps1 -BuildDirectory build/ci-package -PackageScript tools/build/package_release.ps1
-          archive=artifacts/packages/koi-engine-v1.1.2-macos-arm64.tar.gz
-          (cd artifacts/packages && shasum -a 256 -c koi-engine-v1.1.2-macos-arm64.tar.gz.sha256)
-          extracted=/tmp/koi-v1.1.2-package
+          archive=artifacts/packages/koi-engine-v1.1.3-macos-arm64.tar.gz
+          (cd artifacts/packages && shasum -a 256 -c koi-engine-v1.1.3-macos-arm64.tar.gz.sha256)
+          extracted=/tmp/koi-v1.1.3-package
           mkdir -p "$extracted"
           tar -xzf "$archive" -C "$extracted"
           python3 - <<"PY"
@@ -190,9 +190,9 @@ jobs:
           import os
           import pathlib
           import re
-          root = pathlib.Path("/tmp/koi-v1.1.2-package")
+          root = pathlib.Path("/tmp/koi-v1.1.3-package")
           manifest = json.loads((root / "package.json").read_text(encoding="utf-8-sig"))
-          assert manifest["version"] == "1.1.2", manifest["version"]
+          assert manifest["version"] == "1.1.3", manifest["version"]
           assert manifest["platform"] == "macos-arm64", manifest["platform"]
           assert re.fullmatch(r"[0-9a-f]{40,64}", manifest["provenance"]["source_commit"]), manifest["provenance"]
           assert manifest["provenance"]["source_commit"] == os.environ["GITHUB_SHA"], manifest["provenance"]
@@ -225,7 +225,7 @@ jobs:
         with:
           name: koi-engine-macos-tarball
           path: |
-            artifacts/packages/koi-engine-v1.1.2-macos-arm64.tar.gz
-            artifacts/packages/koi-engine-v1.1.2-macos-arm64.tar.gz.sha256
+            artifacts/packages/koi-engine-v1.1.3-macos-arm64.tar.gz
+            artifacts/packages/koi-engine-v1.1.3-macos-arm64.tar.gz.sha256
           if-no-files-found: ignore
           retention-days: 7

@@ -13,7 +13,7 @@ $isMacOSHost = -not $isWindowsHost -and
     [System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([System.Runtime.InteropServices.OSPlatform]::OSX)
 $platformTag = if ($isWindowsHost) { '' } elseif ($isMacOSHost) { '-macos-arm64' } else { '-linux-x86_64' }
 $binarySuffix = if ($isWindowsHost) { '.exe' } else { '' }
-$packageName = "koi-engine-v1.1.2$platformTag"
+$packageName = "koi-engine-v1.1.3$platformTag"
 $archivePathName = if ($isWindowsHost) { "$packageName.zip" } else { "$packageName.tar.gz" }
 $outputDirectory = Join-Path ([System.IO.Path]::GetTempPath()) ('koi-package-test-' + [guid]::NewGuid().ToString('N'))
 
@@ -108,7 +108,7 @@ try {
     $manifestText = Get-Content -LiteralPath (Join-Path $packageDirectory 'package.json') -Raw
     $manifest = $manifestText | ConvertFrom-Json
     Assert-True ($manifest.schema -ceq 'koi-engine-package-v1') 'package manifest schema is incorrect'
-    Assert-True ($manifest.version -ceq '1.1.2') 'package manifest version is not 1.1.2'
+    Assert-True ($manifest.version -ceq '1.1.3') 'package manifest version is not 1.1.3'
     $expectedPlatform = if ($isWindowsHost) { 'windows-x86_64' } elseif ($isMacOSHost) { 'macos-arm64' } else { 'linux-x86_64' }
     Assert-True ($manifest.platform -ceq $expectedPlatform) 'manifest platform does not match the host'
     Assert-True ($manifest.build_configuration -ceq 'Release') 'manifest build configuration is not Release'
@@ -203,7 +203,7 @@ try {
     $netPaths = @($netManifest.files | ForEach-Object { [string]$_.path })
     Assert-True ($netPaths -contains 'nnue/koi.nnue') 'manifest file list is missing the network'
 
-    Write-Output 'PASS v1.1.2 release package manifest, checksums, provenance, and extracted archive smoke'
+    Write-Output 'PASS v1.1.3 release package manifest, checksums, provenance, and extracted archive smoke'
 } finally {
     if (Test-Path -LiteralPath $outputDirectory) {
         Remove-Item -LiteralPath $outputDirectory -Recurse -Force
