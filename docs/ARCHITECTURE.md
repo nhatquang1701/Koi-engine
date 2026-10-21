@@ -5,7 +5,7 @@ module map, not a call graph: solid arrows show the main data and control
 direction, and every node names a real translation unit or header.
 
 ```mermaid
-flowchart LR
+flowchart TD
     GUI["UCI GUI · Arena<br/>Cute Chess · lichess-bot"] -- "UCI protocol" --> UCI
     UCI["uci_controller.cpp<br/>options · protocol output<br/>search lifecycle"]
     UCI --> TIME["time_manager.cpp<br/>soft/hard budgets<br/>move overhead"]
