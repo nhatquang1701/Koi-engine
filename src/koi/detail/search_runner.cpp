@@ -2627,7 +2627,7 @@ void maybe_publish_interim(const SearchEventSink& sink, InterimReportState& stat
             // current move so interval lines show live progress instead of
             // repeating only the completed iteration.
             info.currmove = info.pv.front();
-            info.currmovenumber = 0;
+            info.currmovenumber = 1;
         } else if (info.currmove.is_no_move() && !info.pv.empty()) {
             // The in-flight PV is not published yet on this path; still report
             // the root move of the line being shown so GUIs get live progress.
