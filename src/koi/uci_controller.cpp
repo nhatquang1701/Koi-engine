@@ -1663,6 +1663,9 @@ void UciController::write_search_info(std::uint64_t generation, const SearchInfo
 
     output_ << "info depth " << info.depth << " seldepth " << info.seldepth
             << " multipv " << info.multipv;
+    if (!info.currmove.is_no_move()) {
+        output_ << " currmove " << info.currmove.uci();
+    }
     if (info.bound != SearchInfo::Bound::estimate) {
         output_ << " score ";
         if (info.mate.has_value()) {

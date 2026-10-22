@@ -2623,6 +2623,16 @@ void maybe_publish_interim(const SearchEventSink& sink, InterimReportState& stat
         first_line = false;
         if (use_live_pv) {
             info.pv = live_pv->to_vector();
+            // Report the root move of the in-flight principal variation as the
+            // current move so interval lines show live progress instead of
+            // repeating only the completed iteration.
+            info.currmove = info.pv.front();
+            info.currmovenumber = 0;
+        } else if (info.currmove.is_no_move() && !info.pv.empty()) {
+            // The in-flight PV is not published yet on this path; still report
+            // the root move of the line being shown so GUIs get live progress.
+            info.currmove = info.pv.front();
+            info.currmovenumber = 1;
         }
         info.nodes = std::max(stored.nodes, live_nodes);
         info.nps = elapsed.count() > 0 ? info.nodes * 1000 /

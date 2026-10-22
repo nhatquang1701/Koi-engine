@@ -3061,6 +3061,12 @@ void test_interim_publication_reports_the_in_flight_principal_variation() {
                         "an interim line must republish the last completed score and bound");
                 if (interim.pv != completed_prior.pv) {
                     saw_in_flight = true;
+                    require(!interim.currmove.is_no_move(),
+                            "an in-flight interim line must report the current root move");
+                    require(interim.currmove == interim.pv.front(),
+                            "currmove must match the live in-flight principal variation");
+                    require(interim.currmovenumber >= 1,
+                            "currmovenumber must be one-based");
                 }
             }
         }
@@ -4739,7 +4745,7 @@ void test_transposition_table_reports_hashfull_occupancy() {
     // Writing far more keys than the table has clusters guarantees every
     // cluster is populated, so the bounded hashfull sample always observes
     // occupied slots regardless of the internal segment sizing.
-    for (std::uint64_t key = 0; key < 65536; ++key) {
+    for (std::uint64_t key = 0; key < 262144; ++key) {
         table.store(key, 3, 0, koi::TranspositionBound::exact, *move);
     }
     require(table.hashfull_permill() == 1000,

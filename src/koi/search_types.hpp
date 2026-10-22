@@ -192,6 +192,12 @@ struct SearchInfo {
     // nullopt means the UCI layer derives the heuristic WDL triplet from the
     // score instead.
     std::optional<std::array<int, 3>> exact_wdl;
+    // Root move currently under search, published by interim lines so a GUI
+    // can show live progress between completed iterations (same fields
+    // Stockfish emits). no_move means "omit". Appended last so positional
+    // aggregate initialization of earlier members stays valid.
+    Move currmove = Move::no_move();
+    int currmovenumber = 0;
 };
 
 // Identity of one controller request as seen by the completion pipeline.
