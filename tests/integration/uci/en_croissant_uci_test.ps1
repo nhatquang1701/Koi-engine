@@ -44,7 +44,7 @@ try {
         $line = Read-UciLine $session 'MultiPV bestmove'
         if ($line -match '^bestmove [a-h][1-8][a-h][1-8][nbrq]?( ponder [a-h][1-8][a-h][1-8][nbrq]?)?$') {
             $secondBestmoves.Add($line)
-        } elseif ($line -match '^info depth [1-9][0-9]* seldepth [0-9]+ multipv ([1-9][0-9]*)(?: score (?:cp|mate) -?[0-9]+(?: (?:lowerbound|upperbound))?(?: wdl [0-9]+ [0-9]+ [0-9]+)?)? nodes [0-9]+ nps [0-9]+ hashfull [0-9]+ time [0-9]+ pv(?: [a-h][1-8][a-h][1-8][nbrq]?)*(?: tbhits [0-9]+)?$') {
+        } elseif ($line -match '^info depth [1-9][0-9]* seldepth [0-9]+ multipv ([1-9][0-9]*)(?: currmove [a-h][1-8][a-h][1-8][nbrq]?(?: currmovenumber [1-9][0-9]*)?)?(?: score (?:cp|mate) -?[0-9]+(?: (?:lowerbound|upperbound))?(?: wdl [0-9]+ [0-9]+ [0-9]+)?)? nodes [0-9]+ nps [0-9]+ hashfull [0-9]+ time [0-9]+ pv(?: [a-h][1-8][a-h][1-8][nbrq]?)*(?: tbhits [0-9]+)?$') {
             $null = $multiPvRanks.Add([int]$Matches[1])
         } else {
             throw "Invalid MultiPV output: $line"

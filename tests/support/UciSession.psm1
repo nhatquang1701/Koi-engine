@@ -264,7 +264,7 @@ function Test-SearchInfo {
 
     # UCI permits an info line without score. Koi uses that form for a
     # selective estimate with no proven bound direction while retaining PV.
-    return $Line -match '^info depth [1-9][0-9]* seldepth [0-9]+ multipv ([1-9]|1[0-6])( score (cp|mate) -?[0-9]+( (lowerbound|upperbound))?( wdl [0-9]+ [0-9]+ [0-9]+)?)? nodes [0-9]+ nps [0-9]+ hashfull [0-9]+ time [0-9]+ pv( [a-h][1-8][a-h][1-8][nbrq]?)*( tbhits [0-9]+)?$'
+    return $Line -match '^info depth [1-9][0-9]* seldepth [0-9]+ multipv ([1-9]|1[0-6])( currmove [a-h][1-8][a-h][1-8][nbrq]?( currmovenumber [1-9][0-9]*)?)?( score (cp|mate) -?[0-9]+( (lowerbound|upperbound))?( wdl [0-9]+ [0-9]+ [0-9]+)?)? nodes [0-9]+ nps [0-9]+ hashfull [0-9]+ time [0-9]+ pv( [a-h][1-8][a-h][1-8][nbrq]?)*( tbhits [0-9]+)?$'
 }
 
 Export-ModuleMember -Function Start-UciSession, Stop-AllUciSessions, Send-UciCommand,
