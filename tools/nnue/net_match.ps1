@@ -127,11 +127,13 @@ function Read-NnueContainerInfo {
     $evaluatorMode = switch ($containerVersion) {
         4 { 'nnue-v4' }
         5 { 'nnue-v5' }
+        6 { 'nnue-v6' }
+        8 { 'nnue-v8' }
         default { $null }
     }
     if ($null -eq $evaluatorMode) {
         throw ("$Label uses NNUE container version $containerVersion, but net_match.ps1 only attests " +
-            'v4 and v5 containers through uci_match.ps1 -KoiEvaluatorMode.')
+            'v4, v5, v6, and v8 containers through uci_match.ps1 -KoiEvaluatorMode.')
     }
     return [pscustomobject]@{
         ContainerVersion = $containerVersion

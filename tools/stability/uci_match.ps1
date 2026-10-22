@@ -63,7 +63,7 @@ param(
     # Optional evaluator attestation. For nnue-v4, nnue-v5, or gpu-v5 pass an
     # existing network with -KoiEvalFile; gpu-v5 also requires KOI_GPU_NNUE=1
     # and at least two -Threads. Existing KoiOptions EvalFile remains supported.
-    [ValidateSet('classical', 'nnue-v4', 'nnue-v5', 'gpu-v5')]
+    [ValidateSet('classical', 'nnue-v4', 'nnue-v5', 'nnue-v6', 'nnue-v8', 'gpu-v5')]
     [string]$KoiEvaluatorMode = 'classical',
 
     [string]$KoiEvalFile = '',
@@ -243,7 +243,10 @@ if ($KoiEvaluatorMode -ne 'classical') {
     $networkVersion = [System.BitConverter]::ToUInt32($header, 8)
     $expectedNetworkVersion = switch ($KoiEvaluatorMode) {
         'nnue-v4' { 4 }
-        { $_ -in @('nnue-v5', 'gpu-v5') } { 5 }
+        'nnue-v5' { 5 }
+        'nnue-v6' { 6 }
+        'nnue-v8' { 8 }
+        { $_ -in @('gpu-v5') } { 5 }
     }
     if ($networkVersion -ne $expectedNetworkVersion) {
         throw "Koi EvalFile for '$KoiEvaluatorMode' does not contain NNUE v$expectedNetworkVersion."
@@ -532,7 +535,7 @@ function Start-UciEngine([string]$Path, [string]$Label) {
     $startInfo.RedirectStandardInput = $true
     $startInfo.RedirectStandardOutput = $true
     $startInfo.RedirectStandardError = $true
-    if ($Label -ceq 'Koi' -and $KoiEvaluatorMode -in @('nnue-v4', 'nnue-v5')) {
+    if ($Label -ceq 'Koi' -and $KoiEvaluatorMode -in @('nnue-v4', 'nnue-v5', 'nnue-v6', 'nnue-v8')) {
         # Keep CPU v4/v5 attestations explicit even when the parent shell asked
         # the engine to prefer GPU inference for unrelated runs.
         $startInfo.EnvironmentVariables['KOI_GPU_NNUE'] = '0'
