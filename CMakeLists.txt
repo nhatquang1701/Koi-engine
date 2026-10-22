@@ -1224,6 +1224,16 @@ if(Python3_Interpreter_FOUND)
         COMMAND "${Python3_EXECUTABLE}" -m unittest tests/python/evaluation/nnue_training_test.py -v
     )
     add_test(
+        NAME nnue_info_python
+        COMMAND "${Python3_EXECUTABLE}" -m unittest tests/python/evaluation/nnue_info_test.py -v
+    )
+    set_tests_properties(
+        nnue_info_python
+        PROPERTIES
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+            ENVIRONMENT "PYTHONDONTWRITEBYTECODE=1"
+    )
+    add_test(
         NAME nnue_wrapper_python
         COMMAND "${Python3_EXECUTABLE}" -m unittest tests/python/evaluation/nnue_wrapper_test.py -v
     )

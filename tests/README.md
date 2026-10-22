@@ -154,6 +154,7 @@ the repository root as the working directory:
   artifacts, `release_strength_openings_python` checks the fixed opening sample,
   and `strength_bound_python` checks the paired strength decision and provenance.
 - Evaluation/NNUE: `tune_eval_python`, `nnue_training_python`, `nnue_wrapper_python`,
+  `nnue_info_python`,
   `strength_report_python`, `koi_dataset_python` (koi-dataset-v1 and v2 encoders
   with four-group records), `gen_training_data_python`,
   `koi_trainer_python` (cross-language v4 and v5 parity against the boundary
