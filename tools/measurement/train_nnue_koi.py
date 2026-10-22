@@ -101,6 +101,7 @@ MAGIC = b"KOI-NNUE"
 VERSION = 4
 V5_VERSION = 5
 V6_VERSION = 6
+V8_VERSION = 8
 INPUT_UNITS = 12 * 12 * 64
 V5_INPUT_UNITS = 36864
 OUTPUT_BUCKETS = 8
@@ -878,7 +879,8 @@ def nnue_payload_v6(params, hidden_units: int, l1_units: int) -> bytes:
 
 
 def nnue_container_v6(payload, hidden_units: int, l1_units: int, hidden_shift: int,
-                      output_shift: int, l1_shift: int, l1_diff_shift: int):
+                      output_shift: int, l1_shift: int, l1_diff_shift: int,
+                      version: int = V6_VERSION):
     """Version 6 uses the v5 header with version = 6.
 
     The byte v5 reserves (header offset 31, after ``l1_shift``) carries
@@ -887,7 +889,7 @@ def nnue_container_v6(payload, hidden_units: int, l1_units: int, hidden_shift: i
     writes ``sd >= 8`` there.
     """
     payload_hash = hashlib.sha256(payload).hexdigest()
-    header = struct.pack("<8sIIIIIBBBBHHQ", MAGIC, V6_VERSION, V5_INPUT_UNITS,
+    header = struct.pack("<8sIIIIIBBBBHHQ", MAGIC, version, V5_INPUT_UNITS,
                          hidden_units, OUTPUT_BUCKETS, l1_units, hidden_shift,
                          output_shift, l1_shift, l1_diff_shift, len(QUANTIZATION),
                          len(V5_FEATURE_SET), len(payload))
@@ -928,7 +930,7 @@ def build_parser() -> argparse.ArgumentParser:
                         help="optional path for a float checkpoint after training")
     parser.add_argument("--float-in", type=pathlib.Path, default=None,
                         help="load a float checkpoint and skip training (quantize only)")
-    parser.add_argument("--arch", choices=["v4", "v5", "v6"], default="v5",
+    parser.add_argument("--arch", choices=["v4", "v5", "v6", "v8"], default="v5",
                         help="network architecture to train (default: v5)")
     parser.add_argument("--l1-units", type=int, default=V5_L1_UNITS,
                         help="v5/v6 hidden L1 width (8..128)")
@@ -1163,7 +1165,8 @@ def main_v5(args, rng) -> int:
     return 0
 
 
-def main_v6(args, rng) -> int:
+def main_v6(args, rng, *, format_version: int = V6_VERSION,
+            arch_label: str = "v6", gpu_ready: bool = False) -> int:
     """Train, quantize, and export a v6 network (v5 head plus the diff channel)."""
     if torch is None:  # pragma: no cover - environment dependent
         raise TrainerError("PyTorch is required for training; install torch")
@@ -1355,7 +1358,8 @@ def main_v6(args, rng) -> int:
     payload = nnue_payload_v6(best_params, hidden_units, l1_units)
     container, payload_hash = nnue_container_v6(payload, hidden_units, l1_units,
                                                 best_hidden_shift, best_output_shift,
-                                                best_l1_shift, best_l1_diff_shift)
+                                                best_l1_shift, best_l1_diff_shift,
+                                                version=format_version)
     net_out = args.net_out
     meta_out = args.meta_out
     if pathlib.Path(net_out).name in ("koi-v4.nnue", "koi-v5.nnue"):
@@ -1366,14 +1370,17 @@ def main_v6(args, rng) -> int:
     net_path.parent.mkdir(parents=True, exist_ok=True)
     net_path.write_bytes(container)
     metadata = {
-        "schema": "koi-nnue-training-metadata-v3",
+        "schema": ("koi-nnue-training-metadata-v4" if gpu_ready
+                   else "koi-nnue-training-metadata-v3"),
         "created": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "corpus": str(args.dataset or args.corpus),
         "rows_used": int(rows),
         "val_rows": int(val_order.size),
         "feature_set": V5_FEATURE_SET.decode(),
         "quantization": QUANTIZATION.decode(),
-        "arch": "v6",
+        "arch": arch_label,
+        "format_version": format_version,
+        "gpu_ready": gpu_ready,
         "architecture": {
             "input": V5_INPUT_UNITS,
             "hidden": hidden_units,
@@ -1423,6 +1430,9 @@ def main(argv: list[str] | None = None) -> int:
     torch.set_num_threads(max(1, args.threads))
     rng = np.random.default_rng(args.seed)
     torch.manual_seed(args.seed)
+    if args.arch == "v8":
+        return main_v6(args, rng, format_version=V8_VERSION, arch_label="v8",
+                       gpu_ready=True)
     if args.arch == "v6":
         return main_v6(args, rng)
     if args.arch == "v5":

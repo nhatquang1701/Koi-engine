@@ -121,6 +121,18 @@ class NnueTrainingBoundaryTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertLess(output.stat().st_size, 1_000_000)
 
+    def test_v8_container_header_uses_version_eight(self):
+        spec = importlib.util.spec_from_file_location(
+            "train_nnue_koi", ROOT / "tools" / "measurement" / "train_nnue_koi.py")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        container, payload_hash = module.nnue_container_v6(
+            b"\x00" * 16, 32, 8, 7, 14, 7, 8, version=module.V8_VERSION)
+        version = struct.unpack_from("<I", container, 8)[0]
+        self.assertEqual(version, module.V8_VERSION)
+        self.assertEqual(module.V8_VERSION, 8)
+        self.assertEqual(len(payload_hash), 64)
+
     def test_manifest_input_resolves_relative_split_paths(self):
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)

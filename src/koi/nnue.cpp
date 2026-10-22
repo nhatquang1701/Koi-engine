@@ -215,11 +215,17 @@ template <typename Integer>
     return manifest.version == kKoiNnueHalfkaThreatV6FormatVersion;
 }
 
+[[nodiscard]] constexpr bool is_halfka_threat_v8(
+    const NnueManifest& manifest) noexcept {
+    return manifest.version == kKoiNnueHalfkaThreatV8FormatVersion;
+}
+
 // Versions 5 and 6 share the feature set, the header skeleton, and the
 // incremental path; only the L1 stage and the payload size differ.
 [[nodiscard]] constexpr bool uses_halfka_threat_features(
     const NnueManifest& manifest) noexcept {
-    return is_halfka_threat_v5(manifest) || is_halfka_threat_v6(manifest);
+    return is_halfka_threat_v5(manifest) || is_halfka_threat_v6(manifest) ||
+        is_halfka_threat_v8(manifest);
 }
 
 [[nodiscard]] std::optional<std::size_t> payload_size_for(const NnueManifest& manifest) noexcept {
@@ -234,7 +240,7 @@ template <typename Integer>
         return input_units * hidden_units * sizeof(std::int16_t) +
             hidden_units * sizeof(std::int32_t) +
             l1_units * hidden_units * sizeof(std::int8_t) +
-            (is_halfka_threat_v6(manifest) ?
+            (is_halfka_threat_v6(manifest) || is_halfka_threat_v8(manifest) ?
                  l1_units * hidden_units * sizeof(std::int8_t) : std::size_t{0}) +
             l1_units * sizeof(std::int32_t) +
             output_buckets * l1_units * sizeof(std::int8_t) +
@@ -282,7 +288,8 @@ template <typename Integer>
         manifest.version != kKoiNnuePerspectiveV3FormatVersion &&
         manifest.version != kKoiNnueHalfkaKingBucketV1FormatVersion &&
         manifest.version != kKoiNnueHalfkaThreatV5FormatVersion &&
-        manifest.version != kKoiNnueHalfkaThreatV6FormatVersion) {
+        manifest.version != kKoiNnueHalfkaThreatV6FormatVersion &&
+        manifest.version != kKoiNnueHalfkaThreatV8FormatVersion) {
         return make_error(NnueErrorCode::unsupported_version, "unsupported Koi NNUE container version");
     }
     if (uses_halfka_threat_features(manifest)) {
@@ -1456,7 +1463,7 @@ std::expected<NnueNetwork, NnueError> NnueLoader::load(
         output_shift = container[offset++];
         l1_shift = container[offset++];
         const std::uint8_t diff_or_reserved = container[offset++];
-        if (is_halfka_threat_v6(manifest)) {
+        if (is_halfka_threat_v6(manifest) || is_halfka_threat_v8(manifest)) {
             // v6 packs the split pair/diff shift into the byte v5 reserved;
             // zero keeps the legacy combined interpretation.
             l1_diff_shift = diff_or_reserved;
@@ -1575,7 +1582,7 @@ std::expected<NnueNetwork, NnueError> NnueLoader::load(
             }
             weight = static_cast<std::int8_t>(payload[payload_offset++]);
         }
-        if (is_halfka_threat_v6(network.manifest)) {
+        if (is_halfka_threat_v6(network.manifest) || is_halfka_threat_v8(network.manifest)) {
             network.l1_diff_weights.resize(l1_units * hidden_units);
             for (std::int8_t& weight : network.l1_diff_weights) {
                 if (payload_offset >= payload.size()) {
