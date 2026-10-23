@@ -290,54 +290,86 @@ cmd_update() {
 
 cmd_start() {
     [ -f "$CONFIG" ] || die "no config: run '$0 install --token <token>' first"
+    if [ -f "$PLIST" ]; then
+        # launchd owns the lifecycle once the agent exists.  Kill any instance
+        # started by hand first so the bot never runs twice.
+        kill_stray_bots
+        launchctl bootout "gui/$UID/$LABEL" >/dev/null 2>&1 || true
+        launchctl bootstrap "gui/$UID" "$PLIST" >/dev/null 2>&1 || true
+        launchctl kickstart -k "gui/$UID/$LABEL" >/dev/null 2>&1 || true
+        log "bot started (launchd)"
+        return 0
+    fi
     if bot_loaded; then
         launchctl kickstart "gui/$UID/$LABEL" >/dev/null 2>&1 || true
         log "bot started (launchd)"
         return 0
     fi
-    if [ -n "$(bot_pid)" ]; then
-        log "bot already running (pid $(bot_pid))"
-        return 0
-    fi
-    if [ -f "$PLIST" ]; then
-        launchctl bootstrap "gui/$UID" "$PLIST" >/dev/null 2>&1 || true
-        launchctl kickstart "gui/$UID/$LABEL" >/dev/null 2>&1 || true
-        log "bot started (launchd)"
+    if [ -n "$(bot_processes)" ]; then
+        log "bot already running (pid(s) $(bot_processes | tr '\n' ' '))"
         return 0
     fi
     : > "$BOT_LOG"
-    ( cd "$CLONE" && nohup "$CLONE/.venv/bin/python" lichess-bot.py --config "$CONFIG" \
-        >> "$BOT_LOG" 2>&1 & echo $! > "$PID_FILE" )
+    # `cd` in this shell (not a subshell) so `$!` is lichess-bot's own pid.
+    cd "$CLONE" || die "missing clone: $CLONE"
+    nohup "$CLONE/.venv/bin/python" lichess-bot.py --config "$CONFIG" \
+        >> "$BOT_LOG" 2>&1 &
+    local pid=$!
+    cd "$OLDPWD" || true
+    printf '%s' "$pid" > "$PID_FILE"
     sleep 2
-    local pid
-    pid="$(bot_pid)"
-    [ -n "$pid" ] || die "the bot exited immediately; see $BOT_LOG"
+    kill -0 "$pid" 2>/dev/null || die "the bot exited immediately; see $BOT_LOG"
     log "bot started (pid $pid, log $BOT_LOG)"
 }
 
-cmd_stop() {
-    if bot_loaded; then
-        launchctl bootout "gui/$UID/$LABEL" >/dev/null 2>&1 || true
-        log "bot stopped (launchd)"
-        return 0
-    fi
-    local pid
-    pid="$(bot_pid)"
-    if [ -z "$pid" ]; then
-        rm -f "$PID_FILE"
-        log "bot is not running"
-        return 0
-    fi
-    kill -TERM "$pid" 2>/dev/null || true
-    for _ in $(seq 1 30); do
-        kill -0 "$pid" 2>/dev/null || break
+# Every process running this bot's config, whether or not the pidfile matches.
+bot_processes() {
+    pgrep -f "lichess-bot.py --config $CONFIG" 2>/dev/null || true
+}
+
+# Terminate bot processes started outside launchd (graceful, then hard).
+kill_stray_bots() {
+    local pids p
+    pids="$(bot_processes)"
+    [ -n "$pids" ] || return 0
+    for p in $pids; do kill -TERM "$p" 2>/dev/null || true; done
+    for _ in $(seq 1 20); do
+        [ -z "$(bot_processes)" ] && break
         sleep 1
     done
-    if kill -0 "$pid" 2>/dev/null; then
-        kill -KILL "$pid" 2>/dev/null || true
-        log "bot killed after the grace period (pid $pid)"
+    for p in $(bot_processes); do kill -KILL "$p" 2>/dev/null || true; done
+    rm -f "$PID_FILE"
+}
+
+cmd_stop() {
+    local pid pids p was_loaded=0
+    if bot_loaded; then
+        was_loaded=1
+        launchctl bootout "gui/$UID/$LABEL" >/dev/null 2>&1 || true
+    fi
+    # Also clear anything started by hand, so "stopped" always means stopped.
+    pid="$(bot_pid)"
+    pids="$(bot_processes)"
+    if [ -z "$pid" ] && [ -z "$pids" ]; then
+        rm -f "$PID_FILE"
+        if [ "$was_loaded" = "1" ]; then
+            log "bot stopped (launchd)"
+        else
+            log "bot is not running"
+        fi
+        return 0
+    fi
+    [ -n "$pid" ] && kill -TERM "$pid" 2>/dev/null || true
+    for p in $pids; do kill -TERM "$p" 2>/dev/null || true; done
+    for _ in $(seq 1 30); do
+        [ -z "$(bot_processes)" ] && break
+        sleep 1
+    done
+    for p in $(bot_processes); do kill -KILL "$p" 2>/dev/null || true; done
+    if [ -n "$(bot_processes)" ]; then
+        log "bot processes survived the grace period: $(bot_processes | tr '\n' ' ')"
     else
-        log "bot stopped (pid $pid)"
+        log "bot stopped${pid:+ (pid $pid)}"
     fi
     rm -f "$PID_FILE"
 }
@@ -352,8 +384,8 @@ cmd_status() {
     if [ -f "$NET" ]; then printf 'net:      %s\n' "$NET"; else printf 'net:      missing\n'; fi
     if bot_loaded; then
         printf 'service:  launchd %s\n' "$LABEL"
-    elif [ -n "$(bot_pid)" ]; then
-        printf 'service:  running, pid %s\n' "$(bot_pid)"
+    elif [ -n "$(bot_processes)" ]; then
+        printf 'service:  running, pid(s) %s\n' "$(bot_processes | tr '\n' ' ')"
     else
         printf 'service:  stopped\n'
     fi
@@ -412,6 +444,7 @@ PLIST_XML
 PLIST_XML
     launchctl bootout "gui/$UID/$LABEL" >/dev/null 2>&1 || true
     launchctl bootout "gui/$UID/$UPDATE_LABEL" >/dev/null 2>&1 || true
+    kill_stray_bots
     launchctl bootstrap "gui/$UID" "$PLIST"
     launchctl bootstrap "gui/$UID" "$UPDATE_PLIST"
     log "launchd agents installed: start at login, restart on crash, hourly update check"
