@@ -829,6 +829,40 @@ class V6HeadTests(unittest.TestCase):
                          list(params["l1_diff_weights"].astype("<i1").reshape(-1)))
         self.assertEqual(payload_hash, hashlib.sha256(payload).hexdigest())
 
+    def test_v8_halfka_container_layout(self):
+        """`--arch v8` writes the v4 payload under a version-8 header."""
+        self.assertIsNotNone(train_nnue_koi)
+        hidden = 64
+        rng = np.random.default_rng(29)
+        params = {
+            "feature_weights": rng.integers(-8, 8, size=(train_nnue_koi.INPUT_UNITS, hidden)),
+            "hidden_bias": rng.integers(-4, 4, size=hidden),
+            "output_weights": rng.integers(-8, 8, size=(OUTPUT_BUCKETS, hidden // 2)),
+            "output_bias": rng.integers(-4, 4, size=OUTPUT_BUCKETS),
+        }
+        payload = train_nnue_koi.nnue_payload_v4(params, hidden)
+        container, payload_hash = train_nnue_koi.nnue_container_v4(
+            payload, hidden, 7, 15, version=train_nnue_koi.V8_VERSION)
+        header = struct.unpack_from("<8sIIIIIBB2xHHQ", container, 0)
+        self.assertEqual(header[0], b"KOI-NNUE")
+        self.assertEqual(header[1], 8)
+        self.assertEqual(header[2], train_nnue_koi.INPUT_UNITS)
+        self.assertEqual(header[3], hidden)
+        self.assertEqual(header[4], OUTPUT_BUCKETS)
+        self.assertEqual(header[5], 0)
+        self.assertEqual(header[6:8], (7, 15))
+        self.assertEqual(header[8], len(QUANTIZATION))
+        self.assertEqual(header[9], len(FEATURE_SET))
+        self.assertEqual(header[10], len(payload))
+        # The halfka-only feature set, not the threat-pair variant.
+        strings_at = struct.calcsize("<8sIIIIIBB2xHHQ") + 32
+        self.assertEqual(
+            container[strings_at + len(QUANTIZATION):strings_at + len(QUANTIZATION)
+                      + len(FEATURE_SET)], FEATURE_SET)
+        self.assertEqual(len(payload), train_nnue_koi.INPUT_UNITS * hidden * 2 + hidden * 4
+                         + OUTPUT_BUCKETS * (hidden // 2) + OUTPUT_BUCKETS * 4)
+        self.assertEqual(payload_hash, hashlib.sha256(payload).hexdigest())
+
     def test_raw_perspective_direction(self):
         # Same board, white to move versus black to move.  The v5 pair-only
         # head returns the same raw value for both; the v6 diff channel must
