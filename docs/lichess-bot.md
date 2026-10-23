@@ -5,70 +5,120 @@ Python bridge that plays Lichess games with any UCI engine. Koi speaks the UCI
 surface lichess-bot needs: clock-driven `go` commands, `stop`, in-place
 `ponder`/`ponderhit` conversion, and `MultiPV`.
 
+`tools/bot/koi-bot.sh` wraps the whole setup so a bot can be installed, started,
+stopped, and updated with single commands. It is written for macOS and is
+verified on Apple Silicon; the same layout works on Linux with a different
+release asset.
+
 ## Prerequisites
 
-- A Lichess account upgraded to a bot account, plus an OAuth token with the
-  `bot:play` scope (account menu: *Play with the Lichess API*).
-- Python 3.9+ with `pip`.
-- A Koi release package (Windows zip, Linux tarball, or macOS tarball); see the
-  [repository README](../README.md) for downloads.
+- A Lichess account upgraded to a **bot account**, plus an OAuth token with the
+  `bot:play` scope (account menu: *Play with the Lichess API*). A token that is
+  only allowed to play bot games is fine — that is the normal bot scope.
+- **Python 3.11 or newer** (lichess-bot refuses older interpreters). macOS ships
+  3.9/3.10, so build or install a newer one first; the script records whichever
+  interpreter it used in `~/koi-bot/python-bin`.
+- `git`, `curl`, and a Koi release for the host platform.
 
-## Setup
+## Install
 
-1. Clone and install the bridge:
+```bash
+# 1. put the control script and the token in place (the token never leaves the host)
+install -d -m 700 ~/koi-bot
+cp tools/bot/koi-bot.sh ~/koi-bot/ && chmod +x ~/koi-bot/koi-bot.sh
+printf '%s' 'lip_...' > ~/koi-bot/token
+chmod 600 ~/koi-bot/token
 
-   ```bash
-   git clone https://github.com/lichess-bot-devs/lichess-bot
-   cd lichess-bot
-   pip install -r requirements.txt
-   ```
+# 2. install (clones the bridge, makes the venv, installs the newest Koi release)
+~/koi-bot/koi-bot.sh install
 
-2. Copy `config.yml.default` to `config.yml` and set `token: "your-oauth-token"`.
+# 3. start / stop / inspect
+~/koi-bot/koi-bot.sh start
+~/koi-bot/koi-bot.sh status
+~/koi-bot/koi-bot.sh stop
+```
 
-3. Point the `engine:` section at the Koi binary and its options:
+`install` verifies the release package against its `.sha256` sidecar, installs
+`koi-engine` plus the shipped `.nnue` under `~/koi-bot/engines`, and writes
+`~/koi-bot/config.yml` (mode 600) pointing `EvalFile` at that net.
 
-   ```yaml
-   engine:
-     name: "Koi Engine"
-     dir: "C:/path/to/koi"        # folder that contains the engine binary
-     working_dir: "C:/path/to/koi"
-     protocol: "uci"
-     ponder: true                  # Koi converts the running search on ponderhit
-     engine_options:
-       Hash: 512
-       Threads: 4
-       MultiPV: 1
-       OwnBook: false
-       EvalFile: ""                # optional NNUE file; empty keeps the classical evaluator
-   ```
+## Commands
 
-   Use the engine binary from the release package. On Windows
-   `koi-engine.exe` selects the best CPU variant for the host automatically.
+| Command | Effect |
+| --- | --- |
+| `koi-bot.sh install [--token T]` | clone/refresh the bridge, build the venv, install the newest engine, write the config |
+| `koi-bot.sh start` | run the bot (launchd when installed, otherwise a pidfile) |
+| `koi-bot.sh stop` | stop the bot and its engine processes |
+| `koi-bot.sh restart` | stop, then start |
+| `koi-bot.sh status` | engine version, net, service state, last log lines |
+| `koi-bot.sh logs [N]` | tail the bot log |
+| `koi-bot.sh update [--force]` | install the newest release and restart only when the tag changed |
+| `koi-bot.sh install-launchd` | start at login, restart on crash, check for a new release hourly |
+| `koi-bot.sh uninstall-launchd` | remove those agents |
 
-4. Allow matchmaking with the time controls you want:
+## Staying on the newest release
 
-   ```yaml
-   matchmaking:
-     allow_matchmaking: true
-     challenge_timeout: 30
-     time_controls: ["3+0", "3+2", "5+3", "10+0"]
-     modes: ["rated", "casual"]
-     variants: ["standard"]        # Koi plays standard chess only
-   ```
+`update` asks GitHub for `releases/latest`, compares the tag with the installed
+`~/koi-bot/engines/VERSION`, and does nothing when they match. When a newer
+release exists it downloads the macOS arm64 package, verifies the sidecar hash,
+swaps the binary and net, rewrites the config, and restarts the bot.
 
-5. Start the bot: `python lichess-bot.py`.
+`install-launchd` registers two agents:
 
-The `config.yml.default` shipped with lichess-bot is the source of truth for
-key names in your installed version; the example above covers the stable
-engine and matchmaking keys.
+- `org.koi.lichess-bot` — runs the bot at login and restarts it after a crash;
+- `org.koi.lichess-bot-update` — runs `update` every hour.
 
-## Notes
+So every minor update or patch published on the repository reaches the bot
+within the hour, with no manual step. Run `koi-bot.sh uninstall-launchd` to go
+back to manual control.
 
+## Layout
+
+```
+~/koi-bot/
+  koi-bot.sh          # this control script
+  token               # OAuth token, mode 600
+  config.yml          # generated, mode 600 - edits are overwritten
+  python-bin          # interpreter used for the venv
+  engines/koi-engine  # release binary
+  engines/koi.nnue    # release network
+  engines/VERSION     # installed release tag
+  lichess-bot/        # upstream clone + .venv
+  logs/bot.log        # bot output
+  logs/update.log     # updater output
+  games/              # PGN records of the bot's games
+```
+
+## Engine options used
+
+The generated config sends only options Koi defines:
+
+```yaml
+uci_options:
+  Threads: 4
+  Hash: 512
+  UCI_ShowWDL: true
+  EvalFile: "/Users/<you>/koi-bot/engines/koi.nnue"
+```
+
+`EvalFile` is an absolute path on purpose: the engine resolves the network
+against its own working directory, and a relative path silently falls back to
+the classical evaluator. `move_overhead: 2000` in the config leaves the engine a
+buffer on the Lichess clock.
+
+## Notes and troubleshooting
+
+- **`Unexpected engine output: 'info string NNUE enabled from …'`** — harmless.
+  Koi reports the loaded network on `setoption`; lichess-bot logs unknown
+  `info string` lines as a warning and keeps playing.
+- **The bot plays without the net** — check `EvalFile` in `config.yml` is an
+  absolute path that exists, then `koi-bot.sh logs` for the engine's own
+  `info string EvalFile rejected: …`.
+- **`unrecognized arguments: -c`** — older/newer lichess-bot versions spell the
+  config flag `--config`; the script uses the current spelling.
 - Koi plays standard chess only; leave the variants list at `standard`.
-- Leave `ponder: true` unless you specifically want to disable it — Koi's
-  ponderhit handling is part of its conformance test surface.
-- Optional assets stay optional: set `SyzygyPath`, or `OwnBook: true` with
-  `BookFile`, only when you have the files. No book or tablebase data ships
-  with Koi.
-- For analysis-style use (no clock, infinite search, MultiPV), a GUI is a
-  better fit than a bot; see the [user guide](USER_GUIDE.md).
+- Optional assets stay optional: only set `SyzygyPath`, or `OwnBook: true` with
+  `BookFile`, when you have the files. No book or tablebase data ships with Koi.
+- For analysis-style use (no clock, infinite search, MultiPV), a GUI is a better
+  fit than a bot; see the [user guide](USER_GUIDE.md).
+- The bridge is AGPLv3; it is cloned at setup time and never vendored here.
