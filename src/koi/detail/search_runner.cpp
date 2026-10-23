@@ -2625,9 +2625,12 @@ void maybe_publish_interim(const SearchEventSink& sink, InterimReportState& stat
             info.pv = live_pv->to_vector();
             // Report the root move of the in-flight principal variation as the
             // current move so interval lines show live progress instead of
-            // repeating only the completed iteration.
-            info.currmove = info.pv.front();
-            info.currmovenumber = 1;
+            // repeating only the completed iteration.  The PV can still be
+            // empty at the very first interim tick, so guard the access.
+            if (!info.pv.empty()) {
+                info.currmove = info.pv.front();
+                info.currmovenumber = 1;
+            }
         } else if (info.currmove.is_no_move() && !info.pv.empty()) {
             // The in-flight PV is not published yet on this path; still report
             // the root move of the line being shown so GUIs get live progress.
