@@ -200,9 +200,19 @@ template <typename Integer>
     return true;
 }
 
+// True for every container that uses the halfka-only layout: the historical v4
+// container and, from 1.1.4, the version-8 container.  Version 8 carries either
+// layout, so the input width decides: 9216 inputs is the halfka-only form, and
+// `is_halfka_threat_v8` claims the 36864-input threat form.  Both predicates are
+// used while parsing the header, before the feature-set string is available, so
+// they must only consult the version and the layer sizes.
 [[nodiscard]] constexpr bool is_halfka_king_bucket_v1(
     const NnueManifest& manifest) noexcept {
-    return manifest.version == kKoiNnueHalfkaKingBucketV1FormatVersion;
+    if (manifest.version == kKoiNnueHalfkaKingBucketV1FormatVersion) {
+        return true;
+    }
+    return manifest.version == kKoiNnueHalfkaThreatV8FormatVersion &&
+        manifest.layer_sizes[0] == kKoiNnueHalfkaKingBucketV1FeatureCount;
 }
 
 [[nodiscard]] constexpr bool is_halfka_threat_v5(
@@ -215,9 +225,12 @@ template <typename Integer>
     return manifest.version == kKoiNnueHalfkaThreatV6FormatVersion;
 }
 
+// The version-8 container carries either layout; only the 36864-input form has
+// the threat-pair inputs and the antisymmetric diff head.
 [[nodiscard]] constexpr bool is_halfka_threat_v8(
     const NnueManifest& manifest) noexcept {
-    return manifest.version == kKoiNnueHalfkaThreatV8FormatVersion;
+    return manifest.version == kKoiNnueHalfkaThreatV8FormatVersion &&
+        manifest.layer_sizes[0] == kKoiNnueHalfkaThreatV5FeatureCount;
 }
 
 // Versions 5 and 6 share the feature set, the header skeleton, and the
@@ -1482,7 +1495,7 @@ std::expected<NnueNetwork, NnueError> NnueLoader::load(
             return std::unexpected(make_error(NnueErrorCode::malformed_manifest,
                                                "NNUE v5/v6 shift is out of range"));
         }
-    } else if (manifest.version == kKoiNnueHalfkaKingBucketV1FormatVersion) {
+    } else if (is_halfka_king_bucket_v1(manifest)) {
         if (container.size() - offset < 4) {
             return std::unexpected(make_error(NnueErrorCode::malformed_manifest,
                                                "NNUE v4 scale metadata is truncated"));

@@ -820,12 +820,17 @@ def nnue_payload_v4(params: dict, hidden_units: int) -> bytes:
 
 
 def nnue_container_v4(payload: bytes, hidden_units: int, hidden_shift: int,
-                      output_shift: int) -> tuple[bytes, str]:
+                      output_shift: int, version: int = VERSION) -> tuple[bytes, str]:
+    """Halfka-only container.
+
+    ``version`` 8 selects the GPU-ready v8 header, which keeps the v4 payload
+    byte for byte: the only difference is the version word the loader reads.
+    """
     payload_hash = hashlib.sha256(payload).hexdigest()
     header = struct.pack(
         "<8sIIIIIBB2xHHQ",
         MAGIC,
-        VERSION,
+        version,
         INPUT_UNITS,
         hidden_units,
         OUTPUT_BUCKETS,
@@ -1430,9 +1435,10 @@ def main(argv: list[str] | None = None) -> int:
     torch.set_num_threads(max(1, args.threads))
     rng = np.random.default_rng(args.seed)
     torch.manual_seed(args.seed)
-    if args.arch == "v8":
-        return main_v6(args, rng, format_version=V8_VERSION, arch_label="v8",
-                       gpu_ready=True)
+    # `--arch v8` is the halfka-only layout in the version-8 container.  The
+    # threat-input form (v6 math) lost three straight matches against the
+    # halfka-only nets, so it is no longer what "v8" means.
+    v8_halfka = args.arch == "v8"
     if args.arch == "v6":
         return main_v6(args, rng)
     if args.arch == "v5":
@@ -1565,18 +1571,23 @@ def main(argv: list[str] | None = None) -> int:
     )))
     w1_saturation, w2_saturation = saturation_fractions(params, args.hidden_units)
     payload = nnue_payload_v4(params, args.hidden_units)
-    container, payload_hash = nnue_container_v4(payload, args.hidden_units,
-                                                hidden_shift, output_shift)
+    container, payload_hash = nnue_container_v4(
+        payload, args.hidden_units, hidden_shift, output_shift,
+        version=(V8_VERSION if v8_halfka else VERSION))
     args.net_out.parent.mkdir(parents=True, exist_ok=True)
     args.net_out.write_bytes(container)
     metadata = {
-        "schema": "koi-nnue-training-metadata-v2",
+        "schema": ("koi-nnue-training-metadata-v4" if v8_halfka
+                   else "koi-nnue-training-metadata-v2"),
         "created": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "corpus": str(args.dataset if args.dataset is not None else args.corpus),
         "rows_used": int(offsets.size - 1),
         "val_rows": int(val_order.size),
         "feature_set": FEATURE_SET.decode(),
         "quantization": QUANTIZATION.decode(),
+        "arch": ("v8" if v8_halfka else "v4"),
+        "format_version": (V8_VERSION if v8_halfka else VERSION),
+        "gpu_ready": v8_halfka,
         "architecture": {
             "input": INPUT_UNITS,
             "hidden": args.hidden_units,

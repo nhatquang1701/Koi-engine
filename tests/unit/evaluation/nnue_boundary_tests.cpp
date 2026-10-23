@@ -90,6 +90,54 @@ void test_container_round_trip_and_validation() {
             "NNUE loader must reject a payload checksum mismatch");
 }
 
+void test_v8_halfka_container_round_trip() {
+    // The version-8 container carries either layout.  In the halfka-only form
+    // only the version word differs from v4, so the payload size, the manifest
+    // layout, and every evaluation must stay identical.
+    const koi::NnueNetwork v4 = koi::NnueNetwork::synthetic_v4();
+    koi::NnueNetwork v8 = koi::NnueNetwork::synthetic_v4();
+    v8.manifest.version = koi::kKoiNnueHalfkaThreatV8FormatVersion;
+
+    const auto v4_encoded = koi::NnueLoader::serialize(v4);
+    const auto v8_encoded = koi::NnueLoader::serialize(v8);
+    require(v4_encoded.has_value() && v8_encoded.has_value(),
+            "both the v4 and the v8 halfka-only containers must serialize");
+    require((*v8_encoded)[8] == 8 && (*v4_encoded)[8] == 4,
+            "the version-8 halfka-only container must carry the version-8 word");
+    require(v8_encoded->size() == v4_encoded->size(),
+            "the version-8 halfka-only container must keep the v4 payload size");
+
+    const auto decoded = koi::NnueLoader::load(*v8_encoded);
+    require(decoded.has_value(), "the v8 halfka-only container must load");
+    require(decoded->manifest.version == koi::kKoiNnueHalfkaThreatV8FormatVersion &&
+                decoded->manifest.layer_sizes == v4.manifest.layer_sizes &&
+                decoded->manifest.feature_set == koi::kKoiNnueHalfkaKingBucketV1FeatureSet,
+            "the v8 halfka-only container must keep the v4 layout and feature set");
+
+    const koi::GameState state = require_state(
+        "r3k2r/pp3ppp/2n1bn2/2bpp3/4P3/2NP1N2/PPPB1PPP/R2Q1RK1 w kq - 2 10");
+    const koi::EvaluationFeatures features = koi::EvaluationFeatureExtractor::extract(state);
+    const auto v4_weights = std::make_shared<const koi::NnueNetwork>(std::move(v4));
+    const auto v8_weights = std::make_shared<const koi::NnueNetwork>(std::move(*decoded));
+    koi::NnueWorker v4_worker(v4_weights);
+    koi::NnueWorker v8_worker(v8_weights);
+    require(v4_worker.evaluate(features, koi::Color::white, koi::NnueInferencePath::scalar) ==
+                v8_worker.evaluate(features, koi::Color::white, koi::NnueInferencePath::scalar),
+            "the v8 halfka-only container must evaluate exactly like v4");
+}
+
+void test_v8_container_rejects_layout_mismatch() {
+    // The input width selects the v8 layout: a manifest that claims the halfka
+    // feature set with the threat input width is malformed.
+    koi::NnueNetwork wrong = koi::NnueNetwork::synthetic_v6();
+    wrong.manifest.version = koi::kKoiNnueHalfkaThreatV8FormatVersion;
+    wrong.manifest.feature_set = koi::kKoiNnueHalfkaKingBucketV1FeatureSet;
+    const auto encoded = koi::NnueLoader::serialize(wrong);
+    require(!encoded.has_value() &&
+                encoded.error().code == koi::NnueErrorCode::unsupported_feature_set,
+            "a v8 manifest with threat-width inputs and the halfka feature set must be rejected");
+}
+
 void test_container_rejects_nonstandard_layer_shape() {
     koi::NnueNetwork network = koi::NnueNetwork::synthetic();
     network.manifest.layer_sizes[1] = 64;
@@ -2301,6 +2349,8 @@ int main(int argc, char** argv) {
 
     const std::vector<koi::test::TestCase> tests{
         {"NNUE container", test_container_round_trip_and_validation},
+        {"NNUE v8 halfka container", test_v8_halfka_container_round_trip},
+        {"NNUE v8 layout validation", test_v8_container_rejects_layout_mismatch},
         {"NNUE layer shape", test_container_rejects_nonstandard_layer_shape},
         {"NNUE fallback", test_malformed_or_absent_network_uses_classical_fallback},
         {"NNUE worker isolation", test_workers_keep_immutable_weights_and_private_accumulators},

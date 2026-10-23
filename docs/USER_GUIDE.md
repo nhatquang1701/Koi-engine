@@ -335,6 +335,14 @@ perspectives feeding full-width cross pair products (`p[j] = own[j] * opp[j]`) a
 pair products; the version 3 trainer (`train_nnue_sf.py`) remains available, and
 version 2, 3, and 4 containers still load:
 
+`--arch v8` writes the GPU-ready version 8 container in the halfka-only layout:
+the same 9216-input payload as the version 4 network, so the container differs
+only in its version word. The version 8 container also still accepts the
+36864-input `threat-pairs-v1` form written by `--arch v6`, whose payload is
+otherwise identical; the input width selects the layout. The threat-input form
+measured weaker than the halfka-only nets in every match, so it is not what
+`--arch v8` trains.
+
 ```powershell
 python .\tools\measurement\gen_training_data.py all --games 30000 --workers 3 --label-depth 10
 python .\tools\measurement\koi_dataset.py encode --input .\artifacts\training\labels.txt `
