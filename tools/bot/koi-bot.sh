@@ -290,6 +290,7 @@ cmd_update() {
 
 cmd_start() {
     [ -f "$CONFIG" ] || die "no config: run '$0 install --token <token>' first"
+    rotate_log_if_large
     if [ -f "$PLIST" ]; then
         # launchd owns the lifecycle once the agent exists.  Kill any instance
         # started by hand first so the bot never runs twice.
@@ -327,10 +328,42 @@ bot_processes() {
     pgrep -f "lichess-bot.py --config $CONFIG" 2>/dev/null || true
 }
 
+# lichess-bot runs its engines through a multiprocessing pool; those workers
+# survive a hard-killed parent and then spam the log with tracebacks, so any
+# orphan belonging to this venv is cleaned up with the bot.
+kill_orphan_workers() {
+    local p
+    for p in $(pgrep -f 'multiprocessing' 2>/dev/null); do
+        if ps -o command= -p "$p" 2>/dev/null | grep -q "$CLONE/.venv"; then
+            kill -TERM "$p" 2>/dev/null || true
+        fi
+    done
+    sleep 1
+    for p in $(pgrep -f 'multiprocessing' 2>/dev/null); do
+        if ps -o command= -p "$p" 2>/dev/null | grep -q "$CLONE/.venv"; then
+            kill -KILL "$p" 2>/dev/null || true
+        fi
+    done
+}
+
+# launchd owns the log file handle, so rotate before the next spawn, never from
+# inside the running bot.
+rotate_log_if_large() {
+    [ -f "$BOT_LOG" ] || return 0
+    local size
+    size="$(wc -c < "$BOT_LOG" | tr -d ' ')"
+    if [ "${size:-0}" -gt 20000000 ]; then
+        mv -f "$BOT_LOG" "$BOT_LOG.1"
+        : > "$BOT_LOG"
+        log "rotated bot.log (${size} bytes)"
+    fi
+}
+
 # Terminate bot processes started outside launchd (graceful, then hard).
 kill_stray_bots() {
     local pids p
     pids="$(bot_processes)"
+    kill_orphan_workers
     [ -n "$pids" ] || return 0
     for p in $pids; do kill -TERM "$p" 2>/dev/null || true; done
     for _ in $(seq 1 20); do
