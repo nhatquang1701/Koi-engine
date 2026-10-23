@@ -374,7 +374,10 @@ template <typename Integer>
 [[nodiscard]] bool arrays_match_manifest(const NnueNetwork& network) noexcept {
     const auto& sizes = network.manifest.layer_sizes;
     if (uses_halfka_threat_features(network.manifest)) {
-        const bool v6 = is_halfka_threat_v6(network.manifest);
+        // v6 and v8 both carry the threat-input diff head; v8 only changes the
+        // container version and GPU metadata, not the array layout.
+        const bool v6 = is_halfka_threat_v6(network.manifest) ||
+            is_halfka_threat_v8(network.manifest);
         return network.feature_weights.size() ==
                 static_cast<std::size_t>(sizes[0]) * sizes[1] &&
             network.hidden_bias.size() == sizes[1] &&
@@ -921,7 +924,8 @@ void l1_activations_scalar(const NnueNetwork& network,
     const std::size_t hidden_units = network.manifest.layer_sizes[1];
     const std::size_t pair_count = hidden_units;
     const std::size_t l1_units = network.manifest.layer_sizes[3];
-    const bool use_diff = is_halfka_threat_v6(network.manifest);
+    const bool use_diff = is_halfka_threat_v6(network.manifest) ||
+        is_halfka_threat_v8(network.manifest);
     accumulator.values.assign(hidden_units, 0);
     accumulator.bottleneck_values.assign(pair_count, 0);
     std::vector<std::int16_t> opp_values(hidden_units, 0);
@@ -1057,7 +1061,8 @@ void l1_activations_avx2(const NnueNetwork& network,
     const std::size_t hidden_units = network.manifest.layer_sizes[1];
     const std::size_t pair_count = hidden_units;
     const std::size_t l1_units = network.manifest.layer_sizes[3];
-    const bool use_diff = is_halfka_threat_v6(network.manifest);
+    const bool use_diff = is_halfka_threat_v6(network.manifest) ||
+        is_halfka_threat_v8(network.manifest);
     accumulator.values.assign(hidden_units, 0);
     accumulator.bottleneck_values.assign(pair_count, 0);
     std::vector<std::int16_t> opp_values(hidden_units, 0);
@@ -1326,7 +1331,8 @@ std::expected<std::vector<std::uint8_t>, NnueError> NnueLoader::serialize(
         }
         // The v6 split shift packs into the byte v5 reserved, so a v5 network
         // must leave it at zero.
-        if (!is_halfka_threat_v6(network.manifest) && network.l1_diff_shift != 0) {
+        if (!is_halfka_threat_v6(network.manifest) &&
+            !is_halfka_threat_v8(network.manifest) && network.l1_diff_shift != 0) {
             return std::unexpected(make_error(NnueErrorCode::malformed_manifest,
                                               "NNUE v5 containers cannot carry a diff shift"));
         }
