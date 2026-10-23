@@ -11,6 +11,7 @@ Directory map:
 | Directory | Purpose |
 | --- | --- |
 | `tools/build/` | build, package, book-install, and verification scripts |
+| `tools/bot/` | Lichess bot control script (install, start, stop, auto-update) |
 | `tools/engine/` | small C++ command-line tools built with Koi |
 | `tools/measurement/` | PGN, oracle, corpus, tuning, and NNUE tooling |
 | `tools/nnue/` | NNUE A/B match tools and the bullet/Rust crate and wrapper |
