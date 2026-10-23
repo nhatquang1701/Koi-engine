@@ -8,8 +8,8 @@ network. This page shows the loop that turns self-play data into a promoted
 flowchart TD
     DATA["tools/measurement/gen_training_data.py<br/>Stockfish self-play + fixed-depth labels"]
     TEXT["text corpus<br/>FEN;cp;best_move"]
-    ENCODE["tools/measurement/koi_dataset.py encode<br/>sparse koi-dataset-v2<br/>halfka-king-bucket + threat pairs"]
-    TRAIN["tools/measurement/train_nnue_koi.py<br/>PyTorch · v4/v5/v6<br/>early stop · output-shift grid"]
+    ENCODE["tools/measurement/koi_dataset.py encode<br/>sparse koi-dataset-v2<br/>halfka-king-bucket (+ optional threat pairs)"]
+    TRAIN["tools/measurement/train_nnue_koi.py<br/>PyTorch · v4/v5/v6/v8<br/>early stop · output-shift grid"]
     FLOAT["float checkpoint<br/>.pt"]
     EXPORT["tools/measurement/export_nnue.py<br/>int16/int8 quantization<br/>metadata + sha256"]
     NET["quantized network<br/>.nnue + .metadata.json"]
@@ -173,3 +173,14 @@ flowchart TD
   `.sha256` sidecar; release packages copy that payload with provenance.
 - Training changes are one variable at a time (architecture, data size, or
   shift grid), so a rejected run points at a single cause.
+- **Node-limited matches cannot promote a network on their own.** A wider hidden
+  layer is equal at equal nodes and loses at equal time because it doubles eval
+  cost: the 1024-wide v8 candidate measured 48.75-49.00% against the 512-wide
+  official net at equal nodes but only 50.78% against the classical evaluator at
+  equal time, where the official net scores 62.50%. Always run the equal-time
+  gate before promoting.
+- The version-8 container accepts both layouts: the halfka-only 9216-input
+  payload (identical bytes to v4, written by `--arch v8`) and the 36864-input
+  `threat-pairs-v1` form written by `--arch v6`. The input width selects the
+  layout. The threat form lost every match it entered (33.75% against the
+  official net) and its export saturates the L1 head, so it is not the default.
