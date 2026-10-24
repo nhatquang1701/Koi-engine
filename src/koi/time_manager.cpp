@@ -179,7 +179,6 @@ void TimeManager::initialize(Color side_to_move, std::uint8_t speed_percent,
     // clock inside 20 moves let a 5+0 game burn 30-45 s per move and flag.  With
     // an increment part of every move is refunded, so a shorter horizon is safe.
     const bool has_increment = clock->increment > std::chrono::milliseconds::zero();
-    sudden_death_ = !has_increment;
     const std::uint32_t default_horizon = has_increment ? 25U : 50U;
     timing_.horizon = std::max<std::uint32_t>(
         1, limits_.moves_to_go.value_or(default_horizon));
@@ -199,10 +198,12 @@ void TimeManager::initialize(Color side_to_move, std::uint8_t speed_percent,
     const auto increment_credit = std::min(three_quarters(clock->increment),
                                            scale_fraction(timing_.usable, 1, 4));
     const auto raw_soft = saturating_add(base_allocation, increment_credit);
-    // Sudden death has no refund, so a single unstable move may only take twice
-    // the base allocation; with an increment the third unit is recovered.
+    // Sudden death has no refund, so a single unstable move may only take two
+    // base units mid-game (three at a low clock, where the absolute budget is
+    // already tiny); with an increment the third unit is recovered.
+    const auto hard_units = (has_increment || remaining <= std::chrono::milliseconds{3000}) ? 3 : 2;
     const auto raw_hard = saturating_add(
-        scale_fraction(base_allocation, has_increment ? 3 : 2, 1),
+        scale_fraction(base_allocation, hard_units, 1),
         scale_fraction(increment_credit, 3, 2));
     const auto scale_budget = [slow_mover_percent, speed_percent, this](
                                   std::chrono::milliseconds duration) {
@@ -378,6 +379,13 @@ void TimeManager::observe_iteration(const SearchIterationObservation& observatio
     previous_score_ = observation.score_cp;
 }
 
+bool TimeManager::hard_extension_affordable() const noexcept {
+    // A hard position may exceed the soft budget only while the clock still pays
+    // for four more hard moves. Without this taper an unstable sudden-death game
+    // spends the hard budget on every move and flags.
+    return timing_.usable >= scale_fraction(timing_.hard_budget, 4, 1);
+}
+
 bool TimeManager::should_stop_after_iteration() const noexcept {
     const std::int64_t budget_ms = budget_ms_.load(std::memory_order_relaxed);
     if (unbounded_.load(std::memory_order_relaxed) || budget_ms < 0) {
@@ -389,15 +397,12 @@ bool TimeManager::should_stop_after_iteration() const noexcept {
         hard_deadline_reached_.store(true, std::memory_order_relaxed);
         return true;
     }
-    if (emergency_pacing_ && (!hard_position_ || sudden_death_) &&
+    if (emergency_pacing_ && (!hard_position_ || !hard_extension_affordable()) &&
         elapsed >= timing_.soft_budget) {
         return true;
     }
-    // In sudden death an unstable position must still stop at the soft budget:
-    // there is no increment to refund the time, and letting every "hard" move
-    // run to the hard cap is what flagged the 5+0 blitz game.
-    return clock_mode_ && (!hard_position_ || sudden_death_) && stable_observations_ >= 2 &&
-        elapsed >= timing_.soft_budget;
+    return clock_mode_ && (!hard_position_ || !hard_extension_affordable()) &&
+        stable_observations_ >= 2 && elapsed >= timing_.soft_budget;
 }
 
 bool TimeManager::should_start_next_iteration(std::chrono::milliseconds estimated_next_iteration) const noexcept {
@@ -407,7 +412,7 @@ bool TimeManager::should_start_next_iteration(std::chrono::milliseconds estimate
     }
     const auto elapsed = std::chrono::milliseconds{
         (now_nanoseconds() - started_ns_.load(std::memory_order_relaxed)) / 1'000'000};
-    if (emergency_pacing_ && (!hard_position_ || sudden_death_) &&
+    if (emergency_pacing_ && (!hard_position_ || !hard_extension_affordable()) &&
         elapsed >= timing_.soft_budget) {
         return false;
     }

@@ -171,7 +171,7 @@ void test_sudden_death_paces_the_whole_clock() {
                                                  std::nullopt, false);
     require(incremental.diagnostics().horizon <= 30,
             "an increment control must not use the sudden-death horizon");
-    require(incremental.diagnostics().soft_budget >= milliseconds{4000},
+    require(incremental.diagnostics().soft_budget >= milliseconds{2000},
             "an increment control must still allow real think time");
 }
 

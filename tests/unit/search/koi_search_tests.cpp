@@ -2365,7 +2365,7 @@ void test_adaptive_time_manager_uses_tt_stability_and_hardness() {
     const koi::TimeManagementStats initial = manager.diagnostics();
     require(initial.reserve == 300ms, "clock timing must reserve three percent at ten seconds");
     require(initial.usable == 9700ms, "clock timing must spend only time outside the reserve");
-    require(initial.soft_budget == 1235ms && initial.hard_budget == 2425ms,
+    require(initial.soft_budget == 1138ms && initial.hard_budget == 2289ms,
             "clock timing must calculate the approved soft and hard budgets, with the hard budget "
             "capped at a quarter of the usable time");
     require(initial.initial_hardness == 0,

@@ -41,6 +41,9 @@ private:
     [[nodiscard]] std::chrono::steady_clock::time_point now() const noexcept;
     [[nodiscard]] std::int64_t now_nanoseconds() const noexcept;
     [[nodiscard]] static int initial_hardness(const RootTimingContext& context) noexcept;
+    // A hard position may run past the soft budget only while the clock can
+    // still pay for several more hard moves; near the end the soft budget wins.
+    [[nodiscard]] bool hard_extension_affordable() const noexcept;
     void initialize(Color side_to_move, std::uint8_t speed_percent, std::uint32_t move_overhead_ms,
                     std::uint32_t slow_mover_percent);
 
@@ -53,9 +56,6 @@ private:
     bool hard_position_ = false;
     bool clock_mode_ = false;
     bool emergency_pacing_ = false;
-    // Sudden death (no increment): the clock is never refunded, so the search
-    // must respect the soft budget even when the position looks hard.
-    bool sudden_death_ = false;
     mutable std::atomic_bool hard_deadline_reached_ = false;
 
     // The stop checks run per node (SearchContext::interrupted) and from Lazy
