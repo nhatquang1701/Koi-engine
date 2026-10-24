@@ -139,6 +139,42 @@ void test_fast_control_move_leaves_most_of_the_clock() {
             "at least two thirds of the clock must survive a single move");
 }
 
+// Regression guard for the 5+0 blitz game that lost on time: with no increment
+// and no `movestogo` the old horizon (20) allocated ~15 s per move and let an
+// unstable position spend up to 45 s, so the clock was gone by move 22.
+void test_sudden_death_paces_the_whole_clock() {
+    const milliseconds control{300000};
+    TimeManager manager = make_clock_manager(control, milliseconds{0}, std::nullopt, false);
+    const TimeManagementStats stats = manager.diagnostics();
+    require(manager.time_budget().has_value(), "a sudden-death clock must allocate a budget");
+
+    // 5+0: aiming to keep playing for 40+ moves means single-digit seconds.
+    require(stats.soft_budget <= milliseconds{8000},
+            "a 5+0 soft budget must stay under eight seconds");
+    require(stats.hard_budget <= milliseconds{16000},
+            "a 5+0 hard budget must stay under sixteen seconds");
+    require(stats.horizon >= 40,
+            "sudden death must plan over a longer horizon than twenty moves");
+    require(stats.hard_budget * 20 <= control,
+            "twenty hard-budget moves must still fit inside the whole clock");
+
+    // 1+0 must be proportionally tighter, not just scaled by the same budget.
+    TimeManager bullet = make_clock_manager(milliseconds{60000}, milliseconds{0},
+                                            std::nullopt, false);
+    require(bullet.diagnostics().hard_budget <= milliseconds{4000},
+            "a 1+0 hard budget must stay under four seconds");
+    require(bullet.time_budget().value() < milliseconds{60000},
+            "a 1+0 budget must leave time on the clock");
+
+    // An increment refunds part of every move, so the pacing may stay shorter.
+    TimeManager incremental = make_clock_manager(milliseconds{300000}, milliseconds{2000},
+                                                 std::nullopt, false);
+    require(incremental.diagnostics().horizon <= 30,
+            "an increment control must not use the sudden-death horizon");
+    require(incremental.diagnostics().soft_budget >= milliseconds{4000},
+            "an increment control must still allow real think time");
+}
+
 void test_low_clock_engages_emergency_pacing() {
     TimeManager emergency = make_clock_manager(milliseconds{2000}, milliseconds{100},
                                                std::nullopt, true);
@@ -271,6 +307,7 @@ int main(int argc, char** argv) {
     const std::vector<koi::test::TestCase> tests{
         {"clock budget safety invariants", test_clock_budget_never_breaks_the_safety_invariants},
         {"fast control keeps the clock", test_fast_control_move_leaves_most_of_the_clock},
+        {"sudden death pacing", test_sudden_death_paces_the_whole_clock},
         {"emergency pacing", test_low_clock_engages_emergency_pacing},
         {"movetime budget", test_movetime_keeps_its_own_budget},
         {"frozen deadline", test_deadline_is_fixed_at_construction_and_cannot_be_extended},

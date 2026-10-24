@@ -53,6 +53,9 @@ private:
     bool hard_position_ = false;
     bool clock_mode_ = false;
     bool emergency_pacing_ = false;
+    // Sudden death (no increment): the clock is never refunded, so the search
+    // must respect the soft budget even when the position looks hard.
+    bool sudden_death_ = false;
     mutable std::atomic_bool hard_deadline_reached_ = false;
 
     // The stop checks run per node (SearchContext::interrupted) and from Lazy

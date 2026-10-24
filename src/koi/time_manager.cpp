@@ -173,6 +173,16 @@ void TimeManager::initialize(Color side_to_move, std::uint8_t speed_percent,
         static_cast<std::chrono::milliseconds::rep>(std::min<std::uint64_t>(
             move_overhead_ms, static_cast<std::uint64_t>(
                 std::numeric_limits<std::chrono::milliseconds::rep>::max())))};
+    // Horizon: how many moves this allocation plans for.  A GUI may send
+    // `movestogo`, but lichess-bot and most GUIs do not, so the fallback decides
+    // the pacing.  Sudden death needs a long horizon: planning to spend the whole
+    // clock inside 20 moves let a 5+0 game burn 30-45 s per move and flag.  With
+    // an increment part of every move is refunded, so a shorter horizon is safe.
+    const bool has_increment = clock->increment > std::chrono::milliseconds::zero();
+    sudden_death_ = !has_increment;
+    const std::uint32_t default_horizon = has_increment ? 25U : 50U;
+    timing_.horizon = std::max<std::uint32_t>(
+        1, limits_.moves_to_go.value_or(default_horizon));
     const auto reserve_floor = std::max(
         std::chrono::milliseconds{50},
         std::max(scale_duration(remaining, 3), saturating_add(overhead, overhead)));
@@ -189,8 +199,11 @@ void TimeManager::initialize(Color side_to_move, std::uint8_t speed_percent,
     const auto increment_credit = std::min(three_quarters(clock->increment),
                                            scale_fraction(timing_.usable, 1, 4));
     const auto raw_soft = saturating_add(base_allocation, increment_credit);
-    const auto raw_hard = saturating_add(scale_fraction(base_allocation, 3, 1),
-                                         scale_fraction(increment_credit, 3, 2));
+    // Sudden death has no refund, so a single unstable move may only take twice
+    // the base allocation; with an increment the third unit is recovered.
+    const auto raw_hard = saturating_add(
+        scale_fraction(base_allocation, has_increment ? 3 : 2, 1),
+        scale_fraction(increment_credit, 3, 2));
     const auto scale_budget = [slow_mover_percent, speed_percent, this](
                                   std::chrono::milliseconds duration) {
         const auto slow = scale_duration(duration, slow_mover_percent);
@@ -207,10 +220,12 @@ void TimeManager::initialize(Color side_to_move, std::uint8_t speed_percent,
     // low-clock searches over three times the normal horizon and retain only
     // a small hard-position extension while preserving the reserve.
     if (emergency_pacing_) {
-        const std::uint32_t emergency_horizon = timing_.horizon <=
-                std::numeric_limits<std::uint32_t>::max() / 3 ?
-            timing_.horizon * 3 : std::numeric_limits<std::uint32_t>::max();
-        const auto emergency_base = timing_.usable / std::max<std::uint32_t>(1, emergency_horizon);
+        // Pace low-clock searches over a horizon that still allows a usable
+        // think time: with the sudden-death horizon of 50 a naive tripling would
+        // allocate tens of milliseconds per move and throw the clock away.
+        const std::uint32_t emergency_horizon = std::max<std::uint32_t>(
+            10, timing_.horizon / 2);
+        const auto emergency_base = timing_.usable / emergency_horizon;
         const auto emergency_soft = std::min(
             timing_.usable, saturating_add(emergency_base, increment_credit));
         const auto emergency_extension = std::max(
@@ -374,10 +389,14 @@ bool TimeManager::should_stop_after_iteration() const noexcept {
         hard_deadline_reached_.store(true, std::memory_order_relaxed);
         return true;
     }
-    if (emergency_pacing_ && !hard_position_ && elapsed >= timing_.soft_budget) {
+    if (emergency_pacing_ && (!hard_position_ || sudden_death_) &&
+        elapsed >= timing_.soft_budget) {
         return true;
     }
-    return clock_mode_ && !hard_position_ && stable_observations_ >= 2 &&
+    // In sudden death an unstable position must still stop at the soft budget:
+    // there is no increment to refund the time, and letting every "hard" move
+    // run to the hard cap is what flagged the 5+0 blitz game.
+    return clock_mode_ && (!hard_position_ || sudden_death_) && stable_observations_ >= 2 &&
         elapsed >= timing_.soft_budget;
 }
 
@@ -388,7 +407,8 @@ bool TimeManager::should_start_next_iteration(std::chrono::milliseconds estimate
     }
     const auto elapsed = std::chrono::milliseconds{
         (now_nanoseconds() - started_ns_.load(std::memory_order_relaxed)) / 1'000'000};
-    if (emergency_pacing_ && !hard_position_ && elapsed >= timing_.soft_budget) {
+    if (emergency_pacing_ && (!hard_position_ || sudden_death_) &&
+        elapsed >= timing_.soft_budget) {
         return false;
     }
     const auto budget = std::chrono::milliseconds{budget_ms};
