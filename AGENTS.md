@@ -1,4 +1,4 @@
-# Koi Engine contributor and agent guide
+# Koi contributor and agent guide
 
 This file gives contributors and coding agents the repository context needed to
 make safe, reviewable changes. Use the documentation site for navigable user

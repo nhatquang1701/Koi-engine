@@ -1,4 +1,4 @@
-# Koi Engine documentation map
+# Koi documentation map
 
 Start with the [documentation landing page](index.md) for installation, GUI
 setup, UCI use, developer guidance, and release notes. The

@@ -1,6 +1,6 @@
-# Koi Engine
+# Koi
 
-Koi Engine is a Windows x64, Linux x86-64, and macOS arm64 (Apple Silicon) UCI
+Koi is a Windows x64, Linux x86-64, and macOS arm64 (Apple Silicon) UCI
 chess engine for standard chess. It is
 written in C++26 and is documented and process-tested against En Croissant as
 the primary GUI workflow. It uses deterministic iterative-deepening alpha-beta search
@@ -14,6 +14,13 @@ nondeterministic: the deterministic guarantee is scoped to `Threads = 1`, and
 threaded runs are validated for legality and coverage instead of byte
 equality. The UCI command loop remains responsive in both configurations.
 
+## Name
+
+The engine is called **Koi**. Releases up to and including v1.1.4 used the name
+"Koi Engine" in the UCI identity, package text and documentation; those
+historical releases are not renamed. New builds identify themselves as **Koi**
+in the UCI handshake, and this guide uses **Koi** throughout. Binary and archive
+file names keep the `koi-engine` spelling so existing scripts keep working.
 ## Architecture
 
 The engine is deliberately layered so the chess rules implementation remains a
@@ -252,7 +259,7 @@ sample as the primary result and retaining every sample in the profile's `runs`
 array. Combine all three for steady-state throughput comparisons. `--timed` is
 opt-in and adds wall-clock `elapsed_ms` and measured NPS to text and JSON; it is
 intentionally absent from the default CI-shaped output. Untimed JSON profiles use
-the stable `Koi Engine 1.1.4` build identity, set `timed` to `false`, and record
+the stable `Koi 1.1.4` build identity, set `timed` to `false`, and record
 `nps` as unmeasured (`0`). Each profile carries `hash_state` (`cold` or `warm`) at
 the top level and on every position. It is a separate process and never writes to
 the UCI engine's stdout.
@@ -957,7 +964,7 @@ per search. Any other standard UCI GUI can use the same executable and options.
 1. Build the engine and resolve the path to `koi-engine.exe`.
 2. In Lucas Chess, open the engine-management or configuration dialog and add
    the built executable as an external UCI engine.
-3. Save the engine configuration, then select Koi Engine for play.
+3. Save the engine configuration, then select Koi for play.
 
 Recommended starting settings for a machine with sufficient memory are:
 
@@ -1053,7 +1060,7 @@ transcript but cannot automate a locally installed Lucas Chess GUI.
 
 ## Configuration and release packaging
 
-The Koi Engine v1.1.4 Windows package is `koi-engine-v1.1.4.zip`; the portable
+The Koi v1.1.4 Windows package is `koi-engine-v1.1.4.zip`; the portable
 Linux archive is
 `koi-engine-v1.1.4-linux-x86_64.tar.gz`. Each archive retains this README, the
 project MIT license, required third-party licenses, and a `package.json` manifest with per-file

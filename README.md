@@ -1,4 +1,4 @@
-<h1 align="center">Koi Engine</h1>
+<h1 align="center">Koi</h1>
 
 <p align="center">
   A free, open-source UCI chess engine for standard chess.<br>
@@ -33,6 +33,13 @@ NNUE network can be enabled when available.
 | Chess support | Standard chess over the UCI protocol |
 | Optional assets | Bundled CC0 Polyglot opening book; user-supplied Syzygy tablebases |
 
+## Name
+
+The engine is called **Koi**. Releases up to and including v1.1.4, their package
+metadata and archived documentation used the name "Koi Engine"; those historical
+artifacts are left unchanged. New releases, the UCI identity and the current
+documentation use **Koi**. Executable and archive file names keep the
+`koi-engine` spelling for tooling compatibility.
 ## Download
 
 Get the Windows, Linux x86-64, and macOS arm64 packages and their checksum
@@ -75,5 +82,5 @@ The classical evaluator remains available when no NNUE network is loaded.
 
 ## License
 
-Koi Engine is released under the [MIT License](LICENSE). Release packages also
+Koi is released under the [MIT License](LICENSE). Release packages also
 include the required licenses for vendored components.

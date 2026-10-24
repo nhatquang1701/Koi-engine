@@ -1,4 +1,4 @@
-# Koi Engine
+# Koi
 
 Koi is a C++26 UCI chess engine for standard chess on Windows x64, Linux
 x86-64, and macOS arm64 (Apple Silicon). It uses iterative-deepening alpha-beta
