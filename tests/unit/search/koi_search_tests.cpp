@@ -3810,6 +3810,11 @@ void test_threaded_short_forcing_root_search_finds_knight_move() {
 }
 
 void test_clock_short_forcing_root_uses_root_forcing_extension() {
+#if defined(__SANITIZE_THREAD__)
+    // ThreadSanitizer slows the whole search by an order of magnitude, so the
+    // 500 ms forcing-root window this contract needs is not measurable there.
+    koi::test::skip("ThreadSanitizer timing makes the short forcing-root window unmeasurable");
+#endif
     const koi::GameState root = require_state(
         "r1bqk2r/p4ppp/2p2n2/2bpP3/8/2N5/PPP1P1PP/R1BQKB1R b KQkq - 0 8");
     const auto expected = koi::Move::parse_uci("f6g4");
