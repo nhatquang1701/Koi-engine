@@ -42,6 +42,7 @@ public:
     void run();
 
 private:
+    void run_impl();
     std::shared_ptr<SearchSession> session_;
     std::shared_ptr<const Evaluator> evaluator_;
     std::shared_ptr<TranspositionTable> table_;

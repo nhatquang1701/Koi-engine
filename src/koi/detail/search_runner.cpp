@@ -2717,6 +2717,23 @@ SearchRunner::SearchRunner(std::shared_ptr<SearchSession> session,
       sink_(std::move(sink)) {}
 
 void SearchRunner::run() {
+    try {
+        run_impl();
+    } catch (...) {
+        // A failure in the setup prefix (root/limits/identity copies allocate
+        // before run_impl's internal try) must still deliver exactly one
+        // completion; otherwise the GUI waits forever for a bestmove.
+        SearchResult failed;
+        failed.failed = true;
+        failed.completed = true;
+        try {
+            (void)session_->publish_completion(sink_, failed);
+        } catch (...) {
+        }
+    }
+}
+
+void SearchRunner::run_impl() {
     const auto& session = session_;
     const auto& evaluator = evaluator_;
     const auto& table = table_;
