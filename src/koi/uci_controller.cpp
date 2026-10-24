@@ -945,9 +945,15 @@ void UciController::handle_setoption(std::istream& command) {
         });
         break;
 
-    case UciOptionId::ponder:
-        apply_boolean(ponder_enabled_, [this](bool ponder_enabled) { ponder_enabled_ = ponder_enabled; });
+    case UciOptionId::ponder: {
+        // Ponder tells the GUI that the engine is prepared to ponder; it does
+        // not change the running search, so never abort one for this option.
+        bool parsed = false;
+        if (parse_boolean(value, parsed)) {
+            ponder_enabled_ = parsed;
+        }
         break;
+    }
 
     case UciOptionId::own_book: {
         bool parsed = false;

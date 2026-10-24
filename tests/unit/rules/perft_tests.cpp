@@ -47,6 +47,32 @@ void test_endgame_perft_counts_cover_pins_and_en_passant_legality() {
     require(koi::perft(state, 3) == 2812, "position three depth 3 must have 2812 nodes");
 }
 
+void test_promotion_and_castling_perft_fixtures() {
+    // CPW position 4: promotion / check-evasion rich.
+    const auto promotion = koi::GameState::from_fen(
+        "r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1");
+    require(promotion.has_value(), "the promotion perft fixture must parse");
+    koi::GameState promotion_state = *promotion;
+    require(koi::perft(promotion_state, 1) == 6,
+            "promotion fixture depth 1 must have 6 nodes");
+    require(koi::perft(promotion_state, 2) == 264,
+            "promotion fixture depth 2 must have 264 nodes");
+    require(koi::perft(promotion_state, 3) == 9467,
+            "promotion fixture depth 3 must have 9467 nodes");
+
+    // CPW position 5: castling rights, en passant, and tactical legality.
+    const auto castling = koi::GameState::from_fen(
+        "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8");
+    require(castling.has_value(), "the castling perft fixture must parse");
+    koi::GameState castling_state = *castling;
+    require(koi::perft(castling_state, 1) == 44,
+            "castling fixture depth 1 must have 44 nodes");
+    require(koi::perft(castling_state, 2) == 1486,
+            "castling fixture depth 2 must have 1486 nodes");
+    require(koi::perft(castling_state, 3) == 62379,
+            "castling fixture depth 3 must have 62379 nodes");
+}
+
 void test_interruptible_perft_matches_standard_count_and_restores_position() {
     koi::GameState state = koi::GameState::startpos();
     const std::string root_fen = state.fen();
@@ -81,6 +107,7 @@ int main(int argc, char** argv) {
         {"start-position perft", test_start_position_perft_counts},
         {"Kiwipete perft", test_kiwipete_perft_counts},
         {"endgame pin perft", test_endgame_perft_counts_cover_pins_and_en_passant_legality},
+        {"promotion and castling perft", test_promotion_and_castling_perft_fixtures},
         {"interruptible perft count and restore", test_interruptible_perft_matches_standard_count_and_restores_position},
         {"interruptible perft stop", test_interruptible_perft_stops_before_generating_moves},
     };

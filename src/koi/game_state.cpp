@@ -1813,7 +1813,8 @@ PositionFeatures GameState::position_features() const noexcept {
     // The shadow remains synchronized for legality/tablebase compatibility;
     // it is intentionally no longer on the evaluator hot path.
     return impl_->feature_state.get_or_compute(
-        impl_->native_position.history_size(),
+        std::min<std::size_t>(impl_->native_position.history_size(),
+                              detail::kMaximumGameStateHistory - 1),
         impl_->native_position.position_key(),
         impl_->native_position,
         native_position_features);
@@ -1824,7 +1825,8 @@ bool GameState::position_features_into(PositionFeatures& out) const noexcept {
     // only the return path differs, so the extracted snapshot is identical.
     // The returned flag reports whether this call rebuilt the snapshot.
     return impl_->feature_state.get_or_compute_into(
-        impl_->native_position.history_size(),
+        std::min<std::size_t>(impl_->native_position.history_size(),
+                              detail::kMaximumGameStateHistory - 1),
         impl_->native_position.position_key(),
         impl_->native_position,
         native_position_features,

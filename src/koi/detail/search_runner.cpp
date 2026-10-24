@@ -2167,18 +2167,21 @@ public:
 
         {
             std::unique_lock lock(mutex_);
-            while (finished_workers_ != worker_count_) {
+            while (finished_workers_ != worker_count_ &&
+                   !failed_.load(std::memory_order_relaxed)) {
                 if (!progress_tick) {
                     // No interim tick configured: the original predicate wait.
                     work_finished_.wait(lock, [this] {
-                        return finished_workers_ == worker_count_;
+                        return finished_workers_ == worker_count_ ||
+                            failed_.load(std::memory_order_relaxed);
                     });
                     continue;
                 }
                 const std::chrono::milliseconds interval =
                     std::max(std::chrono::milliseconds{1}, progress_tick_interval);
                 work_finished_.wait_for(lock, interval, [this] {
-                    return finished_workers_ == worker_count_;
+                    return finished_workers_ == worker_count_ ||
+                        failed_.load(std::memory_order_relaxed);
                 });
                 if (finished_workers_ == worker_count_) {
                     break;
@@ -2200,7 +2203,8 @@ public:
         for (const SearchStats& worker_stats : worker_stats_) {
             accumulate_stats(stats, worker_stats);
         }
-        aborted = job->aborted.load(std::memory_order_relaxed) ||
+        aborted = failed_.load(std::memory_order_relaxed) ||
+            job->aborted.load(std::memory_order_relaxed) ||
             stop_requested_.load(std::memory_order_relaxed);
         window_failed_high = job->window_failed_high.load(std::memory_order_relaxed);
         window_failed_low = false;
@@ -2267,7 +2271,25 @@ private:
         bool multi_pv = false;
     };
 
-    void worker_loop(std::size_t worker_index) {
+    void worker_loop(std::size_t worker_index) noexcept {
+        // Mirror LazySmpPool: a throwing root worker (bad_alloc under memory
+        // pressure, condition-variable/system_error) must not cross the thread
+        // entry point, which would call std::terminate and take the engine down.
+        try {
+            worker_body(worker_index);
+        } catch (...) {
+            failed_.store(true, std::memory_order_relaxed);
+            std::lock_guard lock(mutex_);
+            if (job_) {
+                job_->aborted.store(true, std::memory_order_relaxed);
+            }
+            stopping_ = true;
+            work_available_.notify_all();
+            work_finished_.notify_all();
+        }
+    }
+
+    void worker_body(std::size_t worker_index) {
         // Root jobs are authoritative. The striped table keeps concurrent probe/store activity
         // safe without requiring a serial confirmation search.
         auto context_storage = std::make_unique<SearchContext>(
@@ -2568,6 +2590,7 @@ private:
     std::condition_variable work_available_;
     std::condition_variable work_finished_;
     std::shared_ptr<Job> job_;
+    std::atomic_bool failed_{false};
     std::size_t finished_workers_ = 0;
     std::uint64_t sequence_ = 0;
     bool stopping_ = false;
@@ -5222,6 +5245,17 @@ void SearchRunner::run() {
                 }
             }
         } catch (...) {
+        }
+        if (limits.ponder) {
+            // A failed ponder search must keep the protocol contract: UCI allows
+            // exactly one bestmove, and only after stop/ponderhit. Without this
+            // gate the catch path publishes an unsolicited bestmove and a later
+            // ponderhit answers a second time.
+            try {
+                session->wait_until_stopped_or_ponderhit();
+                (void)session->take_ponderhit_limits();
+            } catch (...) {
+            }
         }
     }
 

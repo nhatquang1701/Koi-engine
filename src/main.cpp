@@ -69,8 +69,12 @@ int main(int argc, char* argv[]) {
     // sits next to this binary and the host supports it, re-exec through that
     // binary so the AVX2 or AVX-512 code paths are used without asking the user
     // to pick a flavor. A missing or unstartable sibling keeps this process.
+    // run_cpu_selector() returns -1 when this process must continue; any other
+    // value is a child exit code. A child that crashed on Windows returns a
+    // negative int (0xC0000005 in DWORD form), which must still stop this
+    // process instead of booting a second engine session.
     const int selector_exit = koi::run_cpu_selector();
-    if (selector_exit >= 0) {
+    if (selector_exit != -1) {
         return selector_exit;
     }
 #endif
