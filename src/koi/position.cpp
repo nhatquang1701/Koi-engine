@@ -1333,8 +1333,10 @@ std::vector<Move> legal_moves() {
         }
         state.key ^= keys.black_to_move;
         state.en_passant = {};
-        state.halfmove = static_cast<std::uint16_t>(
-            std::min<unsigned>(std::numeric_limits<std::uint16_t>::max(), state.halfmove + 1));
+        // Do not advance the halfmove clock: the compatibility mirror's
+        // makeNullMove() leaves its clock untouched (chess-library semantics),
+        // and every tracked null move would otherwise be reported inconsistent.
+        // The 50/75-move claims are already suppressed for null branches.
         if (state.side == Color::black) {
             state.fullmove = static_cast<std::uint16_t>(
                 std::min<unsigned>(std::numeric_limits<std::uint16_t>::max(), state.fullmove + 1));

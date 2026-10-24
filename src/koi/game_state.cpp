@@ -1878,6 +1878,11 @@ bool GameState::is_legal(const Move& move) const noexcept {
 }
 
 bool GameState::make_move(const Move& move) noexcept {
+    if (!impl_->mirror_tracking) {
+        // Search states detach the compatibility mirror; native rules are the
+        // only authority there, so a public make_move must still work.
+        return impl_->native_position.make_move(move);
+    }
     if (!impl_->native_position.make_move(move)) {
         return false;
     }

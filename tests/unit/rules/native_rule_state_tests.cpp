@@ -567,6 +567,29 @@ void test_slider_attack_tables_match_the_ray_reference() {
             "out-of-range slider queries must answer zero");
 }
 
+void test_null_move_keeps_native_and_mirror_consistent() {
+    GameState state = require_state(
+        "r3k2r/ppp2ppp/2n1bn2/3qp3/3P4/2NB1N2/PPP2PPP/R2Q1RK1 w kq - 10 9");
+    const std::string before = state.fen();
+    require(state.make_null_move(), "the null-move consistency fixture must accept a null move");
+    require(state.native_shadow_consistent(),
+            "a tracked null move must keep the native and shadow clocks in sync");
+    require(state.consistency_snapshot().consistent(),
+            "a tracked null move must leave a consistent diagnostic snapshot");
+    require(state.unmake_null_move(), "the null move must unmake");
+    require(state.fen() == before, "unmaking the null move must restore the FEN");
+}
+
+void test_detached_state_make_move_uses_native_rules() {
+    GameState state = require_state("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+    const std::string before = state.fen();
+    state.detach_mirror();
+    const Move e2e4 = require_move("e2e4");
+    require(state.make_move(e2e4),
+            "a mirror-detached search state must accept a legal native move");
+    require(state.unmake_move(), "the detached move must unmake");
+    require(state.fen() == before, "unmaking on a detached state must restore the FEN");
+}
 } // namespace
 
 int main(int argc, char** argv) {
@@ -590,6 +613,8 @@ int main(int argc, char** argv) {
         {"sparse black piece move ordering", test_sparse_black_piece_set_preserves_ascending_source_square_order},
         {"occupied squares transactions", test_occupied_squares_track_make_unmake_transactions},
         {"locked wall survives make/unmake", test_locked_wall_dead_position_survives_make_unmake},
+        {"null move mirror consistency", test_null_move_keeps_native_and_mirror_consistent},
+        {"detached state make move", test_detached_state_make_move_uses_native_rules},
         {"slider attacks match the ray reference", test_slider_attack_tables_match_the_ray_reference},
     };
     return koi::test::run_tests(tests, argc, argv);

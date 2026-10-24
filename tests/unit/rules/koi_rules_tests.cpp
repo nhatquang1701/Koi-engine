@@ -341,13 +341,13 @@ void test_null_move_incremental_key_matches_a_fresh_parse() {
     };
     constexpr Fixture fixtures[] = {
         {"r3k2r/ppp2ppp/2n1bn2/3qp3/3P4/2NB1N2/PPP2PPP/R2Q1RK1 w kq - 10 9",
-         "r3k2r/ppp2ppp/2n1bn2/3qp3/3P4/2NB1N2/PPP2PPP/R2Q1RK1 b kq - 11 9", koi::Color::black},
+         "r3k2r/ppp2ppp/2n1bn2/3qp3/3P4/2NB1N2/PPP2PPP/R2Q1RK1 b kq - 10 9", koi::Color::black},
         {"4k3/8/8/3pP3/8/8/8/4K3 w - d6 0 2",
-         "4k3/8/8/3pP3/8/8/8/4K3 b - - 1 2", koi::Color::black},
+         "4k3/8/8/3pP3/8/8/8/4K3 b - - 0 2", koi::Color::black},
         {"4r1k1/8/8/3pP3/8/8/8/4K3 w - d6 0 2",
-         "4r1k1/8/8/3pP3/8/8/8/4K3 b - - 1 2", koi::Color::black},
+         "4r1k1/8/8/3pP3/8/8/8/4K3 b - - 0 2", koi::Color::black},
         {"4k3/8/3p4/8/4Pp2/8/8/4K3 b - e3 0 9",
-         "4k3/8/3p4/8/4Pp2/8/8/4K3 w - - 1 10", koi::Color::white},
+         "4k3/8/3p4/8/4Pp2/8/8/4K3 w - - 0 10", koi::Color::white},
     };
 
     for (const Fixture& fixture : fixtures) {
