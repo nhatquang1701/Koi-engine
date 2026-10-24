@@ -895,6 +895,7 @@ void UciController::handle_setoption(std::istream& command) {
         break;
 
     case UciOptionId::own_book:
+        own_book_explicit_ = true;
         apply_boolean(own_book_, [this](bool own_book) { own_book_ = own_book; });
         break;
 
@@ -915,9 +916,9 @@ void UciController::handle_setoption(std::istream& command) {
     case UciOptionId::book_file:
         if (!value.empty()) {
             stop_and_suppress_active_search();
+            book_file_ = value;
             opening_book_.set_file(value);
-        }
-        break;
+        }        break;
 
     case UciOptionId::book_depth:
         apply_unsigned(*option, book_depth_, [this](std::uint64_t book_depth) {
@@ -1204,8 +1205,18 @@ void UciController::start_search(GameState root, SearchLimits limits, bool skip_
     std::uint32_t ply = 0;
     if (book_eligible) {
         ply = root_ply(root);
-        book_choice = opening_book_.choose(root, ply, own_book_, book_depth_, random_seed_,
-                                           book_random_, book_safety_, book_safety_depth_);
+        // A book shipped beside the executable is used automatically unless the
+        // GUI asked for OwnBook explicitly. Missing or unreadable book files are
+        // silent: the search simply proceeds without one.
+        const bool book_auto = !own_book_explicit_ && book_is_available();
+        if (book_auto && !book_auto_reported_) {
+            book_auto_reported_ = true;
+            output_ << "info string book detected: " << resolved_book_path().string()
+                    << " (OwnBook not set, using it)\n" << std::flush;
+        }
+        book_choice = opening_book_.choose(root, ply, own_book_ || book_auto, book_depth_,
+                                           random_seed_, book_random_, book_safety_,
+                                           book_safety_depth_);
     }
     debug_json_event(
         "go",
@@ -1598,6 +1609,24 @@ void UciController::write_handshake() {
         output_ << '\n';
     }
     output_ << "uciok\n" << std::flush;
+}
+
+std::filesystem::path UciController::resolved_book_path() const {
+    std::filesystem::path path{book_file_};
+    if (path.is_relative() && !executable_directory_.empty()) {
+        path = executable_directory_ / path;
+    }
+    return path;
+}
+
+bool UciController::book_is_available() const {
+    std::error_code error;
+    const std::filesystem::path path = resolved_book_path();
+    if (!std::filesystem::is_regular_file(path, error)) {
+        return false;
+    }
+    const auto size = std::filesystem::file_size(path, error);
+    return !error && size >= 16U;
 }
 
 void UciController::write_readyok() {

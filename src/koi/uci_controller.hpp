@@ -71,6 +71,10 @@ private:
                                std::uint32_t root_ply,
                                const std::shared_ptr<CompletionOnce>& completion_once);
     void write_position_error(const char* message);
+    // Book auto-detection: a book beside the executable is used without the GUI
+    // setting OwnBook, so shipping one is enough for it to take effect.
+    [[nodiscard]] std::filesystem::path resolved_book_path() const;
+    [[nodiscard]] bool book_is_available() const;
     void write_perft_results(GameState root, int depth, std::stop_token stop_token,
                              std::uint64_t generation);
     void debug_event(std::string message) noexcept;
@@ -115,6 +119,11 @@ private:
     std::size_t multi_pv_ = 1;
     bool ponder_enabled_ = false;
     bool own_book_ = false;
+    // An opening book shipped beside the executable is used automatically unless
+    // the GUI sets OwnBook explicitly, so "install the book" is all a user does.
+    bool own_book_explicit_ = false;
+    bool book_auto_reported_ = false;
+    std::string book_file_ = "book.bin";
     bool book_random_ = false;
     bool book_safety_ = true;
     std::uint8_t book_safety_depth_ = 2;

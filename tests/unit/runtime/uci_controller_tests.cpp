@@ -817,27 +817,44 @@ void test_book_options_emit_one_seeded_marker_and_bestmove_for_normal_play() {
             "every book bestmove must be the legal selected move");
 }
 
-void test_opening_book_is_disabled_by_default() {
+// A book shipped beside the executable is used without the GUI enabling
+// OwnBook, but an explicit `OwnBook false` must still win.
+void test_opening_book_is_auto_detected() {
     koi::test::TempDirectory files;
     const std::filesystem::path book = files.path() / "book.bin";
     const koi::GameState start = koi::GameState::startpos();
     write_book(book, {{start.polyglot_key(), polyglot_move("e2", "e4"), 1, 0}});
 
-    const ControllerResult result = run_controller_in_directory(
+    const ControllerResult automatic = run_controller_in_directory(
         "setoption name BookFile value book.bin\n"
         "position startpos\n"
         "go depth 1\n"
         "stop\n"
         "quit\n",
         files.path());
-    const std::vector<std::string> lines = output_lines(result.output);
-
-    require(result.exit_code == 0 && result.diagnostics.empty(),
+    const std::vector<std::string> automatic_lines = output_lines(automatic.output);
+    require(automatic.exit_code == 0 && automatic.diagnostics.empty(),
             "a default search with an available book must remain protocol-clean");
-    require(lines_starting_with(lines, "info string book move ").empty(),
-            "an available Polyglot book must not be selected until OwnBook is enabled");
-    require(lines_starting_with(lines, "bestmove ").size() == 1,
-            "the default search must still return one bestmove");
+    require(lines_starting_with(automatic_lines, "info string book move ").size() == 1,
+            "an available book must be used when OwnBook was never set");
+    require(lines_starting_with(automatic_lines, "info string book detected: ").size() == 1,
+            "the automatic book selection must be announced once");
+
+    const ControllerResult refused = run_controller_in_directory(
+        "setoption name BookFile value book.bin\n"
+        "setoption name OwnBook value false\n"
+        "position startpos\n"
+        "go depth 1\n"
+        "stop\n"
+        "quit\n",
+        files.path());
+    const std::vector<std::string> refused_lines = output_lines(refused.output);
+    require(refused.exit_code == 0 && refused.diagnostics.empty(),
+            "an explicit OwnBook false search must remain protocol-clean");
+    require(lines_starting_with(refused_lines, "info string book move ").empty(),
+            "an explicit OwnBook false must disable the auto-detected book");
+    require(lines_starting_with(refused_lines, "bestmove ").size() == 1,
+            "the search must still return one bestmove");
 }
 
 void test_book_random_option_accepts_valid_values_and_ignores_invalid_values() {
@@ -2178,7 +2195,7 @@ int main(int argc, char** argv) {
         {"public option replacement", test_public_option_change_emits_exactly_one_bestmove},
         {"Task 6 StrengthMode", test_task6_strength_mode_is_case_insensitive_and_cancels_active_search},
         {"opening-book normal play", test_book_options_emit_one_seeded_marker_and_bestmove_for_normal_play},
-        {"opening-book disabled by default", test_opening_book_is_disabled_by_default},
+        {"opening-book auto detection", test_opening_book_is_auto_detected},
         {"opening-book random option", test_book_random_option_accepts_valid_values_and_ignores_invalid_values},
         {"opening-book safety option", test_book_safety_options_reject_poisoned_moves_and_fallback_to_search},
         {"opening-book fallback and bypass", test_book_fallback_and_analysis_style_commands_search_without_markers},

@@ -5,7 +5,11 @@ param(
     # Optional gated NNUE payload: a network with at least classical-equal
     # strength at equal time. Omit it for packages without a bundled network.
     [string]$NnuePath = '',
-    [string]$NnueMetadataPath = ''
+    [string]$NnueMetadataPath = '',
+    # Optional Polyglot opening book, generated with tools/book/build_book.py from
+    # the CC0 lichess-org/chess-openings data. The engine auto-detects a book
+    # beside the executable when OwnBook was never set.
+    [string]$BookPath = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -123,6 +127,31 @@ if (-not [string]::IsNullOrWhiteSpace($NnuePath)) {
     $nnueIncluded = $true
 }
 
+$bookIncluded = $false
+if (-not [string]::IsNullOrWhiteSpace($BookPath)) {
+    $resolvedBook = [System.IO.Path]::GetFullPath($BookPath)
+    if (-not (Test-Path -LiteralPath $resolvedBook -PathType Leaf)) {
+        throw "opening book is missing: $resolvedBook"
+    }
+    $bookDirectory = Join-Path $packageDirectory 'book'
+    New-Item -ItemType Directory -Path $bookDirectory -Force | Out-Null
+    # The engine looks for book.bin beside the executable; the package keeps it
+    # in book/ with a sidecar so a user can copy it next to the binary verbatim.
+    $bookTarget = Join-Path $bookDirectory 'koi.bin'
+    Copy-Item -LiteralPath $resolvedBook -Destination $bookTarget
+    $bookSha = Get-Sha256Hex $bookTarget
+    Set-Content -LiteralPath (Join-Path $bookDirectory 'koi.bin.sha256') -Value $bookSha -Encoding ASCII
+    $bookNotice = Join-Path $packageDirectory 'book/COPYING.txt'
+    Set-Content -LiteralPath $bookNotice -Encoding ASCII -Value @(
+        'koi.bin is a Polyglot opening book generated from lichess-org/chess-openings,',
+        'released under CC0 1.0 Universal (public domain dedication).',
+        'Source: https://github.com/lichess-org/chess-openings',
+        'Generator: tools/book/build_book.py',
+        "SHA-256: $bookSha"
+    )
+    $bookIncluded = $true
+}
+
 $licenseDirectory = Join-Path $packageDirectory 'licenses'
 New-Item -ItemType Directory -Path $licenseDirectory -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $repositoryRoot 'third_party/chess-library/LICENSE') `
@@ -135,6 +164,11 @@ $avx2Name = "koi-engine-avx2$binarySuffix"
 $avx512Name = "koi-engine-avx512$binarySuffix"
 $nnueParagraph = if ($nnueIncluded) {
     "This package includes Koi's gated NNUE network at nnue/koi.nnue (its SHA-256 is in nnue/koi.nnue.sha256). Set EvalFile to that path to use it; the classical evaluator remains the fallback."
+} else {
+    ''
+}
+$bookParagraph = if ($bookIncluded) {
+    "This package includes a Polyglot opening book at book/koi.bin (CC0, generated from lichess-org/chess-openings; SHA-256 in book/koi.bin.sha256). Copy it next to the engine binary as book.bin and Koi uses it automatically: a book beside the executable is used unless the GUI sets OwnBook explicitly."
 } else {
     ''
 }
@@ -165,10 +199,11 @@ Koi Engine v1.1.3 installation
 Run $engineName as a UCI engine from En Croissant or another UCI GUI.
 $launcherParagraph
 
-The optional user-supplied book.bin belongs beside $engineName and is not
-included in this package. Syzygy tablebase files are also user-supplied;
-configure SyzygyPath in the GUI when they are available.
+The optional user-supplied book.bin belongs beside $engineName. Syzygy
+tablebase files are also user-supplied; configure SyzygyPath in the GUI when
+they are available.
 $nnueParagraph
+$bookParagraph
 
 Recommended starting options:
   Hash=512
@@ -217,7 +252,7 @@ $manifest = [ordered]@{
     platform = if ($isWindowsHost) { 'windows-x86_64' } elseif ($isMacOSHost) { 'macos-arm64' } else { 'linux-x86_64' }
     build_configuration = 'Release'
     files = $packageFiles
-    book_included = $false
+    book_included = [bool]$bookIncluded
     tablebases_included = $false
     nnue_included = [bool]$nnueIncluded
     provenance = [ordered]@{
