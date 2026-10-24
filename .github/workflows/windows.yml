@@ -245,7 +245,7 @@ jobs:
           if errorlevel 1 exit /b 1
           pwsh -NoProfile -File tests/integration/packaging/package_release_test.ps1 -BuildDirectory build/ci-package -PackageScript tools/build/package_release.ps1
           if errorlevel 1 exit /b 1
-          certutil -hashfile artifacts\packages\koi-engine-v1.1.3.zip SHA256
+          certutil -hashfile artifacts\packages\koi-engine-v1.1.4.zip SHA256
           if errorlevel 1 exit /b 1
           dir artifacts\packages
       - name: Upload the Windows package
@@ -254,7 +254,7 @@ jobs:
         with:
           name: koi-engine-windows-package
           path: |
-            artifacts/packages/koi-engine-v1.1.3.zip
-            artifacts/packages/koi-engine-v1.1.3.zip.sha256
+            artifacts/packages/koi-engine-v1.1.4.zip
+            artifacts/packages/koi-engine-v1.1.4.zip.sha256
           if-no-files-found: ignore
           retention-days: 7

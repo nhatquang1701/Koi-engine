@@ -137,7 +137,7 @@ the opening, which matters most in short games.
   config flag `--config`; the script uses the current spelling.
 - Koi plays standard chess only; leave the variants list at `standard`.
 - Optional assets stay optional: only set `SyzygyPath`, or `OwnBook: true` with
-  `BookFile`, when you have the files. No book or tablebase data ships with Koi.
+  `BookFile`, when you have the files. Release packages carry the CC0 opening book `book/koi.bin`; Syzygy tablebase data is never bundled.
 - For analysis-style use (no clock, infinite search, MultiPV), a GUI is a better
   fit than a bot; see the [user guide](USER_GUIDE.md).
 - The bridge is AGPLv3; it is cloned at setup time and never vendored here.

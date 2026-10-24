@@ -31,7 +31,7 @@ NNUE network can be enabled when available.
 | Search | Alpha-beta with Lazy SMP |
 | Evaluation | Classical by default, with optional Koi NNUE and GPU NNUE |
 | Chess support | Standard chess over the UCI protocol |
-| Optional assets | User-supplied Polyglot opening books and Syzygy tablebases |
+| Optional assets | Bundled CC0 Polyglot opening book; user-supplied Syzygy tablebases |
 
 ## Download
 
@@ -39,9 +39,9 @@ Get the Windows, Linux x86-64, and macOS arm64 packages and their checksum
 sidecars from
 [GitHub Releases](https://github.com/nhatquang1701/Koi-engine/releases).
 
-- Windows: `koi-engine-v1.1.3.zip`
-- Linux x86-64: `koi-engine-v1.1.3-linux-x86_64.tar.gz`
-- macOS arm64: `koi-engine-v1.1.3-macos-arm64.tar.gz`
+- Windows: `koi-engine-v1.1.4.zip`
+- Linux x86-64: `koi-engine-v1.1.4-linux-x86_64.tar.gz`
+- macOS arm64: `koi-engine-v1.1.4-macos-arm64.tar.gz`
 
 macOS arm64 (Apple Silicon) can also build from source: install Homebrew LLVM
 (clang 19+; AppleClang 18+ also works), CMake, and Ninja, then configure with

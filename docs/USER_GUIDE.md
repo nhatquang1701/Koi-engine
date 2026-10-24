@@ -251,7 +251,7 @@ sample as the primary result and retaining every sample in the profile's `runs`
 array. Combine all three for steady-state throughput comparisons. `--timed` is
 opt-in and adds wall-clock `elapsed_ms` and measured NPS to text and JSON; it is
 intentionally absent from the default CI-shaped output. Untimed JSON profiles use
-the stable `Koi Engine 1.1.3` build identity, set `timed` to `false`, and record
+the stable `Koi Engine 1.1.4` build identity, set `timed` to `false`, and record
 `nps` as unmeasured (`0`). Each profile carries `hash_state` (`cold` or `warm`) at
 the top level and on every position. It is a separate process and never writes to
 the UCI engine's stdout.
@@ -512,7 +512,7 @@ with their opening books disabled, and every repeated game derives its own seed.
 The tool defaults to one game per opening and color; repeated move sequences are
 counted once as `effective_games` and raise a loud duplicate-game warning. The script exits 0 on
 accept, 1 on reject, and 2 when more games are needed.
-The v1.1.3 release comparison uses the fixed, color-reversed opening sample and
+The v1.1.4 release comparison uses the fixed, color-reversed opening sample and
 exact bound described in the release evidence report; this SPRT utility is exploratory.
 
 ```powershell
@@ -651,7 +651,7 @@ full inventory, how to run the whole suite or a single test (`KOI_TEST_FILTER`,
 `KOI_ALLOW_XPASS`, `KOI_TEST_TIMEOUT_SECONDS`, `KOI_UCI_TIMEOUT_MS`,
 `KOI_REPLAY_PATH`, `PYTHONDONTWRITEBYTECODE`, `KOI_NNUE_BOUNDARY_EXE`),
 optional-dependency skips, and per-test timeouts. The search suite's
-`known_failures` and `intermittent` registries are empty for v1.1.3; all 152
+`known_failures` and `intermittent` registries are empty for v1.1.4; all 152
 search behavior cases run as ordinary fatal tests. The dated counts in the
 verification snapshots below ("17 targets", "26 tests") are historical records
 from the 2026-09-05 and 2026-09-06 runs, not the current inventory.
@@ -859,7 +859,7 @@ every `go` is answered. `time_manager_tests` and
 `UCI_ShowWDL` defaults to false. When enabled, scored alpha-beta `info` lines
 append a deterministic `wdl W D L` triplet. An alpha-beta selective iteration
 with no proven score direction reports depth, nodes, and PV but omits score and
-WDL. Koi v1.1.3 does not advertise `UCI_LimitStrength` or `UCI_Elo`:
+WDL. Koi v1.1.4 does not advertise `UCI_LimitStrength` or `UCI_Elo`:
 the previous node-cap mapping was not calibrated to an actual rating. A GUI
 that sends those legacy options receives normal full-strength play.
 Stockfish's separate Elo controls remain available to the measurement tools
@@ -1046,13 +1046,12 @@ transcript but cannot automate a locally installed Lucas Chess GUI.
 
 ## Configuration and release packaging
 
-The Koi Engine v1.1.3 Windows package is `koi-engine-v1.1.3.zip`; the portable
+The Koi Engine v1.1.4 Windows package is `koi-engine-v1.1.4.zip`; the portable
 Linux archive is
-`koi-engine-v1.1.3-linux-x86_64.tar.gz`. Each archive retains this README, the
+`koi-engine-v1.1.4-linux-x86_64.tar.gz`. Each archive retains this README, the
 project MIT license, required third-party licenses, and a `package.json` manifest with per-file
 SHA-256 hashes and source commit provenance. A `.sha256` sidecar verifies the
-archive itself. macOS arm64 (Apple Silicon) is a source-build target; no macOS
-release archive is published.
+archive itself. macOS arm64 (Apple Silicon) archives are published as well.
 
 Koi has no required configuration file. En Croissant or another UCI GUI sends
 the options at session start; the portable release defaults are `RandomSeed=0`,
@@ -1067,11 +1066,11 @@ For the recommended En Croissant smoke scenario, use `Hash=512`, `Threads=4`, an
 `Speed=100`, then keep the book and Syzygy paths explicitly configured if those
 assets are available.
 
-The Polyglot `book.bin` is an external licensed asset. Do not commit it, embed
-it in the executable, or redistribute it as part of an unlicensed Koi archive.
-For a release package, place the user-supplied `book.bin` beside `koi-engine.exe`
-only when its license permits that distribution, and retain these repository
-licenses with the package:
+The release packages carry a CC0 1.0 Polyglot book as `book/koi.bin`, with a
+`book/COPYING.txt` notice and a SHA-256 sidecar; copy it beside the binary as
+`book.bin` to enable automatic detection. User-supplied books remain supported
+through `BookFile`. Never redistribute a book whose license does not permit it.
+Retain these repository licenses with the package:
 
 - `third_party/chess-library/LICENSE` for the vendored chess-library code.
 - `third_party/fathom/LICENSE` for the optional Syzygy adapter code.
