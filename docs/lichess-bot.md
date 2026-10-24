@@ -106,6 +106,25 @@ against its own working directory, and a relative path silently falls back to
 the classical evaluator. `move_overhead: 2000` in the config leaves the engine a
 buffer on the Lichess clock.
 
+## Opening book
+
+Release packages from 1.1.4 carry a Polyglot book generated from Lichess's
+open-source opening data ([lichess-org/chess-openings](https://github.com/lichess-org/chess-openings),
+CC0 1.0). Copy it next to the engine binary as `book.bin`:
+
+```bash
+cp book/koi.bin ~/koi-bot/engines/book.bin
+```
+
+A book found beside the executable is used **automatically** — the engine
+reports `info string book detected: …` and plays the book move without any
+option. Setting `OwnBook=false` from a GUI disables it again, and `BookFile`
+points at a different book. `BookDepth` (default 16), `BookRandom`, and
+`BookSafety` tune how it is used.
+
+Because the book is used before the search starts, it also saves clock time in
+the opening, which matters most in short games.
+
 ## Notes and troubleshooting
 
 - **`Unexpected engine output: 'info string NNUE enabled from …'`** — harmless.

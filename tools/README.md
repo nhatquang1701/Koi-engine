@@ -11,6 +11,7 @@ Directory map:
 | Directory | Purpose |
 | --- | --- |
 | `tools/build/` | build, package, book-install, and verification scripts |
+| `tools/book/` | Polyglot book generator (CC0 Lichess opening data) |
 | `tools/bot/` | Lichess bot control script (install, start, stop, auto-update) |
 | `tools/engine/` | small C++ command-line tools built with Koi |
 | `tools/measurement/` | PGN, oracle, corpus, tuning, and NNUE tooling |
