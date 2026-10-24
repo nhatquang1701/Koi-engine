@@ -56,60 +56,6 @@ int clamp_history(const std::int64_t value, const int maximum) noexcept {
     return static_cast<int>(std::clamp<std::int64_t>(value, -maximum, maximum));
 }
 
-// Sum of the initial (never-updated) values that quiet_history_score() would
-// read for this context.  Subtracting it turns the composite into a
-// zero-centred signal, matching the LMR bands and the ordering thresholds.
-std::int64_t quiet_history_baseline(const SearchHistoryContext& context) noexcept {
-    std::int64_t baseline = kInitialPieceToHistory;
-    if (context.ply < static_cast<int>(kLowPlyHistoryPliesForBaseline)) {
-        baseline += kInitialLowPlyHistory;
-    }
-    const std::size_t move_count = std::min(context.count, kSearchContinuationPlies);
-    if (move_count > 1 && !context.continuation_moves[1].is_no_move()) {
-        baseline += kInitialContinuationHistory / 2;
-    }
-    if (move_count > 2 && !context.continuation_moves[2].is_no_move()) {
-        baseline += kInitialContinuationHistory / 3;
-    }
-    if (move_count > 3 && !context.continuation_moves[3].is_no_move()) {
-        baseline += kInitialContinuationHistory / 4;
-    }
-    if (move_count > 4 && !context.continuation_moves[4].is_no_move()) {
-        baseline += kInitialContinuationHistory / 5;
-    }
-    if (move_count > 5 && !context.continuation_moves[5].is_no_move()) {
-        baseline += kInitialContinuationHistory / 6;
-    }
-    if (context.count > 0 && !context.continuation_moves[0].is_no_move()) {
-        baseline += kInitialContinuationHistory;
-    }
-    baseline += kInitialPawnHistory / 2;
-    return baseline;
-}
-
-std::int64_t continuation_history_baseline(const SearchHistoryContext& context) noexcept {
-    std::int64_t baseline = 0;
-    const std::size_t move_count = std::min(context.count, kSearchContinuationPlies);
-    if (move_count > 1 && !context.continuation_moves[1].is_no_move()) {
-        baseline += kInitialContinuationHistory / 2;
-    }
-    if (move_count > 2 && !context.continuation_moves[2].is_no_move()) {
-        baseline += kInitialContinuationHistory / 3;
-    }
-    if (move_count > 3 && !context.continuation_moves[3].is_no_move()) {
-        baseline += kInitialContinuationHistory / 4;
-    }
-    if (move_count > 4 && !context.continuation_moves[4].is_no_move()) {
-        baseline += kInitialContinuationHistory / 5;
-    }
-    if (move_count > 5 && !context.continuation_moves[5].is_no_move()) {
-        baseline += kInitialContinuationHistory / 6;
-    }
-    if (move_count > 0 && !context.continuation_moves[0].is_no_move()) {
-        baseline += kInitialContinuationHistory;
-    }
-    return baseline;
-}
 
 std::uint64_t mix64(std::uint64_t value) noexcept {
     value += 0x9E3779B97F4A7C15ULL;
@@ -348,7 +294,7 @@ int SearchOrderingTables::quiet_history_score(
     }
     score += pawn_history_[pawn_index(context, metadata.moving_piece, metadata.move.to())] / 2;
 
-    return clamp_history(score - quiet_history_baseline(context), kMaximumHistoryScore);
+    return clamp_history(score, kMaximumHistoryScore);
 }
 
 int SearchOrderingTables::continuation_history_score(
@@ -421,7 +367,7 @@ int SearchOrderingTables::continuation_history_score(
             (kContinuationHistorySize - 1U);
         score += continuation_history_[pair_index];
     }
-    return clamp_history(score - continuation_history_baseline(context), kMaximumHistoryScore);
+    return clamp_history(score, kMaximumHistoryScore);
 }
 
 int SearchOrderingTables::capture_history_score(const MoveMetadata& metadata) const noexcept {

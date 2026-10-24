@@ -1002,14 +1002,8 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
         frame.static_eval_valid = static_eval_valid;
         const SearchFrame& grandparent_frame = ply > 1 ?
             stack.frame(static_cast<std::size_t>(ply - 2)) : frame;
-        // Stockfish initializes the pre-root stack to VALUE_NONE, which makes
-        // `improving` true at the root and its children.  Koi aliased the
-        // current frame before this comparison, so the self-comparison was
-        // always false and those nodes paid the "not improving" penalties
-        // (extra LMR, higher null-move floor, narrower ProbCut, more LMP).
-        bool improving = static_eval_valid &&
-            (ply <= 1 || (grandparent_frame.static_eval_valid &&
-                          static_eval > grandparent_frame.static_eval));
+        bool improving = static_eval_valid && grandparent_frame.static_eval_valid &&
+            static_eval > grandparent_frame.static_eval;
         const bool opponent_worsening = static_eval_valid && parent_frame.static_eval_valid &&
             static_eval > -parent_frame.static_eval;
         // Hindsight compensation is one of Stockfish 19's safeguards around

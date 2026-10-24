@@ -107,11 +107,11 @@ void test_late_move_policy_owns_gating_history_and_reduction() {
             "deep late moves must receive the configured depth/move reduction");
 
     const auto high_history_gate = koi::detail::SearchPolicy::late_move_gate(
-        8, 4, 1'024, 0, false, false, false, false, false, false, false);
+        8, 4, 128, 0, false, false, false, false, false, false, false);
     require(high_history_gate.candidate && high_history_gate.high_history_exclusion,
             "high-history moves must remain authoritative instead of being reduced");
     const auto high_history = koi::detail::SearchPolicy::dynamic_late_move(
-        8, 4, 7, 1'024, 0, 0, false, false, false, false, false, false, false, true, false,
+        8, 4, 7, 128, 0, 0, false, false, false, false, false, false, false, true, false,
         false, false, true, false, 0, true, false);
     require(!high_history.reduced,
             "high-history moves must not be reduced even when they are late");

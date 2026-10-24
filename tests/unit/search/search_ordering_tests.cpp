@@ -667,25 +667,6 @@ void test_correction_history_saturates_and_resets() {
             "clear must reset the correction tables");
 }
 
-void test_fresh_quiet_history_is_centred_on_zero() {
-    // The LMR bands compare composite history against zero, so a quiet move
-    // that has never been updated must read 0 (the negative table priors are
-    // subtracted as the context baseline).
-    const koi::GameState state = require_state("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
-    koi::detail::SearchMoveOrdering ordering;
-    koi::MoveMetadataList moves;
-    state.legal_moves_with_metadata(moves);
-    ordering.order(state, moves, std::nullopt, 0);
-    for (const koi::MoveMetadata& metadata : moves) {
-        if (metadata.is_capture() || metadata.gives_check ||
-            metadata.move.promotion() != koi::Promotion::none) {
-            continue;
-        }
-        require(metadata.ordering_score == 0,
-                "an untrained quiet move must have a zero-centred history score");
-    }
-}
-
 void test_quiet_history_gravity_keeps_the_lmr_scale() {
     // Regression for a 299,998-clamp bug: the main history table shared the
     // counter-move priority clamp instead of the fixed-point 16,384 scale used
@@ -739,7 +720,6 @@ int main(int argc, char** argv) {
         {"deferred SEE ordering", test_ordering_resolves_deferred_see_for_search_moves},
         {"correction history saturation", test_correction_history_saturates_and_resets},
         {"quiet history gravity scale", test_quiet_history_gravity_keeps_the_lmr_scale},
-        {"fresh quiet history centring", test_fresh_quiet_history_is_centred_on_zero},
     };
 
     return koi::test::run_tests(tests, argc, argv);
