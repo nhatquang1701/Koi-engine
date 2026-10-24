@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <memory>
 
 #include "koi/evaluator.hpp"
@@ -27,6 +28,10 @@ public:
     void wait();
     [[nodiscard]] bool running() const noexcept;
     void request_ponderhit(SearchLimits limits);
+    // Stops the search after `delay` if it is still running. Used to bound a
+    // ponderhit conversion whose new budget cannot be observed until the
+    // current iteration ends.
+    void stop_after(std::chrono::milliseconds delay);
 
 private:
     explicit SearchHandle(std::shared_ptr<detail::SearchSession> state) noexcept;

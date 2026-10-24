@@ -20,6 +20,7 @@
 #include "koi/gpu/nnue_gpu_evaluator.hpp"
 #include "koi/nnue.hpp"
 #include "koi/perft.hpp"
+#include "koi/time_manager.hpp"
 
 namespace koi {
 
@@ -1240,7 +1241,25 @@ void UciController::handle_ponderhit() {
         // exact root the GUI ponders after, so the ponderhit is converted in
         // place. The worker keeps its TT-warm state, identity, and generation;
         // only time management switches from unbounded to the real budget.
+        SearchLimits converted_for_timing = converted;
         active_search_->request_ponderhit(std::move(converted));
+        // The worker consumes the conversion only at the next iteration
+        // boundary; until then the pondering search has no deadline even though
+        // the GUI clock is running. Arm a hard-budget fallback timer so a long
+        // in-flight iteration cannot flag the engine.
+        try {
+            koi::TimeManager converted_timing(
+                converted_for_timing, position_.side_to_move(), speed_percent_,
+                move_overhead_ms_, slow_mover_percent_, koi::RootTimingContext{}, {},
+                dynamic_overhead_);
+            if (const auto budget = converted_timing.time_budget();
+                budget.has_value() && budget->count() > 0) {
+                std::chrono::milliseconds deadline = *budget;
+                deadline += std::chrono::milliseconds{50};
+                active_search_->stop_after(deadline);
+            }
+        } catch (...) {
+        }
         std::uint64_t generation = 0;
         {
             std::lock_guard lock(output_mutex_);

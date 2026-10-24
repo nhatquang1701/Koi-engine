@@ -4088,6 +4088,24 @@ void test_search_reduces_late_quiet_moves_without_losing_root_legality() {
             "late quiet moves must reuse one parent feature snapshot per search node");
 }
 
+void test_stop_after_deadline_completes_a_running_search() {
+    koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>());
+    koi::SearchLimits limits;
+    limits.infinite = true;
+    std::optional<koi::SearchResult> completed;
+    koi::SearchHandle handle = service.start(koi::GameState::startpos(), limits,
+        {.on_complete = [&completed](const koi::SearchResult& result) {
+            completed = result;
+        }});
+    handle.stop_after(std::chrono::milliseconds{50});
+    handle.wait();
+    require(completed.has_value() && completed->completed,
+            "a stop-after deadline must complete a running search");
+    require(completed->best_move.has_value() &&
+                koi::GameState::startpos().is_legal(*completed->best_move),
+            "a stop-after completion must still carry a legal move");
+    require(completed->cancelled, "a stop-after completion must report the cancellation");
+}
 void test_search_reuses_static_evaluations_for_transpositions() {
     koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>());
     koi::SearchLimits limits;
@@ -5216,6 +5234,7 @@ int main(int argc, char** argv) {
         {"quiet history moving side", test_quiet_history_updates_use_saved_moving_side_after_unmake},
         {"quiet history hook exceptions", test_throwing_history_diagnostic_hook_cannot_abort_search},
         {"late quiet move reductions", test_search_reduces_late_quiet_moves_without_losing_root_legality},
+        {"stop-after deadline", test_stop_after_deadline_completes_a_running_search},
         {"static evaluation cache", test_search_reuses_static_evaluations_for_transpositions},
         {"static eval correction history", test_search_records_static_eval_correction_history},
         {"true internal iterative deepening", test_search_records_true_internal_iterative_deepening},

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <chrono>
 #include <condition_variable>
 #include <cstdint>
 #include <functional>
@@ -44,6 +45,10 @@ public:
     // Records a UCI ponderhit conversion for the running worker. The worker
     // consumes it at the top of the next iteration and re-arms timing.
     void request_ponderhit(SearchLimits limits);
+    // Arms a bounded fallback deadline: the search is stopped after `delay`
+    // unless it completed or was stopped earlier.  A jthread timer owned by the
+    // session; re-arming joins the previous timer.
+    void request_stop_after(std::chrono::milliseconds delay);
     [[nodiscard]] bool ponderhit_requested() const noexcept {
         return ponderhit_requested_.load(std::memory_order_acquire);
     }
@@ -65,6 +70,7 @@ private:
     std::mutex ponderhit_mutex_;
     std::optional<SearchLimits> ponderhit_limits_;
     WorkerThread worker_;
+    std::jthread stop_timer_;
 };
 
 } // namespace koi::detail

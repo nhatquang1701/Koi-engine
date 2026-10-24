@@ -90,6 +90,29 @@ void SearchSession::request_ponderhit(SearchLimits limits) {
     stop_condition_.notify_all();
 }
 
+void SearchSession::request_stop_after(std::chrono::milliseconds delay) {
+    if (delay <= std::chrono::milliseconds::zero()) {
+        return;
+    }
+    stop_timer_ = std::jthread([this, delay](std::stop_token token) {
+        const auto deadline = std::chrono::steady_clock::now() + delay;
+        while (!token.stop_requested()) {
+            if (stop_requested_.load(std::memory_order_relaxed)) {
+                return;
+            }
+            if (std::chrono::steady_clock::now() >= deadline) {
+                break;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds{5});
+        }
+        if (token.stop_requested()) {
+            return;
+        }
+        stop_requested_.store(true, std::memory_order_relaxed);
+        stop_condition_.notify_all();
+    });
+}
+
 std::optional<SearchLimits> SearchSession::take_ponderhit_limits() {
     if (!ponderhit_requested_.load(std::memory_order_acquire)) {
         return std::nullopt;

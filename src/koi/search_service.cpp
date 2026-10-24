@@ -57,6 +57,12 @@ bool SearchHandle::running() const noexcept {
     return state_ && state_->running();
 }
 
+void SearchHandle::stop_after(std::chrono::milliseconds delay) {
+    if (state_ != nullptr) {
+        state_->request_stop_after(delay);
+    }
+}
+
 void SearchHandle::request_ponderhit(SearchLimits limits) {
     if (state_) {
         state_->request_ponderhit(std::move(limits));
