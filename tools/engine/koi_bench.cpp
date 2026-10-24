@@ -45,6 +45,10 @@ struct BenchmarkConfig {
     std::optional<std::string> profile_json_path;
     std::optional<std::string> report_json_path;
     std::optional<std::string> nnue_path;
+    // Effective evaluator after loading: a requested-but-rejected network must
+    // never make the report claim it measured NNUE.
+    bool nnue_active = false;
+    std::string nnue_error_message;
 };
 
 std::string suite_name(const BenchmarkConfig& config) {
@@ -590,13 +594,19 @@ void write_profile_json(const std::string& path, const BenchmarkConfig& config,
            << "  \"hash_mb\": 512,\n"
            << "  \"threads\": " << config.threads << ",\n"
            << "  \"speed\": " << static_cast<unsigned>(config.speed_percent) << ",\n"
-           << "  \"evaluator\": \"" << (config.nnue_path ? "nnue" : "classical") << "\",\n";
+           << "  \"evaluator\": \"" << (config.nnue_active ? "nnue" : "classical") << "\",\n";
     if (config.nnue_path) {
         std::error_code file_error;
         const auto network_bytes = std::filesystem::file_size(*config.nnue_path, file_error);
         output << "  \"nnue\": {\"path\": ";
         write_json_string(output, *config.nnue_path);
-        output << ", \"bytes\": " << (file_error ? 0 : network_bytes) << "},\n";
+        output << ", \"bytes\": " << (file_error ? 0 : network_bytes)
+               << ", \"active\": " << (config.nnue_active ? "true" : "false");
+        if (!config.nnue_error_message.empty()) {
+            output << ", \"error\": ";
+            write_json_string(output, config.nnue_error_message);
+        }
+        output << "},\n";
     }
     output << "  \"positions\": [\n";
     for (std::size_t index = 0; index < profiles.size(); ++index) {
@@ -691,7 +701,7 @@ void write_speed_json(const std::string& path, const BenchmarkConfig& config,
            << "  \"suite\": \"" << suite_name(config) << "\",\n"
            << "  \"source\": ";
     write_json_string(output, config.fen_file_path ? *config.fen_file_path : std::string("built-in"));
-    output << ",\n  \"evaluator\": \"" << (config.nnue_path ? "nnue" : "classical") << "\",\n"
+    output << ",\n  \"evaluator\": \"" << (config.nnue_active ? "nnue" : "classical") << "\",\n"
            << "  \"threads\": " << config.threads << ",\n"
            << "  \"speed\": " << static_cast<unsigned>(config.speed_percent) << ",\n"
            << "  \"hash_mb\": 512,\n"
@@ -802,7 +812,9 @@ int main(int argc, char** argv) {
         koi::EvaluatorSelection selection;
         if (config->nnue_path.has_value()) {
             selection = koi::make_evaluator(std::filesystem::path{*config->nnue_path});
+            config->nnue_active = selection.nnue_enabled;
             if (selection.nnue_error.has_value()) {
+                config->nnue_error_message = selection.nnue_error->message;
                 std::cerr << "koi-bench: NNUE network rejected ("
                           << selection.nnue_error->message
                           << "); using the classical evaluator.\n";
