@@ -431,7 +431,11 @@ bool TimeManager::should_stop_after_iteration() const noexcept {
         hard_deadline_reached_.store(true, std::memory_order_relaxed);
         return true;
     }
-    if (emergency_pacing_ && (!hard_position_ || !hard_extension_affordable()) &&
+    // At a low clock the cold-TT "hard" classification is intentionally not
+    // trusted; stop at soft only when the clock can no longer afford the
+    // extension (a root forcing extension / worker startup needs the hard
+    // budget even in a quiet-looking position).
+    if (emergency_pacing_ && !hard_extension_affordable() &&
         elapsed >= timing_.soft_budget) {
         return true;
     }
@@ -446,7 +450,7 @@ bool TimeManager::should_start_next_iteration(std::chrono::milliseconds estimate
     }
     const auto elapsed = std::chrono::milliseconds{
         (now_nanoseconds() - started_ns_.load(std::memory_order_relaxed)) / 1'000'000};
-    if (emergency_pacing_ && (!hard_position_ || !hard_extension_affordable()) &&
+    if (emergency_pacing_ && !hard_extension_affordable() &&
         elapsed >= timing_.soft_budget) {
         return false;
     }
