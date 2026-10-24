@@ -302,14 +302,16 @@ def _search_position(process: subprocess.Popen[str], lines: queue.Queue[Any], fe
             row_complete = all(row[field] is not None for field in ("nodes", "nps", "time_ms"))
             previous_complete = previous is not None and all(
                 previous[field] is not None for field in ("nodes", "nps", "time_ms"))
-            # A later complete row for a depth is an interim progress refresh of
-            # the same completed iteration, so the first complete row wins;
-            # incomplete rows are still merged or upgraded.
-            if previous is None or (row_complete and not previous_complete):
+            # Interim progress refreshes can carry the in-flight depth with a
+            # partial node count and the previous score.  Keep the LAST complete
+            # row for a depth (that is the completed iteration); merge field-wise
+            # only while no complete row exists.
+            if row_complete:
                 depth_rows[row_depth] = row
-            elif not previous_complete:
+            elif previous is None or not previous_complete:
                 depth_rows[row_depth] = {
-                    field: row[field] if row[field] is not None else previous[field]
+                    field: row[field] if row[field] is not None else
+                    (previous[field] if previous is not None else None)
                     for field in ("depth", "nodes", "nps", "time_ms")
                 }
         elif line.startswith("bestmove "):
@@ -330,7 +332,12 @@ def _search_position(process: subprocess.Popen[str], lines: queue.Queue[Any], fe
         if stop_sent_at is not None else 0,
         "time_to_bestmove_ms": int(round((bestmove_at - started) * 1000)),
         "depth_rows": [depth_rows[key] for key in sorted(depth_rows)],
-        "completed_depth": max(depth_rows, default=0),
+        # Only a depth with a complete row (nodes + nps + time) counts as an
+        # actually completed iteration; an interim in-flight row must not.
+        "completed_depth": max(
+            (key for key, row in depth_rows.items()
+             if all(row[field] is not None for field in ("nodes", "nps", "time_ms"))),
+            default=0),
         "bestmove": bestmove,
         "ponder": ponder,
     }

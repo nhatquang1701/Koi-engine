@@ -400,6 +400,11 @@ BenchmarkRun run_position(const BenchPosition& benchmark, const BenchmarkConfig&
     koi::SearchOptions options;
     options.threads = config.threads;
     options.speed_percent = config.speed_percent;
+    // A benchmark sample labelled `depth d` must describe the *completed*
+    // iteration d, not a 250 ms interim refresh of it (which carries the
+    // previous score and a partial node count).  Disable interim reporting so
+    // the sweep table only ever sees completed iteration lines.
+    options.interim_report_interval = std::chrono::milliseconds{0};
 
     std::optional<koi::SearchResult> result;
     std::vector<koi::Move> pv;

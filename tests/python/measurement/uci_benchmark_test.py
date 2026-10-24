@@ -199,7 +199,7 @@ class UciBenchmarkReportTest(unittest.TestCase):
             self.assertTrue(all(run["positions"][0]["go_command"] == "go infinite"
                                 for run in report["runs"]))
 
-    def test_first_complete_depth_row_wins_over_a_later_interim_row(self):
+    def test_last_complete_depth_row_wins_over_an_earlier_interim_row(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             temp = Path(temp_dir)
             engine_path = temp / "fake_uci_engine.py"
@@ -214,12 +214,12 @@ class UciBenchmarkReportTest(unittest.TestCase):
                     source_revision="abc1234",
                 )
 
-            # Depth 2 first arrives incomplete (no time), is upgraded by the
-            # first complete row, and the later interim-style duplicate row
-            # must not overwrite it.
+            # Depth 2 first arrives incomplete (no time), then complete, then a
+            # later interim-style duplicate.  The completed iteration is the last
+            # complete row, so it must win over the earlier one.
             self.assertEqual(report["runs"][0]["positions"][0]["depth_rows"], [
                 {"depth": 1, "nodes": 10, "nps": 5000, "time_ms": 2},
-                {"depth": 2, "nodes": 30, "nps": 6000, "time_ms": 5},
+                {"depth": 2, "nodes": 99, "nps": 11000, "time_ms": 9},
             ])
 
     def test_named_fen_corpus_is_normalized_before_engine_launch(self):
