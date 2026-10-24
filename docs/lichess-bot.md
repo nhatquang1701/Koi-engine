@@ -140,4 +140,17 @@ the opening, which matters most in short games.
   `BookFile`, when you have the files. Release packages carry the CC0 opening book `book/koi.bin`; Syzygy tablebase data is never bundled.
 - For analysis-style use (no clock, infinite search, MultiPV), a GUI is a better
   fit than a bot; see the [user guide](USER_GUIDE.md).
+- **Desktop status window.** While the bot is online, `koi-bot.sh start` opens a
+  Terminal window titled **LICHESS BOT RUNNING** showing the installed engine
+  version, config and log path. The window closes automatically (and on
+  `koi-bot.sh stop`) when the bot goes offline. It is opened through
+  `open -a Terminal`, so no Automation permission is needed to open it; the
+  close-on-exit step uses AppleScript and is silently skipped if macOS denies
+  Automation access (the window then shows LICHESS BOT OFFLINE instead).
+- **All time controls.** The generated config accepts bullet, blitz, rapid and
+  classical challenges with `move_overhead: 150` ms, `Contempt: 50` (play for a
+  win; accept a draw only when forced) and `Dynamic Overhead: true` (the engine
+  derives its per-move overhead from the remaining clock). The last two options
+  are active from the first engine release that advertises them; older engines
+  ignore unknown options.
 - The bridge is AGPLv3; it is cloned at setup time and never vendored here.
