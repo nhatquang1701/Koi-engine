@@ -440,10 +440,10 @@ NnueSparseFeaturesV5 EvaluationFeatureExtractor::encode_sparse_v5(
     const NnueSparseFeaturesThreatV1 group_b =
         encode_sparse_threat_v1(features, perspective);
     std::size_t count = 0;
-    for (std::size_t i = 0; i < group_a.count; ++i) {
+    for (std::size_t i = 0; i < group_a.count && count < sparse.indices.size(); ++i) {
         sparse.indices[count++] = group_a.indices[i];
     }
-    for (std::size_t i = 0; i < group_b.count; ++i) {
+    for (std::size_t i = 0; i < group_b.count && count < sparse.indices.size(); ++i) {
         sparse.indices[count++] = group_b.indices[i];
     }
     std::sort(sparse.indices.begin(),

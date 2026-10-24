@@ -98,8 +98,24 @@ CompletionValidation CompletionGate::validate(
                 after_best.is_legal(*candidate.ponder_move);
         }
 
-        const bool candidate_valid = candidate.best_move.has_value() && result.native_legal &&
-            result.shadow_legal && result.searchmoves_legal && result.pv_legal &&
+        // A searched best move that is legal under both authorities and allowed
+        // by searchmoves must not be replaced by the alphabetically first legal
+        // move just because the PV tail, the ponder hint, or the native/shadow
+        // bookkeeping disagreed.  Emit the searched move with a conservative
+        // legal PV and drop the unvalidated ponder hint.
+        const bool move_valid = candidate.best_move.has_value() && result.native_legal &&
+            result.shadow_legal && result.searchmoves_legal;
+        if (move_valid && (!result.pv_legal || !result.ponder_legal ||
+                           !result.root_consistent)) {
+            result.disposition = CompletionDisposition::emit;
+            result.best_move = candidate.best_move;
+            result.pv = {*candidate.best_move};
+            result.ponder_move = std::nullopt;
+            result.reason = result.root_consistent ? "truncated_pv" :
+                "native_shadow_inconsistent";
+            return result;
+        }
+        const bool candidate_valid = move_valid && result.pv_legal &&
             result.ponder_legal && result.root_consistent;
         if (candidate_valid) {
             result.disposition = CompletionDisposition::emit;

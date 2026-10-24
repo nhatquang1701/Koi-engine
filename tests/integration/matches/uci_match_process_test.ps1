@@ -256,7 +256,7 @@ try {
     }
 
     $pgn = Get-Content -LiteralPath $pgnFiles[0].FullName -Raw
-    if ($pgn -notmatch '\[Event "Koi Engine UCI match"\]' -or
+    if ($pgn -notmatch '\[Event "Koi UCI match"\]' -or
         $pgn -notmatch '\[Result "\*"\]' -or
         $pgn -notmatch '\[MoveFormat "UCI coordinate notation"\]') {
         throw 'UCI match PGN must contain reproducibility headers.'

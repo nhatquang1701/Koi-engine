@@ -47,6 +47,22 @@ const std::vector<std::string_view> kLiveFens = {
     "4k3/8/8/3q4/4Q3/8/8/4K3 w - - 0 1",
 };
 
+void test_blocked_pawns_are_not_passed() {
+    const koi::ClassicalEvaluator evaluator;
+    // The two pawns block each other on the same file; neither is a passer.
+    const GameState blocked = state_from("4k3/8/3p4/3P4/8/8/8/4K3 w - - 0 1");
+    const EvaluationBreakdown blocked_breakdown = evaluator.breakdown(blocked, Color::white);
+    require(blocked_breakdown.passed_pawn == 0,
+            "a pawn blocked by an enemy pawn on its own file must not be a passer");
+    require(blocked_breakdown.pawn_structure == 0,
+            "a symmetric same-file blockade must have a neutral pawn-structure score");
+
+    // Control: an unblocked pawn on the same file is a real passer.
+    const GameState passer = state_from("4k3/8/8/3P4/8/8/8/4K3 w - - 0 1");
+    require(evaluator.breakdown(passer, Color::white).passed_pawn > 0,
+            "an unblocked advanced pawn must still score as a passer");
+}
+
 void test_perspective_negates_the_score() {
     const koi::ClassicalEvaluator evaluator;
     for (const std::string_view fen : kLiveFens) {
@@ -97,17 +113,15 @@ void test_insufficient_material_scores_zero() {
             "bare kings must not report material");
 }
 
-void test_locked_pawn_wall_scores_zero() {
-    // The native position owns dead-position recognition.  This blocked pawn
-    // wall is the known FIDE example the evaluator now defers to, so the total
-    // must be a draw even though both sides have pawns and bishops.
+void test_locked_pawn_wall_is_not_dead() {
+    // The blocked pawn wall is not a dead position: both bishops can leave
+    // their diagonals and a legal helpmate exists.  The evaluator must therefore
+    // score it as a live position instead of returning a draw.
     const koi::ClassicalEvaluator evaluator;
     const GameState state = state_from("8/2b1k3/7p/p1p1p2P/PpP1P3/1P1BK3/8/8 w - - 0 1");
-    require(state.is_dead_position(), "the fixture must be a recognized dead position");
-    const EvaluationBreakdown breakdown = evaluator.breakdown(state, Color::white);
-    require(breakdown.total == 0, "a locked pawn wall must evaluate as a draw");
-    require(breakdown.passed_pawn != 0 || breakdown.pawn_structure != 0,
-            "diagnostic terms stay visible for a locked wall");
+    require(!state.is_dead_position(), "the fixture must not be a dead position");
+    require(evaluator.breakdown(state, Color::white).total != 0,
+            "a live locked wall must not evaluate as a draw");
 }
 
 void test_material_advantage_is_counted() {
@@ -267,7 +281,8 @@ int main(int argc, char** argv) {
         {"classical evaluator breakdown sum", test_breakdown_terms_sum_to_total},
         {"classical evaluator symmetric start", test_symmetric_positions_score_even},
         {"classical evaluator insufficient material", test_insufficient_material_scores_zero},
-        {"classical evaluator locked pawn wall", test_locked_pawn_wall_scores_zero},
+        {"classical evaluator locked pawn wall", test_locked_pawn_wall_is_not_dead},
+        {"classical evaluator blocked pawns are not passed", test_blocked_pawns_are_not_passed},
         {"classical evaluator material", test_material_advantage_is_counted},
         {"classical evaluator mobility", test_mobility_term_follows_the_extra_rook},
         {"classical evaluator tempo gate", test_endgame_tempo_is_phase_gated},

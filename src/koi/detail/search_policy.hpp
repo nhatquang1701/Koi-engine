@@ -98,7 +98,7 @@ public:
         // overstate the bound; below the threshold the null probe itself must
         // already have reached beta without a selective cutoff, and a second
         // full search would only repeat the same shallow horizon.
-        const bool verify = reduction >= 3 && depth >= kNullMoveVerificationMinimumDepth;
+        const bool verify = depth >= kNullMoveVerificationMinimumDepth;
         return DynamicNullMoveDecision{true, reduction, verify};
     }
 
@@ -185,7 +185,10 @@ public:
                 ++reduction;
             }
         } else if (prior_fail_high) {
-            --reduction;
+            // A previous sibling already failed high, so a later move is an
+            // even less likely continuation: increase the reduction, matching
+            // the reference direction (the old -1 searched deeper instead).
+            ++reduction;
         }
         if (history_score > 512) {
             --reduction;
@@ -246,9 +249,13 @@ public:
         if (!eligible) {
             return {};
         }
+        // Both signals mean the static position is better for us than it was,
+        // so they must make the fail-high easier: subtract them from the
+        // margin (the worsening term previously added to it, the opposite
+        // direction to the reference and to the hindsight compensation).
         const int margin = std::max(
             0, kReverseFutilityBaseMargin + kReverseFutilityDepthMargin * depth -
-                (improving ? kReverseFutilityImprovingDiscount : 0) +
+                (improving ? kReverseFutilityImprovingDiscount : 0) -
                 (opponent_worsening ? kReverseFutilityWorseningSurcharge : 0));
         return ReverseFutilityDecision{static_eval - margin >= beta, margin};
     }

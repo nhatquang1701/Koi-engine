@@ -1,5 +1,5 @@
-id name Koi Engine
-id author Koi Engine contributors
+id name Koi
+id author Koi contributors
 option name RandomSeed type spin default 0 min 0 max 2147483647
 option name Hash type spin default 512 min 1 max 4096
 option name Threads type spin default 1 min 1 max {max_threads}

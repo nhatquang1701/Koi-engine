@@ -51,7 +51,10 @@ private:
     // goes through emplace_back, which stores the element before counting it.
     // NoInitArray defers each entry's construction to that store, so a
     // generation call never writes 256 no-move sentinels (1 KiB).
-    detail::NoInitArray<Move, kMaximumLegalMoves> storage_;
+    // The generator fills this with *pseudo-legal* moves (a strict superset of
+    // legal moves); 256 is only the legal-move bound, so promotion-rich
+    // positions could silently truncate legal moves.  Use a real pseudo bound.
+    detail::NoInitArray<Move, 512> storage_;
     std::size_t size_ = 0;
 };
 
@@ -827,6 +830,15 @@ public:
         }
 
         rebuild_derived(candidate);
+        // Canonicalize the en-passant field exactly as the make path does: a
+        // target square that no legal capture can use is not part of the
+        // position.  The position key and the shadow board already ignore it,
+        // so keeping the raw FEN text here made native/shadow look inconsistent
+        // and the completion gate then discarded a fully searched move.
+        if (candidate.en_passant.index() < Square::kInvalid &&
+            !has_legal_en_passant_capture(candidate)) {
+            candidate.en_passant = {};
+        }
         const int white_king = king_square(candidate, Color::white);
         const int black_king = king_square(candidate, Color::black);
         if (strict) {
@@ -1523,60 +1535,12 @@ std::vector<Move> legal_moves() {
         return (bishops & dark_squares) == 0 || (bishops & ~dark_squares) == 0;
     }
 
-    [[nodiscard]] bool is_known_locked_pawn_wall() const noexcept {
-        // Keep dead-position recognition intentionally narrow. This blocked
-        // pawn wall is a known FIDE dead-position example; the board is what
-        // makes it dead, not the side to move or the bookkeeping fields in a
-        // FEN. Compare the normalized board first: the pattern is almost
-        // never present, and the en-passant certificate below needs a copy of
-        // the whole state, so it must only run for a matching board.
-        //
-        // The pattern literal below holds exactly 14 non-empty squares
-        // (17, 19, 20, 24, 25, 26, 28, 32, 34, 36, 39, 47, 50, 52), and the
-        // board comparison accepts a position only when every pattern square
-        // holds the same piece type and every other square is empty.  So
-        // passing the loop implies exactly 14 occupied squares, and this
-        // popcount pre-check is equivalent: it can only reject boards the
-        // loop would reject too.  `state.occupied` is kept in sync with the
-        // board by rebuild_derived and the make/unmake path.  The
-        // en-passant exception is only reached once the board matched, so it
-        // is unaffected.
-        if (std::popcount(state.occupied) != 14) {
-            return false;
-        }
-        static constexpr Board pattern = [] {
-            Board result{};
-            result[17] = {PieceType::pawn, Color::white};
-            result[19] = {PieceType::bishop, Color::white};
-            result[20] = {PieceType::king, Color::white};
-            result[24] = {PieceType::pawn, Color::white};
-            result[25] = {PieceType::pawn, Color::black};
-            result[26] = {PieceType::pawn, Color::white};
-            result[28] = {PieceType::pawn, Color::white};
-            result[32] = {PieceType::pawn, Color::black};
-            result[34] = {PieceType::pawn, Color::black};
-            result[36] = {PieceType::pawn, Color::black};
-            result[39] = {PieceType::pawn, Color::white};
-            result[50] = {PieceType::bishop, Color::black};
-            result[52] = {PieceType::king, Color::black};
-            result[47] = {PieceType::pawn, Color::black};
-            return result;
-        }();
-        for (std::size_t square = 0; square < pattern.size(); ++square) {
-            const Piece actual = state.board[square];
-            const Piece expected = pattern[square];
-            if (actual.type != expected.type ||
-                (!actual.empty() && actual.color != expected.color)) {
-                return false;
-            }
-        }
-        // An actually legal en-passant capture is an exception because it
-        // creates a pawn continuation from an otherwise locked wall.
-        return !has_legal_en_passant_capture(state);
-    }
-
     [[nodiscard]] bool is_dead_position() const noexcept {
-        return is_insufficient_material() || is_known_locked_pawn_wall();
+        // Dead-position recognition is limited to provably mate-free material.
+        // A previous hardcoded "locked pawn wall" pattern was not actually dead:
+        // both bishops could leave their diagonals and a legal helpmate existed,
+        // so treating it as a draw terminated live games incorrectly.
+        return is_insufficient_material();
     }
 
     // Overload taking a precomputed repetition_count() so one history scan can

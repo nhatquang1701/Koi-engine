@@ -191,10 +191,13 @@ void test_countermove_confidence_ignores_colliding_continuation_history() {
             "the collision fixture must retain two legal quiet replies");
 
     koi::detail::SearchMoveOrdering ordering;
-    for (int count = 0; count < 500; ++count) {
+    // Keep the fixture below the 16,384 fixed-point history clamp so the two
+    // moves stay distinguishable by their accumulated history instead of both
+    // saturating at the ceiling (the fixture predates that shared scale).
+    for (int count = 0; count < 20; ++count) {
         ordering.record_quiet_cutoff(state.side_to_move(), history, 4, 64);
     }
-    for (int count = 0; count < 100; ++count) {
+    for (int count = 0; count < 2; ++count) {
         ordering.record_quiet_cutoff(state.side_to_move(), colliding_reply, 4, 64,
                                      colliding_previous);
     }
@@ -664,6 +667,54 @@ void test_correction_history_saturates_and_resets() {
             "clear must reset the correction tables");
 }
 
+void test_fresh_quiet_history_is_centred_on_zero() {
+    // The LMR bands compare composite history against zero, so a quiet move
+    // that has never been updated must read 0 (the negative table priors are
+    // subtracted as the context baseline).
+    const koi::GameState state = require_state("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+    koi::detail::SearchMoveOrdering ordering;
+    koi::MoveMetadataList moves;
+    state.legal_moves_with_metadata(moves);
+    ordering.order(state, moves, std::nullopt, 0);
+    for (const koi::MoveMetadata& metadata : moves) {
+        if (metadata.is_capture() || metadata.gives_check ||
+            metadata.move.promotion() != koi::Promotion::none) {
+            continue;
+        }
+        require(metadata.ordering_score == 0,
+                "an untrained quiet move must have a zero-centred history score");
+    }
+}
+
+void test_quiet_history_gravity_keeps_the_lmr_scale() {
+    // Regression for a 299,998-clamp bug: the main history table shared the
+    // counter-move priority clamp instead of the fixed-point 16,384 scale used
+    // by every other table and by the LMR bands.  Gravity is (less than)
+    // linear in the clamp, so the wider clamp let repeated bonuses accumulate
+    // into the thousands and excluded most good quiet moves from LMR.
+    const koi::GameState state = require_state("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+    koi::detail::SearchMoveOrdering ordering;
+    const koi::Move move = require_move("e2e4");
+    for (int repeat = 0; repeat < 400; ++repeat) {
+        ordering.record_quiet_cutoff(state.side_to_move(), move, 0, 8);
+    }
+    koi::MoveMetadataList moves;
+    state.legal_moves_with_metadata(moves);
+    ordering.order(state, moves, std::nullopt, 1);
+    const auto selected = std::find_if(moves.begin(), moves.end(), [&move](const koi::MoveMetadata& metadata) {
+        return metadata.move == move;
+    });
+    require(selected != moves.end(), "the history scale fixture must retain the quiet move");
+    require(selected->ordering_score <= 16'384,
+            "quiet history must saturate at the shared 16,384 fixed-point scale");
+    require(selected->ordering_score > 0,
+            "repeated quiet cutoffs must keep a positive history score");
+    // 400 x bonus(8) is 25,600 before gravity; the aged score must stay below
+    // the raw accumulator, proving the table actually decays.
+    require(selected->ordering_score < 400 * 64,
+            "quiet history gravity must age repeated bonuses instead of accumulating");
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -687,6 +738,8 @@ int main(int argc, char** argv) {
         {"quiet-only check metadata", test_search_move_generation_can_skip_capture_check_analysis},
         {"deferred SEE ordering", test_ordering_resolves_deferred_see_for_search_moves},
         {"correction history saturation", test_correction_history_saturates_and_resets},
+        {"quiet history gravity scale", test_quiet_history_gravity_keeps_the_lmr_scale},
+        {"fresh quiet history centring", test_fresh_quiet_history_is_centred_on_zero},
     };
 
     return koi::test::run_tests(tests, argc, argv);

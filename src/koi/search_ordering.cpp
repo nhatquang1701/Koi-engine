@@ -17,9 +17,9 @@ constexpr int kCheckingMovePriority = 350'000;
 constexpr int kKillerPriority = 300'000;
 constexpr int kCounterMovePriority = kKillerPriority - 1;
 constexpr int kSeeOrderingWeight = 12;
-// Koi's history tables use a wider range than Stockfish's fixed-point quiet
-// score. This threshold leaves initially neutral quiets in the good stage,
-// while allowing repeatedly failing quiets to move behind bad captures.
+// Quiet history is a fixed-point score clamped to +/-16,384, the same scale as
+// the LMR bands. This threshold leaves initially neutral quiets in the good
+// stage, while allowing repeatedly failing quiets to move behind bad captures.
 constexpr int kGoodQuietPriorityThreshold = -4'096;
 constexpr int kBadCapturePenalty = 210'000;
 constexpr int kCaptureHistoryWeight = 2;

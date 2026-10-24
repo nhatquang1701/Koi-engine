@@ -631,8 +631,12 @@ bool pawn_is_passed_bitboard(const PositionFeatures& features, int enemy, int fi
     const std::uint64_t ahead = direction > 0
         ? kRanksFrom[static_cast<std::size_t>(rank + 1)]
         : kRanksUpTo[static_cast<std::size_t>(rank)];
-    return (features.pawns[static_cast<std::size_t>(enemy)] &
-            kAdjacentFileMasks[static_cast<std::size_t>(file)] & ahead) == 0;
+    // A passed pawn has no enemy pawn on its own file or the two adjacent files
+    // ahead of it.  Using only the adjacent-file mask scored a pawn blocked by
+    // an enemy pawn directly in front as a full passer.
+    const std::uint64_t span = kFileMasks[static_cast<std::size_t>(file)] |
+        kAdjacentFileMasks[static_cast<std::size_t>(file)];
+    return (features.pawns[static_cast<std::size_t>(enemy)] & span & ahead) == 0;
 }
 
 template <typename Fn>

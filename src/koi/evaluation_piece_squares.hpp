@@ -115,6 +115,10 @@ inline constexpr std::array<int, 64> kQueenEndGame{
     -10,  -5,  -5,   0,   0,  -5,  -5, -10,
 };
 
+// Square indices are rank-8-first (square 0 is a8), so the first rows penalise
+// a king on the eighth rank and the last row rewards the castled back rank.
+// (An audit flagged this as upside-down assuming a1-first indexing; the
+// evaluator's square convention is a8-first, so the original order is right.)
 inline constexpr std::array<int, 64> kKingMiddleGame{
     -30, -40, -40, -50, -50, -40, -40, -30,
     -30, -40, -40, -50, -50, -40, -40, -30,

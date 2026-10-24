@@ -113,9 +113,13 @@ void test_invalid_pv_cannot_be_emitted_as_valid_completion() {
     invalid.pv = {move("e2e4"), move("e7e5"), move("e7e6")};
     CompletionGate gate;
     const auto result = gate.validate(root, SearchLimits{}, identity(root), invalid);
-    require(result.disposition == CompletionDisposition::fallback,
-            "an invalid PV must not be emitted as a valid completion");
-    require(result.fallback_used, "invalid PV must be recorded as a hard fallback");
+    require(result.disposition == CompletionDisposition::emit,
+            "an invalid PV tail must keep the searched best move, not fall back");
+    require(result.best_move.has_value() && *result.best_move == move("e2e4"),
+            "the searched best move must survive PV truncation");
+    require(result.pv.size() == 1 && result.pv.front() == move("e2e4"),
+            "the emitted PV must be truncated to the legal prefix");
+    require(!result.fallback_used, "a legal searched move must not be a hard fallback");
 }
 
 void test_terminal_root_emits_0000() {

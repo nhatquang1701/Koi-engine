@@ -76,13 +76,13 @@ int main(int argc, char* argv[]) {
 #endif
 #if defined(NDEBUG) && defined(KOI_CPU_REQUIRES_AVX512)
     if (!koi::cpu_supports_avx512()) {
-        std::cerr << "Koi Engine Release requires an x64 CPU with AVX-512 support.\n";
+        std::cerr << "Koi Release requires an x64 CPU with AVX-512 support.\n";
         return 3;
     }
 #endif
 #if defined(NDEBUG) && defined(KOI_CPU_REQUIRES_AVX2)
     if (!koi::cpu_supports_avx2()) {
-        std::cerr << "Koi Engine Release requires an x64 CPU with AVX2 support.\n";
+        std::cerr << "Koi Release requires an x64 CPU with AVX2 support.\n";
         return 3;
     }
 #endif

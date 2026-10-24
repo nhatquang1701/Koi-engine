@@ -1066,7 +1066,7 @@ void l1_activations_avx2(const NnueNetwork& network,
     // the int64 scalar path when a channel's worst case cannot fit, so the
     // vector path is always equivalent to the scalar reference.
     const std::int64_t lane_worst_case =
-        static_cast<std::int64_t>(pair_count / 16U + 1U) * 2 * 127 * (127 * 127);
+        static_cast<std::int64_t>(pair_count / 16U + 1U) * 2 * 128 * (127 * 127);
     if (lane_worst_case > std::numeric_limits<std::int32_t>::max()) {
         l1_activations_scalar(network, pairs, diff, activations);
         return;

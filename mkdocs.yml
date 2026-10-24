@@ -66,6 +66,7 @@ nav:
       - Developer tools: tools/README.md
   - Reference:
       - Documentation map: docs/overview.md
+      - Engine specification: docs/ENGINE_SPEC.md
       - Removed NNUE Studio: docs/history/removed-nnue-studio.md
       - Release notes (1.1.4): docs/releases/v1.1.4.md
       - Release notes (1.1.3): docs/releases/v1.1.3.md

@@ -330,7 +330,8 @@ private:
     };
 
     [[nodiscard]] static std::size_t normalized_size_mb(std::size_t megabytes) noexcept;
-    [[nodiscard]] HashResizeResult resize_locked(std::size_t megabytes) noexcept;
+    [[nodiscard]] HashResizeResult resize_locked(std::size_t megabytes,
+                                                       std::shared_ptr<Storage>* retired_out = nullptr) noexcept;
     // Resolves this thread's hazard slot on first use and arranges its release
     // at thread exit.  A constant-initialized thread_local above keeps the hot
     // path free of dynamic-init guards.

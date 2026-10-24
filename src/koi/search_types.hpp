@@ -281,7 +281,10 @@ struct SearchOptions {
     // The portable engine default is intentionally sized for the supported
     // 32 GiB development/match machine.  UCI can still reduce this for small
     // GUI hosts, and the TT keeps its 1..4096 MiB safety bounds.
-    std::size_t hash_mb = 512;
+    // 0 means "keep the service's configured table"; any non-zero value is an
+    // explicit resize request (512 used to double as the sentinel, so an
+    // explicit 512 MB request on a smaller service was silently ignored).
+    std::size_t hash_mb = 0;
     std::size_t threads = 1;
     std::uint8_t speed_percent = 100;
     std::size_t multi_pv = 1;

@@ -102,11 +102,13 @@ inline constexpr int kTablebaseInteriorLossScore = -90'000;
 // Interior probing starts at or below this remaining depth when enabled.
 inline constexpr int kMinimumSyzygyInteriorDepth = 1;
 
-// Kept as a private compatibility predicate for existing diagnostic tests;
-// SearchPolicy owns the live LMR decision and uses the same threshold.
+// Quiet history is now zero-centred on the shared 16,384 component scale (see
+// search_ordering_tables.cpp), so the exclusion threshold must be scaled too.
+// 128 was one shallow cutoff on the old wide scale and disabled LMR for almost
+// every good quiet move; require several cutoffs before a move skips LMR.
 [[nodiscard]] constexpr bool high_history_move_excluded_from_lmr(
     const int history_score) noexcept {
-    return history_score >= 128;
+    return history_score >= 1'024;
 }
 
 } // namespace koi::detail

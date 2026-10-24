@@ -35,7 +35,7 @@ for line in sys.stdin:
     line = line.strip()
     log(line)
     if line == "uci":
-        print("id name Fake Koi Engine", flush=True)
+        print("id name Fake Koi", flush=True)
         print("option name Threads type spin default 1 min 1 max 64", flush=True)
         print("option name Hash type spin default 16 min 1 max 1024", flush=True)
         print("option name MultiPV type spin default 1 min 1 max 8", flush=True)

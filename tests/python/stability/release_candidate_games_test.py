@@ -111,7 +111,7 @@ class ReleaseCandidateGamesTest(unittest.TestCase):
             {
                 "label": "Koi",
                 "path": "C:/package/koi-engine.exe",
-                "name": "Koi Engine",
+                "name": "Koi",
                 "version": "1.0.0",
                 "hashes": {"executable_sha256": executable_sha256},
             },
@@ -132,7 +132,7 @@ class ReleaseCandidateGamesTest(unittest.TestCase):
             "executable_identity": {
                 "path": "C:/package/koi-engine.exe",
                 "package_relative_path": "koi-engine.exe",
-                "name": "Koi Engine",
+                "name": "Koi",
                 "version": "1.0.0",
                 "sha256": executable_sha256,
             },
@@ -249,7 +249,7 @@ class ReleaseCandidateGamesTest(unittest.TestCase):
     def write_uci_match(self, *, termination="max plies", result="*",
                          process="clean shutdown", bestmove="bestmove e2e4"):
         self.pgn.write_text(
-            '[Event "Koi Engine UCI match"]\n'
+            '[Event "Koi UCI match"]\n'
             '[White "Koi"]\n'
             '[Black "Opponent"]\n'
             '[Result "*"]\n'
@@ -472,7 +472,7 @@ class ReleaseCandidateGamesTest(unittest.TestCase):
         data["games"][0]["moves"] = []
         self.report.write_text(json.dumps(data), encoding="utf-8")
         self.pgn.write_text(
-            '[Event "Koi Engine UCI match"]\n[Result "1/2-1/2"]\n'
+            '[Event "Koi UCI match"]\n[Result "1/2-1/2"]\n'
             '[MoveFormat "UCI coordinate notation"]\n\n1/2-1/2\n',
             encoding="utf-8",
         )

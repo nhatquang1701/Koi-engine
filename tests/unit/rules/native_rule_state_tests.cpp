@@ -173,8 +173,10 @@ void test_move_clock_checkmate_and_dead_position_rules() {
 
     const GameState locked = require_state(
         "8/2b1k3/7p/p1p1p2P/PpP1P3/1P1BK3/8/8 w - - 0 1");
-    require(locked.is_dead_position() && locked.is_terminal(),
-            "the known locked pawn wall must be recognized conservatively");
+    // The bishops can leave their diagonals and a legal helpmate exists
+    // (White Kb6, Bb7 vs Black Ka8, Bb8), so this is not a dead position.
+    require(!locked.is_dead_position() && !locked.is_terminal(),
+            "a locked pawn wall with mobile bishops is not a dead position");
     const GameState live = require_state("4k3/8/8/8/8/8/4P3/4K1B1 w - - 0 1");
     require(!live.is_dead_position(), "a mobile pawn position must remain live");
 }
@@ -183,17 +185,16 @@ void test_locked_wall_dead_position_survives_make_unmake() {
     // Every make/unmake round trip must restore the wall board, the
     // dead-position verdict, and the maintained position state together.
     GameState state = require_state("8/2b1k3/7p/p1p1p2P/PpP1P3/1P1BK3/8/8 w - - 0 1");
-    require(state.is_dead_position() && state.draw_status() == koi::DrawStatus::dead_position,
-            "the locked pawn wall must be a dead position before any move");
+    require(!state.is_dead_position() && state.draw_status() != koi::DrawStatus::dead_position,
+            "the locked pawn wall must not be treated as a dead position");
     const std::string original_fen = state.fen();
     const std::vector<koi::Move> moves = state.legal_moves();
     require(!moves.empty(), "the locked wall still has legal moves");
     for (const koi::Move move : moves) {
         require(state.make_move(move), "wall move must be legal");
         require(state.unmake_move(), "wall move must unmake");
-        require(state.fen() == original_fen && state.is_dead_position() &&
-                    state.draw_status() == koi::DrawStatus::dead_position,
-                "unmake must restore the dead wall and its maintained occupancy");
+        require(state.fen() == original_fen && !state.is_dead_position(),
+                "unmake must restore the wall board and its live verdict");
     }
 }
 
@@ -312,6 +313,26 @@ void test_en_passant_identity_requires_a_legal_capture() {
     require(capturable.is_legal(require_move("g5f6")) &&
                 capturable.position_key() != capturable_without_target.position_key(),
             "a legal en-passant capture must remain part of the native repetition identity");
+}
+
+void test_spec_fen_en_passant_field_is_canonicalized() {
+    // Strict FEN (and many GUIs/exporters) writes the en-passant target after
+    // every double push even when no legal capture exists.  The native parser
+    // used to keep that square while the shadow dropped it, so the completion
+    // gate saw a native/shadow inconsistency and replaced the searched move
+    // with the alphabetically first legal move.
+    GameState strict_ep = require_state("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1");
+    require(strict_ep.en_passant_square().index() == Square::kInvalid,
+            "an unusable FEN en-passant square must be canonicalized away");
+    require(strict_ep.native_shadow_consistent(),
+            "the canonicalized FEN en-passant field must keep native and shadow consistent");
+    require(strict_ep.consistency_snapshot().consistent(),
+            "a spec-conforming FEN must not desynchronise the completion snapshot");
+
+    // A capturable en-passant target must survive canonicalization.
+    GameState capturable = require_state("7k/8/8/5pP1/7K/8/8/8 w - f6 0 2");
+    require(capturable.en_passant_square() == *Square::parse("f6"),
+            "a legal en-passant capture must keep the FEN target square");
 }
 
 void test_illegal_en_passant_identity_repeats_with_the_shadow() {
@@ -559,6 +580,7 @@ int main(int argc, char** argv) {
         {"king move legality direct test", test_king_move_legality_ignores_the_vacated_origin},
         {"check evasions screened", test_check_evasions_are_screened_before_the_probe},
         {"legal en-passant repetition identity", test_en_passant_identity_requires_a_legal_capture},
+        {"spec FEN en-passant canonicalization", test_spec_fen_en_passant_field_is_canonicalized},
         {"unusable en-passant repetition identity", test_illegal_en_passant_identity_repeats_with_the_shadow},
         {"long replay history window", test_long_replays_keep_the_recent_history_window},
         {"generated move transaction", test_generated_move_transaction_preserves_shadow_consistency},

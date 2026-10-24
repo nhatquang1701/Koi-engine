@@ -297,20 +297,23 @@ std::int64_t TimeManager::now_nanoseconds() const noexcept {
 
 int TimeManager::initial_hardness(const RootTimingContext& context) noexcept {
     int hardness = 0;
+    // A cold TT means "new position", not "hard position".  The old weights
+    // summed to 80 for a plain root TT miss, which latched every normal move
+    // into the hard class and made the soft budget unreachable.
     if (!context.table_available || !context.tt_hit) {
-        hardness += 30;
+        hardness += 5;
     }
     if (!context.tt_exact) {
-        hardness += 15;
+        hardness += 5;
     }
     if (context.tt_depth < 6) {
-        hardness += 15;
+        hardness += 5;
     }
     if (context.tt_generation_age > 2) {
-        hardness += 10;
+        hardness += 5;
     }
     if (!context.tt_has_best_move) {
-        hardness += 10;
+        hardness += 5;
     }
     if (context.in_check) {
         hardness += 15;
@@ -372,8 +375,10 @@ void TimeManager::observe_iteration(const SearchIterationObservation& observatio
             static_cast<long long>(*previous_score_);
         score_swing = std::llabs(delta) >= 75;
     }
-    const bool hard_evidence = observation.best_move_changed || observation.pv_changed ||
-        score_swing || observation.aspiration_researched;
+    // PV growth is expected on every deeper iteration; treating the full-vector
+    // inequality as instability made `stable_observations_` unable to reach 2.
+    const bool hard_evidence = observation.best_move_changed || score_swing ||
+        observation.aspiration_researched;
     if (hard_evidence) {
         hard_position_ = true;
         // The stop deadline is fixed when the search starts and the safety
@@ -385,9 +390,14 @@ void TimeManager::observe_iteration(const SearchIterationObservation& observatio
     } else if (previous_score_.has_value()) {
         const long long delta = static_cast<long long>(observation.score_cp) -
             static_cast<long long>(*previous_score_);
-        if (!observation.best_move_changed && !observation.pv_changed &&
-            std::llabs(delta) <= 25 && !observation.aspiration_researched) {
+        if (!observation.best_move_changed && std::llabs(delta) <= 25 &&
+            !observation.aspiration_researched) {
             ++stable_observations_;
+            if (stable_observations_ >= 2) {
+                // Recent iterations are stable, so the position is no longer
+                // treated as hard and the soft budget may end the search.
+                hard_position_ = false;
+            }
         } else {
             stable_observations_ = 0;
         }
@@ -398,15 +408,16 @@ void TimeManager::observe_iteration(const SearchIterationObservation& observatio
 }
 
 bool TimeManager::hard_extension_affordable() const noexcept {
-    // A hard position may exceed the soft budget only while the clock still pays
-    // for four more hard moves.  Compare against the *remaining* usable clock:
-    // `timing_.usable` is fixed at construction and the flag-proof ceiling caps
-    // the hard budget at a quarter of it, so comparing the two made this guard
-    // always true and the low-clock taper never fired.
     const auto elapsed = std::chrono::milliseconds{
         (now_nanoseconds() - started_ns_.load(std::memory_order_relaxed)) / 1'000'000};
     const auto remaining = nonnegative_difference(timing_.usable, elapsed);
-    return remaining >= scale_fraction(timing_.hard_budget, 4, 1);
+    // Compare the *current* clock against two soft budgets plus the teardown
+    // overhead: the earlier `remaining >= 4*hard` form was scale-invariant
+    // because both sides shrank with the same construction-time `usable`
+    // snapshot, so it stayed true for the whole move and the taper never fired.
+    const auto required = saturating_add(scale_fraction(timing_.soft_budget, 2, 1),
+                                         timing_.overhead);
+    return remaining >= required;
 }
 
 bool TimeManager::should_stop_after_iteration() const noexcept {

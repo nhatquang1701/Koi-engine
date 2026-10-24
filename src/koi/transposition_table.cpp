@@ -222,8 +222,6 @@ private:
 } // namespace
 
 std::size_t TranspositionTable::register_thread_hazard_slot() noexcept {
-    const std::size_t slot = hazard_slot_pool().acquire();
-    cached_hazard_slot_ = slot;
     struct Releaser {
         std::size_t index = kTranspositionHazardSlots;
         ~Releaser() {
@@ -232,9 +230,20 @@ std::size_t TranspositionTable::register_thread_hazard_slot() noexcept {
             }
         }
     };
-    static thread_local const Releaser releaser{slot};
-    (void)releaser;
-    return slot;
+    static thread_local Releaser releaser{};
+    if (releaser.index >= kTranspositionHazardSlots) {
+        // The first acquisition may have failed while the pool was exhausted;
+        // retry on later accesses and remember the slot in the thread-local
+        // releaser so it is actually returned at thread exit.
+        const std::size_t slot = hazard_slot_pool().acquire();
+        if (slot < kTranspositionHazardSlots) {
+            releaser.index = slot;
+        }
+        cached_hazard_slot_ = slot;
+        return slot;
+    }
+    cached_hazard_slot_ = releaser.index;
+    return releaser.index;
 }
 
 struct TranspositionTable::Storage {
@@ -352,11 +361,28 @@ std::size_t TranspositionTable::normalized_size_mb(std::size_t megabytes) noexce
 }
 
 HashResizeResult TranspositionTable::set_size_mb(std::size_t megabytes) noexcept {
-    std::lock_guard lock(maintenance_mutex_);
-    return resize_locked(megabytes);
+    std::shared_ptr<Storage> retired;
+    HashResizeResult result;
+    {
+        std::lock_guard lock(maintenance_mutex_);
+        result = resize_locked(megabytes, &retired);
+    }
+    // Wait for readers of the retired storage *outside* the maintenance lock.
+    // A search thread that owns a session pin reports info/hashfull from its own
+    // callback; if the resizer held the lock while spinning on that pin, the
+    // callback would block on the same mutex and the resize would deadlock.
+    if (retired != nullptr) {
+        for (const HazardSlot& hazard : hazards_) {
+            while (hazard.storage.load(std::memory_order_acquire) == retired.get()) {
+                std::this_thread::yield();
+            }
+        }
+    }
+    return result;
 }
 
-HashResizeResult TranspositionTable::resize_locked(std::size_t megabytes) noexcept {
+HashResizeResult TranspositionTable::resize_locked(std::size_t megabytes,
+                                                   std::shared_ptr<Storage>* retired_out) noexcept {
     HashResizeResult result;
     result.requested_mb = megabytes;
     const std::size_t normalized = normalized_size_mb(megabytes);
@@ -445,12 +471,11 @@ HashResizeResult TranspositionTable::resize_locked(std::size_t megabytes) noexce
             // "keep the last two storages" cap could.
             storage_ = std::move(replacement);
             hot_storage_.store(raw, std::memory_order_release);
-            if (retired != nullptr) {
-                for (const HazardSlot& hazard : hazards_) {
-                    while (hazard.storage.load(std::memory_order_acquire) == retired) {
-                        std::this_thread::yield();
-                    }
-                }
+            // The caller owns the wait (outside the maintenance lock) so it can
+            // keep the retired storage alive without stalling hashfull/size
+            // readers on the maintenance mutex.
+            if (retired_out != nullptr) {
+                *retired_out = std::move(current);
             }
         } catch (...) {
             result.status = current == nullptr ? HashResizeStatus::disabled :
@@ -508,17 +533,17 @@ std::size_t TranspositionTable::hashfull_permill() const noexcept {
     }
 
     const std::size_t sample_slots = std::min(kHashfullSampleSlots, storage->total_slot_count);
-    const std::size_t stride = std::max<std::size_t>(1, storage->total_slot_count / sample_slots);
-    std::size_t sampled = 0;
     std::size_t used = 0;
-    for (std::size_t slot = 0; slot < storage->total_slot_count && sampled < sample_slots;
-         slot += stride, ++sampled) {
+    for (std::size_t sampled = 0; sampled < sample_slots; ++sampled) {
+        // Evenly spaced samples cover the whole allocation; the old
+        // stride-and-stop loop never reached the tail of small tables.
+        const std::size_t slot = sampled * storage->total_slot_count / sample_slots;
         const TranspositionEntry& entry = storage->at(slot);
         if (entry.occupied && entry.generation_age == storage->clear_epoch) {
             ++used;
         }
     }
-    return sampled == 0 ? 0 : used * 1000 / sampled;
+    return sample_slots == 0 ? 0 : used * 1000 / sample_slots;
 }
 
 void TranspositionTable::clear() noexcept {

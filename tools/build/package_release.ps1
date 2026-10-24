@@ -194,7 +194,7 @@ KOI_GPU_NNUE=1.
 "@
 }
 @"
-Koi Engine v1.1.4 installation
+Koi v1.1.4 installation
 
 Run $engineName as a UCI engine from En Croissant or another UCI GUI.
 $launcherParagraph

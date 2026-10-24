@@ -317,6 +317,26 @@ void test_dynamic_move_overhead_tracks_the_time_control() {
     require(overhead_for(milliseconds{1000}, false) == milliseconds{kMoveOverheadMs},
             "a fixed overhead must keep the configured Move Overhead value");
 }
+void test_soft_budget_stops_a_stable_quiet_position() {
+    auto fake_now = std::make_shared<Clock::time_point>(Clock::now());
+    const SearchLimits limits = clock_limits(milliseconds{300'000}, milliseconds{0});
+    TimeManager manager(limits, koi::Color::white, 100, kMoveOverheadMs, 100,
+                        warm_context(), [fake_now] { return *fake_now; });
+    require(!manager.should_stop_after_iteration(),
+            "a fresh quiet search must not stop before the soft budget");
+    const auto soft = manager.diagnostics().soft_budget;
+    require(soft > milliseconds{0}, "a 5+0 clock must produce a positive soft budget");
+    for (int iteration = 0; iteration < 3; ++iteration) {
+        SearchIterationObservation observation;
+        observation.depth = 6 + iteration;
+        observation.score_cp = 20;
+        manager.observe_iteration(observation);
+    }
+    *fake_now += soft + milliseconds{1};
+    require(manager.should_stop_after_iteration(),
+            "a stable quiet position must stop once the soft budget is reached");
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -328,6 +348,7 @@ int main(int argc, char** argv) {
         {"movetime budget", test_movetime_keeps_its_own_budget},
         {"frozen deadline", test_deadline_is_fixed_at_construction_and_cannot_be_extended},
         {"synthetic games never flag", test_synthetic_games_never_reach_the_flag},
+        {"soft budget stops stable quiet positions", test_soft_budget_stops_a_stable_quiet_position},
         {"dynamic move overhead", test_dynamic_move_overhead_tracks_the_time_control},
     };
     return koi::test::run_tests(tests, argc, argv);

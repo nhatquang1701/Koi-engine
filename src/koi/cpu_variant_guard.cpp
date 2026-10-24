@@ -24,11 +24,11 @@ namespace {
 __attribute__((constructor(101))) void koi_cpu_variant_guard() {
 #if defined(KOI_CPU_REQUIRES_AVX512)
     if (!koi::cpu_supports_avx512()) {
-        exit_unsupported("Koi Engine Release requires an x64 CPU with AVX-512 support.\n");
+        exit_unsupported("Koi Release requires an x64 CPU with AVX-512 support.\n");
     }
 #elif defined(KOI_CPU_REQUIRES_AVX2)
     if (!koi::cpu_supports_avx2()) {
-        exit_unsupported("Koi Engine Release requires an x64 CPU with AVX2 support.\n");
+        exit_unsupported("Koi Release requires an x64 CPU with AVX2 support.\n");
     }
 #endif
 }

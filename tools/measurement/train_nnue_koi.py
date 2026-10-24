@@ -356,7 +356,10 @@ def _pack_rows(rows: list[list[int]], scores: list[int]) -> tuple[np.ndarray, np
 
 def piece_count_buckets(offsets: np.ndarray) -> np.ndarray:
     counts = offsets[1:] - offsets[:-1]
-    return np.minimum(7, (32 - counts) // 4).astype(np.int64)
+    # Clamp >32-piece records like every other bucket derivation; without the
+    # clamp numpy wraps a negative bucket onto output head 7 while the engine
+    # plays head 0 for the same position.
+    return np.minimum(7, (32 - np.minimum(counts, 32)) // 4).astype(np.int64)
 
 
 # ---------------------------------------------------------------------------

@@ -2927,10 +2927,12 @@ void SearchRunner::run() {
                             {result.best_move.value()}, 0, 0, 0, 1, 1};
             info.exact_wdl = syzygy_wdl_permill(tablebase_result->wdl);
             safely_report_info(sink, info);
-        } else if (root_is_claimable_draw || root_is_forced_draw || use_lazy_smp ||
+        } else if ((root_is_claimable_draw && options.multi_pv == 1) ||
+                   (root_is_forced_draw && options.multi_pv == 1) || use_lazy_smp ||
                    (options.threads == 1 && options.multi_pv == 1) || legal_moves.size() < 2 ||
                    (time_manager.node_limit().has_value() && options.multi_pv == 1) ||
-                   (short_tactical_budget && !ultra_short_nonchecking_parallel)) {
+                   (short_tactical_budget && options.multi_pv == 1 &&
+                    !ultra_short_nonchecking_parallel)) {
             auto context_storage = std::make_unique<SearchContext>(
                 *evaluator, *table, time_manager, session->stop_requested(),
                 nullptr, evaluator_mutex_ptr, &legal_moves, true,

@@ -60,6 +60,22 @@ void test_dynamic_null_move_owns_reduction_and_verification_depth() {
             "checked nodes must reject null move");
 }
 
+void test_reverse_futility_state_signals_ease_the_cutoff() {
+    using koi::detail::SearchPolicy;
+    const auto neutral =
+        SearchPolicy::reverse_futility(8, 100, 1'000, false, false, true, false, false);
+    const auto improving =
+        SearchPolicy::reverse_futility(8, 100, 1'000, false, false, true, true, false);
+    const auto worsening =
+        SearchPolicy::reverse_futility(8, 100, 1'000, false, false, true, false, true);
+    require(neutral.eligible && improving.eligible && worsening.eligible,
+            "the reverse-futility fixtures must be eligible at depth 8");
+    require(improving.margin < neutral.margin,
+            "an improving static evaluation must lower the reverse-futility margin");
+    require(worsening.margin < neutral.margin,
+            "an opponent-worsening signal must lower the reverse-futility margin too");
+}
+
 void test_check_extension_policy_owns_timing_and_budget_rules() {
     require(koi::detail::SearchPolicy::check_extension(true, 4, false, 1),
             "checked nodes with budget must extend");
@@ -91,11 +107,11 @@ void test_late_move_policy_owns_gating_history_and_reduction() {
             "deep late moves must receive the configured depth/move reduction");
 
     const auto high_history_gate = koi::detail::SearchPolicy::late_move_gate(
-        8, 4, 128, 0, false, false, false, false, false, false, false);
+        8, 4, 1'024, 0, false, false, false, false, false, false, false);
     require(high_history_gate.candidate && high_history_gate.high_history_exclusion,
             "high-history moves must remain authoritative instead of being reduced");
     const auto high_history = koi::detail::SearchPolicy::dynamic_late_move(
-        8, 4, 7, 128, 0, 0, false, false, false, false, false, false, false, true, false,
+        8, 4, 7, 1'024, 0, 0, false, false, false, false, false, false, false, true, false,
         false, false, true, false, 0, true, false);
     require(!high_history.reduced,
             "high-history moves must not be reduced even when they are late");
@@ -201,6 +217,7 @@ int main(int argc, char** argv) {
     const std::vector<koi::test::TestCase> tests{
         {"null move policy", test_null_move_policy_owns_window_and_reduction_rules},
         {"dynamic null move policy", test_dynamic_null_move_owns_reduction_and_verification_depth},
+        {"reverse futility state signals", test_reverse_futility_state_signals_ease_the_cutoff},
         {"check extension policy", test_check_extension_policy_owns_timing_and_budget_rules},
         {"late move policy", test_late_move_policy_owns_gating_history_and_reduction},
         {"quiet futility policy", test_quiet_futility_policy_owns_exact_boundary},

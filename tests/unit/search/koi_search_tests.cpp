@@ -4068,7 +4068,10 @@ void test_throwing_history_diagnostic_hook_cannot_abort_search() {
 void test_search_reduces_late_quiet_moves_without_losing_root_legality() {
     koi::SearchService service(std::make_shared<koi::ClassicalEvaluator>());
     koi::SearchLimits limits;
-    limits.depth = 4;
+    // Depth four is now fully pruned by null move / reverse futility in the
+    // opening, so the LMR contract is exercised at depth six (where the
+    // statistics show hundreds of reductions).
+    limits.depth = 6;
     const koi::GameState root = koi::GameState::startpos();
     const koi::SearchResult result = search(service, root, limits);
 

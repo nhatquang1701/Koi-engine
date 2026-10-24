@@ -7,12 +7,18 @@
 namespace koi::detail {
 namespace {
 
-constexpr int kCounterMovePriority = 300'000 - 1;
-constexpr int kMaximumHistoryScore = kCounterMovePriority - 1;
+// All history tables share Stockfish's fixed-point scale so the LMR bands in
+// search_policy (|history| > 512, and the >= 128 high-history exclusion) and the
+// ordering tiers stay meaningful.  The main table once clamped at the
+// counter-move priority (~300k), which made gravity negligible: scores rapidly
+// saturated in the thousands, most good quiet moves were excluded from LMR, and
+// quiet ordering was distorted.  Keep every table on the same 16,384 scale.
 constexpr int kHistoryTableMaximum = 16'384;
+constexpr int kMaximumHistoryScore = kHistoryTableMaximum;
 constexpr int kCaptureHistoryMaximum = 16'384;
 constexpr int kCounterMoveMinimumConfidence = 7 * 7;
 constexpr int kMaximumPly = 64;
+constexpr int kMaximumKillerPly = 128;
 
 // These priors match the neutral starting point used by Stockfish 19's
 // search histories.  The fixed tables are value-initialized, but the two
@@ -22,6 +28,14 @@ constexpr int kInitialCaptureHistory = -742;
 constexpr int kInitialPieceToHistory = -586;
 constexpr int kInitialContinuationHistory = -586;
 constexpr int kInitialPawnHistory = -1338;
+constexpr int kInitialLowPlyHistory = 102;
+// The LMR bands in search_policy compare the composite quiet/continuation
+// history against zero (|score| > 512, high-history >= 1024).  The priors above
+// give a never-updated move a large negative composite, so the bands were
+// mis-centred and every fresh quiet move looked "bad" to LMR.  The score
+// functions subtract the neutral baseline for the current history context so a
+// never-updated move reads exactly 0.
+constexpr std::size_t kLowPlyHistoryPliesForBaseline = 5;
 
 int color_index(const Color color) noexcept {
     return color == Color::white ? 0 : 1;
@@ -40,6 +54,61 @@ std::size_t continuation_previous_component(
 
 int clamp_history(const std::int64_t value, const int maximum) noexcept {
     return static_cast<int>(std::clamp<std::int64_t>(value, -maximum, maximum));
+}
+
+// Sum of the initial (never-updated) values that quiet_history_score() would
+// read for this context.  Subtracting it turns the composite into a
+// zero-centred signal, matching the LMR bands and the ordering thresholds.
+std::int64_t quiet_history_baseline(const SearchHistoryContext& context) noexcept {
+    std::int64_t baseline = kInitialPieceToHistory;
+    if (context.ply < static_cast<int>(kLowPlyHistoryPliesForBaseline)) {
+        baseline += kInitialLowPlyHistory;
+    }
+    const std::size_t move_count = std::min(context.count, kSearchContinuationPlies);
+    if (move_count > 1 && !context.continuation_moves[1].is_no_move()) {
+        baseline += kInitialContinuationHistory / 2;
+    }
+    if (move_count > 2 && !context.continuation_moves[2].is_no_move()) {
+        baseline += kInitialContinuationHistory / 3;
+    }
+    if (move_count > 3 && !context.continuation_moves[3].is_no_move()) {
+        baseline += kInitialContinuationHistory / 4;
+    }
+    if (move_count > 4 && !context.continuation_moves[4].is_no_move()) {
+        baseline += kInitialContinuationHistory / 5;
+    }
+    if (move_count > 5 && !context.continuation_moves[5].is_no_move()) {
+        baseline += kInitialContinuationHistory / 6;
+    }
+    if (context.count > 0 && !context.continuation_moves[0].is_no_move()) {
+        baseline += kInitialContinuationHistory;
+    }
+    baseline += kInitialPawnHistory / 2;
+    return baseline;
+}
+
+std::int64_t continuation_history_baseline(const SearchHistoryContext& context) noexcept {
+    std::int64_t baseline = 0;
+    const std::size_t move_count = std::min(context.count, kSearchContinuationPlies);
+    if (move_count > 1 && !context.continuation_moves[1].is_no_move()) {
+        baseline += kInitialContinuationHistory / 2;
+    }
+    if (move_count > 2 && !context.continuation_moves[2].is_no_move()) {
+        baseline += kInitialContinuationHistory / 3;
+    }
+    if (move_count > 3 && !context.continuation_moves[3].is_no_move()) {
+        baseline += kInitialContinuationHistory / 4;
+    }
+    if (move_count > 4 && !context.continuation_moves[4].is_no_move()) {
+        baseline += kInitialContinuationHistory / 5;
+    }
+    if (move_count > 5 && !context.continuation_moves[5].is_no_move()) {
+        baseline += kInitialContinuationHistory / 6;
+    }
+    if (move_count > 0 && !context.continuation_moves[0].is_no_move()) {
+        baseline += kInitialContinuationHistory;
+    }
+    return baseline;
 }
 
 std::uint64_t mix64(std::uint64_t value) noexcept {
@@ -64,7 +133,7 @@ SearchOrderingTables::SearchOrderingTables()
     // contents.
     capture_history_.fill(kInitialCaptureHistory);
     piece_to_history_.fill(kInitialPieceToHistory);
-    low_ply_history_.fill(102);
+    low_ply_history_.fill(kInitialLowPlyHistory);
     continuation_history_.fill(kInitialContinuationHistory);
     std::fill_n(multi_ply_continuation_history_.get(),
                 kSearchContinuationPlies * kContinuationHistorySize,
@@ -122,7 +191,7 @@ std::size_t SearchOrderingTables::pawn_index(const SearchHistoryContext& context
 }
 
 int SearchOrderingTables::normalized_ply(const int ply) noexcept {
-    return std::clamp(ply, 0, kMaximumPly - 1);
+    return std::clamp(ply, 0, kMaximumKillerPly - 1);
 }
 
 void SearchOrderingTables::update_history(int& score, const int delta,
@@ -279,7 +348,7 @@ int SearchOrderingTables::quiet_history_score(
     }
     score += pawn_history_[pawn_index(context, metadata.moving_piece, metadata.move.to())] / 2;
 
-    return clamp_history(score, kMaximumHistoryScore);
+    return clamp_history(score - quiet_history_baseline(context), kMaximumHistoryScore);
 }
 
 int SearchOrderingTables::continuation_history_score(
@@ -352,7 +421,7 @@ int SearchOrderingTables::continuation_history_score(
             (kContinuationHistorySize - 1U);
         score += continuation_history_[pair_index];
     }
-    return clamp_history(score, kMaximumHistoryScore);
+    return clamp_history(score - continuation_history_baseline(context), kMaximumHistoryScore);
 }
 
 int SearchOrderingTables::capture_history_score(const MoveMetadata& metadata) const noexcept {

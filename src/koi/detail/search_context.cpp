@@ -139,7 +139,9 @@ int SearchContext::quiescence(GameState& state, int alpha, int beta, int ply,
         qframe.in_check = checked;
         qframe.move_count = 0;
         qframe.reduction = 0;
-        qframe.cutoff_count = 0;
+        // cutoff_count belongs to the parent's move loop: qsearch never
+        // increments it, and clearing it here destroyed the accumulated
+        // fail-high count that LMR reads for later siblings.
         const bool use_qsearch_cache = qsearch_cache_allowed(state, repetition_sensitive) &&
             !(checked && qdepth >= kMaximumQuiescenceSafetyDepth);
         const std::uint64_t qsearch_key = use_qsearch_cache ?
@@ -751,7 +753,10 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
         frame.in_check = checked;
         frame.move_count = 0;
         frame.reduction = 0;
-        frame.cutoff_count = 0;
+        // cutoff_count is intentionally not cleared here: the parent owns this
+        // slot and clears it once before its first candidate, so fail-high
+        // counts accumulate across siblings for the LMR late-move signal.
+        // Re-zeroing it at every child entry made that signal a permanent 0/1.
         frame.static_eval = excluded_search ? inherited_frame->static_eval : 0;
         frame.static_eval_valid = excluded_search ? inherited_frame->static_eval_valid : false;
         frame.tt_pv = excluded_search ? inherited_frame->tt_pv : false;
@@ -760,9 +765,9 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
             // The current node reads the cutoff count owned by its immediate
             // child while deciding later-sibling LMR. Clear that slot before
             // the first candidate so an early make/prune failure cannot make
-            // a stale cutoff from a prior path look like live feedback. A
-            // searched child initializes the same slot and leaves its own
-            // completed cutoff signal for subsequent siblings.
+            // a stale cutoff from a prior path look like live feedback.  Each
+            // searched child then increments the slot on its fail-high and the
+            // count accumulates for the rest of this node's move loop.
             stack.frame(static_cast<std::size_t>(ply + 1)).cutoff_count = 0;
         }
         MoveMetadataList moves;
@@ -997,8 +1002,14 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
         frame.static_eval_valid = static_eval_valid;
         const SearchFrame& grandparent_frame = ply > 1 ?
             stack.frame(static_cast<std::size_t>(ply - 2)) : frame;
-        bool improving = static_eval_valid && grandparent_frame.static_eval_valid &&
-            static_eval > grandparent_frame.static_eval;
+        // Stockfish initializes the pre-root stack to VALUE_NONE, which makes
+        // `improving` true at the root and its children.  Koi aliased the
+        // current frame before this comparison, so the self-comparison was
+        // always false and those nodes paid the "not improving" penalties
+        // (extra LMR, higher null-move floor, narrower ProbCut, more LMP).
+        bool improving = static_eval_valid &&
+            (ply <= 1 || (grandparent_frame.static_eval_valid &&
+                          static_eval > grandparent_frame.static_eval));
         const bool opponent_worsening = static_eval_valid && parent_frame.static_eval_valid &&
             static_eval > -parent_frame.static_eval;
         // Hindsight compensation is one of Stockfish 19's safeguards around
@@ -1120,7 +1131,9 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
                 if (null_score >= beta) {
                     int verified_score = null_score;
                     bool null_cutoff_proven = !null_selective_bound;
-                    if (null_move_decision.verify) {
+                    // A verification search may not start another nested
+                    // verification (Stockfish's nmpMinPly guard).
+                    if (null_move_decision.verify && null_verification_min_ply == 0) {
                         ++stats.null_verifications;
                         PrincipalVariation verification_pv;
                         const bool saved_table_state = table_access.enabled();
@@ -2191,7 +2204,11 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
                     const SearchFrame& parent_frame =
                         stack.frame(static_cast<std::size_t>(ply - 1));
                     const int first_non_tt_move = parent_frame.had_tt_move ? 2 : 1;
-                    if (parent_frame.move_count == first_non_tt_move) {
+                    // frame.move_count is published only after a child returns,
+                    // so while this child is being searched it holds the number
+                    // of earlier candidates (0-based).  Compare it with the
+                    // 1-based index of the parent's first non-TT move.
+                    if (parent_frame.move_count + 1 == first_non_tt_move) {
                         ordering.record_parent_refuted(parent_side, parent_move, parent_piece.type,
                                                        ply - 1, history, depth);
                         ++stats.quiet_history_updates;

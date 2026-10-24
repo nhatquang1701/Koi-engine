@@ -26,7 +26,8 @@ struct PackedMove {
 };
 
 struct SearchOptionsContract {
-    std::uint32_t hash_mb = 512;
+    // 0 means "keep the service configuration"; non-zero resizes the table.
+    std::uint32_t hash_mb = 0;
     std::uint32_t threads = 1;
     std::uint8_t speed_percent = 100;
     std::uint32_t multi_pv = 1;

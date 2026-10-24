@@ -116,6 +116,10 @@ public:
 
 private:
     static constexpr int kMaximumPly = 64;
+    // Killers are per-ply state; the search stack is 128 frames deep and a deep
+    // path can exceed 64 plies through extensions.  Size the killer table for
+    // the real stack instead of folding plies >= 63 onto one slot.
+    static constexpr int kMaximumKillerPly = 128;
     static constexpr std::size_t kMoveTableSize = 64 * 64;
     static constexpr std::size_t kPieceTypeCount = 7;
     static constexpr std::size_t kCapturedPieceCount = 7;
@@ -148,7 +152,7 @@ private:
                                  const SearchHistoryContext& context, int bonus,
                                  bool continuation_only) noexcept;
 
-    std::array<std::array<Move, 2>, kMaximumPly> killers_{};
+    std::array<std::array<Move, 2>, kMaximumKillerPly> killers_{};
     std::array<std::array<int, kMoveTableSize>, 2> history_{};
     std::array<std::array<Move, kMoveTableSize>, 2> counter_moves_{};
     std::array<std::array<int, kMoveTableSize>, 2> counter_confidence_{};

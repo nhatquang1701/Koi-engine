@@ -61,8 +61,8 @@ def profile(*, threads: int = 1, include_pv: bool = True) -> dict:
         positions[1]["pv"] = ["e1f1"]
     return {
         "schema": "koi-bench-profile-v1",
-        "engine": "Koi Engine",
-        "build": "Koi Engine test",
+        "engine": "Koi",
+        "build": "Koi test",
         "suite": "optional_strength",
         "warm_hash": False,
         "hash_state": "cold",

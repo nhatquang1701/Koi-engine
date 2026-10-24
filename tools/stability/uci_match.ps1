@@ -1079,7 +1079,7 @@ function Get-TimeControlMetadata {
 
 function Format-Pgn($Position, $Game, [string]$WhiteName, [string]$BlackName, [string]$TimeControl) {
     $headers = [System.Collections.Generic.List[string]]::new()
-    $headers.Add('[Event "Koi Engine UCI match"]')
+    $headers.Add('[Event "Koi UCI match"]')
     $headers.Add('[Site "local"]')
     $headers.Add(('[Date "{0}"]' -f (Get-Date).ToUniversalTime().ToString('yyyy.MM.dd')))
     $headers.Add(('[Round "{0}"]' -f $Game.round))

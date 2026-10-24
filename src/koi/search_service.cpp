@@ -77,7 +77,7 @@ SearchHandle SearchService::start(GameState root, SearchLimits limits, SearchEve
                                   SearchOptions options) {
     // The default SearchOptions hash value means "use the service configuration".
     // A non-default value explicitly reconfigures the shared service table.
-    if (options.hash_mb != SearchOptions{}.hash_mb) {
+    if (options.hash_mb != 0) {
         (void)impl_->table->set_size_mb(options.hash_mb);
     }
 

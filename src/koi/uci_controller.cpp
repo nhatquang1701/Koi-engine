@@ -864,10 +864,13 @@ void UciController::handle_setoption(std::istream& command) {
         if (parse_uint64(value, megabytes) && megabytes >= option->minimum &&
             megabytes <= option->maximum) {
             stop_and_suppress_active_search();
-            hash_mb_ = static_cast<std::size_t>(megabytes);
             try {
                 const HashResizeResult result =
                     search_service_.set_hash_size_mb(static_cast<std::size_t>(megabytes));
+                // Record the *effective* size: a failed or memory-capped resize
+                // must leave the previous value in place so a retry with the
+                // same requested size is not filtered out as a no-op.
+                hash_mb_ = result.effective_mb;
                 debug_json_event(
                     "hash_resize",
                     "\"requested_mb\":" + std::to_string(result.requested_mb) +
@@ -901,11 +904,25 @@ void UciController::handle_setoption(std::istream& command) {
     }
 
 
-    case UciOptionId::threads:
-        apply_unsigned(*option, threads_, [this](std::uint64_t threads) {
-            threads_ = static_cast<std::size_t>(threads);
-        });
+    case UciOptionId::threads: {
+        // The handshake advertises a dynamic maximum; a larger request must be
+        // clamped (like Stockfish) instead of silently leaving Threads at 1.
+        std::uint64_t requested = 0;
+        if (parse_uint64(value, requested)) {
+            const std::uint64_t maximum = static_cast<std::uint64_t>(maximum_search_threads());
+            const std::uint64_t clamped = std::clamp<std::uint64_t>(requested, 1, maximum);
+            if (clamped != threads_) {
+                stop_and_suppress_active_search();
+                threads_ = static_cast<std::size_t>(clamped);
+            }
+            if (clamped != requested) {
+                std::lock_guard lock(output_mutex_);
+                output_ << "info string Threads " << requested << " clamped to " << clamped
+                        << '\n' << std::flush;
+            }
+        }
         break;
+    }
 
     case UciOptionId::speed:
         apply_unsigned(*option, speed_percent_, [this](std::uint64_t speed) {
@@ -932,10 +949,14 @@ void UciController::handle_setoption(std::istream& command) {
         apply_boolean(ponder_enabled_, [this](bool ponder_enabled) { ponder_enabled_ = ponder_enabled; });
         break;
 
-    case UciOptionId::own_book:
-        own_book_explicit_ = true;
-        apply_boolean(own_book_, [this](bool own_book) { own_book_ = own_book; });
+    case UciOptionId::own_book: {
+        bool parsed = false;
+        if (parse_boolean(value, parsed)) {
+            own_book_explicit_ = true;
+            apply_boolean(own_book_, [this](bool own_book) { own_book_ = own_book; });
+        }
         break;
+    }
 
     case UciOptionId::book_random:
         apply_boolean(book_random_, [this](bool book_random) { book_random_ = book_random; });
@@ -1007,6 +1028,9 @@ void UciController::handle_setoption(std::istream& command) {
     }
 
     case UciOptionId::syzygy_path: {
+        if (value == syzygy_path_.string()) {
+            break;
+        }
         stop_and_suppress_active_search();
         // A single relative path resolves against the engine directory, like
         // EvalFile and BookFile.  A path list is left untouched because its
@@ -1630,8 +1654,8 @@ std::uint64_t UciController::begin_generation() {
 
 void UciController::write_handshake() {
     std::lock_guard lock(output_mutex_);
-    output_ << "id name Koi Engine\n"
-               "id author Koi Engine contributors\n";
+    output_ << "id name Koi\n"
+               "id author Koi contributors\n";
     for (const UciOptionDescriptor& option : kUciOptions) {
         if (!option.advertised) {
             continue;

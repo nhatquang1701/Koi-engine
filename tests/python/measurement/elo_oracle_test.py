@@ -401,7 +401,7 @@ class EloOracleExtractionTests(unittest.TestCase):
         args = stockfish_match._build_parser().parse_args(
             [
                 "--koi",
-                "C:\\Koi Engine\\koi.exe",
+                "C:\\Koi\\koi.exe",
                 "--stockfish",
                 "C:\\Engines\\stockfish.exe",
                 "--random-seed",

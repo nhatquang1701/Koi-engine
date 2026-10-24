@@ -573,8 +573,8 @@ void write_profile_json(const std::string& path, const BenchmarkConfig& config,
     }
 
     output << "{\n  \"schema\": \"koi-bench-profile-v1\",\n"
-           << "  \"engine\": \"Koi Engine\",\n"
-           << "  \"build\": \"Koi Engine " KOI_ENGINE_BUILD_VERSION "\",\n"
+           << "  \"engine\": \"Koi\",\n"
+           << "  \"build\": \"Koi " KOI_ENGINE_BUILD_VERSION "\",\n"
            << "  \"suite\": \"" << suite_name(config) << "\",\n"
            << "  \"warm_hash\": " << (config.warm_hash ? "true" : "false") << ",\n"
            << "  \"hash_state\": \"" << (config.warm_hash ? "warm" : "cold") << "\",\n"
@@ -681,8 +681,8 @@ void write_speed_json(const std::string& path, const BenchmarkConfig& config,
     }
 
     output << "{\n  \"schema\": \"koi-bench-speed-v1\",\n"
-           << "  \"engine\": \"Koi Engine\",\n"
-           << "  \"build\": \"Koi Engine " KOI_ENGINE_BUILD_VERSION "\",\n"
+           << "  \"engine\": \"Koi\",\n"
+           << "  \"build\": \"Koi " KOI_ENGINE_BUILD_VERSION "\",\n"
            << "  \"suite\": \"" << suite_name(config) << "\",\n"
            << "  \"source\": ";
     write_json_string(output, config.fen_file_path ? *config.fen_file_path : std::string("built-in"));
