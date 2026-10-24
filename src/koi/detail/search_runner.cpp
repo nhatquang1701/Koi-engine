@@ -5131,6 +5131,23 @@ void SearchRunner::run_impl() {
                     static_cast<std::uint64_t>(elapsed.count()) : visited;
                 const std::size_t line_count = multi_pv ?
                     std::min(options.multi_pv, ranked_indices.size()) : std::size_t{1};
+                // Proven-score substitution must be keyed by the root move,
+                // not by publication rank: ranks reorder every iteration, so a
+                // rank index can pair an old score with a different move's PV.
+                const auto proven_info_for_move =
+                    [&interim_state](const std::vector<Move>& current_pv) -> const SearchInfo* {
+                        if (current_pv.empty()) {
+                            return nullptr;
+                        }
+                        for (const SearchInfo& previous : interim_state.lines) {
+                            if (!previous.pv.empty() &&
+                                previous.pv.front() == current_pv.front() &&
+                                previous.bound != SearchInfo::Bound::estimate) {
+                                return &previous;
+                            }
+                        }
+                        return nullptr;
+                    };
                 std::vector<SearchInfo> iteration_lines;
                 iteration_lines.reserve(line_count);
                 for (std::size_t rank = 0; rank < line_count; ++rank) {
@@ -5152,12 +5169,11 @@ void SearchRunner::run_impl() {
                         // recent proven score for this rank so a GUI never
                         // receives an unproven score, while the PV stays this
                         // iteration's own.
-                        if (rank < interim_state.lines.size() &&
-                            interim_state.lines[rank].bound != SearchInfo::Bound::estimate) {
-                            const SearchInfo& proven = interim_state.lines[rank];
-                            info.score_cp = proven.score_cp;
-                            info.mate = proven.mate;
-                            info.bound = proven.bound;
+                        if (const SearchInfo* proven = proven_info_for_move(info.pv);
+                            proven != nullptr) {
+                            info.score_cp = proven->score_cp;
+                            info.mate = proven->mate;
+                            info.bound = proven->bound;
                         } else {
                             info.bound = SearchInfo::Bound::estimate;
                         }
