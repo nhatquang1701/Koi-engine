@@ -63,6 +63,19 @@ void test_blocked_pawns_are_not_passed() {
             "an unblocked advanced pawn must still score as a passer");
 }
 
+void test_two_knights_versus_king_is_a_dead_draw() {
+    const koi::ClassicalEvaluator evaluator;
+    const GameState knn = state_from("8/8/8/8/8/8/8/KNN4k w - - 0 1");
+    require(knn.is_dead_position(), "two knights versus a bare king must be a dead position");
+    require(knn.draw_status() == koi::DrawStatus::dead_position,
+            "KNN vs K must report the dead-position draw status");
+    require(evaluator.breakdown(knn, Color::white).total == 0,
+            "KNN vs K must evaluate as a dead draw");
+
+    const GameState with_extra_knight = state_from("6nk/8/8/8/8/8/8/KNN5 w - - 0 1");
+    require(!with_extra_knight.is_dead_position(),
+            "KNN vs KN is not provably dead and must stay live");
+}
 void test_perspective_negates_the_score() {
     const koi::ClassicalEvaluator evaluator;
     for (const std::string_view fen : kLiveFens) {
@@ -281,6 +294,7 @@ int main(int argc, char** argv) {
         {"classical evaluator breakdown sum", test_breakdown_terms_sum_to_total},
         {"classical evaluator symmetric start", test_symmetric_positions_score_even},
         {"classical evaluator insufficient material", test_insufficient_material_scores_zero},
+        {"classical evaluator two knights dead", test_two_knights_versus_king_is_a_dead_draw},
         {"classical evaluator locked pawn wall", test_locked_pawn_wall_is_not_dead},
         {"classical evaluator blocked pawns are not passed", test_blocked_pawns_are_not_passed},
         {"classical evaluator material", test_material_advantage_is_counted},

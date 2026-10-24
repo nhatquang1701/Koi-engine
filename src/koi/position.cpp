@@ -1529,6 +1529,13 @@ std::vector<Move> legal_moves() {
         if (static_cast<int>(std::popcount(knights | bishops)) <= 1) {
             return true;
         }
+        // KNN vs K cannot mate: two knights of one colour and no other
+        // non-king material is a dead position.
+        if (bishops == 0 && std::popcount(knights) == 2 &&
+            (std::popcount(state.piece_bitboards[0][knight]) == 2 ||
+             std::popcount(state.piece_bitboards[1][knight]) == 2)) {
+            return true;
+        }
         if (knights != 0) {
             return false;
         }
