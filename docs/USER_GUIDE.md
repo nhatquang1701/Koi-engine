@@ -137,7 +137,8 @@ On macOS arm64 (Apple Silicon):
 - CMake 3.31 or newer, for example `python3 -m pip install --upgrade cmake`.
 - C++26 named modules are disabled on macOS (`-DKOI_BUILD_MODULES=OFF`), and
   the Linux static-runtime policy does not apply (`-DKOI_STATIC_RUNTIME=OFF`).
-- GPU NNUE is CUDA-only and unavailable on macOS; the engine uses the CPU NNUE
+- GPU NNUE is experimental, disabled by default, and scheduled for removal; it
+  is CUDA-only and unavailable on macOS. The engine uses the CPU NNUE
   network when one is loaded and the classical evaluator otherwise.
 - Optional: `pwsh` for the PowerShell process tests and Python 3 for the
   Python tooling tests.
@@ -360,9 +361,12 @@ every reader: `koi_dataset.py`, `train_nnue_koi.py`, and `train_nnue_sf.py` spli
 `;` and read the leading fields, so older corpora keep working and the result can be
 used as a WDL target once a trainer consumes it.
 
-Load a trained network with the UCI `EvalFile` option, or place `koi.nnue` beside
-the executable (or point the `KOI_NNUE_PATH` environment variable at it) to select it
-at startup. A missing or rejected file falls back to the classical evaluator and
+The engine discovers a network automatically at startup: it looks for `koi.nnue`
+beside the executable, then the packaged `nnue/koi.nnue`, then a single `*.nnue`
+file in either directory (and in the working directory for development runs).
+Point the `KOI_NNUE_PATH` environment variable at a specific file to override the
+scan, or set `KOI_NNUE_AUTODETECT=0` to keep the classical evaluator; the UCI
+`EvalFile` option still swaps the network at runtime. A missing or rejected file falls back to the classical evaluator and
 writes one explanatory line to stderr. Trained networks are local artifacts and are
 not committed. On the local single-thread probe the version 4 `halfka-king-bucket-v1`
 network runs at about 76k nodes/s against about 144k for the classical evaluator, it
@@ -394,20 +398,22 @@ colour-split A/B match against the classical evaluator
 network (`tools/nnue/net_match.ps1`, schema `koi-nnue-net-match-v1`). Validation
 output is a local report, not an Elo claim or a CI threshold.
 
-### Optional GPU NNUE inference
+### GPU NNUE inference (experimental, off by default)
 
-On a machine with an NVIDIA GPU and a CUDA 12.x toolkit, the engine can evaluate
-the version 5 network on the GPU. The `GpuNnue` UCI option selects the policy:
+**GPU NNUE is experimental, disabled by default, and scheduled for removal.**
+It only runs version 5 networks on NVIDIA GPUs with a CUDA 12.x toolkit; the CPU
+NNUE path (and the classical evaluator) is the supported default and fallback.
+The `GpuNnue` UCI option selects the policy:
 
-- `auto` (default) uses the GPU when this build contains the kernel, the CUDA
-  driver loads, the loaded network is a compatible version 5 container, and the
-  search uses `Threads` greater than one. Threads=1 keeps the deterministic CPU
-  path. Any failure falls back to the CPU network.
-- `on` requests the GPU. If no CUDA driver is available, the build has no GPU
-  kernel, or the network is not a compatible v5 container, the engine keeps the
-  CPU network and reports why; it never fails to start.
-- `off` never uses the GPU, even when a driver and a compatible network are
-  present.
+- `off` (default) never uses the GPU, even when a driver and a compatible
+  network are present.
+- `auto` (experimental) uses the GPU when this build contains the kernel, the
+  CUDA driver loads, the loaded network is a compatible version 5 container, and
+  the search uses `Threads` greater than one. Threads=1 keeps the deterministic
+  CPU path. Any failure falls back to the CPU network.
+- `on` (experimental) requests the GPU. If no CUDA driver is available, the
+  build has no GPU kernel, or the network is not a compatible v5 container, the
+  engine keeps the CPU network and reports why; it never fails to start.
 
 The environment variables stay higher-priority test overrides: `KOI_GPU_NNUE=0`
 forces `off`, and any other non-empty `KOI_GPU_NNUE` value forces `on` over the
@@ -420,7 +426,7 @@ At the start of every search with an NNUE network loaded the engine emits one
 diagnostic line, for example:
 
 ```
-info string GPU NNUE: auto -> cuda (NVIDIA GeForce GTX 1060)
+info string GPU NNUE: on -> cuda (NVIDIA GeForce GTX 1060)
 info string GPU NNUE: off (Threads=1)
 info string GPU NNUE: unavailable (no CUDA driver)
 ```
@@ -436,9 +442,10 @@ device can run and JITs it, so a GTX 1060 (sm_61) and an RTX 50-series card
 required at build time because CUDA 13 drops Pascal support; the installed
 driver only has to be CUDA 12.x-capable. The GPU result is bit-exact with the
 CPU scalar evaluation, but this first pass does not promise a speedup and makes
-no strength or Elo claims. GPU NNUE is CUDA-only: macOS arm64 has no CUDA
-support, so those builds always report the GPU as unavailable and use the CPU
-NNUE or classical evaluator.
+no strength or Elo claims. GPU NNUE is experimental, off by default, and
+scheduled for removal; it is CUDA-only, and macOS arm64 has no CUDA support, so
+those builds always report the GPU as unavailable and use the CPU NNUE or
+classical evaluator.
 
 For a reproducible local match against Stockfish or another UCI engine, use the
 optional PowerShell harness:
@@ -1057,6 +1064,7 @@ Koi has no required configuration file. En Croissant or another UCI GUI sends
 the options at session start; the portable release defaults are `RandomSeed=0`,
 `Hash=512`, `Threads=1`, `Speed=100`, `UCI_AnalyseMode=false`, `MultiPV=1`,
 `Ponder=false`, `OwnBook=false`, `BookFile=book.bin`, `BookDepth=16`,
+`Contempt=0`, `Dynamic Overhead=false`,
 `BookRandom=false`, `BookSafety=true`, `BookSafetyDepth=2`,
 `UCI_ShowWDL=false`, `Move Overhead=30`, `Slow Mover=100`, `StrengthMode=false`,
 `SyzygyPath=""`, `SyzygyProbeDepth=1`, `SyzygyProbeLimit=7`,

@@ -7,6 +7,7 @@
 #include <chrono>
 #include <cstdint>
 #include <cstdlib>
+#include <exception>
 #include <iomanip>
 #include <limits>
 #include <memory>
@@ -32,6 +33,7 @@ constexpr std::uint64_t kMaximumSpeedPercent = 100;
 constexpr std::uint64_t kMinimumSlowMoverPercent = 10;
 constexpr std::uint64_t kMaximumSlowMoverPercent = 1'000;
 constexpr std::uint64_t kMaximumMoveOverheadMs = 5'000;
+constexpr std::uint64_t kMaximumContemptCp = 1'000;
 constexpr std::uint64_t kMinimumMultiPv = 1;
 constexpr std::uint64_t kMaximumMultiPv = 16;
 constexpr std::uint64_t kMaximumBookDepth = 40;
@@ -144,7 +146,9 @@ enum class UciOptionId {
     clear_hash,
     show_wdl,
     move_overhead,
+    dynamic_overhead,
     slow_mover,
+    contempt,
     strength_mode,
     syzygy_path,
     syzygy_probe_depth,
@@ -175,7 +179,7 @@ struct UciOptionDescriptor {
 // and `handle_setoption` consume this table, so an advertised option can never
 // drift out of sync with the option the controller actually applies. The order
 // of the entries is the order advertised to a GUI and must stay stable.
-constexpr std::array<UciOptionDescriptor, 27> kUciOptions{{
+constexpr std::array<UciOptionDescriptor, 29> kUciOptions{{
     {"RandomSeed", UciOptionKind::spin, UciOptionId::random_seed, "0", 0,
      kMaximumRandomSeed, false, true},
     {"Hash", UciOptionKind::spin, UciOptionId::hash, "512", kMinimumHashMegabytes,
@@ -200,8 +204,16 @@ constexpr std::array<UciOptionDescriptor, 27> kUciOptions{{
     {"UCI_ShowWDL", UciOptionKind::check, UciOptionId::show_wdl, "false", 0, 0, false, true},
     {"Move Overhead", UciOptionKind::spin, UciOptionId::move_overhead, "30", 0,
      kMaximumMoveOverheadMs, false, true},
+    // Derive the per-move overhead from the time control (2% of the remaining
+    // clock, 10..100 ms) instead of the fixed Move Overhead value.
+    {"Dynamic Overhead", UciOptionKind::check, UciOptionId::dynamic_overhead, "false", 0, 0,
+     false, true},
     {"Slow Mover", UciOptionKind::spin, UciOptionId::slow_mover, "100", kMinimumSlowMoverPercent,
      kMaximumSlowMoverPercent, false, true},
+    // Draw avoidance: a draw is scored -Contempt for Koi and +Contempt for the
+    // opponent, so Koi only accepts a draw when every alternative is worse.
+    {"Contempt", UciOptionKind::spin, UciOptionId::contempt, "0", 0, kMaximumContemptCp, false,
+     true},
     {"StrengthMode", UciOptionKind::check, UciOptionId::strength_mode, "false", 0, 0, false, true},
     {"SyzygyPath", UciOptionKind::string, UciOptionId::syzygy_path, "", 0, 0, false, true},
     {"SyzygyProbeDepth", UciOptionKind::spin, UciOptionId::syzygy_probe_depth, "1",
@@ -219,14 +231,15 @@ constexpr std::array<UciOptionDescriptor, 27> kUciOptions{{
     // advertised with KOI_NNUE_PATH).  A non-empty path loads and activates a
     // Koi NNUE network, with the classical evaluator retained as a fallback.
     {"EvalFile", UciOptionKind::string, UciOptionId::eval_file, "", 0, 0, false, true},
-    // GPU inference for a compatible v5 NNUE network.  `auto` (default) uses
-    // the GPU when this build has the kernel, the CUDA driver loads, and the
-    // search uses more than one thread; `on` requests the GPU and falls back to
-    // the CPU with a diagnostic when it is unavailable; `off` never uses it.
-    // Precedence: an explicit `off` from this option or KOI_GPU_NNUE=0 always
-    // wins, otherwise a non-empty KOI_GPU_NNUE other than "0" forces `on` as a
-    // test override, otherwise this option decides.
-    {"GpuNnue", UciOptionKind::combo, UciOptionId::gpu_nnue, "auto", 0, 0, false, true,
+    // EXPERIMENTAL, OFF BY DEFAULT, and scheduled for removal.  GPU inference for
+    // a compatible v5 NNUE network: `auto` uses the GPU when this build has the
+    // kernel, the CUDA driver loads, and the search uses more than one thread;
+    // `on` requests the GPU and falls back to the CPU with a diagnostic when it
+    // is unavailable; `off` (default) never uses it.  Precedence: an explicit
+    // `off` from this option or KOI_GPU_NNUE=0 always wins, otherwise a non-empty
+    // KOI_GPU_NNUE other than "0" forces `on` as a test override, otherwise this
+    // option decides.
+    {"GpuNnue", UciOptionKind::combo, UciOptionId::gpu_nnue, "off", 0, 0, false, true,
      "var auto var on var off"},
     // Developer diagnostics stay settable but are intentionally not advertised.
     {"Debug", UciOptionKind::check, UciOptionId::debug, "false", 0, 0, false, false},
@@ -641,6 +654,7 @@ int UciController::run() {
             continue;
         }
 
+        try {
         if (name == "uci") {
             write_handshake();
         } else if (name == "isready") {
@@ -681,6 +695,16 @@ int UciController::run() {
             }
             stop_and_suppress_active_search();
             return 0;
+        }
+        } catch (const std::exception& error) {
+            // A malformed or resource-starved command must not terminate the
+            // engine mid-game: report it as a protocol-valid info line and keep
+            // serving.  quit/EOF cancellation semantics are unchanged.
+            std::lock_guard lock(output_mutex_);
+            output_ << "info string command failed: " << error.what() << '\n' << std::flush;
+        } catch (...) {
+            std::lock_guard lock(output_mutex_);
+            output_ << "info string command failed\n" << std::flush;
         }
     }
 
@@ -786,6 +810,20 @@ void UciController::handle_setoption(std::istream& command) {
     const std::string& value = parsed->value;
     const UciOptionDescriptor* option = find_uci_option(name);
     if (option == nullptr) {
+        return;
+    }
+
+    // Resource options must be true no-ops when re-sent with their current
+    // value: GUIs re-apply settings between games and aborting a live search for
+    // an unchanged value desynchronises them.  Their handlers below assume the
+    // generic helpers' changed-only contract, so filter here before dispatch.
+    const bool unchanged_resource_option =
+        (option->id == UciOptionId::hash && value == std::to_string(hash_mb_)) ||
+        (option->id == UciOptionId::random_seed && value == std::to_string(random_seed_)) ||
+        (option->id == UciOptionId::book_file && value == book_file_) ||
+        (option->id == UciOptionId::syzygy_path && value == syzygy_path_.string()) ||
+        (option->id == UciOptionId::eval_file && value == eval_file_.string());
+    if (unchanged_resource_option) {
         return;
     }
 
@@ -941,9 +979,21 @@ void UciController::handle_setoption(std::istream& command) {
         });
         break;
 
+    case UciOptionId::dynamic_overhead:
+        apply_boolean(dynamic_overhead_, [this](bool dynamic_overhead) {
+            dynamic_overhead_ = dynamic_overhead;
+        });
+        break;
+
     case UciOptionId::slow_mover:
         apply_unsigned(*option, slow_mover_percent_, [this](std::uint64_t slow_mover) {
             slow_mover_percent_ = static_cast<std::uint32_t>(slow_mover);
+        });
+        break;
+
+    case UciOptionId::contempt:
+        apply_unsigned(*option, contempt_cp_, [this](std::uint64_t contempt) {
+            contempt_cp_ = static_cast<std::uint32_t>(contempt);
         });
         break;
 
@@ -1047,7 +1097,7 @@ void UciController::handle_setoption(std::istream& command) {
     }
 
     case UciOptionId::gpu_nnue: {
-        gpu::GpuNnueMode requested = gpu::GpuNnueMode::automatic;
+        gpu::GpuNnueMode requested = gpu::GpuNnueMode::disabled;
         if (!gpu::parse_gpu_nnue_mode(value, requested) ||
             requested == gpu::gpu_nnue_mode()) {
             // An invalid or unchanged value must not disturb a live search.
@@ -1424,7 +1474,9 @@ void UciController::start_search(GameState root, SearchLimits limits, bool skip_
     options.analyse_mode = analyse_mode_;
     options.show_wdl = show_wdl_;
     options.move_overhead_ms = move_overhead_ms_;
+    options.dynamic_move_overhead = dynamic_overhead_;
     options.slow_mover_percent = slow_mover_percent_;
+    options.contempt_cp = static_cast<int>(contempt_cp_);
     options.generation = generation;
     options.strength_mode = strength_mode_;
     options.syzygy = syzygy_;

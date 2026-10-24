@@ -301,6 +301,22 @@ void test_synthetic_games_never_reach_the_flag() {
     }
 }
 
+void test_dynamic_move_overhead_tracks_the_time_control() {
+    const auto overhead_for = [](milliseconds remaining, bool dynamic) {
+        SearchLimits limits = clock_limits(remaining, milliseconds{0});
+        TimeManager manager(limits, koi::Color::white, 100, kMoveOverheadMs, 100,
+                            RootTimingContext{}, {}, dynamic);
+        return manager.diagnostics().overhead;
+    };
+    require(overhead_for(milliseconds{1000}, true) == milliseconds{20},
+            "dynamic overhead on a 1+0 clock must be 2% of the remaining clock");
+    require(overhead_for(milliseconds{300000}, true) == milliseconds{100},
+            "dynamic overhead must cap at 100 ms on a long clock");
+    require(overhead_for(milliseconds{100}, true) == milliseconds{10},
+            "dynamic overhead must floor at 10 ms");
+    require(overhead_for(milliseconds{1000}, false) == milliseconds{kMoveOverheadMs},
+            "a fixed overhead must keep the configured Move Overhead value");
+}
 } // namespace
 
 int main(int argc, char** argv) {
@@ -312,6 +328,7 @@ int main(int argc, char** argv) {
         {"movetime budget", test_movetime_keeps_its_own_budget},
         {"frozen deadline", test_deadline_is_fixed_at_construction_and_cannot_be_extended},
         {"synthetic games never flag", test_synthetic_games_never_reach_the_flag},
+        {"dynamic move overhead", test_dynamic_move_overhead_tracks_the_time_control},
     };
     return koi::test::run_tests(tests, argc, argv);
 }

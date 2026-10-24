@@ -29,7 +29,7 @@ NNUE network can be enabled when available.
 | Engine area | What Koi provides |
 | --- | --- |
 | Search | Alpha-beta with Lazy SMP |
-| Evaluation | Classical by default, with optional Koi NNUE and GPU NNUE |
+| Evaluation | Classical by default, with optional Koi NNUE and experimental GPU NNUE (off by default) |
 | Chess support | Standard chess over the UCI protocol |
 | Optional assets | Bundled CC0 Polyglot opening book; user-supplied Syzygy tablebases |
 
@@ -45,7 +45,8 @@ sidecars from
 
 macOS arm64 (Apple Silicon) can also build from source: install Homebrew LLVM
 (clang 19+; AppleClang 18+ also works), CMake, and Ninja, then configure with
-`-DKOI_BUILD_MODULES=OFF -DKOI_STATIC_RUNTIME=OFF`. GPU NNUE is CUDA-only and
+`-DKOI_BUILD_MODULES=OFF -DKOI_STATIC_RUNTIME=OFF`. GPU NNUE is experimental,
+disabled by default, CUDA-only, and
 unavailable on macOS; the CPU NNUE and classical evaluator paths work normally.
 See the [user guide](docs/USER_GUIDE.md#build-prerequisites) for the commands.
 

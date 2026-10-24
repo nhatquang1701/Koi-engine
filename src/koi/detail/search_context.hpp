@@ -188,6 +188,9 @@ struct SearchContext {
     TimeManager& time_manager;
     std::atomic_bool& stop_requested;
     const MoveMetadataList* root_moves = nullptr;
+    // Root perspective the draw bias is resolved against.
+    Color root_color = Color::white;
+    int contempt_cp = 0;
     std::atomic_bool* iteration_aborted = nullptr;
     SearchOptions::QuietHistorySideHook quiet_history_side_hook;
     TablebaseSearchBinding tablebase;
@@ -227,13 +230,15 @@ struct SearchContext {
                   const MoveMetadataList* root_moves = nullptr,
                   bool use_transposition_table = true,
                   SearchOptions::QuietHistorySideHook quiet_history_side_hook = {},
-                  TablebaseSearchBinding tablebase_binding = {})
+                  TablebaseSearchBinding tablebase_binding = {},
+                  Color root_color = Color::white, int contempt_cp = 0)
         : evaluation(evaluator, evaluator_mutex), table_access(table, use_transposition_table),
           budget(time_manager, global_nodes), time_manager(time_manager),
           stop_requested(stop_requested), root_moves(root_moves),
           evaluation_cache(std::make_unique<EvaluationCacheEntry[]>(kEvaluationCacheSize)),
           quiet_history_side_hook(std::move(quiet_history_side_hook)),
-          tablebase(std::move(tablebase_binding)) {
+          tablebase(std::move(tablebase_binding)), root_color(root_color),
+          contempt_cp(contempt_cp) {
         if (const auto budget = time_manager.time_budget(); budget.has_value() &&
             *budget <= kShortTimedSerialThreshold) {
             // A short timed search must finish its first root iteration before
@@ -450,7 +455,13 @@ struct SearchContext {
         if (move_count != 0) {
             return 0;
         }
-        return state.in_check() ? -kMateScore + ply : 0;
+        return state.in_check() ? -kMateScore + ply : draw_value(state);
+    }
+
+    // Draw score from the side to move's perspective, biased against the root
+    // side by `contempt_cp`.  Zero contempt keeps the historical neutral draw.
+    [[nodiscard]] int draw_value(const GameState& state) const noexcept {
+        return state.side_to_move() == root_color ? -contempt_cp : contempt_cp;
     }
 
     [[nodiscard]] int evaluate(const GameState& state, Color perspective) {

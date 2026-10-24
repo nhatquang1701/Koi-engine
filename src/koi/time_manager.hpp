@@ -16,10 +16,12 @@ class TimeManager {
 public:
     TimeManager(SearchLimits limits, Color side_to_move, std::uint8_t speed_percent = 100,
                 std::uint32_t move_overhead_ms = 30,
-                std::uint32_t slow_mover_percent = 100);
+                std::uint32_t slow_mover_percent = 100,
+                bool dynamic_move_overhead = false);
     TimeManager(SearchLimits limits, Color side_to_move, std::uint8_t speed_percent,
                 std::uint32_t move_overhead_ms, std::uint32_t slow_mover_percent,
-                RootTimingContext root_context, TimePointProvider now = {});
+                RootTimingContext root_context, TimePointProvider now = {},
+                bool dynamic_move_overhead = false);
 
     [[nodiscard]] std::optional<std::chrono::milliseconds> time_budget() const noexcept;
     [[nodiscard]] std::optional<std::uint64_t> node_limit() const noexcept;
@@ -35,7 +37,8 @@ public:
     // the conversion so the new budget is fully available.
     void reconfigure(const SearchLimits& limits, Color side_to_move, std::uint8_t speed_percent,
                      std::uint32_t move_overhead_ms, std::uint32_t slow_mover_percent,
-                     const RootTimingContext& root_context);
+                     const RootTimingContext& root_context,
+                     bool dynamic_move_overhead = false);
 
 private:
     [[nodiscard]] std::chrono::steady_clock::time_point now() const noexcept;
@@ -45,7 +48,7 @@ private:
     // still pay for several more hard moves; near the end the soft budget wins.
     [[nodiscard]] bool hard_extension_affordable() const noexcept;
     void initialize(Color side_to_move, std::uint8_t speed_percent, std::uint32_t move_overhead_ms,
-                    std::uint32_t slow_mover_percent);
+                    std::uint32_t slow_mover_percent, bool dynamic_move_overhead);
 
     SearchLimits limits_;
     RootTimingContext root_context_;
@@ -55,6 +58,7 @@ private:
     std::uint32_t stable_observations_ = 0;
     bool hard_position_ = false;
     bool clock_mode_ = false;
+    bool dynamic_move_overhead_ = false;
     bool emergency_pacing_ = false;
     mutable std::atomic_bool hard_deadline_reached_ = false;
 

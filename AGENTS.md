@@ -15,7 +15,8 @@ reference is [docs/USER_GUIDE.md](docs/USER_GUIDE.md), and
 and verification archive.
 
 The engine has a classical evaluator by default. A Koi-native NNUE evaluator
-can be loaded through `EvalFile`; GPU NNUE is an optional runtime capability.
+can be loaded through `EvalFile`; GPU NNUE is an optional, experimental runtime
+capability that is disabled by default and scheduled for removal.
 Polyglot books and Syzygy tablebases are optional user-provided assets. Neither
 the engine nor ordinary builds require those files.
 
@@ -58,7 +59,7 @@ headers are private and do not establish an ABI commitment.
 | --- | --- |
 | `src/koi/` | Engine rules, evaluation, search, UCI, time management, and runtime code. |
 | `src/koi/detail/` | Private search sessions, contexts, ordering tables, search policy, root coordination, feature state, and compatibility mechanisms. |
-| `src/koi/gpu/` | Optional CUDA driver and GPU NNUE implementation. |
+| `src/koi/gpu/` | Experimental CUDA driver and GPU NNUE implementation (off by default, scheduled for removal). |
 | `src/koi/modules/` | C++26 module interfaces. |
 | `tests/unit/` | Rules, evaluation, search, runtime, and architecture tests. |
 | `tests/integration/` | UCI process, packaging, match, tooling, and differential tests. |
@@ -101,7 +102,8 @@ ctest --test-dir build/release -C Release -j 8 --output-on-failure
 ```
 
 The documented macOS arm64 build disables C++26 named modules and the Linux
-static-runtime policy. GPU NNUE is CUDA-only and unavailable on macOS; the CPU
+static-runtime policy. GPU NNUE is experimental, off by default, CUDA-only, and
+unavailable on macOS; the CPU
 NNUE and classical evaluator paths are unaffected.
 
 `KOI_BUILD_MODULES=OFF` disables named modules where the compiler cannot build

@@ -27,7 +27,8 @@ enum class CpuVariant {
 // target binary still gates itself), otherwise the best supported variant wins.
 [[nodiscard]] CpuVariant choose_cpu_variant(bool avx512_supported, bool avx2_supported,
                                             bool avx512_available, bool avx2_available,
-                                            std::optional<CpuVariant> forced) noexcept;
+                                            std::optional<CpuVariant> forced,
+                                            bool fast_pext = true) noexcept;
 
 // Startup selector for the baseline engine. Returns -1 when the caller must
 // continue in-process (the generic build is the right choice, the faster

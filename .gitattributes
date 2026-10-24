@@ -1,0 +1,16 @@
+# Repository-wide line-ending policy.  The 1.1.4 release hit a false
+# source_dirty=true in the Ubuntu packaging container because the Windows
+# worktree was CRLF while the container expected LF; normalising every text file
+# to LF (and keeping batch files CRLF) makes checkouts, Docker builds and CI
+# agree.  Run `git add --renormalize .` once to rewrite existing entries.
+* text=auto eol=lf
+*.cmd text eol=crlf
+*.bat text eol=crlf
+*.png binary
+*.jpg binary
+*.zip binary
+*.gz binary
+*.nnue binary
+*.bin binary
+*.pt binary
+*.spv binary

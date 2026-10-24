@@ -518,7 +518,7 @@ void test_gpu_nnue_option_is_case_insensitive_and_cancels_active_searches() {
     require(result.exit_code == 0 && result.diagnostics.empty(),
             "GpuNnue option changes must leave the UCI stdio clean");
     require(result.output.find(
-                "option name GpuNnue type combo default auto var auto var on var off\n") !=
+                "option name GpuNnue type combo default off var auto var on var off\n") !=
                 std::string::npos,
             "GpuNnue must be advertised as an auto/on/off combo");
     require(bestmoves.size() == 1 && is_legal_move(Position{}, first_bestmove_move(bestmoves[0])),
@@ -1887,9 +1887,9 @@ void test_handshake_option_table_is_unique_and_well_formed() {
             "a handshake-only transcript must stay clean");
     const std::vector<std::string> options =
         lines_starting_with(output_lines(handshake.output), "option name ");
-    require(options.size() == 25, "the handshake must advertise exactly 25 options");
+    require(options.size() == 27, "the handshake must advertise exactly 27 options");
     require(handshake.output.find(
-                "option name GpuNnue type combo default auto var auto var on var off") !=
+                "option name GpuNnue type combo default off var auto var on var off") !=
                 std::string::npos,
             "GpuNnue must advertise auto/on/off with auto as the default");
 

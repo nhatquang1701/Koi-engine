@@ -94,31 +94,37 @@ std::chrono::milliseconds nonnegative_difference(std::chrono::milliseconds left,
 } // namespace
 
 TimeManager::TimeManager(SearchLimits limits, Color side_to_move, std::uint8_t speed_percent,
-                         std::uint32_t move_overhead_ms, std::uint32_t slow_mover_percent)
+                         std::uint32_t move_overhead_ms, std::uint32_t slow_mover_percent,
+                         bool dynamic_move_overhead)
     : TimeManager(std::move(limits), side_to_move, speed_percent, move_overhead_ms,
-                  slow_mover_percent, {}, {}) {}
+                  slow_mover_percent, {}, {}, dynamic_move_overhead) {}
 
 TimeManager::TimeManager(SearchLimits limits, Color side_to_move, std::uint8_t speed_percent,
                          std::uint32_t move_overhead_ms, std::uint32_t slow_mover_percent,
                          RootTimingContext root_context,
-                         TimePointProvider now)
+                         TimePointProvider now, bool dynamic_move_overhead)
     : limits_(std::move(limits)), root_context_(root_context), now_(std::move(now)) {
     started_ns_.store(now_nanoseconds(), std::memory_order_relaxed);
-    initialize(side_to_move, speed_percent, move_overhead_ms, slow_mover_percent);
+    initialize(side_to_move, speed_percent, move_overhead_ms, slow_mover_percent,
+               dynamic_move_overhead);
 }
 
 void TimeManager::reconfigure(const SearchLimits& limits, Color side_to_move,
                               std::uint8_t speed_percent, std::uint32_t move_overhead_ms,
                               std::uint32_t slow_mover_percent,
-                              const RootTimingContext& root_context) {
+                              const RootTimingContext& root_context,
+                              bool dynamic_move_overhead) {
     limits_ = limits;
     root_context_ = root_context;
     started_ns_.store(now_nanoseconds(), std::memory_order_relaxed);
-    initialize(side_to_move, speed_percent, move_overhead_ms, slow_mover_percent);
+    initialize(side_to_move, speed_percent, move_overhead_ms, slow_mover_percent,
+               dynamic_move_overhead);
 }
 
 void TimeManager::initialize(Color side_to_move, std::uint8_t speed_percent,
-                             std::uint32_t move_overhead_ms, std::uint32_t slow_mover_percent) {
+                             std::uint32_t move_overhead_ms, std::uint32_t slow_mover_percent,
+                             bool dynamic_move_overhead) {
+    dynamic_move_overhead_ = dynamic_move_overhead;
     budget_ms_.store(-1, std::memory_order_relaxed);
     unbounded_.store(limits_.infinite || limits_.ponder, std::memory_order_relaxed);
     has_node_limit_.store(limits_.nodes.has_value(), std::memory_order_relaxed);
@@ -158,6 +164,8 @@ void TimeManager::initialize(Color side_to_move, std::uint8_t speed_percent,
         timing_.usable = movetime_budget;
         timing_.soft_budget = movetime_budget;
         timing_.hard_budget = movetime_budget;
+        timing_.overhead = std::chrono::milliseconds{
+            static_cast<std::chrono::milliseconds::rep>(move_overhead_ms)};
         return;
     }
 
@@ -169,10 +177,20 @@ void TimeManager::initialize(Color side_to_move, std::uint8_t speed_percent,
 
     clock_mode_ = true;
     const auto remaining = std::max(clock->remaining, std::chrono::milliseconds::zero());
+    std::uint32_t effective_overhead_ms = move_overhead_ms;
+    if (dynamic_move_overhead_) {
+        // Derive the overhead from the time control: 2% of the remaining clock,
+        // floored at 10 ms and capped at 100 ms.  Bullet keeps a small margin,
+        // longer controls get a larger safety buffer.
+        const std::int64_t derived =
+            std::clamp<std::int64_t>(remaining.count() / 50, 10, 100);
+        effective_overhead_ms = static_cast<std::uint32_t>(derived);
+    }
     const auto overhead = std::chrono::milliseconds{
         static_cast<std::chrono::milliseconds::rep>(std::min<std::uint64_t>(
-            move_overhead_ms, static_cast<std::uint64_t>(
+            effective_overhead_ms, static_cast<std::uint64_t>(
                 std::numeric_limits<std::chrono::milliseconds::rep>::max())))};
+    timing_.overhead = overhead;
     // Horizon: how many moves this allocation plans for.  A GUI may send
     // `movestogo`, but lichess-bot and most GUIs do not, so the fallback decides
     // the pacing.  Sudden death needs a long horizon: planning to spend the whole
@@ -381,9 +399,14 @@ void TimeManager::observe_iteration(const SearchIterationObservation& observatio
 
 bool TimeManager::hard_extension_affordable() const noexcept {
     // A hard position may exceed the soft budget only while the clock still pays
-    // for four more hard moves. Without this taper an unstable sudden-death game
-    // spends the hard budget on every move and flags.
-    return timing_.usable >= scale_fraction(timing_.hard_budget, 4, 1);
+    // for four more hard moves.  Compare against the *remaining* usable clock:
+    // `timing_.usable` is fixed at construction and the flag-proof ceiling caps
+    // the hard budget at a quarter of it, so comparing the two made this guard
+    // always true and the low-clock taper never fired.
+    const auto elapsed = std::chrono::milliseconds{
+        (now_nanoseconds() - started_ns_.load(std::memory_order_relaxed)) / 1'000'000};
+    const auto remaining = nonnegative_difference(timing_.usable, elapsed);
+    return remaining >= scale_fraction(timing_.hard_budget, 4, 1);
 }
 
 bool TimeManager::should_stop_after_iteration() const noexcept {

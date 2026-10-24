@@ -63,6 +63,17 @@ void test_choose_cpu_variant_prefers_the_fastest_supported_sibling() {
     koi::test::require(choose_cpu_variant(false, false, true, true, automatic) ==
                            CpuVariant::generic,
                        "a host with neither extension must select the baseline build");
+    koi::test::require(choose_cpu_variant(true, true, true, true, automatic, false) ==
+                           CpuVariant::generic,
+                       "microcoded PEXT must keep the baseline build even when both "
+                       "optimized siblings exist");
+    koi::test::require(choose_cpu_variant(false, true, true, true, automatic, false) ==
+                           CpuVariant::generic,
+                       "microcoded PEXT must keep the baseline build even when AVX2 "
+                       "is supported");
+    koi::test::require(choose_cpu_variant(true, true, true, true, automatic, true) ==
+                           CpuVariant::avx512,
+                       "fast PEXT must preserve the fastest-sibling selection");
 }
 
 void test_choose_cpu_variant_honors_an_explicit_override() {

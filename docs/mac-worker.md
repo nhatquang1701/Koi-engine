@@ -25,7 +25,8 @@ Notes:
 
 - `KOI_BUILD_MODULES=OFF` — AppleClang cannot build the C++26 named modules.
 - `KOI_STATIC_RUNTIME=OFF` — the static runtime policy is Linux-only.
-- `KOI_ENABLE_GPU_NNUE=OFF` — GPU NNUE is CUDA-only and unavailable on macOS.
+- `KOI_ENABLE_GPU_NNUE=OFF` — GPU NNUE is experimental, off by default,
+  CUDA-only, and unavailable on macOS.
 - `-DPython3_FIND_FRAMEWORK=LAST` avoids picking the system Python framework.
 - After changing the compiler or flags, delete `build/release` before
   reconfiguring: CMake caches the compiler choice.

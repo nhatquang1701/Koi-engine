@@ -2059,6 +2059,28 @@ void test_v6_incremental_wide_accumulation_deltas() {
                               {"e2e4", "e7e5", "g1f3", "b8c6", "f1b5"}, weights);
 }
 
+void test_nnue_auto_discovery_prefers_bundled_layout() {
+    const std::filesystem::path base =
+        std::filesystem::path(KOI_TEST_DATA_DIR) / "nnue-discovery";
+    require(!koi::discover_nnue_network(base / "none").has_value(),
+            "an empty directory must not auto-discover a network");
+    require(koi::discover_nnue_network(base / "exact") == base / "exact" / "koi.nnue",
+            "koi.nnue beside the executable must be discovered");
+    require(koi::discover_nnue_network(base / "packaged") ==
+                base / "packaged" / "nnue" / "koi.nnue",
+            "the packaged nnue/koi.nnue layout must be discovered");
+    require(koi::discover_nnue_network(base / "single") ==
+                base / "single" / "only-network.nnue",
+            "a single *.nnue file must be discovered");
+    require(!koi::discover_nnue_network(base / "ambiguous").has_value(),
+            "two candidate networks must stay ambiguous instead of guessing");
+    require(koi::discover_nnue_network(base / "preference") ==
+                base / "preference" / "koi.nnue",
+            "the exact koi.nnue name must win over other networks");
+    require(!koi::discover_nnue_network({}).has_value(),
+            "an empty search directory must not discover anything");
+}
+
 } // namespace
 
 // Test-only seam: serialize a deterministic v4 fixture network and print the
@@ -2402,6 +2424,7 @@ int main(int argc, char** argv) {
         {"NNUE invalid fallback", test_invalid_in_memory_network_uses_the_classical_fallback},
         {"NNUE one-shot stateless", test_one_shot_evaluation_matches_stateless_inference},
         {"external NNUE container", test_external_v2_container},
+        {"NNUE auto discovery", test_nnue_auto_discovery_prefers_bundled_layout},
     };
     return koi::test::run_tests(tests, argc, argv);
 }

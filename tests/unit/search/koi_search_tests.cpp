@@ -5054,6 +5054,36 @@ void test_start_position_completes_depth_seven_within_the_extension_budget() {
 #endif
 }
 
+void test_contempt_biases_draw_scores_against_the_root_side() {
+    // A dead-position draw must be worth -Contempt to the root side and
+    // +Contempt to its opponent, so the search only settles for a draw when
+    // every alternative is worse.  Zero keeps the historical neutral value.
+    koi::ClassicalEvaluator evaluator;
+    koi::SearchLimits limits;
+    limits.depth = 1;
+    const std::array<const char*, 2> fixtures{
+        "7k/8/6K1/8/8/8/8/8 w - - 0 1", "7k/8/6K1/8/8/8/8/8 b - - 0 1"};
+    for (const int contempt : {0, 50}) {
+        for (const char* fen : fixtures) {
+            koi::GameState state = require_state(fen);
+            require(state.draw_status() == koi::DrawStatus::dead_position,
+                    "the contempt fixture must be an automatic dead-position draw");
+            koi::TimeManager manager(limits, state.side_to_move());
+            koi::TranspositionTable table(1);
+            std::atomic_bool stop_requested = false;
+            koi::detail::SearchContext context(
+                evaluator, table, manager, stop_requested, nullptr, nullptr, nullptr, true, {}, {},
+                koi::Color::white, contempt);
+            context.begin_iteration(nullptr);
+            const int score = context.quiescence(
+                state, -koi::detail::kInfinity, koi::detail::kInfinity, 0);
+            const int expected = state.side_to_move() == koi::Color::white ? -contempt : contempt;
+            require(score == expected,
+                    "a dead-position draw must carry the root-relative contempt bias: got " +
+                        std::to_string(score) + " expected " + std::to_string(expected));
+        }
+    }
+}
 int main(int argc, char** argv) {
     const std::vector<koi::test::TestCase> tests{
         {"classical evaluator", test_evaluator_returns_material_and_pst_from_requested_perspective},
@@ -5194,6 +5224,7 @@ int main(int argc, char** argv) {
         {"qsearch exact TT cutoff ordering", test_qsearch_exact_tt_cutoff_precedes_tactical_move_generation},
         {"qsearch lower TT cutoff window", test_qsearch_lower_tt_cutoff_is_limited_to_null_windows},
         {"qsearch TT terminal precedence", test_qsearch_tt_cutoffs_preserve_forced_draw_and_checkmate_precedence},
+        {"contempt draw bias", test_contempt_biases_draw_scores_against_the_root_side},
         {"checked quiescence cap", test_quiescence_keeps_searching_checked_evasions_past_normal_cap},
         {"poisoned capture quiescence", test_quiescence_rejects_the_poisoned_knight_capture_at_shallow_depth},
         {"bounded quiescence checks", test_quiescence_keeps_bounded_checking_continuations},

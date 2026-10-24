@@ -1899,12 +1899,14 @@ public:
                 std::atomic_bool& stop_requested, std::mutex* evaluator_mutex,
                 bool use_transposition_table,
                 SearchOptions::QuietHistorySideHook quiet_history_side_hook,
-                TablebaseSearchBinding tablebase_binding = {})
+                TablebaseSearchBinding tablebase_binding = {},
+                Color root_color = Color::white, int contempt_cp = 0)
         : root_(root), root_moves_(std::move(root_moves)), evaluator_(evaluator), table_(table),
           time_manager_(time_manager), stop_requested_(stop_requested),
           evaluator_mutex_(evaluator_mutex), use_transposition_table_(use_transposition_table),
           quiet_history_side_hook_(std::move(quiet_history_side_hook)),
-          tablebase_binding_(std::move(tablebase_binding)),
+          tablebase_binding_(std::move(tablebase_binding)), root_color_(root_color),
+          contempt_cp_(contempt_cp),
           helper_stats_(std::max<std::size_t>(1, helper_count)) {
         helpers_.reserve(helper_stats_.size());
         try {
@@ -2043,7 +2045,8 @@ private:
         GameState state = root_;
         auto context_storage = std::make_unique<SearchContext>(
             evaluator_, table_, time_manager_, stop_requested_, nullptr, evaluator_mutex_,
-            &root_moves_, use_transposition_table_, quiet_history_side_hook_, tablebase_binding_);
+            &root_moves_, use_transposition_table_, quiet_history_side_hook_, tablebase_binding_,
+            root_color_, contempt_cp_);
         SearchContext& context = *context_storage;
         int depth = 1 + static_cast<int>(helper_index % 3);
         while (!stopping_.load(std::memory_order_relaxed) &&
@@ -2073,6 +2076,8 @@ private:
     bool use_transposition_table_ = true;
     SearchOptions::QuietHistorySideHook quiet_history_side_hook_;
     TablebaseSearchBinding tablebase_binding_;
+    Color root_color_ = Color::white;
+    int contempt_cp_ = 0;
     std::vector<WorkerThread> helpers_;
     std::vector<SearchStats> helper_stats_;
     std::atomic<int> main_depth_{1};
@@ -2095,12 +2100,14 @@ public:
                    std::atomic<std::uint64_t>* global_nodes, std::mutex* evaluator_mutex,
                    bool use_transposition_table,
                    SearchOptions::QuietHistorySideHook quiet_history_side_hook = {},
-                   TablebaseSearchBinding tablebase_binding = {})
+                   TablebaseSearchBinding tablebase_binding = {},
+                   Color root_color = Color::white, int contempt_cp = 0)
         : worker_count_(std::max<std::size_t>(1, worker_count)), evaluator_(evaluator), table_(table),
           time_manager_(time_manager), stop_requested_(stop_requested), global_nodes_(global_nodes),
           evaluator_mutex_(evaluator_mutex), use_transposition_table_(use_transposition_table),
           quiet_history_side_hook_(std::move(quiet_history_side_hook)),
-          tablebase_binding_(std::move(tablebase_binding)), worker_stats_(worker_count_),
+          tablebase_binding_(std::move(tablebase_binding)), root_color_(root_color),
+          contempt_cp_(contempt_cp), worker_stats_(worker_count_),
           live_visited_(worker_count_) {
         workers_.reserve(worker_count_);
         try {
@@ -2266,7 +2273,7 @@ private:
         auto context_storage = std::make_unique<SearchContext>(
             evaluator_, table_, time_manager_, stop_requested_, global_nodes_,
             evaluator_mutex_, nullptr, use_transposition_table_, quiet_history_side_hook_,
-            tablebase_binding_);
+            tablebase_binding_, root_color_, contempt_cp_);
         SearchContext& context = *context_storage;
         std::uint64_t seen_sequence = 0;
 
@@ -2543,6 +2550,8 @@ private:
     bool use_transposition_table_;
     SearchOptions::QuietHistorySideHook quiet_history_side_hook_;
     TablebaseSearchBinding tablebase_binding_;
+    Color root_color_ = Color::white;
+    int contempt_cp_ = 0;
     std::vector<WorkerThread> workers_;
     std::vector<SearchStats> worker_stats_;
     // Per-worker visited-node high-water marks, cumulative across jobs. Each
@@ -2754,7 +2763,7 @@ void SearchRunner::run() {
         table_access.new_generation();
         TimeManager time_manager(limits, root.side_to_move(), options.speed_percent,
                                  options.move_overhead_ms, options.slow_mover_percent,
-                                 timing_context);
+                                 timing_context, {}, options.dynamic_move_overhead);
         const FallbackControl fallback_control{&time_manager, &session->stop_requested()};
         result.timing = time_manager.diagnostics();
         result.best_move = legal_moves.empty() ? std::nullopt :
@@ -2805,11 +2814,12 @@ void SearchRunner::run() {
             tablebase_binding.probe_hook = options.tablebase_probe_hook;
         }
         const auto normalize_root_fallback_score =
-            [root_is_claimable_draw, root_is_forced_draw](const int score) {
+            [root_is_claimable_draw, root_is_forced_draw,
+             contempt = options.contempt_cp](const int score) {
                 if (root_is_forced_draw) {
-                    return 0;
+                    return -contempt;
                 }
-                return root_is_claimable_draw ? std::max(0, score) : score;
+                return root_is_claimable_draw ? std::max(-contempt, score) : score;
             };
         std::optional<SyzygyRootResult> tablebase_result;
         // SyzygyProbeDepth is a minimum search depth.  A declared depth limit is
@@ -2897,7 +2907,8 @@ void SearchRunner::run() {
             lazy_pool = std::make_unique<LazySmpPool>(
                 options.threads - 1, root, legal_moves, *evaluator, *table, time_manager,
                 session->stop_requested(), evaluator_mutex_ptr, true,
-                options.quiet_history_side_hook, tablebase_binding);
+                options.quiet_history_side_hook, tablebase_binding, root.side_to_move(),
+                options.contempt_cp);
         }
 
         if (legal_moves.empty()) {
@@ -2923,7 +2934,8 @@ void SearchRunner::run() {
             auto context_storage = std::make_unique<SearchContext>(
                 *evaluator, *table, time_manager, session->stop_requested(),
                 nullptr, evaluator_mutex_ptr, &legal_moves, true,
-                options.quiet_history_side_hook, tablebase_binding);
+                options.quiet_history_side_hook, tablebase_binding, root.side_to_move(),
+                options.contempt_cp);
             SearchContext& context = *context_storage;
             // The loop below records the depth and principal variation being
             // searched so interim publications can report the in-flight
@@ -3014,7 +3026,7 @@ void SearchRunner::run() {
                     limits = std::move(*conversion);
                     time_manager.reconfigure(limits, root.side_to_move(), options.speed_percent,
                                              options.move_overhead_ms, options.slow_mover_percent,
-                                             timing_context);
+                                             timing_context, options.dynamic_move_overhead);
                     maximum_depth = std::min(
                         kMaximumSearchDepth,
                         std::max(1, limits.depth.value_or(kMaximumSearchDepth)));
@@ -3023,7 +3035,7 @@ void SearchRunner::run() {
                 if (!unbounded && depth > maximum_depth) {
                     break;
                 }
-                if (!unbounded && !time_manager.should_start_next_iteration(previous_iteration_elapsed)) {
+                if (!unbounded && !time_manager.should_start_next_iteration(previous_iteration_elapsed * 2)) {
                     break;
                 }
                 if (context.interrupted()) {
@@ -4226,12 +4238,14 @@ void SearchRunner::run() {
             const bool multi_pv = options.multi_pv > 1;
             RootWorkerPool pool(worker_count, *evaluator, *table, time_manager,
                                 session->stop_requested(), global_nodes_ptr, evaluator_mutex_ptr, true,
-                                options.quiet_history_side_hook, tablebase_binding);
+                                options.quiet_history_side_hook, tablebase_binding,
+                                root.side_to_move(), options.contempt_cp);
             SearchStats total_stats;
             auto root_context_storage = std::make_unique<SearchContext>(
                 *evaluator, *table, time_manager, session->stop_requested(),
                 global_nodes_ptr, evaluator_mutex_ptr, nullptr, true,
-                options.quiet_history_side_hook, tablebase_binding);
+                options.quiet_history_side_hook, tablebase_binding, root.side_to_move(),
+                options.contempt_cp);
             SearchContext& root_context = *root_context_storage;
             // The loop below records the depth being searched so interim
             // publications can report the in-flight iteration.
@@ -4315,7 +4329,7 @@ void SearchRunner::run() {
                     limits = std::move(*conversion);
                     time_manager.reconfigure(limits, root.side_to_move(), options.speed_percent,
                                              options.move_overhead_ms, options.slow_mover_percent,
-                                             timing_context);
+                                             timing_context, options.dynamic_move_overhead);
                     maximum_depth = std::min(
                         kMaximumSearchDepth,
                         std::max(1, limits.depth.value_or(kMaximumSearchDepth)));
@@ -4324,7 +4338,7 @@ void SearchRunner::run() {
                 if (!unbounded && depth > maximum_depth) {
                     break;
                 }
-                if (!unbounded && !time_manager.should_start_next_iteration(previous_iteration_elapsed)) {
+                if (!unbounded && !time_manager.should_start_next_iteration(previous_iteration_elapsed * 2)) {
                     break;
                 }
                 if (session->stop_requested().load(std::memory_order_relaxed) ||

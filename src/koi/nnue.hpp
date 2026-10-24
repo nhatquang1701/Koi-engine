@@ -236,6 +236,11 @@ private:
                              std::size_t slot);
 
     std::shared_ptr<const NnueNetwork> weights_;
+    // Manifest and tensor validation is immutable per worker: the network is
+    // shared read-only, so evaluate()/make/unmake must not re-validate it on
+    // every call (the checks used to run per evaluation and per incremental
+    // hook).  Computed once in the constructor.
+    bool network_usable_ = false;
     NnueAccumulator accumulator_;
 
     std::size_t hidden_units_ = 0;
@@ -299,5 +304,13 @@ struct EvaluatorSelection {
 
 [[nodiscard]] EvaluatorSelection make_evaluator(
     std::optional<std::filesystem::path> nnue_path = std::nullopt);
+
+// Boot-time NNUE auto-discovery in one directory.  Order: `koi.nnue`, then
+// `nnue/koi.nnue` (the packaged layout), then a single `*.nnue` file in the
+// directory or in its `nnue/` subdirectory.  Ambiguous matches and empty
+// directories return nullopt.  `KOI_NNUE_PATH` (explicit) is handled by main and
+// wins; `KOI_NNUE_AUTODETECT=0` disables this scan.
+[[nodiscard]] std::optional<std::filesystem::path> discover_nnue_network(
+    const std::filesystem::path& directory);
 
 } // namespace koi

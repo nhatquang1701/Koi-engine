@@ -222,7 +222,8 @@ std::string_view cpu_variant_executable_name(CpuVariant variant) noexcept {
 
 CpuVariant choose_cpu_variant(bool avx512_supported, bool avx2_supported,
                               bool avx512_available, bool avx2_available,
-                              std::optional<CpuVariant> forced) noexcept {
+                              std::optional<CpuVariant> forced,
+                              bool fast_pext) noexcept {
     if (forced.has_value()) {
         switch (*forced) {
         case CpuVariant::generic:
@@ -239,10 +240,13 @@ CpuVariant choose_cpu_variant(bool avx512_supported, bool avx2_supported,
             break;
         }
     }
-    if (avx512_supported && avx512_available) {
+    // Both optimized siblings use _pext_u64 in the attack-table build.  On a
+    // host where PEXT is microcoded (pre-Zen3 AMD) the baseline build is
+    // faster, so require fast PEXT before auto-selecting an optimized sibling.
+    if (avx512_supported && avx512_available && fast_pext) {
         return CpuVariant::avx512;
     }
-    if (avx2_supported && avx2_available) {
+    if (avx2_supported && avx2_available && fast_pext) {
         return CpuVariant::avx2;
     }
     return CpuVariant::generic;
@@ -270,7 +274,8 @@ int run_cpu_selector() noexcept {
         exists_error);
 
     const CpuVariant chosen = choose_cpu_variant(cpu_supports_avx512(), cpu_supports_avx2(),
-                                                 avx512_available, avx2_available, forced);
+                                                 avx512_available, avx2_available, forced,
+                                                 cpu_supports_fast_pext());
     if (chosen == CpuVariant::generic) {
         return -1;
     }

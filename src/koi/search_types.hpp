@@ -66,6 +66,8 @@ struct SearchIterationObservation {
 
 struct TimeManagementStats {
     std::chrono::milliseconds reserve{0};
+    // Overhead actually applied to this allocation (diagnostics and tests).
+    std::chrono::milliseconds overhead{0};
     std::chrono::milliseconds usable{0};
     std::chrono::milliseconds soft_budget{0};
     std::chrono::milliseconds hard_budget{0};
@@ -287,6 +289,14 @@ struct SearchOptions {
     bool show_wdl = false;
     std::uint32_t move_overhead_ms = 30;
     std::uint32_t slow_mover_percent = 100;
+    // Derive the per-move overhead from the time control instead of using the
+    // fixed Move Overhead value (2% of the remaining clock, 10..100 ms).
+    bool dynamic_move_overhead = false;
+    // Centipawns added against drawing: a draw scores -contempt for the root
+    // side and +contempt for its opponent, so the engine only settles for a
+    // draw when every alternative is worse.  0 keeps the historical neutral
+    // draw value used by matches and analysis.
+    int contempt_cp = 0;
     bool limit_strength = false;
     std::uint32_t elo = 1320;
     std::uint32_t random_seed = 0;

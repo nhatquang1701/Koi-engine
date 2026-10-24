@@ -163,7 +163,7 @@ $engineName = "koi-engine$binarySuffix"
 $avx2Name = "koi-engine-avx2$binarySuffix"
 $avx512Name = "koi-engine-avx512$binarySuffix"
 $nnueParagraph = if ($nnueIncluded) {
-    "This package includes Koi's gated NNUE network at nnue/koi.nnue (its SHA-256 is in nnue/koi.nnue.sha256). Set EvalFile to that path to use it; the classical evaluator remains the fallback."
+    "This package includes Koi's gated NNUE network at nnue/koi.nnue (its SHA-256 is in nnue/koi.nnue.sha256). The engine discovers it automatically at startup; set EvalFile only to override it. The classical evaluator remains the fallback."
 } else {
     ''
 }
@@ -183,12 +183,12 @@ KOI_CPU_VARIANT=generic, avx2, or avx512 to force one build.
 "@
 }
 $hardwareParagraph = if ($isMacOSHost) {
-    'The optional GPU NNUE inference is CUDA-only and is not available on macOS.'
+    'GPU NNUE inference is experimental, disabled by default, scheduled for removal, and CUDA-only; it is not available on macOS.'
 } else {
 @"
 Every build requires an x86-64 CPU. The AVX2 build requires AVX2 and the
 AVX-512 build requires AVX-512; the baseline build has no instruction-set
-requirement. The optional GPU NNUE inference needs an NVIDIA GPU (Pascal
+requirement. The experimental GPU NNUE inference (off by default) needs an NVIDIA GPU (Pascal
 sm_61 or newer) with a CUDA 12.x-capable driver and is opt-in with
 KOI_GPU_NNUE=1.
 "@
@@ -229,12 +229,17 @@ if ($sourceCommit -notmatch '^[0-9a-f]{40,64}$') {
 if ($sourceCommit -notmatch '^[0-9a-f]{40,64}$') {
     throw 'Release packaging requires a source commit; set GITHUB_SHA or run from a Git checkout.'
 }
-$statusOutput = @(& git -C $repositoryRoot status --porcelain --untracked-files=all 2>$null)
+# Disable autocrlf for the dirty probe: a CRLF worktree must not be reported as
+# dirty when the index stores LF (the 1.1.4 Docker packaging hit exactly this).
+$statusOutput = @(& git -c core.autocrlf=false -C $repositoryRoot status --porcelain --untracked-files=all 2>$null)
 $gitStatusExitCode = $LASTEXITCODE
 if ($gitStatusExitCode -ne 0) {
     throw 'Unable to determine whether the source checkout is dirty.'
 }
 $sourceDirty = $statusOutput.Count -gt 0
+if ($sourceDirty) {
+    Write-Output "source_dirty=true first_offender=$($statusOutput[0])"
+}
 $packageFiles = @(Get-ChildItem -LiteralPath $packageDirectory -File -Recurse |
     Where-Object { $_.FullName -ne (Join-Path $packageDirectory 'package.json') } |
     Sort-Object { $_.FullName.Substring($packageDirectory.Length + 1).Replace('\', '/') } |

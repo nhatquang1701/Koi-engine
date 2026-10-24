@@ -31,7 +31,8 @@ namespace koi::gpu {
 namespace {
 
 std::atomic<int> g_threaded_searches{0};
-std::atomic<GpuNnueMode> g_requested_mode{GpuNnueMode::automatic};
+// Experimental GPU inference is off by default and scheduled for removal.
+std::atomic<GpuNnueMode> g_requested_mode{GpuNnueMode::disabled};
 
 // 0 = not probed yet, 1 = no override, 2 = disabled, 3 = require.
 std::atomic<int> g_env_override{0};

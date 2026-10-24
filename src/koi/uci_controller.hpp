@@ -112,7 +112,9 @@ private:
     std::uint8_t speed_percent_ = 100;
     bool show_wdl_ = false;
     std::uint32_t move_overhead_ms_ = 30;
+    bool dynamic_overhead_ = false;
     std::uint32_t slow_mover_percent_ = 100;
+    std::uint32_t contempt_cp_ = 0;
     bool strength_mode_ = false;
     bool debug_enabled_ = false;
     bool analyse_mode_ = false;

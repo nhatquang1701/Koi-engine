@@ -29,6 +29,15 @@
 #define KOI_NNUE_COMPILED_AVX2 0
 #endif
 
+// NEON CReLU clamp for arm64 (Apple Silicon, ARM Linux).  The arithmetic is
+// identical to the scalar loop; only the packing is vectorised.
+#if (defined(__ARM_NEON) || defined(__ARM_NEON__)) && (defined(__aarch64__) || defined(__arm__))
+#include <arm_neon.h>
+#define KOI_NNUE_COMPILED_NEON 1
+#else
+#define KOI_NNUE_COMPILED_NEON 0
+#endif
+
 namespace koi {
 namespace {
 
@@ -716,8 +725,67 @@ void accumulate_hidden_sparse_avx2(const NnueNetwork& network,
     }
 }
 
+#if KOI_NNUE_COMPILED_AVX2
+// Vectorised CReLU clamp for the v4 finish path: clamp int32 sums to [0,127]
+// and narrow to int16.  The arithmetic is identical to the scalar loop; only
+// the packing order needs a lane fix-up.
+void fill_v4_activations_avx2(std::span<const std::int32_t> hidden_sums,
+                              std::span<std::int16_t> values) noexcept {
+    std::size_t hidden = 0;
+    const __m256i zero = _mm256_setzero_si256();
+    const __m256i maximum = _mm256_set1_epi32(kKoiNnueClippedReluMaximum);
+    for (; hidden + 16U <= hidden_sums.size(); hidden += 16U) {
+        __m256i low = _mm256_loadu_si256(
+            reinterpret_cast<const __m256i*>(hidden_sums.data() + hidden));
+        __m256i high = _mm256_loadu_si256(
+            reinterpret_cast<const __m256i*>(hidden_sums.data() + hidden + 8U));
+        low = _mm256_min_epi32(_mm256_max_epi32(low, zero), maximum);
+        high = _mm256_min_epi32(_mm256_max_epi32(high, zero), maximum);
+        __m256i packed = _mm256_packs_epi32(low, high);
+        // packs_epi32 keeps 128-bit lane order: [a0..a3,b0..b3|a4..a7,b4..b7].
+        packed = _mm256_permute4x64_epi64(packed, _MM_SHUFFLE(3, 1, 2, 0));
+        _mm256_storeu_si256(reinterpret_cast<__m256i*>(values.data() + hidden), packed);
+    }
+    for (; hidden < hidden_sums.size(); ++hidden) {
+        values[hidden] = static_cast<std::int16_t>(std::clamp<std::int32_t>(
+            hidden_sums[hidden], 0, kKoiNnueClippedReluMaximum));
+    }
+}
+#endif
+
+#if KOI_NNUE_COMPILED_NEON
+void fill_v4_activations_neon(std::span<const std::int32_t> hidden_sums,
+                              std::span<std::int16_t> values) noexcept {
+    std::size_t hidden = 0;
+    const int32x4_t zero = vdupq_n_s32(0);
+    const int32x4_t maximum = vdupq_n_s32(kKoiNnueClippedReluMaximum);
+    for (; hidden + 8U <= hidden_sums.size(); hidden += 8U) {
+        int32x4_t low = vld1q_s32(hidden_sums.data() + hidden);
+        int32x4_t high = vld1q_s32(hidden_sums.data() + hidden + 4U);
+        low = vminq_s32(vmaxq_s32(low, zero), maximum);
+        high = vminq_s32(vmaxq_s32(high, zero), maximum);
+        const int16x8_t packed = vcombine_s16(vqmovn_s32(low), vqmovn_s32(high));
+        vst1q_s16(values.data() + hidden, packed);
+    }
+    for (; hidden < hidden_sums.size(); ++hidden) {
+        values[hidden] = static_cast<std::int16_t>(std::clamp<std::int32_t>(
+            hidden_sums[hidden], 0, kKoiNnueClippedReluMaximum));
+    }
+}
+#endif
+
 void fill_v4_activations(std::span<const std::int32_t> hidden_sums,
                          NnueAccumulator& accumulator) noexcept {
+#if KOI_NNUE_COMPILED_NEON
+    fill_v4_activations_neon(hidden_sums, accumulator.values);
+    return;
+#endif
+#if KOI_NNUE_COMPILED_AVX2
+    if (avx2_available()) {
+        fill_v4_activations_avx2(hidden_sums, accumulator.values);
+        return;
+    }
+#endif
     for (std::size_t hidden = 0; hidden < hidden_sums.size(); ++hidden) {
         accumulator.values[hidden] = static_cast<std::int16_t>(std::clamp<std::int32_t>(
             hidden_sums[hidden], 0, kKoiNnueClippedReluMaximum));
@@ -1689,8 +1757,9 @@ std::expected<NnueNetwork, NnueError> NnueLoader::load_file(const std::filesyste
 
 NnueWorker::NnueWorker(std::shared_ptr<const NnueNetwork> weights)
     : weights_(std::move(weights)) {
-    if (weights_ && !validate_manifest(weights_->manifest).has_value() &&
-        arrays_match_manifest(*weights_)) {
+    network_usable_ = weights_ && !validate_manifest(weights_->manifest).has_value() &&
+        arrays_match_manifest(*weights_);
+    if (network_usable_) {
         const std::size_t hidden_units = weights_->manifest.layer_sizes[1];
         const bool threat = uses_halfka_threat_features(weights_->manifest);
         const bool halfka_v4 = is_halfka_king_bucket_v1(weights_->manifest);
@@ -1702,8 +1771,7 @@ NnueWorker::NnueWorker(std::shared_ptr<const NnueNetwork> weights)
 
 int NnueWorker::evaluate(const EvaluationFeatures& features, const Color perspective,
                          const NnueInferencePath path) {
-    if (!weights_ || validate_manifest(weights_->manifest).has_value() ||
-        !arrays_match_manifest(*weights_)) {
+    if (!network_usable_) {
         return 0;
     }
     const bool use_halfka = is_halfka_king_bucket_v1(weights_->manifest);
@@ -1843,11 +1911,9 @@ int NnueWorker::evaluate(const GameState& state, const Color perspective,
 }
 
 bool NnueWorker::supports_incremental() const noexcept {
-    return weights_ &&
+    return network_usable_ &&
         (is_halfka_king_bucket_v1(weights_->manifest) ||
-         uses_halfka_threat_features(weights_->manifest)) &&
-        !validate_manifest(weights_->manifest).has_value() &&
-        arrays_match_manifest(*weights_);
+         uses_halfka_threat_features(weights_->manifest));
 }
 
 void NnueWorker::ensure_incremental_storage() {
@@ -2279,6 +2345,51 @@ std::shared_ptr<const Evaluator> maybe_wrap_gpu_nnue(
                                 "this build has no GPU NNUE kernel");
 #endif
     return cpu_evaluator;
+}
+
+std::optional<std::filesystem::path> discover_nnue_network(
+    const std::filesystem::path& directory) {
+    if (directory.empty()) {
+        return std::nullopt;
+    }
+    if (const char* disabled = std::getenv("KOI_NNUE_AUTODETECT");
+        disabled != nullptr && *disabled != '\0' && std::string_view(disabled) == "0") {
+        return std::nullopt;
+    }
+    const auto regular_file = [](const std::filesystem::path& path) {
+        std::error_code error;
+        const bool file = std::filesystem::is_regular_file(path, error);
+        return file && !error;
+    };
+    const std::filesystem::path nnue_directory = directory / "nnue";
+    const std::array<std::filesystem::path, 2> preferred{
+        directory / "koi.nnue", nnue_directory / "koi.nnue"};
+    for (const std::filesystem::path& candidate : preferred) {
+        if (regular_file(candidate)) {
+            return candidate;
+        }
+    }
+    const auto single_network = [&regular_file](const std::filesystem::path& search)
+        -> std::optional<std::filesystem::path> {
+        std::error_code error;
+        std::optional<std::filesystem::path> found;
+        for (std::filesystem::directory_iterator it(search, error), end;
+             !error && it != end; it.increment(error)) {
+            const std::filesystem::path& path = it->path();
+            if (path.extension() != ".nnue" || !regular_file(path)) {
+                continue;
+            }
+            if (found.has_value()) {
+                return std::nullopt;  // ambiguous: never guess between networks
+            }
+            found = path;
+        }
+        return found;
+    };
+    if (auto found = single_network(directory)) {
+        return found;
+    }
+    return single_network(nnue_directory);
 }
 
 EvaluatorSelection make_evaluator(std::optional<std::filesystem::path> nnue_path) {

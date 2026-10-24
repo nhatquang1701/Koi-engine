@@ -118,7 +118,7 @@ int SearchContext::quiescence(GameState& state, int alpha, int beta, int ply,
             }
             const DrawStatus draw_status = state.draw_status();
             if (is_forced_draw_status(draw_status)) {
-                return 0;
+                return draw_value(state);
             }
             // There are legal moves, but the fixed stack boundary prevents
             // this qsearch node from examining its tactical frontier.
@@ -128,7 +128,7 @@ int SearchContext::quiescence(GameState& state, int alpha, int beta, int ply,
             }
             const int static_score = evaluate(state, state.side_to_move());
             return is_claimable_draw_status(draw_status) ?
-                std::max(0, static_score) : static_score;
+                std::max(draw_value(state), static_score) : static_score;
         }
         // Qsearch can be entered before regular negamax initializes the frame
         // at this ply, and its recursive children enter the same way.  Reset
@@ -189,7 +189,7 @@ int SearchContext::quiescence(GameState& state, int alpha, int beta, int ply,
             }
             const DrawStatus draw_status = state.draw_status();
             if (is_forced_draw_status(draw_status)) {
-                return 0;
+                return draw_value(state);
             }
             // A checked qsearch node with legal evasions has no stand-pat
             // fallback. Returning a neutral value at this hard safety
@@ -213,7 +213,7 @@ int SearchContext::quiescence(GameState& state, int alpha, int beta, int ply,
         // positions still need legal evasions first so checkmate keeps
         // precedence over automatic draw rules.
         if (!checked && is_forced_draw_status(draw_status)) {
-            return 0;
+            return draw_value(state);
         }
         const bool claimable_draw = is_claimable_draw_status(draw_status);
 
@@ -241,7 +241,7 @@ int SearchContext::quiescence(GameState& state, int alpha, int beta, int ply,
             }
         }
 
-        int best = claimable_draw ? 0 : -kInfinity;
+        int best = claimable_draw ? draw_value(state) : -kInfinity;
         const int original_alpha = alpha;
         bool best_lower_bound = false;
         bool unknown_selective_child = false;
@@ -261,7 +261,7 @@ int SearchContext::quiescence(GameState& state, int alpha, int beta, int ply,
             const int raw_eval = (tt_entry.has_value() && tt_entry->eval != kNoEvaluation) ?
                 tt_entry->eval : evaluate(state, state.side_to_move());
             qsearch_eval = raw_eval;
-            best = claimable_draw ? std::max(0, raw_eval) : raw_eval;
+            best = claimable_draw ? std::max(draw_value(state), raw_eval) : raw_eval;
             // Stand-pat is a legal null continuation in qsearch terms, so it
             // provides a safe lower bound for the tactical frontier.  This
             // direction remains useful to a parent even when later pruning
@@ -310,7 +310,7 @@ int SearchContext::quiescence(GameState& state, int alpha, int beta, int ply,
             return score;
         }
         if (is_forced_draw_status(draw_status)) {
-            return 0;
+            return draw_value(state);
         }
 
         // At this boundary the tactical generator deliberately stops probing
@@ -782,7 +782,7 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
         // a legal zero-valued option for the side to move, so the move loop
         // must still be allowed to discover a better continuation.
         if (is_forced_draw_status(draw_status)) {
-            return 0;
+            return draw_value(state);
         }
         if (excluded_search) {
             // MoveMetadataList is a fixed container; compact the excluded move
@@ -797,14 +797,14 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
             moves.resize(write_index);
         }
         if (moves.empty()) {
-            return claimable_draw ? 0 :
+            return claimable_draw ? draw_value(state) :
                 (excluded_search ? alpha : terminal_score(state, moves.size(), ply));
         }
         if (claimable_draw) {
             // A claim is an available floor, not a forced terminal result.
             // Raise the lower edge before node-type selection so a null
             // window with beta <= 0 can use the claim as a valid cutoff.
-            alpha = std::max(alpha, 0);
+            alpha = std::max(alpha, draw_value(state));
             if (alpha >= beta) {
                 path_selective_bound = true;
                 path_lower_bound = true;
@@ -1252,7 +1252,8 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
             excluded_search, repetition_sensitive);
         if (!claimable_draw && probcut.eligible && cut_node && !repetition_sensitive &&
             !pawn_endgame &&
-            !(tt_entry.has_value() && tt_entry->score < probcut.beta)) {
+            !(tt_entry.has_value() && tt_entry->depth >= probcut.depth &&
+              tt_entry->score < probcut.beta)) {
             MoveMetadataList probcut_moves;
             for (const MoveMetadata& candidate : moves) {
                 if ((candidate.is_capture() || candidate.move.promotion() != Promotion::none) &&
@@ -1421,7 +1422,7 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
         // A claimable draw is an implicit zero-valued option for the side to
         // move. Keep it as the initial floor while still searching every
         // legal move for a positive continuation.
-        int best_score = claimable_draw ? 0 : -kInfinity;
+        int best_score = claimable_draw ? draw_value(state) : -kInfinity;
         bool best_score_safe_lower_bound = claimable_draw;
         Move best_move = Move::no_move();
         int move_number = 0;
@@ -1787,8 +1788,11 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
             const bool reduced = lmr_decision.reduced;
             const int reduction = lmr_decision.reduction;
             const int extension_depth = singular_extension + (quiet_forcing_extension ? 1 : 0);
-            const int authoritative_child_depth =
-                std::clamp(full_child_depth + extension_depth, 0, depth);
+            // Keep the documented +2/+3 singular-extension ladder; clamping at
+            // the parent depth silently truncated it to +1.
+            const int authoritative_child_depth = std::clamp(
+                full_child_depth + extension_depth, 0,
+                std::min(depth + 3, kMaximumSearchDepth - 1));
             const int child_depth = reduced ?
                 std::max(0, authoritative_child_depth - reduction) : authoritative_child_depth;
             const bool child_depth_reduced_by_extension = extension_depth < 0;
@@ -2083,7 +2087,7 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
             // move is below zero. Keep the UCI contract of returning a legal
             // move and choose the least-losing searched continuation as its
             // PV placeholder; the reported score remains the exact claim
-            // value of zero.
+            // value of the contempt draw bias.
             const RootMoveScore* fallback = &root_move_scores[0];
             for (std::size_t index = 1; index < root_move_score_count; ++index) {
                 if (root_move_scores[index].score > fallback->score) {
@@ -2267,7 +2271,7 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
                 return root_score.selective_upper_bound && incumbent_has_lower_bound &&
                     root_score.score <= incumbent_score;
             };
-            bool claim_option_authoritative = claimable_draw && best_score == 0 &&
+            bool claim_option_authoritative = claimable_draw && best_score == -contempt_cp &&
                 best_metadata_valid && complete_root_coverage;
             if (claim_option_authoritative) {
                 // With a claim available, zero is exact only when every root
@@ -2276,8 +2280,8 @@ int SearchContext::negamax(GameState& state, int depth, int alpha, int beta, int
                 // selective fail-high remains an unresolved challenger.
                 for (std::size_t index = 0; index < root_move_score_count; ++index) {
                     const RootMoveScore& root_score = root_move_scores[index];
-                    if (root_score.score > 0 ||
-                        !root_score_is_safe(root_score, 0, true)) {
+                    if (root_score.score > -contempt_cp ||
+                        !root_score_is_safe(root_score, -contempt_cp, true)) {
                         claim_option_authoritative = false;
                         break;
                     }

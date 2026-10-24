@@ -143,4 +143,60 @@ bool cpu_supports_avx512() noexcept {
 #endif
 }
 
+bool cpu_supports_fast_pext() noexcept {
+#if !KOI_CPU_ARCH_X86
+    return false;
+#elif defined(_MSC_VER)
+    int registers[4]{};
+    __cpuid(registers, 0);
+    const bool intel = registers[1] == 0x756E6547 && registers[2] == 0x49656E69 &&
+        registers[3] == 0x6C65746E;  // "GenuineIntel"
+    const bool amd = registers[1] == 0x68747541 && registers[2] == 0x69746E65 &&
+        registers[3] == 0x444D4163;  // "AuthenticAMD"
+    if (registers[0] < 7) {
+        return false;
+    }
+    __cpuidex(registers, 7, 0);
+    if ((registers[1] & (1 << 8)) == 0) {  // BMI2
+        return false;
+    }
+    __cpuid(registers, 1);
+    const unsigned base_family = (static_cast<unsigned>(registers[0]) >> 8U) & 0xFU;
+    const unsigned family = base_family == 0xFU ?
+        base_family + ((static_cast<unsigned>(registers[0]) >> 20U) & 0xFFU) : base_family;
+    if (intel) {
+        return true;
+    }
+    if (amd) {
+        return family >= 0x19U;  // Zen 3 and newer; Zen 1/2 are family 0x17
+    }
+    return false;
+#else
+    unsigned int eax = 0;
+    unsigned int ebx = 0;
+    unsigned int ecx = 0;
+    unsigned int edx = 0;
+    if (__get_cpuid_max(0, nullptr) < 7U) {
+        return false;
+    }
+    __cpuid(0U, eax, ebx, ecx, edx);
+    const bool intel = ebx == 0x756E6547 && edx == 0x49656E69 && ecx == 0x6C65746E;
+    const bool amd = ebx == 0x68747541 && edx == 0x69746E65 && ecx == 0x444D4163;
+    __cpuid_count(7U, 0U, eax, ebx, ecx, edx);
+    if ((ebx & (1U << 8)) == 0) {  // BMI2
+        return false;
+    }
+    __cpuid(1U, eax, ebx, ecx, edx);
+    const unsigned base_family = (eax >> 8U) & 0xFU;
+    const unsigned family = base_family == 0xFU ? base_family + ((eax >> 20U) & 0xFFU) : base_family;
+    if (intel) {
+        return true;
+    }
+    if (amd) {
+        return family >= 0x19U;
+    }
+    return false;
+#endif
+}
+
 } // namespace koi

@@ -100,11 +100,24 @@ int main(int argc, char* argv[]) {
     if (const char* environment_path = std::getenv("KOI_NNUE_PATH");
         environment_path != nullptr && *environment_path != '\0') {
         nnue_path = environment_path;
-    } else if (!engine_directory.empty()) {
-        const std::filesystem::path candidate = engine_directory / "koi.nnue";
-        std::error_code exists_error;
-        if (std::filesystem::exists(candidate, exists_error) && !exists_error) {
-            nnue_path = candidate;
+    } else {
+        // Auto-discovery: packaged `nnue/koi.nnue`, `koi.nnue` beside the binary,
+        // or a single `*.nnue` in either place.  Falls back to the working
+        // directory for development runs.  KOI_NNUE_AUTODETECT=0 disables it and
+        // `EvalFile` still overrides the boot-time choice at runtime.
+        if (auto discovered = koi::discover_nnue_network(engine_directory);
+            discovered.has_value()) {
+            nnue_path = *discovered;
+        } else {
+            std::error_code working_error;
+            const std::filesystem::path working_directory =
+                std::filesystem::current_path(working_error);
+            if (!working_error && working_directory != engine_directory) {
+                if (auto discovered = koi::discover_nnue_network(working_directory);
+                    discovered.has_value()) {
+                    nnue_path = *discovered;
+                }
+            }
         }
     }
     // Evaluator selection must never abort the process: a rejected network
